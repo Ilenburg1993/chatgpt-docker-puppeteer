@@ -30,6 +30,7 @@ import {
     cmdCount as _cmdCount,
     cmdDbHistory as _cmdDbHistory,
     cmdDbSessions as _cmdDbSessions,
+    cmdDiagnose as _cmdDiagnose,
     cmdForget as _cmdForget,
     cmdGh as _cmdGh,
     cmdGit as _cmdGit,
@@ -47,6 +48,7 @@ import {
 } from './commands/index.js';
 import { ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
+import { clearRateLimiters } from './rate-limiter-state.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ const BANNER = `
  */
 const CMD_ROUTES = [
     [['status'], (ctx) => _cmdStatus({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println })],
+    [['diagnose', 'diag'], (ctx) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println })],
     [['history'], (_, arg) => _cmdHistory({ println }, Number(arg) || 10)],
     [
         ['db-history'],
@@ -109,6 +112,7 @@ const CMD_ROUTES = [
     [['answer'], (_, arg) => _cmdAnswer({ println }, arg)],
     [['count'], (ctx) => _cmdCount({ hubSessionId: ctx.hubSessionId, println })],
     [['restart'], () => _cmdRestart()],
+    [['emergency-reset', 'ereset'], () => _cmdEmergencyReset()],
     [['model'], (_, arg) => _cmdModel({ println }, arg)],
     [['reasoning'], (_, arg) => _cmdReasoning({ println }, arg)],
     [['attach'], (_, arg) => _cmdAttach({ println }, arg)],
@@ -161,6 +165,15 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
 }
 
 // ─── Handlers standalone de comandos inline ───────────────────────────────────
+
+/** F16.2 — Limpa rate limiters e reinicia dialog loop (útil após throttling acidental). */
+async function _cmdEmergencyReset() {
+    println('\x1b[33m  [emergency-reset] Limpando rate limiters…\x1b[0m');
+    clearRateLimiters();
+    println('\x1b[33m  [emergency-reset] Reiniciando dialog loop…\x1b[0m');
+    await _cmdRestart();
+    println('\x1b[32m  [emergency-reset] OK — rate limiters limpos e loop reiniciado.\x1b[0m');
+}
 
 async function _cmdRestart() {
     println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');

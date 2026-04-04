@@ -16,6 +16,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { wrapWithStats } from '#copilot/observability/tool-stats';
 import { buildCustomTools } from '../config/tools/registry.js';
 import { registerTools } from '../lib/tools-registry.js';
 import {
@@ -96,8 +97,11 @@ export function bootstrapTools(registry, mcpTools) {
 
     const allTools = [...TOOL_GROUPS.flatMap(([t]) => t), ...mcpTools, ...customTools];
 
+    // F7.3: instrumentar todas as tools com wrapWithStats para capturar latência e erros automaticamente
+    const instrumentedTools = allTools.map(wrapWithStats);
+
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
-    registerForIntrospection(allTools);
+    registerForIntrospection(instrumentedTools);
 
     // Detecta colisões de nome entre tools. Cada tool com sobreposição potencial com built-ins do CLI
     // deve declarar `overridesBuiltInTool` explicitamente; não forçar globalmente para não mascarar conflitos.
@@ -123,5 +127,5 @@ export function bootstrapTools(registry, mcpTools) {
     const summary = [...categoryCount.entries()].map(([cat, n]) => `${cat}:${n}`).join(', ');
     log('INFO', `[tools-bootstrap] Bootstrap concluído: ${allTools.length} tools registradas (${summary})`);
 
-    return allTools;
+    return instrumentedTools;
 }

@@ -350,3 +350,72 @@ export function createTask(store, opts) {
     }
     return { task };
 }
+
+// ---------------------------------------------------------------------------
+// F7.1 — TTL e cleanup automático de tarefas antigas
+// ---------------------------------------------------------------------------
+
+/** Dias máximos de retenção para tarefas concluídas/canceladas (default: 7). */
+export const TODO_MAX_AGE_DAYS = 7;
+
+/**
+ * Remove tarefas com status `done` ou `cancelled` cujo campo `completedAt` seja mais antigo que `maxAgeDays`. Limpa
+ * também referências em `subtaskIds` de tarefas pai que continuam ativas.
+ *
+ * @param {number} [maxAgeDays] - Limite de retenção em dias (default: {@link TODO_MAX_AGE_DAYS})
+ * @returns {Promise<number>} Quantidade de tarefas removidas
+ */
+export async function cleanupExpiredTasks(maxAgeDays = TODO_MAX_AGE_DAYS) {
+    return withStore((store) => {
+        const cutoffTs = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+        /** @type {Set<string>} */
+        const removed = new Set();
+
+        for (const [id, task] of Object.entries(store.tasks)) {
+            const expired =
+                (task.status === 'done' || task.status === 'cancelled') &&
+                task.completedAt != null &&
+                task.completedAt < cutoffTs;
+            if (expired) removed.add(id);
+        }
+
+        if (removed.size === 0) return 0;
+
+        // Remove as tarefas expiradas
+        for (const id of removed) {
+            delete store.tasks[id];
+        }
+
+        // Limpa referências em subtaskIds de tarefas que ainda existem
+        for (const task of Object.values(store.tasks)) {
+            if (task.subtaskIds.some((id) => removed.has(id))) {
+                task.subtaskIds = task.subtaskIds.filter((id) => !removed.has(id));
+            }
+        }
+
+        log('INFO', `[todo/store] cleanup: ${removed.size} tarefa(s) expirada(s) removida(s) (>${maxAgeDays}d).`);
+        return removed.size;
+    });
+}
+
+/**
+ * Agenda cleanup periódico de tarefas antigas. Seguro para chamar múltiplas vezes (idempotente via flag). Executa
+ * imediatamente na primeira chamada, depois a cada `intervalMs` milissegundos.
+ *
+ * @param {{ intervalMs?: number; maxAgeDays?: number }} [opts]
+ * @returns {NodeJS.Timeout} Timer retornado por setInterval (use clearInterval para cancelar)
+ */
+export function startTodoCleanupJob(opts = {}) {
+    const { intervalMs = 24 * 60 * 60 * 1000, maxAgeDays = TODO_MAX_AGE_DAYS } = opts;
+
+    // Executa imediatamente (assíncrono, sem bloquear)
+    cleanupExpiredTasks(maxAgeDays).catch((/** @type {Error} */ e) =>
+        log('WARN', `[todo/store] cleanup inicial falhou: ${e.message}`),
+    );
+
+    return setInterval(() => {
+        cleanupExpiredTasks(maxAgeDays).catch((/** @type {Error} */ e) =>
+            log('WARN', `[todo/store] cleanup periódico falhou: ${e.message}`),
+        );
+    }, intervalMs);
+}

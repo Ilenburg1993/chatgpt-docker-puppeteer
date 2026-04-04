@@ -75,6 +75,25 @@ export class ConversationHub {
         log('INFO', '[ConversationHub] Ambiente permanente LLM-A ↔ LLM-B ↔ Usuário inicializado.');
     }
 
+    /**
+     * Inicializa o hub em modo standalone (sem Socket.io, sem NERV). Indicado para o terminal LLM-B rodando de forma
+     * isolada, sem o main server. Ativa o ConversationStore e o HubOrchestrator — persistência e eventos funcionam
+     * normalmente; broadcast Socket.io é simplesmente omitido.
+     *
+     * É idempotente: se `init()` ou `initStandalone()` já foram chamados, é no-op.
+     *
+     * @returns {void}
+     */
+    initStandalone() {
+        if (this.#initialized) return;
+
+        conversationStore.init();
+        this.#orchestrator = new HubOrchestrator(conversationStore);
+        this.#orchestrator.init();
+        this.#initialized = true;
+        log('INFO', '[ConversationHub] Modo standalone ativo (sem Socket.io/NERV).');
+    }
+
     // ─── Acesso ao orquestrador ────────────────────────────────────────────────
 
     /**

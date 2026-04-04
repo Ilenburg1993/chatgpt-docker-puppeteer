@@ -101,7 +101,12 @@ export function readState() {
         _stateCache = /** @type {AliveAgentState} */ (parsed);
         return _stateCache;
     } catch (/** @type {any} */ e) {
-        log('WARN', `[PersistentSession] Falha ao ler estado: ${e.message}`);
+        log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
+        try {
+            rmSync(STATE_FILE, { force: true });
+        } catch {
+            // Ignorar falha de remoção — próxima leitura retornará null via existsSync
+        }
         return null;
     }
 }

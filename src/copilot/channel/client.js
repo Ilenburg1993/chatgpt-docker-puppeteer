@@ -118,6 +118,8 @@ function requireAgent() {
  * @property {number} [timeoutMs] - Timeout em ms (default: 60000)
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
+ * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
+ * @property {number} [retryDelayMs] - F11.4: delay base entre tentativas em ms (default: 1500; cresce 2× a cada retry)
  */
 
 // ─── Implementação ────────────────────────────────────────────────────────────
@@ -165,6 +167,41 @@ export class LlmBridgeClient {
      * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
      */
     async chat(message, opts = {}) {
+        const { onDelta, onQuestion, timeoutMs = 60_000, attachments, retries = 0, retryDelayMs = 1_500 } = opts;
+
+        // F11.4: wrapper de retry — tenta no máximo `retries+1` vezes em erros de timeout ou busy
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                return await this.#chatOnce(message, { onDelta, onQuestion, timeoutMs, attachments });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                const isRetryable = msg.includes('Timeout') || msg.includes('busy') || msg.includes('ECONNRESET');
+                if (isRetryable && attempt < retries) {
+                    const waitMs = retryDelayMs * Math.pow(2, attempt);
+                    log('DEBUG', `[LlmBridgeClient] chat() retry ${attempt + 1}/${retries} após ${waitMs}ms: ${msg}`);
+                    await new Promise((r) => setTimeout(r, waitMs));
+                    continue;
+                }
+                throw err;
+            }
+        }
+        // Nunca alcançado (loop sempre re-throw na última iteração), mas satisfaz o tipo
+        throw new Error('[LlmBridgeClient] Falha inesperada após retries');
+    }
+
+    /**
+     * Envia uma mensagem ao LLM-B e aguarda a resposta completa (implementação interna sem retry).
+     *
+     * @param {string} message
+     * @param {{
+     *     onDelta?: ChatOptions['onDelta'];
+     *     onQuestion?: ChatOptions['onQuestion'];
+     *     timeoutMs?: number;
+     *     attachments?: ChatOptions['attachments'];
+     * }} opts
+     * @returns {Promise<ChatResult>}
+     */
+    async #chatOnce(message, opts = {}) {
         const { onDelta, onQuestion, timeoutMs = 60_000, attachments } = opts;
         const startedAt = Date.now();
 
@@ -314,9 +351,35 @@ export class LlmBridgeClient {
         const serialized = serializeStructuredMessage(msg);
         const chatResult = await this.chat(serialized, chatOpts);
 
-        const structured = parseStructuredResponse(chatResult.response);
+        let structured = parseStructuredResponse(chatResult.response);
 
-        // BUG-04 (fix): popular parseError quando a resposta não é um StructuredMessage válido
+        // F11.5: segunda tentativa quando resposta não é estruturada em sessões novas
+        if (chatResult.response && !structured) {
+            log(
+                'DEBUG',
+                '[LlmBridgeClient] chatStructured: resposta não-estruturada — tentando novamente com instrução explícita.',
+            );
+            const retryPrompt =
+                `Por favor responda APENAS com JSON válido no formato StructuredMessage.\n` +
+                `Não inclua texto, markdown ou explicações fora do JSON.\n` +
+                `Minha mensagem anterior foi:\n${serialized}`;
+            const retryResult = await this.chat(retryPrompt, chatOpts);
+            const retryStructured = parseStructuredResponse(retryResult.response);
+            if (retryStructured) {
+                log('INFO', '[LlmBridgeClient] chatStructured: segunda tentativa bem-sucedida.');
+                structured = retryStructured;
+                // Atualiza resultado com dados da segunda tentativa
+                Object.assign(chatResult, {
+                    response: retryResult.response,
+                    responseLen: retryResult.responseLen,
+                    durationMs: chatResult.durationMs + retryResult.durationMs,
+                    chunks: [...chatResult.chunks, ...retryResult.chunks],
+                    taskId: retryResult.taskId,
+                });
+            }
+        }
+
+        // BUG-04 (fix): popular parseError quando a resposta não é um StructuredMessage válido após ambas as tentativas
         /** @type {Error | undefined} */
         let parseError;
         if (chatResult.response && !structured) {
@@ -516,10 +579,14 @@ export class LlmBridgeClient {
      *
      * F6.9 (UPG-05): implementação cursor-based — navega do fim para o início sem criar arrays intermediários.
      *
+     * F12.4: Opção `summarize: true` retorna versão compacta de cada turno (primeiros 200 chars), para uso em prompts
+     * onde tokens são escassos.
+     *
      * @param {number} [pairs=5] - Número máximo de pares a retornar. Default is `5`
+     * @param {{ summarize?: boolean }} [opts]
      * @returns {ReadonlyArray<ConversationTurn>} Slice imutável dos últimos N pares
      */
-    getLastNPairs(pairs = 5) {
+    getLastNPairs(pairs = 5, opts = {}) {
         const hist = /** @type {ConversationTurn[]} */ (this.#history);
         /** @type {{ user: ConversationTurn; assistant: ConversationTurn }[]} */
         const collected = [];
@@ -537,11 +604,21 @@ export class LlmBridgeClient {
             }
             i--;
         }
-        if (!collected.length) return /** @type {ReadonlyArray<ConversationTurn>} */ (hist.slice(-pairs * 2));
-        // Achata pares em array plano [user, assistant, user, assistant, ...]
-        return /** @type {ReadonlyArray<ConversationTurn>} */ (
-            collected.flatMap(({ user, assistant }) => [user, assistant])
-        );
+        /** @type {ConversationTurn[]} */
+        let result;
+        if (!collected.length) {
+            result = /** @type {ConversationTurn[]} */ (hist.slice(-pairs * 2));
+        } else {
+            result = collected.flatMap(({ user, assistant }) => [user, assistant]);
+        }
+        // F12.4: modo compacto — truncar conteúdo a 200 chars para economia de tokens
+        if (opts.summarize) {
+            result = result.map((t) => ({
+                ...t,
+                content: t.content.length > 200 ? t.content.slice(0, 200) + '…' : t.content,
+            }));
+        }
+        return /** @type {ReadonlyArray<ConversationTurn>} */ (result);
     }
 
     /**
@@ -567,11 +644,25 @@ export class LlmBridgeClient {
      * Adiciona um turno ao histórico local sem enviar ao modelo (seed manual). Útil para inicializar contexto após
      * resetar histórico via clearHistory().
      *
+     * F12.2: Valida que o role não cria sequência inválida (dois turnos idênticos seguidos), com exceção de 'system'
+     * que pode aparecer a qualquer momento.
+     *
      * @param {'user' | 'assistant' | 'system'} role - Papel do turno
      * @param {string} content - Conteúdo do turno
      * @returns {void}
      */
     seedHistory(role, content) {
+        // F12.2: validação de alternância (não bloqueia 'system' que não faz parte da sequência chat)
+        if (role !== 'system' && this.#history.length > 0) {
+            const last = this.#history[this.#history.length - 1];
+            if (last && last.role === role) {
+                log(
+                    'WARN',
+                    `[LlmBridgeClient] seedHistory: sequência inválida — dois turnos '${role}' consecutivos. ` +
+                        `Isso pode confundir o modelo. Considere alternar user/assistant.`,
+                );
+            }
+        }
         this.#pushHistory({ role, content, timestamp: Date.now() });
     }
 
@@ -583,9 +674,18 @@ export class LlmBridgeClient {
      */
     #pushHistory(turn) {
         this.#history.push(turn);
-        if (this.#history.length > this.#maxHistorySize) {
+        // F12.1: aviso proativo antes do auto-trim (ao atingir 80% da capacidade)
+        const len = this.#history.length;
+        if (len === Math.floor(this.#maxHistorySize * 0.8)) {
+            log(
+                'WARN',
+                `[LlmBridgeClient] Histórico em ${len}/${this.#maxHistorySize} entradas (80%) — ` +
+                    `próximas adições vão acionar auto-trim.`,
+            );
+        }
+        if (len > this.#maxHistorySize) {
             // ARCH-07 (fix): emitir warning explícito ao truncar histórico em vez de silenciar
-            const removed = this.#history.length - this.#maxHistorySize;
+            const removed = len - this.#maxHistorySize;
             this.#history.splice(0, removed);
             log(
                 'WARN',

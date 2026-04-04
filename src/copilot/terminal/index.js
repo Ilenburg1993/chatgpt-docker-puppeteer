@@ -22,14 +22,45 @@ import { resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { configureHookTools, setHub, setPermissionAgent } from '../agent/tools-bootstrap.js';
 import { loadAliases } from '../bridges/alias-store.js';
+import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { llmBridgeClient, setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files-loader.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
+import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
+
+/**
+ * F10.3: Imprime o banner de diagnóstico do modo de operação (standalone vs. conectado ao server).
+ *
+ * Útil para o usuário do terminal saber quais recursos estão disponíveis.
+ *
+ * @returns {void}
+ */
+function printStandaloneBanner() {
+    const mcp = getMcpStatus();
+    const isStandalone = !mcp.available;
+    const lines = [
+        '',
+        '┌─────────────────────────────────────────────────────────────┐',
+        '│  Terminal Permanente LLM-B                                  │',
+        isStandalone
+            ? '│  Modo: STANDALONE  (server 3008 não detectado)              │'
+            : `│  Modo: CONECTADO   (MCP: ${String(mcp.toolCount).padEnd(2)} tools via :3008)              │`,
+        '│  Inject server: http://localhost:3009                       │',
+        '│  Comandos: /help  /status  /skills  /ask                   │',
+        '└─────────────────────────────────────────────────────────────┘',
+        '',
+    ];
+    for (const line of lines) println(line);
+    if (isStandalone) {
+        println('  ⚠  MCP tools indisponíveis — tools locais ativas. Inicie src/server para habilitar.');
+        println('');
+    }
+}
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;
@@ -153,6 +184,10 @@ function registerAgentEventListeners() {
     alwaysAliveAgent.on(
         'ready',
         async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
+            // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
+            if (!evt.reconected) {
+                printStandaloneBanner();
+            }
             const _hubSessionId = getHubSessionId();
             if (!_hubSessionId || !evt.reconected) return;
             try {
@@ -262,15 +297,31 @@ export async function startTerminalServer() {
     await pinnedLoader.start().catch((/** @type {any} */ e) => {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
-    pinnedLoader.on('changed', () => {
-        log('INFO', '[TerminalServer] PinnedFilesLoader: arquivos de contexto atualizados.');
+    pinnedLoader.on('changed', (/** @type {{ file: string; type: string }} */ evt) => {
+        // F13.5: hot-reload de skills/instruções sem reiniciar o agente.
+        // buildHookSystemContext() já lê do disco a cada chamada (sem cache), então a próxima
+        // sessão ou turno que chamar initOrResumeSession receberá automaticamente o conteúdo atualizado.
+        // Aqui apenas emitimos o evento SSE para que LLM-A (e dashboards) sejam notificados.
+        const updatedAt = new Date().toISOString();
+        const fileCount = pinnedLoader.getFiles().length;
+        log(
+            'WARN',
+            `[TerminalServer] Skills/instruções atualizadas — hot-reload ativo (${fileCount} arquivo(s), trigger: ${evt?.file ?? 'unknown'})`,
+        );
+        broadcastSse('skills.reloaded', {
+            updatedAt,
+            fileCount,
+            trigger: evt?.file ?? null,
+            type: evt?.type ?? 'change',
+            note: 'Context refreshed. Next session turn will use updated skills/instructions.',
+        });
     });
 
     const injectServer = createInjectServer();
 
     // Criar hub_session permanente (best-effort)
     try {
-        conversationHub.store.init();
+        conversationHub.initStandalone();
         const hubSessionId = conversationHub.store.createHubSession({
             title: 'Terminal Permanente LLM-B',
             metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
@@ -284,6 +335,9 @@ export async function startTerminalServer() {
     registerAgentEventListeners();
     startReflectionLoop();
 
+    // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
+    startTodoCleanupJob();
+
     // T-21: graceful shutdown handlers para SIGTERM/SIGINT
     const _onShutdown = () => {
         log('INFO', '[TerminalServer] Sinal de encerramento recebido — cleanup...');
@@ -294,6 +348,26 @@ export async function startTerminalServer() {
     };
     process.once('SIGTERM', _onShutdown);
     process.once('SIGINT', _onShutdown);
+
+    // T-22: SIGHUP é enviado pelo VS Code quando o painel do terminal é fechado.
+    // Ignorar para manter o inject server HTTP ativo mesmo após o painel ser fechado.
+    process.on('SIGHUP', () => {
+        log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
+    });
+
+    // F13.2: emitir evento terminal.started com snapshot de boot para monitoramento
+    broadcastSse('terminal.started', {
+        timestamp: Date.now(),
+        operationMode: (() => {
+            const s = getMcpStatus();
+            return s.available && s.toolCount > 0 && !s.circuitOpen ? 'connected' : 'standalone';
+        })(),
+        mcpToolCount: getMcpStatus().toolCount,
+        hubSessionId: getHubSessionId(),
+        dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+        model: alwaysAliveAgent.model,
+    });
+    log('INFO', '[TerminalServer] terminal.started emitido.');
 
     await startRepl(injectServer);
 }

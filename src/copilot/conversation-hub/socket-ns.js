@@ -424,7 +424,7 @@ export function unmountCopilotNamespace() {
  */
 export function broadcastToSession(hubSessionId, event, payload) {
     if (!copilotNamespace) {
-        log('WARN', `[socket-ns/copilot] Namespace não montado. Broadcast '${event}' ignorado.`);
+        log('DEBUG', `[socket-ns/copilot] Namespace não montado. Broadcast '${event}' ignorado.`);
         return;
     }
     copilotNamespace.to(hubSessionId).emit(event, payload);

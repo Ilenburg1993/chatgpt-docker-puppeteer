@@ -220,6 +220,45 @@ export class ConversationStore {
     }
 
     /**
+     * F12.3: Persiste métricas de qualidade ao fechar uma sessão.
+     *
+     * Armazena no campo `metadata` da hub_session um objeto `_metrics` com totais de turnos, duração média por turno,
+     * taxa de respostas estruturadas e timestamp de fechamento. Não sobrescreve campos existentes em `metadata` — faz
+     * um merge superficial.
+     *
+     * @param {string} hubSessionId
+     * @param {{
+     *     totalTurns: number;
+     *     avgTurnDurationMs: number;
+     *     structuredResponseRate: number;
+     *     closedAt?: number;
+     * }} metrics
+     * @returns {void}
+     */
+    recordHubSessionMetrics(hubSessionId, metrics) {
+        const db = this.#getDb();
+        const row = db.prepare('SELECT metadata FROM copilot_hub_sessions WHERE id = ?').get(hubSessionId);
+        if (!row) return;
+        /** @type {Record<string, unknown>} */
+        let existing = {};
+        try {
+            existing = JSON.parse(/** @type {any} */ (row).metadata ?? '{}') ?? {};
+        } catch {
+            /* parse falhou — começa com objeto vazio */
+        }
+        const merged = {
+            ...existing,
+            _metrics: { ...metrics, closedAt: metrics.closedAt ?? Date.now() },
+        };
+        db.prepare(`UPDATE copilot_hub_sessions SET metadata = ?, updated_at = ? WHERE id = ?`).run(
+            JSON.stringify(merged),
+            Date.now(),
+            hubSessionId,
+        );
+        log('DEBUG', `[ConversationStore] Métricas persistidas para sessão ${hubSessionId}`);
+    }
+
+    /**
      * Lista hub_sessions (paginado, mais recentes primeiro).
      *
      * @param {{ limit?: number; offset?: number; status?: HubSessionStatus }} [opts]

@@ -26,7 +26,6 @@ export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
 export { tryReconnect } from './reconnect-policy.js';
 export { wireSessionEvents } from './session-event-wirer.js';
-export { createSessionHooks } from './session-hooks.js';
 export {
     buildHookSystemContext,
     buildHookSystemContextSafe,

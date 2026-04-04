@@ -77,7 +77,14 @@ export class PinnedFilesLoader extends EventEmitter {
         this.#started = true;
 
         await Promise.all(this.#dirs.map((dir) => this.#loadDir(dir)));
-        this.#startWatchers();
+        // F10.5: #startWatchers já silencia erros individuais via watcher.on('error'); o try/catch
+        // aqui garante que falhas globais (ex: fs.watch não disponível) não bloqueiam o boot.
+        try {
+            this.#startWatchers();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            log('WARN', `[PinnedFilesLoader] Watchers não iniciados (continuando sem hot-reload): ${msg}`);
+        }
         log(
             'INFO',
             `[PinnedFilesLoader] Pronto — ${this.#files.size} arquivo(s) carregado(s) de ${this.#dirs.length} dir(s)`,

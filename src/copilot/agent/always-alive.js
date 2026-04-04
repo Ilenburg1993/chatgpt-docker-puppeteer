@@ -35,7 +35,7 @@ import {
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
-import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
+import { buildMcpTools, startMcpAutoReconnect } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
@@ -238,6 +238,13 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /** @type {import('#copilot/lib/tools-registry').ToolRegistry} */
     #toolsRegistry = createRegistry();
+
+    /**
+     * F9.2: Cancela o job de auto-reconnect ao MCP. null quando não está rodando.
+     *
+     * @type {(() => void) | null}
+     */
+    #mcpReconnectCancel = null;
 
     /**
      * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
@@ -466,6 +473,13 @@ export class AlwaysAliveAgent extends EventEmitter {
                 }, metricsMs);
                 this.#metricsTimer.unref();
             }
+
+            // F9.2: iniciar auto-reconnect periódico ao MCP Tool Registry
+            // Intervalo configurável via AGENT_MCP_RECONNECT_MS (padrão: 5 min)
+            const mcpReconnectMs = Number(process.env['AGENT_MCP_RECONNECT_MS']) || 5 * 60_000;
+            this.#mcpReconnectCancel = startMcpAutoReconnect((tools) => {
+                this.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });
+            }, mcpReconnectMs);
         } catch (/** @type {any} */ e) {
             this.#setStatus('stopped');
             log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
@@ -537,6 +551,11 @@ export class AlwaysAliveAgent extends EventEmitter {
         if (this.#metricsTimer) {
             clearInterval(this.#metricsTimer);
             this.#metricsTimer = null;
+        }
+        // F9.2: cancelar job de auto-reconnect MCP
+        if (this.#mcpReconnectCancel) {
+            this.#mcpReconnectCancel();
+            this.#mcpReconnectCancel = null;
         }
         // Fase CB: parar snapshot periódico de métricas — sem isso, em ciclos stop→start
         // múltiplos snapshots rodam em paralelo, causando escrita concorrente em metrics.jsonl

@@ -11,6 +11,7 @@
 import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { sendTurn } from './dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './file-context.js';
+import { recordInjectHistory } from './state.js';
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
 
@@ -204,11 +205,28 @@ export async function handleInject(body) {
     const t0 = Date.now();
     try {
         const reply = await sendTurn(enrichedMessage, from);
+        const durationMs = Date.now() - t0;
+        recordInjectHistory({
+            ts: t0,
+            from,
+            message: message.slice(0, 200),
+            replySnippet: reply ? reply.slice(0, 200) : null,
+            durationMs,
+            ok: reply !== null,
+        });
         return {
             status: reply !== null ? 200 : 409,
-            body: { ok: reply !== null, reply: reply ?? null, durationMs: Date.now() - t0, from },
+            body: { ok: reply !== null, reply: reply ?? null, durationMs, from },
         };
     } catch (/** @type {any} */ e) {
+        recordInjectHistory({
+            ts: t0,
+            from,
+            message: message.slice(0, 200),
+            replySnippet: null,
+            durationMs: Date.now() - t0,
+            ok: false,
+        });
         return { status: 500, body: { ok: false, error: e.message } };
     }
 }

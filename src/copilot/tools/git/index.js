@@ -226,6 +226,37 @@ const gitLogTool = defineTool('git_log', {
 });
 
 /**
+ * Tool: git_current_branch — retorna o nome do branch atual.
+ */
+const gitCurrentBranchTool = defineTool('git_current_branch', {
+    description:
+        'Retorna o nome do branch Git atual. Útil para confirmar em qual branch está antes de commitar ou pushar.',
+    handler: async () => {
+        const r = await safeGitArgs(['rev-parse', '--abbrev-ref', 'HEAD']);
+        return { branch: r.stdout.trim(), error: r.error };
+    },
+});
+
+/**
+ * Tool: git_is_dirty — verifica se há arquivos modificados não commitados.
+ */
+const gitIsDirtyTool = defineTool('git_is_dirty', {
+    description:
+        'Verifica se o repositório tem mudanças não commitadas (working tree sujo). Retorna isDirty=true se há arquivos modificados, staged ou untracked.',
+    handler: async () => {
+        const r = await safeGitArgs(['status', '--porcelain']);
+        const isDirty = r.stdout.trim().length > 0;
+        const lines = r.stdout.trim() ? r.stdout.trim().split('\n') : [];
+        return {
+            isDirty,
+            changedFiles: lines.length,
+            summary: isDirty ? `${lines.length} arquivo(s) modificado(s)` : 'working tree limpa',
+            error: r.error,
+        };
+    },
+});
+
+/**
  * @type {import('@github/copilot-sdk').Tool[]}
  */
 export const gitTools = [
@@ -236,4 +267,6 @@ export const gitTools = [
     gitPushTool,
     gitCreateBranchTool,
     withSkipPermission(gitLogTool),
+    withSkipPermission(gitCurrentBranchTool),
+    withSkipPermission(gitIsDirtyTool),
 ];

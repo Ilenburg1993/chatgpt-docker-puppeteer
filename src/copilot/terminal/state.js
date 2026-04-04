@@ -161,3 +161,45 @@ export function getPlanMode() {
 export function setPlanMode(value) {
     _planMode = value;
 }
+
+// ─── Inject history (F16.3) ──────────────────────────────────────────────────
+
+const MAX_INJECT_HISTORY = Number(process.env['TERMINAL_MAX_INJECT_HISTORY'] ?? '100');
+
+/**
+ * @typedef {{
+ *     ts: number;
+ *     from: string;
+ *     message: string;
+ *     replySnippet: string | null;
+ *     durationMs: number;
+ *     ok: boolean;
+ * }} InjectHistoryEntry
+ */
+
+/** @type {InjectHistoryEntry[]} */
+let _injectHistory = [];
+
+/**
+ * Registra uma injeção no histórico circular (máx `TERMINAL_MAX_INJECT_HISTORY`).
+ *
+ * @param {InjectHistoryEntry} entry
+ * @returns {void}
+ */
+export function recordInjectHistory(entry) {
+    _injectHistory.push(entry);
+    if (_injectHistory.length > MAX_INJECT_HISTORY) {
+        _injectHistory = _injectHistory.slice(-MAX_INJECT_HISTORY);
+    }
+}
+
+/**
+ * Retorna as últimas `n` entradas do histórico.
+ *
+ * @param {number} [n=50] Default is `50`
+ * @returns {InjectHistoryEntry[]}
+ */
+export function getInjectHistory(n = 50) {
+    const limit = Math.min(Math.max(1, n), MAX_INJECT_HISTORY);
+    return _injectHistory.slice(-limit);
+}

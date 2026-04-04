@@ -39,9 +39,12 @@
 import { log } from '#copilot/observability/logger';
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
+import https from 'node:https';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
+import { defaultAuditLog } from '../observability/audit-log.js';
 import { println } from './dialog.js';
 import { handleMetrics } from './http-handlers.js';
+import { registerClearRateLimiters } from './rate-limiter-state.js';
 import { matchRoute } from './route-table.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
 
@@ -61,7 +64,7 @@ const INJECT_PORT = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
  *
  * @param {number} max - Máximo de requisições permitidas por janela
  * @param {number} windowMs - Duração da janela em ms
- * @returns {{ check: (key: string) => { allowed: boolean; remaining: number; resetIn: number } }}
+ * @returns {{ check: (key: string) => { allowed: boolean; remaining: number; resetIn: number }; clear: () => void }}
  */
 function createRateLimiter(max, windowMs) {
     /** @type {Map<string, { count: number; resetAt: number }>} */
@@ -84,6 +87,9 @@ function createRateLimiter(max, windowMs) {
                 remaining: Math.max(0, max - bucket.count),
                 resetIn: Math.ceil((bucket.resetAt - now) / 1000),
             };
+        },
+        clear() {
+            store.clear();
         },
     };
 }
@@ -121,6 +127,14 @@ function checkWriteRate(ipEndpoint) {
 const SSE_RATE_MAX = Number(process.env['LLM_B_SSE_RATE_MAX'] ?? 10);
 const SSE_RATE_WINDOW_MS = Number(process.env['LLM_B_SSE_RATE_WINDOW_MS'] ?? 60_000);
 const _sseRateLimiter = createRateLimiter(SSE_RATE_MAX, SSE_RATE_WINDOW_MS);
+
+// F16.2 — registra função de limpeza para o módulo rate-limiter-state (sem circular dep)
+registerClearRateLimiters(() => {
+    _injectRateLimiter.clear();
+    _writeRateLimiter.clear();
+    _sseRateLimiter.clear();
+    log('INFO', '[TerminalServer] Rate limiters resetados por emergency-reset.');
+});
 
 /**
  * Verifica rate-limit para conexões SSE (/events, /events/critical) — janela e limite independentes dos endpoints de
@@ -195,6 +209,38 @@ function tryParseJson(raw) {
 // ─── Servidor HTTP ────────────────────────────────────────────────────────────
 
 /**
+ * F16.1 — Dispara o ready webhook (fire-and-forget) se `COPILOT_READY_WEBHOOK` estiver definido.
+ *
+ * @param {number} port - Porta em que o servidor está escutando
+ * @returns {void}
+ */
+function _fireReadyWebhook(port) {
+    const webhookUrl = process.env['COPILOT_READY_WEBHOOK'];
+    if (!webhookUrl) return;
+    try {
+        const parsed = new URL(webhookUrl);
+        const payload = JSON.stringify({ ok: true, port, ts: Date.now() });
+        const lib = parsed.protocol === 'https:' ? https : http;
+        const req = lib.request(
+            {
+                hostname: parsed.hostname,
+                port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+                path: parsed.pathname + parsed.search,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+            },
+            (res) => log('INFO', `[TerminalServer] Ready webhook respondeu: ${res.statusCode}`),
+        );
+        req.on('error', (e) => log('WARN', `[TerminalServer] Ready webhook erro: ${e.message}`));
+        req.setTimeout(5000, () => req.destroy());
+        req.write(payload);
+        req.end();
+    } catch (/** @type {any} */ e) {
+        log('WARN', `[TerminalServer] Ready webhook URL inválida: ${e?.message ?? e}`);
+    }
+}
+
+/**
  * Cria o servidor HTTP interno para injeção de mensagens de LLM-A e consulta de estado.
  *
  * @returns {http.Server} Servidor HTTP iniciado na porta `INJECT_PORT`
@@ -246,6 +292,11 @@ export function createInjectServer() {
                 const lengthMatch = authHeader.length === expected.length;
                 const tokenMatch = timingSafeEqual(providedBuf, expectedBuf) && lengthMatch;
                 if (!tokenMatch) {
+                    // F15.3: registrar falha de autenticação no audit log
+                    defaultAuditLog.record({
+                        type: 'auth.failure',
+                        data: { ip: req.socket?.remoteAddress ?? 'unknown', path: url.pathname, requestId },
+                    });
                     res.writeHead(401, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
                     return;
@@ -375,6 +426,7 @@ export function createInjectServer() {
     server.listen(INJECT_PORT, '127.0.0.1', () => {
         log('INFO', `[TerminalServer] Inject server ativo em http://127.0.0.1:${INJECT_PORT}`);
         println(`[inject] Servidor de injeção ativo em http://127.0.0.1:${INJECT_PORT}`);
+        _fireReadyWebhook(INJECT_PORT);
     });
 
     server.on('error', (/** @type {NodeJS.ErrnoException} */ e) => {

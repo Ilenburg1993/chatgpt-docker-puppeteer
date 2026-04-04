@@ -18,7 +18,9 @@
  * @module copilot/tools/shell-tools
  */
 
+import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
+import { recordToolCall } from '#copilot/observability/tool-stats';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile, spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -141,6 +143,23 @@ const ALLOWED_NPM_SCRIPTS = new Set(
         ];
     })(),
 );
+
+/**
+ * F15.1 — Allowlist de executáveis para `exec_command`. Configurada via `COPILOT_ALLOWED_EXECUTABLES` (lista separada
+ * por vírgula). Quando definida, apenas executáveis na lista passam — o blocklist permanece ativo. Quando não definida
+ * (padrão), qualquer executável não bloqueado é permitido.
+ *
+ * @type {Set<string> | null}
+ */
+const ALLOWED_EXECUTABLES = (() => {
+    const env = process.env['COPILOT_ALLOWED_EXECUTABLES'];
+    if (!env) return null;
+    const list = env
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+    return list.length > 0 ? new Set(list) : null;
+})();
 
 /**
  * BUG-H01 (fix): tokeniza um comando shell respeitando aspas simples e duplas. Exemplo: tokenizeShell('echo "hello
@@ -478,9 +497,36 @@ const execCommandTool = defineTool('exec_command', {
             return { success: false, error: 'Comando vazio.' };
         }
 
+        // F15.1: verificar allowlist de executáveis (quando COPILOT_ALLOWED_EXECUTABLES definido)
+        if (ALLOWED_EXECUTABLES && !ALLOWED_EXECUTABLES.has(executable.toLowerCase())) {
+            log(
+                'WARN',
+                `[ShellTools] exec_command bloqueado por allowlist: "${executable}" não está em COPILOT_ALLOWED_EXECUTABLES`,
+            );
+            return {
+                success: false,
+                error: `Executável "${executable}" não está na lista de permitidos (COPILOT_ALLOWED_EXECUTABLES).`,
+            };
+        }
+
+        const _auditId = `exec-${Date.now()}`;
+        defaultAuditLog.recordToolStart({
+            toolCallId: _auditId,
+            toolName: 'shell.exec_command',
+            args: { command: executable, cwd: cwdCheck.resolved },
+        });
         const result = await runProcess(executable, execArgs, {
             cwd: cwdCheck.resolved,
             timeoutMs,
+        });
+
+        // F6.4: registrar execução no audit de tools para observabilidade
+        recordToolCall('shell.exec_command', result.durationMs, result.exitCode === 0);
+        // F14.5: audit JSONL para rastreabilidade de shell execution
+        defaultAuditLog.recordToolComplete({
+            toolCallId: _auditId,
+            success: result.exitCode === 0,
+            resultContent: `exit ${result.exitCode}`,
         });
 
         return {
@@ -535,9 +581,24 @@ const runNpmScriptTool = defineTool('run_npm_script', {
         const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
         log('INFO', `[ShellTools] run_npm_script: npm run ${script} (timeout=${timeoutMs}ms)`);
 
+        const _npmAuditId = `npm-${Date.now()}`;
+        defaultAuditLog.recordToolStart({
+            toolCallId: _npmAuditId,
+            toolName: 'shell.run_npm_script',
+            args: { script },
+        });
         const result = await runProcess('npm', ['run', script], {
             cwd: WORKSPACE_ROOT,
             timeoutMs,
+        });
+
+        // F6.4: audit log de execução npm
+        recordToolCall('shell.run_npm_script', result.durationMs, result.exitCode === 0);
+        // F14.5: audit JSONL para rastreabilidade
+        defaultAuditLog.recordToolComplete({
+            toolCallId: _npmAuditId,
+            success: result.exitCode === 0,
+            resultContent: `exit ${result.exitCode}`,
         });
 
         return {
@@ -607,9 +668,24 @@ const runNodeFileTool = defineTool('run_node_file', {
         const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
         log('INFO', `[ShellTools] run_node_file: node ${resolved} (timeout=${timeoutMs}ms)`);
 
+        const _nodeAuditId = `node-${Date.now()}`;
+        defaultAuditLog.recordToolStart({
+            toolCallId: _nodeAuditId,
+            toolName: 'shell.run_node_file',
+            args: { filePath: resolved, args },
+        });
         const result = await runProcess('node', [resolved, ...args], {
             cwd: WORKSPACE_ROOT,
             timeoutMs,
+        });
+
+        // F6.4: audit log de execução node
+        recordToolCall('shell.run_node_file', result.durationMs, result.exitCode === 0);
+        // F14.5: audit JSONL para rastreabilidade
+        defaultAuditLog.recordToolComplete({
+            toolCallId: _nodeAuditId,
+            success: result.exitCode === 0,
+            resultContent: `exit ${result.exitCode}`,
         });
 
         return {

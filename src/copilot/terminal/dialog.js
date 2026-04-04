@@ -590,7 +590,8 @@ async function _executeTurn(message, actor) {
                 });
                 // FLOW-UPG-01: notificar Orchestrator para que LLM-A e listeners SSE vejam a
                 // mensagem do terminal. Usa turn_number do store para consistência de sequência.
-                try {
+                // Guard: hub inicializado via initStandalone() (standalone) ou init() (main-server).
+                if (conversationHub.isReady) {
                     const msgTurn = conversationHub.store.getTurn(msgTurnId);
                     const replyTurn = conversationHub.store.getTurn(replyTurnId);
                     conversationHub.notifyTerminalTurn(
@@ -607,11 +608,6 @@ async function _executeTurn(message, actor) {
                             turnNumber: replyTurn?.turn_number ?? 0,
                             durationMs,
                         },
-                    );
-                } catch (/** @type {any} */ notifyErr) {
-                    log(
-                        'WARN',
-                        `[TerminalServer] FLOW-01: notifyTerminalTurn falhou (não crítico): ${notifyErr.message}`,
                     );
                 }
                 emitNerv('copilot:turn:sent', {

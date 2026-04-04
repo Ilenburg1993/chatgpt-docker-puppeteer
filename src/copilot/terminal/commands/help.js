@@ -32,6 +32,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/count\x1b[0m                               — estatísticas da sessão
   \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
+  \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa rate limiters + reinicia loop
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
 
   \x1b[1mConfiguração do Modelo\x1b[0m

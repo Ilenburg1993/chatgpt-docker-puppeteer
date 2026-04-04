@@ -188,6 +188,19 @@ export function createAuditLog(opts = {}) {
      * @returns {void}
      */
     function record(entry) {
+        // F17.1 — dedup: ignora entradas com mesmo type + toolName em janela de 1s
+        const now = Date.now();
+        const last = _buffer.at(-1);
+        if (
+            last &&
+            last.type === entry.type &&
+            /** @type {any} */ (last).data?.toolName === /** @type {any} */ (entry).data?.toolName &&
+            entry.type !== 'tool.start' &&
+            entry.type !== 'tool.complete' &&
+            now - new Date(last.ts).getTime() < 1000
+        ) {
+            return;
+        }
         const full = /** @type {AuditEntry} */ ({
             ...entry,
             ts: new Date().toISOString(),

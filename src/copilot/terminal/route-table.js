@@ -26,11 +26,15 @@ import {
     handleDeleteMemory,
     handleDialogPause,
     handleDialogResume,
+    handleGetAudit,
     handleGetConfig,
     handleGetContext,
     handleGetCustomTools,
+    handleGetErrors,
+    handleGetHistory,
     handleGetQuota,
     handleGetSkills,
+    handleGetToolStats,
     handleGetToolsConfig,
     handleGhCi,
     handleGhIssues,
@@ -50,6 +54,7 @@ import {
     handleSetSkills,
     handleSetToolsConfig,
     handleStoreMemory,
+    handleSystemReset,
 } from './http-handlers.js';
 
 /**
@@ -80,8 +85,41 @@ export const ROUTE_TABLE = [
     { method: 'GET', path: '/config/skills', handler: handleGetSkills, async: true },
     { method: 'GET', path: '/config/tools', handler: handleGetToolsConfig },
     { method: 'GET', path: '/config/tools/custom', handler: handleGetCustomTools },
+    // F14.1: error stats — F15.2: rate limited para evitar data mining
+    { method: 'GET', path: '/errors', handler: handleGetErrors, rateLimiter: 'write', rateLimiterKey: 'errors' },
+    // F14.3: tool stats — F15.2: rate limited
+    {
+        method: 'GET',
+        path: '/tool-stats',
+        handler: handleGetToolStats,
+        rateLimiter: 'write',
+        rateLimiterKey: 'tool-stats',
+    },
+    // F16.3: injection history
+    {
+        method: 'GET',
+        path: '/history',
+        handler: handleGetHistory,
+        params: (url) => ({ limit: Number(url.searchParams.get('limit') ?? '50') }),
+    },
+    // F16.2: emergency reset — limpa rate limiters e error tracker
+    { method: 'POST', path: '/system/reset', handler: handleSystemReset },
 
     // ── GET with query params ─────────────────────────────────────────────
+    // F14.2: audit log (async + F15.2: rate limited para dados históricos sensíveis)
+    {
+        method: 'GET',
+        path: '/audit',
+        handler: handleGetAudit,
+        async: true,
+        rateLimiter: 'write',
+        rateLimiterKey: 'audit',
+        params: (url) => ({
+            summary: Number(url.searchParams.get('summary') ?? '0'),
+            limit: Number(url.searchParams.get('limit') ?? '50'),
+            ...(url.searchParams.has('sessionId') ? { sessionId: url.searchParams.get('sessionId') } : {}),
+        }),
+    },
     {
         method: 'GET',
         path: '/sessions',

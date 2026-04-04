@@ -27,6 +27,7 @@
 
 import { BridgeError } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
+import { recordToolCall } from '#copilot/observability/tool-stats';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 
@@ -51,8 +52,10 @@ const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
  * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - Tentativas automáticas em caso de 409 LLM_B_BUSY (default: 3; 0 = sem retry)
- * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; multiplicado pelo número da tentativa (backoff
- *   linear, default: 1500)
+ * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; duplicado por tentativa (backoff exponencial,
+ *   default: 1500)
+ * @property {boolean} [retryOn503] - Se true, faz retry em 503 (dialog loop iniciando). útil no boot do terminal
+ *   (default: false)
  */
 
 /**
@@ -161,8 +164,9 @@ export async function checkLlmBHealth(opts = {}) {
  *
  * Latência esperada: 15-25 segundos por turno (round-trip ao modelo).
  *
- * INJECT-01: Em caso de 409 (LLM_B_BUSY), tenta automaticamente até `retries` vezes com backoff linear (default: 3
- * tentativas, 1.5s / 3s / 4.5s de espera). O comportamento é configurável via `opts.retries` e `opts.retryDelayMs`.
+ * INJECT-01: Em caso de 409 (LLM_B_BUSY) ou 503 com `retryOn503=true` (dialog loop iniciando), tenta automaticamente
+ * até `retries` vezes com backoff exponencial (default: 3 tentativas, base 1.5s → 1.5s, 3s, 6s). O comportamento é
+ * configurável via `opts.retries`, `opts.retryDelayMs` e `opts.retryOn503`.
  *
  * @param {string} message - Mensagem a enviar para LLM-B
  * @param {InjectOpts} [opts]
@@ -172,14 +176,21 @@ export async function checkLlmBHealth(opts = {}) {
 export async function injectToLlmB(message, opts = {}) {
     const maxRetries = opts.retries ?? 3;
     const retryDelayMs = opts.retryDelayMs ?? 1_500;
+    const retryOn503 = opts.retryOn503 ?? false;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await _doInjectToLlmB(message, opts);
         } catch (/** @type {any} */ err) {
             const isBusy = err?.code === 'LLM_B_BUSY';
-            if (isBusy && attempt < maxRetries) {
-                const waitMs = retryDelayMs * (attempt + 1);
+            const isBootingUp = retryOn503 && err?.code === 'LLM_B_UNAVAILABLE';
+            if ((isBusy || isBootingUp) && attempt < maxRetries) {
+                // F11.2: backoff exponencial (base, 2×, 4×, ...) em vez de linear
+                const waitMs = retryDelayMs * Math.pow(2, attempt);
+                log(
+                    'INFO',
+                    `[inject-llmb] Tentativa ${attempt + 1}/${maxRetries} (${isBusy ? 'BUSY' : 'BOOTING'}) — aguardando ${waitMs}ms...`,
+                );
                 await new Promise((r) => setTimeout(r, waitMs));
                 continue;
             }
@@ -204,21 +215,33 @@ async function _doInjectToLlmB(message, opts) {
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const from = opts.from ?? 'llm-a';
     const attachments = opts.attachments;
+    const _startMs = Date.now();
 
     const payload = { message, from, ...(attachments !== undefined ? { attachments } : {}) };
-    const { statusCode, body } = await httpRequest('POST', '/inject', payload, port, timeoutMs);
+    let statusCode;
+    let body;
+    try {
+        ({ statusCode, body } = await httpRequest('POST', '/inject', payload, port, timeoutMs));
+    } catch (/** @type {any} */ e) {
+        // F11.3: registrar erro de transporte no tool-stats
+        recordToolCall('channel.inject', Date.now() - _startMs, false);
+        throw e;
+    }
 
     let parsed;
     try {
         parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
-        throw new BridgeError(
+        const e = new BridgeError(
             `[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`,
             'LLM_B_INVALID_RESPONSE',
         );
+        recordToolCall('channel.inject', Date.now() - _startMs, false);
+        throw e;
     }
 
     if (statusCode === 409) {
+        // Não registrar 409 como erro — é condição esperada de backpressure
         throw new BridgeError(
             '[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.',
             'LLM_B_BUSY',
@@ -233,8 +256,13 @@ async function _doInjectToLlmB(message, opts) {
     }
 
     if (!parsed['ok']) {
-        throw new BridgeError(`[inject-llmb] Erro: ${parsed['error'] ?? 'desconhecido'}`, 'LLM_B_ERROR');
+        const e = new BridgeError(`[inject-llmb] Erro: ${parsed['error'] ?? 'desconhecido'}`, 'LLM_B_ERROR');
+        recordToolCall('channel.inject', Date.now() - _startMs, false);
+        throw e;
     }
+
+    // F11.3: registrar latência por chamada bem-sucedida
+    recordToolCall('channel.inject', Date.now() - _startMs);
 
     return {
         ok: true,

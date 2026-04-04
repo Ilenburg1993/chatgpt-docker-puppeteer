@@ -19,6 +19,23 @@ import { log } from '#copilot/observability/logger';
  */
 
 /**
+ * F8.3: Mapa de thresholds de stall em ms por tipo de tarefa.
+ *
+ * Tarefas de análise ou longa duração recebem threshold maior para evitar watchdog kills prematuros. Chave `default` é
+ * o fallback quando o tipo não estiver mapeado.
+ *
+ * @type {Readonly<Record<string, number>>}
+ */
+export const WATCHDOG_THRESHOLDS = Object.freeze({
+    default: 15 * 60_000, // 15 min — threshold padrão
+    analysis: 45 * 60_000, // 45 min — análise/auditoria profunda
+    refactor: 30 * 60_000, // 30 min — refatoração com múltiplos arquivos
+    simple: 8 * 60_000, // 8 min — respostas simples / perguntas
+    codegen: 20 * 60_000, // 20 min — geração de código
+    test: 20 * 60_000, // 20 min — execução de testes
+});
+
+/**
  * Monitor de inatividade para o dialog loop.
  *
  * Exemplo de uso:
@@ -32,6 +49,8 @@ import { log } from '#copilot/observability/logger';
  * watchdog.start();
  * // ao receber atividade:
  * watchdog.ping();
+ * // ao começar tarefa de análise longa:
+ * watchdog.setThreshold(WATCHDOG_THRESHOLDS.analysis);
  * // ao parar o loop:
  * watchdog.stop();
  * ```
@@ -110,5 +129,43 @@ export class DialogWatchdog {
      */
     get running() {
         return this.#timer !== null;
+    }
+
+    /**
+     * F8.3: Ajusta o threshold de stall em runtime sem reiniciar o watchdog. Útil para escalar o timeout conforme o
+     * tipo de tarefa em andamento.
+     *
+     * @param {number} thresholdMs - Novo threshold em ms
+     * @returns {void}
+     */
+    setThreshold(thresholdMs) {
+        if (typeof thresholdMs === 'number' && thresholdMs > 0) {
+            this.#stallThresholdMs = thresholdMs;
+            log('DEBUG', `[DialogWatchdog] stallThreshold atualizado para ${thresholdMs}ms`);
+        }
+    }
+
+    /**
+     * F8.3: Ajusta o threshold de stall por tipo de tarefa nomeado (see WATCHDOG_THRESHOLDS). Ignora tipos
+     * desconhecidos (mantém threshold atual).
+     *
+     * @param {string} taskType - Tipo de tarefa (ex: 'analysis', 'simple', 'codegen')
+     * @returns {void}
+     */
+    setTaskType(taskType) {
+        const threshold = /** @type {number} */ (
+            WATCHDOG_THRESHOLDS[taskType] ?? WATCHDOG_THRESHOLDS['default'] ?? 15 * 60_000
+        );
+        this.setThreshold(threshold);
+        log('INFO', `[DialogWatchdog] Tipo de tarefa="${taskType}" → threshold=${threshold}ms`);
+    }
+
+    /**
+     * Retorna o threshold de stall atual em ms.
+     *
+     * @returns {number}
+     */
+    get stallThresholdMs() {
+        return this.#stallThresholdMs;
     }
 }

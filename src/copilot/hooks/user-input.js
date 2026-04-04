@@ -117,7 +117,7 @@ export function createQueuedInputHandler({ maxSize = 100 } = {}) {
         // BUG-UI-001: limite máximo para evitar crescimento unbounded da fila
         if (queue.length >= maxSize) {
             log('WARN', `[hooks/user-input] queue cheia (maxSize=${maxSize}) — rejeitando ask_user`);
-            return { response: '' };
+            return { answer: '', wasFreeform: false };
         }
         return new Promise((resolve) => {
             // Publica o request na fila para quem estiver ouvindo

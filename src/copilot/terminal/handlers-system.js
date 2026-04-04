@@ -22,10 +22,23 @@ import { alwaysAliveAgent } from '../agent/always-alive.js';
 import { setBackgroundCompactionThreshold } from '../agent/session-initializer.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
+import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { conversationStore } from '../conversation-hub/store.js';
+import { defaultAuditLog } from '../observability/audit-log.js';
+import { defaultErrorTracker } from '../observability/error-tracker.js';
+import { defaultMetrics } from '../observability/metrics.js';
+import { getStatsByCategory, getToolStats } from '../observability/tool-stats.js';
 import { getFileCacheStats } from './file-context.js';
-import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from './state.js';
+import { clearRateLimiters } from './rate-limiter-state.js';
+import {
+    getBusy,
+    getHubSessionId,
+    getInjectHistory,
+    getPlanMode,
+    getSseClients,
+    getSseCriticalClients,
+} from './state.js';
 
 /**
  * @typedef {import('./handlers-shared.js').HandlerResult} HandlerResult
@@ -68,9 +81,30 @@ export function handleHealth() {
             cacheStats: { fileContext: getFileCacheStats() },
             // UPG-N22: status do ConversationHub
             hub: hubInfo,
+            // F4.1: métricas acumuladas (tokens, tasks, dialog)
+            metrics: (() => {
+                const s = defaultMetrics.getSummary();
+                return {
+                    tokens: {
+                        input: s.tokens.inputTokens,
+                        output: s.tokens.outputTokens,
+                        cacheRead: s.tokens.cacheReadTokens,
+                        total: s.tokens.inputTokens + s.tokens.outputTokens,
+                    },
+                    tasks: { completed: s.tasks.completed, failed: s.tasks.failed },
+                    dialog: { turns: s.dialog.turnsTotal, success: s.dialog.turnsSuccess },
+                };
+            })(),
             // QUA-P2-08: uptime e memória do processo
             uptime: Math.round(process.uptime()),
             memoryMB: Math.round(process.memoryUsage.rss() / 1_048_576),
+            // F9.1: estado do MCP bridge (circuit breaker + disponibilidade)
+            mcp: getMcpStatus(),
+            // F10.4: modo de operação derivado do estado MCP
+            operationMode: (() => {
+                const s = getMcpStatus();
+                return s.available && s.toolCount > 0 && !s.circuitOpen ? 'connected' : 'standalone';
+            })(),
         },
     };
 }
@@ -362,6 +396,78 @@ export function handleMetrics() {
         `llmb_context_utilization ${cw?.utilization ?? 0}`,
         '',
     ];
+
+    // F13.3: métricas de canal inject (LLM-A ↔ LLM-B) via tool-stats
+    const stats = getToolStats();
+    const injectStats = stats['channel.inject'];
+    if (injectStats) {
+        const successCount = injectStats.calls - injectStats.errors;
+        lines.push(
+            '# HELP llm_b_inject_total Total de chamadas ao canal inject LLM-A→LLM-B',
+            '# TYPE llm_b_inject_total counter',
+            `llm_b_inject_total{status="success"} ${successCount}`,
+            `llm_b_inject_total{status="error"} ${injectStats.errors}`,
+            `llm_b_inject_total{status="total"} ${injectStats.calls}`,
+            '',
+            '# HELP llm_b_inject_duration_ms_avg Latência média do canal inject em ms',
+            '# TYPE llm_b_inject_duration_ms_avg gauge',
+            `llm_b_inject_duration_ms_avg ${injectStats.avgLatencyMs}`,
+            '',
+            '# HELP llm_b_inject_error_rate Taxa de erro do canal inject (0.0-100.0)',
+            '# TYPE llm_b_inject_error_rate gauge',
+            `llm_b_inject_error_rate ${injectStats.errorRate}`,
+            '',
+        );
+    }
+
+    // F4.1: dialog loop e sessão — contadores reais do defaultMetrics
+    const summary = defaultMetrics.getSummary();
+    lines.push(
+        '# HELP llmb_dialog_turns_total Total de turns do dialog loop executados',
+        '# TYPE llmb_dialog_turns_total counter',
+        `llmb_dialog_turns_total ${summary.dialog.turnsTotal}`,
+        '',
+        '# HELP llmb_dialog_turns_success Turns do dialog loop concluídos com sucesso',
+        '# TYPE llmb_dialog_turns_success counter',
+        `llmb_dialog_turns_success ${summary.dialog.turnsSuccess}`,
+        '',
+        '# HELP llmb_dialog_stalls_total Total de stalls detectados pelo watchdog',
+        '# TYPE llmb_dialog_stalls_total counter',
+        `llmb_dialog_stalls_total ${summary.dialog.stallsTotal}`,
+        '',
+        '# HELP llmb_sessions_started_total Total de sessões SDK iniciadas',
+        '# TYPE llmb_sessions_started_total counter',
+        `llmb_sessions_started_total ${summary.sessions.started}`,
+        '',
+        '# HELP llmb_sessions_errors_total Total de erros de sessão SDK',
+        '# TYPE llmb_sessions_errors_total counter',
+        `llmb_sessions_errors_total ${summary.sessions.errors}`,
+        '',
+        '# HELP llmb_tokens_input_total Total de tokens de input consumidos',
+        '# TYPE llmb_tokens_input_total counter',
+        `llmb_tokens_input_total ${summary.tokens.inputTokens}`,
+        '',
+        '# HELP llmb_tokens_output_total Total de tokens de output gerados',
+        '# TYPE llmb_tokens_output_total counter',
+        `llmb_tokens_output_total ${summary.tokens.outputTokens}`,
+        '',
+    );
+
+    // F17.3: percentis de latência do dialog turn
+    if (summary.dialog.turnsTotal > 0) {
+        const lp = summary.dialog.turnLatency;
+        lines.push(
+            '# HELP llmb_dialog_turn_duration_p50_ms Percentil 50 de duração de turns (ms)',
+            '# TYPE llmb_dialog_turn_duration_p50_ms gauge',
+            `llmb_dialog_turn_duration_p50_ms ${lp.p50}`,
+            '',
+            '# HELP llmb_dialog_turn_duration_p95_ms Percentil 95 de duração de turns (ms)',
+            '# TYPE llmb_dialog_turn_duration_p95_ms gauge',
+            `llmb_dialog_turn_duration_p95_ms ${lp.p95}`,
+            '',
+        );
+    }
+
     return {
         status: 200,
         contentType: 'text/plain; version=0.0.4; charset=utf-8',
@@ -369,7 +475,96 @@ export function handleMetrics() {
     };
 }
 
-// ─── Git/GH ───────────────────────────────────────────────────────────────────
+// ─── F14.1 — Errors endpoint ──────────────────────────────────────────────────
+
+/**
+ * GET /errors — estatísticas e últimos erros do error tracker.
+ *
+ * Expõe `defaultErrorTracker.getStats()` e `getErrors(20)` como JSON para monitoramento por LLM-A e dashboards
+ * externos.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetErrors() {
+    const stats = defaultErrorTracker.getStats();
+    const recent = defaultErrorTracker.getErrors(20);
+    return {
+        status: 200,
+        cors: true,
+        body: { ok: true, stats, recent },
+    };
+}
+
+// ─── F14.2 — Audit endpoint ───────────────────────────────────────────────────
+
+/**
+ * GET /audit — ring buffer de auditoria e sumário do audit log.
+ *
+ * Retorna as últimas entradas do buffer em memória via `defaultAuditLog.getEntries()`. O query param `?summary=1`
+ * executa leitura JSONL histórica via `getAuditSummary()`.
+ *
+ * @param {{ summary?: number; limit?: number; sessionId?: string | null }} [params]
+ * @returns {Promise<HandlerResult>}
+ */
+export async function handleGetAudit({ summary: wantSummary = 0, limit = 50, sessionId = null } = {}) {
+    const entries = defaultAuditLog.getEntries();
+    if (!wantSummary) {
+        return { status: 200, cors: true, body: { ok: true, entries } };
+    }
+    try {
+        const historical = await defaultAuditLog.getAuditSummary(sessionId, limit);
+        return { status: 200, cors: true, body: { ok: true, entries, historical } };
+    } catch (/** @type {any} */ e) {
+        return { status: 200, cors: true, body: { ok: true, entries, historicalError: e.message } };
+    }
+}
+
+// ─── F14.3 — Tool stats endpoint ──────────────────────────────────────────────
+
+/**
+ * GET /tool-stats — estatísticas detalhadas por tool.
+ *
+ * Retorna o mapa completo de `getToolStats()` como JSON estruturado, com contagens de chamadas, erros, latência média e
+ * taxa de erro por ferramenta.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetToolStats() {
+    const stats = getToolStats();
+    const entries = Object.entries(stats).map(([name, s]) => ({ name, ...s }));
+    const byCategory = getStatsByCategory();
+    return {
+        status: 200,
+        cors: true,
+        body: { ok: true, toolCount: entries.length, tools: entries, byCategory },
+    };
+}
+
+/**
+ * GET /history — retorna o histórico das últimas N injeções.
+ *
+ * @param {{ limit?: number }} [params]
+ * @returns {HandlerResult}
+ */
+export function handleGetHistory({ limit = 50 } = {}) {
+    const entries = getInjectHistory(limit);
+    return {
+        status: 200,
+        cors: true,
+        body: { ok: true, count: entries.length, entries },
+    };
+}
+
+/**
+ * POST /system/reset — limpa rate limiters + error tracker. Útil após throttling acidental.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleSystemReset() {
+    clearRateLimiters();
+    defaultErrorTracker.clearErrors();
+    return { status: 200, body: { ok: true, message: 'Rate limiters e error tracker resetados.' } };
+}
 
 /**
  * GET /gh/issues — lista GitHub issues via gh CLI.
