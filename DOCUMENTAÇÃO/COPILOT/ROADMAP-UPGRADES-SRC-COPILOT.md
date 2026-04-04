@@ -18,16 +18,16 @@ sequenciais por impacto e risco.
 
 ### Problemas Confirmados
 
-| ID     | Problema                                                                         | Severidade | Status       |
-| ------ | -------------------------------------------------------------------------------- | ---------- | ------------ |
+| ID     | Problema                                                                         | Severidade | Status      |
+| ------ | -------------------------------------------------------------------------------- | ---------- | ----------- |
 | BUG-01 | `LOG_LEVEL=debug` global polui o terminal LLM-B com centenas de linhas DEBUG     | Alta       | ✅ Corrigido |
 | BUG-02 | `FLOW-01 WARN` em toda mensagem — hub standalone nunca inicializado              | Média      | ✅ Corrigido |
 | BUG-03 | SIGHUP não tratado → terminal morria ao fechar painel VS Code                    | Alta       | ✅ Corrigido |
 | BUG-04 | `broadcastToSession()` gerava WARN para comportamento esperado (socket-ns)       | Baixa      | ✅ Corrigido |
-| GAP-01 | ConversationHub: `notifyTerminalTurn()` falha silenciosamente em modo standalone | Média      | Pendente     |
-| GAP-02 | `agent.metrics` emitido a cada 30s sem log de nível adequado no observer         | Baixa      | Pendente     |
-| GAP-03 | `tokens=?` no usage — contador real não conectado                                | Média      | Pendente     |
-| GAP-04 | 8 shims `@deprecated` ainda exportados por compat (custo de manutenção)          | Baixa      | Pendente     |
+| GAP-01 | ConversationHub: `notifyTerminalTurn()` falha silenciosamente em modo standalone | Média      | Pendente    |
+| GAP-02 | `agent.metrics` emitido a cada 30s sem log de nível adequado no observer         | Baixa      | Pendente    |
+| GAP-03 | `tokens=?` no usage — contador real não conectado                                | Média      | Pendente    |
+| GAP-04 | 8 shims `@deprecated` ainda exportados por compat (custo de manutenção)          | Baixa      | Pendente    |
 
 ### Shims Depreciados Ativos
 
@@ -1229,19 +1229,19 @@ diagnósticos e integração com telemetria do SDK.
 
 ## Sumário de Novas Fases (F18-F28)
 
-| Fase | Nome                             | SubFases | Prioridade | Dependências | Status     |
-| ---- | -------------------------------- | -------- | ---------- | ------------ | ---------- |
-| F18  | Streaming Thinking Display       | 5        | **Alta**   | Nenhuma      | ✅ Concluída |
-| F19  | Streaming Response               | 3        | **Alta**   | F18          | ✅ Concluída |
-| F20  | Usage & Intent Display           | 3        | Média      | F18, F19     | ✅ Concluída |
-| F21  | Context & Tools Integration      | 5        | Média      | Nenhuma      | 🔶 Parcial  |
-| F22  | Session Lifecycle Awareness      | 4        | Média      | F18          | 🔶 Parcial  |
-| F23  | Rich Markdown & Syntax           | 4        | Baixa      | F19          | ⬜ Pendente  |
-| F24  | Session Management & Multi-Sess. | 5        | Média      | Nenhuma      | ⬜ Pendente  |
-| F25  | Abort, Retry & Turn Control      | 5        | **Alta**   | F19          | ⬜ Pendente  |
-| F26  | Permission Display & Smart Ctx   | 5        | Média      | F22          | ⬜ Pendente  |
-| F27  | History, Search & Navigation     | 5        | Média      | Nenhuma      | ⬜ Pendente  |
-| F28  | Telemetry, Diagnostics & DevTools| 6        | Baixa      | F21          | ⬜ Pendente  |
+| Fase | Nome                              | SubFases | Prioridade | Dependências | Status      |
+| ---- | --------------------------------- | -------- | ---------- | ------------ | ----------- |
+| F18  | Streaming Thinking Display        | 5        | **Alta**   | Nenhuma      | ✅ Concluída |
+| F19  | Streaming Response                | 3        | **Alta**   | F18          | ✅ Concluída |
+| F20  | Usage & Intent Display            | 3        | Média      | F18, F19     | ✅ Concluída |
+| F21  | Context & Tools Integration       | 5        | Média      | Nenhuma      | 🔶 Parcial   |
+| F22  | Session Lifecycle Awareness       | 4        | Média      | F18          | 🔶 Parcial   |
+| F23  | Rich Markdown & Syntax            | 4        | Baixa      | F19          | ⬜ Pendente  |
+| F24  | Session Management & Multi-Sess.  | 5        | Média      | Nenhuma      | ⬜ Pendente  |
+| F25  | Abort, Retry & Turn Control       | 5        | **Alta**   | F19          | ⬜ Pendente  |
+| F26  | Permission Display & Smart Ctx    | 5        | Média      | F22          | ⬜ Pendente  |
+| F27  | History, Search & Navigation      | 5        | Média      | Nenhuma      | ⬜ Pendente  |
+| F28  | Telemetry, Diagnostics & DevTools | 6        | Baixa      | F21          | ⬜ Pendente  |
 
 **Escopo total**: 50 subfases · ~20 novos arquivos · ~25 arquivos modificados
 
