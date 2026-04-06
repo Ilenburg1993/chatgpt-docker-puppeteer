@@ -5,6 +5,5 @@
  * @module copilot/agent/lifecycle
  */
 
-export { startWithRetry } from './entry.js';
 export { tryReconnect } from './reconnect-policy.js';
 export { clearState, drainStateWrites, readState, writeState, writeStateAsync } from './state-io.js';
