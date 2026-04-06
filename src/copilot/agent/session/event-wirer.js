@@ -12,7 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { writeStateAsync } from '../state-io.js';
+import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação a cada chamada de

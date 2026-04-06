@@ -22,9 +22,10 @@ export {
     wireDialogLoopEvents,
 } from './dialog/index.js';
 export { AGENT_EVENTS } from './events.js';
+export { tryReconnect } from './lifecycle/reconnect-policy.js';
+export { clearState, readState, writeState, writeStateAsync } from './lifecycle/state-io.js';
 export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
-export { tryReconnect } from './reconnect-policy.js';
 export {
     SessionKeepalive,
     buildHookSystemContext,
@@ -40,7 +41,6 @@ export {
     shouldRotateSession,
     wireSessionEvents,
 } from './session/index.js';
-export { clearState, readState, writeState, writeStateAsync } from './state-io.js';
 export { buildStatusSnapshot } from './status-snapshot.js';
 export { executeTask } from './task-executor.js';
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from './tool-audit-logger.js';

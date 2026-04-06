@@ -22,7 +22,7 @@ import { SessionError } from '#copilot/core/errors';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { startSpan } from '#copilot/observability/otel';
-import { writeStateAsync } from '../state-io.js';
+import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.

@@ -45,7 +45,7 @@ import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { AGENT_EVENTS } from './events.js';
 import { MessageQueue } from './message-queue.js';
 import { PermissionController } from './permission-controller.js';
-import { tryReconnect } from './reconnect-policy.js';
+import { tryReconnect } from './lifecycle/reconnect-policy.js';
 import { wireSessionEvents } from './session/event-wirer.js';
 import { createSnapshot, saveSnapshot } from './session/snapshot.js';
 // N.1: usar hooks module canônico em vez do arquivo @deprecated
@@ -56,7 +56,7 @@ import { HandoffManager } from './handoff-manager.js';
 import { cleanupStaleSessions } from './session/cleanup.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
-import { readState, writeStateAsync } from './state-io.js';
+import { readState, writeStateAsync } from './lifecycle/state-io.js';
 import { buildStatusSnapshot } from './status-snapshot.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';

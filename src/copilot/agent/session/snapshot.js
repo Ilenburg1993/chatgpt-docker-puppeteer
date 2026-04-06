@@ -13,7 +13,7 @@
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { readState } from '../state-io.js';
+import { readState } from '../lifecycle/state-io.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const SNAPSHOT_DIR = process.env['AGENT_SNAPSHOT_DIR']
