@@ -11,8 +11,8 @@
  * @module copilot/agent/session-cleanup
  */
 
+import { deleteSession, listSessions } from '#copilot/lib/session';
 import { log } from '#copilot/observability/logger';
-import { listSessions, deleteSession } from '#copilot/lib/session';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -83,7 +83,10 @@ export async function cleanupStaleSessions(client, options = {}) {
             }
         }
 
-        log('INFO', `[SessionCleanup] Concluído: ${result.deleted}/${result.total} sessões removidas, ${result.kept} mantidas.`);
+        log(
+            'INFO',
+            `[SessionCleanup] Concluído: ${result.deleted}/${result.total} sessões removidas, ${result.kept} mantidas.`,
+        );
     } catch (/** @type {any} */ e) {
         log('WARN', `[SessionCleanup] Erro ao listar sessões: ${e.message}`);
         result.errors.push(e.message);

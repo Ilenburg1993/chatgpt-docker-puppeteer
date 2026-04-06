@@ -15,32 +15,32 @@
 **Objetivo**: Garantir que `agent-event-observer` está ativo para TODAS as tasks, não apenas dialog
 loop.
 
-| Sub   | Tarefa                                                                        | Prioridade | Status                                            |
-| ----- | ----------------------------------------------------------------------------- | ---------- | ------------------------------------------------- |
+| Sub   | Tarefa                                                                        | Prioridade | Status                                             |
+| ----- | ----------------------------------------------------------------------------- | ---------- | -------------------------------------------------- |
 | F29.1 | Mover `createAgentEventObserver()` para `start()`, após `wireSessionEvents()` | ALTA       | ✅                                                 |
 | F29.2 | Remover criação redundante em `#ensureDialogLoopAttached()`                   | ALTA       | ✅                                                 |
 | F29.3 | Adicionar testes: task via sendMessage com métricas verificadas               | ALTA       | ✅ (test_agent_event_observer.spec.js — 21 testes) |
-| F29.4 | Validar OTEL spans para tasks não-dialog                                      | MÉDIA      | ✅ (test_otel_spans_tasks.spec.js — 10 testes) |
+| F29.4 | Validar OTEL spans para tasks não-dialog                                      | MÉDIA      | ✅ (test_otel_spans_tasks.spec.js — 10 testes)     |
 
 ### F30 — Usage Source-of-Truth Unificação [GAP-02] ✅
 
 **Objetivo**: Eliminar divergência entre event-collector e agent-event-observer no tracking de
 usage/tokens.
 
-| Sub   | Tarefa                                                      | Prioridade | Status                                    |
-| ----- | ----------------------------------------------------------- | ---------- | ----------------------------------------- |
+| Sub   | Tarefa                                                      | Prioridade | Status                                     |
+| ----- | ----------------------------------------------------------- | ---------- | ------------------------------------------ |
 | F30.1 | Definir event-collector como SoT para persistência          | ALTA       | ✅                                         |
 | F30.2 | Definir agent-event-observer como SoT para runtime metrics  | ALTA       | ✅                                         |
 | F30.3 | Adicionar dedup guard em `MetricsStore.recordUsage()`       | ALTA       | ✅ (resolvido removendo chamada duplicada) |
-| F30.4 | Verificar contagem dupla com teste de integração            | MÉDIA      | ✅ (test_usage_dedup.spec.js — 5 testes) |
+| F30.4 | Verificar contagem dupla com teste de integração            | MÉDIA      | ✅ (test_usage_dedup.spec.js — 5 testes)   |
 | F30.5 | Unificar display de usage no terminal (eliminar `tokens=?`) | MÉDIA      | ✅ (display unificado em dialog.js F20.2)  |
 
 ### F31 — DLM Watchdog Fix [BUG-02, GAP-10] ✅
 
 **Objetivo**: Corrigir watchdog falso-positivo em pause e implementar compaction proativa.
 
-| Sub   | Tarefa                                                     | Prioridade | Status                                             |
-| ----- | ---------------------------------------------------------- | ---------- | -------------------------------------------------- |
+| Sub   | Tarefa                                                     | Prioridade | Status                                              |
+| ----- | ---------------------------------------------------------- | ---------- | --------------------------------------------------- |
 | F31.1 | Pausar watchdog interval quando `state === 'paused'`       | ALTA       | ✅                                                  |
 | F31.2 | Reativar watchdog no resume                                | ALTA       | ✅                                                  |
 | F31.3 | Implementar compaction proativa ao atingir 90% context     | MÉDIA      | ✅ (DLM handleTokenBudget + always-alive wiring)    |
@@ -51,8 +51,8 @@ usage/tokens.
 
 **Objetivo**: Substituir boolean flag por Promise coalescing para evitar boot duplo.
 
-| Sub   | Tarefa                                                     | Prioridade | Status                                         |
-| ----- | ---------------------------------------------------------- | ---------- | ---------------------------------------------- |
+| Sub   | Tarefa                                                     | Prioridade | Status                                          |
+| ----- | ---------------------------------------------------------- | ---------- | ----------------------------------------------- |
 | F32.1 | Refatorar `_ensureDialogLoopInFlight` de boolean → Promise | MÉDIA      | ✅ (já era Promise)                             |
 | F32.2 | Boot subsequentes aguardam Promise existente               | MÉDIA      | ✅ (já implementado)                            |
 | F32.3 | Testar concorrência com múltiplos inject simultaneamente   | MÉDIA      | ✅ (test_inject_concurrency.spec.js — 6 testes) |
@@ -61,8 +61,8 @@ usage/tokens.
 
 **Objetivo**: Limpar shims deprecated e reduzir ruído de métricas.
 
-| Sub   | Tarefa                                                       | Prioridade | Status                      |
-| ----- | ------------------------------------------------------------ | ---------- | --------------------------- |
+| Sub   | Tarefa                                                       | Prioridade | Status                       |
+| ----- | ------------------------------------------------------------ | ---------- | ---------------------------- |
 | F33.1 | Marcar 8 shims deprecated com `@deprecated` JSDoc            | BAIXA      | ✅ (8 arquivos marcados)     |
 | F33.2 | Condicionar emissão de `agent.metrics` a delta significativo | BAIXA      | ✅ (delta dedup no observer) |
 | F33.3 | Aumentar tool TTL para 10min (event-collector `_pending`)    | BAIXA      | ✅                           |
@@ -76,21 +76,21 @@ usage/tokens.
 
 **Objetivo**: Permitir que NERV envie comandos para o agente copilot (não apenas receber).
 
-| Sub   | Tarefa                                                           | Prioridade | Status                                  |
-| ----- | ---------------------------------------------------------------- | ---------- | --------------------------------------- |
-| F34.1 | Definir NERV → agent command schema (message, config, restart)   | ALTA       | ✅                                       |
-| F34.2 | Implementar listener no agente para NERV commands                | ALTA       | ✅                                       |
-| F34.3 | Comandos suportados: sendMessage, pause, resume, restart, config | ALTA       | ✅ (sendMessage, pause, resume, restart) |
-| F34.4 | Validação automática de EVENT_MAP coverage vs agent events       | MÉDIA      | ✅ (validate-event-map-coverage.mjs)     |
-| F34.5 | Script CI para detectar eventos não-mapeados                     | MÉDIA      | ✅ (mesmo script, exit code 1 se gaps)   |
+| Sub   | Tarefa                                                           | Prioridade | Status                                                |
+| ----- | ---------------------------------------------------------------- | ---------- | ----------------------------------------------------- |
+| F34.1 | Definir NERV → agent command schema (message, config, restart)   | ALTA       | ✅                                                    |
+| F34.2 | Implementar listener no agente para NERV commands                | ALTA       | ✅                                                    |
+| F34.3 | Comandos suportados: sendMessage, pause, resume, restart, config | ALTA       | ✅ (sendMessage, pause, resume, restart)              |
+| F34.4 | Validação automática de EVENT_MAP coverage vs agent events       | MÉDIA      | ✅ (validate-event-map-coverage.mjs)                  |
+| F34.5 | Script CI para detectar eventos não-mapeados                     | MÉDIA      | ✅ (mesmo script, exit code 1 se gaps)                |
 | F34.6 | Testes de integração NERV ↔ agent (round-trip)                   | MÉDIA      | ✅ (test_nerv_bridge_integration.spec.js — 23 testes) |
 
 ### F35 — ConversationHub Resilience [GAP-05] ✅
 
 **Objetivo**: Tornar o ConversationHub resiliente em modo standalone e multi-sessão.
 
-| Sub   | Tarefa                                            | Prioridade | Status                                                 |
-| ----- | ------------------------------------------------- | ---------- | ------------------------------------------------------ |
+| Sub   | Tarefa                                            | Prioridade | Status                                                  |
+| ----- | ------------------------------------------------- | ---------- | ------------------------------------------------------- |
 | F35.1 | Queue local para notifyTerminalTurn em standalone | MÉDIA      | ✅ (\_pendingNotifications + drainPendingNotifications) |
 | F35.2 | Replay de turnos ao reconectar com hub servidor   | MÉDIA      | ✅ (drainPendingNotifications no dialog.js)             |
 | F35.3 | Log.debug() no catch de standalone failures       | BAIXA      | ✅ (F33: try-catch em notifyTerminalTurn)               |
@@ -101,8 +101,8 @@ usage/tokens.
 
 **Objetivo**: Permitir streaming visible para tasks (não apenas dialog turns).
 
-| Sub   | Tarefa                                                         | Prioridade | Status                               |
-| ----- | -------------------------------------------------------------- | ---------- | ------------------------------------ |
+| Sub   | Tarefa                                                         | Prioridade | Status                                |
+| ----- | -------------------------------------------------------------- | ---------- | ------------------------------------- |
 | F36.1 | Novo canal `task.delta` separado de `response.delta`           | MÉDIA      | ✅ (já existe em session-event-wirer) |
 | F36.2 | Refatorar filtro em session-event-wirer para rotear vs filtrar | MÉDIA      | ✅ (dialog.delta routing separado)    |
 | F36.3 | Terminal buffer para exibição de task streaming                | BAIXA      | ✅ (task.delta/reasoning display)     |
@@ -112,8 +112,8 @@ usage/tokens.
 
 **Objetivo**: Melhorar UX do REPL com features de terminal moderno.
 
-| Sub   | Tarefa                                                           | Prioridade | Status                       |
-| ----- | ---------------------------------------------------------------- | ---------- | ---------------------------- |
+| Sub   | Tarefa                                                           | Prioridade | Status                        |
+| ----- | ---------------------------------------------------------------- | ---------- | ----------------------------- |
 | F37.1 | Tab completion para comandos (readline completer)                | MÉDIA      | ✅                            |
 | F37.2 | `/help` inline com descrição detalhada de cada comando           | MÉDIA      | ✅ (já existente e completo)  |
 | F37.3 | Syntax highlighting para code blocks na resposta                 | BAIXA      | ✅ (ANSI code block styling)  |
@@ -125,8 +125,8 @@ usage/tokens.
 
 **Objetivo**: SSE mais robusto para UIs externas.
 
-| Sub   | Tarefa                                              | Prioridade | Status                           |
-| ----- | --------------------------------------------------- | ---------- | -------------------------------- |
+| Sub   | Tarefa                                              | Prioridade | Status                            |
+| ----- | --------------------------------------------------- | ---------- | --------------------------------- |
 | F38.1 | Filtros por tipo de evento no endpoint SSE          | MÉDIA      | ✅ (level=critical)               |
 | F38.2 | Buffer de reconexão (replay últimos N eventos)      | MÉDIA      | ✅ (Last-Event-ID + replayBuffer) |
 | F38.3 | Heartbeat SSE (ping a cada 30s para manter conexão) | MÉDIA      | ✅ (PHASE-9)                      |
@@ -136,8 +136,8 @@ usage/tokens.
 
 **Objetivo**: Alertas automáticos baseados em thresholds (não apenas logging).
 
-| Sub   | Tarefa                                                   | Prioridade | Status                                   |
-| ----- | -------------------------------------------------------- | ---------- | ---------------------------------------- |
+| Sub   | Tarefa                                                   | Prioridade | Status                                    |
+| ----- | -------------------------------------------------------- | ---------- | ----------------------------------------- |
 | F39.1 | Threshold engine no ErrorTracker (e.g., 5 erros em 1min) | MÉDIA      | ✅ (error-alerting.js createErrorAlerter) |
 | F39.2 | Ação: emitir evento NERV de alerta                       | MÉDIA      | ✅ (nervEmit copilot:error:alert)         |
 | F39.3 | Ação: notificação no terminal (banner persistente)       | MÉDIA      | ✅ (terminalPrint ANSI banner)            |
@@ -152,8 +152,8 @@ usage/tokens.
 
 **Objetivo**: Pool de modelos com seleção dinâmica baseada em custo, velocidade e capacidade.
 
-| Sub   | Tarefa                                                           | Prioridade | Status                                            |
-| ----- | ---------------------------------------------------------------- | ---------- | ------------------------------------------------- |
+| Sub   | Tarefa                                                           | Prioridade | Status                                             |
+| ----- | ---------------------------------------------------------------- | ---------- | -------------------------------------------------- |
 | F40.1 | ModelRegistry: catalog de modelos disponíveis com capabilities   | ALTA       | ✅ (model-registry.js — KNOWN_MODELS + tiers)      |
 | F40.2 | ModelSelector: heurística de seleção (cost, speed, context size) | ALTA       | ✅ (ModelSelector + score composto + histórico)    |
 | F40.3 | Integrar com DLM fallback (substituir lógica hardcoded)          | MÉDIA      | ✅ (session-lifecycle.js — ModelSelector fallback) |
@@ -165,8 +165,8 @@ usage/tokens.
 
 **Objetivo**: Persistir e restaurar sessões completas (incluindo context window).
 
-| Sub   | Tarefa                                                    | Prioridade | Status                  |
-| ----- | --------------------------------------------------------- | ---------- | ----------------------- |
+| Sub   | Tarefa                                                    | Prioridade | Status                   |
+| ----- | --------------------------------------------------------- | ---------- | ------------------------ |
 | F41.1 | SessionSnapshot: serializar estado completo para disco    | ALTA       | ✅                       |
 | F41.2 | SessionRestore: re-hidratar sessão a partir de snapshot   | ALTA       | ✅                       |
 | F41.3 | Handoff API: transferir sessão entre instâncias do agente | MÉDIA      | ✅ (PARTE-7 F45.1-F45.4) |
@@ -186,14 +186,14 @@ always-alive.js (1323 LOC), session-event-wirer.js (545 LOC).
 
 | Sub    | Tarefa                                                                  | Prioridade | Status |
 | ------ | ----------------------------------------------------------------------- | ---------- | ------ |
-| F41B.1 | BUG: `stop()` shutdown timer dead code — reordenar flags                | ALTA       | ✅      |
-| F41B.2 | BUG: `model.fallback` nunca aplica modelo — add `setModel` ao AgentHost | ALTA       | ✅      |
-| F41B.3 | BUG: listener leak em `dispatchTurnToHost` — cleanup outer listeners    | MÉDIA      | ✅      |
-| F41B.4 | BUG: `notifyReconnect()` não para watchdog                              | BAIXA      | ✅      |
-| F41B.5 | MELHORIA: AbortSignal no `waitForRestartAndReply`                       | MÉDIA      | ✅      |
-| F41B.6 | MELHORIA: wirer — propagar `compaction.requested` + `question`          | BAIXA      | ✅      |
-| F41B.7 | MELHORIA: watchdog pre-stall warning a 80% do threshold                 | MÉDIA      | ✅      |
-| F41B.8 | MELHORIA: métricas de PR consumidos por boot/resume                     | MÉDIA      | ✅      |
+| F41B.1 | BUG: `stop()` shutdown timer dead code — reordenar flags                | ALTA       | ✅     |
+| F41B.2 | BUG: `model.fallback` nunca aplica modelo — add `setModel` ao AgentHost | ALTA       | ✅     |
+| F41B.3 | BUG: listener leak em `dispatchTurnToHost` — cleanup outer listeners    | MÉDIA      | ✅     |
+| F41B.4 | BUG: `notifyReconnect()` não para watchdog                              | BAIXA      | ✅     |
+| F41B.5 | MELHORIA: AbortSignal no `waitForRestartAndReply`                       | MÉDIA      | ✅     |
+| F41B.6 | MELHORIA: wirer — propagar `compaction.requested` + `question`          | BAIXA      | ✅     |
+| F41B.7 | MELHORIA: watchdog pre-stall warning a 80% do threshold                 | MÉDIA      | ✅     |
+| F41B.8 | MELHORIA: métricas de PR consumidos por boot/resume                     | MÉDIA      | ✅     |
 
 ### F42 — Dashboard Copilot (Vue) [F25 expandido]
 

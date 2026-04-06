@@ -17,7 +17,7 @@ describe('cleanupStaleSessions', async () => {
     });
 
     /**
-     * @param {Array<{ sessionId: string; startTime: Date }>} sessions
+     * @param {{ sessionId: string; startTime: Date }[]} sessions
      * @returns {any}
      */
     function mockClient(sessions) {
@@ -36,9 +36,7 @@ describe('cleanupStaleSessions', async () => {
     });
 
     it('deve preservar sessão atual', async () => {
-        const client = mockClient([
-            { sessionId: 'current-1', startTime: new Date(Date.now() - 48 * 3600_000) },
-        ]);
+        const client = mockClient([{ sessionId: 'current-1', startTime: new Date(Date.now() - 48 * 3600_000) }]);
         const result = await cleanupStaleSessions(client, { currentSessionId: 'current-1' });
         assert.equal(result.deleted, 0);
         assert.equal(result.kept, 1);
@@ -52,7 +50,9 @@ describe('cleanupStaleSessions', async () => {
                 { sessionId: 'old-1', startTime: new Date(now - 48 * 3600_000) },
                 { sessionId: 'recent-1', startTime: new Date(now - 1 * 3600_000) },
             ],
-            deleteSession: async (/** @type {string} */ id) => { deleted.push(id); },
+            deleteSession: async (/** @type {string} */ id) => {
+                deleted.push(id);
+            },
         };
         const result = await cleanupStaleSessions(client, {
             maxAgeMs: 24 * 3600_000,
@@ -64,9 +64,7 @@ describe('cleanupStaleSessions', async () => {
     });
 
     it('deve preservar sessões sem startTime', async () => {
-        const client = mockClient([
-            { sessionId: 'no-time', startTime: /** @type {any} */ (undefined) },
-        ]);
+        const client = mockClient([{ sessionId: 'no-time', startTime: /** @type {any} */ (undefined) }]);
         const result = await cleanupStaleSessions(client);
         assert.equal(result.deleted, 0);
         assert.equal(result.kept, 1);
@@ -74,10 +72,10 @@ describe('cleanupStaleSessions', async () => {
 
     it('deve lidar com erro de deleteSession gracefully', async () => {
         const client = {
-            listSessions: async () => [
-                { sessionId: 'fail-1', startTime: new Date(Date.now() - 48 * 3600_000) },
-            ],
-            deleteSession: async () => { throw new Error('API error'); },
+            listSessions: async () => [{ sessionId: 'fail-1', startTime: new Date(Date.now() - 48 * 3600_000) }],
+            deleteSession: async () => {
+                throw new Error('API error');
+            },
         };
         const result = await cleanupStaleSessions(client, { maxAgeMs: 24 * 3600_000 });
         assert.equal(result.deleted, 0);

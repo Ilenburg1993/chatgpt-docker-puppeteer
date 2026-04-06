@@ -21,6 +21,7 @@
  * @module copilot/terminal/route-table
  */
 
+import { handleAcceptHandoff, handleGetHandoffs, handleRejectHandoff } from './handlers-agent.js';
 import {
     handleDeleteCustomTool,
     handleDeleteMemory,
@@ -56,7 +57,6 @@ import {
     handleStoreMemory,
     handleSystemReset,
 } from './http-handlers.js';
-import { handleGetHandoffs, handleAcceptHandoff, handleRejectHandoff } from './handlers-agent.js';
 
 /**
  * @typedef {Object} RouteEntry

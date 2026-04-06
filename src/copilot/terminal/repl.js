@@ -287,7 +287,9 @@ function _cmdHandoff() {
     println('\x1b[36m  ── Handoff History ──\x1b[0m');
     for (const h of history) {
         const ts = new Date(h.receivedAt).toISOString();
-        println(`  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  reason=\x1b[90m${h.reason ?? '-'}\x1b[0m  status=\x1b[36m${h.status}\x1b[0m`);
+        println(
+            `  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  reason=\x1b[90m${h.reason ?? '-'}\x1b[0m  status=\x1b[36m${h.status}\x1b[0m`,
+        );
     }
 }
 

@@ -5,6 +5,7 @@
  * F45 (GAP-SD-07): Handoff Manager — gerencia transferência de sessão entre agentes.
  *
  * Quando o SDK emite `session.handoff`, este módulo:
+ *
  * 1. Salva snapshot da sessão atual
  * 2. Prepara o contexto para o agente destino
  * 3. Emite eventos de progresso

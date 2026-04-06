@@ -4,8 +4,8 @@
  *
  * F43.2 (GAP-SD-03): Política de rotação de sessão.
  *
- * Determina quando criar uma nova sessão em vez de resumir a existente,
- * baseado em utilização de contexto, idade da sessão, e contagem de compactions.
+ * Determina quando criar uma nova sessão em vez de resumir a existente, baseado em utilização de contexto, idade da
+ * sessão, e contagem de compactions.
  *
  * @module copilot/agent/session-rotation
  */
@@ -37,7 +37,7 @@ import { log } from '#copilot/observability/logger';
 
 /** @type {RotationPolicy} */
 const DEFAULT_POLICY = {
-    maxUtilization: Number(process.env['AGENT_ROTATION_MAX_UTIL'] || 0.90),
+    maxUtilization: Number(process.env['AGENT_ROTATION_MAX_UTIL'] || 0.9),
     maxAgeMs: Number(process.env['AGENT_ROTATION_MAX_AGE_MS'] || 4 * 60 * 60_000),
     maxCompactions: Number(process.env['AGENT_ROTATION_MAX_COMPACTIONS'] || 5),
     maxTurns: Number(process.env['AGENT_ROTATION_MAX_TURNS'] || 200),

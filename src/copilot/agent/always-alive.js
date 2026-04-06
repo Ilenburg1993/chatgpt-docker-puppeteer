@@ -52,11 +52,11 @@ import { createSnapshot, saveSnapshot } from './session-snapshot.js';
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
 import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
-import { initOrResumeSession } from './session-initializer.js';
-import { readState, writeStateAsync } from './state-io.js';
-import { SessionKeepalive } from './session-keepalive.js';
-import { cleanupStaleSessions } from './session-cleanup.js';
 import { HandoffManager } from './handoff-manager.js';
+import { cleanupStaleSessions } from './session-cleanup.js';
+import { initOrResumeSession } from './session-initializer.js';
+import { SessionKeepalive } from './session-keepalive.js';
+import { readState, writeStateAsync } from './state-io.js';
 import { buildStatusSnapshot } from './status-snapshot.js';
 import { executeTask } from './task-executor.js';
 import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
@@ -503,12 +503,14 @@ export class AlwaysAliveAgent extends EventEmitter {
             if (this.#client) {
                 void cleanupStaleSessions(this.#client, {
                     currentSessionId: session.sessionId,
-                }).then((result) => {
-                    if (result.deleted > 0) {
-                        for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
-                        this.emit('session.cleanup', result);
-                    }
-                }).catch(() => {});
+                })
+                    .then((result) => {
+                        if (result.deleted > 0) {
+                            for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
+                            this.emit('session.cleanup', result);
+                        }
+                    })
+                    .catch(() => {});
             }
             log(
                 'INFO',
@@ -527,8 +529,11 @@ export class AlwaysAliveAgent extends EventEmitter {
                 const savedState = readState();
                 if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
                     const utilization = this.#contextState?.utilization ?? 0;
-                    if (utilization < 0.80) {
-                        log('INFO', '[AlwaysAlive] F42.1: Re-ativando dialog loop após resume (estava ativo previamente).');
+                    if (utilization < 0.8) {
+                        log(
+                            'INFO',
+                            '[AlwaysAlive] F42.1: Re-ativando dialog loop após resume (estava ativo previamente).',
+                        );
                         setTimeout(() => {
                             if (this.#status !== 'stopped') {
                                 this.startDialogLoop().catch((/** @type {any} */ e) =>
@@ -537,7 +542,10 @@ export class AlwaysAliveAgent extends EventEmitter {
                             }
                         }, 5_000);
                     } else {
-                        log('WARN', `[AlwaysAlive] F42.1: Dialog loop não re-ativado — utilização de contexto alta (${Math.round(utilization * 100)}%).`);
+                        log(
+                            'WARN',
+                            `[AlwaysAlive] F42.1: Dialog loop não re-ativado — utilização de contexto alta (${Math.round(utilization * 100)}%).`,
+                        );
                     }
                 }
             }
@@ -570,10 +578,22 @@ export class AlwaysAliveAgent extends EventEmitter {
             });
 
             // F45.1: wiring de session.handoff → HandoffManager
-            this.on('session.handoff', (/** @type {{ fromAgent: string; toAgent: string; reason?: string; context?: Record<string, unknown> }} */ data) => {
-                this.#handoff.receive(data);
-                defaultMetrics.recordHandoff();
-            });
+            this.on(
+                'session.handoff',
+                (
+                    /**
+                     * @type {{
+                     *     fromAgent: string;
+                     *     toAgent: string;
+                     *     reason?: string;
+                     *     context?: Record<string, unknown>;
+                     * }}
+                     */ data,
+                ) => {
+                    this.#handoff.receive(data);
+                    defaultMetrics.recordHandoff();
+                },
+            );
         } catch (/** @type {any} */ e) {
             this.#setStatus('stopped');
             log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
@@ -1005,8 +1025,11 @@ export class AlwaysAliveAgent extends EventEmitter {
                     'CONTEXT_EXHAUSTED',
                 );
             }
-            if (utilization >= 0.80) {
-                log('WARN', `[AlwaysAlive] F44.1: Utilização de contexto em ${Math.round(utilization * 100)}% — dialog loop prosseguindo com cautela.`);
+            if (utilization >= 0.8) {
+                log(
+                    'WARN',
+                    `[AlwaysAlive] F44.1: Utilização de contexto em ${Math.round(utilization * 100)}% — dialog loop prosseguindo com cautela.`,
+                );
             }
         }
         this.#ensureDialogLoopAttached();
@@ -1030,7 +1053,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Para o modo diálogo. Delega ao DialogLoopManager.
      *
-     * @param {{ authorized?: boolean; reason?: 'watchdog_restart' | 'authorized_stop'; shutdownTimeoutMs?: number }} [opts]
+     * @param {{
+     *     authorized?: boolean;
+     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     shutdownTimeoutMs?: number;
+     * }} [opts]
      * @returns {Promise<void>}
      */
     async stopDialogLoop(opts) {
@@ -1361,8 +1388,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução aguardando
      * `answerPendingQuestion()` — necessário para fechar o ciclo `ask_user` do SDK.
      *
-     * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync de
-     * pendingQuestion para evitar I/O desnecessário em cada turno do dialog loop.
+     * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync de pendingQuestion para
+     * evitar I/O desnecessário em cada turno do dialog loop.
      *
      * @param {{ question: string; allowFreeform: boolean }} input
      * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
@@ -1372,7 +1399,8 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#dialogLoop.handleProtocolInput({ question });
 
         // F44.3: detectar protocolo para skip de I/O de estado
-        const isProtocolMessage = question.startsWith('READY') || question.startsWith('REPLY:') || question.startsWith('STOPPED');
+        const isProtocolMessage =
+            question.startsWith('READY') || question.startsWith('REPLY:') || question.startsWith('STOPPED');
 
         // Suspende via handleInteractiveQuestion mas pula persist de pendingQuestion para protocolo
         return this.#handleInteractiveQuestion({ question, allowFreeform, skipPersist: isProtocolMessage });

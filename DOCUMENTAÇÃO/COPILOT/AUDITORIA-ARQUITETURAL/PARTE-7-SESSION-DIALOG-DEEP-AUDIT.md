@@ -1,9 +1,7 @@
 # PARTE 7 — Auditoria Profunda: Sessions & Dialog Loop
 
-**Data**: 2026-03-20
-**Última atualização**: 2026-03-20
-**Status**: Canônico
-**Escopo**: Arquitetura completa de sessões SDK, dialog loop, persistência, reconexão e resiliência
+**Data**: 2026-03-20 **Última atualização**: 2026-03-20 **Status**: Canônico **Escopo**: Arquitetura
+completa de sessões SDK, dialog loop, persistência, reconexão e resiliência
 
 ---
 
@@ -170,46 +168,46 @@ STOP → modelo emite "STOPPED: ..." via ask_user
 
 | Funcionalidade SDK                               | Status na Implementação | Detalhes                                                     |
 | ------------------------------------------------ | ----------------------- | ------------------------------------------------------------ |
-| `client.createSession(config)`                   | ✅ Implementado          | Via `lib/session.js → createSession()`                       |
-| `client.resumeSession(id, config)`               | ✅ Implementado          | Via `lib/session.js → resumeSession()`                       |
-| `client.listSessions(filter)`                    | ✅ Implementado          | Via `lib/session.js → listSessions()`                        |
-| `client.deleteSession(id)`                       | ✅ Implementado          | Via `lib/session.js → deleteSession()`                       |
-| `session.disconnect()`                           | ✅ Implementado          | Chamado em `stop()` e `lib/session.js → disconnectSession()` |
-| `session.send({prompt})`                         | ⚠️ Parcial               | Usado indiretamente via fila de tasks                        |
-| `session.sendAndWait()`                          | ❓ Não verificado        | Possivelmente usado em `executeTask`                         |
-| `infiniteSessions.enabled`                       | ✅ Implementado          | Configurado em `initOrResumeSession`                         |
-| `infiniteSessions.backgroundCompactionThreshold` | ✅ Implementado          | Dinâmico via `setBackgroundCompactionThreshold()`            |
-| `session.on(eventName, cb)`                      | ✅ Implementado          | Via `wireSessionEvents()` — 80+ eventos                      |
-| `session.on(cb)` (catch-all)                     | ✅ Implementado          | Via `_wireCatchAll()`                                        |
-| `streaming: true`                                | ✅ Implementado          | Configurado em `buildSessionConfig()`                        |
-| `mode: 'immediate'` (steering)                   | ✅ Implementado          | Via `steerMessage()`                                         |
-| `systemMessage: {mode:'customize', content}`     | ✅ Implementado          | Injeção de hook context                                      |
-| `workingDirectory`                               | ✅ Implementado          | Configurado em `initOrResumeSession`                         |
-| `skillDirectories`                               | ✅ Implementado          | Configurado em `initOrResumeSession`                         |
-| `customAgents`                                   | ✅ Implementado          | Via `buildCustomAgentsConfig()`                              |
-| `excludedTools` / `availableTools`               | ✅ Implementado          | Via `getToolsConfig()`                                       |
-| `onPermissionRequest`                            | ✅ Implementado          | Via `PermissionController` + audit wrapper                   |
-| `onUserInputRequest`                             | ✅ Implementado          | Via `#handleUserInputRequest()`                              |
-| `hooks.onSessionStart`                           | ✅ Implementado          | Via `createSessionHooks()` com additionalContext             |
-| `hooks.onSessionEnd`                             | ✅ Implementado          | Via `createSessionHooks()`                                   |
-| `hooks.onErrorOccurred`                          | ✅ Implementado          | Com fallback model via ModelSelector                         |
-| `hooks.onPreToolUse`                             | ✅ Implementado          | Via `createHooks()`                                          |
-| `hooks.onPostToolUse`                            | ✅ Implementado          | Via `createHooks()`                                          |
-| `session.idle` (event)                           | ✅ Subscrito             | Via `event-collector.js`                                     |
-| `session.task_complete` (event)                  | ✅ Subscrito             | Via `_wireSdkResponseEvents()`                               |
-| `session.shutdown` (event)                       | ✅ Subscrito             | Via `_wireSdkResponseEvents()`                               |
-| `session.usage_info` (event)                     | ✅ Subscrito             | Via `_wireTokenBudgetEvents()`                               |
-| `assistant.usage` (event)                        | ✅ Subscrito             | Via `_wireUsageEvent()` — billing/PR tracking                |
-| `session.compaction_start/complete`              | ✅ Subscrito             | Via `_wireCompactionEvents()`                                |
-| `session.error` (event)                          | ✅ Subscrito             | Via `_wireSdkResponseEvents()`                               |
-| `elicitation.requested` (event)                  | ✅ Subscrito             | Via `_wireSdkResponseEvents()`                               |
-| `session.getMessages()`                          | ✅ Implementado          | Via `getSessionMessages()` com cache TTL                     |
-| `session.rpc`                                    | ✅ Usado                 | Via `setSessionRpc(session.rpc)`                             |
+| `client.createSession(config)`                   | ✅ Implementado         | Via `lib/session.js → createSession()`                       |
+| `client.resumeSession(id, config)`               | ✅ Implementado         | Via `lib/session.js → resumeSession()`                       |
+| `client.listSessions(filter)`                    | ✅ Implementado         | Via `lib/session.js → listSessions()`                        |
+| `client.deleteSession(id)`                       | ✅ Implementado         | Via `lib/session.js → deleteSession()`                       |
+| `session.disconnect()`                           | ✅ Implementado         | Chamado em `stop()` e `lib/session.js → disconnectSession()` |
+| `session.send({prompt})`                         | ⚠️ Parcial              | Usado indiretamente via fila de tasks                        |
+| `session.sendAndWait()`                          | ❓ Não verificado       | Possivelmente usado em `executeTask`                         |
+| `infiniteSessions.enabled`                       | ✅ Implementado         | Configurado em `initOrResumeSession`                         |
+| `infiniteSessions.backgroundCompactionThreshold` | ✅ Implementado         | Dinâmico via `setBackgroundCompactionThreshold()`            |
+| `session.on(eventName, cb)`                      | ✅ Implementado         | Via `wireSessionEvents()` — 80+ eventos                      |
+| `session.on(cb)` (catch-all)                     | ✅ Implementado         | Via `_wireCatchAll()`                                        |
+| `streaming: true`                                | ✅ Implementado         | Configurado em `buildSessionConfig()`                        |
+| `mode: 'immediate'` (steering)                   | ✅ Implementado         | Via `steerMessage()`                                         |
+| `systemMessage: {mode:'customize', content}`     | ✅ Implementado         | Injeção de hook context                                      |
+| `workingDirectory`                               | ✅ Implementado         | Configurado em `initOrResumeSession`                         |
+| `skillDirectories`                               | ✅ Implementado         | Configurado em `initOrResumeSession`                         |
+| `customAgents`                                   | ✅ Implementado         | Via `buildCustomAgentsConfig()`                              |
+| `excludedTools` / `availableTools`               | ✅ Implementado         | Via `getToolsConfig()`                                       |
+| `onPermissionRequest`                            | ✅ Implementado         | Via `PermissionController` + audit wrapper                   |
+| `onUserInputRequest`                             | ✅ Implementado         | Via `#handleUserInputRequest()`                              |
+| `hooks.onSessionStart`                           | ✅ Implementado         | Via `createSessionHooks()` com additionalContext             |
+| `hooks.onSessionEnd`                             | ✅ Implementado         | Via `createSessionHooks()`                                   |
+| `hooks.onErrorOccurred`                          | ✅ Implementado         | Com fallback model via ModelSelector                         |
+| `hooks.onPreToolUse`                             | ✅ Implementado         | Via `createHooks()`                                          |
+| `hooks.onPostToolUse`                            | ✅ Implementado         | Via `createHooks()`                                          |
+| `session.idle` (event)                           | ✅ Subscrito            | Via `event-collector.js`                                     |
+| `session.task_complete` (event)                  | ✅ Subscrito            | Via `_wireSdkResponseEvents()`                               |
+| `session.shutdown` (event)                       | ✅ Subscrito            | Via `_wireSdkResponseEvents()`                               |
+| `session.usage_info` (event)                     | ✅ Subscrito            | Via `_wireTokenBudgetEvents()`                               |
+| `assistant.usage` (event)                        | ✅ Subscrito            | Via `_wireUsageEvent()` — billing/PR tracking                |
+| `session.compaction_start/complete`              | ✅ Subscrito            | Via `_wireCompactionEvents()`                                |
+| `session.error` (event)                          | ✅ Subscrito            | Via `_wireSdkResponseEvents()`                               |
+| `elicitation.requested` (event)                  | ✅ Subscrito            | Via `_wireSdkResponseEvents()`                               |
+| `session.getMessages()`                          | ✅ Implementado         | Via `getSessionMessages()` com cache TTL                     |
+| `session.rpc`                                    | ✅ Usado                | Via `setSessionRpc(session.rpc)`                             |
 
 ### 3.2 Funcionalidades SDK Subutilizadas ou Ausentes
 
-| Funcionalidade SDK                                                 | Status                         | Impacto                                                                                     |
-| ------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| Funcionalidade SDK                                                 | Status                          | Impacto                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | `session.disconnect()` sem `deleteSession()` para preservar estado | ⚠️ Parcial                      | `stop()` chama `disconnect()` mas não gerencia lifecycle de sessões persistidas no servidor |
 | `client.listSessions()` para cleanup proativo                      | ⚠️ Não usado proativamente      | Sessões acumulam no servidor sem limpeza automática                                         |
 | `bufferExhaustionThreshold`                                        | ⚠️ Não configurado              | Usa default do SDK — sem controle granular de exaustão                                      |
@@ -226,86 +224,107 @@ STOP → modelo emite "STOPPED: ..." via ask_user
 
 ### BUG-SD-001 — Sessão SDK Expira em 30 Min de Idle (CRÍTICO) ✅ CORRIGIDO (F42.2)
 
-**Severidade**: ALTA
-**Arquivo**: `session-initializer.js` / `always-alive.js`
+**Severidade**: ALTA **Arquivo**: `session-initializer.js` / `always-alive.js`
 
-O SDK tem timeout de idle de 30 minutos para cleanup automático. O dialog loop mantém a sessão "viva" enquanto `ask_user` está pendente, mas quando o dialog loop **não está ativo** e o agente está em status `idle` (nenhuma task enfileirada), a sessão SDK pode expirar silenciosamente.
+O SDK tem timeout de idle de 30 minutos para cleanup automático. O dialog loop mantém a sessão
+"viva" enquanto `ask_user` está pendente, mas quando o dialog loop **não está ativo** e o agente
+está em status `idle` (nenhuma task enfileirada), a sessão SDK pode expirar silenciosamente.
 
-**Impacto**: Após 30 min sem atividade, `sendMessage()` falhará e só será detectado na tentativa de envio, forçando reconexão.
+**Impacto**: Após 30 min sem atividade, `sendMessage()` falhará e só será detectado na tentativa de
+envio, forçando reconexão.
 
-**Correção proposta**: Implementar heartbeat periódico ou keepalive ping para sessões idle (via `session.send()` com prompt no-op ou verificação de estado).
+**Correção proposta**: Implementar heartbeat periódico ou keepalive ping para sessões idle (via
+`session.send()` com prompt no-op ou verificação de estado).
 
 ### BUG-SD-002 — `reconnect-policy.js` Recria Client Mas Reutiliza o Mesmo ✅ CORRIGIDO (F42.5)
 
-**Severidade**: MÉDIA
-**Arquivo**: `reconnect-policy.js:59`
+**Severidade**: MÉDIA **Arquivo**: `reconnect-policy.js:59`
 
-Em `tryReconnect()`, o `client.stop()` é chamado antes de `initSession(client)`. Porém, o mesmo objeto `client` é reutilizado após `stop()`. O SDK pode não suportar reutilização de um client já parado — a documentação sugere que `stop()` é terminal.
+Em `tryReconnect()`, o `client.stop()` é chamado antes de `initSession(client)`. Porém, o mesmo
+objeto `client` é reutilizado após `stop()`. O SDK pode não suportar reutilização de um client já
+parado — a documentação sugere que `stop()` é terminal.
 
-**Impacto**: Possível falha silenciosa em reconexões onde o SDK internamente previne reutilização do client.
+**Impacto**: Possível falha silenciosa em reconexões onde o SDK internamente previne reutilização do
+client.
 
-**Correção proposta**: Criar um novo `CopilotClient()` em cada tentativa de reconexão em vez de reutilizar o parado.
+**Correção proposta**: Criar um novo `CopilotClient()` em cada tentativa de reconexão em vez de
+reutilizar o parado.
 
 ### BUG-SD-003 — prMetrics Não Persistidos Entre Restarts ✅ CORRIGIDO (F42.4)
 
-**Severidade**: MÉDIA
-**Arquivo**: `dialog-loop-manager.js`
+**Severidade**: MÉDIA **Arquivo**: `dialog-loop-manager.js`
 
-`#prMetrics = { boots: 0, resumesWithPR: 0, resumesZeroPR: 0 }` é inicializado em memória e nunca restaurado do estado em disco. Após PM2 restart, os contadores resetam para zero, perdendo o histórico de consumo de PR.
+`#prMetrics = { boots: 0, resumesWithPR: 0, resumesZeroPR: 0 }` é inicializado em memória e nunca
+restaurado do estado em disco. Após PM2 restart, os contadores resetam para zero, perdendo o
+histórico de consumo de PR.
 
-**Impacto**: Dashboard mostra contadores incorretos após restart. O snapshot (F41.4) salva prMetrics no shutdown, mas não são restaurados no boot.
+**Impacto**: Dashboard mostra contadores incorretos após restart. O snapshot (F41.4) salva prMetrics
+no shutdown, mas não são restaurados no boot.
 
-**Correção proposta**: No `start()`, restaurar `#prMetrics` do último snapshot ou do `sdk-always-alive.json`.
+**Correção proposta**: No `start()`, restaurar `#prMetrics` do último snapshot ou do
+`sdk-always-alive.json`.
 
 ### BUG-SD-004 — `handleDialogLoopInput` Sempre Suspende via `handleInteractiveQuestion` ✅ CORRIGIDO (F44.3)
 
-**Severidade**: BAIXA (design intencional, mas ineficiente)
-**Arquivo**: `always-alive.js:1285`
+**Severidade**: BAIXA (design intencional, mas ineficiente) **Arquivo**: `always-alive.js:1285`
 
 Quando o dialog loop está ativo e o modelo emite `READY` ou `REPLY`, `handleDialogLoopInput()`:
+
 1. Classifica e emite eventos via DLM
-2. **Sempre** chama `handleInteractiveQuestion()` que muda status para `waiting_for_input` e persiste `pendingQuestion`
+2. **Sempre** chama `handleInteractiveQuestion()` que muda status para `waiting_for_input` e
+   persiste `pendingQuestion`
 
-Isso causa uma transição de status desnecessária (`processing → waiting_for_input`) para mensagens de protocolo que serão respondidas imediatamente pelo `sendTurn()` via `answerPendingQuestion()`.
+Isso causa uma transição de status desnecessária (`processing → waiting_for_input`) para mensagens
+de protocolo que serão respondidas imediatamente pelo `sendTurn()` via `answerPendingQuestion()`.
 
-**Impacto**: Overhead de escrita em disco + status transitório visível no dashboard por frações de segundo.
+**Impacto**: Overhead de escrita em disco + status transitório visível no dashboard por frações de
+segundo.
 
-**Correção proposta**: Para mensagens READY/REPLY do protocolo, pular a persistência de `pendingQuestion` (é efêmera).
+**Correção proposta**: Para mensagens READY/REPLY do protocolo, pular a persistência de
+`pendingQuestion` (é efêmera).
 
 ### BUG-SD-005 — `stopDialogLoop()` Não Propaga `shutdownTimeoutMs` ✅ CORRIGIDO (F44.2)
 
-**Severidade**: BAIXA
-**Arquivo**: `always-alive.js:991`
+**Severidade**: BAIXA **Arquivo**: `always-alive.js:991`
 
-O método `stopDialogLoop(opts)` delega para `this.#dialogLoop.stop(opts)`, porém a assinatura pública aceita `{ authorized?, reason? }` mas NÃO inclui `shutdownTimeoutMs`. O timeout de shutdown usa o default de 30s sem opção de customização via API pública.
+O método `stopDialogLoop(opts)` delega para `this.#dialogLoop.stop(opts)`, porém a assinatura
+pública aceita `{ authorized?, reason? }` mas NÃO inclui `shutdownTimeoutMs`. O timeout de shutdown
+usa o default de 30s sem opção de customização via API pública.
 
-**Correção proposta**: Adicionar `shutdownTimeoutMs?: number` à assinatura pública de `stopDialogLoop()`.
+**Correção proposta**: Adicionar `shutdownTimeoutMs?: number` à assinatura pública de
+`stopDialogLoop()`.
 
 ### BUG-SD-006 — `forceDeactivate()` Não Limpa Fila de Mutex ✅ CORRIGIDO (F42.3)
 
-**Severidade**: MÉDIA
-**Arquivo**: `dialog-loop-manager.js:465`
+**Severidade**: MÉDIA **Arquivo**: `dialog-loop-manager.js:465`
 
-`forceDeactivate()` seta `#active = false` e para o watchdog, mas NÃO limpa `#turnMutex` ou `#turnQueueDepth`. Se havia turns enfileirados no mutex, eles continuarão executando (o `prev.then()` já foi encadeado) e emitirão eventos/respostas num DLM que já foi desativado.
+`forceDeactivate()` seta `#active = false` e para o watchdog, mas NÃO limpa `#turnMutex` ou
+`#turnQueueDepth`. Se havia turns enfileirados no mutex, eles continuarão executando (o
+`prev.then()` já foi encadeado) e emitirão eventos/respostas num DLM que já foi desativado.
 
-**Impacto**: Leak de execuções fantasma após `forceDeactivate()` durante shutdown com fila de turns profunda.
+**Impacto**: Leak de execuções fantasma após `forceDeactivate()` durante shutdown com fila de turns
+profunda.
 
-**Correção proposta**: Reset `#turnMutex = Promise.resolve(); #turnQueueDepth = 0; #turnMutexGen++` em `forceDeactivate()`.
+**Correção proposta**: Reset `#turnMutex = Promise.resolve(); #turnQueueDepth = 0; #turnMutexGen++`
+em `forceDeactivate()`.
 
 ### BUG-SD-007 — Race Condition em `resume()` Estratégia B ✅ CORRIGIDO (F42.6)
 
-**Severidade**: MÉDIA
-**Arquivo**: `dialog-loop-manager.js:393-402`
+**Severidade**: MÉDIA **Arquivo**: `dialog-loop-manager.js:393-402`
 
 Na Estratégia B do `resume()`:
+
 ```js
 this.#active = false;
 await writeStateAsync({ dialogLoopActive: false });
 await this.start();
 ```
-Entre `this.#active = false` e `this.start()`, outra chamada pode tentar `start()` sem encontrar `#active` como guard. O `start()` faz `if (this.#active) throw`, mas a janela é pequena.
 
-Mais criticamente: se `writeStateAsync` falhar, `this.#active` já é `false` mas o disco diz `dialogLoopActive: true`.
+Entre `this.#active = false` e `this.start()`, outra chamada pode tentar `start()` sem encontrar
+`#active` como guard. O `start()` faz `if (this.#active) throw`, mas a janela é pequena.
+
+Mais criticamente: se `writeStateAsync` falhar, `this.#active` já é `false` mas o disco diz
+`dialogLoopActive: true`.
 
 **Correção proposta**: Usar flag atômico de `resuming` para prevenir interleaving.
 
@@ -316,27 +335,32 @@ Mais criticamente: se `writeStateAsync` falhar, `this.#active` já é `false` ma
 ### GAP-SD-01 — Sem Gerenciamento Proativo de Sessões Persistidas no Servidor ✅ RESOLVIDO (F43.1)
 
 O SDK persiste sessões em `~/.copilot/session-state/{sessionId}/`. Não há:
+
 - Limpeza periódica de sessões antigas
 - Verificação de espaço em disco
 - Listagem e purge de sessões órfãs
 
 **Impacto**: Acumulação no disco do servidor de estados de sessões nunca mais usadas.
 
-**Resolução**: `session-cleanup.js` implementa cleanup on-boot com `listSessions()` + `deleteSession()` para sessões > 24h.
+**Resolução**: `session-cleanup.js` implementa cleanup on-boot com `listSessions()` +
+`deleteSession()` para sessões > 24h.
 
 ### GAP-SD-02 — Session Locking para Acesso Concorrente
 
-O SDK não implementa session locking nativo. Se dois processos tentarem usar a mesma sessão (cenário PM2 + terminal), haverá corrupção de estado.
+O SDK não implementa session locking nativo. Se dois processos tentarem usar a mesma sessão (cenário
+PM2 + terminal), haverá corrupção de estado.
 
 **Impacto**: Risco em cenários de multi-processo.
 
 ### GAP-SD-03 — Sem Mecanismo de Session Rotation ✅ RESOLVIDO (F43.2)
 
-Sessões muito longas (horas, dias) acumulam contexto. Mesmo com compaction, a qualidade degrada. Não há política de "criar nova sessão limpa após N horas/turnos mantendo referência à anterior".
+Sessões muito longas (horas, dias) acumulam contexto. Mesmo com compaction, a qualidade degrada. Não
+há política de "criar nova sessão limpa após N horas/turnos mantendo referência à anterior".
 
 **Impacto**: Degradação gradual de qualidade em sessões ultra-longas.
 
-**Resolução**: `session-rotation.js` implementa `shouldRotateSession()` com política configurável (4h/200 turns/5 compactions/90% utilização).
+**Resolução**: `session-rotation.js` implementa `shouldRotateSession()` com política configurável
+(4h/200 turns/5 compactions/90% utilização).
 
 ### GAP-SD-04 — Dialog Loop Não Sobrevive a Restart de PC ✅ MITIGADO (F42.1)
 
@@ -354,11 +378,15 @@ PC restart → PM2 restart → AlwaysAliveAgent.start()
   → O boot do dialog loop consome 1 PR
 ```
 
-**Problema central**: Após restart, a sessão SDK é retomada (0 PR para resume), mas o dialog loop não é restaurado automaticamente. O terminal LLM-B precisa ser reiniciado e dar `/dialog start`, consumindo 1 PR.
+**Problema central**: Após restart, a sessão SDK é retomada (0 PR para resume), mas o dialog loop
+não é restaurado automaticamente. O terminal LLM-B precisa ser reiniciado e dar `/dialog start`,
+consumindo 1 PR.
 
 ### GAP-SD-05 — Snapshot/Restore Desconectado do Resume SDK
 
-O `session-snapshot.js` salva estado do agente (model, sendCount, dialogLoopActive, prMetrics), mas o restore não integra com o `resumeSession()` do SDK. São dois sistemas paralelos:
+O `session-snapshot.js` salva estado do agente (model, sendCount, dialogLoopActive, prMetrics), mas
+o restore não integra com o `resumeSession()` do SDK. São dois sistemas paralelos:
+
 - SDK resume: restaura conversation history + tool results
 - Snapshot restore: restaura metadata do agente
 
@@ -366,7 +394,8 @@ Não há orquestração que combine ambos para um resume completo.
 
 ### GAP-SD-06 — Sem Tratamento de `session.truncation` ✅ RESOLVIDO (F43.3)
 
-O evento `session.truncation` está no `KNOWN_SDK_EVENTS` mas é silenciado. Truncation de contexto pode degradar a qualidade sem aviso.
+O evento `session.truncation` está no `KNOWN_SDK_EVENTS` mas é silenciado. Truncation de contexto
+pode degradar a qualidade sem aviso.
 
 **Resolução**: Handler dedicado em `session-event-wirer.js` propaga evento no AGENT EventEmitter.
 
@@ -378,11 +407,14 @@ O SDK emite `session.handoff` mas não há handler. Este é o gap de F41.3.
 
 ### GAP-SD-08 — Sem Health Check de Sessão Pré-Boot ✅ RESOLVIDO (F44.1)
 
-Antes de iniciar o dialog loop, não há verificação de que a sessão está saudável (connection test, token budget check). Se a sessão já está em 90% de token budget, o boot do dialog loop consumirá tokens e pode triggar compaction.
+Antes de iniciar o dialog loop, não há verificação de que a sessão está saudável (connection test,
+token budget check). Se a sessão já está em 90% de token budget, o boot do dialog loop consumirá
+tokens e pode triggar compaction.
 
 ### GAP-SD-09 — Evento `session.resume` Não Integrado com Dialog Loop Auto-Start
 
-O SDK emite `session.resume` quando retoma uma sessão. Este evento não é usado para triggar o auto-start do dialog loop.
+O SDK emite `session.resume` quando retoma uma sessão. Este evento não é usado para triggar o
+auto-start do dialog loop.
 
 ---
 
@@ -427,15 +459,20 @@ O objetivo é eliminar o 1 PR consumed no dialog loop boot após restart. Análi
 
 **Opção A: SDK `resumeSession()` preserva o `ask_user` pendente**
 
-O SDK persiste conversation history, incluindo o último `ask_user` pendente. Quando `resumeSession()` é chamado, o modelo retoma de onde parou — se o último estado era um `ask_user` pendente, o SDK deveria preservá-lo.
+O SDK persiste conversation history, incluindo o último `ask_user` pendente. Quando
+`resumeSession()` é chamado, o modelo retoma de onde parou — se o último estado era um `ask_user`
+pendente, o SDK deveria preservá-lo.
 
-**Hipótese**: Se o SDK reemite o `onUserInputRequest` após resume, o dialog loop pode retomar sem 1 PR adicional.
+**Hipótese**: Se o SDK reemite o `onUserInputRequest` após resume, o dialog loop pode retomar sem 1
+PR adicional.
 
-**Teste necessário**: Verificar se `resumeSession()` aciona `onUserInputRequest` com o `ask_user` preservado.
+**Teste necessário**: Verificar se `resumeSession()` aciona `onUserInputRequest` com o `ask_user`
+preservado.
 
 **Opção B: Auto-start do dialog loop após resume com detecção de contexto**
 
 Após `resumeSession()`, verificar se:
+
 1. `dialogLoopActive: true` no estado persistido
 2. Sessão foi retomada com sucesso (`isResumed: true`)
 3. Token budget permite (< 80%)
@@ -444,12 +481,14 @@ Se todas as condições forem atendidas, auto-start do dialog loop.
 
 **Opção C: Keepalive heartbeat para prevenir expiração de sessão**
 
-Enviar heartbeat periódico (ex: a cada 10 min) via `session.send()` com prompt no-op para prevenir o timeout de 30 min do SDK. Isso mantém a sessão viva durante periods de idle.
+Enviar heartbeat periódico (ex: a cada 10 min) via `session.send()` com prompt no-op para prevenir o
+timeout de 30 min do SDK. Isso mantém a sessão viva durante periods de idle.
 
 ### 6.4 Estratégia Recomendada: Combinação B + C
 
 1. **Keepalive** (Opção C): Manter sessão viva durante idle para evitar recriação
-2. **Auto-Dialog-Boot** (Opção B): Após resume bem-sucedido, auto-iniciar dialog loop se estava ativo antes do restart
+2. **Auto-Dialog-Boot** (Opção B): Após resume bem-sucedido, auto-iniciar dialog loop se estava
+   ativo antes do restart
 3. **Verificar Opção A**: Testar se SDK preserva `ask_user` após resume para potencial 0 PR
 
 ---
@@ -531,19 +570,26 @@ Enviar heartbeat periódico (ex: a cada 10 min) via `session.send()` com prompt 
 #### UPG-SD-01: Session Keepalive (Prevenir Timeout 30min)
 
 Criar `SessionKeepAlive` que envia heartbeat periódico quando:
+
 - Agente está `idle`
 - Dialog loop NÃO está ativo (dialog loop já mantém a sessão viva via `ask_user`)
 - Última atividade > 20 min
 
 ```js
 class SessionKeepAlive {
-    #timer = null;
-    #session = null;
-    #intervalMs = 10 * 60_000; // 10 min
+  #timer = null;
+  #session = null;
+  #intervalMs = 10 * 60_000; // 10 min
 
-    start(session) { /* setInterval → session.send({prompt: '[keepalive]'}) */ }
-    stop() { /* clearInterval */ }
-    ping() { /* reset timer */ }
+  start(session) {
+    /* setInterval → session.send({prompt: '[keepalive]'}) */
+  }
+  stop() {
+    /* clearInterval */
+  }
+  ping() {
+    /* reset timer */
+  }
 }
 ```
 
@@ -553,15 +599,15 @@ Em `AlwaysAliveAgent.start()`, após sessão retomada com sucesso:
 
 ```js
 if (isResumed) {
-    const state = readState();
-    if (state?.dialogLoopActive && !state?.dialogPaused) {
-        const snapshot = loadLatestSnapshot();
-        const tokenBudgetOk = this.#contextState?.utilization < 0.8;
-        if (tokenBudgetOk) {
-            log('INFO', '[AlwaysAlive] Auto-starting dialog loop após resume...');
-            setTimeout(() => this.startDialogLoop(), 5_000); // delay para estabilizar
-        }
+  const state = readState();
+  if (state?.dialogLoopActive && !state?.dialogPaused) {
+    const snapshot = loadLatestSnapshot();
+    const tokenBudgetOk = this.#contextState?.utilization < 0.8;
+    if (tokenBudgetOk) {
+      log('INFO', '[AlwaysAlive] Auto-starting dialog loop após resume...');
+      setTimeout(() => this.startDialogLoop(), 5_000); // delay para estabilizar
     }
+  }
 }
 ```
 
@@ -606,27 +652,30 @@ callbacks.updateClient(freshClient);
 #### UPG-SD-06: Session Cleanup Proativo
 
 Periódico (ex: a cada boot + diário):
+
 ```js
 const sessions = await client.listSessions();
 for (const s of sessions) {
-    if (Date.now() - s.lastActivity > 24*60*60*1000) {
-        await client.deleteSession(s.sessionId);
-    }
+  if (Date.now() - s.lastActivity > 24 * 60 * 60 * 1000) {
+    await client.deleteSession(s.sessionId);
+  }
 }
 ```
 
 #### UPG-SD-07: Propagação de Eventos Silenciados
 
-Propagar `session.truncation`, `session.handoff`, `session.snapshot_rewind` no `session-event-wirer.js`.
+Propagar `session.truncation`, `session.handoff`, `session.snapshot_rewind` no
+`session-event-wirer.js`.
 
 #### UPG-SD-08: Health Check Pré-Boot do Dialog Loop
 
 Antes de `startDialogLoop()`:
+
 ```js
 // Verificar token budget
 if (this.#contextState?.utilization > 0.85) {
-    log('WARN', '[AlwaysAlive] Token budget alto — aguardando compaction antes do dialog boot');
-    await once(this, 'session.compaction_complete', { timeout: 30_000 });
+  log('WARN', '[AlwaysAlive] Token budget alto — aguardando compaction antes do dialog boot');
+  await once(this, 'session.compaction_complete', { timeout: 30_000 });
 }
 ```
 
@@ -634,19 +683,18 @@ if (this.#contextState?.utilization > 0.85) {
 
 ```js
 class SessionRotation {
-    #maxAgeMs = 8 * 60 * 60_000;  // 8h
-    #maxTurns = 200;
+  #maxAgeMs = 8 * 60 * 60_000; // 8h
+  #maxTurns = 200;
 
-    shouldRotate(startedAt, turnCount) {
-        return (Date.now() - startedAt > this.#maxAgeMs) ||
-               (turnCount > this.#maxTurns);
-    }
+  shouldRotate(startedAt, turnCount) {
+    return Date.now() - startedAt > this.#maxAgeMs || turnCount > this.#maxTurns;
+  }
 
-    async rotate(agent) {
-        await agent.stop();
-        clearState();
-        await agent.start(); // Nova sessão limpa
-    }
+  async rotate(agent) {
+    await agent.stop();
+    clearState();
+    await agent.start(); // Nova sessão limpa
+  }
 }
 ```
 
@@ -659,32 +707,39 @@ class SessionRotation {
 > Prioridade: P0 — Impacto direto em consumo de PR e resiliência
 
 #### F42.1 — Auto Dialog Loop Start Após Resume
+
 - **Arquivo**: `always-alive.js`
-- **O que**: Após `start()` com `isResumed: true`, verificar `dialogLoopActive` no estado e auto-iniciar
+- **O que**: Após `start()` com `isResumed: true`, verificar `dialogLoopActive` no estado e
+  auto-iniciar
 - **Condições**: `isResumed && dialogLoopActive && !dialogPaused && tokenBudget < 80%`
 - **Delay**: 5s para estabilização
 - **PR Cost**: 1 PR (boot do dialog) — inevitável, mas automático sem intervenção manual
 - **Testes**: Unitário + integração com mock de session
 
 #### F42.2 — Session Keepalive Heartbeat
+
 - **Arquivo**: Novo `src/copilot/agent/session-keepalive.js`
 - **O que**: Timer que envia heartbeat quando idle > 20min e dialog loop inativo
 - **Intervalo**: 10min (configurável via AGENT_KEEPALIVE_MS)
-- **Integra com**: `start()` (liga), `stop()` (desliga), `startDialogLoop()` (pausa — dialog mantém vivo)
+- **Integra com**: `start()` (liga), `stop()` (desliga), `startDialogLoop()` (pausa — dialog mantém
+  vivo)
 - **Testes**: Unitário com fake timers
 
 #### F42.3 — ForceDeactivate v2 (BUG-SD-006)
+
 - **Arquivo**: `dialog-loop-manager.js:465`
 - **O que**: Reset completo de mutex, queue depth e generation counter
 - **Impacto**: Previne execuções fantasma após shutdown forçado
 - **Testes**: Unitário com turns enfileirados + forceDeactivate
 
 #### F42.4 — PrMetrics Persistence (BUG-SD-003)
+
 - **Arquivo**: `dialog-loop-manager.js` + `always-alive.js`
 - **O que**: Salvar prMetrics em `sdk-always-alive.json` a cada boot/resume; restaurar no construct
 - **Testes**: Unitário — save/restore cycle
 
 #### F42.5 — Reconnect com Novo Client (BUG-SD-002)
+
 - **Arquivo**: `reconnect-policy.js` + `always-alive.js`
 - **O que**: Criar novo `CopilotClient()` a cada tentativa de reconexão
 - **Impacto**: Evita reutilização de client parado
@@ -692,6 +747,7 @@ class SessionRotation {
 - **Testes**: Unitário com mock de CopilotClient
 
 #### F42.6 — Resume Atomicity Fix (BUG-SD-007)
+
 - **Arquivo**: `dialog-loop-manager.js:393`
 - **O que**: Adicionar flag `#resuming` para prevenir interleaving entre `resume()` e `start()`
 - **Testes**: Unitário com chamadas concorrentes
@@ -701,12 +757,14 @@ class SessionRotation {
 > Prioridade: P1 — Governance e cleanup de sessões
 
 #### F43.1 — Session Cleanup On-Boot
+
 - **Arquivo**: `always-alive.js` (em `start()`) ou nova `session-cleanup.js`
 - **O que**: `listSessions()` → deletar sessões > 24h no boot do agente
 - **Quando**: Após `initSession()`, antes de `emit('ready')`
 - **Testes**: Unitário com mock de listSessions/deleteSession
 
 #### F43.2 — Session Rotation Policy
+
 - **Arquivo**: Novo `src/copilot/agent/session-rotation.js`
 - **O que**: Política de rotação baseada em idade (8h) ou turnos (200)
 - **Trigger**: Avaliado no `session.usage_info` event
@@ -714,12 +772,14 @@ class SessionRotation {
 - **Testes**: Unitário + integração
 
 #### F43.3 — Propagação de `session.truncation`
+
 - **Arquivo**: `session-event-wirer.js`
 - **O que**: Handler dedicado para `session.truncation` — emitir warning no AGENT + log
 - **Impacto**: Visibilidade de degradação de contexto
 - **Testes**: Unitário
 
 #### F43.4 — Propagação de `session.snapshot_rewind`
+
 - **Arquivo**: `session-event-wirer.js`
 - **O que**: Handler dedicado — emitir no AGENT EventEmitter + log com detalhes
 - **Testes**: Unitário
@@ -729,17 +789,20 @@ class SessionRotation {
 > Prioridade: P1 — Robustez operacional
 
 #### F44.1 — Health Check Pré-Boot
+
 - **Arquivo**: `always-alive.js` ou `dialog-loop-manager.js`
 - **O que**: Antes de `startDialogLoop()`, verificar token budget, connection health
 - **Se budget > 85%**: Aguardar compaction ou emitir warning
 - **Testes**: Unitário
 
 #### F44.2 — `stopDialogLoop` com `shutdownTimeoutMs` (BUG-SD-005)
+
 - **Arquivo**: `always-alive.js:991`
 - **O que**: Expor `shutdownTimeoutMs` na assinatura pública de `stopDialogLoop()`
 - **Testes**: Unitário
 
 #### F44.3 — Dialog Protocol Efficiency (BUG-SD-004)
+
 - **Arquivo**: `always-alive.js:1285`
 - **O que**: Pular `writeStateAsync({ pendingQuestion })` para mensagens READY/REPLY do protocolo
 - **Impacto**: Reduz I/O desnecessário no hot path do dialog loop
@@ -750,23 +813,27 @@ class SessionRotation {
 > Prioridade: P2 — Feature nova baseada em evento SDK
 
 #### F45.1 — Handler de `session.handoff` Event
+
 - **Arquivo**: `session-event-wirer.js`
 - **O que**: Subscrever `session.handoff`, emitir no AGENT EventEmitter
 - **Dados**: `{ fromSessionId, toSessionId, reason, handoffData }`
 - **Testes**: Unitário
 
 #### F45.2 — HandoffManager
+
 - **Arquivo**: Novo `src/copilot/agent/handoff-manager.js`
 - **O que**: Gerencia handoff requests — accept, reject, auto-accept policy
 - **API**: `accept(handoffId)`, `reject(handoffId, reason)`, `setPolicy('auto' | 'manual')`
 - **Testes**: Unitário
 
 #### F45.3 — Rotas HTTP de Handoff
+
 - **Arquivo**: Rotas no servidor HTTP existente
 - **O que**: `POST /handoff/accept`, `POST /handoff/reject`, `GET /handoff/pending`
 - **Testes**: Integração HTTP
 
 #### F45.4 — Terminal Commands de Handoff
+
 - **Arquivo**: Novo command em `terminal/commands/handoff.js`
 - **O que**: `/handoff list`, `/handoff accept <id>`, `/handoff reject <id> [reason]`
 - **Testes**: Unitário
@@ -776,16 +843,22 @@ class SessionRotation {
 > Prioridade: P2 — Visibilidade e diagnóstico
 
 #### F46.1 — Dashboard Widget de Session Lifecycle
-- **O que**: Visualizar no dashboard: idade da sessão, turns, token usage, PR consumed, rotation schedule
+
+- **O que**: Visualizar no dashboard: idade da sessão, turns, token usage, PR consumed, rotation
+  schedule
 - **Testes**: Unitário Vue component
 
 #### F46.2 — Session Metrics Export
+
 - **O que**: Endpoint `GET /metrics/session` com Prometheus-style metrics
-- **Métricas**: session_age_ms, session_turns_total, pr_consumed_total, compaction_count, reconnect_count
+- **Métricas**: session_age_ms, session_turns_total, pr_consumed_total, compaction_count,
+  reconnect_count
 - **Testes**: Integração HTTP
 
 #### F46.3 — Auditoria de Eventos SDK Completa
-- **O que**: Verificar todos os 83 tipos de eventos documentados no streaming-events.md; garantir que cada um tem tratamento (handler, forward ou suppress documentado)
+
+- **O que**: Verificar todos os 83 tipos de eventos documentados no streaming-events.md; garantir
+  que cada um tem tratamento (handler, forward ou suppress documentado)
 - **Resultado**: Tabela exaustiva de cobertura
 
 ---
@@ -818,10 +891,10 @@ class SessionRotation {
 | session.title_changed       |   ✓    |       ✓        |        ✓        | Propagado                         |
 | session.context_changed     |   ✓    |       ✓        |        ✓        | Propagado                         |
 | session.mode_changed        |   ✓    |       ✓        |        ✓        | Log + propagado                   |
-| session.truncation          |   ✓    |       ✗        |        ✓        | ✅ F43.3 — propagado             |
-| session.handoff             |   ✓    |       ✓        |        ✓        | ✅ F45.1 — HandoffManager        |
+| session.truncation          |   ✓    |       ✗        |        ✓        | ✅ F43.3 — propagado              |
+| session.handoff             |   ✓    |       ✓        |        ✓        | ✅ F45.1 — HandoffManager         |
 | session.resume              |   ✗    |       ✓        |        ✗        | Apenas observabilidade            |
-| session.snapshot_rewind     |   ✓    |       ✗        |        ✓        | ✅ F43.4 — propagado             |
+| session.snapshot_rewind     |   ✓    |       ✗        |        ✓        | ✅ F43.4 — propagado              |
 | assistant.turn_start        |   ✓    |       ✓        |        ✓        | Propagado                         |
 | assistant.turn_end          |   ✓    |       ✓        |        ✓        | Propagado                         |
 | assistant.intent            |   ✓    |       ✓        |        ✓        | Propagado                         |
@@ -865,26 +938,26 @@ class SessionRotation {
 
 | Subfase | Descrição                                 | Status | Commit   |
 | ------- | ----------------------------------------- | :----: | -------- |
-| F42.1   | Auto-start dialog loop após resume        |   ✅    | Pendente |
-| F42.2   | Session Keepalive heartbeat               |   ✅    | Pendente |
-| F42.3   | ForceDeactivate fix (BUG-SD-006)          |   ✅    | Pendente |
-| F42.4   | PrMetrics persistence (BUG-SD-003)        |   ✅    | Pendente |
-| F42.5   | Reconnect com client fresco (BUG-SD-002)  |   ✅    | Pendente |
-| F42.6   | Resume atomicity fix (BUG-SD-007)         |   ✅    | Pendente |
-| F43.1   | Session cleanup on-boot (GAP-SD-01)       |   ✅    | Pendente |
-| F43.2   | Session rotation policy (GAP-SD-03)       |   ✅    | Pendente |
-| F43.3   | Propagação session.truncation (GAP-SD-06) |   ✅    | Pendente |
-| F43.4   | Propagação snapshot_rewind (GAP-SD-04)    |   ✅    | Pendente |
-| F44.1   | Health check pré-boot dialog              |   ✅    | Pendente |
-| F44.2   | shutdownTimeoutMs em stopDialogLoop       |   ✅    | Pendente |
-| F44.3   | Dialog protocol efficiency (BUG-SD-004)   |   ✅    | Pendente |
-| F45.1   | Handler session.handoff no wirer          |   ✅    | Pendente |
-| F45.2   | HandoffManager                            |   ✅    | Pendente |
-| F45.3   | Rotas HTTP para handoff                   |   ✅    | Pendente |
-| F45.4   | Comando /handoff no REPL                  |   ✅    | Pendente |
-| F46.1   | Métricas de sessão no dashboard           |   ✅    | Pendente |
-| F46.2   | Exportação Prometheus de sessão           |   ✅    | Pendente |
-| F46.3   | Auditoria completa de eventos SDK         |   ✅    | Pendente |
+| F42.1   | Auto-start dialog loop após resume        |   ✅   | Pendente |
+| F42.2   | Session Keepalive heartbeat               |   ✅   | Pendente |
+| F42.3   | ForceDeactivate fix (BUG-SD-006)          |   ✅   | Pendente |
+| F42.4   | PrMetrics persistence (BUG-SD-003)        |   ✅   | Pendente |
+| F42.5   | Reconnect com client fresco (BUG-SD-002)  |   ✅   | Pendente |
+| F42.6   | Resume atomicity fix (BUG-SD-007)         |   ✅   | Pendente |
+| F43.1   | Session cleanup on-boot (GAP-SD-01)       |   ✅   | Pendente |
+| F43.2   | Session rotation policy (GAP-SD-03)       |   ✅   | Pendente |
+| F43.3   | Propagação session.truncation (GAP-SD-06) |   ✅   | Pendente |
+| F43.4   | Propagação snapshot_rewind (GAP-SD-04)    |   ✅   | Pendente |
+| F44.1   | Health check pré-boot dialog              |   ✅   | Pendente |
+| F44.2   | shutdownTimeoutMs em stopDialogLoop       |   ✅   | Pendente |
+| F44.3   | Dialog protocol efficiency (BUG-SD-004)   |   ✅   | Pendente |
+| F45.1   | Handler session.handoff no wirer          |   ✅   | Pendente |
+| F45.2   | HandoffManager                            |   ✅   | Pendente |
+| F45.3   | Rotas HTTP para handoff                   |   ✅   | Pendente |
+| F45.4   | Comando /handoff no REPL                  |   ✅   | Pendente |
+| F46.1   | Métricas de sessão no dashboard           |   ✅   | Pendente |
+| F46.2   | Exportação Prometheus de sessão           |   ✅   | Pendente |
+| F46.3   | Auditoria completa de eventos SDK         |   ✅   | Pendente |
 
 ### Arquivos criados (4)
 

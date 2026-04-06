@@ -2,12 +2,12 @@
 /**
  * tests/unit/copilot/test_session_keepalive.spec.js
  *
- * Testes unitários para F42.2: SessionKeepalive — heartbeat periódico
- * para prevenir expiração de sessão SDK por idle timeout.
+ * Testes unitários para F42.2: SessionKeepalive — heartbeat periódico para prevenir expiração de sessão SDK por idle
+ * timeout.
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it, afterEach } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 
 describe('SessionKeepalive', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session-keepalive.js').SessionKeepalive} */

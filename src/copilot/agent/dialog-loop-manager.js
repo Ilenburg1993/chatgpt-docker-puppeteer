@@ -541,8 +541,8 @@ export class DialogLoopManager extends EventEmitter {
     /**
      * Força desativação sem protocolo (usado durante shutdown do agente).
      *
-     * F42.3 (BUG-SD-006 fix): reseta mutex, queue depth e generation counter para prevenir
-     * execuções fantasma de turns enfileirados que continuariam executando após desativação.
+     * F42.3 (BUG-SD-006 fix): reseta mutex, queue depth e generation counter para prevenir execuções fantasma de turns
+     * enfileirados que continuariam executando após desativação.
      */
     forceDeactivate() {
         this.#active = false;

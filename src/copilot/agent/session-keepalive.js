@@ -4,8 +4,8 @@
  *
  * F42.2 (BUG-SD-001 fix): Previne expiração de sessão SDK por idle timeout (30 min).
  *
- * Envia heartbeat periódico quando o agente está idle e dialog loop não está ativo
- * (o dialog loop já mantém a sessão viva via `ask_user` pendente).
+ * Envia heartbeat periódico quando o agente está idle e dialog loop não está ativo (o dialog loop já mantém a sessão
+ * viva via `ask_user` pendente).
  *
  * @module copilot/agent/session-keepalive
  */
@@ -42,14 +42,15 @@ export class SessionKeepalive {
      */
     constructor(options = {}) {
         this.#intervalMs = options.intervalMs ?? Number(process.env['AGENT_KEEPALIVE_MS'] || 10 * 60_000);
-        this.#idleThresholdMs = options.idleThresholdMs ?? Number(process.env['AGENT_KEEPALIVE_IDLE_MS'] || 20 * 60_000);
+        this.#idleThresholdMs =
+            options.idleThresholdMs ?? Number(process.env['AGENT_KEEPALIVE_IDLE_MS'] || 20 * 60_000);
     }
 
     /**
      * Inicia o monitor de keepalive.
      *
      * @param {{
-     *     getSession: () => ({ send?: (opts: { prompt: string }) => Promise<unknown> } | null);
+     *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
      *     onKeepalive?: (ts: number) => void;
@@ -65,7 +66,10 @@ export class SessionKeepalive {
         }, this.#intervalMs);
         this.#timer.unref();
 
-        log('INFO', `[SessionKeepalive] Iniciado (intervalo: ${this.#intervalMs}ms, idle threshold: ${this.#idleThresholdMs}ms).`);
+        log(
+            'INFO',
+            `[SessionKeepalive] Iniciado (intervalo: ${this.#intervalMs}ms, idle threshold: ${this.#idleThresholdMs}ms).`,
+        );
     }
 
     /**
@@ -82,8 +86,7 @@ export class SessionKeepalive {
     }
 
     /**
-     * Registra atividade recente (reseta o timer de idle).
-     * Deve ser chamado a cada sendMessage, sendDialogTurn, etc.
+     * Registra atividade recente (reseta o timer de idle). Deve ser chamado a cada sendMessage, sendDialogTurn, etc.
      */
     ping() {
         this.#lastActivityAt = Date.now();
@@ -96,7 +99,7 @@ export class SessionKeepalive {
 
     /**
      * @param {{
-     *     getSession: () => ({ send?: (opts: { prompt: string }) => Promise<unknown> } | null);
+     *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
      *     onKeepalive?: (ts: number) => void;

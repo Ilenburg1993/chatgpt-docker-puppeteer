@@ -31,7 +31,9 @@ describe('HandoffManager', async () => {
         it('deve emitir evento handoff.received', () => {
             const mgr = new HandoffManager();
             let received = false;
-            mgr.on('handoff.received', () => { received = true; });
+            mgr.on('handoff.received', () => {
+                received = true;
+            });
             mgr.receive({ fromAgent: 'a' });
             assert.ok(received);
         });
@@ -63,7 +65,9 @@ describe('HandoffManager', async () => {
         it('deve emitir evento handoff.accepted', () => {
             const mgr = new HandoffManager();
             let accepted = false;
-            mgr.on('handoff.accepted', () => { accepted = true; });
+            mgr.on('handoff.accepted', () => {
+                accepted = true;
+            });
             const req = mgr.receive({ fromAgent: 'a' });
             mgr.accept(req.id);
             assert.ok(accepted);
@@ -90,7 +94,9 @@ describe('HandoffManager', async () => {
         it('deve emitir evento handoff.rejected', () => {
             const mgr = new HandoffManager();
             let rejected = false;
-            mgr.on('handoff.rejected', () => { rejected = true; });
+            mgr.on('handoff.rejected', () => {
+                rejected = true;
+            });
             const req = mgr.receive({ fromAgent: 'a' });
             mgr.reject(req.id);
             assert.ok(rejected);

@@ -494,7 +494,10 @@ function _wireSdkResponseEvents(session, { emit }) {
                 reason: reason ?? 'unknown',
                 ts: Date.now(),
             });
-            log('WARN', `[session-event-wirer] session.truncation: ${messageTruncatedCount ?? '?'} msgs, ${tokensTruncated ?? '?'} tokens (reason: ${reason ?? '?'})`);
+            log(
+                'WARN',
+                `[session-event-wirer] session.truncation: ${messageTruncatedCount ?? '?'} msgs, ${tokensTruncated ?? '?'} tokens (reason: ${reason ?? '?'})`,
+            );
         }),
         // F43.4: propagar session.snapshot_rewind para observabilidade
         session.on('session.snapshot_rewind', (/** @type {SdkEvent} */ evt) => {
@@ -504,7 +507,10 @@ function _wireSdkResponseEvents(session, { emit }) {
                 reason: reason ?? 'unknown',
                 ts: Date.now(),
             });
-            log('INFO', `[session-event-wirer] session.snapshot_rewind: snapshot=${snapshotId ?? '?'}, reason=${reason ?? '?'}`);
+            log(
+                'INFO',
+                `[session-event-wirer] session.snapshot_rewind: snapshot=${snapshotId ?? '?'}, reason=${reason ?? '?'}`,
+            );
         }),
         // F45.1 (GAP-SD-07): propagar session.handoff para HandoffManager
         session.on('session.handoff', (/** @type {SdkEvent} */ evt) => {
@@ -516,7 +522,10 @@ function _wireSdkResponseEvents(session, { emit }) {
                 context: context ?? undefined,
                 ts: Date.now(),
             });
-            log('INFO', `[session-event-wirer] session.handoff: ${fromAgent ?? '?'} → ${toAgent ?? '?'} (reason: ${reason ?? '?'})`);
+            log(
+                'INFO',
+                `[session-event-wirer] session.handoff: ${fromAgent ?? '?'} → ${toAgent ?? '?'} (reason: ${reason ?? '?'})`,
+            );
         }),
     ];
 }
