@@ -22,6 +22,7 @@
  * @module copilot/observability/agent-event-observer
  */
 
+import { modelStatsTracker } from '../lib/model-registry.js';
 import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { startSpanImmediate } from './otel.js';
@@ -74,6 +75,10 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
 
     /** CR-02: timestamp do último chunk de streaming para medir intervalo. */
     let _lastChunkTs = 0;
+
+    /** F40.4: duração e success do último turn (para alimentar ModelStatsTracker no session.usage). */
+    let _lastTurnDurationMs = 0;
+    let _lastTurnSuccess = true;
 
     /**
      * @param {import('node:events').EventEmitter} emitter
@@ -149,6 +154,9 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 const durationMs = evt?.durationMs ?? (entry ? performance.now() - entry.ts : 0);
                 const success = typeof evt?.reply === 'string' && evt.reply.length > 0;
                 metrics.recordDialogTurn(Math.round(durationMs), success);
+                // F40.4: rastrear última latência/sucesso para alimentar ModelStatsTracker
+                _lastTurnDurationMs = Math.round(durationMs);
+                _lastTurnSuccess = success;
                 // CO-03: fechar span OTEL do turn
                 if (entry?.span) {
                     entry.span.setAttribute('duration_ms', Math.round(durationMs));
@@ -205,7 +213,18 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 const durationMs = evt?.durationMs ?? 0;
                 metrics.recordTaskCompletion(durationMs, true);
                 metrics.recordCounter('tasks.completed');
-                log('DEBUG', `[agent-event-observer] task.completed taskId=${evt?.taskId} durationMs=${durationMs}`);
+                // F29.4: fechar span OTEL da task
+                const taskId = evt?.taskId ?? 'unknown';
+                const entry = _taskSpans.get(taskId);
+                if (entry) {
+                    _taskSpans.delete(taskId);
+                    if (entry.span) {
+                        entry.span.setAttribute('duration_ms', Math.round(durationMs));
+                        entry.span.setAttribute('success', true);
+                        entry.span.end();
+                    }
+                }
+                log('DEBUG', `[agent-event-observer] task.completed taskId=${taskId} durationMs=${durationMs}`);
             }, 'task.completed'),
         );
 
@@ -219,13 +238,27 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                 metrics.recordCounter('tasks.errors');
                 metrics.recordSessionError();
 
+                // F29.4: fechar span OTEL da task com erro
+                const taskId = evt?.taskId ?? 'unknown';
+                const entry = _taskSpans.get(taskId);
+                if (entry) {
+                    _taskSpans.delete(taskId);
+                    if (entry.span) {
+                        entry.span.setAttribute('duration_ms', Math.round(durationMs));
+                        entry.span.setAttribute('success', false);
+                        entry.span.setStatus({ code: 2, message: String(evt?.error ?? 'task.error') });
+                        if (evt?.error) entry.span.recordException(evt.error);
+                        entry.span.end();
+                    }
+                }
+
                 // Fase BM: propagar para ErrorTracker (anteriormente ausente para task.error)
                 if (errorTracker) {
                     const err = evt?.error instanceof Error ? evt.error : new Error(String(evt?.error ?? 'task.error'));
-                    errorTracker.trackError(err, { source: 'agent:task.error', metadata: { taskId: evt?.taskId } });
+                    errorTracker.trackError(err, { source: 'agent:task.error', metadata: { taskId } });
                 }
 
-                log('WARN', `[agent-event-observer] task.error taskId=${evt?.taskId}`);
+                log('WARN', `[agent-event-observer] task.error taskId=${taskId}`);
             }, 'task.error'),
         );
 
@@ -385,13 +418,31 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
             }, 'task.queued'),
         );
 
+        // ── F29.4: Map de taskId → { ts, span } para OTEL de tasks não-dialog ───
+        /** @type {Map<string, { ts: number; span: import('./otel.js').OtelSpan | null }>} */
+        const _taskSpans = new Map();
+        /** TTL para entradas _taskSpans (10 minutos) */
+        const _TASK_SPAN_TTL_MS = 10 * 60 * 1000;
+
         // ── task.started — tarefa iniciada ────────────────────────────────────
         _on(
             agent,
             'task.started',
             _safe((/** @type {{ taskId?: string }} */ evt) => {
                 metrics.recordCounter('tasks.started');
-                log('DEBUG', `[agent-event-observer] task.started taskId=${evt?.taskId ?? '?'}`);
+                const taskId = evt?.taskId ?? 'unknown';
+                // F29.4: TTL cleanup
+                const nowPerf = performance.now();
+                for (const [id, entry] of _taskSpans) {
+                    if (nowPerf - entry.ts > _TASK_SPAN_TTL_MS) {
+                        entry.span?.end();
+                        _taskSpans.delete(id);
+                    }
+                }
+                // F29.4: span OTEL para rastreio de task
+                const span = startSpanImmediate('copilot.task', { taskId });
+                _taskSpans.set(taskId, { ts: nowPerf, span });
+                log('DEBUG', `[agent-event-observer] task.started taskId=${taskId}`);
             }, 'task.started'),
         );
 
@@ -650,6 +701,15 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
                     // F30: recordUsage removido daqui para evitar dupla contagem.
                     // O event-collector.js já chama recordUsage() diretamente do SDK session event,
                     // que é o source-of-truth para persistência de usage.
+                    // F40.4: alimentar ModelStatsTracker com latência do último turn
+                    if (model !== 'unknown') {
+                        modelStatsTracker.record(model, {
+                            latencyMs: _lastTurnDurationMs,
+                            success: _lastTurnSuccess,
+                            inputTokens: input,
+                            outputTokens: output,
+                        });
+                    }
                     log(
                         'DEBUG',
                         `[agent-event-observer] session.usage tokens=${evt?.tokens ?? '?'} model=${model} input=${input} output=${output} cache=${cacheRead}/${cacheWrite}`,

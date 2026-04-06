@@ -10,6 +10,7 @@
  */
 
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { modelRegistry, modelStatsTracker } from '../../lib/model-registry.js';
 import { listModels } from '../../lib/models.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
@@ -40,11 +41,37 @@ export async function cmdModel({ println }, arg) {
 
     if (!arg || arg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
-        println(`  \x1b[90mUso: /model list  |  /model <id>\x1b[0m\n`);
+        const meta = modelRegistry.get(current);
+        if (meta) {
+            println(
+                `  \x1b[90m    cost=${meta.costTier}  speed=${meta.speedTier}  ctx=${meta.contextWindow.toLocaleString()}\x1b[0m`,
+            );
+        }
+        println(`  \x1b[90mUso: /model list | stats | <id>\x1b[0m\n`);
         return;
     }
 
     const trimmed = arg.trim().toLowerCase();
+
+    if (trimmed === 'stats') {
+        const stats = modelStatsTracker.allStats();
+        if (stats.length === 0) {
+            println('  \x1b[33mSem estatísticas coletadas ainda.\x1b[0m\n');
+            return;
+        }
+        println(`\n  \x1b[36mEstatísticas por modelo:\x1b[0m\n`);
+        for (const s of stats) {
+            const isActive = s.modelId === current;
+            const marker = isActive ? ' \x1b[32m← ativo\x1b[0m' : '';
+            const rate = (s.successRate * 100).toFixed(0);
+            println(`    \x1b[33m${s.modelId}\x1b[0m${marker}`);
+            println(
+                `      calls=${s.totalCalls}  avg_latency=${s.avgLatencyMs}ms  success=${rate}%  tokens=${s.totalTokens}`,
+            );
+        }
+        println('');
+        return;
+    }
 
     if (trimmed === 'list') {
         println('\x1b[90m  Consultando modelos disponíveis…\x1b[0m');

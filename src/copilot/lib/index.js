@@ -82,6 +82,17 @@ export {
 } from '#copilot/lib/agents';
 
 export {
+    AutoDowngradeDetector,
+    ModelRegistry,
+    ModelSelector,
+    ModelStatsTracker,
+    autoDowngradeDetector,
+    modelRegistry,
+    modelSelector,
+    modelStatsTracker,
+} from '#copilot/lib/model-registry';
+
+export {
     buildReasoningConfig,
     filterEnabledModels,
     filterReasoningModels,

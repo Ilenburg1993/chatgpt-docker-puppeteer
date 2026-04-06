@@ -16,6 +16,7 @@
  */
 
 import { getCopilotFallbackModel } from '#copilot/core/constants';
+import { modelSelector } from '#copilot/lib/model-registry';
 import { defaultMetrics } from '#copilot/observability';
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
@@ -107,8 +108,13 @@ export function createSessionHooks(ctx) {
 
         const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
         if (isRateOrQuotaError) {
-            const currentModel = getModel();
-            const fallbackModel = getCopilotFallbackModel();
+            const currentModel = getModel() ?? 'unknown';
+            // F40.3: priorizar env var explícita; se ausente, usar ModelSelector dinâmico
+            const envFallback = getCopilotFallbackModel();
+            const fallbackModel =
+                envFallback && envFallback !== currentModel
+                    ? envFallback
+                    : (modelSelector.suggestFallback(currentModel)?.id ?? null);
             if (fallbackModel && fallbackModel !== currentModel) {
                 log(
                     'WARN',
@@ -116,7 +122,7 @@ export function createSessionHooks(ctx) {
                 );
                 scheduleFallback(fallbackModel);
             } else {
-                log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem COPILOT_FALLBACK_MODEL configurado.');
+                log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
             }
         }
 
