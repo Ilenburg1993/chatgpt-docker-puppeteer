@@ -15,10 +15,10 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { log } from '#copilot/observability/logger';
-import { wrapWithStats } from '#copilot/observability/tool-stats';
 import { buildCustomTools } from '#copilot/config/custom-tools-registry';
 import { registerTools } from '#copilot/lib/tools-registry';
+import { log } from '#copilot/observability/logger';
+import { wrapWithStats } from '#copilot/observability/tool-stats';
 import {
     codeTools,
     fileReadTools,
