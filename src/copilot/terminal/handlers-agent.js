@@ -8,7 +8,7 @@
  * @see module:copilot/terminal/http-handlers
  */
 
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 import { sendTurn } from './dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './file-context.js';
 import { recordInjectHistory } from './state.js';

@@ -44,6 +44,8 @@ import {
  * @typedef {import('@github/copilot-sdk').Tool} Tool
  */
 
+// R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc exportados diretamente de tools/index.js
+// O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
 export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '../../tools/index.js';
 
 /**

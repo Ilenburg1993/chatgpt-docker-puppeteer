@@ -10,7 +10,7 @@
  * @module copilot/terminal/commands/context
  */
 
-import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
 import { llmBridgeClient } from '../../channel/client.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 

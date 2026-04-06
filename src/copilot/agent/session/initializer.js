@@ -28,9 +28,6 @@ import { pickDefined } from '../../lib/utils.js';
 import { readStore as _readTodoStore } from '../../tools/todo/store.js';
 import { buildAuditingPermissionHandler } from '../infra/tool-audit-logger.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
-// Re-exporta funções de I/O de estado de state-io.js para compatibilidade retroativa com importadores
-// que usam '#copilot/session-manager'. Novos módulos devem importar de '../lifecycle/state-io.js'.
-export { clearState, readState, writeState, writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient

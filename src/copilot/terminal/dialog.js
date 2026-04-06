@@ -18,7 +18,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 import { eventFanout } from '../api/event-fanout.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { llmBridgeClient } from '../channel/client.js';

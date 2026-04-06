@@ -17,7 +17,7 @@
  * @module copilot/terminal/commands/diagnose
  */
 
-import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
 import { getMcpStatus } from '../../bridges/mcp-tool-bridge.js';
 import { conversationHub } from '../../conversation-hub/hub.js';
 import { conversationStore } from '../../conversation-hub/store.js';

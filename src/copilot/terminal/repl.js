@@ -17,7 +17,7 @@
 
 import { log } from '#copilot/observability/logger';
 import readline from 'node:readline';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 import { resolve } from '../bridges/alias-store.js';
 import { llmBridgeClient } from '../channel/client.js';
 import {

@@ -25,7 +25,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 
 /**
  * Mapa de eventos do AlwaysAliveAgent → actionCode NERV.

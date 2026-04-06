@@ -24,7 +24,7 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 import { registerControlRoutes } from './bridge-control.js';
 import { registerDialogRoutes } from './bridge-dialog.js';
 import { registerStreamRoutes } from './bridge-stream.js';

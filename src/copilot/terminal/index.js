@@ -19,8 +19,7 @@
 import { AGENT_EVENTS } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { resolve } from 'node:path';
-import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { configureHookTools, setHub, setPermissionAgent } from '../agent/infra/tools-bootstrap.js';
+import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
 import { loadAliases } from '../bridges/alias-store.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { llmBridgeClient, setBridgeAgent } from '../channel/client.js';

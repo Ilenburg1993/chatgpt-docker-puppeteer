@@ -7,7 +7,7 @@
  * @module copilot/terminal/commands/metrics
  */
 
-import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
 import { llmBridgeClient } from '../../channel/client.js';
 import { defaultErrorTracker } from '../../observability/error-tracker.js';
 import { getToolStats } from '../../observability/tool-stats.js';
