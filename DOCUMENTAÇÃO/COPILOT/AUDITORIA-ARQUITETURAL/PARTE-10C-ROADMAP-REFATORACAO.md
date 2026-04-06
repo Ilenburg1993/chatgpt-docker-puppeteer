@@ -805,3 +805,146 @@ git push origin main
 | R10  | `92c0ac35`    | agent/index.js reescrito com `export * from` sub-barrels                                                                                                                  |
 | R11  | —             | Análise concluiu que start()/stop() acessam ~16 campos privados cada. Extração criaria API surface frágil sem ganho real. Decisão: manter como está (mesma lógica de R6). |
 | R12  | (este commit) | Testes ✓, lint ✓, typecheck ✓, push ✓                                                                                                                                     |
+
+---
+
+## Fase R13: Import Hygiene — Redirecionar Deep Imports para Barrel (2026-07-21)
+
+### Problemas Identificados
+
+1. **17 imports diretos** de `../agent/always-alive.js` em terminal/, routes/, api/, bridges/ —
+   todos bypassando o barrel `agent/index.js`
+2. **3 deep imports** em terminal/ para subdiretórios internos de agent/:
+   - `terminal/commands/session.js` → `../../agent/session/snapshot.js`
+   - `terminal/handlers-system.js` → `../agent/session/initializer.js`
+   - `terminal/index.js` → `../agent/infra/tools-bootstrap.js`
+3. **Re-exports mortos** em `session/initializer.js` (linha 33):
+   `export { clearState, readState, writeState, writeStateAsync }` — nenhum consumidor externo usava
+   estes re-exports
+
+### R13.1 — Remover re-exports mortos de session/initializer.js
+
+Removeu-se o bloco de re-export de state-io.js em initializer.js (3 linhas).
+
+### R13.2 — Redirecionar terminal/index.js para barrel
+
+`configureHookTools, setHub, setPermissionAgent` agora importados de `../agent/index.js` junto com
+`alwaysAliveAgent`, eliminando 2 imports separados.
+
+### R13.3 — Redirecionar terminal/commands/session.js para barrel
+
+`createSnapshot, listSnapshots, loadSnapshot, saveSnapshot` + `alwaysAliveAgent` agora importados de
+`../../agent/index.js`.
+
+### R13.4 — Redirecionar terminal/handlers-system.js para barrel
+
+`alwaysAliveAgent` + `setBackgroundCompactionThreshold` consolidados em import único do barrel.
+
+### R13.5–R13.6 — Redirecionar todos os demais always-alive.js diretos
+
+14 arquivos em terminal/, routes/, api/, bridges/ redirecionados para `../agent/index.js`.
+
+### Resultado R13
+
+| Métrica            | Antes | Depois |
+| ------------------ | ----- | ------ |
+| Deep imports       | 3     | 0      |
+| Imports diretos    | 17    | 0      |
+| Re-exports mortos  | 1     | 0      |
+| Arquivos alterados | —     | 19     |
+
+**Commit**: `105d2555` — refactor(agent): R13 — redirecionar imports para barrel e remover
+re-exports legado
+
+---
+
+## Fase R14: Corrigir Headers e Annotations Stale (2026-07-21)
+
+### Problemas Identificados
+
+- `@module copilot/always-alive` → deveria ser `copilot/agent/always-alive`
+- **10 headers de arquivo** com path antigo pré-R2/R5 (ex: `dialog-loop-manager.js` em vez de
+  `dialog/loop-manager.js`)
+
+### R14.1 — Fix @module em always-alive.js
+
+`@module copilot/always-alive` → `@module copilot/agent/always-alive`
+
+### R14.2 — Fix headers em 10 arquivos
+
+dialog/loop-manager.js, dialog/protocol.js, dialog/turn-executor.js, session/event-wirer.js,
+session/rotation.js, infra/handoff-manager.js, infra/message-queue.js,
+infra/permission-controller.js, infra/status-snapshot.js, infra/tool-audit-logger.js
+
+**Commit**: `84224a0e` — docs(agent): R14 — corrigir headers de arquivo e @module stale
+pós-reestruturação
+
+---
+
+## Fase R15: Centralizar process.env em config.js (2026-07-21)
+
+### Problemas Identificados
+
+~35 usos diretos de `process.env[...]` espalhados por 14 arquivos em agent/, cada um com parsing
+inline e defaults duplicados. Sem ponto central para documentar, validar ou testar configuração.
+
+### R15.1 — Criar src/copilot/agent/config.js
+
+Módulo centralizado com ~30 constantes exportadas, organizadas por subsistema:
+
+- Dialog Loop: `DIALOG_QUEUE_MAX`, `BOOT_TIMEOUT_MS`, `WATCHDOG_INTERVAL_MS`, `WATCHDOG_STALL_MS`
+- Session: `HOOK_CONTEXT_MAX_BYTES`, `SESSION_MAX_AGE_MS`, `WORKING_DIRECTORY`
+- Rotation: `ROTATION_MAX_UTIL`, `ROTATION_MAX_AGE_MS`, `ROTATION_MAX_COMPACTIONS`,
+  `ROTATION_MAX_TURNS`
+- Keepalive: `KEEPALIVE_INTERVAL_MS`, `KEEPALIVE_IDLE_THRESHOLD_MS`
+- Snapshots/State: `SNAPSHOT_DIR`, `MAX_SNAPSHOTS`, `STATE_FILE`
+- Lifecycle: `RESTART_DELAY_MS`, `COPILOT_MODEL`, `COPILOT_REASONING_EFFORT`
+- Agent core: `MESSAGES_CACHE_TTL_MS`, `MAX_LISTENERS`, `MCP_RECONNECT_MS`, `METRICS_INTERVAL_MS`,
+  `STATUS_SNAPSHOT_TTL_MS`
+- Task/Webhooks: `MAX_TASK_RETRIES`, `TASK_TIMEOUT_MS`, `WEBHOOK_TIMEOUT_MS`, etc.
+- Audit/Permission: `TOOL_AUDIT_LOG`, `TOOL_AUDIT_MAX_LOG_BYTES`, `PERMISSION_MODE`,
+  `STARVATION_THRESHOLD_MS`
+
+### R15.2–R15.14 — Atualizar 14 módulos
+
+Todos os arquivos de agent/ agora importam de `./config.js` (ou `../config.js`).
+
+**Exceções (mantidas inline por razão justificada):**
+
+- `NODE_ENV` — idioma universal do Node.js
+- `WEBHOOK_ALLOW_PRIVATE_HOSTS` — check de segurança SSRF inline
+- `COPILOT_HIGH_RISK_TOOLS` — extensão da lista de ferramentas de alto risco
+- `AGENT_DENY_SHELL_TOOLS` — deny list de segurança
+
+### Resultado R15
+
+| Métrica                          | Antes | Depois |
+| -------------------------------- | ----- | ------ |
+| process.env no agent/ (excl.4)   | ~35   | 0      |
+| Módulo de configuração           | 0     | 1      |
+| Arquivos com defaults duplicados | 14    | 0      |
+| Constantes centralizadas         | 0     | ~30    |
+
+**Commit**: `d7ce3520` — refactor(agent): R15 — centralizar process.env em config.js
+
+---
+
+## Resumo Geral R1–R15
+
+| Fase | Tipo        | Escopo                          | Resultado                             |
+| ---- | ----------- | ------------------------------- | ------------------------------------- |
+| R1   | Refatoração | types.js centralização          | Eliminação de circular deps           |
+| R2   | Refatoração | dialog/ subdiretório            | 5 arquivos extraídos                  |
+| R3   | Refatoração | session/ subdiretório           | 7 arquivos extraídos                  |
+| R4   | Refatoração | lifecycle/ subdiretório         | 4 arquivos extraídos                  |
+| R5   | Refatoração | infra/ subdiretório             | 8 arquivos extraídos                  |
+| R6   | Análise     | Decomposição always-alive.js    | Skip (orchestrator pattern correto)   |
+| R7   | Docs        | JSDoc + orphan cleanup          | @module/@see + 3 orphans removidos    |
+| R8   | Operação    | Push                            | origin/main atualizado                |
+| R9   | Refatoração | Inversão dependência core→agent | core/agent-events.js canônico         |
+| R10  | Refatoração | Barrel simplificação            | export \* from sub-barrels            |
+| R11  | Análise     | start()/stop() extraction       | Skip (same as R6)                     |
+| R12  | Docs        | Documentação + push             | PARTE-10C atualizada                  |
+| R13  | Refatoração | Import hygiene                  | 19 imports → barrel, 1 dead re-export |
+| R14  | Docs        | Headers/annotations stale       | 11 headers corrigidos                 |
+| R15  | Refatoração | Config centralização            | config.js com ~30 constantes          |
