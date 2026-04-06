@@ -125,3 +125,27 @@ export const TOOL_AUDIT_MAX_LOG_BYTES = envInt('AGENT_TOOL_AUDIT_MAX_LOG_BYTES',
 export const PERMISSION_MODE = /** @type {'approve_all' | 'deny_all' | 'interactive'} */ (
     envStr('AGENT_PERMISSION_MODE', 'approve_all')
 );
+
+// ── Context Utilization Thresholds ───────────────────────────
+
+/** Utilização de contexto acima da qual o dialog loop NÃO inicia (bloqueio) */
+export const CONTEXT_UTIL_BLOCK_THRESHOLD = 0.95;
+/** Utilização de contexto acima da qual emite warning mas prossegue */
+export const CONTEXT_UTIL_WARN_THRESHOLD = 0.8;
+
+// ── Agent Timeouts ───────────────────────────────────────────
+
+/** Timeout para tarefas de longa duração (dialog loop) — 24h em ms */
+export const LONG_TASK_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+/** Delay de boot recovery após resume (ms) */
+export const BOOT_RECOVERY_DELAY_MS = 5_000;
+/** Timeout máximo de shutdown padrão (ms) */
+export const SHUTDOWN_TIMEOUT_MS = 10_000;
+/** Timeout para aguardar boot durante stop() (ms) */
+export const STOP_BOOT_WAIT_MS = 15_000;
+/** Timeout padrão para drain de writes (ms) */
+export const DRAIN_WRITES_TIMEOUT_MS = 3_000;
+/** Timeout de ping para health check (ms) */
+export const PING_TIMEOUT_MS = 5_000;
+/** Timeout para aguardar question.pending em resume (ms) */
+export const RESUME_QUESTION_WAIT_MS = 5_000;

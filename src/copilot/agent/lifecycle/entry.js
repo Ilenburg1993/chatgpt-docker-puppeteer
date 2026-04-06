@@ -16,7 +16,7 @@ import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { COPILOT_MODEL, RESTART_DELAY_MS } from '../config.js';
+import { COPILOT_MODEL, DRAIN_WRITES_TIMEOUT_MS, PING_TIMEOUT_MS, RESTART_DELAY_MS } from '../config.js';
 import { drainStateWrites } from './state-io.js';
 
 /**
@@ -111,7 +111,7 @@ alwaysAliveAgent.on('session.fatal', (/** @type {Record<string, unknown>} */ evt
         .stop()
         .catch(() => {})
         .finally(() => {
-            void drainStateWrites(3000).finally(() => {
+            void drainStateWrites(DRAIN_WRITES_TIMEOUT_MS).finally(() => {
                 process.exitCode = 1;
                 process.exit(1);
             });
@@ -125,7 +125,7 @@ try {
     const pingClient = new CopilotClient();
     await Promise.race([
         pingClient.ping(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), 5000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), PING_TIMEOUT_MS)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
     // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.

@@ -53,13 +53,18 @@ import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
 import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
 import {
+    BOOT_RECOVERY_DELAY_MS,
+    CONTEXT_UTIL_BLOCK_THRESHOLD,
+    CONTEXT_UTIL_WARN_THRESHOLD,
     COPILOT_MODEL,
     COPILOT_REASONING_EFFORT,
     MAX_LISTENERS,
     MCP_RECONNECT_MS,
     MESSAGES_CACHE_TTL_MS,
     METRICS_INTERVAL_MS,
+    SHUTDOWN_TIMEOUT_MS,
     STATUS_SNAPSHOT_TTL_MS,
+    STOP_BOOT_WAIT_MS,
 } from './config.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { buildStatusSnapshot } from './infra/status-snapshot.js';
@@ -607,7 +612,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 const savedState = readState();
                 if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
                     const utilization = this.#contextState?.utilization ?? 0;
-                    if (utilization < 0.8) {
+                    if (utilization < CONTEXT_UTIL_WARN_THRESHOLD) {
                         log(
                             'INFO',
                             '[AlwaysAlive] F53/F42.1: Re-ativando dialog loop após resume — tentando zero-PR primeiro.',
@@ -639,7 +644,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                                     );
                                 }
                             }
-                        }, 5_000);
+                        }, BOOT_RECOVERY_DELAY_MS);
                     } else {
                         log(
                             'WARN',
@@ -713,7 +718,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @param {{ shutdownTimeoutMs?: number }} [opts]
      * @returns {Promise<void>}
      */
-    async stop({ shutdownTimeoutMs = 10_000 } = {}) {
+    async stop({ shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
         // Idempotente: se já está parado, retorna sem ação
         if (this.#status === 'stopped') return;
 
@@ -727,7 +732,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // Garante que o boot não fique suspenso se stop() for chamado durante o start().
         if (this.#status === 'starting') {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-            await raceEvents(this, ['ready', 'error'], { timeoutMs: 15_000 }).catch(() => {});
+            await raceEvents(this, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch(() => {});
         }
 
         // Se estiver processando uma tarefa, aguarda ela terminar (com timeout)
@@ -1120,13 +1125,13 @@ export class AlwaysAliveAgent extends EventEmitter {
         // F44.1 (GAP-SD-08): health check pre-boot — verificar contexto antes de iniciar dialog loop
         if (this.#contextState) {
             const utilization = this.#contextState.utilization ?? 0;
-            if (utilization >= 0.95) {
+            if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
                 throw new SessionError(
                     `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
                     'CONTEXT_EXHAUSTED',
                 );
             }
-            if (utilization >= 0.8) {
+            if (utilization >= CONTEXT_UTIL_WARN_THRESHOLD) {
                 log(
                     'WARN',
                     `[AlwaysAlive] F44.1: Utilização de contexto em ${Math.round(utilization * 100)}% — dialog loop prosseguindo com cautela.`,

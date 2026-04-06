@@ -24,7 +24,14 @@ import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
-import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '../config.js';
+import {
+    BOOT_TIMEOUT_MS,
+    DIALOG_QUEUE_MAX,
+    LONG_TASK_TIMEOUT_MS,
+    RESUME_QUESTION_WAIT_MS,
+    WATCHDOG_INTERVAL_MS,
+    WATCHDOG_STALL_MS,
+} from '../config.js';
 import { readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { DialogProtocol } from './protocol.js';
 import { executeTurnImpl } from './turn-executor.js';
@@ -280,9 +287,9 @@ export class DialogLoopManager extends EventEmitter {
             typeof (/** @type {{ sendMessageDialogBoot?: Function }} */ (host).sendMessageDialogBoot) === 'function'
                 ? /** @type {{ sendMessageDialogBoot: Function }} */ (host).sendMessageDialogBoot.bind(host)
                 : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
-                      host.sendMessage(msg, { ...opts, timeoutMs: 24 * 60 * 60 * 1000 });
+                      host.sendMessage(msg, { ...opts, timeoutMs: LONG_TASK_TIMEOUT_MS });
 
-        bootSendFn(metaPrompt, { timeoutMs: 24 * 60 * 60 * 1000 }).catch((/** @type {Error} */ e) => {
+        bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS }).catch((/** @type {Error} */ e) => {
             if (this.#active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
@@ -478,7 +485,9 @@ export class DialogLoopManager extends EventEmitter {
             // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
             const hostEmitter = /** @type {import('events').EventEmitter} */ (/** @type {unknown} */ (this.#host));
             const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
-            const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs: 5_000 })
+            const preserved = await waitForEvent(pendingTarget, 'question.pending', {
+                timeoutMs: RESUME_QUESTION_WAIT_MS,
+            })
                 .then(() => true)
                 .catch(() => false);
 

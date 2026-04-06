@@ -17,7 +17,7 @@ import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { STATE_FILE as _STATE_FILE_ENV } from '../config.js';
+import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../config.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
@@ -211,7 +211,7 @@ export function clearState() {
  * @param {number} [timeoutMs=3000] - Timeout máximo em ms. Default is `3000`
  * @returns {Promise<void>}
  */
-export async function drainStateWrites(timeoutMs = 3000) {
+export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
     await Promise.race([
         _writeQueue.then(() => undefined).catch(() => undefined),
         new Promise((resolve) => setTimeout(resolve, timeoutMs)),

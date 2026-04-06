@@ -12,6 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { CONTEXT_UTIL_WARN_THRESHOLD } from '../config.js';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
@@ -262,7 +263,7 @@ function _checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResume
             `[AlwaysAlive] Sessão retomada com contexto pesado (${ratio}% — ${currentTokens}/${tokenLimit}). Compaction automática pode ocorrer em breve.`,
         );
         emit('session.token_budget_warning', { currentTokens, tokenLimit, ratio, reason: 'startup_heavy' });
-    } else if (currentTokens / tokenLimit > 0.8) {
+    } else if (currentTokens / tokenLimit > CONTEXT_UTIL_WARN_THRESHOLD) {
         log(
             'WARN',
             `[AlwaysAlive] Token budget em ${ratio}% (${currentTokens}/${tokenLimit}) — emitindo token_budget_warning`,
