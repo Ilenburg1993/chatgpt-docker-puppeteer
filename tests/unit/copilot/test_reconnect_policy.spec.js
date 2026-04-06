@@ -269,3 +269,66 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
         assert.strictEqual(delays[0], 100, `Delay da tentativa 1 deve ser 100ms, obtido: ${delays[0]}`);
     });
 });
+
+describe('reconnect-policy › M-01: ping health check pós-reconexão', () => {
+    it('deve chamar client.ping() após initSession bem-sucedido', async () => {
+        let pingCalled = false;
+        const client = {
+            stop: async () => {},
+            ping: async () => {
+                pingCalled = true;
+            },
+        };
+        const cbs = makeCallbacks();
+        await tryReconnect(new Error('err'), client, 'idle', cbs, FAST_OPTS);
+        assert.ok(pingCalled, 'client.ping() deve ser chamado após reconexão');
+    });
+
+    it('deve descartar tentativa se ping() falhar e continuar tentando', async () => {
+        let attempts = 0;
+        let pingFails = 1; // falha na 1ª tentativa
+        const client = {
+            stop: async () => {},
+            ping: async () => {
+                if (pingFails > 0) {
+                    pingFails--;
+                    throw new Error('ping failed');
+                }
+            },
+        };
+        const cbs = makeCallbacks({
+            initSession: async () => {
+                attempts++;
+                return { session: { sessionId: `sess-${attempts}` }, isResumed: false };
+            },
+        });
+        const result = await tryReconnect(new Error('err'), client, 'idle', cbs, FAST_OPTS);
+        assert.strictEqual(result, true);
+        assert.strictEqual(attempts, 2, 'Deve tentar 2x pois ping falhou na 1ª');
+    });
+
+    it('deve funcionar normalmente se client não tem ping()', async () => {
+        const client = { stop: async () => {} };
+        const cbs = makeCallbacks();
+        const result = await tryReconnect(new Error('err'), client, 'idle', cbs, FAST_OPTS);
+        assert.strictEqual(result, true);
+    });
+});
+
+describe('reconnect-policy › M-05: sessionLog callback', () => {
+    it('deve chamar sessionLog após reconexão bem-sucedida', async () => {
+        const logs = /** @type {string[]} */ ([]);
+        const cbs = makeCallbacks();
+        await tryReconnect(new Error('err'), {}, 'idle', cbs, {
+            ...FAST_OPTS,
+            sessionLog: async (/** @type {string} */ msg) => {
+                logs.push(msg);
+            },
+        });
+        assert.ok(logs.length > 0, 'sessionLog deve ter sido chamado');
+        assert.ok(
+            logs[0].includes('Reconexão bem-sucedida'),
+            `Mensagem deve conter "Reconexão bem-sucedida": ${logs[0]}`,
+        );
+    });
+});

@@ -424,6 +424,46 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * M-04 (PARTE-8): Aborta a mensagem SDK em processamento na sessão atual.
+     *
+     * Útil para cancelar operações travadas (stall) sem destruir o dialog loop inteiro. Se não houver sessão ativa ou o
+     * método `abort()` não estiver disponível, é um no-op.
+     *
+     * @returns {Promise<void>}
+     */
+    async abortCurrentMessage() {
+        if (!this.#session || typeof this.#session.abort !== 'function') {
+            log('DEBUG', '[AlwaysAlive] abortCurrentMessage(): sem sessão ativa ou abort indisponível.');
+            return;
+        }
+        try {
+            await this.#session.abort();
+            log('INFO', '[AlwaysAlive] Mensagem SDK abortada via session.abort().');
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[AlwaysAlive] session.abort() falhou: ${e.message}`);
+        }
+    }
+
+    /**
+     * M-05 (PARTE-8): Registra mensagem no timeline da sessão SDK via session.log().
+     *
+     * Torna eventos significativos (reconexão, rotação, keepalive) visíveis em ferramentas de debug do SDK/CLI. No-op
+     * se a sessão não estiver ativa.
+     *
+     * @param {string} message - Mensagem para registrar no timeline
+     * @param {{ level?: 'info' | 'warning' | 'error' }} [options]
+     * @returns {Promise<void>}
+     */
+    async sessionLog(message, options) {
+        if (!this.#session || typeof this.#session.log !== 'function') return;
+        try {
+            await this.#session.log(message, options);
+        } catch {
+            // best-effort — não bloqueia fluxo principal
+        }
+    }
+
+    /**
      * Inicializa o agente: conecta ao CLI e cria/retoma sessão.
      *
      * @returns {Promise<void>}
@@ -567,8 +607,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             }, mcpReconnectMs);
 
             // F42.2: iniciar keepalive de sessão para prevenir expiração por idle timeout
+            // M-02 (PARTE-8): usa client.ping() (0 PR) como primeiro recurso
             this.#keepalive.start({
                 getSession: () => this.#session,
+                getClient: () => this.#client,
                 isIdle: () => this.#status === 'idle',
                 isDialogLoopActive: () => this.#dialogLoop.active,
                 onKeepalive: (ts) => {
@@ -1066,6 +1108,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         if (this.#status !== 'stopped' && this.#session) {
             this.#keepalive.start({
                 getSession: () => this.#session,
+                getClient: () => this.#client,
                 isIdle: () => this.#status === 'idle',
                 isDialogLoopActive: () => this.#dialogLoop.active,
                 onKeepalive: (ts) => {

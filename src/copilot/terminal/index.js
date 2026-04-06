@@ -82,6 +82,11 @@ function registerAgentEventListeners() {
         const secs = Math.round(evt.stalledMs / 1000);
         println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo). Reiniciando dialog loop.`);
+
+        // M-04 (PARTE-8): abortar mensagem SDK pendente antes de reiniciar.
+        // Isso cancela qualquer operação travada no servidor sem destruir a sessão.
+        await alwaysAliveAgent.abortCurrentMessage();
+
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {

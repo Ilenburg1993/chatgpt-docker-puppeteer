@@ -77,4 +77,34 @@ describe('SessionKeepalive', async () => {
             assert.equal(ka.running, false); // ping não inicia o keepalive
         });
     });
+
+    describe('M-02: getClient opcional para ping keepalive', () => {
+        /** @type {InstanceType<typeof SessionKeepalive>} */
+        let ka;
+
+        afterEach(() => {
+            ka?.stop();
+        });
+
+        it('deve aceitar callbacks sem getClient (backward compat)', () => {
+            ka = new SessionKeepalive({ intervalMs: 60_000 });
+            ka.start({
+                getSession: () => null,
+                isIdle: () => true,
+                isDialogLoopActive: () => false,
+            });
+            assert.equal(ka.running, true);
+        });
+
+        it('deve aceitar callbacks com getClient', () => {
+            ka = new SessionKeepalive({ intervalMs: 60_000 });
+            ka.start({
+                getSession: () => null,
+                getClient: () => ({ ping: async () => {} }),
+                isIdle: () => true,
+                isDialogLoopActive: () => false,
+            });
+            assert.equal(ka.running, true);
+        });
+    });
 });

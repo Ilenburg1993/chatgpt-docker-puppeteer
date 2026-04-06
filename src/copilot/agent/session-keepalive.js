@@ -51,6 +51,7 @@ export class SessionKeepalive {
      *
      * @param {{
      *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
+     *     getClient?: () => { ping?: () => Promise<unknown> } | null;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
      *     onKeepalive?: (ts: number) => void;
@@ -100,6 +101,7 @@ export class SessionKeepalive {
     /**
      * @param {{
      *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
+     *     getClient?: () => { ping?: () => Promise<unknown> } | null;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
      *     onKeepalive?: (ts: number) => void;
@@ -107,7 +109,7 @@ export class SessionKeepalive {
      * @returns {Promise<void>}
      */
     async #tick(callbacks) {
-        const { getSession, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
+        const { getSession, getClient, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
 
         // Dialog loop ativo mantém a sessão viva — não precisa de heartbeat
         if (isDialogLoopActive()) return;
@@ -122,14 +124,29 @@ export class SessionKeepalive {
         const idleMs = Date.now() - this.#lastActivityAt;
         if (idleMs < this.#idleThresholdMs) return;
 
+        // M-02 (PARTE-8): usar client.ping() (0 PR) como primeiro recurso de keepalive.
+        // Apenas faz fallback para session.send() se ping() não estiver disponível.
+        const client = getClient?.();
+        if (client && typeof client.ping === 'function') {
+            try {
+                await client.ping();
+                this.#lastActivityAt = Date.now();
+                log('DEBUG', `[SessionKeepalive] Ping keepalive (0 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
+                onKeepalive?.(Date.now());
+                return;
+            } catch (/** @type {any} */ pingErr) {
+                log('WARN', `[SessionKeepalive] Ping keepalive falhou: ${pingErr.message} — tentando session.send()`);
+            }
+        }
+
+        // Fallback: session.send() consome 1 PR, mas garante que a sessão não expire
         const session = getSession();
         if (!session || typeof session.send !== 'function') return;
 
         try {
-            // Heartbeat mínimo para resetar o idle timeout do SDK
             await session.send({ prompt: '[keepalive]' });
             this.#lastActivityAt = Date.now();
-            log('DEBUG', `[SessionKeepalive] Heartbeat enviado (idle: ${Math.round(idleMs / 1000)}s).`);
+            log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
             onKeepalive?.(Date.now());
         } catch (/** @type {any} */ e) {
             log('WARN', `[SessionKeepalive] Heartbeat falhou: ${e.message}`);

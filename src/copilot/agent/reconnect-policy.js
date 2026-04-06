@@ -34,12 +34,19 @@ import { log } from '#copilot/observability/logger';
  * @param {import('@github/copilot-sdk').CopilotClient} client - Cliente SDK ativo (`CopilotClient`)
  * @param {string} currentStatus - Status atual do agente (retorna false se `'stopped'`)
  * @param {ReconnectCallbacks} callbacks - Callbacks de side-effect do host
- * @param {{ maxAttempts?: number; baseDelayMs?: number; jitterFn?: () => number }} [opts] - Opções de tuning
+ * @param {{
+ *     maxAttempts?: number;
+ *     baseDelayMs?: number;
+ *     jitterFn?: () => number;
+ *     sessionLog?: (msg: string) => Promise<void>;
+ * }} [opts]
+ *   - Opções de tuning
+ *
  * @returns {Promise<boolean>} `true` se reconexão bem-sucedida, `false` se esgotado
  */
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
     // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
-    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random } = opts;
+    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog } = opts;
     const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient } = callbacks;
 
     // Só tenta reconectar se o cliente ainda existe e o agente não foi parado.
@@ -81,10 +88,24 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
             }
 
             const { session, isResumed } = await initSession(activeClient);
+
+            // M-01 (PARTE-8): health check pós-reconexão — valida que o transport está funcional
+            // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
+            if (typeof activeClient.ping === 'function') {
+                try {
+                    await activeClient.ping();
+                } catch (/** @type {any} */ pingErr) {
+                    log('WARN', `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`);
+                    throw pingErr; // força retry na próxima iteração
+                }
+            }
+
             log(
                 'INFO',
                 `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
             );
+            // M-05 (PARTE-8): registrar reconexão no timeline SDK para debug
+            await sessionLog?.(`[reconnect-policy] Reconexão bem-sucedida na tentativa ${attempt}/${maxAttempts}`);
             emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
 
             if (dialogLoop.active) {
