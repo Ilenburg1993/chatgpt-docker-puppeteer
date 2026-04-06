@@ -31,6 +31,9 @@ export {
     cmdDbHistory,
     cmdDbSessions,
     cmdHistory,
+    cmdSessionList,
+    cmdSessionRestore,
+    cmdSessionSave,
     cmdStatus,
     cmdWho,
 } from './session.js';

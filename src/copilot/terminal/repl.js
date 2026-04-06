@@ -48,6 +48,9 @@ import {
     cmdRemember as _cmdRemember,
     cmdResume as _cmdResume,
     cmdSearch as _cmdSearch,
+    cmdSessionList as _cmdSessionList,
+    cmdSessionRestore as _cmdSessionRestore,
+    cmdSessionSave as _cmdSessionSave,
     cmdSkills as _cmdSkills,
     cmdStatus as _cmdStatus,
     cmdThinking as _cmdThinking,
@@ -144,6 +147,7 @@ const CMD_ROUTES = [
     [['export'], (_, arg) => _cmdExport({ println }, arg)],
     [['metrics'], () => _cmdMetrics({ println })],
     [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],
+    [['session'], (_, arg, rest) => _cmdSessionDispatch(arg, rest)],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],
     [['gh'], (_, _2, rest) => _cmdGh({ println }, rest)],
     [['git'], (_, _2, rest) => _cmdGit({ println }, rest)],
@@ -186,6 +190,25 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
 }
 
 // ─── Handlers standalone de comandos inline ───────────────────────────────────
+
+/**
+ * F41.5: Dispatcher para subcomandos de `/session save|list|restore`.
+ *
+ * @param {string} subCmd
+ * @param {string[]} rest
+ */
+function _cmdSessionDispatch(subCmd, rest) {
+    const sub = (subCmd || '').toLowerCase();
+    if (sub === 'save') {
+        _cmdSessionSave({ println }, rest.join(' ') || undefined);
+    } else if (sub === 'list') {
+        _cmdSessionList({ println });
+    } else if (sub === 'restore') {
+        _cmdSessionRestore({ println }, rest[0] || '');
+    } else {
+        println('\x1b[33m  Uso: /session save [reason] | /session list | /session restore <id>\x1b[0m');
+    }
+}
 
 /** F16.2 — Limpa rate limiters e reinicia dialog loop (útil após throttling acidental). */
 async function _cmdEmergencyReset() {

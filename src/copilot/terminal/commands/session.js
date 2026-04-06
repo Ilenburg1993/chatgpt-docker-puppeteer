@@ -9,6 +9,7 @@
  */
 
 import { alwaysAliveAgent } from '../../agent/always-alive.js';
+import { createSnapshot, listSnapshots, loadSnapshot, saveSnapshot } from '../../agent/session-snapshot.js';
 import { llmBridgeClient } from '../../channel/client.js';
 import { conversationStore } from '../../conversation-hub/store.js';
 import { getWorkspaceContext } from '../workspace-context.js';
@@ -207,4 +208,86 @@ export function cmdClear({ println }) {
 export function cmdAnswer({ println }, arg) {
     const ok = alwaysAliveAgent.answerPendingQuestion(arg);
     println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
+}
+
+/**
+ * F41.5: Salva snapshot da sessão atual.
+ *
+ * @param {SessionContext} ctx
+ * @param {string} [reason]
+ * @returns {void}
+ */
+export function cmdSessionSave({ println }, reason) {
+    const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
+    const prm = alwaysAliveAgent.dialogPrMetrics;
+
+    const data = createSnapshot({
+        sessionId: alwaysAliveAgent.sessionId ?? null,
+        model: String(snap.model ?? 'unknown'),
+        status: String(snap.status ?? 'unknown'),
+        sendCount: Number(snap.sendCount ?? 0),
+        dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+        dialogPaused: Boolean(snap.dialogPaused),
+        pendingQuestion: snap.pendingQuestion ? String(snap.pendingQuestion) : null,
+        prMetrics: prm ?? null,
+        reason: reason || 'manual',
+    });
+
+    const path = saveSnapshot(data);
+    println(`\x1b[32m  ✓ Snapshot salvo: ${data.snapshotId}\x1b[0m`);
+    println(`\x1b[90m    Path: ${path}\x1b[0m`);
+}
+
+/**
+ * F41.5: Lista snapshots disponíveis.
+ *
+ * @param {SessionContext} ctx
+ * @returns {void}
+ */
+export function cmdSessionList({ println }) {
+    const snaps = listSnapshots();
+    if (snaps.length === 0) {
+        println('\x1b[90m  Nenhum snapshot encontrado.\x1b[0m');
+        return;
+    }
+    println(`\x1b[36m  Snapshots disponíveis (${snaps.length}):\x1b[0m`);
+    for (const s of snaps) {
+        const date = new Date(s.createdAt).toISOString().replace('T', ' ').slice(0, 19);
+        println(`    ${s.snapshotId}  ${date}  model=${s.model}  ${s.reason ?? ''}`);
+    }
+}
+
+/**
+ * F41.5: Exibe detalhes de um snapshot.
+ *
+ * @param {SessionContext} ctx
+ * @param {string} snapshotId
+ * @returns {void}
+ */
+export function cmdSessionRestore({ println }, snapshotId) {
+    if (!snapshotId) {
+        println('\x1b[33m  Uso: /session restore <snapshotId>\x1b[0m');
+        println('\x1b[90m  Use /session list para ver snapshots disponíveis.\x1b[0m');
+        return;
+    }
+
+    const snap = loadSnapshot(snapshotId);
+    if (!snap) {
+        println(`\x1b[31m  Snapshot não encontrado: ${snapshotId}\x1b[0m`);
+        return;
+    }
+
+    println(`\x1b[36m  Snapshot: ${snap.snapshotId}\x1b[0m`);
+    println(`    Criado: ${new Date(snap.createdAt).toISOString()}`);
+    println(`    Session: ${snap.sessionId ?? '(none)'}`);
+    println(`    Model: ${snap.model}  Status: ${snap.status}`);
+    println(`    Send count: ${snap.sendCount}`);
+    println(`    Dialog loop: ${snap.dialogLoopActive ? 'active' : 'inactive'}${snap.dialogPaused ? ' (paused)' : ''}`);
+    if (snap.pendingQuestion) println(`    Pending question: ${snap.pendingQuestion}`);
+    if (snap.prMetrics) {
+        println(
+            `    PR metrics: boots=${snap.prMetrics.boots} resumePR=${snap.prMetrics.resumesWithPR} zeroPR=${snap.prMetrics.resumesZeroPR}`,
+        );
+    }
+    println('\x1b[90m    (Restore automático ocorre no boot via PM2 — use /session save antes de reiniciar)\x1b[0m');
 }

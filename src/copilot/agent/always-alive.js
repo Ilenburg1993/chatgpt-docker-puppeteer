@@ -47,6 +47,7 @@ import { MessageQueue } from './message-queue.js';
 import { PermissionController } from './permission-controller.js';
 import { tryReconnect } from './reconnect-policy.js';
 import { wireSessionEvents } from './session-event-wirer.js';
+import { createSnapshot, saveSnapshot } from './session-snapshot.js';
 // N.1: usar hooks module canônico em vez do arquivo @deprecated
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
@@ -560,6 +561,24 @@ export class AlwaysAliveAgent extends EventEmitter {
             this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
         }
 
+        // F41.4: auto-save snapshot antes de shutdown (para PM2 restart)
+        try {
+            const snap = createSnapshot({
+                sessionId: this.sessionId ?? null,
+                model: this.#model,
+                status: this.#status,
+                sendCount: this.#sendCount,
+                dialogLoopActive: false, // acabou de ser desativado
+                dialogPaused: this.#dialogLoop.paused,
+                pendingQuestion: this.#pendingQuestion?.question ?? null,
+                prMetrics: this.dialogPrMetrics,
+                reason: 'auto-shutdown',
+            });
+            saveSnapshot(snap);
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
+        }
+
         await writeStateAsync({ sendCount: this.#sendCount }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
         );
@@ -960,6 +979,15 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * F41: Métricas de consumo de premium requests do dialog loop.
+     *
+     * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
+     */
+    get dialogPrMetrics() {
+        return this.#dialogLoop.prMetrics ?? null;
+    }
+
+    /**
      * Último snapshot de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo SDK.
      *
      * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
@@ -985,6 +1013,10 @@ export class AlwaysAliveAgent extends EventEmitter {
             answerPendingQuestion: (answer) => this.answerPendingQuestion(answer),
             getSessionId: () => this.sessionId,
             getModel: () => this.#model,
+            // F41B.2: expor setModel para que o DLM possa efetivamente trocar o modelo no fallback
+            setModel: (modelId) => {
+                this.#model = modelId;
+            },
             getPendingQuestion: () => this.#pendingQuestion,
         };
         // Sempre atualiza host — necessário após reconexão.
