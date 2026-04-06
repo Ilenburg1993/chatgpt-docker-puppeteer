@@ -133,14 +133,26 @@ export function buildTurnResolutionListeners(emitter, opts) {
  *     timeout: number;
  *     timeoutHandle: ReturnType<typeof setTimeout>;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
+ *     onReplyOuter: (evt: { reply: string }) => void;
+ *     onStopOuter: (evt: { authorized?: boolean; reason?: string }) => void;
  *     resolve: (v: string) => void;
  *     reject: (e: unknown) => void;
  *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
  * }} opts
  */
 export function dispatchTurnToHost(emitter, opts) {
-    const { host, message, timeout, timeoutHandle, pendingListenerRef, resolve, reject, waitForRestartAndReplyFn } =
-        opts;
+    const {
+        host,
+        message,
+        timeout,
+        timeoutHandle,
+        pendingListenerRef,
+        onReplyOuter,
+        onStopOuter,
+        resolve,
+        reject,
+        waitForRestartAndReplyFn,
+    } = opts;
 
     if (host.getPendingQuestion()) {
         host.answerPendingQuestion(message);
@@ -148,6 +160,10 @@ export function dispatchTurnToHost(emitter, opts) {
         const onPending = (/** @type {unknown} */ _) => {
             pendingListenerRef.current = null;
             clearTimeout(timeoutHandle);
+            // F41B.3: remover os outer listeners registrados por buildTurnResolutionListeners
+            // para evitar listener leak / double-fire quando novos listeners são registrados abaixo
+            emitter.off('reply', onReplyOuter);
+            emitter.off('stopped', onStopOuter);
             const newTimeout = setTimeout(() => {
                 emitter.off('reply', onReply);
                 emitter.off('stopped', onStop);
@@ -189,19 +205,35 @@ export function dispatchTurnToHost(emitter, opts) {
  * @param {string} message
  * @param {number} timeout
  * @param {string} [stopReason]
+ * @param {AbortSignal} [signal] - F41B.5: AbortSignal para cancelar o restart
  * @returns {Promise<string>}
  */
-export function waitForRestartAndReply(emitter, host, message, timeout, stopReason) {
+export function waitForRestartAndReply(emitter, host, message, timeout, stopReason, signal) {
     if (!host) return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
+    if (signal?.aborted) {
+        return Promise.reject(new DOMException('[DialogLoopManager] restart abortado.', 'AbortError'));
+    }
 
     return new Promise((resolve, reject) => {
-        // G2-ARCH-04: declarar onRetryPending no escopo da Promise para poder removê-la no timeout
         /** @type {(() => void) | null} */
         let onRetryPending = null;
+        let settled = false;
+
+        // F41B.5: abort handler — limpa todos os listeners pendentes
+        const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(retryTimeout);
+            emitter.off('ready', onRetryReady);
+            if (onRetryPending) emitter.off('question.pending', onRetryPending);
+            reject(new DOMException('[DialogLoopManager] restart abortado.', 'AbortError'));
+        };
+        if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
         const retryTimeout = setTimeout(() => {
+            if (settled) return;
+            settled = true;
             emitter.off('ready', onRetryReady);
-            // G2-ARCH-04: limpar listener 'question.pending' se ainda pendente
             if (onRetryPending) emitter.off('question.pending', onRetryPending);
             reject(
                 new SessionError(
@@ -267,7 +299,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
     const { turnStart } = emitTurnStart(emitter, message, sendCountRef);
 
     /** @param {string} msg @param {number} t @param {string} [r] */
-    const waitFn = (msg, t, r) => waitForRestartAndReply(emitter, host, msg, t, r);
+    const waitFn = (msg, t, r) => waitForRestartAndReply(emitter, host, msg, t, r, signal);
 
     return startSpan(
         'dialog.send_turn',
@@ -315,6 +347,8 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
                     timeout,
                     timeoutHandle,
                     pendingListenerRef,
+                    onReplyOuter,
+                    onStopOuter,
                     resolve,
                     reject,
                     waitForRestartAndReplyFn: waitFn,

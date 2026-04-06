@@ -49,6 +49,7 @@ import { readState, writeStateAsync } from './state-io.js';
  * @property {(answer: string) => void} answerPendingQuestion - Responde à pergunta pendente
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
+ * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
  * @property {() => import('./always-alive.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
  */
 
@@ -102,6 +103,9 @@ export class DialogLoopManager extends EventEmitter {
 
     /** @type {{ sendCount: number }} Ref mutável para o contador de sends — usado pelo dialog-turn-executor. */
     #sendCountRef = { sendCount: 0 };
+
+    /** @type {{ boots: number; resumesWithPR: number; resumesZeroPR: number }} F41B.8: contadores de PR */
+    #prMetrics = { boots: 0, resumesWithPR: 0, resumesZeroPR: 0 };
 
     /**
      * @param {DialogLoopManagerOptions} [options]
@@ -167,6 +171,16 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
+     * F41B.8: Retorna métricas de PR consumidos pelo dialog loop (boots e resumes).
+     *
+     * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }}
+     */
+    get prMetrics() {
+        const { boots, resumesWithPR, resumesZeroPR } = this.#prMetrics;
+        return { boots, resumesWithPR, resumesZeroPR, totalPR: boots + resumesWithPR };
+    }
+
+    /**
      * Notifica o DLM que houve reconexão do agente.
      *
      * Desativa o flag `active` para que o mecanismo de restart da fila detecte a reconexão e reenvie a mensagem
@@ -175,6 +189,8 @@ export class DialogLoopManager extends EventEmitter {
     notifyReconnect() {
         if (this.#active) {
             this.#active = false;
+            // F41B.4: parar watchdog ao reconectar — sem loop ativo, watchdog não deve rodar
+            this.#watchdog?.stop();
             this.emit('changed', { active: false, ts: Date.now(), reason: 'reconnect' });
         }
     }
@@ -220,6 +236,10 @@ export class DialogLoopManager extends EventEmitter {
         if (this.#pendingModelFallback && this.#fallbackModel) {
             const prev = this.#host.getModel();
             this.#pendingModelFallback = false;
+            // F41B.2: efetivamente aplicar o modelo no host (se setModel estiver disponível)
+            if (typeof this.#host.setModel === 'function') {
+                this.#host.setModel(this.#fallbackModel);
+            }
             this.emit('model.fallback', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
             log('WARN', `[DialogLoopManager] Aplicando modelo fallback: ${prev} → ${this.#fallbackModel}`);
         }
@@ -235,6 +255,8 @@ export class DialogLoopManager extends EventEmitter {
             intervalMs: this.#watchdogIntervalMs,
             stallThresholdMs: this.#watchdogStallMs,
             onStall: (stalledMs) => this.emit('stalled', { stalledMs }),
+            // F41B.7: aviso pré-stall a 80% do threshold
+            onPreStallWarning: (stalledMs) => this.emit('pre_stall_warning', { stalledMs }),
         });
         this.#watchdog.start();
 
@@ -268,6 +290,8 @@ export class DialogLoopManager extends EventEmitter {
         });
 
         await bootPromise;
+        // F41B.8: contabilizar boot como 1 PR consumido
+        this.#prMetrics.boots++;
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -344,20 +368,29 @@ export class DialogLoopManager extends EventEmitter {
             this.#host.answerPendingQuestion('STOP_DIALOG');
         }
 
-        // G2-ARCH-11: timeout de encerramento para o caso de um turno em andamento não terminar.
-        const shutdownTimer = setTimeout(() => {
-            if (this.#active) {
-                log(
-                    'WARN',
-                    `[DialogLoopManager] stop() timeout após ${shutdownTimeoutMs}ms — forçando forceDeactivate().`,
-                );
-                this.forceDeactivate();
-            }
-        }, shutdownTimeoutMs);
+        // F41B.1: Aguardar mutex drenar dentro do timeout antes de desativar.
+        // O timer de shutdown só força desativação se o turno em andamento não terminar a tempo.
+        await Promise.race([
+            this.#turnMutex,
+            new Promise((resolve) => {
+                const timer = setTimeout(() => {
+                    log(
+                        'WARN',
+                        `[DialogLoopManager] stop() timeout após ${shutdownTimeoutMs}ms — forçando forceDeactivate().`,
+                    );
+                    this.forceDeactivate();
+                    resolve(undefined);
+                }, shutdownTimeoutMs);
+                // Se o mutex resolver antes do timeout, limpar o timer
+                void this.#turnMutex.then(() => {
+                    clearTimeout(timer);
+                    resolve(undefined);
+                });
+            }),
+        ]);
 
         this.#active = false;
         this.#stopping = false;
-        clearTimeout(shutdownTimer);
         writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
             log('WARN', `[DialogLoopManager] writeState dialogLoopActive=false: ${e.message}`),
         );
@@ -406,6 +439,8 @@ export class DialogLoopManager extends EventEmitter {
             log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
             // F31: reiniciar watchdog após resume
             this.#watchdog?.start();
+            // F41B.8: contabilizar resume zero-PR
+            this.#prMetrics.resumesZeroPR++;
             this.emit('resumed', { prConsumed: false });
             return;
         }
@@ -423,6 +458,8 @@ export class DialogLoopManager extends EventEmitter {
             log('INFO', '[DialogLoopManager] ask_user preservado — retomada zero-PR.');
             // F31: reiniciar watchdog após resume
             this.#watchdog?.start();
+            // F41B.8: contabilizar resume zero-PR
+            this.#prMetrics.resumesZeroPR++;
             this.emit('resumed', { prConsumed: false });
             return;
         }
@@ -435,6 +472,8 @@ export class DialogLoopManager extends EventEmitter {
         this.#active = false;
         await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
         await this.start();
+        // F41B.8: contabilizar resume com PR
+        this.#prMetrics.resumesWithPR++;
         this.emit('resumed', { prConsumed: true });
     }
 

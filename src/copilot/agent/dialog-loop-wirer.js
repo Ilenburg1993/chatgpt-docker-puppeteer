@@ -38,6 +38,8 @@ export function wireDialogLoopEvents(dialogLoop, emitFn) {
         'turn_timeout',
         'changed',
         'model.fallback',
+        'compaction.requested',
+        'pre_stall_warning',
     ];
     for (const event of DLM_EVENTS) dialogLoop.removeAllListeners(event);
 
@@ -52,4 +54,11 @@ export function wireDialogLoopEvents(dialogLoop, emitFn) {
     dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_timeout', evt));
     dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.loop.changed', evt));
     dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) => emitFn('pr.fallback_model', evt));
+    // F41B.6: propagar compaction e pre-stall para observabilidade
+    dialogLoop.on('compaction.requested', (/** @type {Record<string, unknown>} */ evt) =>
+        emitFn('dialog.compaction.requested', evt),
+    );
+    dialogLoop.on('pre_stall_warning', (/** @type {Record<string, unknown>} */ evt) =>
+        emitFn('dialog.pre_stall_warning', evt),
+    );
 }

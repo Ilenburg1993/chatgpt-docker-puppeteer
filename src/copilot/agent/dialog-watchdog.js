@@ -65,6 +65,12 @@ export class DialogWatchdog {
     /** @type {(stalledMs: number) => void} */
     #onStall;
 
+    /** @type {((stalledMs: number) => void) | null} F41B.7: callback de aviso pré-stall */
+    #onPreStallWarning = null;
+
+    /** @type {boolean} F41B.7: flag para evitar múltiplos avisos pré-stall no mesmo ciclo */
+    #preStallEmitted = false;
+
     /** @type {ReturnType<typeof setInterval> | null} */
     #timer = null;
 
@@ -72,12 +78,13 @@ export class DialogWatchdog {
     #lastActivity = 0;
 
     /**
-     * @param {DialogWatchdogOptions} opts
+     * @param {DialogWatchdogOptions & { onPreStallWarning?: (stalledMs: number) => void }} opts
      */
-    constructor({ intervalMs, stallThresholdMs, onStall }) {
+    constructor({ intervalMs, stallThresholdMs, onStall, onPreStallWarning }) {
         this.#intervalMs = intervalMs;
         this.#stallThresholdMs = stallThresholdMs;
         this.#onStall = onStall;
+        this.#onPreStallWarning = onPreStallWarning ?? null;
     }
 
     /**
@@ -92,8 +99,18 @@ export class DialogWatchdog {
             return;
         }
         this.#lastActivity = Date.now();
+        this.#preStallEmitted = false;
         this.#timer = setInterval(() => {
             const stalledMs = Date.now() - this.#lastActivity;
+            // F41B.7: aviso pré-stall a 80% do threshold
+            if (!this.#preStallEmitted && this.#onPreStallWarning && stalledMs > this.#stallThresholdMs * 0.8) {
+                this.#preStallEmitted = true;
+                log(
+                    'WARN',
+                    `[DialogWatchdog] Pré-stall: loop inativo há ${Math.round(stalledMs / 1000)}s (80% do threshold)`,
+                );
+                this.#onPreStallWarning(stalledMs);
+            }
             if (stalledMs > this.#stallThresholdMs) {
                 log('WARN', `[DialogWatchdog] Dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
                 this.#onStall(stalledMs);
@@ -108,6 +125,7 @@ export class DialogWatchdog {
      */
     ping() {
         this.#lastActivity = Date.now();
+        this.#preStallEmitted = false;
     }
 
     /**
