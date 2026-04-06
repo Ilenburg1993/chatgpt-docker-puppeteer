@@ -59,17 +59,6 @@ export function getDisabledTools() {
 }
 
 /**
- * Injeta o store de telemetria — mantido por compatibilidade; uso interno migrado para defaultMetrics.
- *
- * @deprecated Use defaultMetrics diretamente.
- * @param {unknown} _
- * @returns {void}
- */
-export function setTelemetryStore(_) {
-    // No-op: telemetria migrada para defaultMetrics (observability)
-}
-
-/**
  * Informa ao módulo quais ferramentas estão registradas na sessão atual. Deve ser chamado pelo AlwaysAliveAgent após
  * montar o array de tools.
  *

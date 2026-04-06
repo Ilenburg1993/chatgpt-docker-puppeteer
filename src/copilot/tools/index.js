@@ -18,7 +18,6 @@ import {
     introspectionTools,
     isToolDisabled,
     registerForIntrospection,
-    setTelemetryStore,
 } from './introspection-tools.js';
 import { permissionTools, setPermissionAgent } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
@@ -70,7 +69,6 @@ export {
     setHub,
     setPermissionAgent,
     setSessionRpc,
-    setTelemetryStore,
     shellTools,
     taskTools,
     todoReadTools,
