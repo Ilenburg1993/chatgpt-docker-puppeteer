@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { executeTask } from '../../../src/copilot/agent/task-executor.js';
+import { executeTask } from '../../../src/copilot/agent/infra/task-executor.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -43,8 +43,8 @@ import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { AGENT_EVENTS } from './events.js';
-import { MessageQueue } from './message-queue.js';
-import { PermissionController } from './permission-controller.js';
+import { MessageQueue } from './infra/message-queue.js';
+import { PermissionController } from './infra/permission-controller.js';
 import { tryReconnect } from './lifecycle/reconnect-policy.js';
 import { wireSessionEvents } from './session/event-wirer.js';
 import { createSnapshot, saveSnapshot } from './session/snapshot.js';
@@ -52,15 +52,15 @@ import { createSnapshot, saveSnapshot } from './session/snapshot.js';
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
 import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
-import { HandoffManager } from './handoff-manager.js';
+import { HandoffManager } from './infra/handoff-manager.js';
+import { buildStatusSnapshot } from './infra/status-snapshot.js';
+import { executeTask } from './infra/task-executor.js';
+import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
+import { WebhookManager } from './infra/webhook-manager.js';
+import { readState, writeStateAsync } from './lifecycle/state-io.js';
 import { cleanupStaleSessions } from './session/cleanup.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
-import { readState, writeStateAsync } from './lifecycle/state-io.js';
-import { buildStatusSnapshot } from './status-snapshot.js';
-import { executeTask } from './task-executor.js';
-import { bootstrapTools, setSessionRpc } from './tools-bootstrap.js';
-import { WebhookManager } from './webhook-manager.js';
 // G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
 import { resolveUserInput as hookToolsResolveUserInput } from '../tools/hook-tools.js';
 

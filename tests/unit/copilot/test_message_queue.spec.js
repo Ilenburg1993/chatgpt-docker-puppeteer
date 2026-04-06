@@ -16,7 +16,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { MessageQueue } from '../../../src/copilot/agent/message-queue.js';
+import { MessageQueue } from '../../../src/copilot/agent/infra/message-queue.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -22,10 +22,21 @@ export {
     wireDialogLoopEvents,
 } from './dialog/index.js';
 export { AGENT_EVENTS } from './events.js';
+export { MessageQueue } from './infra/message-queue.js';
+export { PermissionController } from './infra/permission-controller.js';
+export { buildStatusSnapshot } from './infra/status-snapshot.js';
+export { executeTask } from './infra/task-executor.js';
+export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from './infra/tool-audit-logger.js';
+export {
+    bootstrapTools,
+    configureHookTools,
+    setHub,
+    setPermissionAgent,
+    setSessionRpc,
+} from './infra/tools-bootstrap.js';
+export { WebhookManager } from './infra/webhook-manager.js';
 export { tryReconnect } from './lifecycle/reconnect-policy.js';
 export { clearState, readState, writeState, writeStateAsync } from './lifecycle/state-io.js';
-export { MessageQueue } from './message-queue.js';
-export { PermissionController } from './permission-controller.js';
 export {
     SessionKeepalive,
     buildHookSystemContext,
@@ -41,9 +52,4 @@ export {
     shouldRotateSession,
     wireSessionEvents,
 } from './session/index.js';
-export { buildStatusSnapshot } from './status-snapshot.js';
-export { executeTask } from './task-executor.js';
-export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from './tool-audit-logger.js';
-export { bootstrapTools, configureHookTools, setHub, setPermissionAgent, setSessionRpc } from './tools-bootstrap.js';
 export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
-export { WebhookManager } from './webhook-manager.js';

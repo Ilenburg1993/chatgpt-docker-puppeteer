@@ -10,7 +10,7 @@
  *   agente pai.
  */
 
-import { startSpanImmediate } from '../observability/otel.js';
+import { startSpanImmediate } from '../../observability/otel.js';
 
 /**
  * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
