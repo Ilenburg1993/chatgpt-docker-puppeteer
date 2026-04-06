@@ -948,3 +948,106 @@ Todos os arquivos de agent/ agora importam de `./config.js` (ou `../config.js`).
 | R13  | Refatoração | Import hygiene                  | 19 imports → barrel, 1 dead re-export |
 | R14  | Docs        | Headers/annotations stale       | 11 headers corrigidos                 |
 | R15  | Refatoração | Config centralização            | config.js com ~30 constantes          |
+
+---
+
+## Fase R17: Magic Numbers → Named Constants (2026-07-21)
+
+### Problemas Identificados
+
+~14 magic numbers espalhados por 6 arquivos: thresholds de utilização de contexto (`0.8`, `0.95`),
+timeout de 24h para dialog loop, delays de boot recovery, shutdown timeouts.
+
+### R17.1 — Adicionar constantes ao config.js
+
+Novas constantes:
+
+- `CONTEXT_UTIL_BLOCK_THRESHOLD` (0.95) — bloqueio de dialog loop
+- `CONTEXT_UTIL_WARN_THRESHOLD` (0.8) — warning de utilização
+- `LONG_TASK_TIMEOUT_MS` (24h) — timeout de tarefas de longa duração
+- `BOOT_RECOVERY_DELAY_MS` (5s) — delay de boot recovery
+- `SHUTDOWN_TIMEOUT_MS` (10s) — timeout padrão de shutdown
+- `STOP_BOOT_WAIT_MS` (15s) — espera de boot durante stop()
+- `DRAIN_WRITES_TIMEOUT_MS` (3s) — timeout de drain de writes
+- `PING_TIMEOUT_MS` (5s) — timeout de ping CLI
+- `RESUME_QUESTION_WAIT_MS` (5s) — espera de question.pending no resume
+
+### R17.2 — Substituir em 6 arquivos
+
+always-alive.js, loop-manager.js, event-wirer.js, entry.js, state-io.js
+
+### Resultado R17
+
+| Métrica             | Antes | Depois                              |
+| ------------------- | ----- | ----------------------------------- |
+| Magic numbers       | ~14   | 1 (0.8 no watchdog — multiplicador) |
+| Constantes nomeadas | ~30   | ~39                                 |
+
+**Commit**: `cf429dd9` — refactor(agent): R17 — substituir magic numbers por constantes nomeadas
+
+---
+
+## Fase R18: DRY writeStateAsync fire-and-forget (2026-07-21)
+
+### Problemas Identificados
+
+11 ocorrências do padrão boilerplate:
+
+```js
+writeStateAsync({ key: value }).catch((e) => log('WARN', `[Tag] writeState key: ${e.message}`));
+```
+
+Código repetitivo, propenso a inconsistências na mensagem de log.
+
+### R18.1 — Criar persistState(data, tag) em state-io.js
+
+```js
+export function persistState(data, tag) {
+  writeStateAsync(data).catch((e) => log('WARN', `${tag}: ${e.message}`));
+}
+```
+
+### R18.2 — Substituir 11 fire-and-forget calls
+
+- `always-alive.js`: 4 substituições
+- `dialog/loop-manager.js`: 5 substituições
+- `dialog/turn-executor.js`: 1 substituição
+- `session/event-wirer.js`: 1 substituição
+
+**Mantidos intactos**: 4 `await writeStateAsync().catch()` (padrão diferente — aguardam resultado).
+
+### Resultado R18
+
+| Métrica                           | Antes | Depois           |
+| --------------------------------- | ----- | ---------------- |
+| Boilerplate writeStateAsync.catch | 11    | 0                |
+| Helper centralizado               | 0     | 1 (persistState) |
+| Linhas de código removidas (net)  | -     | -3               |
+
+**Commit**: `d4d931e6` — refactor(agent): R18 — DRY writeStateAsync fire-and-forget via
+persistState()
+
+---
+
+## Resumo Geral R1–R18
+
+| Fase | Tipo        | Escopo                          | Resultado                             |
+| ---- | ----------- | ------------------------------- | ------------------------------------- |
+| R1   | Refatoração | types.js centralização          | Eliminação de circular deps           |
+| R2   | Refatoração | dialog/ subdiretório            | 5 arquivos extraídos                  |
+| R3   | Refatoração | session/ subdiretório           | 7 arquivos extraídos                  |
+| R4   | Refatoração | lifecycle/ subdiretório         | 4 arquivos extraídos                  |
+| R5   | Refatoração | infra/ subdiretório             | 8 arquivos extraídos                  |
+| R6   | Análise     | Decomposição always-alive.js    | Skip (orchestrator pattern correto)   |
+| R7   | Docs        | JSDoc + orphan cleanup          | @module/@see + 3 orphans removidos    |
+| R8   | Operação    | Push                            | origin/main atualizado                |
+| R9   | Refatoração | Inversão dependência core→agent | core/agent-events.js canônico         |
+| R10  | Refatoração | Barrel simplificação            | export \* from sub-barrels            |
+| R11  | Análise     | start()/stop() extraction       | Skip (same as R6)                     |
+| R12  | Docs        | Documentação + push             | PARTE-10C atualizada                  |
+| R13  | Refatoração | Import hygiene                  | 19 imports → barrel, 1 dead re-export |
+| R14  | Docs        | Headers/annotations stale       | 11 headers corrigidos                 |
+| R15  | Refatoração | Config centralização            | config.js com ~30 constantes          |
+| R16  | Docs        | Documentação R13–R15            | PARTE-10A/B/C atualizados             |
+| R17  | Refatoração | Magic numbers → constants       | 9 constantes nomeadas adicionadas     |
+| R18  | Refatoração | DRY writeStateAsync             | persistState() helper, 11 call sites  |
