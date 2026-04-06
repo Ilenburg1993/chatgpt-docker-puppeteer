@@ -354,3 +354,88 @@ describe('http-bridge GET /stream — cleanup no fechamento', () => {
         reqEmitter.emit('close');
     });
 });
+
+// ─── Suite: GET /stream/tasks (F36.4) ────────────────────────────────────────
+
+describe('http-bridge GET /stream/tasks — rota de task streaming (F36.4)', () => {
+    /** @type {any} */
+    let bridge;
+
+    before(async () => {
+        const mod = await import('../../../src/copilot/api/http-bridge.js');
+        bridge = mod.default;
+    });
+
+    it('router tem a rota GET /stream/tasks registrada', () => {
+        const stack = bridge?.stack ?? [];
+        const found = stack.some((/** @type {any} */ l) => l.route?.path === '/stream/tasks' && l.route?.methods?.get);
+        assert.ok(found, 'GET /stream/tasks deve estar registrado no router');
+    });
+
+    it('emite evento SSE "connected" com channel=tasks ao conectar', () => {
+        const { res: resMock, chunks } = makeSseResMock();
+        const reqEmitter = new EventEmitter();
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
+
+        const handler = getRouteHandler(bridge, 'get', '/stream/tasks');
+        handler(reqMock, resMock);
+
+        assert.ok(chunks.length >= 1, 'deve ter escrito ao menos 1 chunk SSE');
+        const firstChunk = chunks[0] ?? '';
+        assert.ok(firstChunk.includes('event: connected'), 'primeiro evento deve ser connected');
+        const dataLine = firstChunk.split('\n').find((l) => l.startsWith('data: ')) ?? '';
+        const parsed = JSON.parse(dataLine.replace('data: ', ''));
+        assert.strictEqual(parsed.channel, 'tasks', 'connected deve indicar channel=tasks');
+
+        reqEmitter.emit('close');
+    });
+
+    it('repassa task.delta do agente via SSE no canal tasks', () => {
+        const { res: resMock, chunks } = makeSseResMock();
+        const reqEmitter = new EventEmitter();
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
+
+        const handler = getRouteHandler(bridge, 'get', '/stream/tasks');
+        handler(reqMock, resMock);
+
+        const before = chunks.length;
+        /** @type {any} */ (alwaysAliveAgent).emit('task.delta', { taskId: 'tasks-ch-001', chunk: 'partial' });
+
+        assert.ok(chunks.length > before, 'deve ter repassado task.delta');
+        const deltaChunk = chunks.find((c) => c.includes('event: task.delta'));
+        assert.ok(deltaChunk, 'deve ter evento task.delta');
+
+        reqEmitter.emit('close');
+    });
+
+    it('NÃO repassa eventos dialog.* no canal tasks', () => {
+        const { res: resMock, chunks } = makeSseResMock();
+        const reqEmitter = new EventEmitter();
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
+
+        const handler = getRouteHandler(bridge, 'get', '/stream/tasks');
+        handler(reqMock, resMock);
+
+        const before = chunks.length;
+        /** @type {any} */ (alwaysAliveAgent).emit('dialog.ready', {});
+
+        assert.strictEqual(chunks.length, before, 'dialog.ready NÃO deve ser repassado no canal tasks');
+
+        reqEmitter.emit('close');
+    });
+
+    it('remove listeners ao fechar conexão', () => {
+        const { res: resMock, chunks } = makeSseResMock();
+        const reqEmitter = new EventEmitter();
+        const reqMock = /** @type {any} */ ({ on: reqEmitter.on.bind(reqEmitter), query: {}, headers: {} });
+
+        const handler = getRouteHandler(bridge, 'get', '/stream/tasks');
+        handler(reqMock, resMock);
+
+        reqEmitter.emit('close');
+        const afterClose = chunks.length;
+
+        /** @type {any} */ (alwaysAliveAgent).emit('task.completed', { taskId: 'after-close-tasks' });
+        assert.strictEqual(chunks.length, afterClose, 'nenhum chunk após fechar a conexão tasks');
+    });
+});

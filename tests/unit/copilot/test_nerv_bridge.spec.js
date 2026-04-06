@@ -190,4 +190,96 @@ describe('copilotNervBridge', () => {
             assert.equal(isMounted(), false);
         });
     });
+
+    // ── 6. F34.6: Inbound NERV → agent round-trip ─────────────────────────
+
+    describe('F34.6: NERV → agent inbound commands (round-trip)', () => {
+        it('COPILOT_COMMAND com comando desconhecido não lança erro', async () => {
+            /** @type {Map<string, (envelope: any) => void>} */
+            const subs = new Map();
+            const nerv = {
+                ...makeMockNerv(),
+                onEvent: (/** @type {string} */ actionCode, /** @type {(env: any) => void} */ handler) => {
+                    subs.set(actionCode, handler);
+                    return () => subs.delete(actionCode);
+                },
+            };
+            mount(nerv);
+            const handler = subs.get('COPILOT_COMMAND');
+            assert.ok(handler, 'handler COPILOT_COMMAND deve ser registrado');
+            // Enviar comando desconhecido — deve ser no-op sem crash
+            assert.doesNotThrow(() => handler({ payload: { command: 'nonexistent' } }));
+        });
+
+        it('COPILOT_COMMAND sem campo command é no-op', async () => {
+            /** @type {Map<string, (envelope: any) => void>} */
+            const subs = new Map();
+            const nerv = {
+                ...makeMockNerv(),
+                onEvent: (/** @type {string} */ actionCode, /** @type {(env: any) => void} */ handler) => {
+                    subs.set(actionCode, handler);
+                    return () => subs.delete(actionCode);
+                },
+            };
+            mount(nerv);
+            const handler = subs.get('COPILOT_COMMAND');
+            assert.ok(handler);
+            assert.doesNotThrow(() => handler({ payload: {} }));
+            assert.doesNotThrow(() => handler({ payload: { command: 42 } }));
+        });
+
+        it('outbound round-trip: agent event → NERV → agent listener pode reagir', async () => {
+            /** @type {any[]} */
+            const captured = [];
+            const nerv = {
+                ...makeMockNerv(),
+                emitEvent: async (/** @type {any} */ envelope) => {
+                    captured.push(envelope);
+                },
+            };
+            mount(nerv);
+
+            // Agent emite task.queued → nerv-bridge repassa para NERV como COPILOT_TASK_QUEUED
+            alwaysAliveAgent.emit('task.queued', { taskId: 'rt-1' });
+            await new Promise((r) => setImmediate(r));
+
+            const envelope = captured.find((c) => c.actionCode === 'COPILOT_TASK_QUEUED');
+            assert.ok(envelope, 'envelope COPILOT_TASK_QUEUED deve existir no NERV');
+            assert.equal(envelope.payload.taskId, 'rt-1');
+            assert.equal(envelope.actor, 'COPILOT');
+            assert.equal(envelope.messageType, 'EVENT');
+            assert.ok(typeof envelope.timestamp === 'number');
+        });
+
+        it('unmount() limpa inbound subscription (onEvent unsub é chamado)', () => {
+            let unsubCalled = false;
+            const nerv = {
+                ...makeMockNerv(),
+                onEvent: (/** @type {string} */ _ac, /** @type {any} */ _h) => {
+                    return () => {
+                        unsubCalled = true;
+                    };
+                },
+            };
+            mount(nerv);
+            unmount();
+            assert.ok(unsubCalled, 'unsub do onEvent deve ter sido chamado ao unmount');
+        });
+
+        it('mount() → unmount() → mount() não duplica listeners', async () => {
+            const nerv1 = makeMockNerv();
+            const nerv2 = makeMockNerv();
+            mount(nerv1);
+            unmount();
+            mount(nerv2);
+
+            alwaysAliveAgent.emit('task.started', { taskId: 'dup-check' });
+            await new Promise((r) => setImmediate(r));
+
+            // Deve aparecer somente no nerv2 (não no nerv1)
+            assert.equal(nerv1.calls.length, 0, 'nerv1 não deve receber após unmount');
+            const found = nerv2.calls.find((c) => c.actionCode === 'COPILOT_TASK_STARTED');
+            assert.ok(found, 'nerv2 deve receber o evento');
+        });
+    });
 });

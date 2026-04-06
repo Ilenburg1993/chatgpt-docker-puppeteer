@@ -8,6 +8,7 @@
  */
 
 import { MAX_SSE_CLIENTS } from '#copilot/core';
+import { createGzip } from 'node:zlib';
 
 /** @typedef {import('./sse-replay-buffer.js').SseReplayBuffer} SseReplayBuffer */
 
@@ -25,6 +26,8 @@ import { MAX_SSE_CLIENTS } from '#copilot/core';
  * @property {SseConnectionTracker | null} [tracker=null] - Tracker de conexões (null = sem limite). Default is `null`
  * @property {number} [maxContentChars=0] - Trunca campo `content` de payloads maiores que este valor (0 =
  *   desabilitado). Default is `0`
+ * @property {boolean} [compress=false] - F38.4: habilita gzip compression se cliente suportar (Accept-Encoding: gzip).
+ *   Default is `false`
  */
 
 /**
@@ -46,6 +49,19 @@ export function sanitizeSseEvent(event) {
 /**
  * Configura uma conexão SSE padrão sobre um par req/res Express.
  *
+ * **Clientes SSE conhecidos neste projeto:**
+ *
+ * 1. **`src/copilot/channel/inject.js`** — cliente HTTP raw (`http.request`) que consome `/stream` para propagar eventos
+ *    do bridge para o terminal inject server. NÃO suporta gzip (não envia `Accept-Encoding: gzip`).
+ * 2. **`src/copilot/terminal/server.js`** — endpoint `/events` do terminal server (server-side interno).
+ * 3. **Dashboard Vue** — consumers browser via `EventSource` nativo (quando implementado).
+ * 4. **Ferramentas externas** — qualquer cliente HTTP que envie `Accept: text/event-stream`.
+ *
+ * **Sobre compressão gzip (`compress: true`):** Só será ativada se o _cliente HTTP_ enviar o header `Accept-Encoding:
+ * gzip` na requisição. O `EventSource` nativo de browsers geralmente envia esse header automaticamente. O cliente
+ * interno `inject.js` NÃO envia `Accept-Encoding`, então a compressão nunca ativa para ele — isso é intencional, pois a
+ * comunicação é localhost e a latência de gzip não compensa.
+ *
  * Responsabilidades:
  *
  * - Headers SSE (Content-Type, Cache-Control, Connection, X-Accel-Buffering)
@@ -62,17 +78,46 @@ export function sanitizeSseEvent(event) {
  * @returns {SseWriter}
  */
 export function createSseWriter(req, res, opts = {}) {
-    const { heartbeatMs = 15_000, maxLifetimeMs = 0, replayBuffer = null, tracker = null, maxContentChars = 0 } = opts;
+    const {
+        heartbeatMs = 15_000,
+        maxLifetimeMs = 0,
+        replayBuffer = null,
+        tracker = null,
+        maxContentChars = 0,
+        compress = false,
+    } = opts;
 
     // Registrar no tracker (caller já verificou accept() antes de chamar)
     tracker?.increment();
+
+    // --- F38.4: Gzip compression se cliente aceita e opção habilitada ---
+    const acceptEncoding = String(req.headers?.['accept-encoding'] ?? '');
+    const useGzip = compress && /\bgzip\b/.test(acceptEncoding);
+
+    /** @type {import('node:zlib').Gzip | null} */
+    let gzStream = null;
 
     // --- Headers padrão SSE ---
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    if (useGzip) {
+        res.setHeader('Content-Encoding', 'gzip');
+        gzStream = createGzip({ flush: 2 }); // Z_SYNC_FLUSH = 2
+        gzStream.pipe(res);
+    }
     res.flushHeaders();
+
+    /** @type {{ write: (chunk: string) => boolean; writableEnded: boolean }} */
+    const out = gzStream
+        ? {
+              get writableEnded() {
+                  return res.writableEnded;
+              },
+              write: (/** @type {string} */ chunk) => /** @type {boolean} */ (gzStream?.write(chunk, 'utf8') ?? false),
+          }
+        : res;
 
     /**
      * Envia um evento SSE formatado.
@@ -82,7 +127,7 @@ export function createSseWriter(req, res, opts = {}) {
      * @param {{ skipBuffer?: boolean }} [sendOpts]
      */
     const send = (event, data, sendOpts) => {
-        if (res.writableEnded) return;
+        if (out.writableEnded) return;
         const safeEvent = sanitizeSseEvent(event);
         // FASE-13.3: truncamento configurável de campo `content`
         let payload = data;
@@ -94,7 +139,7 @@ export function createSseWriter(req, res, opts = {}) {
         }
         const id = replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, payload) : undefined;
         const idLine = id != null ? `id: ${id}\n` : '';
-        res.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
+        out.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
     };
 
     // --- Replay de eventos perdidos via Last-Event-ID ---
@@ -103,8 +148,8 @@ export function createSseWriter(req, res, opts = {}) {
         if (lastEventId > 0) {
             const missed = replayBuffer.getAfter(lastEventId);
             for (const evt of missed) {
-                if (res.writableEnded) break;
-                res.write(
+                if (out.writableEnded) break;
+                out.write(
                     `id: ${evt.id}\nevent: ${sanitizeSseEvent(evt.event)}\ndata: ${JSON.stringify(evt.data)}\n\n`,
                 );
             }
@@ -123,9 +168,10 @@ export function createSseWriter(req, res, opts = {}) {
     let lifetimeTimer = null;
     if (maxLifetimeMs > 0) {
         lifetimeTimer = setTimeout(() => {
-            if (!res.writableEnded) {
+            if (!out.writableEnded) {
                 send('reconnect', { reason: 'max_lifetime', ts: Date.now() });
-                res.end();
+                if (gzStream) gzStream.end();
+                else res.end();
             }
         }, maxLifetimeMs);
     }
@@ -152,8 +198,13 @@ export function createSseWriter(req, res, opts = {}) {
     return {
         send,
         close: () => {
-            cleanup();
-            if (!res.writableEnded) res.end();
+            if (!out.writableEnded) {
+                if (gzStream)
+                    gzStream.end(); // end() flushes, then triggers 'finish' → cleanup via res listener
+                else res.end();
+            } else {
+                cleanup(); // already ended — just release resources
+            }
         },
     };
 }

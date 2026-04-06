@@ -213,6 +213,66 @@ function registerAgentEventListeners() {
         }
     });
 
+    // ── F36.3: Terminal buffer para task streaming ─────────────────────────
+    // Quando task.delta/task.reasoning são emitidos fora do dialog loop, renderiza no terminal.
+    // Rastreia a task ativa por ID para evitar estado inconsistente com tasks concorrentes.
+
+    /** @type {string | null} ID da task com streaming ativo */
+    let _activeTaskId = null;
+
+    /**
+     * Inicia o bloco visual de task streaming (se não houver um ativo).
+     *
+     * @param {string | null} taskId
+     */
+    const _startTaskBlock = (taskId) => {
+        if (_activeTaskId) return; // já há um streaming ativo
+        _activeTaskId = taskId ?? '__anonymous__';
+        println('');
+        println(`  \x1b[90m┌── task streaming${taskId ? ` (${taskId})` : ''} ──┐\x1b[0m`);
+        process.stdout.write('  \x1b[90m│\x1b[0m  ');
+    };
+
+    /**
+     * Escreve texto no bloco de streaming (com word-wrap por linhas).
+     *
+     * @param {string} text
+     */
+    const _writeTaskChunk = (text) => {
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (i > 0) process.stdout.write('\n  \x1b[90m│\x1b[0m  ');
+            process.stdout.write(/** @type {string} */ (lines[i]));
+        }
+    };
+
+    alwaysAliveAgent.on('task.delta', (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
+        const chunk = evt?.chunk ?? '';
+        if (!chunk) return;
+        _startTaskBlock(evt.taskId ?? null);
+        _writeTaskChunk(chunk);
+    });
+    alwaysAliveAgent.on('task.reasoning', (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
+        const text = evt?.text ?? '';
+        if (!text) return;
+        _startTaskBlock(evt.taskId ?? null);
+        _writeTaskChunk(`\x1b[2m${text}\x1b[22m`); // dim text para reasoning
+    });
+    alwaysAliveAgent.on('task.completed', () => {
+        if (_activeTaskId) {
+            process.stdout.write('\n');
+            println('  \x1b[90m└── task complete ───┘\x1b[0m');
+            _activeTaskId = null;
+        }
+    });
+    alwaysAliveAgent.on('task.error', () => {
+        if (_activeTaskId) {
+            process.stdout.write('\n');
+            println('  \x1b[31m└── task error ──────┘\x1b[0m');
+            _activeTaskId = null;
+        }
+    });
+
     // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
     // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
     // no terminal SSE sem necessidade de wiring manual em cada adição.
@@ -227,6 +287,10 @@ function registerAgentEventListeners() {
         'session.compaction_complete',
         'ready',
         'session.fatal',
+        'task.delta',
+        'task.completed',
+        'task.error',
+        'task.reasoning',
     ]);
     for (const evt of AGENT_EVENTS) {
         if (!handledEvents.has(evt)) {

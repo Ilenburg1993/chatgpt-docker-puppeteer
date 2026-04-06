@@ -88,6 +88,7 @@ export function registerStreamRoutes(bridge, agent) {
             maxLifetimeMs: MAX_SSE_LIFETIME_MS,
             replayBuffer,
             tracker,
+            compress: true,
         });
 
         // Evento inicial com snapshot do estado atual
@@ -115,6 +116,66 @@ export function registerStreamRoutes(bridge, agent) {
 
         handlers.forEach((handler, evt) => agent.on(evt, handler));
 
+        req.on('close', () => {
+            handlers.forEach((handler, evt) => agent.off(evt, handler));
+        });
+    });
+
+    // ── F36.4: SSE channel dedicado para task streaming ──────────────────────
+    // Endpoint leve que expõe apenas eventos task.* para monitoramento de progresso.
+    //
+    // **Clientes previstos:**
+    // - Dashboard Vue (EventSource nativo) → `/api/copilot/stream/tasks`
+    // - Ferramentas CLI externas (curl com Accept: text/event-stream)
+    // - NÃO é consumido pelo inject.js (que usa /stream global)
+    //
+    // Diferenças em relação ao /stream global:
+    // - Heartbeat mais longo (30s vs 15s) — dados fluem mais lentamente
+    // - Sem maxLifetimeMs — conexão persiste indefinidamente
+    // - Buffer de replay menor (64 eventos vs default 256)
+    // - Sem compress — payloads de task são pequenos
+
+    const taskReplayBuffer = new SseReplayBuffer(64);
+    const taskTracker = new SseConnectionTracker('stream-tasks', MAX_SSE_CLIENTS);
+
+    /** @type {ReadonlyArray<AgentEventName>} */
+    const TASK_EVENTS = /** @type {AgentEventName[]} */ ([
+        'task.started',
+        'task.completed',
+        'task.error',
+        'task.delta',
+        'task.queued',
+        'task.reasoning',
+    ]);
+
+    bridge.get('/stream/tasks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        if (!taskTracker.accept()) {
+            res.status(429).json({ ok: false, error: 'Limite de clientes SSE task atingido' });
+            return;
+        }
+
+        const sse = createSseWriter(req, res, {
+            heartbeatMs: 30_000,
+            replayBuffer: taskReplayBuffer,
+            tracker: taskTracker,
+        });
+
+        sse.send('connected', { timestamp: Date.now(), channel: 'tasks' });
+
+        /** @type {Map<AgentEventName, (data: unknown) => void>} */
+        const handlers = new Map(
+            TASK_EVENTS.map((evt) => [
+                evt,
+                /** @type {(data: unknown) => void} */
+                (
+                    (data) => {
+                        sse.send(evt, standardizeSsePayload(data ?? {}));
+                    }
+                ),
+            ]),
+        );
+
+        handlers.forEach((handler, evt) => agent.on(evt, handler));
         req.on('close', () => {
             handlers.forEach((handler, evt) => agent.off(evt, handler));
         });
