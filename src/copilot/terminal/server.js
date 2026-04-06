@@ -32,7 +32,7 @@
  * | GET    | /config             | Configuração dinâmica da sessão LLM-B |
  *
  * @module copilot/terminal/server
- * @see module:copilot/terminal/http-handlers
+ * @see module:copilot/terminal/route-table
  * @see module:copilot/terminal/repl
  */
 
@@ -43,7 +43,7 @@ import https from 'node:https';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { defaultAuditLog } from '../observability/audit-log.js';
 import { println } from './dialog.js';
-import { handleMetrics } from './http-handlers.js';
+import { handleMetrics } from './handlers-system.js';
 import { registerClearRateLimiters } from './rate-limiter-state.js';
 import { matchRoute } from './route-table.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';

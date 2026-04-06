@@ -5,7 +5,7 @@
  * Handlers para endpoints de sessão, memória e turnos do ConversationHub.
  *
  * @module copilot/terminal/handlers-dialog
- * @see module:copilot/terminal/http-handlers
+ * @see module:copilot/terminal/route-table
  */
 
 import { conversationHub } from '../conversation-hub/hub.js';

@@ -14,7 +14,7 @@
  * @module copilot/terminal/commands/skills
  */
 
-import { handleGetSkills, handleSetSkills } from '../http-handlers.js';
+import { handleGetSkills, handleSetSkills } from '../handlers-system.js';
 
 /**
  * @typedef {Object} CmdContext

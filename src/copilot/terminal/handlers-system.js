@@ -5,7 +5,7 @@
  * Handlers de sistema: health, config, metrics, git, gh, skills, tools, quota, SSE.
  *
  * @module copilot/terminal/handlers-system
- * @see module:copilot/terminal/http-handlers
+ * @see module:copilot/terminal/route-table
  */
 
 import {
@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '../agent/index.js';
-import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
+import { listIssues, listPrs, listRuns } from '../bridges/gh/index.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';

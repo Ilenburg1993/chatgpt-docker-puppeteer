@@ -21,15 +21,28 @@
  * @module copilot/terminal/route-table
  */
 
-import { handleAcceptHandoff, handleGetHandoffs, handleRejectHandoff } from './handlers-agent.js';
 import {
-    handleDeleteCustomTool,
-    handleDeleteMemory,
+    handleAcceptHandoff,
     handleDialogPause,
     handleDialogResume,
+    handleGetContext,
+    handleGetHandoffs,
+    handleInject,
+    handlePipeline,
+    handleRejectHandoff,
+} from './handlers-agent.js';
+import {
+    handleDeleteMemory,
+    handleHubHealth,
+    handleListSessions,
+    handleListTurns,
+    handleRecallMemories,
+    handleStoreMemory,
+} from './handlers-dialog.js';
+import {
+    handleDeleteCustomTool,
     handleGetAudit,
     handleGetConfig,
-    handleGetContext,
     handleGetCustomTools,
     handleGetErrors,
     handleGetHistory,
@@ -44,20 +57,13 @@ import {
     handleGitLog,
     handleGitStatus,
     handleHealth,
-    handleHubHealth,
-    handleInject,
-    handleListSessions,
-    handleListTurns,
     handleMetrics,
-    handlePipeline,
-    handleRecallMemories,
     handleRegisterCustomTool,
     handleSetInfiniteSessionConfig,
     handleSetSkills,
     handleSetToolsConfig,
-    handleStoreMemory,
     handleSystemReset,
-} from './http-handlers.js';
+} from './handlers-system.js';
 
 /**
  * @typedef {Object} RouteEntry

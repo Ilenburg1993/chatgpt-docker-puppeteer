@@ -5,7 +5,7 @@
  * Handlers para endpoints do agente/dialog: /pipeline, /inject, /dialog/pause, /dialog/resume.
  *
  * @module copilot/terminal/handlers-agent
- * @see module:copilot/terminal/http-handlers
+ * @see module:copilot/terminal/route-table
  */
 
 import { alwaysAliveAgent } from '../agent/index.js';

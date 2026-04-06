@@ -8,8 +8,6 @@
  * Submódulos disponíveis:
  *
  * - client — gerenciamento do CopilotClient e registry de sessões
- * - hooks — factories de SessionHooks (createHooks, createAuditHooks, ...)
- * - permissions — factories de PermissionHandler (createApproveAllPermission, ...)
  * - session — operações de sessão (createSession, resumeOrCreate, ...)
  * - agents — factories de CustomAgentConfig (createAgent, createReadOnlyAgent, ...)
  * - models — helpers de modelos (listModels, pickModel, buildReasoningConfig, ...)

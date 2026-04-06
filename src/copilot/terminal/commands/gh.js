@@ -26,7 +26,7 @@ import {
     viewIssue,
     viewPr,
     viewRun,
-} from '../../bridges/gh-bridge.js';
+} from '../../bridges/gh/index.js';
 
 /**
  * @typedef {object} SessionContext
