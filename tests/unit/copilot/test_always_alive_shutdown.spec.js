@@ -133,7 +133,10 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
     it('MAX_QUEUE_SIZE deve ser importado em message-queue.js (migrado de always-alive.js)', async () => {
         const { readFile } = await import('node:fs/promises');
         // F.4: MAX_QUEUE_SIZE migrou para message-queue.js; always-alive.js não deve mais importá-lo diretamente.
-        const mq = await readFile(new URL('../../../src/copilot/agent/infra/message-queue.js', import.meta.url), 'utf-8');
+        const mq = await readFile(
+            new URL('../../../src/copilot/agent/infra/message-queue.js', import.meta.url),
+            'utf-8',
+        );
         assert.ok(
             mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'"),
             'MAX_QUEUE_SIZE deve ser importado em message-queue.js (onde a verificação de capacidade está)',
@@ -165,7 +168,10 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
     it('mensagem de erro ao atingir limite deve conter "Fila cheia" em message-queue.js', async () => {
         const { readFile } = await import('node:fs/promises');
         // F.4: mensagem de erro migrou para message-queue.js
-        const mq = await readFile(new URL('../../../src/copilot/agent/infra/message-queue.js', import.meta.url), 'utf-8');
+        const mq = await readFile(
+            new URL('../../../src/copilot/agent/infra/message-queue.js', import.meta.url),
+            'utf-8',
+        );
         assert.ok(
             mq.includes('Fila cheia'),
             "mensagem de erro deve conter 'Fila cheia' em message-queue.js para clareza operacional",

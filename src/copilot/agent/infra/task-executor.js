@@ -83,7 +83,7 @@ export async function executeTask(session, task, callbacks) {
     // (o event-collector.js já cobre registro completo via seus handlers dedicados)
     // Fase BC: corrigido naming dot→underscore para alinhar com AGENT_EVENTS em events.js
 
-    /** @type {Map<string, import('../observability/otel.js').OtelSpan>} CO-02: spans por tool call */
+    /** @type {Map<string, import('../../observability/otel.js').OtelSpan>} CO-02: spans por tool call */
     const _toolSpans = new Map();
 
     const unsubToolStart = session.on(
