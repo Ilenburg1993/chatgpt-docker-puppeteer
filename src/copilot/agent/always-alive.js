@@ -527,6 +527,23 @@ export class AlwaysAliveAgent extends EventEmitter {
             const _collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
             this.#sessionEventUnsubscribers.push(..._collectorUnsubs);
 
+            // M-03 (PARTE-8): registrar lifecycle handlers no client para auditoria de sessões
+            if (typeof client.on === 'function') {
+                const unsubCreated = client.on('session.created', (/** @type {any} */ evt) => {
+                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
+                    this.emit('sdk.lifecycle', { type: 'session.created', sessionId: evt?.sessionId });
+                });
+                const unsubDeleted = client.on('session.deleted', (/** @type {any} */ evt) => {
+                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
+                    this.emit('sdk.lifecycle', { type: 'session.deleted', sessionId: evt?.sessionId });
+                });
+                const unsubUpdated = client.on('session.updated', (/** @type {any} */ evt) => {
+                    log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
+                    this.emit('sdk.lifecycle', { type: 'session.updated', sessionId: evt?.sessionId });
+                });
+                this.#sessionEventUnsubscribers.push(unsubCreated, unsubDeleted, unsubUpdated);
+            }
+
             // F29: agent-event-observer eagerness — criar e atachar aqui para cobrir
             // tasks via sendMessage() que ocorrem ANTES do primeiro dialog loop boot.
             if (this.#agentObserver) this.#agentObserver.detach();
