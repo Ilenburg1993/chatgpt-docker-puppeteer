@@ -71,13 +71,13 @@ export function getCopilotFallbackModel() {
 }
 
 /**
- * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Re-exportados de agent/events.js para acesso centralizado
- * via core/.
+ * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Definidos em core/agent-events.js (R9) e re-exportados
+ * aqui para acesso centralizado via core/.
  *
  * @type {readonly string[]}
  */
-export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from '../agent/events.js';
-/** @typedef {import('../agent/events.js').AgentEventName} AgentEventName */
+export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './agent-events.js';
+/** @typedef {import('./agent-events.js').AgentEventName} AgentEventName */
 
 /**
  * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js. Usar estas constantes em vez
