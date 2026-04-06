@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * src/copilot/agent/session-keepalive.js
+ * src/copilot/agent/session/keepalive.js
  *
  * F42.2 (BUG-SD-001 fix): Previne expiração de sessão SDK por idle timeout (30 min).
  *
  * Envia heartbeat periódico quando o agente está idle e dialog loop não está ativo (o dialog loop já mantém a sessão
  * viva via `ask_user` pendente).
  *
- * @module copilot/agent/session-keepalive
+ * @module copilot/agent/session/keepalive
  */
 
 import { log } from '#copilot/observability/logger';

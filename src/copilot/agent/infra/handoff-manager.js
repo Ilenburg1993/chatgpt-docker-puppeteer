@@ -11,7 +11,7 @@
  * 3. Emite eventos de progresso
  * 4. Permite rejeitar/aceitar handoffs via API
  *
- * @module copilot/agent/handoff-manager
+ * @module copilot/agent/infra/handoff-manager
  */
 
 import { log } from '#copilot/observability/logger';

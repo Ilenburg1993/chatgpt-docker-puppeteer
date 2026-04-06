@@ -1,16 +1,16 @@
 // @ts-check
 /**
- * src/copilot/agent/session-initializer.js
+ * src/copilot/agent/session/initializer.js
  *
  * Inicializador de sessão persistente para o Always-Alive Agent. Preserva o sessionId em disco e retoma sessões após
  * reinicializações (PM2/reboot).
  *
- * I/O de estado persistido delegado a `state-io.js`. Logging de auditoria de ferramentas delegado a
- * `tool-audit-logger.js`.
+ * I/O de estado persistido delegado a `lifecycle/state-io.js`. Logging de auditoria delegado a
+ * `infra/tool-audit-logger.js`.
  *
- * @module copilot/session-initializer
+ * @module copilot/agent/session/initializer
  * @see module:copilot/lib/session
- * @see module:copilot/agent/state-io
+ * @see module:copilot/agent/lifecycle/state-io
  * @see module:copilot/config/session-config
  */
 
@@ -29,7 +29,7 @@ import { readStore as _readTodoStore } from '../../tools/todo/store.js';
 import { buildAuditingPermissionHandler } from '../infra/tool-audit-logger.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 // Re-exporta funções de I/O de estado de state-io.js para compatibilidade retroativa com importadores
-// que usam '#copilot/session-manager'. Novos módulos devem importar de './state-io.js' diretamente.
+// que usam '#copilot/session-manager'. Novos módulos devem importar de '../lifecycle/state-io.js'.
 export { clearState, readState, writeState, writeStateAsync } from '../lifecycle/state-io.js';
 
 /**

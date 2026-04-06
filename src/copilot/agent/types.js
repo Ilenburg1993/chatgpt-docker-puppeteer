@@ -3,7 +3,7 @@
  * src/copilot/agent/types.js
  *
  * Typedefs centralizados do subsistema agent. Elimina importações circulares de tipos entre módulos (status-snapshot,
- * dialog-loop-manager, session-event-wirer ↔ always-alive).
+ * dialog/loop-manager, session/event-wirer ↔ always-alive).
  *
  * @module copilot/agent/types
  */

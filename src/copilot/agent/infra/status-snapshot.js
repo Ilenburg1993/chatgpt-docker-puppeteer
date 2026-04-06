@@ -7,7 +7,7 @@
  * Recebe um objeto `params` com todos os dados necessários, sem acesso a estado mutable, o que facilita o teste
  * unitário e desacopla a lógica de construção do snapshot do agente.
  *
- * @module copilot/agent/status-snapshot
+ * @module copilot/agent/infra/status-snapshot
  */
 
 /**

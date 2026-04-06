@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * src/copilot/agent/session-snapshot.js
+ * src/copilot/agent/session/snapshot.js
  *
  * F41 — Session Snapshot & Restore.
  *
  * Serializa e restaura o estado completo de uma sessão do agente, incluindo contexto do dialog loop, métricas, modelo
  * ativo, fila pendente e configuração de permissões.
  *
- * @module copilot/agent/session-snapshot
+ * @module copilot/agent/session/snapshot
  */
 
 import { log } from '#copilot/observability/logger';

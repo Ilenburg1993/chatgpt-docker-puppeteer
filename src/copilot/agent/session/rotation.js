@@ -7,7 +7,7 @@
  * Determina quando criar uma nova sessão em vez de resumir a existente, baseado em utilização de contexto, idade da
  * sessão, e contagem de compactions.
  *
- * @module copilot/agent/session-rotation
+ * @module copilot/agent/session/rotation
  */
 
 import { log } from '#copilot/observability/logger';

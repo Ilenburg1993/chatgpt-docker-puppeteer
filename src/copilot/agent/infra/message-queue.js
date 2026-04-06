@@ -8,7 +8,7 @@
  * Intencionalmente _não_ implementa o processamento de tarefas (`executeTask`, sessão, status) — essa lógica permanece
  * no host `AlwaysAliveAgent` que instancia esta classe e chama `scheduleNext()`.
  *
- * @module copilot/agent/message-queue
+ * @module copilot/agent/infra/message-queue
  */
 
 import { MAX_QUEUE_SIZE } from '#copilot/core/constants';

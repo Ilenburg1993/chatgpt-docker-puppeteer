@@ -8,8 +8,8 @@
  * REPLY/DONE. Exposto como `DialogProtocol` para permitir testes unitários isolados, sem depender de
  * `AlwaysAliveAgent`.
  *
- * @module copilot/agent/dialog-protocol
- * @see module:copilot/agent/dialog-loop-manager
+ * @module copilot/agent/dialog/protocol
+ * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/channel/client
  */
 

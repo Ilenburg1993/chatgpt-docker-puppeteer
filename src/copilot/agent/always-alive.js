@@ -15,9 +15,9 @@
  *
  * @module copilot/always-alive
  * @see module:copilot/agent/dialog/loop-manager
- * @see module:copilot/agent/session-initializer
- * @see module:copilot/agent/state-io
- * @see module:copilot/agent/message-queue
+ * @see module:copilot/agent/session/initializer
+ * @see module:copilot/agent/lifecycle/state-io
+ * @see module:copilot/agent/infra/message-queue
  */
 
 import { SessionError } from '#copilot/core/errors';
@@ -1419,7 +1419,7 @@ export class AlwaysAliveAgent extends EventEmitter {
 
     /**
      * Tenta reconectar à sessão SDK com backoff exponencial + jitter. Delega para a política centralizada em
-     * `reconnect-policy.js`.
+     * `lifecycle/reconnect-policy.js`.
      *
      * @param {Error} originalError - Erro original que desencadeou a reconexão
      * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts]

@@ -13,7 +13,7 @@
  * Distinto de `audit-log.js`, que registra tool calls SDK (start/complete com durationMs) em
  * `logs/tool-execution-audit.jsonl`. Schemas separados desde CQ-01.
  *
- * @module copilot/agent/tool-audit-logger
+ * @module copilot/agent/infra/tool-audit-logger
  */
 
 import { defaultBus } from '#copilot/hooks/bus';

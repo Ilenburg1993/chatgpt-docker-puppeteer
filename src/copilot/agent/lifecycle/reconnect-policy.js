@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * src/copilot/agent/reconnect-policy.js
+ * src/copilot/agent/lifecycle/reconnect-policy.js
  *
  * Política de reconexão com backoff exponencial + jitter para o AlwaysAliveAgent.
  *
  * Função pura sem estado próprio — recebe callbacks do host (AlwaysAliveAgent) para as operações de side-effect (emit,
  * initSession, dialogLoop). Testável de forma independente.
  *
- * @module copilot/agent/reconnect-policy
+ * @module copilot/agent/lifecycle/reconnect-policy
  */
 
 import { log } from '#copilot/observability/logger';

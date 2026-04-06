@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/state-io.js
+ * src/copilot/agent/lifecycle/state-io.js
  *
  * I/O de estado persistido do Always-Alive Agent. Centraliza leitura, escrita e remoção do snapshot
  * `sdk-always-alive.json` em `.github/hooks/state/`.
@@ -8,9 +8,9 @@
  * Separado de `session-manager.js` para isolar responsabilidades: este módulo não conhece a lógica de sessão SDK —
  * apenas serializa e desserializa o estado.
  *
- * @module copilot/agent/state-io
+ * @module copilot/agent/lifecycle/state-io
  * @see module:copilot/always-alive
- * @see module:copilot/session-initializer
+ * @see module:copilot/agent/session/initializer
  */
 
 import { log } from '#copilot/observability/logger';

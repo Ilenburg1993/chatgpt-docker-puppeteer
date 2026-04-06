@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session-cleanup.js
+ * src/copilot/agent/session/cleanup.js
  *
  * F43.1 (GAP-SD-01): Limpeza proativa de sessões antigas no boot do agente.
  *
@@ -8,7 +8,7 @@
  * - Deleta sessões com mais de `maxAgeMs` (padrão: 24h)
  * - Preserva a sessão ativa atual (se houver)
  *
- * @module copilot/agent/session-cleanup
+ * @module copilot/agent/session/cleanup
  */
 
 import { deleteSession, listSessions } from '#copilot/lib/session';

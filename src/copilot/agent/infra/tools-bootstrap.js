@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/agent/tools-bootstrap
+ * @module copilot/agent/infra/tools-bootstrap
  * @file Inicialização de tools do agente — registro por categoria e tags.
  *
  *   Extrai a lógica repetitiva de `registerTools(registry, grupo, opts)` do método `start()` de `AlwaysAliveAgent`,

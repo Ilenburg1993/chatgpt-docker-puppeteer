@@ -15,7 +15,7 @@
  * Cada função recebe um objeto `emitter` (com `.on/.once/.off/.emit`) e os callbacks/deps necessários — sem acesso a
  * campos privados do DLM.
  *
- * @module copilot/agent/dialog-turn-executor
+ * @module copilot/agent/dialog/turn-executor
  */
 
 import { SessionError } from '#copilot/core/errors';

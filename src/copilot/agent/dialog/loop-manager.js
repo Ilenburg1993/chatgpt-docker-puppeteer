@@ -13,10 +13,10 @@
  * - Pause/Resume zero-PR
  * - Fallback de modelo automático ao atingir quota/rate_limit
  *
- * @module copilot/agent/dialog-loop-manager
+ * @module copilot/agent/dialog/loop-manager
  * @see module:copilot/always-alive
- * @see module:copilot/agent/dialog-protocol
- * @see module:copilot/agent/dialog-watchdog
+ * @see module:copilot/agent/dialog/protocol
+ * @see module:copilot/agent/dialog/watchdog
  */
 
 import { getCopilotFallbackModel } from '#copilot/core/constants';

@@ -8,7 +8,7 @@
  * Função pura sem estado próprio — recebe `session` e um conjunto de callbacks que permitem ao AlwaysAliveAgent reagir
  * aos eventos sem acoplar este módulo ao agente.
  *
- * @module copilot/agent/session-event-wirer
+ * @module copilot/agent/session/event-wirer
  */
 
 import { log } from '#copilot/observability/logger';
