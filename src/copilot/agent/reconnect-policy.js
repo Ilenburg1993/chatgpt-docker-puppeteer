@@ -18,6 +18,8 @@ import { log } from '#copilot/observability/logger';
  * @property {(client: any) => Promise<{ session: any; isResumed: boolean }>} initSession - Reinicializa a sessão SDK
  * @property {{ active: boolean; notifyReconnect: () => void }} dialogLoop - Handle do dialog loop
  * @property {(unsubs: (() => void)[]) => void} clearSessionEventUnsubs - Limpa os unsubscribers da sessão anterior
+ * @property {(client: any) => void} [updateClient] - F42.5: atualiza referência do client no host após criar novo
+ * @property {() => any} [createClient] - F42.5: factory para criar novo CopilotClient
  */
 
 /**
@@ -38,7 +40,7 @@ import { log } from '#copilot/observability/logger';
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
     // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
     const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random } = opts;
-    const { emit, initSession, dialogLoop, clearSessionEventUnsubs } = callbacks;
+    const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient } = callbacks;
 
     // Só tenta reconectar se o cliente ainda existe e o agente não foi parado.
     if (!client || currentStatus === 'stopped') return false;
@@ -67,7 +69,18 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     log('WARN', `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`);
                 }
             }
-            const { session, isResumed } = await initSession(client);
+
+            // F42.5 (BUG-SD-002 fix): criar um novo CopilotClient a cada tentativa de reconexão
+            // em vez de reutilizar o client parado — o SDK pode não suportar reutilização após stop().
+            let activeClient = client;
+            if (typeof createClient === 'function') {
+                activeClient = createClient();
+                if (typeof updateClient === 'function') {
+                    updateClient(activeClient);
+                }
+            }
+
+            const { session, isResumed } = await initSession(activeClient);
             log(
                 'INFO',
                 `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,

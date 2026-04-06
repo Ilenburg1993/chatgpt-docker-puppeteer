@@ -485,6 +485,39 @@ function _wireSdkResponseEvents(session, { emit }) {
             emit('elicitation.pending', { requestId, schema, title, description, ts: Date.now() });
             log('INFO', `[session-event-wirer] elicitation.pending requestId=${requestId ?? '?'}`);
         }),
+        // F43.3 (GAP-SD-06): propagar session.truncation para observabilidade
+        session.on('session.truncation', (/** @type {SdkEvent} */ evt) => {
+            const { messageTruncatedCount, tokensTruncated, reason } = evt?.data ?? {};
+            emit('session.truncation', {
+                messageTruncatedCount: messageTruncatedCount ?? 0,
+                tokensTruncated: tokensTruncated ?? 0,
+                reason: reason ?? 'unknown',
+                ts: Date.now(),
+            });
+            log('WARN', `[session-event-wirer] session.truncation: ${messageTruncatedCount ?? '?'} msgs, ${tokensTruncated ?? '?'} tokens (reason: ${reason ?? '?'})`);
+        }),
+        // F43.4: propagar session.snapshot_rewind para observabilidade
+        session.on('session.snapshot_rewind', (/** @type {SdkEvent} */ evt) => {
+            const { snapshotId, reason } = evt?.data ?? {};
+            emit('session.snapshot_rewind', {
+                snapshotId: snapshotId ?? 'unknown',
+                reason: reason ?? 'unknown',
+                ts: Date.now(),
+            });
+            log('INFO', `[session-event-wirer] session.snapshot_rewind: snapshot=${snapshotId ?? '?'}, reason=${reason ?? '?'}`);
+        }),
+        // F45.1 (GAP-SD-07): propagar session.handoff para HandoffManager
+        session.on('session.handoff', (/** @type {SdkEvent} */ evt) => {
+            const { fromAgent, toAgent, reason, context } = evt?.data ?? {};
+            emit('session.handoff', {
+                fromAgent: fromAgent ?? 'unknown',
+                toAgent: toAgent ?? 'unknown',
+                reason: reason ?? undefined,
+                context: context ?? undefined,
+                ts: Date.now(),
+            });
+            log('INFO', `[session-event-wirer] session.handoff: ${fromAgent ?? '?'} → ${toAgent ?? '?'} (reason: ${reason ?? '?'})`);
+        }),
     ];
 }
 

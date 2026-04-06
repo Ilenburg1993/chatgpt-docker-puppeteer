@@ -11,11 +11,14 @@
  */
 
 export {
+    handleAcceptHandoff,
     handleDialogPause,
     handleDialogResume,
     handleGetContext,
+    handleGetHandoffs,
     handleInject,
     handlePipeline,
+    handleRejectHandoff,
 } from './handlers-agent.js';
 
 export {

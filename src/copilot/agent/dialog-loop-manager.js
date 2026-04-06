@@ -74,6 +74,9 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {boolean} */
     #stopping = false;
 
+    /** @type {boolean} F42.6 (BUG-SD-007 fix): guard atômico para prevenir interleaving entre resume/start */
+    #resuming = false;
+
     /** @type {DialogWatchdog | null} */
     #watchdog = null;
 
@@ -119,6 +122,16 @@ export class DialogLoopManager extends EventEmitter {
         this.#watchdogStallMs =
             options.watchdogStallMs ?? Number(process.env['LLM_B_WATCHDOG_STALL_MS'] ?? 15 * 60 * 1_000);
         this.#fallbackModel = options.fallbackModel ?? getCopilotFallbackModel();
+
+        // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
+        const saved = readState()?.prMetrics;
+        if (saved && typeof saved === 'object') {
+            this.#prMetrics = {
+                boots: Number(saved.boots) || 0,
+                resumesWithPR: Number(saved.resumesWithPR) || 0,
+                resumesZeroPR: Number(saved.resumesZeroPR) || 0,
+            };
+        }
     }
 
     /**
@@ -219,6 +232,7 @@ export class DialogLoopManager extends EventEmitter {
             );
         }
 
+        // F42.6: permitir start() durante resume (Estratégia B) mas bloquear duplicatas externas
         if (this.#active) {
             throw new SessionError(
                 '[DialogLoopManager] Dialog loop já está ativo. Chame stop() primeiro.',
@@ -292,6 +306,10 @@ export class DialogLoopManager extends EventEmitter {
         await bootPromise;
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
+        // F42.4: persistir prMetrics após boot bem-sucedido
+        writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
+            log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
+        );
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -424,57 +442,79 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<void>}
      */
     async resume() {
+        // F42.6 (BUG-SD-007 fix): previne interleaving entre resume() e start() concorrentes
+        if (this.#resuming) {
+            log('WARN', '[DialogLoopManager] resume() já em andamento — ignorado.');
+            return;
+        }
         const state = readState();
         if (!state?.dialogPaused) {
             log('WARN', '[DialogLoopManager] resume() sem dialogPaused=true — ignorado.');
             return;
         }
 
-        await writeStateAsync({ dialogPaused: false }).catch((/** @type {any} */ e) =>
-            log('WARN', `[DialogLoopManager] writeState dialogPaused=false: ${e.message}`),
-        );
+        this.#resuming = true;
+        try {
+            await writeStateAsync({ dialogPaused: false }).catch((/** @type {any} */ e) =>
+                log('WARN', `[DialogLoopManager] writeState dialogPaused=false: ${e.message}`),
+            );
 
-        // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
-        if (this.#host?.getPendingQuestion()) {
-            log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
-            // F31: reiniciar watchdog após resume
-            this.#watchdog?.start();
-            // F41B.8: contabilizar resume zero-PR
-            this.#prMetrics.resumesZeroPR++;
-            this.emit('resumed', { prConsumed: false });
-            return;
+            // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
+            if (this.#host?.getPendingQuestion()) {
+                log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
+                // F31: reiniciar watchdog após resume
+                this.#watchdog?.start();
+                // F41B.8: contabilizar resume zero-PR
+                this.#prMetrics.resumesZeroPR++;
+                // F42.4: persistir prMetrics após resume
+                writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
+                    log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
+                );
+                this.emit('resumed', { prConsumed: false });
+                return;
+            }
+
+            // Estratégia A (async): aguardar ask_user preservado (0 PR)
+            // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
+            // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
+            const hostEmitter = /** @type {import('events').EventEmitter} */ (/** @type {unknown} */ (this.#host));
+            const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
+            const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs: 5_000 })
+                .then(() => true)
+                .catch(() => false);
+
+            if (preserved) {
+                log('INFO', '[DialogLoopManager] ask_user preservado — retomada zero-PR.');
+                // F31: reiniciar watchdog após resume
+                this.#watchdog?.start();
+                // F41B.8: contabilizar resume zero-PR
+                this.#prMetrics.resumesZeroPR++;
+                // F42.4: persistir prMetrics após resume zero-PR
+                writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
+                    log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
+                );
+                this.emit('resumed', { prConsumed: false });
+                return;
+            }
+
+            // Estratégia B: reenviar boot prompt (1 PR)
+            log('INFO', '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt (1 PR).');
+            // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
+            this.#watchdog?.stop();
+            this.#watchdog = null;
+            this.#active = false;
+            await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
+            await this.start();
+            // F41B.8: contabilizar resume com PR
+            this.#prMetrics.resumesWithPR++;
+            // F42.4: persistir prMetrics após resume com PR
+            writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
+                log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
+            );
+            this.emit('resumed', { prConsumed: true });
+        } finally {
+            this.#resuming = false;
         }
-
-        // Estratégia A (async): aguardar ask_user preservado (0 PR)
-        // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
-        // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
-        const hostEmitter = /** @type {import('events').EventEmitter} */ (/** @type {unknown} */ (this.#host));
-        const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
-        const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs: 5_000 })
-            .then(() => true)
-            .catch(() => false);
-
-        if (preserved) {
-            log('INFO', '[DialogLoopManager] ask_user preservado — retomada zero-PR.');
-            // F31: reiniciar watchdog após resume
-            this.#watchdog?.start();
-            // F41B.8: contabilizar resume zero-PR
-            this.#prMetrics.resumesZeroPR++;
-            this.emit('resumed', { prConsumed: false });
-            return;
-        }
-
-        // Estratégia B: reenviar boot prompt (1 PR)
-        log('INFO', '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt (1 PR).');
-        // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
-        this.#watchdog?.stop();
-        this.#watchdog = null;
-        this.#active = false;
-        await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
-        await this.start();
-        // F41B.8: contabilizar resume com PR
-        this.#prMetrics.resumesWithPR++;
-        this.emit('resumed', { prConsumed: true });
     }
 
     /**
@@ -500,9 +540,17 @@ export class DialogLoopManager extends EventEmitter {
 
     /**
      * Força desativação sem protocolo (usado durante shutdown do agente).
+     *
+     * F42.3 (BUG-SD-006 fix): reseta mutex, queue depth e generation counter para prevenir
+     * execuções fantasma de turns enfileirados que continuariam executando após desativação.
      */
     forceDeactivate() {
         this.#active = false;
+        this.#stopping = false;
+        // F42.3: reset completo do mutex pipeline — previne turns fantasma
+        this.#turnMutex = Promise.resolve();
+        this.#turnQueueDepth = 0;
+        this.#turnMutexGen++;
         this.#watchdog?.stop();
         this.#watchdog = null;
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado

@@ -48,6 +48,7 @@ const STATE_FILE = process.env['AGENT_STATE_FILE']
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
  * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
  * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
+ * @property {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number; totalPR?: number }} [prMetrics] - Contadores de consumo de Premium Requests do dialog loop
  */
 
 // ─── Cache in-process ────────────────────────────────────────────────────────

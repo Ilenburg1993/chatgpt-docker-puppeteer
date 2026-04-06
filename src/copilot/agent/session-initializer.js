@@ -335,9 +335,23 @@ export async function initOrResumeSession(client, sessionOptions) {
         customAgents: buildCustomAgentsConfig(),
     };
 
-    // Delega para lib/session.resumeOrCreate — tenta retomar, cria se falhar
-    // F8.2: validação de saúde da sessão persistida antes de tentar retomada
-    const savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
+    // F43.2 (GAP-SD-03): verificar se a sessão deve ser rotacionada antes de tentar retomada
+    let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
+    if (savedSessionId) {
+        const { shouldRotateSession } = await import('./session-rotation.js');
+        /** @type {import('./session-rotation.js').RotationContext} */
+        const rotationCtx = {};
+        if (state?.startedAt) {
+            rotationCtx.sessionAgeMs = Date.now() - state.startedAt;
+        }
+        const decision = shouldRotateSession(rotationCtx);
+        if (decision.shouldRotate) {
+            log('INFO', `[PersistentSession] F43.2: Rotacionando sessão — ${decision.reason}`);
+            const { defaultMetrics } = await import('#copilot/observability/metrics');
+            defaultMetrics.recordSessionRotation();
+            savedSessionId = null;
+        }
+    }
     const result = await resumeOrCreate(client, savedSessionId, opts);
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop

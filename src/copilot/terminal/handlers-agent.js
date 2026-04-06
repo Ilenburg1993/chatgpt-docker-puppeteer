@@ -269,3 +269,64 @@ export async function handleDialogResume() {
         return { status: 500, body: { ok: false, error: e.message } };
     }
 }
+
+// ─── F45.3: Handoff API ──────────────────────────────────────────────────────
+
+/**
+ * GET /handoff — lista handoffs pendentes e histórico.
+ *
+ * @returns {HandlerResult}
+ */
+export function handleGetHandoffs() {
+    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    if (!handoffMgr) {
+        return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
+    }
+    return {
+        status: 200,
+        body: {
+            ok: true,
+            pending: handoffMgr.getPending(),
+            history: handoffMgr.getHistory(),
+        },
+    };
+}
+
+/**
+ * POST /handoff/:id/accept — aceita um handoff pendente.
+ *
+ * @param {{ handoffId?: string }} params
+ * @returns {HandlerResult}
+ */
+export function handleAcceptHandoff(params) {
+    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    if (!handoffMgr) {
+        return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
+    }
+    const id = params?.handoffId;
+    if (!id) {
+        return { status: 400, body: { ok: false, error: 'handoffId é obrigatório.' } };
+    }
+    const result = handoffMgr.accept(id);
+    return { status: result.accepted ? 200 : 404, body: { ok: result.accepted, ...result } };
+}
+
+/**
+ * POST /handoff/:id/reject — rejeita um handoff pendente.
+ *
+ * @param {{ handoffId?: string }} params
+ * @param {{ reason?: string }} [body]
+ * @returns {HandlerResult}
+ */
+export function handleRejectHandoff(params, body) {
+    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    if (!handoffMgr) {
+        return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
+    }
+    const id = params?.handoffId;
+    if (!id) {
+        return { status: 400, body: { ok: false, error: 'handoffId é obrigatório.' } };
+    }
+    const result = handoffMgr.reject(id, body?.reason);
+    return { status: 200, body: { ok: true, ...result } };
+}

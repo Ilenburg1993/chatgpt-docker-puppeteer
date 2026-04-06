@@ -75,7 +75,7 @@ const BANNER = `
   \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
   \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
-  \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m \x1b[90m← NEW-PAUSE: pausa/retoma sem PR\x1b[0m
+  \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
   \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
   \x1b[33m/display [toggle] [on|off]\x1b[0m · \x1b[33m/metrics\x1b[0m · \x1b[33m/export [path]\x1b[0m \x1b[90m← F24: display, metrics, export\x1b[0m
@@ -137,6 +137,7 @@ const CMD_ROUTES = [
     [['resume'], (ctx, arg) => _cmdResume({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['pause'], () => _cmdPauseDialogLoop()],
     [['dialog-resume'], () => _cmdDialogResume()],
+    [['handoff'], () => _cmdHandoff()],
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
     [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
     [['tools'], () => _cmdTools({ println })],
@@ -269,6 +270,24 @@ async function _cmdDialogResume() {
         println('\x1b[32m  Dialog loop retomado.\x1b[0m');
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
+    }
+}
+
+function _cmdHandoff() {
+    const mgr = alwaysAliveAgent.getHandoffManager?.();
+    if (!mgr) {
+        println('\x1b[31m  HandoffManager não disponível.\x1b[0m');
+        return;
+    }
+    const history = mgr.getHistory();
+    if (history.length === 0) {
+        println('\x1b[33m  Nenhum handoff registrado nesta sessão.\x1b[0m');
+        return;
+    }
+    println('\x1b[36m  ── Handoff History ──\x1b[0m');
+    for (const h of history) {
+        const ts = new Date(h.receivedAt).toISOString();
+        println(`  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  reason=\x1b[90m${h.reason ?? '-'}\x1b[0m  status=\x1b[36m${h.status}\x1b[0m`);
     }
 }
 

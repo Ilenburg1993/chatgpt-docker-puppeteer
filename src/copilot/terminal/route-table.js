@@ -56,6 +56,7 @@ import {
     handleStoreMemory,
     handleSystemReset,
 } from './http-handlers.js';
+import { handleGetHandoffs, handleAcceptHandoff, handleRejectHandoff } from './handlers-agent.js';
 
 /**
  * @typedef {Object} RouteEntry
@@ -220,6 +221,21 @@ export const ROUTE_TABLE = [
     { method: 'POST', path: '/inject', handler: handleInject, body: 'json', async: true, rateLimiter: 'inject' },
     { method: 'POST', path: '/dialog/pause', handler: handleDialogPause, async: true },
     { method: 'POST', path: '/dialog/resume', handler: handleDialogResume, async: true },
+    // F45.3: Handoff API
+    { method: 'GET', path: '/handoff', handler: handleGetHandoffs },
+    {
+        method: 'POST',
+        path: /^\/handoff\/[^/]+\/accept$/,
+        handler: handleAcceptHandoff,
+        params: (_url, pathname) => ({ handoffId: pathname.split('/')[2] ?? '' }),
+    },
+    {
+        method: 'POST',
+        path: /^\/handoff\/[^/]+\/reject$/,
+        handler: handleRejectHandoff,
+        body: 'json',
+        params: (_url, pathname) => ({ handoffId: pathname.split('/')[2] ?? '' }),
+    },
 
     // ── DELETE routes ─────────────────────────────────────────────────────
     {

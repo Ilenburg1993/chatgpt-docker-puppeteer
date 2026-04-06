@@ -67,6 +67,10 @@
  * @property {number} started - Sessões iniciadas.
  * @property {number} ended - Sessões encerradas.
  * @property {number} errors - Erros de sessão (session.error).
+ * @property {number} rotations - Sessões rotacionadas por política (F43.2).
+ * @property {number} keepalivePings - Pings de keepalive enviados (F42.2).
+ * @property {number} cleanedUp - Sessões expiradas removidas no boot (F43.1).
+ * @property {number} handoffs - Handoffs recebidos (F45).
  */
 
 /**
@@ -102,6 +106,10 @@
  * @property {() => void} recordSessionStart
  * @property {() => void} recordSessionEnd
  * @property {() => void} recordSessionError
+ * @property {() => void} recordSessionRotation
+ * @property {() => void} recordKeepalivePing
+ * @property {() => void} recordSessionCleanup
+ * @property {() => void} recordHandoff
  * @property {(durationMs: number, success: boolean) => void} recordDialogTurn
  * @property {(stalledMs: number) => void} recordDialogStall
  * @property {() => void} recordDialogTimeout
@@ -205,7 +213,7 @@ export function createMetricsStore() {
     const _tokens = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, byModel: {} };
 
     /** @type {SessionMetrics} */
-    const _sessions = { started: 0, ended: 0, errors: 0 };
+    const _sessions = { started: 0, ended: 0, errors: 0, rotations: 0, keepalivePings: 0, cleanedUp: 0, handoffs: 0 };
 
     /**
      * @type {{
@@ -280,6 +288,18 @@ export function createMetricsStore() {
     }
     function recordSessionError() {
         _sessions.errors++;
+    }
+    function recordSessionRotation() {
+        _sessions.rotations++;
+    }
+    function recordKeepalivePing() {
+        _sessions.keepalivePings++;
+    }
+    function recordSessionCleanup() {
+        _sessions.cleanedUp++;
+    }
+    function recordHandoff() {
+        _sessions.handoffs++;
     }
 
     /**
@@ -478,6 +498,10 @@ export function createMetricsStore() {
         _sessions.started = 0;
         _sessions.ended = 0;
         _sessions.errors = 0;
+        _sessions.rotations = 0;
+        _sessions.keepalivePings = 0;
+        _sessions.cleanedUp = 0;
+        _sessions.handoffs = 0;
         _dialog.turnsTotal = 0;
         _dialog.turnsSuccess = 0;
         _dialog.stallsTotal = 0;
@@ -501,6 +525,10 @@ export function createMetricsStore() {
         recordSessionStart,
         recordSessionEnd,
         recordSessionError,
+        recordSessionRotation,
+        recordKeepalivePing,
+        recordSessionCleanup,
+        recordHandoff,
         recordDialogTurn,
         recordDialogStall,
         recordDialogTimeout,
