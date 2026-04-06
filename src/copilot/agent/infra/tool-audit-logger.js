@@ -21,18 +21,17 @@ import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { TOOL_AUDIT_LOG as _TOOL_AUDIT_LOG_ENV, TOOL_AUDIT_MAX_LOG_BYTES } from '../config.js';
 
 // G2-SEC-05: path do audit log configurável via COPILOT_TOOL_PERMISSIONS_LOG env var.
 // CQ-01: renomeado para tool-permissions-audit.jsonl (distinto de tool-execution-audit.jsonl).
 // @deprecated F33.1: COPILOT_AUDIT_LOG_PATH é legado — usar COPILOT_TOOL_PERMISSIONS_LOG.
-const TOOL_AUDIT_LOG = process.env['COPILOT_TOOL_PERMISSIONS_LOG']
-    ? resolve(process.env['COPILOT_TOOL_PERMISSIONS_LOG'])
-    : process.env['COPILOT_AUDIT_LOG_PATH']
-      ? resolve(process.env['COPILOT_AUDIT_LOG_PATH'])
-      : join(resolve(import.meta.dirname, '../logs'), 'tool-permissions-audit.jsonl');
+const TOOL_AUDIT_LOG = _TOOL_AUDIT_LOG_ENV
+    ? resolve(_TOOL_AUDIT_LOG_ENV)
+    : join(resolve(import.meta.dirname, '../logs'), 'tool-permissions-audit.jsonl');
 const ROTATE_LOG = TOOL_AUDIT_LOG + '.1';
 // G2-DX-11: limite de tamanho do log configurável via env (default 10MB).
-const MAX_LOG_BYTES = Number(process.env['AGENT_TOOL_AUDIT_MAX_LOG_BYTES']) || 10 * 1024 * 1024;
+const MAX_LOG_BYTES = TOOL_AUDIT_MAX_LOG_BYTES;
 
 /**
  * G2-PERF-03: Acumula tamanho do log em memória para evitar `stat()` a cada escrita. Inicializado em -1 (desconhecido)

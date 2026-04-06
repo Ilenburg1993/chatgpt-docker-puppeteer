@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { ROTATION_MAX_AGE_MS, ROTATION_MAX_COMPACTIONS, ROTATION_MAX_TURNS, ROTATION_MAX_UTIL } from '../config.js';
 
 /**
  * @typedef {Object} RotationDecision
@@ -37,10 +38,10 @@ import { log } from '#copilot/observability/logger';
 
 /** @type {RotationPolicy} */
 const DEFAULT_POLICY = {
-    maxUtilization: Number(process.env['AGENT_ROTATION_MAX_UTIL'] || 0.9),
-    maxAgeMs: Number(process.env['AGENT_ROTATION_MAX_AGE_MS'] || 4 * 60 * 60_000),
-    maxCompactions: Number(process.env['AGENT_ROTATION_MAX_COMPACTIONS'] || 5),
-    maxTurns: Number(process.env['AGENT_ROTATION_MAX_TURNS'] || 200),
+    maxUtilization: ROTATION_MAX_UTIL,
+    maxAgeMs: ROTATION_MAX_AGE_MS,
+    maxCompactions: ROTATION_MAX_COMPACTIONS,
+    maxTurns: ROTATION_MAX_TURNS,
 };
 
 /**

@@ -13,15 +13,13 @@
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
 import { readState } from '../lifecycle/state-io.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
-const SNAPSHOT_DIR = process.env['AGENT_SNAPSHOT_DIR']
-    ? resolve(process.env['AGENT_SNAPSHOT_DIR'])
+const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
+    ? resolve(_SNAPSHOT_DIR_ENV)
     : join(ROOT, '.github', 'hooks', 'state', 'snapshots');
-
-/** @type {number} Máximo de snapshots a manter (F41.6) */
-const MAX_SNAPSHOTS = Number(process.env['AGENT_MAX_SNAPSHOTS'] ?? 10);
 
 /**
  * @typedef {Object} SessionSnapshotData

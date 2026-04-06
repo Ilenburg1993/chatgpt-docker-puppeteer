@@ -17,13 +17,12 @@ import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { STATE_FILE as _STATE_FILE_ENV } from '../config.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 // G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.
-const STATE_FILE = process.env['AGENT_STATE_FILE']
-    ? resolve(process.env['AGENT_STATE_FILE'])
-    : join(STATE_DIR, 'sdk-always-alive.json');
+const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : join(STATE_DIR, 'sdk-always-alive.json');
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

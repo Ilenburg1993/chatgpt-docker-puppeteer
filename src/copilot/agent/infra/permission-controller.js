@@ -15,6 +15,7 @@
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/hooks/permission';
 import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
+import { PERMISSION_MODE } from '../config.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ export class PermissionController {
 
     /** @type {PermissionMode} */
     // G2-DX-12: modo padrão configurável via AGENT_PERMISSION_MODE env var.
-    #mode = /** @type {PermissionMode} */ (process.env['AGENT_PERMISSION_MODE'] ?? 'approve_all');
+    #mode = /** @type {PermissionMode} */ (PERMISSION_MODE);
 
     /**
      * Callback invocado após cada troca de modo. Pode ser usado pelo AlwaysAliveAgent para emitir eventos

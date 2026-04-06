@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../config.js';
 
 /**
  * @typedef {Object} SessionKeepaliveOptions
@@ -41,9 +42,8 @@ export class SessionKeepalive {
      * @param {SessionKeepaliveOptions} [options]
      */
     constructor(options = {}) {
-        this.#intervalMs = options.intervalMs ?? Number(process.env['AGENT_KEEPALIVE_MS'] || 10 * 60_000);
-        this.#idleThresholdMs =
-            options.idleThresholdMs ?? Number(process.env['AGENT_KEEPALIVE_IDLE_MS'] || 20 * 60_000);
+        this.#intervalMs = options.intervalMs ?? KEEPALIVE_INTERVAL_MS;
+        this.#idleThresholdMs = options.idleThresholdMs ?? KEEPALIVE_IDLE_THRESHOLD_MS;
     }
 
     /**

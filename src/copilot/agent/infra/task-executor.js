@@ -11,20 +11,7 @@
  */
 
 import { startSpanImmediate } from '../../observability/otel.js';
-
-/**
- * Máximo de tentativas de retry por task após reconexão. Configurável via AGENT_MAX_TASK_RETRIES.
- *
- * @type {number}
- */
-const MAX_TASK_RETRIES = Number(process.env['AGENT_MAX_TASK_RETRIES']) || 3;
-
-/**
- * Timeout padrão de execução de tarefa em ms. Configurável via AGENT_TASK_TIMEOUT_MS.
- *
- * @type {number}
- */
-const DEFAULT_TASK_TIMEOUT_MS = Number(process.env['AGENT_TASK_TIMEOUT_MS']) || 60_000;
+import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../config.js';
 
 /**
  * @typedef {object} TaskExecutorCallbacks

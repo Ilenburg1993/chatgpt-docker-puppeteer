@@ -24,6 +24,7 @@ import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
+import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '../config.js';
 import { readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { DialogProtocol } from './protocol.js';
 import { executeTurnImpl } from './turn-executor.js';
@@ -115,12 +116,10 @@ export class DialogLoopManager extends EventEmitter {
      */
     constructor(options = {}) {
         super();
-        this.#maxQueueSize = options.maxQueueSize ?? Number(process.env['LLM_B_DIALOG_QUEUE_MAX'] ?? 10);
-        this.#bootTimeoutMs = options.bootTimeoutMs ?? Number(process.env['LLM_B_BOOT_TIMEOUT_MS'] ?? 30_000);
-        this.#watchdogIntervalMs =
-            options.watchdogIntervalMs ?? Number(process.env['LLM_B_WATCHDOG_MS'] ?? 5 * 60 * 1_000);
-        this.#watchdogStallMs =
-            options.watchdogStallMs ?? Number(process.env['LLM_B_WATCHDOG_STALL_MS'] ?? 15 * 60 * 1_000);
+        this.#maxQueueSize = options.maxQueueSize ?? DIALOG_QUEUE_MAX;
+        this.#bootTimeoutMs = options.bootTimeoutMs ?? BOOT_TIMEOUT_MS;
+        this.#watchdogIntervalMs = options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS;
+        this.#watchdogStallMs = options.watchdogStallMs ?? WATCHDOG_STALL_MS;
         this.#fallbackModel = options.fallbackModel ?? getCopilotFallbackModel();
 
         // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts

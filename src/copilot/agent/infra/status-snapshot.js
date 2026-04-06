@@ -10,6 +10,8 @@
  * @module copilot/agent/infra/status-snapshot
  */
 
+import { STARVATION_THRESHOLD_MS } from '../config.js';
+
 /**
  * @typedef {import('../types.js').AgentStatusSnapshot} AgentStatusSnapshot
  *
@@ -42,7 +44,6 @@
 
 /** Tempo máximo (ms) antes de considerar uma tarefa em starvation. */
 // G1-DX-05: threshold configurável via env (default: 60s)
-const STARVATION_THRESHOLD_MS = Number(process.env['AGENT_STARVATION_THRESHOLD_MS']) || 60_000;
 
 /**
  * Constrói o snapshot de status do agente a partir de parâmetros imutáveis.

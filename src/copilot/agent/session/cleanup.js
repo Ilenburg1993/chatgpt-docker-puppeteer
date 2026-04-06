@@ -13,6 +13,7 @@
 
 import { deleteSession, listSessions } from '#copilot/lib/session';
 import { log } from '#copilot/observability/logger';
+import { SESSION_MAX_AGE_MS } from '../config.js';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -34,7 +35,7 @@ import { log } from '#copilot/observability/logger';
  * @returns {Promise<SessionCleanupResult>}
  */
 export async function cleanupStaleSessions(client, options = {}) {
-    const maxAgeMs = options.maxAgeMs ?? Number(process.env['AGENT_SESSION_MAX_AGE_MS'] || 24 * 60 * 60_000);
+    const maxAgeMs = options.maxAgeMs ?? SESSION_MAX_AGE_MS;
     const currentSessionId = options.currentSessionId ?? null;
 
     /** @type {SessionCleanupResult} */

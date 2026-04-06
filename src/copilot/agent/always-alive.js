@@ -52,6 +52,15 @@ import { createSnapshot, saveSnapshot } from './session/snapshot.js';
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
 import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
+import {
+    COPILOT_MODEL,
+    COPILOT_REASONING_EFFORT,
+    MAX_LISTENERS,
+    MCP_RECONNECT_MS,
+    MESSAGES_CACHE_TTL_MS,
+    METRICS_INTERVAL_MS,
+    STATUS_SNAPSHOT_TTL_MS,
+} from './config.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
@@ -230,7 +239,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @type {number}
      */
-    static #MESSAGES_CACHE_TTL = Number(process.env['AGENT_MESSAGES_CACHE_TTL_MS']) || 30_000;
+    static #MESSAGES_CACHE_TTL = MESSAGES_CACHE_TTL_MS;
 
     /**
      * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto. `null` até a primeira compaction ser
@@ -279,13 +288,11 @@ export class AlwaysAliveAgent extends EventEmitter {
         super();
         // Agentes de alta carga acumulam múltiplos listeners por tarefa + SSE + bridge.
         // O padrão de 10 é insuficiente; configurável via AGENT_MAX_LISTENERS (padrão 50).
-        this.setMaxListeners(Number(process.env['AGENT_MAX_LISTENERS'] ?? 50));
-        this.#model = options.model ?? process.env['COPILOT_MODEL'] ?? 'gpt-4.1';
+        this.setMaxListeners(MAX_LISTENERS);
+        this.#model = options.model ?? COPILOT_MODEL;
         this.#reasoningEffort =
             options.reasoningEffort ??
-            /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (
-                process.env['COPILOT_REASONING_EFFORT'] || undefined
-            );
+            /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */ (COPILOT_REASONING_EFFORT || undefined);
     }
 
     // ─── Controle de permissão em runtime ─────────────────────────────────────
@@ -653,7 +660,7 @@ export class AlwaysAliveAgent extends EventEmitter {
 
             // F9.2: iniciar auto-reconnect periódico ao MCP Tool Registry
             // Intervalo configurável via AGENT_MCP_RECONNECT_MS (padrão: 5 min)
-            const mcpReconnectMs = Number(process.env['AGENT_MCP_RECONNECT_MS']) || 5 * 60_000;
+            const mcpReconnectMs = MCP_RECONNECT_MS;
             this.#mcpReconnectCancel = startMcpAutoReconnect((tools) => {
                 this.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });
             }, mcpReconnectMs);
@@ -1038,7 +1045,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @type {number}
      */
-    static #METRICS_INTERVAL_MS = Number(process.env['AGENT_METRICS_INTERVAL_MS']) || 30_000;
+    static #METRICS_INTERVAL_MS = METRICS_INTERVAL_MS;
 
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
@@ -1054,7 +1061,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         // TTL safety net: invalida após AGENT_STATUS_SNAPSHOT_TTL_MS para cenários extremos.
         if (this.#statusSnapshotCache) {
             const age = Date.now() - this.#statusSnapshotCache.at;
-            if (age < (Number(process.env['AGENT_STATUS_SNAPSHOT_TTL_MS']) || 500)) {
+            if (age < STATUS_SNAPSHOT_TTL_MS) {
                 return this.#statusSnapshotCache.snapshot;
             }
             // TTL expirado — forçar rebuild como safety net

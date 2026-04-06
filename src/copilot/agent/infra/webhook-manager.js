@@ -9,21 +9,7 @@
 
 import { log } from '#copilot/observability/logger';
 import dns from 'node:dns/promises';
-
-/**
- * Timeout (ms) para cada requisição HTTP de webhook. Evita que webhooks lentos bloqueiem o ciclo.
- *
- * @type {number}
- */
-const WEBHOOK_TIMEOUT_MS = Number(process.env['WEBHOOK_TIMEOUT_MS']) || 5_000;
-
-/**
- * Número máximo de retries para webhooks que falham com erro retriable (5xx, timeout, network). GAP-ROUTE-002:
- * implementa retry com exponential backoff.
- *
- * @type {number}
- */
-const WEBHOOK_MAX_RETRIES = Number(process.env['WEBHOOK_MAX_RETRIES']) || 2;
+import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_TIMEOUT_MS } from '../config.js';
 
 /**
  * Delay base (ms) para backoff exponencial entre retries de webhook.
@@ -31,13 +17,6 @@ const WEBHOOK_MAX_RETRIES = Number(process.env['WEBHOOK_MAX_RETRIES']) || 2;
  * @type {number}
  */
 const WEBHOOK_RETRY_BASE_MS = 500;
-
-/**
- * Máximo de webhooks simultâneos que podem ser registrados.
- *
- * @type {number}
- */
-const MAX_WEBHOOKS = Number(process.env['MAX_WEBHOOKS']) || 50;
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry

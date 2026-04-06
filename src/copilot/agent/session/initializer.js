@@ -20,12 +20,13 @@ import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
 import { log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
-import { access, open, readFile, readdir, stat } from 'node:fs/promises';
+import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { buildCustomAgentsConfig } from '../../config/custom-agents.js';
 import { pickDefined } from '../../lib/utils.js';
 import { readStore as _readTodoStore } from '../../tools/todo/store.js';
+import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES, SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
 import { buildAuditingPermissionHandler } from '../infra/tool-audit-logger.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 
@@ -221,7 +222,7 @@ export async function buildHookSystemContext() {
 
 // G2-DX-09: limite máximo de contexto configurável via env (default 8KB).
 // SEC-02: previne injection de conteúdo grande via briefing
-const HOOK_CONTEXT_MAX_BYTES = Number(process.env['AGENT_HOOK_CONTEXT_MAX_BYTES']) || 8 * 1024;
+const HOOK_CONTEXT_MAX_BYTES = _HOOK_CONTEXT_MAX_BYTES;
 
 /**
  * Constrói contexto do hook system com limite de tamanho aplicado.
@@ -260,7 +261,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
         log('WARN', '[session-initializer] sessionId inválido — forçando nova sessão.');
         return null;
     }
-    const maxAgeMs = Number(process.env['AGENT_SESSION_MAX_AGE_MS']) || 24 * 60 * 60_000;
+    const maxAgeMs = SESSION_MAX_AGE_MS;
     if (lastActivityMs && Date.now() - lastActivityMs > maxAgeMs) {
         log(
             'WARN',
@@ -311,7 +312,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         // Threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
-        workingDirectory: process.env['COPILOT_WORKING_DIRECTORY'] ?? process.cwd(),
+        workingDirectory: WORKING_DIRECTORY,
         // Diretórios de skills para o SDK carregar.
         skillDirectories: ['.github/skills'],
         // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime
