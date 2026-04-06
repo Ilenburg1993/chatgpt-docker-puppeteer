@@ -1,15 +1,14 @@
 # Auditoria Arquitetural — src/copilot · Parte 3: Dialog Loop & Sistema de Eventos
 
-**Data**: 2026-04-04
-**Referência**: [PARTE-2-INTEGRACOES.md](PARTE-2-INTEGRACOES.md)
+**Data**: 2026-04-04 **Referência**: [PARTE-2-INTEGRACOES.md](PARTE-2-INTEGRACOES.md)
 
 ---
 
 ## 1. Mecanismo Dialog Loop Zero-PR
 
-O Dialog Loop é o mecanismo central que permite comunicação contínua com o modelo consumindo
-**zero Premium Requests** após o boot inicial. Isso é possível graças ao uso da tool `ask_user`
-do SDK como protocolo de turnos.
+O Dialog Loop é o mecanismo central que permite comunicação contínua com o modelo consumindo **zero
+Premium Requests** após o boot inicial. Isso é possível graças ao uso da tool `ask_user` do SDK como
+protocolo de turnos.
 
 ### 1.1 Protocolo de Mensagens
 
@@ -135,35 +134,41 @@ Os ~80 eventos do SDK são agrupados em 8 categorias de wiring:
 | `_wireSystemNotificationEvents` | system.notification, system.maintenance                     |
 | `_wireSdkResponseEvents`        | response.complete, response.cancelled, response.failed      |
 | `_wireUsageEvent`               | usage (tokens, PR count, model, billing)                    |
-| `_wireCatchAll`                 | * (catch-all para eventos desconhecidos)                    |
+| `_wireCatchAll`                 | \* (catch-all para eventos desconhecidos)                   |
 
 ### 2.2 Eventos do Agent (EventEmitter)
 
 O `AlwaysAliveAgent` emite os seguintes eventos (agregando SDK + DLM + internos):
 
 **Categoria Dialog:**
+
 - `dialog.loop.started` / `stopped` / `paused` / `resumed`
 - `dialog.turn.start` / `complete` / `error`
 - `dialog.reply` / `dialog.ready` / `dialog.stall` / `dialog.watchdog`
 
 **Categoria Tool:**
+
 - `tool.execution_start` / `tool.execution_complete`
 - `tool.permission.requested` / `tool.permission.granted` / `tool.permission.denied`
 
 **Categoria Session:**
+
 - `session.started` / `session.ended` / `session.error`
 - `session.compaction_start` / `session.compaction_complete`
 - `session.reconnecting` / `session.reconnected`
 - `session.fatal`
 
 **Categoria Task:**
+
 - `task.started` / `task.completed` / `task.failed`
 
 **Categoria Streaming:**
+
 - `response.delta` / `response.reasoning`
 - `response.complete` / `response.cancelled`
 
 **Categoria System:**
+
 - `assistant.intent`
 - `subagent.started` / `subagent.completed` / `subagent.failed`
 - `usage` (token/PR accounting)
@@ -260,22 +265,22 @@ reconnect-policy.js:
 
 ## 4. Proteções de Estabilidade
 
-| Proteção              | Onde                 | Detalhe                                  |
-| --------------------- | -------------------- | ---------------------------------------- |
-| Mutex de turnos       | DLM + dialog.js      | Máximo 1 turno ativo                     |
-| Backpressure          | DLM (MAX_QUEUE=10)   | Rejeita turnos excedentes                |
-| Watchdog              | DLM (5min interval)  | Detecta stall > 15min                    |
-| Boot timeout          | DLM                  | 30s para primeiro READY                  |
-| Context window check  | dialog.js            | Warn 85%, block 95%                      |
-| Tool TTL cleanup      | event-collector      | _pending Map: 5min TTL                   |
-| Turn TTL cleanup      | event-collector      | _turnStart Map: 10min TTL                |
-| SSE truncation        | dialog.js            | MAX_SSE_CONTENT_CHARS                    |
-| Events.jsonl rotation | event-collector      | 5MB max → rotate                         |
-| Metrics ring buffer   | metrics.js           | 500 samples max por histograma           |
-| Error dedup           | error-tracker.js     | Mesmo erro não rastreado duas vezes      |
-| Reconnect backoff     | reconnect-policy.js  | Exponencial com jitter                   |
-| Dialog coalescing     | dialog.js            | Evita boots simultâneos via flag         |
-| Safe event handlers   | agent-event-observer | _safe() wraps every handler in try/catch |
+| Proteção              | Onde                 | Detalhe                                   |
+| --------------------- | -------------------- | ----------------------------------------- |
+| Mutex de turnos       | DLM + dialog.js      | Máximo 1 turno ativo                      |
+| Backpressure          | DLM (MAX_QUEUE=10)   | Rejeita turnos excedentes                 |
+| Watchdog              | DLM (5min interval)  | Detecta stall > 15min                     |
+| Boot timeout          | DLM                  | 30s para primeiro READY                   |
+| Context window check  | dialog.js            | Warn 85%, block 95%                       |
+| Tool TTL cleanup      | event-collector      | \_pending Map: 5min TTL                   |
+| Turn TTL cleanup      | event-collector      | \_turnStart Map: 10min TTL                |
+| SSE truncation        | dialog.js            | MAX_SSE_CONTENT_CHARS                     |
+| Events.jsonl rotation | event-collector      | 5MB max → rotate                          |
+| Metrics ring buffer   | metrics.js           | 500 samples max por histograma            |
+| Error dedup           | error-tracker.js     | Mesmo erro não rastreado duas vezes       |
+| Reconnect backoff     | reconnect-policy.js  | Exponencial com jitter                    |
+| Dialog coalescing     | dialog.js            | Evita boots simultâneos via flag          |
+| Safe event handlers   | agent-event-observer | \_safe() wraps every handler in try/catch |
 
 ---
 

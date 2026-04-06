@@ -18,16 +18,16 @@ sequenciais por impacto e risco.
 
 ### Problemas Confirmados
 
-| ID     | Problema                                                                         | Severidade | Status      |
-| ------ | -------------------------------------------------------------------------------- | ---------- | ----------- |
+| ID     | Problema                                                                         | Severidade | Status       |
+| ------ | -------------------------------------------------------------------------------- | ---------- | ------------ |
 | BUG-01 | `LOG_LEVEL=debug` global polui o terminal LLM-B com centenas de linhas DEBUG     | Alta       | ✅ Corrigido |
 | BUG-02 | `FLOW-01 WARN` em toda mensagem — hub standalone nunca inicializado              | Média      | ✅ Corrigido |
 | BUG-03 | SIGHUP não tratado → terminal morria ao fechar painel VS Code                    | Alta       | ✅ Corrigido |
 | BUG-04 | `broadcastToSession()` gerava WARN para comportamento esperado (socket-ns)       | Baixa      | ✅ Corrigido |
-| GAP-01 | ConversationHub: `notifyTerminalTurn()` falha silenciosamente em modo standalone | Média      | Pendente    |
-| GAP-02 | `agent.metrics` emitido a cada 30s sem log de nível adequado no observer         | Baixa      | Pendente    |
-| GAP-03 | `tokens=?` no usage — contador real não conectado                                | Média      | Pendente    |
-| GAP-04 | 8 shims `@deprecated` ainda exportados por compat (custo de manutenção)          | Baixa      | Pendente    |
+| GAP-01 | ConversationHub: `notifyTerminalTurn()` falha silenciosamente em modo standalone | Média      | Pendente     |
+| GAP-02 | `agent.metrics` emitido a cada 30s sem log de nível adequado no observer         | Baixa      | Pendente     |
+| GAP-03 | `tokens=?` no usage — contador real não conectado                                | Média      | Pendente     |
+| GAP-04 | 8 shims `@deprecated` ainda exportados por compat (custo de manutenção)          | Baixa      | Pendente     |
 
 ### Shims Depreciados Ativos
 
@@ -994,8 +994,8 @@ syntax highlighting para blocos de código.
 
 ## Fase 24 — Terminal: Session Management & Multi-Session
 
-**Objetivo**: Expor o gerenciamento completo de sessões do SDK no terminal — listar, retomar, deletar
-e alternar entre sessões sem sair do REPL.
+**Objetivo**: Expor o gerenciamento completo de sessões do SDK no terminal — listar, retomar,
+deletar e alternar entre sessões sem sair do REPL.
 
 ### F24.1 — Comando `/sessions` no REPL
 
@@ -1046,8 +1046,8 @@ experiência mais interativa e responsiva.
 ### F25.1 — Ctrl+C para abort de turno em progresso
 
 - **Arquivo**: `terminal/repl.js` + `terminal/dialog.js`
-- **Mudança**: Ao pressionar Ctrl+C durante processamento de resposta, chamar `session.abort()`
-  para cancelar o turno atual sem encerrar o REPL
+- **Mudança**: Ao pressionar Ctrl+C durante processamento de resposta, chamar `session.abort()` para
+  cancelar o turno atual sem encerrar o REPL
 - **Display**: `⏹ Turno abortado pelo usuário.`
 
 ### F25.2 — Comando `/abort` no REPL
@@ -1081,8 +1081,8 @@ experiência mais interativa e responsiva.
 
 ## Fase 26 — Terminal: Permission Display & Smart Context
 
-**Objetivo**: Exibir requisições de permissão no terminal e dar ao usuário controle interativo
-sobre aprovações/negações de tool executions.
+**Objetivo**: Exibir requisições de permissão no terminal e dar ao usuário controle interativo sobre
+aprovações/negações de tool executions.
 
 ### F26.1 — Display de permission requests no terminal
 
@@ -1112,8 +1112,8 @@ sobre aprovações/negações de tool executions.
 ### F26.4 — Comando `/context` no REPL
 
 - **Novo arquivo**: `terminal/commands/context.js`
-- **Funcionalidade**: Mostra snapshot detalhado da context window — tokens in/out/cache,
-  percentual, limites, e dica de `/compact` quando > 80%
+- **Funcionalidade**: Mostra snapshot detalhado da context window — tokens in/out/cache, percentual,
+  limites, e dica de `/compact` quando > 80%
 - **Integração**: Usa dados do `session.usage_info` acumulados pelo session-event-wirer
 
 ### F26.5 — Context alerts automáticos
@@ -1126,14 +1126,13 @@ sobre aprovações/negações de tool executions.
 
 ## Fase 27 — Terminal: History, Search & Navigation
 
-**Objetivo**: Tornar o histórico de conversas pesquisável, navegável e exportável diretamente
-do terminal.
+**Objetivo**: Tornar o histórico de conversas pesquisável, navegável e exportável diretamente do
+terminal.
 
 ### F27.1 — Comando `/history` no REPL ✅ (parcial)
 
 - **Arquivo**: `terminal/commands/history.js` (existente → expandir)
-- **Mudança**: Adicionar filtros — `/history last 5`, `/history search <termo>`,
-  `/history since 2h`
+- **Mudança**: Adicionar filtros — `/history last 5`, `/history search <termo>`, `/history since 2h`
 - **Exibição**: Resumo compacto com timestamp, role, preview (primeiros 80 chars)
 
 ### F27.2 — Scroll de histórico com setas (readline)
@@ -1229,8 +1228,8 @@ diagnósticos e integração com telemetria do SDK.
 
 ## Sumário de Novas Fases (F18-F28)
 
-| Fase | Nome                              | SubFases | Prioridade | Dependências | Status      |
-| ---- | --------------------------------- | -------- | ---------- | ------------ | ----------- |
+| Fase | Nome                              | SubFases | Prioridade | Dependências | Status       |
+| ---- | --------------------------------- | -------- | ---------- | ------------ | ------------ |
 | F18  | Streaming Thinking Display        | 5        | **Alta**   | Nenhuma      | ✅ Concluída |
 | F19  | Streaming Response                | 3        | **Alta**   | F18          | ✅ Concluída |
 | F20  | Usage & Intent Display            | 3        | Média      | F18, F19     | ✅ Concluída |

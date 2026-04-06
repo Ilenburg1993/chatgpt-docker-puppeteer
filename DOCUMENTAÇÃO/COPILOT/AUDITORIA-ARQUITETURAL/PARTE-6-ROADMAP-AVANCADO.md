@@ -1,7 +1,6 @@
 # Auditoria Arquitetural — src/copilot · Parte 6: Roadmap Avançado F46-F55 + Índice
 
-**Data**: 2026-04-04
-**Continuação de**: [PARTE-5-ROADMAP.md](PARTE-5-ROADMAP.md)
+**Data**: 2026-04-04 **Continuação de**: [PARTE-5-ROADMAP.md](PARTE-5-ROADMAP.md)
 
 ---
 
@@ -139,8 +138,8 @@
 
 ## Resumo do Roadmap Expandido
 
-| Bloco | Fases   | Tema                           | Status       |
-| ----- | ------- | ------------------------------ | ------------ |
+| Bloco | Fases   | Tema                           | Status        |
+| ----- | ------- | ------------------------------ | ------------- |
 | —     | F1–F17  | Fundação (roadmap original)    | ✅ COMPLETO   |
 | —     | F18–F22 | Terminal features              | ✅ COMPLETO   |
 | —     | F23–F28 | Features avançadas (original)  | ⬜ PENDENTE   |
@@ -152,11 +151,10 @@
 
 ### Priorização Recomendada
 
-**Sprint 1 (imediato):** F29, F30, F31 — correções de gaps críticos
-**Sprint 2:** F32, F33, F34 — fixes menores + NERV bidirecional
-**Sprint 3:** F35, F36, F37 — resilience + UX terminal
-**Sprint 4:** F38, F39, F40 — SSE + alertas + multi-model
-**Long-term:** F41–F55 — features avançadas e infraestrutura
+**Sprint 1 (imediato):** F29, F30, F31 — correções de gaps críticos **Sprint 2:** F32, F33, F34 —
+fixes menores + NERV bidirecional **Sprint 3:** F35, F36, F37 — resilience + UX terminal **Sprint
+4:** F38, F39, F40 — SSE + alertas + multi-model **Long-term:** F41–F55 — features avançadas e
+infraestrutura
 
 ---
 
@@ -173,7 +171,5 @@
 
 ---
 
-**Total de fases**: F1–F55 (55 fases)
-**Total de sub-itens**: ~160 sub-tarefas
-**Fases completas**: F1–F22 (22)
-**Fases pendentes**: F23–F55 (33)
+**Total de fases**: F1–F55 (55 fases) **Total de sub-itens**: ~160 sub-tarefas **Fases completas**:
+F1–F22 (22) **Fases pendentes**: F23–F55 (33)

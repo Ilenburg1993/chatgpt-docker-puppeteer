@@ -1,17 +1,16 @@
 # Auditoria Arquitetural — src/copilot · Parte 1: Arquitetura e Inventário
 
-**Data**: 2026-04-04
-**Escopo**: 172 arquivos JS · ~39.000 linhas · 25 diretórios
-**SDK**: `@github/copilot-sdk` v0.2.0
+**Data**: 2026-04-04 **Escopo**: 172 arquivos JS · ~39.000 linhas · 25 diretórios **SDK**:
+`@github/copilot-sdk` v0.2.0
 
 ---
 
 ## 1. Visão Geral da Arquitetura
 
-O módulo `src/copilot/` implementa um agente autônomo LLM-B sobre o GitHub Copilot SDK, com
-terminal interativo REPL, servidor HTTP, canais de comunicação LLM-A ↔ LLM-B, e sistema de
-observabilidade completo. O design é orientado a eventos via `EventEmitter` do Node.js, com bridges
-opcionais para o NERV (event bus do projeto principal).
+O módulo `src/copilot/` implementa um agente autônomo LLM-B sobre o GitHub Copilot SDK, com terminal
+interativo REPL, servidor HTTP, canais de comunicação LLM-A ↔ LLM-B, e sistema de observabilidade
+completo. O design é orientado a eventos via `EventEmitter` do Node.js, com bridges opcionais para o
+NERV (event bus do projeto principal).
 
 ### Diagrama de Camadas
 
@@ -173,7 +172,8 @@ Configuração de sessão, system prompt, MCP servers, pinned files.
 - `types/` (3 arquivos): index.js, sdk.js, structured-message.js
 - `db/` (2 arquivos): sqlite.js, migrations.js
 - `lib/` (10 arquivos): sdk-client, models, http-request, agents, event-helpers, etc.
-- `api/` (8 arquivos): bridge-control, dialog, stream, tasks, event-fanout, http-bridge, sdk-api, sse
+- `api/` (8 arquivos): bridge-control, dialog, stream, tasks, event-fanout, http-bridge, sdk-api,
+  sse
 - `routes/` (7 arquivos): agent, client, hooks, middleware, observability, sessions, webhooks
 
 ---

@@ -1,7 +1,6 @@
 # Auditoria Arquitetural — src/copilot · Parte 2: Análise de Integração
 
-**Data**: 2026-04-04
-**Referência**: [PARTE-1-ARQUITETURA.md](PARTE-1-ARQUITETURA.md)
+**Data**: 2026-04-04 **Referência**: [PARTE-1-ARQUITETURA.md](PARTE-1-ARQUITETURA.md)
 
 ---
 
@@ -68,10 +67,10 @@ AlwaysAliveAgent.start()
      → createAgentEventObserver(agent, metrics, errorTracker)
 ```
 
-**Ponto Crítico:** O step ⑤ (`agent-event-observer`) só se ativa quando o dialog loop é
-iniciado **pela primeira vez**. Isso significa que metrics derivadas de eventos do agent
-(como `recordDialogTurn`, `recordToolCall`) **não são coletadas** para tarefas executadas
-via `sendMessage()` sem dialog loop.
+**Ponto Crítico:** O step ⑤ (`agent-event-observer`) só se ativa quando o dialog loop é iniciado
+**pela primeira vez**. Isso significa que metrics derivadas de eventos do agent (como
+`recordDialogTurn`, `recordToolCall`) **não são coletadas** para tarefas executadas via
+`sendMessage()` sem dialog loop.
 
 ---
 

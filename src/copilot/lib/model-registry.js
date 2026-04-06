@@ -399,13 +399,15 @@ class ModelStatsTracker {
      * }[]}
      */
     allStats() {
-        /** @type {{
-    modelId: string;
-    avgLatencyMs: number;
-    successRate: number;
-    totalCalls: number;
-    totalTokens: number;
-}[]} */
+        /**
+         * @type {{
+         *     modelId: string;
+         *     avgLatencyMs: number;
+         *     successRate: number;
+         *     totalCalls: number;
+         *     totalTokens: number;
+         * }[]}
+         */
         const result = [];
         for (const [modelId, s] of this.#stats) {
             if (s.totalCalls === 0) continue;
