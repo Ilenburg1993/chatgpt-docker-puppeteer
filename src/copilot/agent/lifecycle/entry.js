@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/entry.js
+ * src/copilot/agent/lifecycle/entry.js
  *
  * Entry point do processo PM2 "copilot-sdk-agent".
  *
@@ -9,7 +9,7 @@
  *
  * Este processo é opcional e controlado por COPILOT_SDK_ENABLED=true.
  *
- * @module copilot/agent
+ * @module copilot/agent/lifecycle/entry
  */
 
 import { defaultErrorTracker } from '#copilot/observability';
