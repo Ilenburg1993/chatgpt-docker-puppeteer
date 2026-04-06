@@ -6,4 +6,4 @@
  */
 
 export { tryReconnect } from './reconnect-policy.js';
-export { clearState, drainStateWrites, readState, writeState, writeStateAsync } from './state-io.js';
+export { clearState, drainStateWrites, persistState, readState, writeState, writeStateAsync } from './state-io.js';

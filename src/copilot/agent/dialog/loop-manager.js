@@ -32,7 +32,7 @@ import {
     WATCHDOG_INTERVAL_MS,
     WATCHDOG_STALL_MS,
 } from '../config.js';
-import { readState, writeStateAsync } from '../lifecycle/state-io.js';
+import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { DialogProtocol } from './protocol.js';
 import { executeTurnImpl } from './turn-executor.js';
 import { DialogWatchdog } from './watchdog.js';
@@ -248,9 +248,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = true;
         this.emit('changed', { active: true, ts: Date.now() });
-        writeStateAsync({ dialogLoopActive: true }).catch((/** @type {any} */ e) =>
-            log('WARN', `[DialogLoopManager] writeState dialogLoopActive=true: ${e.message}`),
-        );
+        persistState({ dialogLoopActive: true }, '[DialogLoopManager] writeState dialogLoopActive=true');
 
         // Aplica fallback de modelo se previamente agendado por `scheduleFallback()`.
         if (this.#pendingModelFallback && this.#fallbackModel) {
@@ -313,9 +311,7 @@ export class DialogLoopManager extends EventEmitter {
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
         // F42.4: persistir prMetrics após boot bem-sucedido
-        writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
-            log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
-        );
+        persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -415,9 +411,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = false;
         this.#stopping = false;
-        writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
-            log('WARN', `[DialogLoopManager] writeState dialogLoopActive=false: ${e.message}`),
-        );
+        persistState({ dialogLoopActive: false }, '[DialogLoopManager] writeState dialogLoopActive=false');
         this.#watchdog?.stop();
         this.emit('stopped', { reason, authorized: true });
     }
@@ -473,9 +467,7 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume
-                writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
-                    log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
-                );
+                persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
                 this.emit('resumed', { prConsumed: false });
                 return;
             }
@@ -498,9 +490,7 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume zero-PR
-                writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
-                    log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
-                );
+                persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
                 this.emit('resumed', { prConsumed: false });
                 return;
             }
@@ -516,9 +506,7 @@ export class DialogLoopManager extends EventEmitter {
             // F41B.8: contabilizar resume com PR
             this.#prMetrics.resumesWithPR++;
             // F42.4: persistir prMetrics após resume com PR
-            writeStateAsync({ prMetrics: { ...this.#prMetrics } }).catch((/** @type {any} */ e) =>
-                log('WARN', `[DialogLoopManager] writeState prMetrics: ${e.message}`),
-            );
+            persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
             this.emit('resumed', { prConsumed: true });
         } finally {
             this.#resuming = false;

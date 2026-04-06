@@ -22,7 +22,7 @@ import { SessionError } from '#copilot/core/errors';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { startSpan } from '#copilot/observability/otel';
-import { writeStateAsync } from '../lifecycle/state-io.js';
+import { persistState } from '../lifecycle/state-io.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -47,11 +47,14 @@ export function emitTurnStart(emitter, message, counter) {
     const turnStart = Date.now();
     counter.sendCount++;
     emitter.emit('turn_start', { message: message.slice(0, 120), ts: turnStart });
-    writeStateAsync({
-        pendingTurnMessage: message,
-        pendingTurnTs: turnStart,
-        pendingTurnConsumedPR: false,
-    }).catch((/** @type {any} */ e) => log('WARN', `[DialogLoopManager] writeState pendingTurn: ${e.message}`));
+    persistState(
+        {
+            pendingTurnMessage: message,
+            pendingTurnTs: turnStart,
+            pendingTurnConsumedPR: false,
+        },
+        '[DialogLoopManager] writeState pendingTurn',
+    );
     return { turnStart };
 }
 

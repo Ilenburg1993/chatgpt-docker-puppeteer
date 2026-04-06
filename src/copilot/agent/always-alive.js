@@ -71,7 +71,7 @@ import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
 import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
 import { WebhookManager } from './infra/webhook-manager.js';
-import { readState, writeStateAsync } from './lifecycle/state-io.js';
+import { persistState, readState, writeStateAsync } from './lifecycle/state-io.js';
 import { cleanupStaleSessions } from './session/cleanup.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
@@ -502,7 +502,7 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         // F56.1 (PARTE-9): marcar que o shutdown não foi graceful inicialmente.
         // Se o processo morrer aqui, o próximo boot saberá que foi um crash.
-        writeStateAsync({ gracefulShutdown: false }).catch(() => {});
+        persistState({ gracefulShutdown: false }, '[AlwaysAlive] gracefulShutdown=false');
 
         // R.1: inicializar o event collector com métricas e errorTracker antes de qualquer attach
         // O defaultBus já está wired via attachBus() em #initSession() — passado aqui para
@@ -974,9 +974,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
         this.#pendingQuestion.resolve(answer);
         this.#pendingQuestion = null;
-        writeStateAsync({ pendingQuestion: null }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState pendingQuestion=null: ${e.message}`),
-        );
+        persistState({ pendingQuestion: null }, '[AlwaysAlive] writeState pendingQuestion=null');
         this.emit('question.answered', { answer });
         // G2-ARCH-03: também resolver Promise da tool request_user_input — import estático
         hookToolsResolveUserInput(answer);
@@ -1526,9 +1524,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#setStatus('waiting_for_input');
         // F44.3: pular persist para mensagens de protocolo do dialog loop (READY/REPLY/STOPPED)
         if (!skipPersist) {
-            writeStateAsync({ pendingQuestion: question }).catch((/** @type {any} */ e) =>
-                log('WARN', `[AlwaysAlive] writeState pendingQuestion: ${e.message}`),
-            );
+            persistState({ pendingQuestion: question }, '[AlwaysAlive] writeState pendingQuestion');
         }
 
         return new Promise((resolve) => {
@@ -1545,7 +1541,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             };
             this.#pendingQuestion = pq;
             // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
-            writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() }).catch(() => {});
+            persistState({ pendingQuestion: question, lastAskUserAt: Date.now() }, '[AlwaysAlive] lastAskUserAt');
             this.emit('question.pending', { question, choices, allowFreeform });
         });
     }

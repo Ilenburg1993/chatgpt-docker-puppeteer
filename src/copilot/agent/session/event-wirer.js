@@ -13,7 +13,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { CONTEXT_UTIL_WARN_THRESHOLD } from '../config.js';
-import { writeStateAsync } from '../lifecycle/state-io.js';
+import { persistState } from '../lifecycle/state-io.js';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação a cada chamada de
@@ -577,12 +577,15 @@ function _wireUsageEvent(session, { emit, onPrInfo }) {
         log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
         onPrInfo(prInfo);
         emit('pr.consumed', prInfo);
-        writeStateAsync({
-            pendingTurnConsumedPR: true,
-            lastPrConsumedAt: Date.now(),
-            lastPrModel: model ?? '',
-            lastPrCost: cost ?? 0,
-            lastQuotaSnapshots: quotaSnapshots ?? null,
-        }).catch((/** @type {any} */ e) => log('WARN', `[AlwaysAlive] writeState pendingTurnConsumedPR: ${e.message}`));
+        persistState(
+            {
+                pendingTurnConsumedPR: true,
+                lastPrConsumedAt: Date.now(),
+                lastPrModel: model ?? '',
+                lastPrCost: cost ?? 0,
+                lastQuotaSnapshots: quotaSnapshots ?? null,
+            },
+            '[AlwaysAlive] writeState pendingTurnConsumedPR',
+        );
     });
 }

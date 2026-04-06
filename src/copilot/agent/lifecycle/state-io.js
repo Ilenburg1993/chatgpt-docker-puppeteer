@@ -218,6 +218,19 @@ export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
     ]);
 }
 
+/**
+ * Fire-and-forget wrapper: chama `writeStateAsync(data)` e loga warnings em caso de falha.
+ *
+ * Evita repetir o boilerplate `.catch((e) => log('WARN', ...))` em ~14 call sites.
+ *
+ * @param {Partial<AliveAgentState>} data - Dados parciais a persistir
+ * @param {string} tag - Tag identificadora para o log de warning (ex.: `'[AlwaysAlive] gracefulShutdown'`)
+ * @returns {void}
+ */
+export function persistState(data, tag) {
+    writeStateAsync(data).catch((/** @type {any} */ e) => log('WARN', `${tag}: ${e.message}`));
+}
+
 // ─── Helpers privados ─────────────────────────────────────────────────────────
 
 /**
