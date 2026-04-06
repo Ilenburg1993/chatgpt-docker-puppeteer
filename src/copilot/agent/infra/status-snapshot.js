@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/status-snapshot.js
+ * src/copilot/agent/infra/status-snapshot.js
  *
  * Função pura para construir o snapshot de status do AlwaysAliveAgent.
  *

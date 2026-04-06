@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog-loop-manager.js
+ * src/copilot/agent/dialog/loop-manager.js
  *
  * DialogLoopManager — gerencia o ciclo de vida completo do dialog loop do agente.
  *

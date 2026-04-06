@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session-event-wirer.js
+ * src/copilot/agent/session/event-wirer.js
  *
  * Registra todos os listeners de eventos SDK de uma sessão Copilot, retornando as funções de unsubscribe
  * correspondentes.

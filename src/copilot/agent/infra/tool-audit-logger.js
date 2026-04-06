@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/tool-audit-logger.js
+ * src/copilot/agent/infra/tool-audit-logger.js
  *
  * Logging de auditoria de ferramentas SDK e construção do PermissionHandler com auditoria automática.
  *

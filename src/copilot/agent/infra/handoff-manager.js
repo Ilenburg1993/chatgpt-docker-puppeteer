@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/handoff-manager.js
+ * src/copilot/agent/infra/handoff-manager.js
  *
  * F45 (GAP-SD-07): Handoff Manager — gerencia transferência de sessão entre agentes.
  *

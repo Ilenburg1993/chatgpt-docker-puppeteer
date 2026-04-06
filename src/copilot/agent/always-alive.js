@@ -13,7 +13,7 @@
  * 4. Ao receber resposta, retoma o processamento
  * 5. Emite eventos via NERV bridge para que o dashboard receba atualizações
  *
- * @module copilot/always-alive
+ * @module copilot/agent/always-alive
  * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/agent/session/initializer
  * @see module:copilot/agent/lifecycle/state-io

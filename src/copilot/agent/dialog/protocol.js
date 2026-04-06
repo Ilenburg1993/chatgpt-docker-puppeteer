@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog-protocol.js
+ * src/copilot/agent/dialog/protocol.js
  *
  * Protocolo de comunicação do Dialog Loop.
  *

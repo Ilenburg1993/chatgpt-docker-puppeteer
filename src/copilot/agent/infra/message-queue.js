@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/message-queue.js
+ * src/copilot/agent/infra/message-queue.js
  *
  * Fila de tarefas (`AgentTask[]`) com suporte a AbortSignal, verificação de capacidade máxima e drain de shutdown.
  * Extrai responsabilidade de `always-alive.js` (F.4) para isolar o ciclo de vida da fila.

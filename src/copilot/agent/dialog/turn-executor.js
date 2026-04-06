@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog-turn-executor.js
+ * src/copilot/agent/dialog/turn-executor.js
  *
  * Funções puras de execução de turno extraídas do `DialogLoopManager`.
  *

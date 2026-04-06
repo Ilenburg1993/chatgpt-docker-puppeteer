@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/permission-controller.js
+ * src/copilot/agent/infra/permission-controller.js
  *
  * Controlador de modo de permissão SDK em runtime. Encapsula a lógica de troca de `PermissionHandler` entre os modos
  * `approve_all`, `audit_only` e `selective` — sem reiniciar o agente.

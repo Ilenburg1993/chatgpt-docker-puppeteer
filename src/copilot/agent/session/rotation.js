@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session-rotation.js
+ * src/copilot/agent/session/rotation.js
  *
  * F43.2 (GAP-SD-03): Política de rotação de sessão.
  *
