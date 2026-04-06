@@ -19,7 +19,7 @@
 
 import { log } from '#copilot/observability/logger';
 import os from 'node:os';
-import { isToolDisabled } from '../../tools/introspection-tools.js';
+import { isToolDisabled } from '#copilot/tools/introspection-tools';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
 import { createPromptTransformer } from '../prompt-transformer.js';

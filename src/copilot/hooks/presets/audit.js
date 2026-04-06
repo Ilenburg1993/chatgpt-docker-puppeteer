@@ -11,8 +11,8 @@
  * @module copilot/hooks/presets/audit
  */
 
-import { defaultAuditLog } from '../../observability/audit-log.js';
-import { log } from '../../observability/logger.js';
+import { defaultAuditLog } from '#copilot/observability/audit-log';
+import { log } from '#copilot/observability/logger';
 import { createPermissionHandler } from '../permission-handler.js';
 
 /**

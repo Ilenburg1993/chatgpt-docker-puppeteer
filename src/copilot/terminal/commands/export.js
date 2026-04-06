@@ -9,7 +9,7 @@
 
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { llmBridgeClient } from '../../channel/client.js';
+import { llmBridgeClient } from '#copilot/channel/client';
 
 /**
  * @typedef {object} ExportContext

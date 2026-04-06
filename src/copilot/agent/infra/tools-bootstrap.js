@@ -17,8 +17,8 @@
 
 import { log } from '#copilot/observability/logger';
 import { wrapWithStats } from '#copilot/observability/tool-stats';
-import { buildCustomTools } from '../../config/tools/registry.js';
-import { registerTools } from '../../lib/tools-registry.js';
+import { buildCustomTools } from '#copilot/config/custom-tools-registry';
+import { registerTools } from '#copilot/lib/tools-registry';
 import {
     codeTools,
     fileReadTools,
@@ -36,7 +36,7 @@ import {
     todoReadTools,
     todoWriteTools,
     webTools,
-} from '../../tools/index.js';
+} from '#copilot/tools/index';
 
 /**
  * @typedef {import('#copilot/lib/tools-registry').ToolRegistry} ToolRegistry
@@ -46,7 +46,7 @@ import {
 
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc exportados diretamente de tools/index.js
 // O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
-export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '../../tools/index.js';
+export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '#copilot/tools/index';
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as

@@ -7,10 +7,10 @@
  * @module copilot/terminal/commands/metrics
  */
 
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { llmBridgeClient } from '../../channel/client.js';
-import { defaultErrorTracker } from '../../observability/error-tracker.js';
-import { getToolStats } from '../../observability/tool-stats.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { llmBridgeClient } from '#copilot/channel/client';
+import { defaultErrorTracker } from '#copilot/observability/error-tracker';
+import { getToolStats } from '#copilot/observability/tool-stats';
 
 /**
  * @typedef {object} MetricsContext

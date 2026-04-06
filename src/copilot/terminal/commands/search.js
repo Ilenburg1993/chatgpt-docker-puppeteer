@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/search
  */
 
-import { conversationHub } from '../../conversation-hub/hub.js';
+import { conversationHub } from '#copilot/conversation-hub/hub';
 
 /**
  * @typedef {object} SearchContext

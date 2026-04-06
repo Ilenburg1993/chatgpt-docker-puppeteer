@@ -9,9 +9,9 @@
  * @module copilot/terminal/commands/config
  */
 
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { modelRegistry, modelStatsTracker } from '../../lib/model-registry.js';
-import { listModels } from '../../lib/models.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { modelRegistry, modelStatsTracker } from '#copilot/lib/model-registry';
+import { listModels } from '#copilot/lib/models';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 

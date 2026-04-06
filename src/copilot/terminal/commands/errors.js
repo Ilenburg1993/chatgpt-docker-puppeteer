@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/errors
  */
 
-import { defaultErrorTracker } from '../../observability/error-tracker.js';
+import { defaultErrorTracker } from '#copilot/observability/error-tracker';
 
 /**
  * @typedef {object} ErrorsContext

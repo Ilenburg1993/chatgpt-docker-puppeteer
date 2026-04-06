@@ -8,15 +8,9 @@
  * @module copilot/terminal/commands/session
  */
 
-import {
-    alwaysAliveAgent,
-    createSnapshot,
-    listSnapshots,
-    loadSnapshot,
-    saveSnapshot,
-} from '../../agent/index.js';
-import { llmBridgeClient } from '../../channel/client.js';
-import { conversationStore } from '../../conversation-hub/store.js';
+import { alwaysAliveAgent, createSnapshot, listSnapshots, loadSnapshot, saveSnapshot } from '#copilot/agent';
+import { llmBridgeClient } from '#copilot/channel/client';
+import { conversationStore } from '#copilot/conversation-hub/store';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**

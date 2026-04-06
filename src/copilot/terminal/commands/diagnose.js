@@ -17,11 +17,11 @@
  * @module copilot/terminal/commands/diagnose
  */
 
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { getMcpStatus } from '../../bridges/mcp-tool-bridge.js';
-import { conversationHub } from '../../conversation-hub/hub.js';
-import { conversationStore } from '../../conversation-hub/store.js';
-import { getToolStats } from '../../observability/tool-stats.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
+import { conversationHub } from '#copilot/conversation-hub/hub';
+import { conversationStore } from '#copilot/conversation-hub/store';
+import { getToolStats } from '#copilot/observability/tool-stats';
 
 /**
  * @typedef {object} DiagnoseContext
