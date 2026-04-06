@@ -23,9 +23,9 @@ describe('DialogLoopManager › G2-ARCH-01: decomposição de #executeTurn', asy
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        const dlm = await readFile(resolve(dir, '../../../src/copilot/agent/dialog-loop-manager.js'), 'utf8');
+        const dlm = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
         // G2-ARCH-01: #executeTurn foi extraído para dialog-turn-executor.js (Fase 5)
-        const executor = await readFile(resolve(dir, '../../../src/copilot/agent/dialog-turn-executor.js'), 'utf8');
+        const executor = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/turn-executor.js'), 'utf8');
         src = dlm + '\n' + executor;
     });
 

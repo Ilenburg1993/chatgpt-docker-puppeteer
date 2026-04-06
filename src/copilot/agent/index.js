@@ -8,19 +8,19 @@
  * @module copilot/agent
  */
 
-export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 export { AlwaysAliveAgent, alwaysAliveAgent, getAgent } from './always-alive.js';
-export { DialogLoopManager } from './dialog-loop-manager.js';
-export { wireDialogLoopEvents } from './dialog-loop-wirer.js';
-export { DialogProtocol } from './dialog-protocol.js';
 export {
+    DialogLoopManager,
+    DialogProtocol,
+    DialogWatchdog,
+    WATCHDOG_THRESHOLDS,
     buildTurnResolutionListeners,
     dispatchTurnToHost,
     emitTurnStart,
     executeTurnImpl,
     waitForRestartAndReply,
-} from './dialog-turn-executor.js';
-export { DialogWatchdog } from './dialog-watchdog.js';
+    wireDialogLoopEvents,
+} from './dialog/index.js';
 export { AGENT_EVENTS } from './events.js';
 export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
@@ -37,4 +37,5 @@ export { buildStatusSnapshot } from './status-snapshot.js';
 export { executeTask } from './task-executor.js';
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from './tool-audit-logger.js';
 export { bootstrapTools, configureHookTools, setHub, setPermissionAgent, setSessionRpc } from './tools-bootstrap.js';
+export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 export { WebhookManager } from './webhook-manager.js';

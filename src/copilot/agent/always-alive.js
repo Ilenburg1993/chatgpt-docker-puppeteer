@@ -14,7 +14,7 @@
  * 5. Emite eventos via NERV bridge para que o dashboard receba atualizações
  *
  * @module copilot/always-alive
- * @see module:copilot/agent/dialog-loop-manager
+ * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/agent/session-initializer
  * @see module:copilot/agent/state-io
  * @see module:copilot/agent/message-queue
@@ -39,9 +39,9 @@ import { buildMcpTools, startMcpAutoReconnect } from '../bridges/mcp-tool-bridge
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
-import { DialogLoopManager } from './dialog-loop-manager.js';
+import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
-import { wireDialogLoopEvents } from './dialog-loop-wirer.js';
+import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { AGENT_EVENTS } from './events.js';
 import { MessageQueue } from './message-queue.js';
 import { PermissionController } from './permission-controller.js';
@@ -1233,7 +1233,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * de eventos (listeners) só ocorre uma vez — guard `#dialogLoopAttached` protege apenas essa parte.
      */
     #ensureDialogLoopAttached() {
-        /** @type {import('./dialog-loop-manager.js').AgentHost} */
+        /** @type {import('./dialog/loop-manager.js').AgentHost} */
         const host = {
             sendMessage: (msg, opts) => this.sendMessage(msg, opts),
             sendMessageDialogBoot: (msg, opts) => this.sendMessageDialogBoot(msg, opts),

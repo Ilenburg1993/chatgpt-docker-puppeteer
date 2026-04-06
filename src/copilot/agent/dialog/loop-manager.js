@@ -24,10 +24,10 @@ import { SessionError } from '#copilot/core/errors';
 import { waitForEvent } from '#copilot/lib/event-helpers';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
-import { DialogProtocol } from './dialog-protocol.js';
-import { executeTurnImpl } from './dialog-turn-executor.js';
-import { DialogWatchdog } from './dialog-watchdog.js';
-import { readState, writeStateAsync } from './state-io.js';
+import { readState, writeStateAsync } from '../state-io.js';
+import { DialogProtocol } from './protocol.js';
+import { executeTurnImpl } from './turn-executor.js';
+import { DialogWatchdog } from './watchdog.js';
 
 /**
  * @typedef {Object} DialogLoopManagerOptions
@@ -50,7 +50,7 @@ import { readState, writeStateAsync } from './state-io.js';
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
  * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
- * @property {() => import('./types.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
+ * @property {() => import('../types.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
  */
 
 /**
@@ -610,4 +610,56 @@ export class DialogLoopManager extends EventEmitter {
             },
         );
     }
+}
+
+// ─── Event Wiring (absorvido de dialog-loop-wirer.js) ─────────────────────────
+
+/**
+ * Registra todos os listeners de forwarding de eventos no DialogLoopManager.
+ *
+ * Esta função deve ser chamada UMA ÚNICA VEZ por instância do agente (a classe-mãe controla a idempotência via flag
+ * interno). Ela:
+ *
+ * 1. Chama `removeAllListeners()` para os eventos conhecidos do DLM.
+ * 2. Registra um listener para cada evento relevante, encaminhando-o ao agente via `emitFn`.
+ *
+ * @param {DialogLoopManager} dialogLoop
+ * @param {(event: string, payload: Record<string, unknown>) => void} emitFn - Função de emissão do agente host.
+ * @returns {void}
+ */
+export function wireDialogLoopEvents(dialogLoop, emitFn) {
+    const DLM_EVENTS = [
+        'ready',
+        'reply',
+        'stopped',
+        'paused',
+        'resumed',
+        'stalled',
+        'turn_start',
+        'turn_end',
+        'turn_timeout',
+        'changed',
+        'model.fallback',
+        'compaction.requested',
+        'pre_stall_warning',
+    ];
+    for (const event of DLM_EVENTS) dialogLoop.removeAllListeners(event);
+
+    dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.ready', evt));
+    dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.reply', evt));
+    dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.stopped', evt));
+    dialogLoop.on('paused', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.paused', evt));
+    dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.resumed', evt));
+    dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.stalled', evt));
+    dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_start', evt));
+    dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_end', evt));
+    dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_timeout', evt));
+    dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.loop.changed', evt));
+    dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) => emitFn('pr.fallback_model', evt));
+    dialogLoop.on('compaction.requested', (/** @type {Record<string, unknown>} */ evt) =>
+        emitFn('dialog.compaction.requested', evt),
+    );
+    dialogLoop.on('pre_stall_warning', (/** @type {Record<string, unknown>} */ evt) =>
+        emitFn('dialog.pre_stall_warning', evt),
+    );
 }

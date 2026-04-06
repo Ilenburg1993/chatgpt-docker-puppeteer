@@ -42,11 +42,11 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         const { readFile } = await import('node:fs/promises');
         sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
             'utf-8',
         );
         wirerSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog-loop-wirer.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
             'utf-8',
         );
     });
@@ -199,7 +199,7 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
     before(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
             'utf-8',
         );
     });
@@ -274,12 +274,12 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     before(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog-loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
             'utf-8',
         );
         // #executeTurn foi extraído para dialog-turn-executor.js na Fase 5
         turnExecutorCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog-turn-executor.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/turn-executor.js', import.meta.url),
             'utf-8',
         );
     });
