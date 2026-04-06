@@ -41,8 +41,8 @@ import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
-import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { AGENT_EVENTS } from '#copilot/core/agent-events';
+import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { PermissionController } from './infra/permission-controller.js';
 import { tryReconnect } from './lifecycle/reconnect-policy.js';
