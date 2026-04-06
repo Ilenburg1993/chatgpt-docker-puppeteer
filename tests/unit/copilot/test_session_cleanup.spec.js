@@ -9,11 +9,11 @@ import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 
 describe('cleanupStaleSessions', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session-cleanup.js').cleanupStaleSessions} */
+    /** @type {typeof import('../../../src/copilot/agent/session/cleanup.js').cleanupStaleSessions} */
     let cleanupStaleSessions;
 
     before(async () => {
-        ({ cleanupStaleSessions } = await import('../../../src/copilot/agent/session-cleanup.js'));
+        ({ cleanupStaleSessions } = await import('../../../src/copilot/agent/session/cleanup.js'));
     });
 
     /**

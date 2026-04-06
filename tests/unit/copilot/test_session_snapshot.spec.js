@@ -17,11 +17,11 @@ process.env['AGENT_SNAPSHOT_DIR'] = TEST_SNAPSHOT_DIR;
 const _readStateStub = () => null;
 
 describe('session-snapshot', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session-snapshot.js')} */
+    /** @type {typeof import('../../../src/copilot/agent/session/snapshot.js')} */
     let mod;
 
     before(async () => {
-        mod = await import('../../../src/copilot/agent/session-snapshot.js');
+        mod = await import('../../../src/copilot/agent/session/snapshot.js');
     });
 
     beforeEach(() => {

@@ -24,7 +24,7 @@ describe('session-manager › createConfig inclui streaming: true', async () => 
         const { readFile } = await import('node:fs/promises');
         // session-manager.js foi renomeado/refatorado para session-initializer.js
         sourceCode = await readFile(
-            new URL('../../../src/copilot/agent/session-initializer.js', import.meta.url),
+            new URL('../../../src/copilot/agent/session/initializer.js', import.meta.url),
             'utf-8',
         );
     });
@@ -58,7 +58,7 @@ describe('always-alive › compaction events wirados', async () => {
         const { readFile } = await import('node:fs/promises');
         // F.6.1: assinaturas de eventos de sessão foram extraídas para session-event-wirer.js
         sessionEventWirerCode = await readFile(
-            new URL('../../../src/copilot/agent/session-event-wirer.js', import.meta.url),
+            new URL('../../../src/copilot/agent/session/event-wirer.js', import.meta.url),
             'utf-8',
         );
     });

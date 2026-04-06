@@ -23,14 +23,14 @@ import { defaultMetrics } from '#copilot/observability/metrics';
 import { access, open, readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { buildCustomAgentsConfig } from '../config/custom-agents.js';
-import { pickDefined } from '../lib/utils.js';
-import { readStore as _readTodoStore } from '../tools/todo/store.js';
-import { readState as _readState, writeStateAsync as _writeStateAsync } from './state-io.js';
-import { buildAuditingPermissionHandler } from './tool-audit-logger.js';
+import { buildCustomAgentsConfig } from '../../config/custom-agents.js';
+import { pickDefined } from '../../lib/utils.js';
+import { readStore as _readTodoStore } from '../../tools/todo/store.js';
+import { readState as _readState, writeStateAsync as _writeStateAsync } from '../state-io.js';
+import { buildAuditingPermissionHandler } from '../tool-audit-logger.js';
 // Re-exporta funções de I/O de estado de state-io.js para compatibilidade retroativa com importadores
 // que usam '#copilot/session-manager'. Novos módulos devem importar de './state-io.js' diretamente.
-export { clearState, readState, writeState, writeStateAsync } from './state-io.js';
+export { clearState, readState, writeState, writeStateAsync } from '../state-io.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient

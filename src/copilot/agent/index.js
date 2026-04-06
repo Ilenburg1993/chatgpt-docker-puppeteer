@@ -25,13 +25,21 @@ export { AGENT_EVENTS } from './events.js';
 export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
 export { tryReconnect } from './reconnect-policy.js';
-export { wireSessionEvents } from './session-event-wirer.js';
 export {
+    SessionKeepalive,
     buildHookSystemContext,
     buildHookSystemContextSafe,
+    cleanupStaleSessions,
+    createSnapshot,
     initOrResumeSession,
+    listSnapshots,
+    loadLatestSnapshot,
+    loadSnapshot,
+    saveSnapshot,
     setBackgroundCompactionThreshold,
-} from './session-initializer.js';
+    shouldRotateSession,
+    wireSessionEvents,
+} from './session/index.js';
 export { clearState, readState, writeState, writeStateAsync } from './state-io.js';
 export { buildStatusSnapshot } from './status-snapshot.js';
 export { executeTask } from './task-executor.js';

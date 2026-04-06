@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { alwaysAliveAgent } from '../agent/always-alive.js';
-import { setBackgroundCompactionThreshold } from '../agent/session-initializer.js';
+import { setBackgroundCompactionThreshold } from '../agent/session/initializer.js';
 import { listIssues, listPrs, listRuns } from '../bridges/gh-bridge.js';
 import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
