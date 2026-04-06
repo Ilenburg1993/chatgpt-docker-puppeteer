@@ -8,7 +8,7 @@
  * @module copilot/agent
  */
 
-export {} from './agent-contract.js'; // re-exporta os typedefs: IAlwaysAliveAgent
+export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 export { AlwaysAliveAgent, alwaysAliveAgent, getAgent } from './always-alive.js';
 export { DialogLoopManager } from './dialog-loop-manager.js';
 export { wireDialogLoopEvents } from './dialog-loop-wirer.js';

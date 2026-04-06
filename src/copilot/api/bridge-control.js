@@ -46,7 +46,7 @@ const _sdkVersion = (() => {
  * }} AgentSnap
  *
  *
- * @typedef {import('../agent/agent-contract.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
+ * @typedef {import('../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
 
 /**

@@ -50,7 +50,7 @@ import { readState, writeStateAsync } from './state-io.js';
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
  * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
- * @property {() => import('./always-alive.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
+ * @property {() => import('./types.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
  */
 
 /**

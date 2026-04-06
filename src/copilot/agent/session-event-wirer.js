@@ -122,7 +122,7 @@ const KNOWN_SDK_EVENTS = new Set([
  *
  * @typedef {Object} SessionWirerCallbacks
  * @property {(event: string, payload?: any) => void} emit - Emite eventos no agente
- * @property {() => import('./always-alive.js').AgentStatusSnapshot} getStatusSnapshot - Retorna snapshot atual
+ * @property {() => import('./types.js').AgentStatusSnapshot} getStatusSnapshot - Retorna snapshot atual
  * @property {(path: string) => void} onCheckpointPath - Atualiza o último caminho de checkpoint
  * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  *   - Atualiza estado do contexto

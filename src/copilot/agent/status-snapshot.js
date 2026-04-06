@@ -11,13 +11,13 @@
  */
 
 /**
- * @typedef {import('./always-alive.js').AgentStatusSnapshot} AgentStatusSnapshot
+ * @typedef {import('./types.js').AgentStatusSnapshot} AgentStatusSnapshot
  *
- * @typedef {import('./always-alive.js').AgentStatus} AgentStatus
+ * @typedef {import('./types.js').AgentStatus} AgentStatus
  *
- * @typedef {import('./always-alive.js').AgentTask} AgentTask
+ * @typedef {import('./types.js').AgentTask} AgentTask
  *
- * @typedef {import('./always-alive.js').PendingQuestion} PendingQuestion
+ * @typedef {import('./types.js').PendingQuestion} PendingQuestion
  */
 
 /**
