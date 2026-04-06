@@ -338,8 +338,8 @@ export async function initOrResumeSession(client, sessionOptions) {
     // F43.2 (GAP-SD-03): verificar se a sessão deve ser rotacionada antes de tentar retomada
     let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
     if (savedSessionId) {
-        const { shouldRotateSession } = await import('./session-rotation.js');
-        /** @type {import('./session-rotation.js').RotationContext} */
+        const { shouldRotateSession } = await import('./rotation.js');
+        /** @type {import('./rotation.js').RotationContext} */
         const rotationCtx = {};
         if (state?.startedAt) {
             rotationCtx.sessionAgeMs = Date.now() - state.startedAt;
