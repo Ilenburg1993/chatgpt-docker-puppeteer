@@ -50,6 +50,9 @@ const STATE_FILE = process.env['AGENT_STATE_FILE']
  * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
  * @property {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number; totalPR?: number }} [prMetrics] -
  *   Contadores de consumo de Premium Requests do dialog loop
+ * @property {boolean} [gracefulShutdown] - F56.1: true se o último shutdown foi graceful (via stop()); false se
+ *   crash/reboot
+ * @property {number} [lastAskUserAt] - F56.2: timestamp do último ask_user recebido (ms)
  */
 
 // ─── Cache in-process ────────────────────────────────────────────────────────

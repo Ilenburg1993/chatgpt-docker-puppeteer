@@ -445,6 +445,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * F52 (PARTE-9): Pinga o watchdog do dialog loop para sinalizar atividade.
+     *
+     * Usado pelo handler de stall quando a recovery zero-PR é bem-sucedida, evitando que o watchdog dispare novamente
+     * imediatamente.
+     */
+    pingDialogWatchdog() {
+        this.#dialogLoop.pingWatchdog();
+    }
+
+    /**
      * M-05 (PARTE-8): Registra mensagem no timeline da sessão SDK via session.log().
      *
      * Torna eventos significativos (reconexão, rotação, keepalive) visíveis em ferramentas de debug do SDK/CLI. No-op
@@ -477,6 +487,10 @@ export class AlwaysAliveAgent extends EventEmitter {
 
         this.#setStatus('starting');
         log('INFO', '[AlwaysAlive] Iniciando agente...');
+
+        // F56.1 (PARTE-9): marcar que o shutdown não foi graceful inicialmente.
+        // Se o processo morrer aqui, o próximo boot saberá que foi um crash.
+        writeStateAsync({ gracefulShutdown: false }).catch(() => {});
 
         // R.1: inicializar o event collector com métricas e errorTracker antes de qualquer attach
         // O defaultBus já está wired via attachBus() em #initSession() — passado aqui para
@@ -589,13 +603,34 @@ export class AlwaysAliveAgent extends EventEmitter {
                     if (utilization < 0.8) {
                         log(
                             'INFO',
-                            '[AlwaysAlive] F42.1: Re-ativando dialog loop após resume (estava ativo previamente).',
+                            '[AlwaysAlive] F53/F42.1: Re-ativando dialog loop após resume — tentando zero-PR primeiro.',
                         );
-                        setTimeout(() => {
-                            if (this.#status !== 'stopped') {
-                                this.startDialogLoop().catch((/** @type {any} */ e) =>
-                                    log('WARN', `[AlwaysAlive] F42.1: Falha ao re-ativar dialog loop: ${e.message}`),
+                        // F53 (PARTE-9): Zero-PR Boot Recovery
+                        // Marcar dialogPaused=true para que resumeDialogLoop() use a Estratégia A/B
+                        // do DialogLoopManager.resume(), que tenta 0 PR antes de fallback para boot.
+                        setTimeout(async () => {
+                            if (this.#status === 'stopped') return;
+                            try {
+                                // Garantir que o DLM está attached antes de tentar resume
+                                this.#ensureDialogLoopAttached();
+                                // Simular pause para que resume() detecte dialogPaused=true
+                                await writeStateAsync({ dialogPaused: true });
+                                await this.resumeDialogLoop();
+                                log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
+                                this.emit('dialog.boot_recovery', { zeroPR: !this.#dialogLoop.active, ts: Date.now() });
+                            } catch (/** @type {any} */ e) {
+                                log(
+                                    'WARN',
+                                    `[AlwaysAlive] F53: Boot recovery falhou (${e.message}) — fallback para startDialogLoop.`,
                                 );
+                                try {
+                                    await this.startDialogLoop();
+                                } catch (/** @type {any} */ e2) {
+                                    log(
+                                        'WARN',
+                                        `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${e2.message}`,
+                                    );
+                                }
                             }
                         }, 5_000);
                     } else {
@@ -734,7 +769,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
         }
 
-        await writeStateAsync({ sendCount: this.#sendCount }).catch((/** @type {any} */ e) =>
+        await writeStateAsync({ sendCount: this.#sendCount, gracefulShutdown: true }).catch((/** @type {any} */ e) =>
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
         );
 
@@ -1497,6 +1532,8 @@ export class AlwaysAliveAgent extends EventEmitter {
                 },
             };
             this.#pendingQuestion = pq;
+            // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
+            writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() }).catch(() => {});
             this.emit('question.pending', { question, choices, allowFreeform });
         });
     }

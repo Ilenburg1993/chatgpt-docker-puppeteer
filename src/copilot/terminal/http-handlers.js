@@ -39,6 +39,7 @@ export {
     handleGetCustomTools,
     handleGetErrors,
     handleGetHistory,
+    handleGetPrBudget,
     handleGetQuota,
     handleGetSkills,
     handleGetToolStats,

@@ -33,6 +33,7 @@ import {
     handleGetCustomTools,
     handleGetErrors,
     handleGetHistory,
+    handleGetPrBudget,
     handleGetQuota,
     handleGetSkills,
     handleGetToolStats,
@@ -82,6 +83,8 @@ export const ROUTE_TABLE = [
     // ── GET routes (simples, sem body) ────────────────────────────────────
     { method: 'GET', path: '/context', handler: handleGetContext },
     { method: 'GET', path: '/quota', handler: handleGetQuota },
+    // F55 (PARTE-9): PR budget tracking
+    { method: 'GET', path: '/pr-budget', handler: handleGetPrBudget },
     { method: 'GET', path: '/config', handler: handleGetConfig },
     { method: 'GET', path: '/config/skills', handler: handleGetSkills, async: true },
     { method: 'GET', path: '/config/tools', handler: handleGetToolsConfig },

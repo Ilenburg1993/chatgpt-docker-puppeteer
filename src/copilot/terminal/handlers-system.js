@@ -696,3 +696,28 @@ export function handleGetQuota() {
         },
     };
 }
+
+/**
+ * F55 (PARTE-9): GET /pr-budget — métricas detalhadas de consumo de Premium Requests.
+ *
+ * @returns {{ status: number; body: object }}
+ */
+export function handleGetPrBudget() {
+    const prMetrics = alwaysAliveAgent.dialogPrMetrics;
+    const prInfo = alwaysAliveAgent.lastPrInfo ?? null;
+    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    return {
+        status: 200,
+        body: {
+            ok: true,
+            prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+            sendCount: snapshot?.sendCount ?? 0,
+            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+            sessionId: alwaysAliveAgent.sessionId ?? null,
+            lastPrConsumedAt: prInfo?.ts ?? null,
+            lastPrModel: prInfo?.model ?? null,
+            lastPrCost: prInfo?.cost ?? null,
+            uptime: Math.round(process.uptime()),
+        },
+    };
+}

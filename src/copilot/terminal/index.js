@@ -80,12 +80,42 @@ function registerAgentEventListeners() {
     _agentListenersRegistered = true;
     alwaysAliveAgent.on('dialog.stalled', async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
-        println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando automaticamente…`);
-        log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo). Reiniciando dialog loop.`);
+        log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo).`);
 
-        // M-04 (PARTE-8): abortar mensagem SDK pendente antes de reiniciar.
-        // Isso cancela qualquer operação travada no servidor sem destruir a sessão.
+        // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
+        // 1. Abortar mensagem travada (session.abort — 0 PR)
         await alwaysAliveAgent.abortCurrentMessage();
+
+        // 2. Aguardar até 5s para o ask_user reaparecer (0 PR se reaparecer)
+        const recovered = await new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 5_000);
+            const check = () => {
+                if (alwaysAliveAgent.pendingQuestion) {
+                    clearTimeout(timeout);
+                    resolve(true);
+                }
+            };
+            // Verificar imediatamente e a cada 500ms
+            check();
+            const interval = setInterval(() => {
+                check();
+                if (alwaysAliveAgent.pendingQuestion) clearInterval(interval);
+            }, 500);
+            setTimeout(() => clearInterval(interval), 5_100);
+        });
+
+        if (recovered) {
+            // F52.3: ask_user reapareceu — dialog loop continua sem custo de PR
+            println(`\n[watchdog] ✅  Dialog loop recuperado sem consumir PR (ask_user preservado).`);
+            log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
+            alwaysAliveAgent.pingDialogWatchdog();
+            broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: true });
+            return;
+        }
+
+        // F52.4: ask_user NÃO reapareceu — fallback para restart completo (1 PR)
+        println(`\n[watchdog] ⚠️  Dialog loop inativo há ${secs}s — reiniciando (1 PR)…`);
+        log('WARN', `[TerminalServer] F52: Watchdog recovery falhou — restart com boot prompt (1 PR).`);
 
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
@@ -108,7 +138,7 @@ function registerAgentEventListeners() {
                 log('ERROR', `[TerminalServer] Falha no fallback de restart após watchdog: ${e2.message}`),
             );
         });
-        broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs });
+        broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: false });
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
