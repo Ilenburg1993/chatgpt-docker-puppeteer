@@ -20,6 +20,7 @@
  * @see module:copilot/hooks/audit
  */
 
+import { getAuditTail } from '#copilot/audit/pipeline';
 import { log } from '#copilot/observability/logger';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -28,7 +29,6 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { getAuditTail } from '#copilot/audit/pipeline';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 const execFileAsync = promisify(execFile);
 
