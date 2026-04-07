@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Barrel — Bridges (integrações externas: git, MCP, Nerv).
  *

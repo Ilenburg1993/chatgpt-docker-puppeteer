@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Barrel — Hooks presets (configurações pré-definidas de hooks).
  *

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Barrel — SSE (Server-Sent Events) utilities.
  *
