@@ -148,7 +148,9 @@ export async function readFileContext(filePath) {
 
     const info = await stat(absPath);
     if (info.size > MAX_EMBED_BYTES) {
-        throw new ToolError(`Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`);
+        throw new ToolError(
+            `Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`,
+        );
     }
     const content = await readFile(absPath, 'utf-8');
     const ctx = {

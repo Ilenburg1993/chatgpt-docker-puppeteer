@@ -17,8 +17,8 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { ConfigError } from '#copilot/core/errors';
 import { COPILOT_DB_PATH as ENV_DB_PATH } from '#copilot/config/env';
+import { ConfigError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
