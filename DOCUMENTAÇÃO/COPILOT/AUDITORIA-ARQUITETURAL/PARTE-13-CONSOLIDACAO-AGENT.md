@@ -1,8 +1,8 @@
 # PARTE 13 — Auditoria Profunda agent/ & Consolidação
 
-**Criação**: 2026-07-23 | **Revisão 2 (Auditoria Profunda)**: 2026-07-23
-**Escopo**: Análise completa de `src/copilot/agent/` (31 arquivos, 6.790L) com foco na
-decomposição estrutural de `always-alive.js` (1.348L → meta <800L).
+**Criação**: 2026-07-23 | **Revisão 3 (Pós-F39)**: 2026-07-24
+**Escopo**: Análise completa de `src/copilot/agent/` (36 arquivos, 7.078L) com foco na
+decomposição estrutural de `always-alive.js` (1.348L → 660L atingido, meta <800L superada).
 
 ---
 
@@ -554,3 +554,275 @@ feitos em qualquer ordem MAS a sequência proposta minimiza conflitos de merge.
 
 **Cada fase é independente e funcional**: após cada fase, o agente deve continuar funcionando
 exatamente como antes (zero mudanças na API pública).
+
+---
+
+# REVISÃO 3 — Estado Pós-F39 & Novo Roadmap
+
+**Data**: 2026-07-24 | **Estado base**: always-alive.js @ 660L (pós-F39)
+
+## 7. Resultados da Execução F35–F39
+
+### 7.1 Fases Executadas
+
+| Fase | Status | Descrição | Commit | ΔL always-alive |
+|------|--------|-----------|--------|-----------------|
+| F35 | ✅ | AgentContext — 26 campos #private → ctx | `ddd3c7b6` | 1348→1197 (-151L) |
+| F36 | ✅ | AgentLifecycle — start/stop/initSession/tryReconnect | `604b9878` | 1197→858 (-339L) |
+| F37 | ✅ | AgentDialogController — dialog start/stop/resume/ensure | `7e3e39ac` | 858→776 (-82L) |
+| F38 | ✅ | AgentMessaging — sendMessage/steer/answer/enqueue | `4a34d3e6` | 776→702 (-74L) |
+| F39 | ✅ | AgentState — getStatusSnapshot/listenerDiagnostics | `e2ff5693` | 702→660 (-42L) |
+
+### 7.2 Módulos Criados (F35-F39)
+
+| Módulo | Linhas | Responsabilidade |
+|--------|--------|------------------|
+| `agent-context.js` | 210L | 26 campos antes #private, AgentContext class |
+| `lifecycle/agent-lifecycle.js` | 377L | agentStart, agentStop, initSession, agentTryReconnect |
+| `dialog/agent-dialog-controller.js` | 156L | dialogStart, dialogStop, dialogResume, dialogEnsureAttached |
+| `messaging/agent-messaging.js` | 156L | sendMessage, sendMessageDialogBoot, steerMessage, answerPendingQuestion, enqueueTask |
+| `state/agent-state.js` | 77L | getStatusSnapshot, listenerDiagnostics |
+
+### 7.3 Métricas Comparativas
+
+| Métrica | Pré-F35 (F34) | Pós-F39 | Delta |
+|---------|---------------|---------|-------|
+| always-alive.js | 1.348L | **660L** | **-688L (-51%)** |
+| Campos `this.#` em AA | 176 refs | **5 refs** | **-97%** |
+| Métodos privados em AA | ~12 | **3** | `#setStatus`, `#processQueue`, `#tryReconnect` |
+| God Modules >600L (agent/) | 2 | **1** (loop-mgr) | **-1** |
+| Total arquivos agent/ | 31 | **36** | +5 novos módulos |
+| Total linhas agent/ | 6.790 | **7.078** | +288L (overhead JSDoc) |
+
+### 7.4 Padrão Arquitetural Adotado
+
+Migração de **Callback Context Pattern** (F29-F34) para **AgentContext Mediator Pattern** (F35+):
+
+```
+F29-F34: performBootWiring(session, isResumed, { emit, getStatus, ... })
+F35-F39: agentStart(ctx, host)  // ctx = AgentContext, host = AlwaysAliveAgent (EventEmitter)
+```
+
+Cada módulo extraído recebe `(ctx, host)`:
+- **ctx** — `AgentContext` com todos os campos de estado mutável
+- **host** — `AlwaysAliveAgent extends EventEmitter` (para emit/on/off e getters)
+
+Interfaces `_Host` (LifecycleHost, DialogHost, MessagingHost, StateHost) definem o contrato mínimo
+que o host deve satisfazer, documentadas via JSDoc @typedef.
+
+### 7.5 always-alive.js — Estado Atual (660L)
+
+Composição restante:
+- **Imports + typedefs**: ~100L
+- **Constructor**: ~15L
+- **Thin getters/setters**: ~200L (19 getters, 3 setters, todos 1-3L de corpo)
+- **Delegações one-liner**: ~120L (start, stop, sendMessage, dialog*, answer*, etc.)
+- **Core privado**: ~60L (#setStatus 4L, #processQueue 30L, #tryReconnect 3L)
+- **Utility**: ~50L (abortCurrentMessage, sessionLog, pingDialogWatchdog, getSessionMessages)
+- **Singleton + Dispose**: ~50L
+
+Os 3 métodos privados que **devem** permanecer na classe:
+1. `#setStatus(status)` — muta ctx.status + invalida cache + emit
+2. `#processQueue()` — loop de processamento com referência circular (#setStatus, #tryReconnect)
+3. `#tryReconnect(err, opts)` — delega para agentTryReconnect (thin wrapper preservando contexto `this`)
+
+## 8. Auditoria Pós-F39 — agent/ Completo
+
+### 8.1 Mapa Atualizado
+
+| Subdir | Arqs | Linhas | Maiores |
+|--------|------|--------|---------|
+| (raiz) | 5 | 1.719 | always-alive.js (660), agent-context.js (210), config.js (177), types.js (122) |
+| dialog/ | 7 | 1.305 | loop-manager.js (661), turn-executor.js (361), agent-dialog-controller.js (156) |
+| infra/ | 8 | 1.251 | webhook-manager.js (300), message-queue.js (212), task-executor.js (177) |
+| lifecycle/ | 5 | 932 | agent-lifecycle.js (377), state-io.js (251), entry.js (162) |
+| messaging/ | 1 | 156 | agent-messaging.js (156) |
+| session/ | 9 | 1.638 | event-wirer.js (591), initializer.js (376), boot-wiring.js (225), snapshot.js (213) |
+| state/ | 1 | 77 | agent-state.js (77) |
+| **Total** | **36** | **7.078** | |
+
+### 8.2 God Modules Restantes (>400L)
+
+| Arquivo | Linhas | Decomponível? | Justificativa |
+|---------|--------|---------------|---------------|
+| dialog/loop-manager.js | 661L | **NÃO** | FSM coeso, 97 refs this.#, avaliado em F18 |
+| session/event-wirer.js | 591L | Parcial | 8 sub-funções internas, composição limpa |
+| lifecycle/agent-lifecycle.js | 377L | NÃO | Lógica coesa, recém-extraído em F36 |
+| session/initializer.js | 376L | Parcial | Session creation + resume — bordas separáveis |
+| dialog/turn-executor.js | 361L | NÃO | Executor coeso, FSM de turns |
+| infra/webhook-manager.js | 300L | Parcial | Classe com 15 métodos, mas coesa por domínio |
+
+### 8.3 Campos this.# por Arquivo (top 5)
+
+| Arquivo | Refs this.# | Nota |
+|---------|-------------|------|
+| dialog/loop-manager.js | 97 | FSM coeso, #private legítimos |
+| session/keepalive.js | 22 | Classe compacta, #private correto |
+| dialog/watchdog.js | 23 | Classe compacta |
+| infra/message-queue.js | 18 | Classe compacta |
+| infra/handoff-manager.js | 13 | Classe compacta |
+
+### 8.4 API Pública — Consumo Externo (inalterado)
+
+~20 consumidores via `#copilot/agent` barrel. Interface 100% retrocompatível:
+- Event Source (48 refs on/off)
+- Status Provider (getStatusSnapshot + getters)
+- Lifecycle Controller (start/stop/pause/resume)
+- Message Gateway (sendMessage/answerPendingQuestion)
+
+### 8.5 Cobertura de Testes
+
+| Arquivo | Testes existentes | Status |
+|---------|------------------|--------|
+| always-alive.js | 5 spec files | 2 falhas pré-existentes (timeout default, MAX_QUEUE_SIZE) |
+| message-queue.js | test_message_queue.spec.js | PASS |
+| state-io.js | test_state_io.spec.js | PASS (em isolamento) |
+| agent-context.js | **NENHUM** | ⚠ Sem cobertura |
+| agent-lifecycle.js | **NENHUM** | ⚠ Sem cobertura |
+| agent-dialog-controller.js | **NENHUM** | ⚠ Sem cobertura |
+| agent-messaging.js | **NENHUM** | ⚠ Sem cobertura |
+| agent-state.js | **NENHUM** | ⚠ Sem cobertura |
+
+**Risco**: 5 módulos extraídos (F35-F39) sem testes unitários diretos.
+Cobertura indireta existe (spec files de always-alive testam delegação), mas é frágil.
+
+## 9. Novo Roadmap — F41+
+
+### 9.1 Oportunidades Identificadas
+
+| ID | Tipo | Escopo | Impacto | Esforço |
+|----|------|--------|---------|---------|
+| F41 | Testes | Testes unitários para módulos F35-F39 | Alto (segurança) | Médio |
+| F42 | Decomposição | event-wirer.js → wirers/ sub-módulos | Médio (legibilidade) | Médio |
+| F43 | Decomposição | initializer.js — separar create vs resume | Baixo | Baixo |
+| F44 | Limpeza | Remover JSDoc orphan/duplicate em always-alive.js | Baixo | Baixo |
+| F45 | Typing | Hardening JSDoc typedefs para Host interfaces | Médio | Baixo |
+| F46 | Testes | Testes de regressão para always-alive delegações | Alto | Médio |
+| F47 | Extração | webhook-manager.js → módulo MCP-agnostic | Baixo | Médio |
+| F48 | Typing | Exportar typedefs compartilhados (AgentContext, etc.) | Médio | Baixo |
+
+### 9.2 Roadmap Priorizado
+
+#### Fase A: Segurança de Regressão (F41 + F46)
+
+**F41: Testes unitários para módulos extraídos**
+1. F41.1 — test_agent_context.spec.js (construção, setStatus, bridge MessageQueue)
+2. F41.2 — test_agent_lifecycle.spec.js (agentStart, agentStop, initSession, tryReconnect)
+3. F41.3 — test_agent_messaging.spec.js (sendMessage guards, enqueueTask, answerPendingQuestion)
+4. F41.4 — test_agent_state.spec.js (getStatusSnapshot cache/TTL, listenerDiagnostics)
+5. F41.5 — test_agent_dialog_controller.spec.js (dialogStart preconditions, dialogStop)
+
+**F46: Testes de delegação always-alive.js**
+1. F46.1 — Verificar que cada método delegado chama o módulo correto
+2. F46.2 — Verificar que thin getters retornam ctx.field correto
+3. F46.3 — Atualizar testes source-scan existentes
+
+**Meta**: ≥80% cobertura dos módulos extraídos, 0 falhas novas.
+
+#### Fase B: Hardening Types (F45 + F48)
+
+**F45: Host interface typedefs**
+1. F45.1 — Unificar LifecycleHost, DialogHost, MessagingHost, StateHost em types.js
+2. F45.2 — AlwaysAliveAgent implements all Host interfaces (JSDoc @implements)
+3. F45.3 — Validar typecheck:strict
+
+**F48: Exportar typedefs compartilhados**
+1. F48.1 — Exportar AgentContext, AgentStatusSnapshot, AgentTask via barrel
+2. F48.2 — Documentar interfaces para consumidores internos
+
+#### Fase C: Decomposição Opcional (F42 + F43)
+
+**F42: Decompor event-wirer.js**
+1. F42.1 — Criar session/wirers/ com streaming.js, lifecycle.js, audit.js, billing.js
+2. F42.2 — event-wirer.js vira compositor (~180L)
+3. F42.3 — Validar
+
+**F43: Separar initializer.js**
+1. F43.1 — Extrair resume-session logic para session/resume.js
+2. F43.2 — initializer.js fica com createSession (~200L)
+
+#### Fase D: Limpeza (F44 + F47)
+
+**F44: JSDoc cleanup**
+1. F44.1 — Remover JSDoc orphan em always-alive.js
+2. F44.2 — Remover duplicações nos módulos extraídos
+
+**F47: webhook-manager.js modularização**
+1. F47.1 — Avaliar se classe é MCP-agnostic
+2. F47.2 — Extrair se aplicável
+
+### 9.3 Sequência Recomendada
+
+```
+F41 (Testes F35-F39) → F46 (Testes delegação) → F45 (Host types) → F48 (Export types)
+         ↓                    ↓                        ↓
+   Segurança base      Regressão coberta        Types hardened
+                                                       ↓
+                              F42 (event-wirer) → F43 (initializer) → F44 (cleanup)
+                                     ↓
+                              Opcional, sob demanda
+```
+
+**Prioridade**: F41 > F46 > F45 ≫ F42/F43/F44/F47/F48
+
+### 9.4 Métricas-Alvo Pós-Roadmap
+
+| Métrica | Atual (F39) | Alvo |
+|---------|-------------|------|
+| always-alive.js | 660L | 660L (estável) |
+| God Modules >600L | 1 (loop-mgr) | 1 |
+| Test coverage (módulos F35-F39) | 0% direto | **≥80%** |
+| Falhas de teste | 2 pré-existentes | 0 |
+| Host interfaces documentadas | 4 ad-hoc | 1 unificada em types.js |
+
+---
+
+## 10. Estrutura Final agent/ (Pós-F39)
+
+```
+src/copilot/agent/
+├── agent-context.js            # F35: 26 campos de contexto compartilhado (210L)
+├── always-alive.js             # Fachada slim: getters + delegação (660L)
+├── config.js                   # Constantes (177L)
+├── index.js                    # Barrel exports (20L)
+├── types.js                    # Typedefs (122L)
+├── dialog/
+│   ├── agent-dialog-controller.js  # F37: dialog start/stop/resume/ensure (156L)
+│   ├── index.js
+│   ├── loop-manager.js             # FSM coeso — NÃO decompor (661L)
+│   ├── protocol.js                 # DialogProtocol (115L)
+│   ├── turn-executor.js            # Executor de turns (361L)
+│   ├── user-input-handler.js       # F31: ask_user dispatch (106L)
+│   └── watchdog.js                 # Stall detection (189L)
+├── infra/
+│   ├── handoff-manager.js          # Handoff (157L)
+│   ├── index.js
+│   ├── message-queue.js            # Fila de tarefas (212L)
+│   ├── permission-controller.js    # Modos de permissão (155L)
+│   ├── status-snapshot.js          # Builder de snapshot (102L)
+│   ├── task-executor.js            # Executor de tasks SDK (177L)
+│   ├── tools-bootstrap.js          # Bootstrap de tools (133L)
+│   └── webhook-manager.js          # Webhooks (300L)
+├── lifecycle/
+│   ├── agent-lifecycle.js          # F36: start/stop/initSession/tryReconnect (377L)
+│   ├── entry.js                    # Entry point (162L)
+│   ├── index.js
+│   ├── reconnect-policy.js         # Política de backoff (133L)
+│   └── state-io.js                 # Persistência de estado (251L)
+├── messaging/
+│   └── agent-messaging.js          # F38: send/steer/answer/enqueue (156L)
+├── session/
+│   ├── boot-wiring.js              # F29: Wiring pós-init (225L)
+│   ├── cleanup.js                  # Cleanup de sessão (97L)
+│   ├── event-wirer.js              # Wiring SDK events (591L)
+│   ├── history-sync.js             # F32: Sync SDK→Store (108L)
+│   ├── index.js
+│   ├── initializer.js              # Criação/resume de sessão (376L)
+│   ├── keepalive.js                # Heartbeat (155L)
+│   ├── rotation.js                 # Rotação de sessão (82L)
+│   └── snapshot.js                 # Snapshots de sessão (213L)
+└── state/
+    └── agent-state.js              # F39: snapshot + diagnostics (77L)
+```
+
+**Total: 36 arquivos, 7.078 linhas**

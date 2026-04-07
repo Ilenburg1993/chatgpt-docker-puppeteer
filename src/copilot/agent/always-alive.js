@@ -553,15 +553,6 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão.
-     *
-     * Chamado de forma assíncrona (fire-and-forget) no `start()` quando `isResumed=true` para não bloquear o startup.
-     * Falhas são logadas como WARN e não propagadas.
-     *
-     * @param {CopilotSession} session
-     * @returns {Promise<void>}
-     */
-    /**
      * @param {AgentStatus} status
      */
     #setStatus(status) {

@@ -166,9 +166,18 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
 
     it('sendMessage() cria tarefa e delega enqueue ao MessageQueue', async () => {
         const { readFile } = await import('node:fs/promises');
+        // F38: lógica de enqueue extraída para messaging/agent-messaging.js
         const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        const msg = await readFile(
+            new URL('../../../src/copilot/agent/messaging/agent-messaging.js', import.meta.url),
+            'utf-8',
+        );
+        const combined = src + msg;
         // F.4: lógica de verificação de limite migrou para MessageQueue.enqueue()
-        assert.ok(src.includes('messageQueue.enqueue(task'), 'sendMessage deve delegar enqueue ao messageQueue (F.4)');
+        assert.ok(
+            combined.includes('messageQueue.enqueue(task'),
+            'sendMessage deve delegar enqueue ao messageQueue (F.4)',
+        );
     });
 
     it('mensagem de erro ao atingir limite deve conter "Fila cheia" em message-queue.js', async () => {
