@@ -21,8 +21,8 @@
 
 import { getCopilotFallbackModel } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { waitForEvent } from '#copilot/sdk/event-helpers';
 import { log } from '#copilot/observability/logger';
+import { waitForEvent } from '#copilot/sdk/event-helpers';
 import EventEmitter from 'node:events';
 import {
     BOOT_TIMEOUT_MS,

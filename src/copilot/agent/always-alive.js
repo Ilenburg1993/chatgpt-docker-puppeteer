@@ -21,8 +21,6 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
-import { raceEvents } from '#copilot/sdk/event-helpers';
-import { createRegistry } from '#copilot/sdk/index';
 import {
     buildTelemetryConfig,
     createAgentEventObserver,
@@ -33,6 +31,8 @@ import {
     startSpan,
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
+import { raceEvents } from '#copilot/sdk/event-helpers';
+import { createRegistry } from '#copilot/sdk/index';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpTools, startMcpAutoReconnect } from '../bridges/mcp-tool-bridge.js';

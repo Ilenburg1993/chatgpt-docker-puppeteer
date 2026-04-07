@@ -11,8 +11,8 @@
  * @module copilot/agent/session/cleanup
  */
 
-import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { log } from '#copilot/observability/logger';
+import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { SESSION_MAX_AGE_MS } from '../config.js';
 
 /**
