@@ -10,8 +10,8 @@
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
-import dns from 'node:dns/promises';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config.js';
+import { checkResolvedIp, validateWebhookUrl } from './url-validator.js';
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry
@@ -34,43 +34,13 @@ export class WebhookManager {
     #urls = new Map();
 
     /**
-     * Valida se uma URL de webhook é segura (protocolo HTTP/HTTPS, sem IPs privados/loopback exceto quando
-     * explicitamente permitido via WEBHOOK_ALLOW_PRIVATE_HOSTS=true).
-     *
-     * G2-SEC-01: prevenção de SSRF básica — bloqueia acesso a RFC-1918 e loopback.
+     * Valida se uma URL de webhook é segura — delega para url-validator.js.
      *
      * @param {string} url
      * @throws {ConfigError} Se a URL for inválida ou insegura
      */
     static #validateUrl(url) {
-        let parsed;
-        try {
-            parsed = new URL(url);
-        } catch {
-            throw new ConfigError(`[WebhookManager] URL inválida: ${url}`);
-        }
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            throw new ConfigError(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
-        }
-        const allowPrivate = WEBHOOK_ALLOW_PRIVATE_HOSTS;
-        if (!allowPrivate) {
-            const hostname = parsed.hostname;
-            // Bloquear loopback, localhost, e ranges RFC-1918
-            if (
-                hostname === 'localhost' ||
-                hostname === '0.0.0.0' ||
-                /^127\./.test(hostname) ||
-                /^::1$/.test(hostname) ||
-                /^10\./.test(hostname) ||
-                /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-                /^192\.168\./.test(hostname) ||
-                /^169\.254\./.test(hostname) // link-local
-            ) {
-                throw new ConfigError(
-                    `[WebhookManager] Host privado/loopback bloqueado por segurança: ${hostname}. Use WEBHOOK_ALLOW_PRIVATE_HOSTS=true para permitir em dev.`,
-                );
-            }
-        }
+        validateWebhookUrl(url);
     }
 
     /**
@@ -156,44 +126,14 @@ export class WebhookManager {
     }
 
     /**
-     * SEC-AGENT-005: Verifica se o IP resolvido para um hostname é privado/loopback. Mitiga DNS rebinding — atacante
-     * usa hostname público que resolve para IP interno.
+     * SEC-AGENT-005: Verifica DNS rebinding — delega para url-validator.js.
      *
      * @param {string} hostname
      * @returns {Promise<void>}
      * @throws {Error} Se o IP resolvido for privado/loopback
      */
     static async #checkResolvedIp(hostname) {
-        let address;
-        try {
-            const result = await dns.lookup(hostname, { family: 4 });
-            address = result.address;
-        } catch {
-            // IPv6 fallback
-            try {
-                const result = await dns.lookup(hostname, { family: 6 });
-                address = result.address;
-            } catch {
-                return; // Não conseguiu resolver — deixa o fetch falhar naturalmente
-            }
-        }
-        const isPrivate =
-            address === '127.0.0.1' ||
-            address === '0.0.0.0' ||
-            /^127\./.test(address) ||
-            /^::1$/.test(address) ||
-            /^10\./.test(address) ||
-            /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
-            /^192\.168\./.test(address) ||
-            /^169\.254\./.test(address) ||
-            /^fe80:/i.test(address) || // link-local IPv6
-            /^f[cd]/i.test(address) || // ULA IPv6 (fc00::/7 → fc/fd prefixes)
-            /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(address); // IPv4-mapped
-        if (isPrivate) {
-            throw new ConfigError(
-                `[WebhookManager] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${address}.`,
-            );
-        }
+        await checkResolvedIp(hostname);
     }
 
     /**
