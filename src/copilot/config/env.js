@@ -177,3 +177,23 @@ export const TERMINAL_SHOW_STREAMING = process.env['TERMINAL_SHOW_STREAMING'] !=
 export const TERMINAL_MAX_INJECT_HISTORY = envInt('TERMINAL_MAX_INJECT_HISTORY', 100);
 export const TERMINAL_MAX_LISTENERS = envInt('TERMINAL_MAX_LISTENERS', 25);
 export const TERMINAL_MAX_ATTACHMENTS = envInt('TERMINAL_MAX_ATTACHMENTS', 50);
+
+// ── Queue / Internal Limits ──────────────────────────────────
+
+/**
+ * Tamanho máximo da fila de mensagens do AlwaysAliveAgent.
+ * Quando a fila atinge este limite, novas mensagens são rejeitadas.
+ *
+ * @type {number}
+ */
+export const MAX_QUEUE_SIZE = 100;
+
+/**
+ * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota.
+ * Lido em runtime (não import-time) para permitir configuração dinâmica via `process.env`.
+ *
+ * @returns {string | null}
+ */
+export function getCopilotFallbackModel() {
+    return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
+}

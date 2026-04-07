@@ -19,7 +19,7 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { getCopilotFallbackModel } from '#copilot/core/constants';
+import { getCopilotFallbackModel } from '#copilot/config/env';
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { waitForEvent } from '#copilot/sdk/event-helpers';

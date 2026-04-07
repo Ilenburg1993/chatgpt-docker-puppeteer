@@ -9,7 +9,7 @@
 
 import { alwaysAliveAgent } from '#copilot/agent';
 import { LLM_B_BOOT_PROMPT } from '#copilot/config/env';
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/core/constants';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config/env';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 

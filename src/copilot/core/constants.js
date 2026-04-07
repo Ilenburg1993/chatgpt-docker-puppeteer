@@ -2,108 +2,23 @@
 /**
  * src/copilot/core/constants.js
  *
- * Constantes centralizadas do módulo copilot.
+ * Re-exports de constantes canônicas para acesso via `#copilot/core`.
  *
- * Centraliza valores literais que antes estavam espalhados (portas, limites, nomes de eventos) para facilitar
- * manutenção e tipagem.
+ * Todos os valores originam de `config/env.js` (SSOT) ou `core/events.js`.
+ * Este módulo existe para manter retrocompatibilidade com importadores que usam
+ * `#copilot/core/constants` ou o barrel `#copilot/core`.
  *
  * @module copilot/core/constants
  */
 
-import {
-    LLM_B_TERMINAL_PORT as _LLM_B_TERMINAL_PORT,
-    LLM_B_TURN_TIMEOUT_MS as _LLM_B_TURN_TIMEOUT_MS,
-    MAX_SSE_CLIENTS as _MAX_SSE_CLIENTS,
-    MAX_SSE_CONTENT_CHARS as _MAX_SSE_CONTENT_CHARS,
+export {
+    getCopilotFallbackModel,
+    LLM_B_TERMINAL_PORT,
+    LLM_B_TURN_TIMEOUT_MS,
+    MAX_QUEUE_SIZE,
+    MAX_SSE_CLIENTS,
+    MAX_SSE_CONTENT_CHARS,
 } from '#copilot/config/env';
 
-/**
- * Porta padrão do terminal LLM-B (servidor HTTP raw + endpoint /inject). Pode ser sobrescrita via variável de ambiente
- * `LLM_B_TERMINAL_PORT`.
- *
- * @type {number}
- */
-export const LLM_B_TERMINAL_PORT = _LLM_B_TERMINAL_PORT;
-
-/**
- * Tamanho máximo da fila de mensagens do AlwaysAliveAgent. Quando a fila atinge este limite, novas mensagens são
- * rejeitadas.
- *
- * @type {number}
- */
-export const MAX_QUEUE_SIZE = 100;
-
-/**
- * Timeout padrão de turno LLM-B em ms. Pode ser sobrescrito via `LLM_B_TURN_TIMEOUT_MS` (preferido) ou
- * `LLM_B_TURN_TIMEOUT` (legado, aceito por compatibilidade). Usado por dialog.js (terminal REPL) e channel/inject.js
- * (injeção HTTP).
- *
- * GAP-CORE-001 fix: suporte às duas formas de env var — prefere a versão `_MS` para nomenclatura inequívoca; mantém
- * `LLM_B_TURN_TIMEOUT` por compatibilidade retroativa.
- *
- * @deprecated F33.1: `LLM_B_TURN_TIMEOUT` env var é legado — usar `LLM_B_TURN_TIMEOUT_MS`.
- * @type {number}
- */
-export const LLM_B_TURN_TIMEOUT_MS = _LLM_B_TURN_TIMEOUT_MS;
-
-/**
- * Número máximo de clientes SSE simultâneos por endpoint. Evita leak de memória quando muitos clientes SSE abrem
- * conexões sem fechá-las.
- *
- * @type {number}
- */
-export const MAX_SSE_CLIENTS = _MAX_SSE_CLIENTS;
-
-/**
- * Tamanho máximo em caracteres de um chunk de conteúdo SSE antes de truncamento. Evita mensagens de eventos SSE
- * excessivamente grandes que podem causar problemas em buffers de proxy/cliente. Configurável via variável de ambiente
- * MAX_SSE_CONTENT_CHARS.
- *
- * @type {number}
- */
-export const MAX_SSE_CONTENT_CHARS = _MAX_SSE_CONTENT_CHARS;
-
-/**
- * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota. Lido em runtime (não import-time) para
- * permitir configuração dinâmica via `process.env`.
- *
- * UPG-SL-001 fix: centraliza valor que antes era lido diretamente de `process.env` em cada callsite.
- *
- * @returns {string | null}
- */
-export function getCopilotFallbackModel() {
-    return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
-}
-
-/**
- * Nomes canônicos de eventos emitidos pelo AlwaysAliveAgent. Definidos em core/agent-events.js (R9) e re-exportados
- * aqui para acesso centralizado via core/.
- *
- * @type {readonly string[]}
- */
 export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './events.js';
 /** @typedef {import('./events.js').AgentEventName} AgentEventName */
-
-/**
- * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js. Usar estas constantes em vez
- * de strings literais ao registrar novas ferramentas.
- *
- * @type {Readonly<Record<string, string>>}
- */
-export const TOOL_CATEGORIES = Object.freeze({
-    TASK: 'task',
-    CODE: 'code',
-    GIT: 'git',
-    SESSION: 'session',
-    SESSION_RPC: 'session-rpc',
-    HOOK: 'hook',
-    HUB: 'hub',
-    INTROSPECTION: 'introspection',
-    FILE: 'file',
-    SHELL: 'shell',
-    WEB: 'web',
-    TODO: 'todo',
-    PERMISSION: 'permission',
-    MCP: 'mcp',
-    CUSTOM: 'custom',
-});
