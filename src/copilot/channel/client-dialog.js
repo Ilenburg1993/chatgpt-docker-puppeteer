@@ -2,8 +2,8 @@
 /**
  * src/copilot/channel/client-dialog.js
  *
- * Funções de dialog mode extraídas de LlmBridgeClient para reduzir o God Module.
- * Cada função opera sobre a interface BridgeAgentLike e retorna dados puros.
+ * Funções de dialog mode extraídas de LlmBridgeClient para reduzir o God Module. Cada função opera sobre a interface
+ * BridgeAgentLike e retorna dados puros.
  *
  * @module copilot/channel/client-dialog
  */
@@ -105,7 +105,7 @@ export async function dialogTurn(agent, message, opts = {}) {
  * Encerra o modo de diálogo direto.
  *
  * @param {BridgeAgentLike} agent
- * @param {string} [reason='watchdog_restart']
+ * @param {string} [reason='watchdog_restart'] Default is `'watchdog_restart'`
  * @returns {Promise<void>}
  */
 export async function stopDialogMode(agent, reason = 'watchdog_restart') {

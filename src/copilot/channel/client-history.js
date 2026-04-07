@@ -14,11 +14,11 @@
 /**
  * Retorna os últimos N pares (user + assistant) de um array de histórico.
  *
- * Cursor-based: navega do fim para o início sem arrays intermediários.
- * Opção `summarize: true` trunca conteúdo a 200 chars para economia de tokens.
+ * Cursor-based: navega do fim para o início sem arrays intermediários. Opção `summarize: true` trunca conteúdo a 200
+ * chars para economia de tokens.
  *
  * @param {ReadonlyArray<ConversationTurn>} history
- * @param {number} [pairs=5]
+ * @param {number} [pairs=5] Default is `5`
  * @param {{ summarize?: boolean }} [opts]
  * @returns {ReadonlyArray<ConversationTurn>}
  */

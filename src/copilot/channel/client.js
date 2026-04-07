@@ -429,7 +429,7 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto.
      *
-     * @param {string} [reason='watchdog_restart']
+     * @param {string} [reason='watchdog_restart'] Default is `'watchdog_restart'`
      * @returns {Promise<void>}
      */
     async stopDialogMode(reason = 'watchdog_restart') {
@@ -458,7 +458,7 @@ export class LlmBridgeClient {
     /**
      * Retorna os últimos N pares (user + assistant) do histórico.
      *
-     * @param {number} [pairs=5]
+     * @param {number} [pairs=5] Default is `5`
      * @param {{ summarize?: boolean }} [opts]
      * @returns {ReadonlyArray<ConversationTurn>}
      */

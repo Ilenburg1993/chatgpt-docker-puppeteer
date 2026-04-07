@@ -16,6 +16,7 @@ import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('./client.js').ChatResult} ChatResult
+ *
  * @typedef {import('./client.js').ChatOptions} ChatOptions
  */
 
