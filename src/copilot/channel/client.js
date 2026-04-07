@@ -37,12 +37,12 @@
  * @see module:copilot/channel/inject
  */
 
-import { log } from '#copilot/observability/logger';
 import {
     buildStructuredRequest,
     parseStructuredResponse,
     serializeStructuredMessage,
 } from '#copilot/core/structured-message';
+import { log } from '#copilot/observability/logger';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 
@@ -331,8 +331,7 @@ export class LlmBridgeClient {
      *     }
      *     ```;
      *
-     * @param {import('#copilot/core/structured-message').StructuredMessageInput} input - Campos da mensagem
-     *   estruturada
+     * @param {import('#copilot/core/structured-message').StructuredMessageInput} input - Campos da mensagem estruturada
      * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts] - Opções de callback e metadata
      * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>} Resultado com campo
      *   `structured`

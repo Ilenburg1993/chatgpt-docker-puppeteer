@@ -2,8 +2,8 @@
 /**
  * src/copilot/types/index.js
  *
- * @deprecated Desde F8 — migrado para core/. Este arquivo é um re-export de compatibilidade.
  * @module copilot/types
+ * @deprecated Desde F8 — migrado para core/. Este arquivo é um re-export de compatibilidade.
  */
 
 export {
