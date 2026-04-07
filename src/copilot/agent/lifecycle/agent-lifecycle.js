@@ -102,7 +102,7 @@ export async function agentStart(ctx, host) {
         const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
         ctx.client = client;
 
-        const { session, isResumed } = await startSpan('session.boot', { model: ctx.model }, () =>
+        const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.model }, () =>
             initSession(ctx, client, host),
         );
 

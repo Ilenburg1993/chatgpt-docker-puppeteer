@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
 vi.mock('#copilot/core/errors', () => {
@@ -32,11 +32,11 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
 
 /* ── SUT ── */
 import {
-    emitTurnStart,
     buildTurnResolutionListeners,
     dispatchTurnToHost,
-    waitForRestartAndReply,
+    emitTurnStart,
     executeTurnImpl,
+    waitForRestartAndReply,
 } from '../../../src/copilot/agent/dialog/turn-executor.js';
 
 /* ── helpers ── */

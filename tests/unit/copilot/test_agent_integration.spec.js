@@ -2,10 +2,10 @@
 /**
  * F67 — Teste de Integração: DialogLoopManager boot → send → stop
  *
- * Exercita o fluxo real do DialogLoopManager com módulos reais (protocol, backpressure,
- * model-fallback) e mocks mínimos para I/O externo (env, logger, state-io, watchdog, turn-executor).
+ * Exercita o fluxo real do DialogLoopManager com módulos reais (protocol, backpressure, model-fallback) e mocks mínimos
+ * para I/O externo (env, logger, state-io, watchdog, turn-executor).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks de camada I/O ── */
 vi.mock('#copilot/config/env', () => ({
@@ -41,6 +41,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_DEBUG: false,
     COPILOT_MAX_TURNS: 100,
     COPILOT_METADATA_FILE: '',
+    COPILOT_LOG_DIR: '',
     COPILOT_REASONING_EFFORT: 'medium',
     COPILOT_RESTART_DELAY_MS: 3000,
     COPILOT_SESSION_ID: '',
@@ -78,13 +79,10 @@ vi.mock('#copilot/sdk/event-helpers', () => ({
         (emitter, event, opts = {}) =>
             new Promise((resolve, reject) => {
                 const timeoutMs = opts.timeoutMs ?? 30000;
-                const timer = setTimeout(
-                    () => {
-                        emitter.off(event, handler);
-                        reject(new Error(opts.timeoutError ?? `waitForEvent timeout: ${event}`));
-                    },
-                    timeoutMs,
-                );
+                const timer = setTimeout(() => {
+                    emitter.off(event, handler);
+                    reject(new Error(opts.timeoutError ?? `waitForEvent timeout: ${event}`));
+                }, timeoutMs);
                 /** @param {any} data */
                 const handler = (data) => {
                     clearTimeout(timer);
@@ -153,11 +151,16 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
 
     afterEach(() => {
         // Cleanup: force deactivate to prevent leaking timers
-        try { dlm.forceDeactivate(); } catch { /* ignore */ }
+        try {
+            dlm.forceDeactivate();
+        } catch {
+            /* ignore */
+        }
     });
 
     /**
      * Helper: inicia o DLM e emite ready logo que start é chamado.
+     *
      * @returns {Promise<void>}
      */
     async function bootDlm() {
@@ -214,11 +217,7 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
                 return `reply-${callCount}`;
             });
 
-            const [r1, r2, r3] = await Promise.all([
-                dlm.sendTurn('q1'),
-                dlm.sendTurn('q2'),
-                dlm.sendTurn('q3'),
-            ]);
+            const [r1, r2, r3] = await Promise.all([dlm.sendTurn('q1'), dlm.sendTurn('q2'), dlm.sendTurn('q3')]);
 
             expect(r1).toBe('reply-1');
             expect(r2).toBe('reply-2');
@@ -240,9 +239,7 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
             await dlm.stop({ authorized: true, reason: 'authorized_stop' });
 
             expect(dlm.active).toBe(false);
-            expect(stoppedSpy).toHaveBeenCalledWith(
-                expect.objectContaining({ authorized: true }),
-            );
+            expect(stoppedSpy).toHaveBeenCalledWith(expect.objectContaining({ authorized: true }));
         });
 
         it('forceDeactivate() reseta estado completo', async () => {

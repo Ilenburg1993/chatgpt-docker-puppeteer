@@ -32,6 +32,7 @@ vi.mock('#copilot/config/env', () => ({
     AGENT_TASK_TIMEOUT_MS: 300000,
     AGENT_TOOL_AUDIT_MAX_LOG_BYTES: 4096,
     COPILOT_AUDIT_LOG_PATH: '/tmp/audit.log',
+    COPILOT_LOG_DIR: '',
     COPILOT_REASONING_EFFORT: 'medium',
     COPILOT_RESTART_DELAY_MS: 3000,
     COPILOT_TOOL_PERMISSIONS_LOG: '/tmp/perms.log',
@@ -89,6 +90,8 @@ function createMockHost() {
         emit: vi.fn(),
         on: vi.fn(() => () => {}),
         off: vi.fn(),
+        getSessionId: vi.fn(() => 'test-session'),
+        getModel: vi.fn(() => 'gpt-4o'),
     };
 }
 

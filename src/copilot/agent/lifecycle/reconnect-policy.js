@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { startSpan } from '#copilot/observability/otel';
 
 /**
  * @typedef {Object} ReconnectCallbacks
@@ -56,78 +57,85 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
 
     clearSessionEventUnsubs([]);
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
-        // G2-ARCH-09: cap no máximo de 30s para evitar esperas excessivas
-        const raw = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
-        const delay = Math.min(raw, 30_000);
-        log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
-        emit('status', `reconnecting:${attempt}/${maxAttempts}`);
+    // F68.3: Span OTEL para toda a operação de reconexão
+    return startSpan(
+        'copilot.reconnect',
+        { sessionId: '', model: '', extra: { maxAttempts, error: originalError.message } },
+        async () => {
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
+                // G2-ARCH-09: cap no máximo de 30s para evitar esperas excessivas
+                const raw = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
+                const delay = Math.min(raw, 30_000);
+                log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
+                emit('status', `reconnecting:${attempt}/${maxAttempts}`);
 
-        await new Promise((r) => setTimeout(r, delay));
+                await new Promise((r) => setTimeout(r, delay));
 
-        try {
-            // G2-BUG-07: parar o client antes de reinicializar para evitar listeners duplicados
-            // e recursos pendurados da sessão anterior.
-            if (typeof client.stop === 'function') {
                 try {
-                    await client.stop();
-                } catch (/** @type {any} */ stopErr) {
-                    log('WARN', `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`);
+                    // G2-BUG-07: parar o client antes de reinicializar para evitar listeners duplicados
+                    // e recursos pendurados da sessão anterior.
+                    if (typeof client.stop === 'function') {
+                        try {
+                            await client.stop();
+                        } catch (/** @type {any} */ stopErr) {
+                            log('WARN', `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`);
+                        }
+                    }
+
+                    // F42.5 (BUG-SD-002 fix): criar um novo CopilotClient a cada tentativa de reconexão
+                    // em vez de reutilizar o client parado — o SDK pode não suportar reutilização após stop().
+                    let activeClient = client;
+                    if (typeof createClient === 'function') {
+                        activeClient = createClient();
+                        if (typeof updateClient === 'function') {
+                            updateClient(activeClient);
+                        }
+                    }
+
+                    const { session, isResumed } = await initSession(activeClient);
+
+                    // M-01 (PARTE-8): health check pós-reconexão — valida que o transport está funcional
+                    // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
+                    if (typeof activeClient.ping === 'function') {
+                        try {
+                            await activeClient.ping();
+                        } catch (/** @type {any} */ pingErr) {
+                            log('WARN', `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`);
+                            throw pingErr; // força retry na próxima iteração
+                        }
+                    }
+
+                    log(
+                        'INFO',
+                        `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
+                    );
+                    // M-05 (PARTE-8): registrar reconexão no timeline SDK para debug
+                    await sessionLog?.(`[reconnect-policy] Reconexão bem-sucedida na tentativa ${attempt}/${maxAttempts}`);
+                    emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
+
+                    if (dialogLoop.active) {
+                        log(
+                            'INFO',
+                            '[AlwaysAlive] Reconexão com dialog loop ativo — emitindo dialog.stopped para restart automático.',
+                        );
+                        dialogLoop.notifyReconnect();
+                        emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
+                    } else {
+                        log(
+                            'INFO',
+                            '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop.',
+                        );
+                    }
+                    return true;
+                } catch (/** @type {any} */ reconnectError) {
+                    log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
                 }
             }
 
-            // F42.5 (BUG-SD-002 fix): criar um novo CopilotClient a cada tentativa de reconexão
-            // em vez de reutilizar o client parado — o SDK pode não suportar reutilização após stop().
-            let activeClient = client;
-            if (typeof createClient === 'function') {
-                activeClient = createClient();
-                if (typeof updateClient === 'function') {
-                    updateClient(activeClient);
-                }
-            }
-
-            const { session, isResumed } = await initSession(activeClient);
-
-            // M-01 (PARTE-8): health check pós-reconexão — valida que o transport está funcional
-            // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
-            if (typeof activeClient.ping === 'function') {
-                try {
-                    await activeClient.ping();
-                } catch (/** @type {any} */ pingErr) {
-                    log('WARN', `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`);
-                    throw pingErr; // força retry na próxima iteração
-                }
-            }
-
-            log(
-                'INFO',
-                `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
-            );
-            // M-05 (PARTE-8): registrar reconexão no timeline SDK para debug
-            await sessionLog?.(`[reconnect-policy] Reconexão bem-sucedida na tentativa ${attempt}/${maxAttempts}`);
-            emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
-
-            if (dialogLoop.active) {
-                log(
-                    'INFO',
-                    '[AlwaysAlive] Reconexão com dialog loop ativo — emitindo dialog.stopped para restart automático.',
-                );
-                dialogLoop.notifyReconnect();
-                emit('dialog.stopped', { reason: 'reconnect_restart', authorized: false });
-            } else {
-                log(
-                    'INFO',
-                    '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop.',
-                );
-            }
-            return true;
-        } catch (/** @type {any} */ reconnectError) {
-            log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
-        }
-    }
-
-    log('ERROR', `[AlwaysAlive] Reconexão esgotada após ${maxAttempts} tentativas. Emitindo session.fatal.`);
-    emit('session.fatal', { originalError: originalError.message, attempts: maxAttempts });
-    return false;
+            log('ERROR', `[AlwaysAlive] Reconexão esgotada após ${maxAttempts} tentativas. Emitindo session.fatal.`);
+            emit('session.fatal', { originalError: originalError.message, attempts: maxAttempts });
+            return false;
+        },
+    );
 }

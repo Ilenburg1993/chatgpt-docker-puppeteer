@@ -1,6 +1,5 @@
 // @ts-check
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { join } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
 vi.mock('#copilot/observability/logger', () => ({
@@ -27,15 +26,15 @@ vi.mock('node:fs', () => ({
 }));
 
 /* ── SUT ── */
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import {
     createSnapshot,
-    saveSnapshot,
     listSnapshots,
-    loadSnapshot,
     loadLatestSnapshot,
+    loadSnapshot,
     pruneSnapshots,
+    saveSnapshot,
 } from '../../../src/copilot/agent/session/snapshot.js';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 
 describe('snapshot', () => {
     beforeEach(() => {

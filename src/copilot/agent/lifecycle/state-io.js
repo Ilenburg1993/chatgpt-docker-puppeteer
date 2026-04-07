@@ -124,6 +124,8 @@ export function readState() {
  *
  * Preferir `writeStateAsync` em fluxos assíncronos para não bloquear o event loop.
  *
+ * @deprecated F69: Use writeStateAsync() em vez desta versão síncrona. Será removida em versão futura.
+ *
  * @example
  *     writeState({ sessionId: 'abc-123', lastActive: Date.now() });
  *

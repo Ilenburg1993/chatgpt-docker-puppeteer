@@ -51,6 +51,9 @@ export async function cleanupStaleSessions(client, options = {}) {
 
         const now = Date.now();
 
+        /** @type {{ id: string; ageMs: number }[]} */
+        const toDelete = [];
+
         for (const session of sessions) {
             const id = session.sessionId;
             if (!id) continue;
@@ -70,17 +73,32 @@ export async function cleanupStaleSessions(client, options = {}) {
 
             const ageMs = now - createdAt;
             if (ageMs > maxAgeMs) {
-                try {
-                    await deleteSession(client, id);
-                    result.deleted++;
-                    result.deletedIds.push(id);
-                    log('DEBUG', `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`);
-                } catch (/** @type {any} */ e) {
-                    result.errors.push(`${id}: ${e.message}`);
-                    log('WARN', `[SessionCleanup] Falha ao remover sessão ${id}: ${e.message}`);
-                }
+                toDelete.push({ id, ageMs });
             } else {
                 result.kept++;
+            }
+        }
+
+        // F70.2: Deletar em paralelo com Promise.allSettled (batched)
+        if (toDelete.length > 0) {
+            const outcomes = await Promise.allSettled(
+                toDelete.map(({ id, ageMs }) =>
+                    deleteSession(client, id).then(() => {
+                        log('DEBUG', `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`);
+                        return id;
+                    }),
+                ),
+            );
+
+            for (const outcome of outcomes) {
+                if (outcome.status === 'fulfilled') {
+                    result.deleted++;
+                    result.deletedIds.push(outcome.value);
+                } else {
+                    const msg = outcome.reason?.message ?? String(outcome.reason);
+                    result.errors.push(msg);
+                    log('WARN', `[SessionCleanup] Falha ao remover sessão: ${msg}`);
+                }
             }
         }
 

@@ -12,6 +12,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
 import { readState } from '../lifecycle/state-io.js';
@@ -95,6 +96,26 @@ export function saveSnapshot(snapshot) {
 
     // F41.6: pruning — manter apenas os últimos MAX_SNAPSHOTS
     pruneSnapshots();
+
+    return filepath;
+}
+
+/**
+ * F69: Versão async de saveSnapshot — usa fs/promises.
+ *
+ * @param {SessionSnapshotData} snapshot
+ * @returns {Promise<string>} Caminho do arquivo salvo
+ */
+export async function saveSnapshotAsync(snapshot) {
+    await mkdir(SNAPSHOT_DIR, { recursive: true });
+
+    const filename = `${snapshot.snapshotId}.json`;
+    const filepath = join(SNAPSHOT_DIR, filename);
+
+    await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
+    log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
+
+    await pruneSnapshotsAsync();
 
     return filepath;
 }
@@ -208,6 +229,109 @@ export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
 
     if (removed > 0) {
         log('INFO', `[SessionSnapshot] Pruning: ${removed} snapshot(s) antigo(s) removido(s).`);
+    }
+    return removed;
+}
+
+// ─── F69: Versões Async ──────────────────────────────────────────────────────
+
+/**
+ * F69: Versão async de listSnapshots — usa fs/promises.
+ *
+ * @returns {Promise<SnapshotListItem[]>}
+ */
+export async function listSnapshotsAsync() {
+    if (!existsSync(SNAPSHOT_DIR)) return [];
+
+    /** @type {SnapshotListItem[]} */
+    const result = [];
+    for (const f of await readdir(SNAPSHOT_DIR)) {
+        if (!f.endsWith('.json')) continue;
+        const filepath = join(SNAPSHOT_DIR, f);
+        try {
+            const data = JSON.parse(await readFile(filepath, 'utf8'));
+            result.push({
+                snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
+                createdAt: Number(data.createdAt ?? 0),
+                sessionId: data.sessionId ?? null,
+                model: String(data.model ?? 'unknown'),
+                reason: data.reason,
+                filepath,
+            });
+        } catch {
+            // skip corrupt files
+        }
+    }
+    result.sort((a, b) => b.createdAt - a.createdAt);
+    return result;
+}
+
+/**
+ * F69: Versão async de loadSnapshot.
+ *
+ * @param {string} snapshotId
+ * @returns {Promise<SessionSnapshotData | null>}
+ */
+export async function loadSnapshotAsync(snapshotId) {
+    if (!existsSync(SNAPSHOT_DIR)) return null;
+
+    const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
+    if (!existsSync(filepath)) {
+        const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
+        if (files.length === 0) return null;
+        const first = files[0];
+        if (!first) return null;
+        try {
+            return JSON.parse(await readFile(join(SNAPSHOT_DIR, first), 'utf8'));
+        } catch {
+            return null;
+        }
+    }
+
+    try {
+        return JSON.parse(await readFile(filepath, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * F69: Versão async de loadLatestSnapshot.
+ *
+ * @returns {Promise<SessionSnapshotData | null>}
+ */
+export async function loadLatestSnapshotAsync() {
+    const snapshots = await listSnapshotsAsync();
+    if (snapshots.length === 0) return null;
+    const latest = snapshots[0];
+    return latest ? loadSnapshotAsync(latest.snapshotId) : null;
+}
+
+/**
+ * F69: Versão async de pruneSnapshots — usa fs/promises.
+ *
+ * @param {number} [keep] - Número de snapshots a manter (default: MAX_SNAPSHOTS)
+ * @returns {Promise<number>} Número de snapshots removidos
+ */
+export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
+    const snapshots = await listSnapshotsAsync();
+    if (snapshots.length <= keep) return 0;
+
+    const toRemove = snapshots.slice(keep);
+    let removed = 0;
+    for (const snap of toRemove) {
+        try {
+            if (snap?.filepath) {
+                await rm(snap.filepath, { force: true });
+                removed++;
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    if (removed > 0) {
+        log('INFO', `[SessionSnapshot] Pruning (async): ${removed} snapshot(s) antigo(s) removido(s).`);
     }
     return removed;
 }

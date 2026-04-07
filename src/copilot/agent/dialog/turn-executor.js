@@ -305,7 +305,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
     const waitFn = (msg, t, r) => waitForRestartAndReply(emitter, host, msg, t, r, signal);
 
     return startSpan(
-        'dialog.send_turn',
+        'copilot.dialog.send_turn',
         {
             sessionId: host.getSessionId() ?? '',
             actor: 'user',

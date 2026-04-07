@@ -22,6 +22,7 @@
 import { getCopilotFallbackModel } from '#copilot/config/env';
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
+import { startSpanImmediate } from '#copilot/observability/otel';
 import { waitForEvent } from '#copilot/sdk/event-helpers';
 import EventEmitter from 'node:events';
 import {
@@ -83,6 +84,9 @@ export class DialogLoopManager extends EventEmitter {
 
     /** @type {DialogWatchdog | null} */
     #watchdog = null;
+
+    /** @type {import('#copilot/observability/otel').OtelSpan | null} F68: span do ciclo de vida do dialog loop */
+    #loopSpan = null;
 
     /** @type {ModelFallbackState} F60: estado de fallback de modelo delegado */
     #modelFallback;
@@ -240,6 +244,12 @@ export class DialogLoopManager extends EventEmitter {
         this.emit('changed', { active: true, ts: Date.now() });
         persistState({ dialogLoopActive: true }, '[DialogLoopManager] writeState dialogLoopActive=true');
 
+        // F68.2: Span OTEL para o ciclo completo do dialog loop (start → stop)
+        this.#loopSpan = startSpanImmediate('copilot.dialog.loop', {
+            'session.id': this.#host?.getSessionId() ?? '',
+            model: this.#host?.getModel() ?? '',
+        });
+
         // F60: delegar aplicação de fallback ao ModelFallbackState
         this.#modelFallback.applyIfPending(this.#host, (event, payload) => this.emit(event, payload));
 
@@ -373,6 +383,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = false;
         this.#stopping = false;
+        this.#endLoopSpan(true);
         persistState({ dialogLoopActive: false }, '[DialogLoopManager] writeState dialogLoopActive=false');
         this.#watchdog?.stop();
         this.emit('stopped', { reason, authorized: true });
@@ -497,6 +508,18 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
+     * F68.2: Encerra o span OTEL do dialog loop.
+     * @param {boolean} success - Se o loop encerrou com sucesso (stop) ou forçadamente.
+     */
+    #endLoopSpan(success) {
+        if (this.#loopSpan) {
+            this.#loopSpan.setAttribute('success', success);
+            this.#loopSpan.end();
+            this.#loopSpan = null;
+        }
+    }
+
+    /**
      * Força desativação sem protocolo (usado durante shutdown do agente).
      *
      * F42.3 (BUG-SD-006 fix): reseta mutex, queue depth e generation counter para prevenir execuções fantasma de turns
@@ -505,6 +528,7 @@ export class DialogLoopManager extends EventEmitter {
     forceDeactivate() {
         this.#active = false;
         this.#stopping = false;
+        this.#endLoopSpan(false);
         // F42.3: reset completo do mutex pipeline — previne turns fantasma
         this.#turnQueue.reset();
         this.#watchdog?.stop();

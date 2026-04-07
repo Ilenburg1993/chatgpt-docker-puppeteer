@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
 vi.mock('#copilot/observability/logger', () => ({
@@ -16,8 +16,8 @@ vi.mock('../../../src/copilot/agent/config.js', () => ({
 }));
 
 /* ── SUT ── */
+import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
-import { listSessions, deleteSession } from '#copilot/sdk/session';
 
 describe('cleanupStaleSessions', () => {
     beforeEach(() => {
@@ -36,11 +36,13 @@ describe('cleanupStaleSessions', () => {
         const old = new Date(now - 100_000_000).toISOString(); // ~27h
         const recent = new Date(now - 1000).toISOString(); // 1s
 
-        vi.mocked(listSessions).mockResolvedValue(/** @type {any} */ ([
-            { sessionId: 'old-1', startTime: old },
-            { sessionId: 'current', startTime: old },
-            { sessionId: 'recent', startTime: recent },
-        ]));
+        vi.mocked(listSessions).mockResolvedValue(
+            /** @type {any} */ ([
+                { sessionId: 'old-1', startTime: old },
+                { sessionId: 'current', startTime: old },
+                { sessionId: 'recent', startTime: recent },
+            ]),
+        );
         vi.mocked(deleteSession).mockResolvedValue(undefined);
 
         const r = await cleanupStaleSessions(/** @type {any} */ ({}), { currentSessionId: 'current' });
@@ -52,10 +54,9 @@ describe('cleanupStaleSessions', () => {
     });
 
     it('pula sessões sem startTime válido', async () => {
-        vi.mocked(listSessions).mockResolvedValue(/** @type {any} */ ([
-            { sessionId: 's1', startTime: null },
-            { sessionId: 's2' },
-        ]));
+        vi.mocked(listSessions).mockResolvedValue(
+            /** @type {any} */ ([{ sessionId: 's1', startTime: null }, { sessionId: 's2' }]),
+        );
 
         const r = await cleanupStaleSessions(/** @type {any} */ ({}));
         expect(r.deleted).toBe(0);
@@ -64,9 +65,7 @@ describe('cleanupStaleSessions', () => {
 
     it('registra erros de delete sem interromper', async () => {
         const old = new Date(Date.now() - 100_000_000).toISOString();
-        vi.mocked(listSessions).mockResolvedValue(/** @type {any} */ ([
-            { sessionId: 'fail-1', startTime: old },
-        ]));
+        vi.mocked(listSessions).mockResolvedValue(/** @type {any} */ ([{ sessionId: 'fail-1', startTime: old }]));
         vi.mocked(deleteSession).mockRejectedValue(new Error('network'));
 
         const r = await cleanupStaleSessions(/** @type {any} */ ({}));
