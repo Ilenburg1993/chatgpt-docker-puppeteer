@@ -8,10 +8,10 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { emitNerv } from '../../bridges/nerv-bridge.js';
-import { llmBridgeClient } from '../../channel/client.js';
-import { conversationHub } from '../../conversation-hub/hub.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { emitNerv } from '#copilot/bridges/nerv-bridge';
+import { llmBridgeClient } from '#copilot/channel/client';
+import { conversationHub } from '#copilot/conversation-hub/hub';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,

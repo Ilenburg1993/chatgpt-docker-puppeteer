@@ -40,8 +40,8 @@ import {
     incrementSessionMessageCount as incrementMessageCount,
     listActiveClientSessions as listActiveSessions,
     resumeClientSession as resumeSdkSession,
-} from '../../sdk/client.js';
-import { pickDefined } from '../../sdk/utils.js';
+} from '#copilot/sdk/client';
+import { pickDefined } from '#copilot/sdk/utils';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 

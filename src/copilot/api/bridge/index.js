@@ -24,7 +24,7 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../../agent/index.js';
+import { alwaysAliveAgent } from '#copilot/agent';
 import { registerControlRoutes } from './control.js';
 import { registerDialogRoutes } from './dialog.js';
 import { registerStreamRoutes } from './stream.js';

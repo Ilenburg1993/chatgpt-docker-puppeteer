@@ -16,8 +16,8 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { validateUrlString } from '../../sdk/url-validator.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { validateUrlString } from '#copilot/sdk/url-validator';
 
 /**
  * @typedef {import('express').Request} Req

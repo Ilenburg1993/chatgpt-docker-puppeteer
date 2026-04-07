@@ -50,6 +50,7 @@
     "#copilot/audit/*": "./src/copilot/audit/*.js",
     "#copilot/tools/*": "./src/copilot/tools/*.js",
     "#copilot/bridges/*": "./src/copilot/bridges/*.js",
+    "#copilot/api/*": "./src/copilot/api/*.js",
     "#copilot/config/*": "./src/copilot/config/*.js",
     "#copilot/terminal/*": "./src/copilot/terminal/*.js",
     "#copilot/session-manager": "./src/copilot/agent/session-initializer.js",

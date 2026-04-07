@@ -22,9 +22,9 @@
 
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { getClient, getClientState, stopClient } from '../../sdk/client.js';
-import { allTools } from '../../tools/index.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { getClient, getClientState, stopClient } from '#copilot/sdk/client';
+import { allTools } from '#copilot/tools/index';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**

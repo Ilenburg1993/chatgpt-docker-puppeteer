@@ -7,9 +7,9 @@
  * @module copilot/terminal/dialog/sse
  */
 
-import { eventFanout } from '../../api/sse/fanout.js';
-import { broadcastGlobal, broadcastToSession } from '../../conversation-hub/socket-ns.js';
-import { MAX_SSE_CONTENT_CHARS } from '../../core/constants.js';
+import { eventFanout } from '#copilot/api/sse/fanout';
+import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub/socket-ns';
+import { MAX_SSE_CONTENT_CHARS } from '#copilot/core/constants';
 import { getHubSessionId, getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../state.js';
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */

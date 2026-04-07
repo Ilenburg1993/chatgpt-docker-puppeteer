@@ -19,11 +19,11 @@ import { getToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '../../agent/index.js';
-import { getMcpStatus } from '../../bridges/mcp-tool-bridge.js';
-import { conversationHub } from '../../conversation-hub/hub.js';
-import { conversationStore } from '../../conversation-hub/store.js';
-import { defaultMetrics } from '../../observability/metrics.js';
+import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
+import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
+import { conversationHub } from '#copilot/conversation-hub/hub';
+import { conversationStore } from '#copilot/conversation-hub/store';
+import { defaultMetrics } from '#copilot/observability/metrics';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from '../state.js';
 

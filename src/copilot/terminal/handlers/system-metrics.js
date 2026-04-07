@@ -9,12 +9,12 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit/pipeline';
-import { alwaysAliveAgent } from '../../agent/index.js';
-import { listIssues, listPrs, listRuns } from '../../bridges/gh/index.js';
-import { gitLog, gitStatus } from '../../bridges/git-bridge.js';
-import { defaultErrorTracker } from '../../observability/error-tracker.js';
-import { defaultMetrics } from '../../observability/metrics.js';
-import { getStatsByCategory, getToolStats } from '../../observability/tool-stats.js';
+import { alwaysAliveAgent } from '#copilot/agent';
+import { listIssues, listPrs, listRuns } from '#copilot/bridges/gh/index';
+import { gitLog, gitStatus } from '#copilot/bridges/git-bridge';
+import { defaultErrorTracker } from '#copilot/observability/error-tracker';
+import { defaultMetrics } from '#copilot/observability/metrics';
+import { getStatsByCategory, getToolStats } from '#copilot/observability/tool-stats';
 import { clearRateLimiters } from '../rate-limiter-state.js';
 import { getInjectHistory, getSseClients } from '../state.js';
 
