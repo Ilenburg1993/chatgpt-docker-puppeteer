@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SRC = fs.readFileSync(path.resolve('src/copilot/channel/inject.js'), 'utf8');
+const SSE_SRC = fs.readFileSync(path.resolve('src/copilot/channel/sse-client.js'), 'utf8');
 
 describe('copilot/channel/inject.js — structural', () => {
     // ─── Exports ────────────────────────────────────────────────────────────────
@@ -173,17 +174,17 @@ describe('copilot/channel/inject.js — structural', () => {
 
     // ─── SSE subscription ───────────────────────────────────────────────────────
 
-    it('deve ter subscrição SSE interna (_subscribeSse)', () => {
-        assert.ok(SRC.includes('_subscribeSse'));
+    it('deve ter subscrição SSE (subscribeSse) via sse-client.js', () => {
+        assert.ok(SRC.includes('subscribeSse') || SSE_SRC.includes('export function subscribeSse'));
     });
 
     it('SSE deve ter reconexão automática com backoff (MR-09)', () => {
-        assert.ok(SRC.includes('reconnectMs'));
-        assert.ok(SRC.includes('MAX_RECONNECT_MS'));
+        assert.ok(SSE_SRC.includes('reconnectMs'));
+        assert.ok(SSE_SRC.includes('MAX_RECONNECT_MS'));
     });
 
     it('SSE deve aceitar text/event-stream', () => {
-        assert.ok(SRC.includes('text/event-stream'));
+        assert.ok(SSE_SRC.includes('text/event-stream'));
     });
 
     it('SSE deve retornar unsubscribe', () => {
@@ -205,7 +206,7 @@ describe('copilot/channel/inject.js — structural', () => {
     });
 
     it('deve ter typedef SseEvent', () => {
-        assert.ok(SRC.includes('@typedef {Object} SseEvent'));
+        assert.ok(SRC.includes('SseEvent') || SSE_SRC.includes('@typedef {Object} SseEvent'));
     });
 
     it('deve importar BridgeError do core', () => {

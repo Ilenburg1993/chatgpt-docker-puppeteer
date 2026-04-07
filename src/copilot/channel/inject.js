@@ -31,6 +31,7 @@ import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
+import { subscribeSse } from './sse-client.js';
 
 /** Porta padrão do terminal LLM-B. GAP-CHAN-002: validação de range. */
 const DEFAULT_PORT = (() => {
@@ -48,8 +49,8 @@ const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 // ─── F96: Client-side rate limiter (sliding window) ───────────────────────────
 
 /**
- * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC.
- * Default: 30 req/s. Protege contra flood acidental.
+ * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC. Default: 30 req/s. Protege
+ * contra flood acidental.
  */
 const INJECT_RATE_PER_SEC = (() => {
     const raw = parseInt(process.env['INJECT_RATE_LIMIT_PER_SEC'] ?? '', 10);
@@ -60,8 +61,7 @@ const INJECT_RATE_PER_SEC = (() => {
 const _injectTimestamps = [];
 
 /**
- * Verifica se a próxima injeção é permitida pelo rate limiter client-side.
- * Usa sliding window de 1s.
+ * Verifica se a próxima injeção é permitida pelo rate limiter client-side. Usa sliding window de 1s.
  *
  * @returns {boolean} true se permitido
  */
@@ -339,148 +339,8 @@ export async function waitForLlmBReady(opts = {}) {
     throw new BridgeError(`[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`, 'LLM_B_NOT_READY');
 }
 
-/**
- * @typedef {Object} SseEvent
- * @property {string} type - tipo do evento SSE ('dialog.reply' | 'dialog.ready' | 'dialog.stalled' | 'dialog.stopped' |
- *   'session.usage' | ...)
- * @property {Record<string, unknown>} data - payload JSON do evento
- */
-
-/**
- * @callback SseHandler
- * @param {SseEvent} event
- * @returns {void}
- */
-
-/**
- * Helper interno: conecta ao endpoint SSE do terminal-server e entrega eventos ao callback. MR-09 (fix): reconecta
- * automaticamente com backoff exponencial quando a conexão cai.
- *
- * @param {string} path - Path do endpoint, ex: '/events' ou '/events?level=critical'
- * @param {number} port
- * @param {SseHandler} onEvent
- * @returns {{ unsubscribe: () => void }}
- */
-function _subscribeSse(path, port, onEvent) {
-    let destroyed = false;
-    // MR-09: controle de reconexão — backoff exponencial entre 1s e 30s
-    let reconnectMs = 1_000;
-    const MAX_RECONNECT_MS = 30_000;
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let reconnectTimer = null;
-    /** @type {ReturnType<typeof http.request> | null} */
-    let currentReq = null;
-    // PHASE-10: rastreia último event ID recebido para replay via Last-Event-ID na reconexão
-    /** @type {string} */
-    let lastEventId = '';
-
-    function connect() {
-        if (destroyed) return;
-
-        /** @type {Record<string, string>} */
-        const headers = { Accept: 'text/event-stream' };
-        // PHASE-10: enviar Last-Event-ID para replay de eventos perdidos na reconexão
-        if (lastEventId) headers['Last-Event-ID'] = lastEventId;
-
-        const req = http.request(
-            {
-                hostname: '127.0.0.1',
-                port,
-                path,
-                method: 'GET',
-                headers,
-            },
-            (res) => {
-                // Reconexão bem-sucedida — resetar backoff
-                reconnectMs = 1_000;
-                let buf = '';
-                // LEAK-CHAN-001: limite de tamanho do buffer SSE para evitar memory leak com streams lentos
-                const MAX_BUF_BYTES = 256 * 1024; // 256 KB
-                res.on('data', (/** @type {Buffer} */ chunk) => {
-                    const chunkStr = chunk.toString();
-                    if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
-                        // Descartar buffer acumulado (sem fechar conexão — próximo bloco completo funciona)
-                        buf = '';
-                        return;
-                    }
-                    buf += chunkStr;
-                    // SSE-INJECT-01 (fix): parsear por blocos delimitados por linha vazia (RFC 8895).
-                    // Múltiplas linhas data: num mesmo bloco são acumuladas e concatenadas com \n.
-                    const blocks = buf.split(/\r?\n\r?\n/);
-                    buf = blocks.pop() ?? '';
-
-                    for (const block of blocks) {
-                        if (!block.trim()) continue;
-                        let currentEvent = '';
-                        let currentId = '';
-                        const dataLines = /** @type {string[]} */ ([]);
-                        for (const line of block.split(/\r?\n/)) {
-                            if (line.startsWith('event:')) {
-                                currentEvent = line.slice(6).trim();
-                            } else if (line.startsWith('data:')) {
-                                dataLines.push(line.slice(5).trimStart());
-                            } else if (line.startsWith('id:')) {
-                                // PHASE-10: capturar event ID para Last-Event-ID na reconexão
-                                currentId = line.slice(3).trim();
-                            }
-                            // ignorar linhas 'retry:' — não usadas por este parser
-                        }
-                        // PHASE-10: atualizar lastEventId para replay na reconexão
-                        if (currentId) lastEventId = currentId;
-                        if (dataLines.length > 0) {
-                            try {
-                                const data = JSON.parse(dataLines.join('\n'));
-                                onEvent({ type: currentEvent || 'message', data });
-                            } catch {
-                                /* ignora JSON inválido */
-                            }
-                        }
-                    }
-                });
-                res.on('close', () => {
-                    if (!destroyed) scheduleReconnect();
-                });
-                res.on('error', () => {
-                    if (!destroyed) scheduleReconnect();
-                });
-            },
-        );
-        currentReq = req;
-
-        req.on('error', () => {
-            if (!destroyed) scheduleReconnect();
-        });
-        req.end();
-    }
-
-    function scheduleReconnect() {
-        if (destroyed || reconnectTimer !== null) return;
-        log('DEBUG', `[inject] SSE desconectado (${path}) — reconectando em ${reconnectMs}ms`);
-        reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            connect();
-        }, reconnectMs);
-        // Backoff exponencial: 1s → 2s → 4s → ... → 30s (teto)
-        reconnectMs = Math.min(reconnectMs * 2, MAX_RECONNECT_MS);
-    }
-
-    // Conectar imediatamente
-    connect();
-
-    return {
-        unsubscribe() {
-            if (!destroyed) {
-                destroyed = true;
-                if (reconnectTimer !== null) {
-                    clearTimeout(reconnectTimer);
-                    reconnectTimer = null;
-                }
-                currentReq?.destroy();
-                currentReq = null;
-            }
-        },
-    };
-}
+/** @typedef {import('./sse-client.js').SseEvent} SseEvent */
+/** @typedef {import('./sse-client.js').SseHandler} SseHandler */
 
 /**
  * Subscreve ao canal SSE de eventos da LLM-B (canal P3: LLM-A observa LLM-B em tempo real).
@@ -501,7 +361,7 @@ function _subscribeSse(path, port, onEvent) {
  * @returns {{ unsubscribe: () => void }} Controle de desconexão
  */
 export function subscribeLlmB(onEvent, opts = {}) {
-    return _subscribeSse('/events', opts.port ?? DEFAULT_PORT, onEvent);
+    return subscribeSse('/events', opts.port ?? DEFAULT_PORT, onEvent);
 }
 
 /**
@@ -515,7 +375,7 @@ export function subscribeLlmB(onEvent, opts = {}) {
  * @returns {{ unsubscribe: () => void }}
  */
 export function subscribeLlmBCritical(onEvent, opts = {}) {
-    return _subscribeSse('/events?level=critical', opts.port ?? DEFAULT_PORT, onEvent);
+    return subscribeSse('/events?level=critical', opts.port ?? DEFAULT_PORT, onEvent);
 }
 
 /**

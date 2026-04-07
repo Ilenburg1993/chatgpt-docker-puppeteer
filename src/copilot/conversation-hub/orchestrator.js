@@ -17,6 +17,7 @@
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
+import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 import { LlmBridgeClient } from '../channel/client.js';
 
 // ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
@@ -368,23 +369,23 @@ export class HubOrchestrator extends EventEmitter {
             const agentInst = this.#agent ?? _fallbackAgent;
             const useDialogLoop = agentInst?.dialogLoopActive === true;
 
+            /** @type {import('./call-strategies.js').CallStrategyContext} */
+            const ctx = {
+                hubSessionId,
+                turnNumber,
+                timeoutMs,
+                emit: this.emit.bind(this),
+            };
+
             if (useDialogLoop) {
-                llmBResponse = await this.#callViaDialogLoop(
-                    message,
-                    messageContent,
-                    hubSessionId,
-                    turnNumber,
-                    timeoutMs,
-                );
+                if (!agentInst) {
+                    throw new SessionError('[HubOrchestrator] Agent não disponível', 'ORCH_AGENT_INACTIVE');
+                }
+                llmBResponse = await callViaDialogLoop(agentInst, message, messageContent, ctx);
             } else if (useStructured && typeof message === 'object') {
-                ({ llmBResponse, llmBStructured, parseError } = await this.#callViaStructured(
-                    message,
-                    hubSessionId,
-                    turnNumber,
-                    timeoutMs,
-                ));
+                ({ llmBResponse, llmBStructured, parseError } = await callViaStructured(this.#bridge, message, ctx));
             } else {
-                llmBResponse = await this.#callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs);
+                llmBResponse = await callViaSimpleChat(this.#bridge, messageContent, ctx);
             }
         } catch (/** @type {any} */ err) {
             const errMsg = `[HubOrchestrator] Erro na resposta de LLM-B: ${err.message}`;
@@ -569,90 +570,4 @@ export class HubOrchestrator extends EventEmitter {
         }
     }
 
-    /**
-     * Envia message via Dialog Loop (sendDialogTurn). Emite `turn:delta` em tempo real via task.delta do agente.
-     *
-     * @param {string | object} message
-     * @param {string} messageContent - Versão string normalizada
-     * @param {string} hubSessionId
-     * @param {number} turnNumber
-     * @param {number} timeoutMs
-     * @returns {Promise<string>}
-     * @throws {Error} Se agentInst não suportar sendDialogTurn
-     */
-    async #callViaDialogLoop(message, messageContent, hubSessionId, turnNumber, timeoutMs) {
-        const agentInst = this.#agent ?? _fallbackAgent;
-        if (!agentInst?.sendDialogTurn) {
-            throw new SessionError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
-        }
-        const content = typeof message === 'string' ? message : messageContent;
-        log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
-        // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
-        const onDelta = (/** @type {{ chunk: string }} */ evt) => {
-            const chunk = evt?.chunk ?? '';
-            if (chunk) this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-        };
-        agentInst.on?.('task.delta', onDelta);
-        try {
-            return await agentInst.sendDialogTurn(content, { timeout: timeoutMs });
-        } finally {
-            agentInst.off?.('task.delta', onDelta);
-        }
-    }
-
-    /**
-     * Envia message via chatStructured() com StructuredMessage.
-     *
-     * @param {object} message
-     * @param {string} hubSessionId
-     * @param {number} turnNumber
-     * @param {number} timeoutMs
-     * @returns {Promise<{ llmBResponse: string; llmBStructured: object | null; parseError: unknown }>}
-     * @throws {Error} Se não inicializado
-     */
-    async #callViaStructured(message, hubSessionId, turnNumber, timeoutMs) {
-        if (!this.#bridge) throw new SessionError('[HubOrchestrator] Não inicializado.', 'ORCH_NOT_INITIALIZED');
-        /** @type {string} */ let accumulated = '';
-        const result = await this.#bridge.chatStructured(
-            /** @type {import('#copilot/core/structured-message').StructuredMessageInput} */ (message),
-            {
-                onDelta: (chunk) => {
-                    accumulated += chunk;
-                    this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-                },
-                timeoutMs,
-            },
-        );
-        return {
-            llmBResponse: result.raw ?? accumulated,
-            llmBStructured: result.structured ?? null,
-            parseError: result.parseError ?? null,
-        };
-    }
-
-    /**
-     * Envia message via chat() simples (fallback). ARCH-03: registra WARN pois indica useStructured=false ou mensagem
-     * em formato inesperado.
-     *
-     * @param {string} messageContent
-     * @param {string} hubSessionId
-     * @param {number} turnNumber
-     * @param {number} timeoutMs
-     * @returns {Promise<string>}
-     * @throws {Error} Se não inicializado
-     */
-    async #callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs) {
-        if (!this.#bridge) throw new SessionError('[HubOrchestrator] Não inicializado.', 'ORCH_NOT_INITIALIZED');
-        log(
-            'WARN',
-            `[HubOrchestrator] Usando chat() simples (fallback path) para hubSession=${hubSessionId}, messageType=string`,
-        );
-        const result = await this.#bridge.chat(messageContent, {
-            onDelta: (chunk) => {
-                this.emit('turn:delta', { hubSessionId, chunk, turnNumber: turnNumber + 1 });
-            },
-            timeoutMs,
-        });
-        return result.response;
-    }
 }

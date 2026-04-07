@@ -19,12 +19,18 @@ import { SessionError } from '#copilot/core/errors';
 import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
 import { v4 as uuidv4 } from 'uuid';
-import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from './store-helpers.js';
+import { initTurnsFts, migrateFts5Tokenizer } from './store-helpers.js';
 import {
     deleteMemory as _deleteMemory,
     recallMemories as _recallMemories,
     storeMemory as _storeMemory,
 } from './store-memories.js';
+import {
+    countTurns as _countTurns,
+    getTurn as _getTurn,
+    readTurns as _readTurns,
+    searchTurns as _searchTurns,
+} from './store-queries.js';
 import { syncFromSdkHistory as _syncFromSdkHistory } from './store-sync.js';
 
 /** @typedef {import('./store-helpers.js').TurnRole} TurnRole */
@@ -400,31 +406,7 @@ export class ConversationStore {
      * @returns {ConversationTurn[]}
      */
     readTurns(hubSessionId, opts = {}) {
-        const db = this.#getDb();
-        const limit = opts.limit ?? 50;
-        const offset = opts.offset ?? 0;
-
-        if (opts.after != null) {
-            return /** @type {ConversationTurn[]} */ (
-                db
-                    .prepare(
-                        `SELECT * FROM copilot_conversation_turns
-                         WHERE hub_session_id = ? AND id > ?
-                         ORDER BY turn_number ASC LIMIT ? OFFSET ?`,
-                    )
-                    .all(hubSessionId, opts.after, limit, offset)
-            );
-        }
-
-        return /** @type {ConversationTurn[]} */ (
-            db
-                .prepare(
-                    `SELECT * FROM copilot_conversation_turns
-                     WHERE hub_session_id = ?
-                     ORDER BY turn_number ASC LIMIT ? OFFSET ?`,
-                )
-                .all(hubSessionId, limit, offset)
-        );
+        return _readTurns(this.#getDb(), hubSessionId, opts);
     }
 
     /**
@@ -434,29 +416,7 @@ export class ConversationStore {
      * @returns {ConversationTurn[]}
      */
     searchTurns(opts) {
-        const db = this.#getDb();
-        const limit = opts.limit ?? 20;
-        const ftsQuery = sanitizeFtsQuery(opts.query);
-        if (!ftsQuery) return [];
-
-        const roleFilter = opts.role ? 'AND t.role = ?' : '';
-        const roleArg = opts.role ? [opts.role] : [];
-        const sessionFilter = opts.hubSessionId ? 'AND t.hub_session_id = ?' : '';
-        const sessionArg = opts.hubSessionId ? [opts.hubSessionId] : [];
-
-        const rows = db
-            .prepare(
-                `SELECT t.*
-                 FROM copilot_turns_fts fts
-                 JOIN copilot_conversation_turns t ON fts.id = t.id
-                 WHERE copilot_turns_fts MATCH ?
-                 ${roleFilter}
-                 ${sessionFilter}
-                 ORDER BY rank
-                 LIMIT ?`,
-            )
-            .all(ftsQuery, ...roleArg, ...sessionArg, limit);
-        return /** @type {ConversationTurn[]} */ (rows);
+        return _searchTurns(this.#getDb(), opts);
     }
 
     /**
@@ -466,9 +426,7 @@ export class ConversationStore {
      * @returns {ConversationTurn | null}
      */
     getTurn(turnId) {
-        const db = this.#getDb();
-        const row = db.prepare('SELECT * FROM copilot_conversation_turns WHERE id = ?').get(turnId);
-        return row ? /** @type {ConversationTurn} */ (row) : null;
+        return _getTurn(this.#getDb(), turnId);
     }
 
     /**
@@ -478,13 +436,7 @@ export class ConversationStore {
      * @returns {number}
      */
     countTurns(hubSessionId) {
-        const db = this.#getDb();
-        const row = /** @type {{ count: number }} */ (
-            db
-                .prepare('SELECT COUNT(*) as count FROM copilot_conversation_turns WHERE hub_session_id = ?')
-                .get(hubSessionId)
-        );
-        return row?.count ?? 0;
+        return _countTurns(this.#getDb(), hubSessionId);
     }
 
     // ─── Mensagens do Usuário ─────────────────────────────────────────────────
