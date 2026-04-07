@@ -2,9 +2,8 @@
 /**
  * src/copilot/observability/observers/session-agent-handlers.js
  *
- * Handlers de session.*, agent.*, question.*, permission.*, system.*,
- * context:*, pending_messages.*, exit_plan_mode.*, external_tool.*
- * do AgentEventObserver.
+ * Handlers de session._, agent._, question._, permission._, system._, context:_, pending_messages._, exit_plan_mode._,
+ * external_tool.* do AgentEventObserver.
  *
  * @module copilot/observability/observers/session-agent-handlers
  */
@@ -85,10 +84,7 @@ export function attachSessionAgentHandlers(ctx) {
                 _compactionSpan.end();
                 _compactionSpan = null;
             }
-            log(
-                'DEBUG',
-                `[agent-event-observer] session.compaction_complete savedTokens=${evt?.savedTokens ?? '?'}`,
-            );
+            log('DEBUG', `[agent-event-observer] session.compaction_complete savedTokens=${evt?.savedTokens ?? '?'}`);
         }, 'session.compaction_complete'),
     );
 

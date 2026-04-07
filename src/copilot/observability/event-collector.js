@@ -46,8 +46,8 @@ const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
  */
 
 /**
- * Último quotaSnapshot por quotaId, atualizado a cada `assistant.usage`.
- * Estado compartilhado via collectors/assistant-handlers.js.
+ * Último quotaSnapshot por quotaId, atualizado a cada `assistant.usage`. Estado compartilhado via
+ * collectors/assistant-handlers.js.
  */
 
 /**

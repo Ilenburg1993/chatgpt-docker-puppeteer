@@ -9,8 +9,11 @@
 
 /**
  * @typedef {import('../metrics.js').MetricsStore} MetricsStore
+ *
  * @typedef {import('#copilot/hooks/bus').HookBus} HookBus
+ *
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
+ *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */
 
@@ -28,7 +31,12 @@
  * @property {(entry: Record<string, unknown>) => void} persistEvent - Função de persistência.
  * @property {boolean} captureUserContent - Se captura conteúdo do usuário.
  * @property {boolean} captureAssistantContent - Se captura conteúdo do assistente.
- * @property {Map<string, { toolName: string; mcpServerName: string | null; startTs: number; toolArgs: Record<string, unknown> }>} pending - Mapa de tool calls pendentes.
+ * @property {Map<
+ *     string,
+ *     { toolName: string; mcpServerName: string | null; startTs: number; toolArgs: Record<string, unknown> }
+ * >} pending
+ *   - Mapa de tool calls pendentes.
+ *
  * @property {Map<string, number>} turnStart - Mapa de turn starts.
  */
 

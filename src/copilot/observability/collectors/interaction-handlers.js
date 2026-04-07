@@ -2,8 +2,7 @@
 /**
  * src/copilot/observability/collectors/interaction-handlers.js
  *
- * Handlers de eventos de interação, permissões, sub-agentes, MCP,
- * external tools, comandos e sistema do EventCollector.
+ * Handlers de eventos de interação, permissões, sub-agentes, MCP, external tools, comandos e sistema do EventCollector.
  *
  * @module copilot/observability/collectors/interaction-handlers
  */
@@ -169,10 +168,7 @@ export function attachInteractionHandlers(ctx) {
                     tracestate: tracestate ?? null,
                 });
             }
-            log(
-                'DEBUG',
-                `[event-collector] external_tool.requested: ${toolName ?? requestId} session=${sessionId}`,
-            );
+            log('DEBUG', `[event-collector] external_tool.requested: ${toolName ?? requestId} session=${sessionId}`);
         }),
     );
     unsubs.push(

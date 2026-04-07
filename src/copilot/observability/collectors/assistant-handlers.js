@@ -28,7 +28,18 @@ const _TURN_TTL_MS = 10 * 60 * 1000;
  * @returns {(() => void)[]}
  */
 export function attachAssistantHandlers(ctx) {
-    const { session, sessionId, metrics, hookBus, persist, persistSet, persistEvent, turnStart, captureUserContent, captureAssistantContent } = ctx;
+    const {
+        session,
+        sessionId,
+        metrics,
+        hookBus,
+        persist,
+        persistSet,
+        persistEvent,
+        turnStart,
+        captureUserContent,
+        captureAssistantContent,
+    } = ctx;
     /** @type {(() => void)[]} */
     const unsubs = [];
 
@@ -190,10 +201,7 @@ export function attachAssistantHandlers(ctx) {
                     contentLength: content?.length ?? 0,
                 });
             }
-            log(
-                'DEBUG',
-                `[event-collector] assistant.reasoning id=${reasoningId ?? '?'} len=${content?.length ?? 0}`,
-            );
+            log('DEBUG', `[event-collector] assistant.reasoning id=${reasoningId ?? '?'} len=${content?.length ?? 0}`);
         }),
     );
 

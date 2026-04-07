@@ -16,6 +16,6 @@
  * @property {import('node:events').EventEmitter} agent
  * @property {(emitter: import('node:events').EventEmitter, event: string, listener: (...args: any[]) => void) => void} on
  *   Registra listener e armazena para cleanup.
- * @property {(fn: (...args: any[]) => void, context: string) => (...args: any[]) => void} safe Wrapper que captura erros
- *   nos handlers.
+ * @property {(fn: (...args: any[]) => void, context: string) => (...args: any[]) => void} safe Wrapper que captura
+ *   erros nos handlers.
  */

@@ -2,8 +2,7 @@
 /**
  * src/copilot/observability/observers/dialog-task-handlers.js
  *
- * Handlers de dialog.*, task.*, tool.*, pr.*, model.fallback e session.usage
- * do AgentEventObserver.
+ * Handlers de dialog._, task._, tool._, pr._, model.fallback e session.usage do AgentEventObserver.
  *
  * @module copilot/observability/observers/dialog-task-handlers
  */
@@ -18,8 +17,8 @@ import { startSpanImmediate } from '../otel.js';
  * Registra handlers de dialog/task/tool no EventEmitter do agente.
  *
  * @param {ObserverContext} ctx
- * @returns {{ lastTurnDurationMs: () => number; lastTurnSuccess: () => boolean; resetChunkTs: () => void }}
- *   Acessores para estado compartilhado necessário por outros handler groups.
+ * @returns {{ lastTurnDurationMs: () => number; lastTurnSuccess: () => boolean; resetChunkTs: () => void }} Acessores
+ *   para estado compartilhado necessário por outros handler groups.
  */
 export function attachDialogTaskHandlers(ctx) {
     const { metrics, errorTracker, agent, on, safe } = ctx;
@@ -322,25 +321,22 @@ export function attachDialogTaskHandlers(ctx) {
     on(
         agent,
         'tool.execution_complete',
-        safe(
-            (/** @type {{ toolName?: string; callId?: string; durationMs?: number; success?: boolean }} */ evt) => {
-                metrics.recordCounter('tool.execution.complete');
-                const callId = evt?.callId;
-                const startInfo = callId ? _toolStarts.get(callId) : null;
-                if (callId) _toolStarts.delete(callId);
-                const toolName = evt?.toolName ?? startInfo?.toolName ?? 'unknown';
-                const durationMs = evt?.durationMs ?? (startInfo ? performance.now() - startInfo.ts : undefined);
-                const success = evt?.success !== false;
-                if (typeof durationMs === 'number') {
-                    metrics.recordToolCall(toolName, durationMs, success);
-                }
-                log(
-                    'DEBUG',
-                    `[agent-event-observer] tool.execution_complete tool=${toolName} duration=${durationMs ?? '?'}ms`,
-                );
-            },
-            'tool.execution_complete',
-        ),
+        safe((/** @type {{ toolName?: string; callId?: string; durationMs?: number; success?: boolean }} */ evt) => {
+            metrics.recordCounter('tool.execution.complete');
+            const callId = evt?.callId;
+            const startInfo = callId ? _toolStarts.get(callId) : null;
+            if (callId) _toolStarts.delete(callId);
+            const toolName = evt?.toolName ?? startInfo?.toolName ?? 'unknown';
+            const durationMs = evt?.durationMs ?? (startInfo ? performance.now() - startInfo.ts : undefined);
+            const success = evt?.success !== false;
+            if (typeof durationMs === 'number') {
+                metrics.recordToolCall(toolName, durationMs, success);
+            }
+            log(
+                'DEBUG',
+                `[agent-event-observer] tool.execution_complete tool=${toolName} duration=${durationMs ?? '?'}ms`,
+            );
+        }, 'tool.execution_complete'),
     );
 
     // ── tool.execution_progress ───────────────────────────────────────────────
@@ -372,10 +368,7 @@ export function attachDialogTaskHandlers(ctx) {
         'pr.consumed',
         safe((/** @type {{ tokens?: number; model?: string }} */ evt) => {
             metrics.recordCounter('pr.consumed');
-            log(
-                'DEBUG',
-                `[agent-event-observer] pr.consumed model=${evt?.model ?? '?'} tokens=${evt?.tokens ?? '?'}`,
-            );
+            log('DEBUG', `[agent-event-observer] pr.consumed model=${evt?.model ?? '?'} tokens=${evt?.tokens ?? '?'}`);
         }, 'pr.consumed'),
     );
 

@@ -271,13 +271,11 @@ export function attachSessionHandlers(ctx) {
                     ts: event.timestamp,
                     totalSkills: skills.length,
                     enabledSkills: enabledCount,
-                    skills: skills.map(
-                        (/** @type {{ name?: string; enabled?: boolean; source?: string }} */ s) => ({
-                            name: s.name,
-                            enabled: s.enabled,
-                            source: s.source,
-                        }),
-                    ),
+                    skills: skills.map((/** @type {{ name?: string; enabled?: boolean; source?: string }} */ s) => ({
+                        name: s.name,
+                        enabled: s.enabled,
+                        source: s.source,
+                    })),
                 });
             }
             log(
@@ -351,10 +349,7 @@ export function attachSessionHandlers(ctx) {
             if (persist && persistSet.has('session.workspace_file_changed')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, path, operation });
             }
-            log(
-                'DEBUG',
-                `[event-collector] session.workspace_file_changed op=${operation ?? '?'} path=${path ?? '?'}`,
-            );
+            log('DEBUG', `[event-collector] session.workspace_file_changed op=${operation ?? '?'} path=${path ?? '?'}`);
         }),
     );
 
