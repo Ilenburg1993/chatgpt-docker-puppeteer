@@ -602,7 +602,7 @@ export class HubOrchestrator extends EventEmitter {
         if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
         /** @type {string} */ let accumulated = '';
         const result = await this.#bridge.chatStructured(
-            /** @type {import('#copilot/types/structured-message').StructuredMessageInput} */ (message),
+            /** @type {import('#copilot/core/structured-message').StructuredMessageInput} */ (message),
             {
                 onDelta: (chunk) => {
                     accumulated += chunk;

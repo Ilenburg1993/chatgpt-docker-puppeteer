@@ -2,12 +2,7 @@
 /**
  * src/copilot/types/index.js
  *
- * Barrel de re-exportação para os tipos do protocolo de comunicação LLM-A ↔ LLM-B.
- *
- * Módulos disponíveis:
- *
- * - structured-message — StructuredMessage schema, builders, serializers, parser
- *
+ * @deprecated Desde F8 — migrado para core/. Este arquivo é um re-export de compatibilidade.
  * @module copilot/types
  */
 
@@ -20,4 +15,4 @@ export {
     isStructuredMessage,
     parseStructuredResponse,
     serializeStructuredMessage,
-} from './structured-message.js';
+} from '#copilot/core/structured-message';

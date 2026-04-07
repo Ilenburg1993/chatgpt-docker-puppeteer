@@ -8,18 +8,18 @@
  *
  * - `constants` — portas, limites e nomes de eventos canônicos
  * - `errors` — CopilotError, SessionError, BridgeError
- *
- * INC-CORE-002 fix: `types/` não mais re-exportado daqui para evitar violação de camada core→types. Importar tipos
- * diretamente via '#copilot/types' ou '#copilot/types/structured-message'.
+ * - `structured-message` — StructuredMessage schema, builders, serializers, parser
+ * - `sdk-types` — JSDoc typedefs para SDK (@github/copilot-sdk)
  *
  * @module copilot/core
  *
  * @example
  *     ```js
  *     import { LLM_B_TERMINAL_PORT, CopilotError, AGENT_EVENTS } from '#copilot/core';
- *     import { buildStructuredRequest } from '#copilot/types/structured-message';
+ *     import { buildStructuredRequest } from '#copilot/core/structured-message';
  *     ```;
  */
 
 export * from './constants.js';
 export * from './errors.js';
+export * from './structured-message.js';
