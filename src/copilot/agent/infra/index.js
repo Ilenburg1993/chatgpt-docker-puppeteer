@@ -10,6 +10,6 @@ export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
 export { buildStatusSnapshot } from './status-snapshot.js';
 export { executeTask } from './task-executor.js';
-export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from './tool-audit-logger.js';
+export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#copilot/audit/pipeline';
 export { bootstrapTools, configureHookTools, setHub, setPermissionAgent, setSessionRpc } from './tools-bootstrap.js';
 export { WebhookManager } from './webhook-manager.js';

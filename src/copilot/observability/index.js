@@ -36,7 +36,7 @@ export { createErrorTracker, defaultErrorTracker } from './error-tracker.js';
 export { createAgentEventObserver } from './agent-event-observer.js';
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
-export { createAuditLog, defaultAuditLog } from './audit-log.js';
+export { createAuditLog, defaultAuditLog } from '#copilot/audit/pipeline';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
 export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan } from './otel.js';

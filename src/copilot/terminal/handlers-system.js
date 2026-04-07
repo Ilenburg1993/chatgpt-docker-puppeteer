@@ -25,7 +25,7 @@ import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { conversationStore } from '../conversation-hub/store.js';
-import { defaultAuditLog } from '../observability/audit-log.js';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { defaultErrorTracker } from '../observability/error-tracker.js';
 import { defaultMetrics } from '../observability/metrics.js';
 import { getStatsByCategory, getToolStats } from '../observability/tool-stats.js';

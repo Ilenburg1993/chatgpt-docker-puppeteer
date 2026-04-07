@@ -28,7 +28,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { getAuditTail } from '../hooks/audit.js';
+import { getAuditTail } from '#copilot/audit/pipeline';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 const execFileAsync = promisify(execFile);
 

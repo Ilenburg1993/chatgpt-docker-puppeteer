@@ -11,7 +11,7 @@
  * @module copilot/hooks/presets/audit
  */
 
-import { defaultAuditLog } from '#copilot/observability/audit-log';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { log } from '#copilot/observability/logger';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -41,7 +41,7 @@ import { createPermissionHandler } from '../permission-handler.js';
  * @returns {{
  *     hooks: SessionHooks;
  *     onPermissionRequest: import('../permission-handler.js').PermissionHandler;
- *     getAuditTrail: () => import('../../observability/audit-log.js').AuditEntry[];
+ *     getAuditTrail: () => import('#copilot/audit/pipeline').AuditEntry[];
  *     clearAuditTrail: () => void;
  * }}
  */
@@ -59,7 +59,7 @@ export function createHooksAuditPreset(options = {}) {
      * @param {unknown} [summary]
      */
     function record(hookName, sessionId, summary) {
-        /** @type {import('../../observability/audit-log.js').AuditEntry} */
+        /** @type {import('#copilot/audit/pipeline').AuditEntry} */
         const entry = {
             type: 'hook.fired',
             ts: new Date().toISOString(),

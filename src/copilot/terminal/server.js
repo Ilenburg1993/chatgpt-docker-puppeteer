@@ -50,7 +50,7 @@ import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
-import { defaultAuditLog } from '../observability/audit-log.js';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { println } from './dialog.js';
 import { handleMetrics } from './handlers-system.js';
 import { registerClearRateLimiters } from './rate-limiter-state.js';

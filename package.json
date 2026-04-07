@@ -44,6 +44,8 @@
     "#copilot/core/*": "./src/copilot/core/*.js",
     "#copilot/agent": "./src/copilot/agent/index.js",
     "#copilot/agent/*": "./src/copilot/agent/*.js",
+    "#copilot/audit": "./src/copilot/audit/index.js",
+    "#copilot/audit/*": "./src/copilot/audit/*.js",
     "#copilot/tools/*": "./src/copilot/tools/*.js",
     "#copilot/bridges/*": "./src/copilot/bridges/*.js",
     "#copilot/config/*": "./src/copilot/config/*.js",

@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/audit
  */
 
-import { defaultAuditLog } from '#copilot/observability/audit-log';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 
 /**
  * @typedef {object} AuditContext

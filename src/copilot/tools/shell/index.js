@@ -19,7 +19,7 @@
  */
 
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config/env';
-import { defaultAuditLog } from '#copilot/observability/audit-log';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
 import { defineTool } from '@github/copilot-sdk';
