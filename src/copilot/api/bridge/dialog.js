@@ -20,7 +20,7 @@ import { log } from '#copilot/observability/logger';
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  */
 
 /**

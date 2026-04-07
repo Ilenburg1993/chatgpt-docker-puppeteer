@@ -20,7 +20,7 @@
 import { LLM_B_BOOT_PROMPT } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { alwaysAliveAgent } from '../agent/index.js';
-import { eventFanout } from '../api/event-fanout.js';
+import { eventFanout } from '../api/sse/fanout.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { conversationHub } from '../conversation-hub/hub.js';
@@ -321,7 +321,7 @@ export function broadcastSse(event, data) {
  * @param {import('node:http').ServerResponse} client
  * @param {string} event - Nome do evento (será sanitizado)
  * @param {object} data - Payload JSON (já truncado se necessário)
- * @param {{ hubSessionId?: string | null; replayBuffer?: import('../api/sse-replay-buffer.js').SseReplayBuffer }} [ctx]
+ * @param {{ hubSessionId?: string | null; replayBuffer?: import('../api/sse/replay-buffer.js').SseReplayBuffer }} [ctx]
  * @returns {boolean} true se a escrita foi bem-sucedida
  */
 function writeSseEvent(client, event, data, ctx = {}) {

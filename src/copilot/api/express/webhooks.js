@@ -16,8 +16,8 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../agent/index.js';
-import { validateUrlString } from '../lib/url-validator.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
+import { validateUrlString } from '../../lib/url-validator.js';
 
 /**
  * @typedef {import('express').Request} Req

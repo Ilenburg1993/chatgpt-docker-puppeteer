@@ -12,8 +12,8 @@
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { createRequire } from 'node:module';
-import { CHANNEL_VERSION } from '../channel/index.js';
-import { conversationStore } from '../conversation-hub/index.js';
+import { CHANNEL_VERSION } from '../../channel/index.js';
+import { conversationStore } from '../../conversation-hub/index.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
 const _sdkVersion = (() => {
@@ -47,7 +47,7 @@ const _sdkVersion = (() => {
  * }} AgentSnap
  *
  *
- * @typedef {import('../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
+ * @typedef {import('../../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
 
 /**

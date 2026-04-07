@@ -10,7 +10,7 @@
 import { MAX_SSE_CLIENTS } from '#copilot/core';
 import { createGzip } from 'node:zlib';
 
-/** @typedef {import('./sse-replay-buffer.js').SseReplayBuffer} SseReplayBuffer */
+/** @typedef {import('./replay-buffer.js').SseReplayBuffer} SseReplayBuffer */
 
 /**
  * @typedef {import('express').Request} Req

@@ -27,7 +27,7 @@ import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../agent/index.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 const router = Router();

@@ -11,9 +11,9 @@
 
 import { MAX_SSE_LIFETIME_MS } from '#copilot/config/env';
 import { AGENT_EVENTS, MAX_SSE_CLIENTS } from '#copilot/core';
-import { eventFanout } from './event-fanout.js';
-import { SseReplayBuffer } from './sse-replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from './sse-utils.js';
+import { eventFanout } from '../sse/fanout.js';
+import { SseReplayBuffer } from '../sse/replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -22,7 +22,7 @@ import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSs
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('./bridge-control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  *
  * @typedef {import('#copilot/core').AgentEventName} AgentEventName
  */

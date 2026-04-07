@@ -20,11 +20,11 @@
 
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../agent/index.js';
-import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../api/sse-utils.js';
-import { getClient } from '../lib/sdk-client.js';
-import { defaultMetrics } from '../observability/index.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
+import { SseReplayBuffer } from '../sse/replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
+import { getClient } from '../../lib/sdk-client.js';
+import { defaultMetrics } from '../../observability/index.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */

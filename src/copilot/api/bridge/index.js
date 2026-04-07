@@ -24,11 +24,11 @@
  */
 
 import { Router } from 'express';
-import { alwaysAliveAgent } from '../agent/index.js';
-import { registerControlRoutes } from './bridge-control.js';
-import { registerDialogRoutes } from './bridge-dialog.js';
-import { registerStreamRoutes } from './bridge-stream.js';
-import { registerTaskRoutes } from './bridge-tasks.js';
+import { alwaysAliveAgent } from '../../agent/index.js';
+import { registerControlRoutes } from './control.js';
+import { registerDialogRoutes } from './dialog.js';
+import { registerStreamRoutes } from './stream.js';
+import { registerTaskRoutes } from './tasks.js';
 
 const bridge = Router();
 

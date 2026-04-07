@@ -17,12 +17,12 @@
  */
 
 import { Router } from 'express';
-import agentRouter from '../routes/agent.js';
-import clientRouter from '../routes/client.js';
-import hooksRouter from '../routes/hooks.js';
-import observabilityRouter from '../routes/observability.js';
-import sessionsRouter from '../routes/sessions.js';
-import webhooksRouter from '../routes/webhooks.js';
+import agentRouter from './agent.js';
+import clientRouter from './client.js';
+import hooksRouter from './hooks.js';
+import observabilityRouter from './observability.js';
+import sessionsRouter from './sessions.js';
+import webhooksRouter from './webhooks.js';
 
 const router = Router();
 

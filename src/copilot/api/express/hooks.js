@@ -18,8 +18,8 @@ import { defaultBus } from '#copilot/hooks/bus';
 import { SDK_HOOKS } from '#copilot/hooks/registry';
 import { log } from '#copilot/observability/logger';
 import { Router } from 'express';
-import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
-import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../api/sse-utils.js';
+import { SseReplayBuffer } from '../sse/replay-buffer.js';
+import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */

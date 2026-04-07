@@ -27,7 +27,7 @@ import {
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config/env';
 import EventEmitter from 'node:events';
-import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
+import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────
 
