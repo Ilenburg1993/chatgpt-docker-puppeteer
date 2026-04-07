@@ -27,13 +27,13 @@ import EventEmitter from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from '#copilot/core/events';
+import { MAX_LISTENERS, STATUS_SNAPSHOT_TTL_MS } from './config.js';
 import {
-    CONTEXT_UTIL_BLOCK_THRESHOLD,
-    CONTEXT_UTIL_WARN_THRESHOLD,
-    MAX_LISTENERS,
-    STATUS_SNAPSHOT_TTL_MS,
-} from './config.js';
-import { wireDialogLoopEvents } from './dialog/loop-manager.js';
+    ensureDialogLoopAttached as dialogEnsureAttached,
+    dialogResume,
+    dialogStart,
+    dialogStop,
+} from './dialog/agent-dialog-controller.js';
 import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
 import { persistState, readState } from './lifecycle/state-io.js';
@@ -573,33 +573,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @throws {Error} Se o agente não estiver no estado 'idle'
      */
     async startDialogLoop(bootPrompt) {
-        if (this.ctx.status !== 'idle') {
-            throw new SessionError(
-                `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${this.ctx.status}'`,
-                'INVALID_STATE',
-            );
-        }
-        // F44.1 (GAP-SD-08): health check pre-boot — verificar contexto antes de iniciar dialog loop
-        if (this.ctx.contextState) {
-            const utilization = this.ctx.contextState.utilization ?? 0;
-            if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
-                throw new SessionError(
-                    `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
-                    'CONTEXT_EXHAUSTED',
-                );
-            }
-            if (utilization >= CONTEXT_UTIL_WARN_THRESHOLD) {
-                log(
-                    'WARN',
-                    `[AlwaysAlive] F44.1: Utilização de contexto em ${Math.round(utilization * 100)}% — dialog loop prosseguindo com cautela.`,
-                );
-            }
-        }
-        this.ensureDialogLoopAttached();
-        // F42.2: pausar keepalive enquanto dialog loop está ativo (o loop mantém a sessão viva)
-        this.ctx.keepalive.stop();
-        await this.ctx.dialogLoop.start(bootPrompt);
-        this.emit('dialog.loop.changed', { active: true, ts: Date.now() });
+        await dialogStart(this.ctx, this, bootPrompt);
     }
 
     /**
@@ -624,20 +598,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<void>}
      */
     async stopDialogLoop(opts) {
-        await this.ctx.dialogLoop.stop(opts);
-        // F42.2: reiniciar keepalive quando dialog loop para (a sessão precisa de heartbeat novamente)
-        if (this.ctx.status !== 'stopped' && this.ctx.session) {
-            this.ctx.keepalive.start({
-                getSession: () => this.ctx.session,
-                getClient: () => this.ctx.client,
-                isIdle: () => this.ctx.status === 'idle',
-                isDialogLoopActive: () => this.ctx.dialogLoop.active,
-                onKeepalive: (ts) => {
-                    defaultMetrics.recordKeepalivePing();
-                    this.emit('session.keepalive', { ts });
-                },
-            });
-        }
+        await dialogStop(this.ctx, this, opts);
     }
 
     /**
@@ -653,16 +614,9 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retoma o dialog loop. Delega ao DialogLoopManager.
      *
      * @returns {Promise<void>}
-     * @throws {SessionError} Se o agente não estiver no estado 'idle' ou 'waiting_for_input'
      */
     async resumeDialogLoop() {
-        if (this.ctx.status !== 'idle' && this.ctx.status !== 'waiting_for_input') {
-            throw new SessionError(
-                `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${this.ctx.status}'`,
-                'INVALID_STATE',
-            );
-        }
-        await this.ctx.dialogLoop.resume();
+        await dialogResume(this.ctx);
     }
 
     /**
@@ -702,43 +656,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * de eventos (listeners) só ocorre uma vez — guard `#dialogLoopAttached` protege apenas essa parte.
      */
     ensureDialogLoopAttached() {
-        /** @type {import('./dialog/loop-manager.js').AgentHost} */
-        const host = {
-            sendMessage: (msg, opts) => this.sendMessage(msg, opts),
-            sendMessageDialogBoot: (msg, opts) => this.sendMessageDialogBoot(msg, opts),
-            answerPendingQuestion: (answer) => this.answerPendingQuestion(answer),
-            getSessionId: () => this.sessionId,
-            getModel: () => this.ctx.model,
-            // F41B.2: expor setModel para que o DLM possa efetivamente trocar o modelo no fallback
-            setModel: (modelId) => {
-                this.ctx.model = modelId;
-            },
-            getPendingQuestion: () => this.ctx.pendingQuestion,
-        };
-        // Sempre atualiza host — necessário após reconexão.
-        this.ctx.dialogLoop.attach(host);
-        // Wiring de eventos: somente na primeira vez (guard de idempotência).
-        if (this.ctx.dialogLoopAttached) return;
-        this.ctx.dialogLoopAttached = true;
-        // G2-ARCH-10: wireDialogLoopEvents() faz removeAllListeners() antes de registrar.
-        // É seguro aqui porque o flag #dialogLoopAttached garante execução única por instância.
-        wireDialogLoopEvents(this.ctx.dialogLoop, (event, payload) => this.emit(event, payload));
-
-        // F31.3/F31.4: Proxy token_budget_warning → DLM para compaction proativa
-        this.on('session.token_budget_warning', (evt) => {
-            const ratio = typeof evt?.ratio === 'number' ? evt.ratio : 0;
-            const currentTokens = typeof evt?.currentTokens === 'number' ? evt.currentTokens : 0;
-            const tokenLimit = typeof evt?.tokenLimit === 'number' ? evt.tokenLimit : 0;
-            this.ctx.dialogLoop.handleTokenBudget({ currentTokens, tokenLimit, ratio });
-        });
-
-        // F31.3: Reset compaction flag após compaction bem-sucedida
-        this.on('session.compaction_complete', (evt) => {
-            if (evt?.success) this.ctx.dialogLoop.resetCompactionFlag();
-        });
-
-        // F29: agent-event-observer agora é criado no start() (eagerness).
-        // Não precisa mais ser criado aqui.
+        dialogEnsureAttached(this.ctx, this);
     }
 
     /**
