@@ -15,7 +15,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../config.js';
 
@@ -85,6 +85,8 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
  *
  * Retorna o cache in-process quando disponível, evitando I/O síncrono no hot path.
  *
+ * @deprecated F91: Use readStateAsync() em vez desta versão síncrona. readState() será mantida para
+ *   callers em getters síncronos que não podem ser migrados facilmente.
  * @example
  *     const state = readState();
  *     if (state) console.log(state.sessionId);
@@ -125,7 +127,6 @@ export function readState() {
  * Preferir `writeStateAsync` em fluxos assíncronos para não bloquear o event loop.
  *
  * @deprecated F69: Use writeStateAsync() em vez desta versão síncrona. Será removida em versão futura.
- *
  * @example
  *     writeState({ sessionId: 'abc-123', lastActive: Date.now() });
  *
@@ -191,6 +192,7 @@ async function _doWriteState(updates) {
 /**
  * Remove o estado persistido e invalida o cache. Força uma nova sessão SDK na próxima inicialização.
  *
+ * @deprecated F91: Use clearStateAsync() em vez desta versão síncrona.
  * @example
  *     clearState(); // remove state.json e força nova sessão
  *
@@ -200,6 +202,59 @@ export function clearState() {
     if (existsSync(STATE_FILE)) {
         rmSync(STATE_FILE);
         log('INFO', '[PersistentSession] Estado removido — próxima inicialização criará nova sessão.');
+    }
+    _stateCache = null;
+    _stateDirReady = false;
+    _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+}
+
+/**
+ * F91: Versão async de readState — usa fs/promises.
+ *
+ * Retorna o cache in-process quando disponível, evitando I/O desnecessário.
+ *
+ * @returns {Promise<AliveAgentState | null>} Estado persistido ou null se o arquivo não existir
+ */
+export async function readStateAsync() {
+    if (_stateCache !== null) return _stateCache;
+    try {
+        await stat(STATE_FILE);
+    } catch {
+        return null;
+    }
+    try {
+        const raw = await readFile(STATE_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            log('WARN', '[PersistentSession] Estado inválido (não é objeto) — ignorando ficheiro.');
+            return null;
+        }
+        _stateCache = /** @type {AliveAgentState} */ (parsed);
+        return _stateCache;
+    } catch (/** @type {any} */ e) {
+        log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
+        try {
+            await rm(STATE_FILE, { force: true });
+        } catch {
+            // Ignorar falha de remoção
+        }
+        return null;
+    }
+}
+
+/**
+ * F91: Versão async de clearState — usa fs/promises.
+ *
+ * Remove o estado persistido e invalida o cache. Força uma nova sessão SDK na próxima inicialização.
+ *
+ * @returns {Promise<void>}
+ */
+export async function clearStateAsync() {
+    try {
+        await rm(STATE_FILE, { force: true });
+        log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
+    } catch {
+        // Arquivo pode não existir
     }
     _stateCache = null;
     _stateDirReady = false;

@@ -8,6 +8,7 @@
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
 import fs from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -41,6 +42,7 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
  * @example
  *     loadAliases(); // carrega de .copilot-aliases.json
  *
+ * @deprecated F93: Use loadAliasesAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadAliases() {
@@ -69,6 +71,41 @@ function saveCustomAliases() {
     }
     try {
         fs.writeFileSync(ALIASES_FILE, JSON.stringify(custom, null, 2));
+    } catch {
+        // silently ignore write errors
+    }
+}
+
+/**
+ * F93: Versão async de loadAliases — usa fs/promises.
+ *
+ * @returns {Promise<void>}
+ */
+export async function loadAliasesAsync() {
+    try {
+        const raw = await readFile(ALIASES_FILE, 'utf8');
+        const custom = JSON.parse(raw);
+        _aliases = { ...BUILTIN_ALIASES, ...custom };
+    } catch {
+        _aliases = { ...BUILTIN_ALIASES };
+    }
+}
+
+/**
+ * F93: Versão async de saveCustomAliases — usa fs/promises.
+ *
+ * @returns {Promise<void>}
+ */
+async function _saveCustomAliasesAsync() {
+    /** @type {Record<string, string>} */
+    const custom = {};
+    for (const [k, v] of Object.entries(_aliases)) {
+        if (BUILTIN_ALIASES[k] === undefined || BUILTIN_ALIASES[k] !== v) {
+            custom[k] = v;
+        }
+    }
+    try {
+        await writeFile(ALIASES_FILE, JSON.stringify(custom, null, 2));
     } catch {
         // silently ignore write errors
     }

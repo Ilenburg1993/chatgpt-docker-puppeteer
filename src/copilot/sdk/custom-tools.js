@@ -18,6 +18,7 @@
 import { log } from '#copilot/observability/logger';
 import { buildTool } from '#copilot/tools/tool-factory';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 /** Caminho do arquivo de persistência. @type {string} */
@@ -129,6 +130,7 @@ let _registry = new Map();
 /**
  * Carrega o registry do disco. Chamado na inicialização do módulo.
  *
+ * @deprecated F92: Use loadCustomToolsAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadCustomTools() {
@@ -164,6 +166,7 @@ export function loadCustomTools() {
 /**
  * Persiste o registry atual no disco.
  *
+ * @deprecated F92: Use persistCustomToolsAsync() em fluxos assíncronos.
  * @returns {void}
  */
 function persistCustomTools() {
@@ -174,6 +177,55 @@ function persistCustomTools() {
         renameSync(tmpPath, CUSTOM_TOOLS_PATH);
     } catch (/** @type {any} */ err) {
         log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json: ${err.message}`);
+    }
+}
+
+/**
+ * F92: Versão async de loadCustomTools — usa fs/promises.
+ *
+ * @returns {Promise<void>}
+ */
+export async function loadCustomToolsAsync() {
+    try {
+        const raw = await readFile(CUSTOM_TOOLS_PATH, 'utf8');
+        const items = /** @type {unknown} */ (JSON.parse(raw));
+        if (!Array.isArray(items)) return;
+        _registry = new Map(
+            items
+                .filter(
+                    (/** @type {unknown} */ item) =>
+                        item &&
+                        typeof item === 'object' &&
+                        typeof (/** @type {Record<string, unknown>} */ (item)['name']) === 'string' &&
+                        typeof (/** @type {Record<string, unknown>} */ (item)['description']) === 'string' &&
+                        typeof (/** @type {Record<string, unknown>} */ (item)['handlerId']) === 'string',
+                )
+                .map(
+                    (/** @type {unknown} */ item) =>
+                        /** @type {[string, CustomToolDefinition]} */ ([
+                            /** @type {string} */ (/** @type {Record<string, unknown>} */ (item)['name']),
+                            /** @type {CustomToolDefinition} */ (item),
+                        ]),
+                ),
+        );
+        log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
+    } catch {
+        // Arquivo não existe ou JSON inválido — registry vazio
+    }
+}
+
+/**
+ * F92: Versão async de persistCustomTools — usa fs/promises com write atômico.
+ *
+ * @returns {Promise<void>}
+ */
+async function _persistCustomToolsAsync() {
+    try {
+        const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
+        await writeFile(tmpPath, JSON.stringify([..._registry.values()], null, 2), 'utf8');
+        await rename(tmpPath, CUSTOM_TOOLS_PATH);
+    } catch (/** @type {any} */ err) {
+        log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json (async): ${err.message}`);
     }
 }
 

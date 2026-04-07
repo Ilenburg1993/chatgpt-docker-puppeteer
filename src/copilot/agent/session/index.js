@@ -17,4 +17,4 @@ export {
 } from './initializer.js';
 export { SessionKeepalive } from './keepalive.js';
 export { shouldRotateSession } from './rotation.js';
-export { createSnapshot, listSnapshots, loadLatestSnapshot, loadSnapshot, saveSnapshot } from './snapshot.js';
+export { createSnapshot, listSnapshots, listSnapshotsAsync, loadLatestSnapshot, loadSnapshot, loadSnapshotAsync, saveSnapshot, saveSnapshotAsync } from './snapshot.js';

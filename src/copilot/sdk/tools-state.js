@@ -13,6 +13,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 /** Caminho do arquivo de persistência. @type {string} */
@@ -29,6 +30,7 @@ let _toolsConfig = { allowlist: null, denylist: [] };
  * Carrega a configuração de ferramentas do disco. Deve ser chamada na inicialização do agente. Idempotente — se o
  * arquivo não existir ou estiver inválido, mantém os defaults em memória.
  *
+ * @deprecated F92: Use loadToolsConfigAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadToolsConfig() {
@@ -57,6 +59,7 @@ export function loadToolsConfig() {
 /**
  * Persiste a configuração atual de ferramentas no disco.
  *
+ * @deprecated F92: Use persistToolsConfigAsync() em fluxos assíncronos.
  * @returns {void}
  */
 function persistToolsConfig() {
@@ -64,6 +67,46 @@ function persistToolsConfig() {
         writeFileSync(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
     } catch (/** @type {any} */ err) {
         log('WARN', `[tools-state] Falha ao persistir tools-config.json: ${err.message}`);
+    }
+}
+
+/**
+ * F92: Versão async de loadToolsConfig — usa fs/promises.
+ *
+ * @returns {Promise<void>}
+ */
+export async function loadToolsConfigAsync() {
+    try {
+        const raw = await readFile(TOOLS_CONFIG_PATH, 'utf8');
+        const parsed = /** @type {unknown} */ (JSON.parse(raw));
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const data = /** @type {Record<string, unknown>} */ (parsed);
+            const allowlist =
+                data['allowlist'] === null || Array.isArray(data['allowlist'])
+                    ? /** @type {string[] | null} */ (data['allowlist'])
+                    : null;
+            const denylist = Array.isArray(data['denylist']) ? /** @type {string[]} */ (data['denylist']) : [];
+            _toolsConfig = { allowlist, denylist };
+            log(
+                'INFO',
+                `[tools-state] Configuração carregada (async): ${allowlist ? allowlist.length + ' ferramentas na allowlist' : 'sem allowlist'}, ${denylist.length} na denylist`,
+            );
+        }
+    } catch {
+        // Arquivo não existe ou JSON inválido — manter defaults
+    }
+}
+
+/**
+ * F92: Versão async de persistToolsConfig — usa fs/promises.
+ *
+ * @returns {Promise<void>}
+ */
+async function _persistToolsConfigAsync() {
+    try {
+        await writeFile(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
+    } catch (/** @type {any} */ err) {
+        log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${err.message}`);
     }
 }
 

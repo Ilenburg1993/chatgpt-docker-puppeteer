@@ -15,8 +15,12 @@
 
 import { COPILOT_WORKING_DIRECTORY } from '#copilot/config/env';
 import { execSync } from 'node:child_process';
+import { exec as execCb } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(execCb);
 
 /**
  * @typedef {Object} WorkspaceContext
@@ -87,6 +91,40 @@ export function getWorkspaceContext() {
     const cwd = COPILOT_WORKING_DIRECTORY;
     const gitRoot = detectGitRoot(cwd);
     const currentBranch = gitRoot ? tryExec('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
+    const context = { cwd, gitRoot, currentBranch };
+    _contextCache = { context, expiresAt: now + CONTEXT_CACHE_TTL_MS };
+    return context;
+}
+
+/**
+ * F93: Executa um comando assíncrono e retorna stdout, ou null em caso de erro.
+ *
+ * @param {string} cmd
+ * @param {string} cwd
+ * @returns {Promise<string | null>}
+ */
+async function tryExecAsync(cmd, cwd) {
+    try {
+        const { stdout } = await execAsync(cmd, { cwd, timeout: 5000 });
+        return stdout.trim();
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * F93: Versão async de getWorkspaceContext — usa exec assíncrono em vez de execSync.
+ *
+ * @returns {Promise<WorkspaceContext>}
+ */
+export async function getWorkspaceContextAsync() {
+    const now = Date.now();
+    if (_contextCache && _contextCache.expiresAt > now) {
+        return _contextCache.context;
+    }
+    const cwd = COPILOT_WORKING_DIRECTORY;
+    const gitRoot = detectGitRoot(cwd);
+    const currentBranch = gitRoot ? await tryExecAsync('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
     const context = { cwd, gitRoot, currentBranch };
     _contextCache = { context, expiresAt: now + CONTEXT_CACHE_TTL_MS };
     return context;

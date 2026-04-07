@@ -199,14 +199,14 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
  * @param {string} subCmd
  * @param {string[]} rest
  */
-function _cmdSessionDispatch(subCmd, rest) {
+async function _cmdSessionDispatch(subCmd, rest) {
     const sub = (subCmd || '').toLowerCase();
     if (sub === 'save') {
-        _cmdSessionSave({ println }, rest.join(' ') || undefined);
+        await _cmdSessionSave({ println }, rest.join(' ') || undefined);
     } else if (sub === 'list') {
-        _cmdSessionList({ println });
+        await _cmdSessionList({ println });
     } else if (sub === 'restore') {
-        _cmdSessionRestore({ println }, rest[0] || '');
+        await _cmdSessionRestore({ println }, rest[0] || '');
     } else {
         println('\x1b[33m  Uso: /session save [reason] | /session list | /session restore <id>\x1b[0m');
     }

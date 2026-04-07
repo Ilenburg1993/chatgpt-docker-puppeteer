@@ -8,7 +8,7 @@
  * @module copilot/terminal/commands/session
  */
 
-import { alwaysAliveAgent, createSnapshot, listSnapshots, loadSnapshot, saveSnapshot } from '#copilot/agent';
+import { alwaysAliveAgent, createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel/client';
 import { conversationStore } from '#copilot/conversation-hub/store';
 import { getWorkspaceContext } from '../workspace-context.js';
@@ -214,9 +214,9 @@ export function cmdAnswer({ println }, arg) {
  *
  * @param {SessionContext} ctx
  * @param {string} [reason]
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function cmdSessionSave({ println }, reason) {
+export async function cmdSessionSave({ println }, reason) {
     const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
     const prm = alwaysAliveAgent.dialogPrMetrics;
 
@@ -232,7 +232,7 @@ export function cmdSessionSave({ println }, reason) {
         reason: reason || 'manual',
     });
 
-    const path = saveSnapshot(data);
+    const path = await saveSnapshotAsync(data);
     println(`\x1b[32m  ✓ Snapshot salvo: ${data.snapshotId}\x1b[0m`);
     println(`\x1b[90m    Path: ${path}\x1b[0m`);
 }
@@ -241,10 +241,10 @@ export function cmdSessionSave({ println }, reason) {
  * F41.5: Lista snapshots disponíveis.
  *
  * @param {SessionContext} ctx
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function cmdSessionList({ println }) {
-    const snaps = listSnapshots();
+export async function cmdSessionList({ println }) {
+    const snaps = await listSnapshotsAsync();
     if (snaps.length === 0) {
         println('\x1b[90m  Nenhum snapshot encontrado.\x1b[0m');
         return;
@@ -261,16 +261,16 @@ export function cmdSessionList({ println }) {
  *
  * @param {SessionContext} ctx
  * @param {string} snapshotId
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function cmdSessionRestore({ println }, snapshotId) {
+export async function cmdSessionRestore({ println }, snapshotId) {
     if (!snapshotId) {
         println('\x1b[33m  Uso: /session restore <snapshotId>\x1b[0m');
         println('\x1b[90m  Use /session list para ver snapshots disponíveis.\x1b[0m');
         return;
     }
 
-    const snap = loadSnapshot(snapshotId);
+    const snap = await loadSnapshotAsync(snapshotId);
     if (!snap) {
         println(`\x1b[31m  Snapshot não encontrado: ${snapshotId}\x1b[0m`);
         return;

@@ -36,7 +36,7 @@ import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
 import { initOrResumeSession } from '../session/initializer.js';
-import { createSnapshot, saveSnapshot } from '../session/snapshot.js';
+import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -215,7 +215,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             prMetrics: host.dialogPrMetrics,
             reason: 'auto-shutdown',
         });
-        saveSnapshot(snap);
+        await saveSnapshotAsync(snap);
     } catch (/** @type {any} */ e) {
         log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
     }

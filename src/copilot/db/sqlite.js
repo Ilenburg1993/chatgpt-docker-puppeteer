@@ -23,6 +23,7 @@ import { log } from '#copilot/observability/logger';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { COPILOT_MIGRATIONS } from './migrations.js';
 
@@ -187,4 +188,16 @@ function registerExitHandler() {
     process.once('SIGINT', handler);
 }
 
-export { closeCopilotDb, getCopilotDb, resolveCopilotDbPath };
+/**
+ * F93: Garante que o diretório do banco exista via fs/promises.
+ * Chamar no boot (antes de getCopilotDb) para evitar mkdirSync no lazy init.
+ *
+ * @returns {Promise<void>}
+ */
+async function ensureCopilotDbDir() {
+    const dbPath = resolveCopilotDbPath();
+    if (dbPath === ':memory:') return;
+    await mkdir(path.dirname(dbPath), { recursive: true });
+}
+
+export { closeCopilotDb, ensureCopilotDbDir, getCopilotDb, resolveCopilotDbPath };
