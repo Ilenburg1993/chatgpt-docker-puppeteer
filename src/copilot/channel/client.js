@@ -82,7 +82,11 @@ export function setBridgeAgent(agent) {
  * @throws {Error} Se o agent não foi injetado via `setBridgeAgent()`.
  */
 function requireAgent() {
-    if (!_agent) throw new BridgeError('[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.', 'BRIDGE_NOT_INITIALIZED');
+    if (!_agent)
+        throw new BridgeError(
+            '[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.',
+            'BRIDGE_NOT_INITIALIZED',
+        );
     return _agent;
 }
 
@@ -207,7 +211,10 @@ export class LlmBridgeClient {
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
-            throw new BridgeError('[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.', 'BRIDGE_AGENT_STOPPED');
+            throw new BridgeError(
+                '[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.',
+                'BRIDGE_AGENT_STOPPED',
+            );
         }
 
         // Registra turno do usuário no histórico

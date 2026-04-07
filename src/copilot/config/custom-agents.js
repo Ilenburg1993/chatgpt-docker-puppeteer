@@ -1,6 +1,6 @@
 // @ts-check
-import { ConfigError } from '#copilot/core/errors';
 import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS } from '#copilot/config/env';
+import { ConfigError } from '#copilot/core/errors';
 /**
  * src/copilot/config/custom-agents.js
  *

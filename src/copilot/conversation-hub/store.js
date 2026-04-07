@@ -390,7 +390,10 @@ export class ConversationStore {
             }
         }
         /* c8 ignore next */
-        throw new SessionError('[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)', 'STORE_WRITE_FAILED');
+        throw new SessionError(
+            '[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)',
+            'STORE_WRITE_FAILED',
+        );
     }
 
     /**
