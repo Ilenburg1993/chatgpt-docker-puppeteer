@@ -35,8 +35,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
 import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
-import { conversationStore } from '../conversation-hub/store.js';
-import { getHubSessionId } from '../terminal/state.js';
+
 import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from '#copilot/core/events';
@@ -68,6 +67,7 @@ import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
 import { WebhookManager } from './infra/webhook-manager.js';
 import { persistState, readState, writeStateAsync } from './lifecycle/state-io.js';
 import { performBootWiring } from './session/boot-wiring.js';
+import { syncSdkHistory, SessionMessagesCache } from './session/history-sync.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
 // G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
@@ -224,22 +224,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     #contextState = null;
 
     /**
-     * Cache de mensagens da sessão SDK para reduzir latência em chamadas repetidas via `getSessionMessages()`. Invalida
-     * automaticamente após `#MESSAGES_CACHE_TTL` ou na troca de sessão.
+     * F32: Cache de mensagens da sessão SDK com TTL, extraído para session/history-sync.js.
      *
-     * @type {unknown[] | null}
+     * @type {SessionMessagesCache}
      */
-    #messagesCache = null;
-
-    /** @type {number} */
-    #messagesCacheAt = 0;
-
-    /**
-     * TTL do cache de mensagens em ms. Padrão: 30 segundos. Configurável via AGENT_MESSAGES_CACHE_TTL_MS.
-     *
-     * @type {number}
-     */
-    static #MESSAGES_CACHE_TTL = MESSAGES_CACHE_TTL_MS;
+    #messagesCache = new SessionMessagesCache(MESSAGES_CACHE_TTL_MS);
 
     /**
      * Último caminho de checkpoint salvo pelo SDK durante compaction de contexto. `null` até a primeira compaction ser
@@ -565,7 +554,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             );
 
             if (isResumed) {
-                void this.#syncSdkHistory(session);
+                void syncSdkHistory(session, (event, payload) => this.emit(event, payload));
             }
 
             this.emit('ready', { sessionId: session.sessionId, isResumed });
@@ -697,7 +686,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
             }
             this.#session = null;
-            this.#messagesCache = null;
+            this.#messagesCache.invalidate();
             setSessionRpc(null);
         }
 
@@ -1152,39 +1141,6 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @param {CopilotSession} session
      * @returns {Promise<void>}
      */
-    async #syncSdkHistory(session) {
-        try {
-            const hubSessionId = getHubSessionId();
-            if (!hubSessionId) return;
-            const sdkSession = /** @type {{ getMessages?: () => Promise<unknown[]> }} */ (session);
-            if (typeof sdkSession.getMessages !== 'function') {
-                log(
-                    'WARN',
-                    '[AlwaysAlive] sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
-                );
-                return;
-            }
-            const messages = await sdkSession.getMessages();
-            if (!Array.isArray(messages) || messages.length === 0) return;
-            const { synced, skipped } = conversationStore.syncFromSdkHistory(
-                hubSessionId,
-                session.sessionId,
-                /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
-            );
-            if (synced > 0) {
-                log(
-                    'INFO',
-                    `[AlwaysAlive] ${synced} turnos SDK sincronizados com o ConversationStore (${skipped} ignorados).`,
-                );
-                this.emit('session.history_synced', { hubSessionId, sessionId: session.sessionId, synced, skipped });
-            }
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${err.message}`);
-            // G2-BUG-17: emitir session.history_synced com ok:false para que consumers SSE monitorem falhas
-            this.emit('session.history_synced', { ok: false, error: err.message });
-        }
-    }
-
     /**
      * @param {AgentStatus} status
      */
@@ -1237,7 +1193,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     async #initSession(client) {
         // G1-API-05 (fix): invalidar cache de mensagens para garantir que chamadas a
         // getSessionMessages() após reconexão não retornem mensagens da sessão anterior.
-        this.#messagesCache = null;
+        this.#messagesCache.invalidate();
         const mcpTools = await buildMcpTools();
         if (mcpTools.length > 0) {
             log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
@@ -1342,26 +1298,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
      *
-     * Útil para debug, auditoria e introspecção do context window. O resultado é cacheado por `#MESSAGES_CACHE_TTL` ms
-     * para reduzir chamadas repetidas ao SDK. Retorna array vazio se não houver sessão ativa ou se `getMessages()`
-     * lance (sem suporte no SDK).
+     * F32: Delegado ao SessionMessagesCache para encapsular TTL e invalidação.
      *
      * @returns {Promise<unknown[]>}
      */
     async getSessionMessages() {
-        if (!this.#session) return [];
-        const now = Date.now();
-        if (this.#messagesCache !== null && now - this.#messagesCacheAt < AlwaysAliveAgent.#MESSAGES_CACHE_TTL) {
-            return this.#messagesCache;
-        }
-        try {
-            const messages = await this.#session.getMessages();
-            this.#messagesCache = messages;
-            this.#messagesCacheAt = now;
-            return messages;
-        } catch {
-            return [];
-        }
+        return this.#messagesCache.get(this.#session);
     }
 
     /**
