@@ -40,6 +40,6 @@ export {
     removeCustomAgent,
 } from './custom-agents.js';
 
-export { PinnedFilesLoader } from './pinned-files-loader.js';
+export { PinnedFilesLoader } from './pinned-files.js';
 
 export * from './tools/index.js';

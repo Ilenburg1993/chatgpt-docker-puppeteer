@@ -81,8 +81,8 @@ export function getCopilotFallbackModel() {
  *
  * @type {readonly string[]}
  */
-export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './agent-events.js';
-/** @typedef {import('./agent-events.js').AgentEventName} AgentEventName */
+export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './events.js';
+/** @typedef {import('./events.js').AgentEventName} AgentEventName */
 
 /**
  * G1-DX-04: Nomes canônicos de categoria de ferramentas registradas em tools-bootstrap.js. Usar estas constantes em vez

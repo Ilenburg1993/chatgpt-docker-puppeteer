@@ -7,7 +7,7 @@
  * @module copilot/terminal/commands/alias
  */
 
-import { formatAliases, removeAlias, setAlias } from '#copilot/bridges/alias-store';
+import { formatAliases, removeAlias, setAlias } from '../alias-store.js';
 
 /**
  * @typedef {object} SessionContext

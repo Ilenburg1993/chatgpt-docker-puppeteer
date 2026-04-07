@@ -19,7 +19,7 @@ import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/index.js';
-import { resolve } from '../bridges/alias-store.js';
+import { resolve } from './alias-store.js';
 import { llmBridgeClient } from '../channel/client.js';
 import {
     cmdAlias as _cmdAlias,
