@@ -1912,7 +1912,7 @@ function setupSignalHandlers(context) {
         }
     };
 
-    const triggerShutdown = async (/** @type {any} */ reason, /** @type {any} */ meta = {}) => {
+    const triggerShutdown = (/** @type {any} */ reason, /** @type {any} */ meta = {}) => {
         // Se já há shutdown em andamento, retorna a mesma Promise
         if (_shutdownPromise) {
             log('WARN', `[SIGNAL] ${reason} ignorado — shutdown já em andamento, aguardando conclusão...`);

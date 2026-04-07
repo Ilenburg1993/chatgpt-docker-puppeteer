@@ -185,10 +185,9 @@ function main() {
         }
     }
 
-    if (!payload.ok) {
-        process.exit(2);
-    }
-    process.exit(0);
+    const exitCode = payload.ok ? 0 : 2;
+    // Garante que stdout drena antes de encerrar (process.exit não espera IO pendente)
+    process.stdout.write('', () => process.exit(exitCode));
 }
 
 main();

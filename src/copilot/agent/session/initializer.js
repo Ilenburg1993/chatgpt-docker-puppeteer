@@ -68,8 +68,9 @@ const SessionJsonSchema = z
 // Carrega configuração de tools persistida ao iniciar o módulo.
 loadToolsConfig();
 
-const BRIEFING_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session-briefing.md');
-const SESSION_JSON_FILE = join(resolve(import.meta.dirname, '../../'), '.github', 'hooks', 'state', 'session.json');
+const PROJECT_ROOT = resolve(import.meta.dirname, '../../../../');
+const BRIEFING_FILE = join(PROJECT_ROOT, '.github', 'hooks', 'state', 'session-briefing.md');
+const SESSION_JSON_FILE = join(PROJECT_ROOT, '.github', 'hooks', 'state', 'session.json');
 
 /**
  * Threshold dinâmico de compaction — configurável em runtime via PUT /config/infinite-session.
