@@ -4,8 +4,8 @@
  *
  * Rotas de gerenciamento de sessões SDK — barrel de composição.
  *
- * Compõe os sub-routers de CRUD e messaging sob autenticação opcional por SDK_API_TOKEN.
- * Montado em /api/sdk/* via sdk-api.js.
+ * Compõe os sub-routers de CRUD e messaging sob autenticação opcional por SDK_API_TOKEN. Montado em /api/sdk/* via
+ * sdk-api.js.
  *
  * Endpoints:
  *

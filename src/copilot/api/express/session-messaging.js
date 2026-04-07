@@ -19,6 +19,7 @@ import { rateLimitMiddleware, validateModel, withErrorHandler } from './session-
 
 /**
  * @typedef {import('express').Request} Req
+ *
  * @typedef {import('express').Response} Res
  */
 
