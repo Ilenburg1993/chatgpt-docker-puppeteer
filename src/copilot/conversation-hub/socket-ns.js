@@ -277,7 +277,7 @@ function _handleSessionsList(socket, store) {
                 socket.emit('error:sessions', { reason: `status inválido: "${rawStatus}"` });
                 return;
             }
-            const statusVal = /** @type {import('./store.js').HubSessionStatus | undefined} */ (rawStatus);
+            const statusVal = /** @type {import('./store-helpers.js').HubSessionStatus | undefined} */ (rawStatus);
             const sessions = store.listHubSessions({
                 limit: opts?.limit ?? 20,
                 offset: opts?.offset ?? 0,

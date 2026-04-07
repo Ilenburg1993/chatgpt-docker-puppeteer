@@ -20,24 +20,16 @@ import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from './store-helpers.js';
+import { deleteMemory as _deleteMemory, recallMemories as _recallMemories, storeMemory as _storeMemory } from './store-memories.js';
+import { syncFromSdkHistory as _syncFromSdkHistory } from './store-sync.js';
 
-/**
- * @deprecated F33.1: Importar tipos diretamente de `./store-helpers.js`. Re-export de tipos para manter backward
- *   compatibility nas import paths existentes.
- * @typedef {import('./store-helpers.js').TurnRole} TurnRole
- *
- * @typedef {import('./store-helpers.js').HubSessionStatus} HubSessionStatus
- *
- * @typedef {import('./store-helpers.js').HubSession} HubSession
- *
- * @typedef {import('./store-helpers.js').ConversationTurn} ConversationTurn
- *
- * @typedef {import('./store-helpers.js').WriteTurnOpts} WriteTurnOpts
- *
- * @typedef {import('./store-helpers.js').ReadTurnsOpts} ReadTurnsOpts
- *
- * @typedef {import('./store-helpers.js').SearchTurnsOpts} SearchTurnsOpts
- */
+/** @typedef {import('./store-helpers.js').TurnRole} TurnRole */
+/** @typedef {import('./store-helpers.js').HubSessionStatus} HubSessionStatus */
+/** @typedef {import('./store-helpers.js').HubSession} HubSession */
+/** @typedef {import('./store-helpers.js').ConversationTurn} ConversationTurn */
+/** @typedef {import('./store-helpers.js').WriteTurnOpts} WriteTurnOpts */
+/** @typedef {import('./store-helpers.js').ReadTurnsOpts} ReadTurnsOpts */
+/** @typedef {import('./store-helpers.js').SearchTurnsOpts} SearchTurnsOpts */
 
 // ─── ConversationStore ────────────────────────────────────────────────────────
 
@@ -566,23 +558,7 @@ export class ConversationStore {
      * @returns {string} ID da memória criada
      */
     storeMemory(opts) {
-        const db = this.#getDb();
-        const id = uuidv4();
-        const now = Date.now();
-        db.prepare(
-            `INSERT INTO copilot_memories (id, hub_session_id, tag, content, metadata, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
-            id,
-            opts.hubSessionId ?? null,
-            opts.tag ?? 'geral',
-            opts.content,
-            opts.metadata ? JSON.stringify(opts.metadata) : null,
-            now,
-            now,
-        );
-        log('DEBUG', `[ConversationStore] Memória persistida: ${id} (tag: ${opts.tag ?? 'geral'})`);
-        return id;
+        return _storeMemory(this.#getDb(), opts);
     }
 
     /**
@@ -592,52 +568,7 @@ export class ConversationStore {
      * @returns {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]}
      */
     recallMemories(opts = {}) {
-        const db = this.#getDb();
-        const limit = opts.limit ?? 20;
-        const sessionFilter = opts.hubSessionId ? 'AND m.hub_session_id = ?' : '';
-        const sessionArg = opts.hubSessionId ? [opts.hubSessionId] : [];
-
-        if (opts.search) {
-            const ftsQuery = sanitizeFtsQuery(opts.search);
-            if (!ftsQuery) return [];
-            const tagFilter = opts.tag ? 'AND m.tag = ?' : '';
-            const tagArg = opts.tag ? [opts.tag] : [];
-            const rows = db
-                .prepare(
-                    `SELECT m.id, m.tag, m.content, m.created_at, m.hub_session_id
-                     FROM copilot_memories_fts fts
-                     JOIN copilot_memories m ON fts.id = m.id
-                     WHERE copilot_memories_fts MATCH ?
-                     ${tagFilter}
-                     ${sessionFilter}
-                     ORDER BY rank
-                     LIMIT ?`,
-                )
-                .all(ftsQuery, ...tagArg, ...sessionArg, limit);
-            return /** @type {any[]} */ (rows);
-        }
-
-        if (opts.tag) {
-            return /** @type {any[]} */ (
-                db
-                    .prepare(
-                        `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
-                         WHERE tag = ? ${opts.hubSessionId ? 'AND hub_session_id = ?' : ''}
-                         ORDER BY created_at DESC LIMIT ?`,
-                    )
-                    .all(opts.tag, ...sessionArg, limit)
-            );
-        }
-
-        return /** @type {any[]} */ (
-            db
-                .prepare(
-                    `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
-                     ${opts.hubSessionId ? 'WHERE hub_session_id = ?' : ''}
-                     ORDER BY created_at DESC LIMIT ?`,
-                )
-                .all(...sessionArg, limit)
-        );
+        return _recallMemories(this.#getDb(), opts);
     }
 
     /**
@@ -647,21 +578,11 @@ export class ConversationStore {
      * @returns {boolean} true se removida
      */
     deleteMemory(memoryId) {
-        const db = this.#getDb();
-        const result = db.prepare('DELETE FROM copilot_memories WHERE id = ?').run(memoryId);
-        return result.changes > 0;
+        return _deleteMemory(this.#getDb(), memoryId);
     }
 
     /**
-     * AI.4 — Sincroniza o histórico do SDK (`session.getHistory()`) para o schema `turns` do ConversationStore. Utiliza
-     * `INSERT OR IGNORE` para idempotência — mensagens já existentes não são duplicadas.
-     *
-     * O mapeamento é:
-     *
-     * - `ConversationMessage.type = 'user'` → `role: 'user'`
-     * - `ConversationMessage.type = 'assistant'` → `role: 'llm_b'` (underscore, canônico)
-     * - `ConversationMessage.content` → `content`
-     * - `ConversationMessage.id` → usado como `metadata.sdkTurnId` para dedup
+     * AI.4 — Sincroniza o histórico do SDK para o schema `turns` do ConversationStore.
      *
      * @param {string} hubSessionId - ID da hub_session destino
      * @param {string} sdkSessionId - ID da sessão SDK de origem
@@ -669,64 +590,7 @@ export class ConversationStore {
      * @returns {{ synced: number; skipped: number }}
      */
     syncFromSdkHistory(hubSessionId, sdkSessionId, messages) {
-        const db = this.#getDb();
-        let synced = 0;
-        let skipped = 0;
-
-        const doSync = db.transaction(() => {
-            for (const msg of messages) {
-                // BUG-CRIT-03 fix: underscore canônico alinhado com TurnRole typedef ('llm_b', não 'llm-b')
-                const role = msg.type === 'assistant' ? 'llm_b' : 'user';
-                const sdkTurnId = msg.id ?? null;
-                const metadata = sdkTurnId ? JSON.stringify({ sdkTurnId }) : null;
-
-                // INSERT OR IGNORE pelo sdkTurnId para idempotência
-                // Usamos sdk_session_id + metadata.sdkTurnId como chave natural de dedup
-                if (sdkTurnId) {
-                    // C11-03: usar coluna sdk_turn_id indexada para dedup O(1) (antes era LIKE scan O(n))
-                    const exists = db
-                        .prepare(
-                            `SELECT 1 FROM copilot_conversation_turns
-                             WHERE hub_session_id = ? AND sdk_turn_id = ?`,
-                        )
-                        .get(hubSessionId, sdkTurnId);
-                    if (exists) {
-                        skipped++;
-                        continue;
-                    }
-                }
-
-                const maxTurn = /** @type {{ max_turn: number | null }} */ (
-                    db
-                        .prepare(
-                            `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
-                        )
-                        .get(hubSessionId)
-                );
-                const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
-
-                db.prepare(
-                    `INSERT INTO copilot_conversation_turns
-                     (hub_session_id, sdk_session_id, role, content, turn_number, created_at, user_read, metadata, sdk_turn_id)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                ).run(
-                    hubSessionId,
-                    sdkSessionId,
-                    role,
-                    msg.content ?? '',
-                    turnNumber,
-                    msg.createdAt ?? Date.now(),
-                    1, // mensagens históricas: marcadas como lidas
-                    metadata,
-                    sdkTurnId,
-                );
-                synced++;
-            }
-        });
-
-        doSync();
-        log('DEBUG', `[ConversationStore] syncFromSdkHistory: ${synced} sincronizados, ${skipped} ignorados (dupl).`);
-        return { synced, skipped };
+        return _syncFromSdkHistory(this.#getDb(), hubSessionId, sdkSessionId, messages);
     }
 }
 

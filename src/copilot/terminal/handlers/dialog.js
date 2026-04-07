@@ -35,7 +35,7 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
             limit: isNaN(limit) ? 20 : limit,
             offset: isNaN(offset) ? 0 : offset,
             ...(status !== undefined && {
-                status: /** @type {import('../../conversation-hub/store.js').HubSessionStatus} */ (status),
+                status: /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus} */ (status),
             }),
         };
         const sessions = conversationStore.listHubSessions(opts);

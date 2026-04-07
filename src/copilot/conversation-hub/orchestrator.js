@@ -533,7 +533,7 @@ export class HubOrchestrator extends EventEmitter {
      * Lê o histórico de turns de uma hub_session.
      *
      * @param {string} hubSessionId
-     * @param {import('./store.js').ReadTurnsOpts} [opts]
+     * @param {import('./store-helpers.js').ReadTurnsOpts} [opts]
      * @returns {import('./store.js').ConversationTurn[]}
      */
     readHistory(hubSessionId, opts = {}) {
@@ -543,7 +543,7 @@ export class HubOrchestrator extends EventEmitter {
     /**
      * Lista as hub_sessions disponíveis.
      *
-     * @param {{ limit?: number; offset?: number; status?: import('./store.js').HubSessionStatus }} [opts]
+     * @param {{ limit?: number; offset?: number; status?: import('./store-helpers.js').HubSessionStatus }} [opts]
      * @returns {import('./store.js').HubSession[]}
      */
     listSessions(opts = {}) {
