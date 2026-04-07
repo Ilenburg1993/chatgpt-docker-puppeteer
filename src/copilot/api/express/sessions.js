@@ -32,8 +32,6 @@ import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
-import { SseReplayBuffer } from '../sse/replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -44,6 +42,8 @@ import {
     resumeClientSession as resumeSdkSession,
 } from '../../lib/sdk-client.js';
 import { pickDefined } from '../../lib/utils.js';
+import { SseReplayBuffer } from '../sse/replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 
 /**
  * @typedef {import('express').Request} Req

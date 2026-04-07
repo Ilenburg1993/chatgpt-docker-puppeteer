@@ -16,9 +16,4 @@ export { default as httpBridge } from './bridge/index.js';
 // SSE utilities
 export { eventFanout } from './sse/fanout.js';
 export { SseReplayBuffer } from './sse/replay-buffer.js';
-export {
-    createEventFilter,
-    createSseWriter,
-    SseConnectionTracker,
-    standardizeSsePayload,
-} from './sse/utils.js';
+export { SseConnectionTracker, createEventFilter, createSseWriter, standardizeSsePayload } from './sse/utils.js';
