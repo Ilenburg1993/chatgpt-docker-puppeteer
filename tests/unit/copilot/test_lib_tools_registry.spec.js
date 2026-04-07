@@ -5,7 +5,6 @@
  * Testes unitários para src/copilot/lib/tools-registry.js
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 
 import {
     createRegistry,
@@ -23,7 +22,7 @@ import {
     mergeRegistries,
     registerTool,
     registerTools,
-} from '../../../src/copilot/lib/tools-registry.js';
+} from '#copilot/sdk/tools-registry';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

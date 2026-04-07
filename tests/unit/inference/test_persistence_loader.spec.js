@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
 import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_client_policy_repo.js';

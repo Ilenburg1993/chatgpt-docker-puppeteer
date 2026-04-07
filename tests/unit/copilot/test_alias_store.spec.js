@@ -7,7 +7,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
 
 // alias-store.js é um módulo singleton com estado interno.
 // Importamos uma única vez — cada describe usa resetAliases para limpar estado.
@@ -18,7 +17,7 @@ import {
     resetAliases,
     resolve,
     setAlias,
-} from '../../../src/copilot/bridges/alias-store.js';
+} from '#copilot/terminal/alias-store';
 
 describe('alias-store › resolve', () => {
     beforeEach(() => {

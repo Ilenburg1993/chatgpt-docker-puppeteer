@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { parsePrettierCheckOutput, parseTsIgnoreFindings } from '../../../scripts/audit/collectors/quality.mjs';
 
 const TS_IGNORE_TOKEN = '@ts-' + 'ignore';

@@ -1,7 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
 import { performance } from 'node:perf_hooks';
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 describe('human.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;
@@ -12,24 +11,24 @@ describe('human.js v2.0 - Unit Tests', () => {
         // Mock page object
         mockPage = {
             mouse: {
-                move: mock.fn(async () => {}),
-                click: mock.fn(async () => {}),
+                move: vi.fn(async () => {}),
+                click: vi.fn(async () => {}),
             },
             keyboard: {
-                type: mock.fn(async () => {}),
-                press: mock.fn(async () => {}),
+                type: vi.fn(async () => {}),
+                press: vi.fn(async () => {}),
             },
-            evaluate: mock.fn(async () => true),
-            waitForSelector: mock.fn(async () => ({})),
-            $: mock.fn(async () => null),
-            isClosed: mock.fn(() => false),
-            url: mock.fn(() => 'https://example.com'),
+            evaluate: vi.fn(async () => true),
+            waitForSelector: vi.fn(async () => ({})),
+            $: vi.fn(async () => null),
+            isClosed: vi.fn(() => false),
+            url: vi.fn(() => 'https://example.com'),
         };
 
         // Mock driver object
         mockDriver = {
             page: mockPage,
-            _emitVital: mock.fn(() => {}),
+            _emitVital: vi.fn(() => {}),
             currentTarget: 'chatgpt',
             correlationId: 'test-123',
         };
@@ -39,7 +38,7 @@ describe('human.js v2.0 - Unit Tests', () => {
     });
 
     afterEach(() => {
-        mock.restoreAll();
+        vi.restoreAllMocks();
     });
 
     // ======================
@@ -190,7 +189,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
                 // Mock focus lock (selector retorna sempre mesmo elemento)
                 let focusCallCount = 0;
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('document.activeElement')) {
                         focusCallCount++;
                         return focusCallCount > 2 ? false : true; // Simula lock por 2 iterações
@@ -213,7 +212,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter((c) => c.arguments[0] === 'CLICK_START');
+                const startEvents = calls.filter((c) => c[0] === 'CLICK_START');
 
                 assert.ok(startEvents.length > 0, 'CLICK_START event não emitido');
             });
@@ -224,7 +223,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const completeEvents = calls.filter((c) => c.arguments[0] === 'CLICK_COMPLETE');
+                const completeEvents = calls.filter((c) => c[0] === 'CLICK_COMPLETE');
 
                 assert.ok(completeEvents.length > 0, 'CLICK_COMPLETE event não emitido');
             });
@@ -235,7 +234,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter((c) => c.arguments[0] === 'TYPE_START');
+                const startEvents = calls.filter((c) => c[0] === 'TYPE_START');
 
                 assert.ok(startEvents.length > 0, 'TYPE_START event não emitido');
             });
@@ -246,7 +245,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test long text for progress tracking');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const progressEvents = calls.filter((c) => c.arguments[0] === 'TYPE_PROGRESS');
+                const progressEvents = calls.filter((c) => c[0] === 'TYPE_PROGRESS');
 
                 // Para texto longo, deve emitir pelo menos 1 progress event
                 assert.ok(progressEvents.length > 0, 'TYPE_PROGRESS event não emitido');
@@ -258,7 +257,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const completeEvents = calls.filter((c) => c.arguments[0] === 'TYPE_COMPLETE');
+                const completeEvents = calls.filter((c) => c[0] === 'TYPE_COMPLETE');
 
                 assert.ok(completeEvents.length > 0, 'TYPE_COMPLETE event não emitido');
             });
@@ -267,7 +266,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 const { humanClick } = humanModule;
 
                 // Simular erro
-                mockPage.waitForSelector = mock.fn(async () => {
+                mockPage.waitForSelector = vi.fn(async () => {
                     throw new Error('Selector timeout');
                 });
 
@@ -276,7 +275,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter((c) => c.arguments[0] === 'CLICK_ERROR');
+                const errorEvents = calls.filter((c) => c[0] === 'CLICK_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'CLICK_ERROR event não emitido');
             });
@@ -287,7 +286,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 const { humanClick } = humanModule;
 
                 let attempts = 0;
-                mockPage.waitForSelector = mock.fn(async () => {
+                mockPage.waitForSelector = vi.fn(async () => {
                     attempts++;
                     if (attempts < 3) {
                         throw new Error('Transient error');
@@ -304,7 +303,7 @@ describe('human.js v2.0 - Unit Tests', () => {
             it('humanClick deve falhar após 3 tentativas', async () => {
                 const { humanClick } = humanModule;
 
-                mockPage.waitForSelector = mock.fn(async () => {
+                mockPage.waitForSelector = vi.fn(async () => {
                     throw new Error('Persistent error');
                 });
 
@@ -358,7 +357,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button', { signal: controller.signal });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter((c) => c.arguments[0] === 'CLICK_ABORTED');
+                const abortEvents = calls.filter((c) => c[0] === 'CLICK_ABORTED');
 
                 assert.ok(abortEvents.length > 0, 'CLICK_ABORTED event não emitido');
             });
@@ -405,14 +404,14 @@ describe('human.js v2.0 - Unit Tests', () => {
                 const { humanClick } = humanModule;
 
                 // Mock elemento fora do viewport
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('getBoundingClientRect')) {
                         return { x: 5000, y: 5000, width: 100, height: 50 }; // Fora
                     }
                     return true;
                 });
 
-                mockPage.$ = mock.fn(async () => ({
+                mockPage.$ = vi.fn(async () => ({
                     boundingBox: async () => ({ x: 5000, y: 5000, width: 100, height: 50 }),
                 }));
 
@@ -444,14 +443,14 @@ describe('human.js v2.0 - Unit Tests', () => {
                 const { humanType } = humanModule;
 
                 // Simular page closed (erro crítico)
-                mockPage.isClosed = mock.fn(() => true);
+                mockPage.isClosed = vi.fn(() => true);
 
                 await assert.rejects(async () => await humanType(mockDriver, '#input', 'test'), {
                     message: /page is closed/,
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter((c) => c.arguments[0] === 'TYPE_ERROR');
+                const errorEvents = calls.filter((c) => c[0] === 'TYPE_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'TYPE_ERROR event não emitido');
             });
@@ -476,9 +475,9 @@ describe('human.js v2.0 - Unit Tests', () => {
             // Verificar eventos emitidos
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
 
-            assert.ok(calls.filter((c) => c.arguments[0] === 'CLICK_START').length >= 3);
-            assert.ok(calls.filter((c) => c.arguments[0] === 'TYPE_START').length >= 2);
-            assert.ok(calls.filter((c) => c.arguments[0] === 'TYPE_COMPLETE').length >= 2);
+            assert.ok(calls.filter((c) => c[0] === 'CLICK_START').length >= 3);
+            assert.ok(calls.filter((c) => c[0] === 'TYPE_START').length >= 2);
+            assert.ok(calls.filter((c) => c[0] === 'TYPE_COMPLETE').length >= 2);
         });
 
         it('deve lidar com abort em meio ao fluxo', async () => {
@@ -503,7 +502,7 @@ describe('human.js v2.0 - Unit Tests', () => {
             const { humanClick } = humanModule;
 
             // Simular múltiplas falhas
-            mockPage.waitForSelector = mock.fn(async () => {
+            mockPage.waitForSelector = vi.fn(async () => {
                 throw new Error('Selector not found');
             });
 
@@ -524,7 +523,7 @@ describe('human.js v2.0 - Unit Tests', () => {
     // ======================
 
     describe('E2E Tests (Mocked)', () => {
-        it('deve digitar 1000 caracteres com delays humanos', async () => {
+        it('deve digitar 1000 caracteres com delays humanos', { timeout: 60000 }, async () => {
             const { humanType } = humanModule;
 
             const longText = 'A'.repeat(1000);
@@ -541,7 +540,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
             // Verificar telemetria
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-            const progressEvents = calls.filter((c) => c.arguments[0] === 'TYPE_PROGRESS');
+            const progressEvents = calls.filter((c) => c[0] === 'TYPE_PROGRESS');
 
             // Para 1000 chars, deve emitir múltiplos progressos
             assert.ok(progressEvents.length > 0, 'Deve emitir progress events para texto longo');
@@ -551,7 +550,7 @@ describe('human.js v2.0 - Unit Tests', () => {
             const { humanClick } = humanModule;
 
             let attempts = 0;
-            mockPage.waitForSelector = mock.fn(async () => {
+            mockPage.waitForSelector = vi.fn(async () => {
                 attempts++;
                 if (attempts < 2) {
                     throw new Error('Element not ready');

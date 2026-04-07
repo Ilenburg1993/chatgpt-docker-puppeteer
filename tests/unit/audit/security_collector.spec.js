@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+
 import { collectSecurityFindings } from '../../../scripts/audit/collectors/security.mjs';
 
 test('collectSecurityFindings detecta superfície HTTP sem auth e ausência de headers', async () => {

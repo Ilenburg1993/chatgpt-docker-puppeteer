@@ -14,13 +14,11 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'node:test';
 
 // Mesmo path que session-initializer.js usa internamente:
-// resolve(import.meta.dirname, '../../') relativo a src/copilot/agent/ = src/
-const SRC_DIR = resolve(import.meta.dirname, '../../../src/copilot/agent/');
-const MODULE_ROOT = resolve(SRC_DIR, '../../');
-const ACTUAL_STATE_DIR = join(MODULE_ROOT, '.github', 'hooks', 'state');
+// resolve(import.meta.dirname, '../../../../') relativo a src/copilot/agent/session/ = project root
+const PROJECT_ROOT = resolve(import.meta.dirname, '../../../');
+const ACTUAL_STATE_DIR = join(PROJECT_ROOT, '.github', 'hooks', 'state');
 const BRIEFING_FILE = join(ACTUAL_STATE_DIR, 'session-briefing.md');
 const SESSION_JSON_FILE = join(ACTUAL_STATE_DIR, 'session.json');
 

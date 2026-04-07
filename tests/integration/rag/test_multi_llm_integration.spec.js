@@ -9,7 +9,7 @@
 
 import express from 'express';
 import assert from 'node:assert';
-import { after, before, describe, it } from 'node:test';
+
 import { registry } from '../../../src/integration/tool-registry.mjs';
 import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 
@@ -19,7 +19,7 @@ import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 /** @type {any} */ let baseUrl;
 
 // Setup test server
-before(async () => {
+beforeAll(async () => {
     process.env.MCP_ENABLED = 'true';
     process.env.NODE_ENV = 'test';
 
@@ -46,7 +46,7 @@ before(async () => {
 });
 
 // Cleanup
-after(() => {
+afterAll(() => {
     if (server) {
         server.close();
     }

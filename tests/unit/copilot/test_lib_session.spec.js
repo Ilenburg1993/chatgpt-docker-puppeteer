@@ -8,7 +8,6 @@
  * CopilotClient REAL nao e instanciado — todos os testes usam mocks.
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 // ─── mock de CopilotClient ───────────────────────────────────────────────────
 
@@ -47,7 +46,7 @@ function makeMockClient(opts = {}) {
 
 describe('lib/session › imports', () => {
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/lib/session.js');
+        const mod = await import('#copilot/sdk/session');
         assert.ok(typeof mod.createSession === 'function');
         assert.ok(typeof mod.resumeSession === 'function');
         assert.ok(typeof mod.resumeOrCreate === 'function');
@@ -62,7 +61,7 @@ describe('lib/session › imports', () => {
 
 describe('lib/session › createSession', () => {
     it('cria sessao com client mock e retorna result correto', async () => {
-        const { createSession } = await import('../../../src/copilot/lib/session.js');
+        const { createSession } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'new-sess-abc' });
         const result = await createSession(client, { model: 'gpt-4.1' });
         assert.strictEqual(result.sessionId, 'new-sess-abc');
@@ -71,7 +70,7 @@ describe('lib/session › createSession', () => {
     });
 
     it('usa gpt-4.1 como model padrao', async () => {
-        const { createSession } = await import('../../../src/copilot/lib/session.js');
+        const { createSession } = await import('#copilot/sdk/session');
         const capturedConfigs = /** @type {any[]} */ ([]);
         const client = {
             ...makeMockClient(),
@@ -87,7 +86,7 @@ describe('lib/session › createSession', () => {
     });
 
     it('inclui systemMessage quando systemMessageContent fornecido', async () => {
-        const { createSession } = await import('../../../src/copilot/lib/session.js');
+        const { createSession } = await import('#copilot/sdk/session');
         const capturedConfigs = /** @type {any[]} */ ([]);
         const client = {
             ...makeMockClient(),
@@ -105,7 +104,7 @@ describe('lib/session › createSession', () => {
     });
 
     it('nao inclui systemMessage quando systemMessage=false', async () => {
-        const { createSession } = await import('../../../src/copilot/lib/session.js');
+        const { createSession } = await import('#copilot/sdk/session');
         const capturedConfigs = /** @type {any[]} */ ([]);
         const client = {
             ...makeMockClient(),
@@ -123,7 +122,7 @@ describe('lib/session › createSession', () => {
 
 describe('lib/session › resumeSession', () => {
     it('retoma sessao existente e retorna isResumed=true', async () => {
-        const { resumeSession } = await import('../../../src/copilot/lib/session.js');
+        const { resumeSession } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'resume-001' });
         const result = await resumeSession(client, 'resume-001');
         assert.strictEqual(result.sessionId, 'resume-001');
@@ -131,7 +130,7 @@ describe('lib/session › resumeSession', () => {
     });
 
     it('lanca erro quando sessao nao existe', async () => {
-        const { resumeSession } = await import('../../../src/copilot/lib/session.js');
+        const { resumeSession } = await import('#copilot/sdk/session');
         const client = makeMockClient({ shouldFailResume: true });
         await assert.rejects(
             () => resumeSession(client, 'nao-existe'),
@@ -144,7 +143,7 @@ describe('lib/session › resumeSession', () => {
 
 describe('lib/session › resumeOrCreate', () => {
     it('cria sessao nova quando existingSessionId e null', async () => {
-        const { resumeOrCreate } = await import('../../../src/copilot/lib/session.js');
+        const { resumeOrCreate } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'newly-created' });
         const result = await resumeOrCreate(client, null);
         assert.strictEqual(result.isResumed, false);
@@ -152,7 +151,7 @@ describe('lib/session › resumeOrCreate', () => {
     });
 
     it('retoma sessao quando existingSessionId e fornecido e valido', async () => {
-        const { resumeOrCreate } = await import('../../../src/copilot/lib/session.js');
+        const { resumeOrCreate } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'existing-001' });
         const result = await resumeOrCreate(client, 'existing-001');
         assert.strictEqual(result.isResumed, true);
@@ -160,7 +159,7 @@ describe('lib/session › resumeOrCreate', () => {
     });
 
     it('cria sessao nova quando resume falha (fallback)', async () => {
-        const { resumeOrCreate } = await import('../../../src/copilot/lib/session.js');
+        const { resumeOrCreate } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'fallback-new', shouldFailResume: true });
         const result = await resumeOrCreate(client, 'sessao-expirada');
         assert.strictEqual(result.isResumed, false);
@@ -172,7 +171,7 @@ describe('lib/session › resumeOrCreate', () => {
 
 describe('lib/session › listSessions', () => {
     it('retorna array do client', async () => {
-        const { listSessions } = await import('../../../src/copilot/lib/session.js');
+        const { listSessions } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'list-001' });
         const list = await listSessions(client);
         assert.ok(Array.isArray(list));
@@ -183,7 +182,7 @@ describe('lib/session › listSessions', () => {
 
 describe('lib/session › deleteSession', () => {
     it('nao lanca erro ao deletar sessao existente', async () => {
-        const { deleteSession } = await import('../../../src/copilot/lib/session.js');
+        const { deleteSession } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'del-001' });
         await assert.doesNotReject(() => deleteSession(client, 'del-001'));
     });
@@ -193,7 +192,7 @@ describe('lib/session › deleteSession', () => {
 
 describe('lib/session › disconnectSession', () => {
     it('chama disconnect na sessao', async () => {
-        const { disconnectSession } = await import('../../../src/copilot/lib/session.js');
+        const { disconnectSession } = await import('#copilot/sdk/session');
         let disconnectCalled = false;
         const mockSession = /** @type {any} */ ({
             sessionId: 'disc-001',
@@ -210,7 +209,7 @@ describe('lib/session › disconnectSession', () => {
 
 describe('lib/session › createClientFromCliUrl', () => {
     it('retorna um objeto (CopilotClient) — sem conectar', async () => {
-        const { createClientFromCliUrl } = await import('../../../src/copilot/lib/session.js');
+        const { createClientFromCliUrl } = await import('#copilot/sdk/session');
         // CopilotClient nao conecta no construtor — apenas configura
         const client = createClientFromCliUrl('http://localhost:9999');
         assert.ok(client);

@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { before, describe, it } from 'node:test';
+
 import { BridgeError } from '../../../src/copilot/core/index.js';
 
 // ─── Suite 1: análise estrutural do source ─────────────────────────────────
@@ -24,7 +24,7 @@ describe('channel/inject.js › INJECT-01: análise estrutural', async () => {
     /** @type {string} */
     let source = '';
 
-    before(async () => {
+    beforeAll(async () => {
         source = await readFile(new URL('../../../src/copilot/channel/inject.js', import.meta.url), 'utf-8');
     });
 

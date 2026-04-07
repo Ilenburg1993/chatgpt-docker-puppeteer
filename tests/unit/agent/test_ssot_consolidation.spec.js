@@ -3,7 +3,6 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
 
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
@@ -51,12 +50,12 @@ class MockNERV {
 describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { concurrency: 1 }, () => {
     const dbPath = makeDbPath();
 
-    before(() => {
+    beforeAll(() => {
         process.env.MAESTRO_DB_PATH = dbPath;
         getDb(); // migrations
     });
 
-    after(() => {
+    afterAll(() => {
         try {
             closeDb();
         } catch (_) {}
@@ -715,13 +714,14 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
         });
 
         nerv.receive(cmd);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        assert.strictEqual(
-            nerv.emittedEvents.length,
-            1,
-            'deve emitir ao menos 1 evento de falha (resposta ao comando)',
-        );
+        // handler é async e passa por vários awaits internos (_emitBoth → _emitEvent → nerv.emitEvent)
+        await vi.waitFor(() => {
+            assert.strictEqual(
+                nerv.emittedEvents.length,
+                1,
+                'deve emitir ao menos 1 evento de falha (resposta ao comando)',
+            );
+        }, { timeout: 2000, interval: 10 });
         assert.strictEqual(nerv.emittedEvents[0].type.action_code, ActionCode.DRIVER_TASK_FAILED);
         assert.strictEqual(nerv.emittedEvents[0].payload.taskId, taskId);
         assert.strictEqual(nerv.emittedEvents[0].payload.reason, 'TASK_ALREADY_RUNNING');

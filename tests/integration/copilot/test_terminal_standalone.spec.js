@@ -20,10 +20,9 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 
 import { getMcpStatus } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
-import { PinnedFilesLoader } from '../../../src/copilot/config/pinned-files-loader.js';
+import { PinnedFilesLoader } from '#copilot/config/pinned-files';
 import { getToolStats, recordToolCall } from '../../../src/copilot/observability/tool-stats.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

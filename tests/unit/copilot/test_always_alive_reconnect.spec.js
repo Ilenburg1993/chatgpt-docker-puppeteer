@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
+
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
 // ─── Suite: análise estrutural do código ────────────────────────────────────
@@ -23,11 +23,11 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
     /** @type {string} */
     let reconnectPolicyCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         [sourceCode, reconnectPolicyCode] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/reconnect-policy.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/lifecycle/reconnect-policy.js', import.meta.url), 'utf-8'),
         ]);
     });
 
@@ -76,11 +76,11 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
         );
     });
 
-    it('deve reenfileirar tarefa via #messageQueue.unshift quando reconexão bem-sucedida', () => {
-        // F.4: requeue migrou para MessageQueue.unshift()
+    it('deve reenfileirar tarefa via messageQueue.unshift quando reconexão bem-sucedida', () => {
+        // F.4: requeue migrou para MessageQueue.unshift() via ctx
         assert.ok(
-            sourceCode.includes('this.#messageQueue.unshift('),
-            'ao reconectar, a tarefa deve ser reenfileirada no início via #messageQueue.unshift() (F.4)',
+            sourceCode.includes('messageQueue.unshift('),
+            'ao reconectar, a tarefa deve ser reenfileirada no início via messageQueue.unshift() (F.4)',
         );
     });
 

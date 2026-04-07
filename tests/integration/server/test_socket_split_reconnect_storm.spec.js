@@ -2,7 +2,6 @@
 import * as socketEngine from '#server/engine/socket';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import test from 'node:test';
 
 function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {
@@ -57,7 +56,7 @@ test('split mode survives reconnect storm (3 forced transport drops)', async (t)
 
     const adapter = await socketEngine.connectExternal(port);
 
-    t.after(async () => {
+    onTestFinished(async () => {
         try {
             adapter.disconnect();
         } catch {

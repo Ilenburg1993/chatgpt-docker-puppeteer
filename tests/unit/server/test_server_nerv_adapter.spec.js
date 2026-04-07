@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
-import { beforeEach, describe, it } from 'node:test';
+
 import sinon from 'sinon';
 
 describe('Server NERV Adapter - Integração Server-NERV', () => {

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { updateMissionProgressState } from '#agent/mission_execution_service';
 import { getMissionById } from '#infra/db/mission_repo';
@@ -84,7 +83,7 @@ test('wave17: atualização stale (current_task_id divergente) é rejeitada sem 
     assert.equal(missionAfter.context?.progress?.current_task_id, 'task-live');
     assert.equal(Number(missionAfter.context?.progress?.current_step_index || 0), 1);
 
-    t.after(() => {
+    onTestFinished(() => {
         try {
             closeDb();
         } catch (_) {}

@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 import { chunkByType } from '../../../tools/rag/lib/chunking/chunk_dispatcher.mjs';
 import { buildChunkId, sha256HexForString } from '../../../tools/rag/lib/contract.mjs';

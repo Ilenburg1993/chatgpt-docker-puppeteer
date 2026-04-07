@@ -7,13 +7,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
 
-/** @type {typeof import('../../../src/copilot/agent/status-snapshot.js').buildStatusSnapshot} */
+/** @type {typeof import('#copilot/agent/infra/status-snapshot').buildStatusSnapshot} */
 let buildStatusSnapshot;
 
-before(async () => {
-    ({ buildStatusSnapshot } = await import('../../../src/copilot/agent/status-snapshot.js'));
+beforeAll(async () => {
+    ({ buildStatusSnapshot } = await import('#copilot/agent/infra/status-snapshot'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +20,7 @@ before(async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildStatusSnapshot() › campos obrigatórios', () => {
-    /** @returns {import('../../../src/copilot/agent/status-snapshot.js').SnapshotParams} */
+    /** @returns {import('#copilot/agent/infra/status-snapshot').SnapshotParams} */
     const baseParams = () => ({
         status: 'idle',
         sessionId: null,
@@ -182,7 +181,7 @@ describe('AlwaysAliveAgent.getStatusSnapshot() › integração', async () => {
     /** @type {import('../../../src/copilot/agent/always-alive.js').AlwaysAliveAgent} */
     let agent;
 
-    before(async () => {
+    beforeAll(async () => {
         const { AlwaysAliveAgent } = await import('../../../src/copilot/agent/always-alive.js');
         agent = new AlwaysAliveAgent();
     });

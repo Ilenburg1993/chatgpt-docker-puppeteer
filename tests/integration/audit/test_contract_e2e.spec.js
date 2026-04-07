@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { runCommand } from '../../../scripts/audit/lib/exec.mjs';
 
 test('check:forbidden emits structured contract payload in hybrid mode', async () => {
@@ -9,6 +9,7 @@ test('check:forbidden emits structured contract payload in hybrid mode', async (
         ['scripts/check_forbidden_patterns.js', '--json', '--contracts-mode', 'hybrid'],
         {
             timeoutMs: 180000,
+            maxStdoutBytes: 4 * 1024 * 1024,
         },
     );
     assert.ok(result.exitCode === 0 || result.exitCode === 2, `unexpected exit code ${result.exitCode}`);

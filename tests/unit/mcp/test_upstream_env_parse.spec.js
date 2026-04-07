@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import { parseUpstreamsFromEnv } from '../../../src/integration/mcp/upstream-manager.mjs';
 

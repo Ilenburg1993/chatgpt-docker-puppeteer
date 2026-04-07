@@ -3,7 +3,7 @@ import express from 'express';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
+
 import request from 'supertest';
 
 import * as schemas from '#core/schemas';
@@ -37,13 +37,13 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
     const dbPath = makeDbPath();
     const artifactsDir = makeArtifactsDir();
 
-    before(() => {
+    beforeAll(() => {
         process.env.MAESTRO_DB_PATH = dbPath;
         process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
         getDb(); // migrations
     });
 
-    after(() => {
+    afterAll(() => {
         try {
             closeDb();
         } catch {}

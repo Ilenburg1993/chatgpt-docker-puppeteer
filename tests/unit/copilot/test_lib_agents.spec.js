@@ -5,7 +5,6 @@
  * Testes unitários para src/copilot/lib/agents.js
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 
 import {
     READ_ONLY_TOOLS,
@@ -16,7 +15,7 @@ import {
     createReadOnlyAgent,
     filterInferableAgents,
     isValidAgentName,
-} from '../../../src/copilot/lib/agents.js';
+} from '#copilot/sdk/agents';
 
 // ─── createAgent ─────────────────────────────────────────────────────────────
 

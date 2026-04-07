@@ -17,7 +17,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it, mock } from 'node:test';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
@@ -29,14 +28,14 @@ const _listeners = new Map();
 
 const mockAgent = {
     getStatusSnapshot: () => ({ status: 'idle', sessionId: 'test-session-id', model: 'gpt-4.1', tools: 30 }),
-    enqueue: mock.fn((/** @type {string} */ _msg, _opts) => {
+    enqueue: vi.fn((/** @type {string} */ _msg, _opts) => {
         return Promise.resolve('mock-task-id');
     }),
     on: (/** @type {string} */ event, /** @type {Function} */ fn) => {
         _listeners.set(event, fn);
     },
     off: (/** @type {any} */ _event, /** @type {any} */ _fn) => {},
-    answerPendingQuestion: mock.fn(),
+    answerPendingQuestion: vi.fn(),
 };
 
 // ─── Helpers de resposta ──────────────────────────────────────────────────────
@@ -63,7 +62,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     /** @type {import('../../../src/copilot/channel/client.js').LlmBridgeClient} */
     let bridge;
 
-    before(async () => {
+    beforeAll(async () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
         const mod = await import('../../../src/copilot/channel/client.js');
         // Injeta mock como bridge agent para que requireAgent() não lance
@@ -82,7 +81,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const b = new mod.LlmBridgeClient();
 
         // Spy em chat() para retornar resposta estruturada sem rede
-        const mockChat = mock.fn(async (_msg, _opts) => ({
+        const mockChat = vi.fn(async (_msg, _opts) => ({
             taskId: 'task-abc',
             response: structuredJsonResponse(),
             responseLen: structuredJsonResponse().length,
@@ -111,7 +110,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = mock.fn(async () => ({
+        const mockChat = vi.fn(async () => ({
             taskId: 'task-1',
             response: structuredJsonResponse({ responseType: 'plan', output: 'Plano A concluído.' }),
             responseLen: 100,
@@ -135,7 +134,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = mock.fn(async () => ({
+        const mockChat = vi.fn(async () => ({
             taskId: 'task-2',
             response: 'Desculpe, não entendi o protocolo. Pode repetir em português?',
             responseLen: 56,
@@ -159,7 +158,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const b = new mod.LlmBridgeClient();
 
         const responseText = structuredJsonResponse();
-        const mockChat = mock.fn(async () => ({
+        const mockChat = vi.fn(async () => ({
             taskId: 'task-3',
             response: responseText,
             responseLen: responseText.length,
@@ -176,7 +175,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = mock.fn(async () => ({
+        const mockChat = vi.fn(async () => ({
             taskId: 'specific-task-id',
             response: structuredJsonResponse(),
             responseLen: 999,
@@ -198,7 +197,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
         /** @type {any} */
         let capturedOpts = null;
-        const mockChat = mock.fn(async (_msg, opts) => {
+        const mockChat = vi.fn(async (_msg, opts) => {
             capturedOpts = opts;
             return { taskId: '', response: structuredJsonResponse(), responseLen: 10, chunks: [], durationMs: 5 };
         });
@@ -217,7 +216,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
         /** @type {string} */
         let capturedMsg = '';
-        const mockChat = mock.fn(async (msg) => {
+        const mockChat = vi.fn(async (msg) => {
             capturedMsg = msg;
             return { taskId: '', response: structuredJsonResponse(), responseLen: 10, chunks: [], durationMs: 5 };
         });

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
 
 test('wave16r: dashboard auth does not contain hardcoded users/passwords', async () => {
     const filePath = path.join(process.cwd(), 'src/server/api/controllers/dashboard.js');

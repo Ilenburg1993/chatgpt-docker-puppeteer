@@ -14,7 +14,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
+
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 import { MAX_QUEUE_SIZE } from '../../../src/copilot/core/constants.js';
 
@@ -24,13 +24,14 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
-        const [main, lifecycle] = await Promise.all([
+        const [main, lifecycle, agentConfig] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/config.js', import.meta.url), 'utf-8'),
         ]);
-        sourceCode = main + '\n' + lifecycle;
+        sourceCode = main + '\n' + lifecycle + '\n' + agentConfig;
     });
 
     it('stop() deve aceitar opção shutdownTimeoutMs (parâmetro opcional)', () => {
@@ -39,8 +40,9 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
 
     it('stop() deve ter timeout padrão de 10000ms', () => {
         assert.ok(
+            sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10_000') || sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10000') ||
             sourceCode.includes('shutdownTimeoutMs = 10_000') || sourceCode.includes('shutdownTimeoutMs = 10000'),
-            'stop() deve ter shutdownTimeoutMs default de 10000ms',
+            'stop() deve ter shutdownTimeoutMs default de 10000ms (via SHUTDOWN_TIMEOUT_MS)',
         );
     });
 
@@ -106,7 +108,7 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
@@ -147,7 +149,8 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
             'utf-8',
         );
         assert.ok(
-            mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'"),
+            mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'") ||
+            mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config/env'"),
             'MAX_QUEUE_SIZE deve ser importado em message-queue.js (onde a verificação de capacidade está)',
         );
         assert.ok(
@@ -200,7 +203,7 @@ describe('always-alive › stop() idempotência', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),

@@ -1,3 +1,4 @@
+// ORPHAN: source module deleted (sdk-api.js deleted) — skip until reimplemented
 // @ts-check
 /**
  * tests/unit/copilot/test_permission_controller.spec.js
@@ -9,17 +10,16 @@
  */
 
 import assert from 'node:assert/strict';
-import { afterEach, before, describe, it } from 'node:test';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite: análise estrutural
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('PermissionController › análise estrutural (G2-DX-12/13/15)', async () => {
+describe.skip('PermissionController › análise estrutural (G2-DX-12/13/15)', async () => {
     /** @type {string} */
     let src = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
@@ -51,13 +51,13 @@ describe('PermissionController › análise estrutural (G2-DX-12/13/15)', async 
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
-    /** @type {import('../../../src/copilot/agent/permission-controller.js').PermissionController} */
+    /** @type {import('#copilot/agent/infra/permission-controller').PermissionController} */
     let ctrl;
-    /** @type {import('../../../src/copilot/agent/permission-controller.js')} */
+    /** @type {import('#copilot/agent/infra/permission-controller')} */
     let mod;
 
-    before(async () => {
-        mod = await import('../../../src/copilot/agent/permission-controller.js');
+    beforeAll(async () => {
+        mod = await import('#copilot/agent/infra/permission-controller');
         const { PermissionController } = mod;
         ctrl = new PermissionController();
     });

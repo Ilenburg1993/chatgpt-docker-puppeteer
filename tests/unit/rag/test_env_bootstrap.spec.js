@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+
 import { bootstrapRagEnv } from '../../../tools/rag/lib/env-bootstrap.mjs';
 
 async function mkTempEnvDir(prefix = 'rag-env-') {

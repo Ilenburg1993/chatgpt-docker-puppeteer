@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { claimNextEligibleTask, insertTask, releaseTaskLock, updateTask } from '#infra/db/task_repo';
@@ -29,7 +28,7 @@ test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando inf
         DELETE FROM missions;
     `);
 
-    t.after(() => {
+    onTestFinished(() => {
         try {
             closeDb();
         } catch (_) {}

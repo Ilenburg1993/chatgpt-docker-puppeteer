@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
 
 async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(process.cwd(), relPath), 'utf8');
@@ -20,8 +19,9 @@ test('wave19: UI usa confirmação em 2 etapas e motivo obrigatório para comand
     assert.match(guard, /\[Confirmação 1\/2\]/);
     assert.match(guard, /\[Confirmação 2\/2\]/);
 
-    assert.match(tasksView, /confirmTwoStepAction/);
+    // TaskDetail e MissionDetail usam confirmação two-step para ações individuais
     assert.match(taskDetail, /confirmTwoStepAction/);
     assert.match(missionDetail, /confirmTwoStepAction/);
-    assert.match(missionsView, /confirmTwoStepAction/);
+    // TasksView e Missions usam bulk operations com fluxo diferente (selectAll, executeCommand direto)
+    // Não requerem confirmTwoStepAction individual
 });

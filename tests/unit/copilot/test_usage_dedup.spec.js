@@ -10,7 +10,6 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { before, describe, it } from 'node:test';
 
 describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
     /** @type {string} */
@@ -19,12 +18,22 @@ describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
     /** @type {string} */
     let collectorSource = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
-        [observerSource, collectorSource] = await Promise.all([
-            readFile(new URL('../../../src/copilot/observability/agent-event-observer.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/observability/event-collector.js', import.meta.url), 'utf-8'),
+        const base = new URL('../../../src/copilot/observability/', import.meta.url);
+        const observerFiles = [
+            'agent-event-observer.js',
+            'observers/dialog-task-handlers.js',
+            'observers/session-agent-handlers.js',
+        ];
+        const [collector, ...observers] = await Promise.all([
+            readFile(new URL('event-collector.js', base), 'utf-8'),
+            ...observerFiles.map(async (f) => {
+                try { return await readFile(new URL(f, base), 'utf-8'); } catch { return ''; }
+            }),
         ]);
+        collectorSource = collector;
+        observerSource = observers.join('\n');
     });
 
     it('event-collector deve registrar assistant.usage para persistência', () => {

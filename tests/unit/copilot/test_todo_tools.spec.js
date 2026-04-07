@@ -28,7 +28,7 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+
 import * as url from 'node:url';
 import { getCopilotDb } from '../../../src/copilot/db/sqlite.js';
 

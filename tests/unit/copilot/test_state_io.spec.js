@@ -15,7 +15,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { after, before, describe, it } from 'node:test';
 
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
 const TEST_STATE_DIR = join(import.meta.dirname, '.tmp-state-io-test');
@@ -23,14 +22,14 @@ const TEST_STATE_FILE = join(TEST_STATE_DIR, 'test-state.json');
 process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
 
 // Importar após definir env
-const { readState, writeState, writeStateAsync, clearState } = await import('../../../src/copilot/agent/state-io.js');
+const { readState, writeState, writeStateAsync, clearState } = await import('#copilot/agent/lifecycle/state-io');
 
 describe('state-io', () => {
-    before(() => {
+    beforeAll(() => {
         mkdirSync(TEST_STATE_DIR, { recursive: true });
     });
 
-    after(() => {
+    afterAll(() => {
         delete process.env.AGENT_STATE_FILE;
         if (existsSync(TEST_STATE_DIR)) {
             rmSync(TEST_STATE_DIR, { recursive: true, force: true });

@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 /**
  * Testes unitários para o controller de métricas

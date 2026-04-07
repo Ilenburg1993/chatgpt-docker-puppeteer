@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import test from 'node:test';
+
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 import { createAuditAgentServer } from '../../../src/audit_agent/server.js';
 import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';

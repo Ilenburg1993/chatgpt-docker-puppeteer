@@ -7,7 +7,6 @@ import { ActionCode } from '#shared/nerv/constants';
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { after, before, describe, it } from 'node:test';
 
 describe('Phase 2 Integration Smoke Tests', () => {
     /** @type {any} */ let missionManager;
@@ -30,7 +29,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
         emitEvent: () => {},
     };
 
-    before(async () => {
+    beforeAll(async () => {
         testMissionsDir = path.join(import.meta.dirname, '../../missions-test-phase2');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
@@ -53,7 +52,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
         await missionManager.initialize();
     });
 
-    after(async () => {
+    afterAll(async () => {
         await fs.rm(testMissionsDir, { recursive: true, force: true });
         missionManager.cleanup();
     });

@@ -1,7 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import test from 'node:test';
 
 test('wave20b: import de src/main.js com DAEMON_MODE=true não dispara boot sem autostart explícito', () => {
     const result = spawnSync(

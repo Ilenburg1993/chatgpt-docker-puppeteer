@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+
 import { parseJsonFromMixedOutput, runCommand } from '../../../scripts/audit/lib/exec.mjs';
 import { validateAuditRun } from '../../../scripts/audit/lib/schema.mjs';
 import { publishSnapshot } from '../../../scripts/audit/publish_snapshot.mjs';
@@ -103,7 +103,8 @@ test('check:forbidden executes without fs runtime crash', async () => {
 });
 
 test('triage fallback is deterministic when MCP is unavailable', async () => {
-    const mod = await import(`../../../scripts/audit/triage_llm.mjs?cachebust=${Date.now()}`);
+    vi.resetModules();
+    const mod = await import('../../../scripts/audit/triage_llm.mjs');
     const finding = {
         id: 'BUG-20990101-001',
         severity: 'P1',

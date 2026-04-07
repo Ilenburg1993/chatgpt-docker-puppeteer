@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+
 import { fingerprintBuffer } from '../../../tools/rag/lib/fingerprint.mjs';
 
 describe('RAG Fingerprinting', () => {

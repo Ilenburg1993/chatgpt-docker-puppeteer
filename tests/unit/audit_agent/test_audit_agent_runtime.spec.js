@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
 test('AuditAgentRuntime creates, queues and processes quick audit jobs to completed', async () => {

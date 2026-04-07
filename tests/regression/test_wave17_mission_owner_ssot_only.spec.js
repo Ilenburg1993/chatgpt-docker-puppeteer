@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -23,7 +22,9 @@ function makeMissionManager(
     const stateManager = {
         baseDir: path.join(process.cwd(), 'tmp', 'missions-wave17-owner'),
         async initialize() {},
-        async getMission(/** @type {any} */ missionId) {},
+        async getMission(/** @type {any} */ missionId) {
+            return JSON.parse(JSON.stringify(stateRef.value));
+        },
         async updateMission(/** @type {any} */ missionId, /** @type {any} */ updates) {
             stateRef.value = { ...stateRef.value, ...updates };
             return JSON.parse(JSON.stringify(stateRef.value));
@@ -103,7 +104,7 @@ test('wave17: MissionManager força SSOT quando legacy_direct não está em cont
         DELETE FROM missions;
     `);
 
-    t.after(() => {
+    afterAll(() => {
         delete process.env.MISSION_STEP_DISPATCH_MODE;
         delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
         try {

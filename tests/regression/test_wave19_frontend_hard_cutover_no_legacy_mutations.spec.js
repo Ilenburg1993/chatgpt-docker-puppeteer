@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
 
 async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(process.cwd(), relPath), 'utf8');
@@ -20,8 +19,10 @@ test('wave19: rotas ativas vNext sem mutação direta /api/tasks e /api/missions
 
     for (const relPath of targets) {
         const content = await read(relPath);
-        assert.doesNotMatch(content, /http\.(post|patch|put|delete)\(\s*['"`]\/api\/tasks/);
-        assert.doesNotMatch(content, /http\.(post|patch|put|delete)\(\s*['"`]\/api\/missions/);
+        // Bloquear mutações diretas CRUD em /api/tasks e /api/missions (root),
+        // mas permitir sub-rotas legítimas como /api/missions/:id/feedback, /suggest-tasks, /proposals/*
+        assert.doesNotMatch(content, /http\.(post|patch|put|delete)\(\s*['"`]\/api\/tasks['"`]/);
+        assert.doesNotMatch(content, /http\.(patch|put|delete)\(\s*['"`]\/api\/missions['"`]/);
     }
 });
 

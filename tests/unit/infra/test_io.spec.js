@@ -3,17 +3,16 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { after, before, describe, it } from 'node:test';
 
 describe('Infra IO Operations - Operações de Entrada/Saída', () => {
     /** @type {any} */ let testDir;
 
-    before(() => {
+    beforeAll(() => {
         testDir = path.join(tmpdir(), `test-io-${Date.now()}`);
         fs.mkdirSync(testDir, { recursive: true });
     });
 
-    after(() => {
+    afterAll(() => {
         try {
             fs.rmSync(testDir, { recursive: true, force: true });
         } catch (err) {

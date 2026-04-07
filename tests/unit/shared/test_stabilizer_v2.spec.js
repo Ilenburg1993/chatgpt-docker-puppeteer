@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 describe('stabilizer.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;
@@ -10,19 +9,19 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
     beforeEach(async () => {
         // Mock page object
         mockPage = {
-            evaluate: mock.fn(async () => true),
-            waitForNetworkIdle: mock.fn(async () => {}),
-            url: mock.fn(() => 'https://chat.openai.com'),
-            isClosed: mock.fn(() => false),
+            evaluate: vi.fn(async () => true),
+            waitForNetworkIdle: vi.fn(async () => {}),
+            url: vi.fn(() => 'https://chat.openai.com'),
+            isClosed: vi.fn(() => false),
         };
 
         // Mock driver object
         mockDriver = {
             page: mockPage,
-            _emitVital: mock.fn(() => {}),
+            _emitVital: vi.fn(() => {}),
             currentTarget: 'chatgpt',
             correlationId: 'test-stabilizer-123',
-            getMetrics: mock.fn(async () => ({
+            getMetrics: vi.fn(async () => ({
                 stream: { avg: 800, p95: 1200 },
             })),
         };
@@ -32,7 +31,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
     });
 
     afterEach(() => {
-        mock.restoreAll();
+        vi.restoreAllMocks();
     });
 
     // ======================
@@ -72,8 +71,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Mock phases para completar rápido
-                mockPage.evaluate = mock.fn(async () => false); // No spinners
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false); // No spinners
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -135,7 +134,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { measureEventLoopLag } = stabilizerModule;
 
                 let attempts = 0;
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     attempts++;
                     if (attempts < 3) {
                         throw new Error('Transient error');
@@ -152,7 +151,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve retornar fallback após 3 falhas', async () => {
                 const { measureEventLoopLag, STABILIZER_CONFIG } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     throw new Error('Persistent error');
                 });
 
@@ -167,7 +166,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { getPageLoadStatus } = stabilizerModule;
 
                 let attempts = 0;
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     attempts++;
                     if (attempts < 3) {
                         throw new Error('Transient error');
@@ -185,7 +184,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { getPageLoadStatus } = stabilizerModule;
 
                 // Mock retorna spinner com getClientRects() vazio (invisível)
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     // Simula detecção de spinner mas com rects vazios
                     return false; // Filtrado corretamente
                 });
@@ -200,9 +199,9 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve extrair domain corretamente', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.url = mock.fn(() => 'https://chat.openai.com/chat');
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.url = vi.fn(() => 'https://chat.openai.com/chat');
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -212,9 +211,9 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve logar erro se URL inválida', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.url = mock.fn(() => 'invalid-url');
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.url = vi.fn(() => 'invalid-url');
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -229,7 +228,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Simular erro durante DOM entropy phase
                 let observerCleanupCalled = false;
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('__STABILIZER_OBSERVERS')) {
                         observerCleanupCalled = true;
                         return;
@@ -240,7 +239,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                     return false;
                 });
 
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -252,7 +251,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
                 let hydrationSource = '';
 
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     const source = fn?.toString?.() || '';
                     if (source.includes("addEventListener('mousemove'")) {
                         hydrationSource = source;
@@ -260,7 +259,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                     }
                     return false;
                 });
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 await waitForStability(mockDriver, 5000);
 
@@ -278,7 +277,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const controller = new AbortController();
 
                 // Simular lag alto (loop infinito sem abort check)
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('eventLoopLag')) {
                         return 200; // Lag alto (threshold = 150)
                     }
@@ -294,7 +293,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Verificar evento STABILITY_ABORTED
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ABORTED');
+                const abortEvents = calls.filter((c) => c[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0, 'STABILITY_ABORTED event não emitido');
             });
         });
@@ -303,13 +302,13 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve emitir STABILITY_START', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_START');
+                const startEvents = calls.filter((c) => c[0] === 'STABILITY_START');
 
                 assert.ok(startEvents.length > 0, 'STABILITY_START não emitido');
             });
@@ -317,14 +316,14 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve emitir STABILITY_COMPLETE em sucesso', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
                 if (result.success) {
                     /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                    const completeEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_COMPLETE');
+                    const completeEvents = calls.filter((c) => c[0] === 'STABILITY_COMPLETE');
                     assert.ok(completeEvents.length > 0, 'STABILITY_COMPLETE não emitido');
                 }
             });
@@ -332,13 +331,13 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve emitir PHASE_START para cada fase', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const phaseStartEvents = calls.filter((c) => c.arguments[0] === 'PHASE_START');
+                const phaseStartEvents = calls.filter((c) => c[0] === 'PHASE_START');
 
                 // Deve ter pelo menos 1 PHASE_START
                 assert.ok(phaseStartEvents.length > 0, 'PHASE_START não emitido');
@@ -347,13 +346,13 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve emitir PHASE_SUCCESS para fases completas', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const phaseSuccessEvents = calls.filter((c) => c.arguments[0] === 'PHASE_SUCCESS');
+                const phaseSuccessEvents = calls.filter((c) => c[0] === 'PHASE_SUCCESS');
 
                 assert.ok(phaseSuccessEvents.length > 0, 'PHASE_SUCCESS não emitido');
             });
@@ -362,14 +361,14 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Simular page closed (erro crítico)
-                mockPage.isClosed = mock.fn(() => true);
+                mockPage.isClosed = vi.fn(() => true);
 
                 await assert.rejects(async () => await waitForStability(mockDriver, 5000), {
                     message: /page is closed/,
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ERROR');
+                const errorEvents = calls.filter((c) => c[0] === 'STABILITY_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'STABILITY_ERROR não emitido');
             });
@@ -387,7 +386,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 assert.strictEqual(result.success, false);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ABORTED');
+                const abortEvents = calls.filter((c) => c[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0);
             });
 
@@ -399,11 +398,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 // Abortar após 100ms
                 setTimeout(() => controller.abort(), 100);
 
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     await new Promise((r) => setTimeout(r, 50)); // Delay para permitir abort
                     return false;
                 });
-                mockPage.waitForNetworkIdle = mock.fn(async () => {
+                mockPage.waitForNetworkIdle = vi.fn(async () => {
                     await new Promise((r) => setTimeout(r, 50));
                 });
 
@@ -424,8 +423,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve distribuir timeout proporcionalmente (15/25/30/10/10/10)', async () => {
                 const { waitForStability, STABILIZER_CONFIG } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const totalTimeout = 10000; // 10s
 
@@ -447,12 +446,12 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Mock metrics: slow stream (1000ms avg)
-                mockDriver.getMetrics = mock.fn(async () => ({
+                mockDriver.getMetrics = vi.fn(async () => ({
                     stream: { avg: 1000, p95: 1500 },
                 }));
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 10000);
 
@@ -464,12 +463,12 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Mock metrics: fast stream (400ms avg)
-                mockDriver.getMetrics = mock.fn(async () => ({
+                mockDriver.getMetrics = vi.fn(async () => ({
                     stream: { avg: 400, p95: 600 },
                 }));
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 10000);
 
@@ -483,7 +482,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 let lagCallCount = 0;
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('eventLoopLag')) {
                         lagCallCount++;
                         return lagCallCount < 3 ? 200 : 100; // Lag alto → normal
@@ -491,7 +490,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                     return false;
                 });
 
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 10000);
 
@@ -508,11 +507,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Força o deadline global expirar antes da fase 2 iniciar.
-                mockPage.evaluate = mock.fn(async () => {
+                mockPage.evaluate = vi.fn(async () => {
                     await new Promise((r) => setTimeout(r, 200)); // Delay longo
                     return false;
                 });
-                mockPage.waitForNetworkIdle = mock.fn(async () => {
+                mockPage.waitForNetworkIdle = vi.fn(async () => {
                     await new Promise((r) => setTimeout(r, 200));
                 });
 
@@ -527,8 +526,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve retornar objeto com 8+ campos', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -551,8 +550,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('resultado deve ser boolean-coercible (backward compat)', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.evaluate = mock.fn(async () => false);
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.evaluate = vi.fn(async () => false);
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -571,7 +570,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { getPageLoadStatus } = stabilizerModule;
 
                 // Mock spinner invisível (rects vazios)
-                mockPage.evaluate = mock.fn(async () => false);
+                mockPage.evaluate = vi.fn(async () => false);
 
                 const result = await getPageLoadStatus(mockPage);
 
@@ -583,7 +582,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             it('deve propagar erros críticos (page closed)', async () => {
                 const { waitForStability } = stabilizerModule;
 
-                mockPage.isClosed = mock.fn(() => true);
+                mockPage.isClosed = vi.fn(() => true);
 
                 await assert.rejects(async () => await waitForStability(mockDriver, 5000), {
                     message: /page is closed/,
@@ -594,14 +593,14 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Mock erro recuperável
-                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+                mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('MutationObserver')) {
                         throw new Error('Transient DOM error');
                     }
                     return false;
                 });
 
-                mockPage.waitForNetworkIdle = mock.fn(async () => {});
+                mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
                 const result = await waitForStability(mockDriver, 5000);
 
@@ -619,8 +618,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
         it('deve completar todas as 6 fases em cenário ideal', async () => {
             const { waitForStability } = stabilizerModule;
 
-            mockPage.evaluate = mock.fn(async () => false); // No spinners, DOM stable
-            mockPage.waitForNetworkIdle = mock.fn(async () => {});
+            mockPage.evaluate = vi.fn(async () => false); // No spinners, DOM stable
+            mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
             const result = await waitForStability(mockDriver, 30000);
 
@@ -637,11 +636,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             // Abortar após 200ms
             setTimeout(() => controller.abort(), 200);
 
-            mockPage.evaluate = mock.fn(async () => {
+            mockPage.evaluate = vi.fn(async () => {
                 await new Promise((r) => setTimeout(r, 100)); // Delay para permitir abort
                 return false;
             });
-            mockPage.waitForNetworkIdle = mock.fn(async () => {
+            mockPage.waitForNetworkIdle = vi.fn(async () => {
                 await new Promise((r) => setTimeout(r, 100));
             });
 
@@ -654,8 +653,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
         it('deve manter telemetria consistente em múltiplas execuções', async () => {
             const { waitForStability } = stabilizerModule;
 
-            mockPage.evaluate = mock.fn(async () => false);
-            mockPage.waitForNetworkIdle = mock.fn(async () => {});
+            mockPage.evaluate = vi.fn(async () => false);
+            mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
             for (let i = 0; i < 3; i++) {
                 await waitForStability(mockDriver, 5000);
@@ -663,7 +662,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
             // Cada execução deve ter emitido STABILITY_START
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-            const startEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_START');
+            const startEvents = calls.filter((c) => c[0] === 'STABILITY_START');
 
             assert.ok(startEvents.length >= 3, `Esperado >= 3 STABILITY_START, obteve ${startEvents.length}`);
         });
@@ -678,7 +677,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { waitForStability } = stabilizerModule;
 
             let spinnerChecks = 0;
-            mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+            mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                 if (fn.toString().includes('spinner') || fn.toString().includes('loading')) {
                     spinnerChecks++;
                     return spinnerChecks <= 2; // Spinner por 2 checks, depois desaparece
@@ -686,7 +685,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 return false;
             });
 
-            mockPage.waitForNetworkIdle = mock.fn(async () => {});
+            mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
             const result = await waitForStability(mockDriver, 30000);
 
@@ -697,7 +696,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { waitForStability } = stabilizerModule;
 
             let mutationChecks = 0;
-            mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
+            mockPage.evaluate = vi.fn(async (/** @type {any} */ fn) => {
                 if (fn.toString().includes('MutationObserver')) {
                     mutationChecks++;
                     // DOM estabiliza após 3 checks
@@ -706,7 +705,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 return false;
             });
 
-            mockPage.waitForNetworkIdle = mock.fn(async () => {});
+            mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
             const result = await waitForStability(mockDriver, 30000);
 
@@ -717,11 +716,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { waitForStability } = stabilizerModule;
 
             // Mock operações longas
-            mockPage.evaluate = mock.fn(async () => {
+            mockPage.evaluate = vi.fn(async () => {
                 await new Promise((r) => setTimeout(r, 2000)); // 2s cada
                 return false;
             });
-            mockPage.waitForNetworkIdle = mock.fn(async () => {
+            mockPage.waitForNetworkIdle = vi.fn(async () => {
                 await new Promise((r) => setTimeout(r, 2000));
             });
 
@@ -740,7 +739,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { measureEventLoopLag } = stabilizerModule;
 
             // Mock sucesso imediato
-            mockPage.evaluate = mock.fn(async () => 50);
+            mockPage.evaluate = vi.fn(async () => 50);
 
             const iterations = 10;
             const start = Date.now();
@@ -761,8 +760,8 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
         it('MutationObserver cleanup não deve vazar memória', async () => {
             const { waitForStability } = stabilizerModule;
 
-            mockPage.evaluate = mock.fn(async () => false);
-            mockPage.waitForNetworkIdle = mock.fn(async () => {});
+            mockPage.evaluate = vi.fn(async () => false);
+            mockPage.waitForNetworkIdle = vi.fn(async () => {});
 
             // Executar múltiplas vezes
             for (let i = 0; i < 10; i++) {
@@ -772,7 +771,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             // Não há como testar leak diretamente em unit test, mas podemos verificar
             // que cleanup foi chamado 10 vezes
             const cleanupCalls = mockPage.evaluate.mock.calls.filter((/** @type {any} */ c) =>
-                c.arguments[0]?.toString().includes('__STABILIZER_OBSERVERS'),
+                c[0]?.toString().includes('__STABILIZER_OBSERVERS'),
             );
 
             console.log(`  🧹 Observer cleanup calls: ${cleanupCalls.length}`);

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
 
 // Stub logger antes de importar o módulo
 
@@ -20,7 +19,7 @@ describe('session-snapshot', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/snapshot.js')} */
     let mod;
 
-    before(async () => {
+    beforeAll(async () => {
         mod = await import('../../../src/copilot/agent/session/snapshot.js');
     });
 
@@ -31,7 +30,7 @@ describe('session-snapshot', async () => {
         }
     });
 
-    after(() => {
+    afterAll(() => {
         if (existsSync(TEST_SNAPSHOT_DIR)) {
             rmSync(TEST_SNAPSHOT_DIR, { recursive: true, force: true });
         }

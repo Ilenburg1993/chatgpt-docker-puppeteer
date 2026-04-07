@@ -2,7 +2,6 @@
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it } from 'node:test';
 
 describe('Boot Sequence Sanity Check (V2.0)', () => {
     it('should have MissionManager module available', async () => {

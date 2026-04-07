@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+
 import { AUDIT_EVENT_TYPES } from '../../../scripts/audit/lib/event_types.mjs';
 import { createAuditLogger } from '../../../scripts/audit/lib/logger.mjs';
 

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import * as schemas from '#core/schemas';
 import { createMission, getMissionById, updateMission } from '#infra/db/mission_repo';
@@ -98,7 +97,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async (t
     assert.equal(byId.get('task-wave18-cascade-2'), 'CANCELLED');
     assert.equal(byId.get('task-wave18-cascade-3'), 'DONE');
 
-    t.after(() => {
+    onTestFinished(() => {
         try {
             closeDb();
         } catch {}

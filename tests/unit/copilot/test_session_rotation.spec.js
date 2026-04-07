@@ -6,13 +6,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
 
 describe('shouldRotateSession', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/rotation.js').shouldRotateSession} */
     let shouldRotateSession;
 
-    before(async () => {
+    beforeAll(async () => {
         ({ shouldRotateSession } = await import('../../../src/copilot/agent/session/rotation.js'));
     });
 

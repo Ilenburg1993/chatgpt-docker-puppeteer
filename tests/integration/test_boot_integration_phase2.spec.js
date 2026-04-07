@@ -6,7 +6,6 @@ import { createNERV } from '#nerv/nerv';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { ContextManager } from '#orchestrator/context_manager';
 import assert from 'node:assert';
-import { before, describe, it } from 'node:test';
 
 describe('Boot Integration - Phase 2 Components', () => {
     /** @type {any} */ let nerv;
@@ -16,7 +15,7 @@ describe('Boot Integration - Phase 2 Components', () => {
     /** @type {any} */ let checkpointManager;
     /** @type {any} */ let missionManager;
 
-    before(async () => {
+    beforeAll(async () => {
         // Simula boot sequence (sem browser pool)
 
         // Fase 2: NERV

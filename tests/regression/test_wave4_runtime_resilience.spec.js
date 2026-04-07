@@ -3,7 +3,6 @@ import * as lifecycle from '#server/engine/lifecycle';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import test from 'node:test';
 
 async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 10000) {
     const start = Date.now();

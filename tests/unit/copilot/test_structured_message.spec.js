@@ -16,7 +16,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 
 import {
     PRIORITY_LEVELS,
@@ -27,7 +26,7 @@ import {
     isStructuredMessage,
     parseStructuredResponse,
     serializeStructuredMessage,
-} from '../../../src/copilot/types/structured-message.js';
+} from '#copilot/core/structured-message';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -267,7 +266,7 @@ describe('serializeStructuredMessage', () => {
 // ─── parseStructuredResponse ─────────────────────────────────────────────────
 
 describe('parseStructuredResponse', () => {
-    /** @param {Partial<import('../../../src/copilot/types/structured-message.js').StructuredMessage>} extra */
+    /** @param {Partial<import('#copilot/core/structured-message').StructuredMessage>} extra */
     function validJsonStr(extra = {}) {
         return JSON.stringify({
             version: '1.0',

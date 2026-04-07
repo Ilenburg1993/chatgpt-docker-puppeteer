@@ -1,3 +1,4 @@
+// ORPHAN: source module deleted (session-keepalive.js deleted) — skip until reimplemented
 // @ts-check
 /**
  * tests/unit/copilot/test_session_keepalive.spec.js
@@ -7,13 +8,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { afterEach, before, describe, it } from 'node:test';
 
-describe('SessionKeepalive', async () => {
+describe.skip('SessionKeepalive', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session-keepalive.js').SessionKeepalive} */
     let SessionKeepalive;
 
-    before(async () => {
+    beforeAll(async () => {
         ({ SessionKeepalive } = await import('../../../src/copilot/agent/session-keepalive.js'));
     });
 

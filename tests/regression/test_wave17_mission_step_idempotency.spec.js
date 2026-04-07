@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { MissionRunner } from '#agent/mission_runner';
 import { getMissionById, updateMission } from '#infra/db/mission_repo';
@@ -97,7 +96,7 @@ test('wave17: MissionRunner cria task de step com id determinístico e sem dupli
     assert.equal(tasks.length, 1);
     assert.equal(String(/** @type {any} */ (tasks[0]).id), firstTaskId);
 
-    t.after(() => {
+    onTestFinished(() => {
         try {
             closeDb();
         } catch (_) {}

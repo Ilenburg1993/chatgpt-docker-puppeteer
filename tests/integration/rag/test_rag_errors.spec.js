@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+
 import { ragHybridSearch, ragIndex, ragReset } from '../../../tools/rag/lib/facade.mjs';
 
 // Fake embeddings provider for testing

@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { resolveInferencePolicy, validateInferenceRoute } from '../../../src/inference_gateway/policy_config.js';
 
 test('resolveInferencePolicy respects precedence from defaults to overrides', () => {

@@ -1,7 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
-import test from 'node:test';
 
 import { isDomainMatch } from '#core/domain_matcher';
 import TargetDriver from '#driver/core/TargetDriver';

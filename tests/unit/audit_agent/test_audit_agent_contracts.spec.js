@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import {
     AUDIT_JOB_KIND,
     AUDIT_JOB_STATUS,

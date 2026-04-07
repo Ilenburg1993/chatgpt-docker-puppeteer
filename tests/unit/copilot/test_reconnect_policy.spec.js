@@ -17,7 +17,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+
 import { tryReconnect } from '../../../src/copilot/agent/lifecycle/reconnect-policy.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

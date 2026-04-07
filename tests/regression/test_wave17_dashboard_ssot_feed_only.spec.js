@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
 
 test('wave17: server/main exige contingência explícita para bridge legado', async () => {
     const content = await fs.readFile(path.join(process.cwd(), 'src/server/main.js'), 'utf8');

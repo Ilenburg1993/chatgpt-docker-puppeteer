@@ -2,7 +2,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import assert from 'node:assert';
-import { test } from 'node:test';
+
 import os from 'os';
 import path from 'path';
 

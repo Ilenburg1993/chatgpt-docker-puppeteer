@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import test from 'node:test';
 
 const filePath = path.join(process.cwd(), 'src/infra/ConnectionOrchestrator.js');
 

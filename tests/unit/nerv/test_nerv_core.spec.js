@@ -1,7 +1,7 @@
 // @ts-check
 import { ActorRole, MessageType } from '#shared/nerv/constants';
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+
 import { criarNERVMock } from '../../mocks/mock_nerv.js';
 
 describe('NERV Core - Event Bus Central', () => {

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -24,7 +23,9 @@ function makeMissionManager(
     const stateManager = {
         baseDir: path.join(process.cwd(), 'tmp', 'missions-wave15'),
         async initialize() {},
-        async getMission(/** @type {any} */ missionId) {},
+        async getMission(/** @type {any} */ missionId) {
+            return JSON.parse(JSON.stringify(stateRef.value));
+        },
         async updateMission(/** @type {any} */ missionId, /** @type {any} */ updates) {
             stateRef.value = { ...stateRef.value, ...updates };
             return JSON.parse(JSON.stringify(stateRef.value));
@@ -106,7 +107,7 @@ test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)'
         DELETE FROM missions;
     `);
 
-    t.after(() => {
+    afterAll(() => {
         delete process.env.MISSION_STEP_DISPATCH_MODE;
         try {
             closeDb();
@@ -158,7 +159,7 @@ test('wave15: MissionManager mantém fallback legacy_direct por env', async (t) 
     process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
     process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = 'true';
 
-    t.after(() => {
+    afterAll(() => {
         delete process.env.MISSION_STEP_DISPATCH_MODE;
         delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
     });

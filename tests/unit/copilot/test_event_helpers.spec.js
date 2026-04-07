@@ -12,9 +12,8 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { describe, it } from 'node:test';
 
-import { raceEvents, waitForEvent } from '../../../src/copilot/lib/event-helpers.js';
+import { raceEvents, waitForEvent } from '#copilot/sdk/event-helpers';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // waitForEvent

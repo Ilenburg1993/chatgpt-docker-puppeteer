@@ -10,7 +10,6 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { before, describe, it } from 'node:test';
 
 describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
     /** @type {typeof import('../../../src/copilot/observability/otel.js')} */
@@ -19,13 +18,22 @@ describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
     /** @type {string} */
     let observerSource = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         otel = await import('../../../src/copilot/observability/otel.js');
-        observerSource = await readFile(
-            new URL('../../../src/copilot/observability/agent-event-observer.js', import.meta.url),
-            'utf-8',
+        // O observer foi decomposto em sub-módulos; ler todos para inspeção
+        const base = new URL('../../../src/copilot/observability/', import.meta.url);
+        const files = [
+            'agent-event-observer.js',
+            'observers/dialog-task-handlers.js',
+            'observers/session-agent-handlers.js',
+        ];
+        const parts = await Promise.all(
+            files.map(async (f) => {
+                try { return await readFile(new URL(f, base), 'utf-8'); } catch { return ''; }
+            }),
         );
+        observerSource = parts.join('\n');
     });
 
     it('otel.js deve exportar startSpanImmediate', () => {

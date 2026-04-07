@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs/promises';
 import path from 'node:path';

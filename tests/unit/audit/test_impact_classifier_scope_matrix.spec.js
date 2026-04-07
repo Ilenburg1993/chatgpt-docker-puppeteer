@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { buildQualityExecutionPlan } from '../../../scripts/audit/lib/impact_classifier.mjs';
 
 test('impact classifier: docs-only quick smart skips lint/typecheck and keeps prettier delta', () => {

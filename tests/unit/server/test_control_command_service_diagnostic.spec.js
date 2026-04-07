@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import test from 'node:test';
+
 import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
 import { COMMANDS, executeCommand, validateCommand } from '../../../src/server/domain/control_command_service.js';
 

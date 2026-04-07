@@ -2,7 +2,7 @@
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { describe, it } from 'node:test';
+
 import { tmpdir } from 'os';
 import { join } from 'path';
 

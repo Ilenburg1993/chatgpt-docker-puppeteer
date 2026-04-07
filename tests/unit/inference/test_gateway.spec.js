@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 
 test('InferenceGateway generate uses policy precedence and validates route', async () => {

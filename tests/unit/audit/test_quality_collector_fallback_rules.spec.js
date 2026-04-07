@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { collectQualityFindings } from '../../../scripts/audit/collectors/quality.mjs';
 
 test('quality collector records warning when lint fails without parseable JSON', async () => {

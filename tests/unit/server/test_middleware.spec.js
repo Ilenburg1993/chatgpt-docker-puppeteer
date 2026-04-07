@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 describe('Server Middleware - Request Processing', () => {
     describe('1. Error Handler Middleware', () => {

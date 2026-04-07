@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import test from 'node:test';
 
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
 import { __mainTestHooks } from '../../src/main.js';
@@ -49,7 +48,7 @@ async function waitForExitWithTimeout(
     }
 }
 
-test.after(async () => {
+afterAll(async () => {
     __mainTestHooks.cleanupSignalHandlers();
     __mainTestHooks.resetShutdownState();
     await shutdownDriverFactory().catch(() => {});

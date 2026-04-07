@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 describe('Driver Adapters - Adaptadores de Plataforma', () => {
     describe('1. ChatGPT Adapter', () => {

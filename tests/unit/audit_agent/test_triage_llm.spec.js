@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import test from 'node:test';
+
 import { createAuditAgentTriageLlmClient } from '../../../src/audit_agent/triage_llm.js';
 
 async function listen(/** @type {any} */ server) {

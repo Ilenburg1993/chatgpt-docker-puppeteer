@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import { __mainTestHooks } from '#main';
 

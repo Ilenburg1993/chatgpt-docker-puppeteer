@@ -5,7 +5,6 @@ import { createNERV } from '#nerv/nerv';
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { after, before, describe, it } from 'node:test';
 
 /**
  * Suite de testes de integração do sistema de missões.
@@ -24,12 +23,12 @@ describe('Mission System Integration (E2E)', () => {
     /** @type {any} */ let missionManager;
     const testMissionsDir = path.join(import.meta.dirname, '../../missions-test');
 
-    before(async () => {
+    beforeAll(async () => {
         // Setup: Cria diretório temporário para missões de teste
         await fs.mkdir(testMissionsDir, { recursive: true });
     });
 
-    after(async () => {
+    afterAll(async () => {
         // Cleanup: Remove diretório de teste
         try {
             await fs.rm(testMissionsDir, { recursive: true, force: true });
@@ -150,7 +149,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('3. Mission Execution Integration', () => {
         /** @type {any} */ let testMissionId;
 
-        before(async () => {
+        beforeAll(async () => {
             // Cria mission para teste de execução
             const mission = await missionManager.createMission({
                 title: 'Execution Test',
@@ -200,7 +199,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('4. Feedback Integration', () => {
         /** @type {any} */ let feedbackMissionId;
 
-        before(async () => {
+        beforeAll(async () => {
             const mission = await missionManager.createMission({
                 title: 'Feedback Test',
                 description: 'Testing feedback injection',
@@ -336,7 +335,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('6. Progress Tracking Integration', () => {
         /** @type {any} */ let progressMissionId;
 
-        before(async () => {
+        beforeAll(async () => {
             const mission = await missionManager.createMission({
                 title: 'Progress Test',
                 description: 'Test',

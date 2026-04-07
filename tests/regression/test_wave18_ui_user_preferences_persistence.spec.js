@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
@@ -40,7 +39,7 @@ test('wave18: preferências de UI persistem em sqlite por usuário', async (t) =
     assert.deepEqual(second.columns, { tasks: ['id', 'status', 'mission_id'] });
     assert.deepEqual(loaded.columns, { tasks: ['id', 'status', 'mission_id'] });
 
-    t.after(() => {
+    onTestFinished(() => {
         try {
             closeDb();
         } catch {}

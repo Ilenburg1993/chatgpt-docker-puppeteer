@@ -4,7 +4,6 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
 
 import { ragExpand, ragIndex, ragQuery } from '../../../tools/rag/lib/facade.mjs';
 

@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { collectRuntimeFindings } from '../../../scripts/audit/collectors/runtime.mjs';
 
 /**

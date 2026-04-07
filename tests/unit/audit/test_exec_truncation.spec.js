@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { runCommand } from '../../../scripts/audit/lib/exec.mjs';
 
 test('runCommand truncates oversized stdout and reports metadata', async () => {

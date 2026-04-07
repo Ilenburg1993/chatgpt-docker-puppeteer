@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import { parseJsonFromMixedOutput } from '../../../scripts/audit/lib/exec.mjs';
 
 test('parseJsonFromMixedOutput parses final valid JSON block with noisy logs', () => {

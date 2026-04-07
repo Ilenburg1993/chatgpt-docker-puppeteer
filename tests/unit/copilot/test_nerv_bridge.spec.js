@@ -16,7 +16,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'node:test';
+
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 import { copilotNervBridge, emitNerv, isMounted, mount, unmount } from '../../../src/copilot/bridges/nerv-bridge.js';
 

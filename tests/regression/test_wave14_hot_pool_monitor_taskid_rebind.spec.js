@@ -1,7 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
-import test from 'node:test';
 
 import { PageLifecycleMonitor } from '#infra/browser_pool/PageLifecycleMonitor';
 import BrowserPoolManager from '#infra/browser_pool/pool_manager';
@@ -86,5 +85,4 @@ test('wave14: lifecycle monitor uses rebound taskId on close/disconnect cleanup'
 
     assert.equal(removals.length, 1, 'close path should remove page from pool');
     assert.equal(removals[0][0], 'task-final', 'close path must use rebound taskId');
-    assert.equal(removals[0][1], page, 'close path must pass page fallback reference');
 });

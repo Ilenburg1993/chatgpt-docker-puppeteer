@@ -1,6 +1,5 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 
 describe('API Router - Rotas e Controllers', () => {
     describe('1. Rotas de Tarefas (Tasks)', () => {
