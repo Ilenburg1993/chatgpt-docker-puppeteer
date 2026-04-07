@@ -178,4 +178,54 @@ describe('MessageQueue', () => {
             assert.equal(changed, 2, 'shift deve disparar onChanged');
         });
     });
+
+    // ---------------------------------------------------------------------------
+    // FIFO order
+    // ---------------------------------------------------------------------------
+    describe('FIFO', () => {
+        it('enqueue + shift mantém ordem FIFO', () => {
+            const q = new MessageQueue();
+            const { task: t1 } = makeTask({ message: 'first' });
+            const { task: t2 } = makeTask({ message: 'second' });
+            const { task: t3 } = makeTask({ message: 'third' });
+            q.enqueue(t1);
+            q.enqueue(t2);
+            q.enqueue(t3);
+            assert.equal(q.shift()?.message, 'first');
+            assert.equal(q.shift()?.message, 'second');
+            assert.equal(q.shift()?.message, 'third');
+        });
+
+        it('size reflete o número de itens na fila', () => {
+            const q = new MessageQueue();
+            assert.equal(q.size, 0);
+            const { task } = makeTask();
+            q.enqueue(task);
+            assert.equal(q.size, 1);
+            q.shift();
+            assert.equal(q.size, 0);
+        });
+    });
+
+    // ---------------------------------------------------------------------------
+    // MAX_QUEUE_SIZE
+    // ---------------------------------------------------------------------------
+    describe('MAX_QUEUE_SIZE', () => {
+        it('lança QUEUE_FULL ao exceder limite', () => {
+            const q = new MessageQueue();
+            // MAX_QUEUE_SIZE default from env.js; enqueue até estourar
+            let thrown = false;
+            for (let i = 0; i < 200; i++) {
+                try {
+                    const { task } = makeTask();
+                    q.enqueue(task);
+                } catch (/** @type {any} */ err) {
+                    assert.equal(err.code, 'QUEUE_FULL');
+                    thrown = true;
+                    break;
+                }
+            }
+            assert.ok(thrown, 'deveria ter lançado QUEUE_FULL');
+        });
+    });
 });
