@@ -222,12 +222,12 @@ export function cmdSessionSave({ println }, reason) {
 
     const data = createSnapshot({
         sessionId: alwaysAliveAgent.sessionId ?? null,
-        model: String(snap.model ?? 'unknown'),
-        status: String(snap.status ?? 'unknown'),
-        sendCount: Number(snap.sendCount ?? 0),
+        model: String(snap['model'] ?? 'unknown'),
+        status: String(snap['status'] ?? 'unknown'),
+        sendCount: Number(snap['sendCount'] ?? 0),
         dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-        dialogPaused: Boolean(snap.dialogPaused),
-        pendingQuestion: snap.pendingQuestion ? String(snap.pendingQuestion) : null,
+        dialogPaused: Boolean(snap['dialogPaused']),
+        pendingQuestion: snap['pendingQuestion'] ? String(snap['pendingQuestion']) : null,
         prMetrics: prm ?? null,
         reason: reason || 'manual',
     });
