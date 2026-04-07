@@ -20,7 +20,6 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { SessionError } from '#copilot/core/errors';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
@@ -36,13 +35,18 @@ import {
 } from './dialog/agent-dialog-controller.js';
 import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
-import { persistState, readState } from './lifecycle/state-io.js';
-// G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
-import { resolveUserInput as hookToolsResolveUserInput } from '../tools/hook-tools.js';
+import { readState } from './lifecycle/state-io.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
 // F36: Lifecycle — start, stop, initSession, tryReconnect
 import { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
+// F38: Messaging — sendMessage, steerMessage, answerPendingQuestion
+import {
+    sendMessage as msgSend,
+    sendMessageDialogBoot as msgSendBoot,
+    steerMessage as msgSteer,
+    answerPendingQuestion as msgAnswer,
+} from './messaging/agent-messaging.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -345,117 +349,39 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @returns {Promise<string>} Resposta completa do modelo
      */
-    sendMessage(message, { timeoutMs, attachments, signal } = {}) {
-        return new Promise((resolve, reject) => {
-            if (signal?.aborted) {
-                reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
-                return;
-            }
-            if (this.ctx.dialogLoop.active) {
-                reject(
-                    new SessionError(
-                        '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
-                        'DIALOG_ACTIVE',
-                    ),
-                );
-                return;
-            }
-            this.#enqueueTask(message, {
-                resolve,
-                reject,
-                ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-                ...(attachments !== undefined ? { attachments } : {}),
-                ...(signal !== undefined ? { signal } : {}),
-            });
-        });
+    sendMessage(message, opts) {
+        return msgSend(this.ctx, this, message, opts);
     }
 
     /**
-     * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt. Bypassa o guard de
-     * dialog loop ativo — NÃO expor como API pública.
+     * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt.
      *
      * @param {string} message
      * @param {{ timeoutMs?: number }} [opts]
      * @returns {Promise<string>}
      */
     sendMessageDialogBoot(message, opts = {}) {
-        return new Promise((resolve, reject) => {
-            this.#enqueueTask(message, { ...opts, resolve, reject });
-        });
+        return msgSendBoot(this.ctx, this, message, opts);
     }
 
     /**
-     * Envia uma mensagem em modo "steering" (immediate) — injetada no turno ativo para redirecionar o agente sem
-     * abortar o processamento. Se o agente não estiver processando, a mensagem inicia um novo turno.
+     * Envia uma mensagem em modo "steering" (immediate).
      *
-     * @param {string} prompt - Mensagem de steering
-     * @returns {Promise<string>} messageId retornado pelo SDK
-     * @throws {SessionError} Se a sessão não estiver ativa
+     * @param {string} prompt
+     * @returns {Promise<string>}
      */
     async steerMessage(prompt) {
-        if (!this.ctx.session) {
-            throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
-        }
-        const messageId = await this.ctx.session.send({ prompt, mode: 'immediate' });
-        log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
-        this.emit('steering.sent', { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
-        return messageId;
-    }
-
-    /**
-     * Enfileira uma task internamente — compartilhado por sendMessage e sendMessageDialogBoot.
-     *
-     * @param {string} message
-     * @param {{
-     *     timeoutMs?: number;
-     *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
-     *     signal?: AbortSignal;
-     *     resolve: (v: string | PromiseLike<string>) => void;
-     *     reject: (r: unknown) => void;
-     * }} opts
-     */
-    #enqueueTask(message, { timeoutMs, attachments, signal, resolve, reject }) {
-        const task = /** @type {AgentTask} */ ({
-            id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            message,
-            resolve,
-            reject,
-            enqueuedAt: Date.now(),
-            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-            ...(attachments !== undefined ? { attachments } : {}),
-        });
-        try {
-            this.ctx.messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
-        } catch (/** @type {any} */ err) {
-            reject(err instanceof Error ? err : new Error(String(err)));
-            return;
-        }
-        this.emit('task.queued', { taskId: task.id, message });
+        return msgSteer(this.ctx, this, prompt);
     }
 
     /**
      * Responde a uma pergunta pendente do modelo.
      *
-     * @param {string} answer - Resposta do usuário
-     * @returns {boolean} True se havia pergunta pendente e foi respondida
+     * @param {string} answer
+     * @returns {boolean}
      */
     answerPendingQuestion(answer) {
-        if (!this.ctx.pendingQuestion) {
-            // ARCH-N01 (fix): mesmo sem pendingQuestion nativo, pode haver Promise de hook-tools.
-            // G2-ARCH-03: resolveUserInput agora é import estático (sem circular dependency).
-            if (!hookToolsResolveUserInput(answer)) {
-                log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
-            }
-            return false;
-        }
-        log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
-        this.ctx.pendingQuestion.resolve(answer);
-        this.ctx.pendingQuestion = null;
-        persistState({ pendingQuestion: null }, '[AlwaysAlive] writeState pendingQuestion=null');
-        this.emit('question.answered', { answer });
-        // G2-ARCH-03: também resolver Promise da tool request_user_input — import estático
-        hookToolsResolveUserInput(answer);
-        return true;
+        return msgAnswer(this.ctx, this, answer);
     }
 
     // ─── Getters / Setters de configuração em runtime ─────────────────────────
