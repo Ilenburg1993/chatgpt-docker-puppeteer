@@ -27,12 +27,12 @@ export {
 // Classes stateful: registry, selector, stats tracker, auto-downgrade
 export {
     AutoDowngradeDetector,
-    autoDowngradeDetector,
     ModelRegistry,
-    modelRegistry,
     ModelSelector,
-    modelSelector,
     ModelStatsTracker,
+    autoDowngradeDetector,
+    modelRegistry,
+    modelSelector,
     modelStatsTracker,
 } from './registry.js';
 

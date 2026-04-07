@@ -2,15 +2,17 @@
 /**
  * src/copilot/sdk/models/known-models.js
  *
- * Catálogo estático de modelos conhecidos com metadata expandida.
- * Usado como fallback pelo ModelRegistry quando o SDK não fornece capabilities completas.
+ * Catálogo estático de modelos conhecidos com metadata expandida. Usado como fallback pelo ModelRegistry quando o SDK
+ * não fornece capabilities completas.
  *
  * @module copilot/sdk/models/known-models
  */
 
 /**
  * @typedef {import('./registry.js').CostTier} CostTier
+ *
  * @typedef {import('./registry.js').SpeedTier} SpeedTier
+ *
  * @typedef {import('./registry.js').ModelMeta} ModelMeta
  */
 
