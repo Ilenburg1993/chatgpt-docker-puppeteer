@@ -7,9 +7,9 @@
 export { EventFanout, eventFanout } from './fanout.js';
 export { SseReplayBuffer } from './replay-buffer.js';
 export {
+    SseConnectionTracker,
     createEventFilter,
     createSseWriter,
     sanitizeSseEvent,
-    SseConnectionTracker,
     standardizeSsePayload,
 } from './utils.js';
