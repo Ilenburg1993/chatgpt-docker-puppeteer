@@ -128,9 +128,9 @@
 // ─── Helpers para percentis ───────────────────────────────────────────────────
 
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
+import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config/env';
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
-import { COPILOT_METRICS_SNAPSHOT_INTERVAL, COPILOT_LOG_DIR } from '#copilot/config/env';
 
 /**
  * Calcula percentil de um array ordenado.

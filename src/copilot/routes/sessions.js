@@ -27,9 +27,9 @@
  * @module copilot/routes/sessions
  */
 
+import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN, SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config/env';
 import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
-import { SDK_API_TOKEN as _SDK_API_TOKEN, BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config/env';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';

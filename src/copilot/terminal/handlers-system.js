@@ -8,6 +8,7 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
@@ -15,7 +16,6 @@ import {
     removeCustomTool,
 } from '#copilot/config/tools/registry';
 import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools/state';
-import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

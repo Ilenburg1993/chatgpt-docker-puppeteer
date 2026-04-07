@@ -20,16 +20,16 @@
  * @module copilot/observability/otel
  */
 
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
     COPILOT_LOG_DIR,
+    COPILOT_OTEL_CAPTURE_CONTENT,
     COPILOT_OTEL_DISABLED,
     COPILOT_OTEL_ENDPOINT,
     COPILOT_OTEL_EXPORTER_TYPE,
     COPILOT_OTEL_SOURCE_NAME,
-    COPILOT_OTEL_CAPTURE_CONTENT,
 } from '#copilot/config/env';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

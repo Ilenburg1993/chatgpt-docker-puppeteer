@@ -10,8 +10,8 @@
  * @module copilot/conversation-hub/socket-ns
  */
 
-import { log } from '#copilot/observability/logger';
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import jwt from 'jsonwebtoken';
 

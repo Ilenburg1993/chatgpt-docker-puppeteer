@@ -19,13 +19,13 @@
  * @module copilot/routes/observability
  */
 
+import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';
 import { getLastQuotaSnapshots } from '#copilot/observability/event-collector';
 import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
-import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { getAuditTail } from '../hooks/audit.js';

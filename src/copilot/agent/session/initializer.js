@@ -14,18 +14,18 @@
  * @see module:copilot/config/session-config
  */
 
+import { buildCustomAgentsConfig } from '#copilot/config/custom-agents';
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { getToolsConfig, loadToolsConfig } from '#copilot/config/tools/state';
 import { resumeOrCreate } from '#copilot/lib/session';
+import { pickDefined } from '#copilot/lib/utils';
 import { log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
+import { readStore as _readTodoStore } from '#copilot/tools/todo/store';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { buildCustomAgentsConfig } from '#copilot/config/custom-agents';
-import { pickDefined } from '#copilot/lib/utils';
-import { readStore as _readTodoStore } from '#copilot/tools/todo/store';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES, SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
 import { buildAuditingPermissionHandler } from '../infra/tool-audit-logger.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';

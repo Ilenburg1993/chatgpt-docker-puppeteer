@@ -36,19 +36,19 @@
  * @see module:copilot/terminal/repl
  */
 
-import { log } from '#copilot/observability/logger';
-import { timingSafeEqual } from 'node:crypto';
-import http from 'node:http';
-import https from 'node:https';
 import {
-    LLM_B_TERMINAL_PORT,
+    COPILOT_READY_WEBHOOK,
     LLM_B_INJECT_RATE_MAX,
     LLM_B_INJECT_RATE_WINDOW_MS,
     LLM_B_SSE_RATE_MAX,
     LLM_B_SSE_RATE_WINDOW_MS,
-    COPILOT_READY_WEBHOOK,
+    LLM_B_TERMINAL_PORT,
     LLM_B_TERMINAL_TOKEN,
 } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
+import { timingSafeEqual } from 'node:crypto';
+import http from 'node:http';
+import https from 'node:https';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { defaultAuditLog } from '../observability/audit-log.js';
 import { println } from './dialog.js';

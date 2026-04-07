@@ -17,8 +17,8 @@
  * @see module:copilot/channel/client
  */
 
-import { log } from '#copilot/observability/logger';
 import { LLM_B_BOOT_PROMPT } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { eventFanout } from '../api/event-fanout.js';
 import { emitNerv } from '../bridges/nerv-bridge.js';

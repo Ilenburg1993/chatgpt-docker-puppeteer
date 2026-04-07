@@ -16,9 +16,9 @@
  * @module copilot/terminal
  */
 
+import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config/env';
 import { AGENT_EVENTS } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
-import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config/env';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
 import { loadAliases } from '../bridges/alias-store.js';

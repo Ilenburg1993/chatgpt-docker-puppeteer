@@ -16,10 +16,10 @@
  * @module copilot/observability/audit-log
  */
 
+import { COPILOT_AUDIT_RING_SIZE } from '#copilot/config/env';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { COPILOT_AUDIT_RING_SIZE } from '#copilot/config/env';
 import { LOG_DIR, log } from './logger.js';
 
 /** Máximo de entradas no buffer em memória. */

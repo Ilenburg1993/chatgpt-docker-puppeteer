@@ -18,15 +18,15 @@
  * @module copilot/terminal/state
  */
 
-import EventEmitter from 'node:events';
 import {
-    TERMINAL_MAX_LISTENERS,
     TERMINAL_MAX_ATTACHMENTS,
+    TERMINAL_MAX_INJECT_HISTORY,
+    TERMINAL_MAX_LISTENERS,
+    TERMINAL_SHOW_STREAMING,
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
-    TERMINAL_SHOW_STREAMING,
-    TERMINAL_MAX_INJECT_HISTORY,
 } from '#copilot/config/env';
+import EventEmitter from 'node:events';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────

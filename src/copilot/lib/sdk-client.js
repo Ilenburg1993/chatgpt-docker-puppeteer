@@ -17,8 +17,8 @@
  * @see module:copilot/always-alive
  */
 
-import { log } from '#copilot/observability/logger';
 import { COPILOT_CLI_URL, OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 
 /**

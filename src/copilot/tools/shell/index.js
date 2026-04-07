@@ -18,10 +18,10 @@
  * @module copilot/tools/shell-tools
  */
 
+import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config/env';
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
-import { COPILOT_NPM_SCRIPT_ALLOWLIST, COPILOT_ALLOWED_EXECUTABLES } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile, spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';

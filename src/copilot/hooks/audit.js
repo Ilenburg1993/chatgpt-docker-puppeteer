@@ -26,8 +26,8 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from '#copilot/observability/logger';
 import { COPILOT_AUDIT_BUFFER_SIZE } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('./types.js').AuditEntry} AuditEntry
