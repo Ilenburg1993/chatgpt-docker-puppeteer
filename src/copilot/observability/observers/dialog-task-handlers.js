@@ -7,7 +7,7 @@
  * @module copilot/observability/observers/dialog-task-handlers
  */
 
-import { modelStatsTracker } from '#copilot/sdk/model-registry';
+import { modelStatsTracker } from '#copilot/sdk/models/registry';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 

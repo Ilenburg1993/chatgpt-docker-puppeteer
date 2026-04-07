@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/lib/model-registry.js
+ * src/copilot/sdk/models/registry.js
  *
  * F40 — Multi-Model Selection Pool.
  *
@@ -11,10 +11,11 @@
  * - **ModelStatsTracker**: rastreamento de latência, success rate e custo por modelo
  * - **AutoDowngradeDetector**: detecção de modelo lento → sinaliza switch automático
  *
- * @module copilot/lib/model-registry
+ * @module copilot/sdk/models/registry
  */
 
 import { log } from '#copilot/observability/logger';
+import { COST_ORDER, KNOWN_MODELS, SPEED_ORDER } from './known-models.js';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -68,124 +69,6 @@ import { log } from '#copilot/observability/logger';
  * @property {string} [prefer] - ID de modelo preferido (prioridade máxima se disponível)
  * @property {string[]} [exclude] - IDs de modelos a excluir
  */
-
-// ─── Known model metadata (hardcoded defaults para modelos conhecidos) ───────
-
-/**
- * Catálogo de modelos conhecidos com capabilities expandidas. Quando o SDK retorna modelos sem metadata suficiente,
- * este catálogo é usado como fallback.
- *
- * @type {ReadonlyArray<ModelMeta>}
- */
-const KNOWN_MODELS = Object.freeze([
-    {
-        id: 'gpt-4.1',
-        costTier: /** @type {CostTier} */ ('medium'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 1_047_576,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['gpt4.1'],
-    },
-    {
-        id: 'gpt-4.1-mini',
-        costTier: /** @type {CostTier} */ ('low'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 1_047_576,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['gpt4.1-mini', 'mini'],
-    },
-    {
-        id: 'gpt-4.1-nano',
-        costTier: /** @type {CostTier} */ ('free'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 1_047_576,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['nano'],
-    },
-    {
-        id: 'gpt-4o',
-        costTier: /** @type {CostTier} */ ('medium'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 128_000,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['4o'],
-    },
-    {
-        id: 'gpt-4o-mini',
-        costTier: /** @type {CostTier} */ ('low'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 128_000,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['4o-mini'],
-    },
-    {
-        id: 'o3',
-        costTier: /** @type {CostTier} */ ('premium'),
-        speedTier: /** @type {SpeedTier} */ ('slow'),
-        contextWindow: 200_000,
-        supportsReasoning: true,
-        supportsVision: true,
-        aliases: [],
-    },
-    {
-        id: 'o3-mini',
-        costTier: /** @type {CostTier} */ ('medium'),
-        speedTier: /** @type {SpeedTier} */ ('medium'),
-        contextWindow: 200_000,
-        supportsReasoning: true,
-        supportsVision: false,
-        aliases: [],
-    },
-    {
-        id: 'o4-mini',
-        costTier: /** @type {CostTier} */ ('medium'),
-        speedTier: /** @type {SpeedTier} */ ('medium'),
-        contextWindow: 200_000,
-        supportsReasoning: true,
-        supportsVision: true,
-        aliases: [],
-    },
-    {
-        id: 'claude-sonnet-4',
-        costTier: /** @type {CostTier} */ ('high'),
-        speedTier: /** @type {SpeedTier} */ ('medium'),
-        contextWindow: 200_000,
-        supportsReasoning: true,
-        supportsVision: true,
-        aliases: ['claude-sonnet', 'sonnet'],
-    },
-    {
-        id: 'claude-3.5-sonnet',
-        costTier: /** @type {CostTier} */ ('medium'),
-        speedTier: /** @type {SpeedTier} */ ('fast'),
-        contextWindow: 200_000,
-        supportsReasoning: false,
-        supportsVision: true,
-        aliases: ['sonnet-3.5'],
-    },
-    {
-        id: 'gemini-2.5-pro',
-        costTier: /** @type {CostTier} */ ('high'),
-        speedTier: /** @type {SpeedTier} */ ('medium'),
-        contextWindow: 1_000_000,
-        supportsReasoning: true,
-        supportsVision: true,
-        aliases: ['gemini-pro'],
-    },
-]);
-
-// ─── Ordenação de tiers para comparação numérica ─────────────────────────────
-
-/** @type {Record<CostTier, number>} */
-const COST_ORDER = { free: 0, low: 1, medium: 2, high: 3, premium: 4 };
-
-/** @type {Record<SpeedTier, number>} */
-const SPEED_ORDER = { slow: 0, medium: 1, fast: 2 };
 
 // ─── ModelRegistry ───────────────────────────────────────────────────────────
 
@@ -665,13 +548,10 @@ const autoDowngradeDetector = new AutoDowngradeDetector(modelStatsTracker, model
 export {
     AutoDowngradeDetector,
     autoDowngradeDetector,
-    COST_ORDER,
-    KNOWN_MODELS,
     ModelRegistry,
     modelRegistry,
     ModelSelector,
     modelSelector,
     ModelStatsTracker,
     modelStatsTracker,
-    SPEED_ORDER,
 };

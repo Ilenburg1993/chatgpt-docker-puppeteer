@@ -78,7 +78,7 @@ export {
     modelRegistry,
     modelSelector,
     modelStatsTracker,
-} from './model-registry.js';
+} from './models/registry.js';
 
 export {
     buildReasoningConfig,
@@ -93,7 +93,7 @@ export {
     pickModel,
     resolveModelId,
     supportsReasoning,
-} from './models.js';
+} from './models/helpers.js';
 
 export {
     createRegistry,
