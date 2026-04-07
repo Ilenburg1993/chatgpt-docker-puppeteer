@@ -67,7 +67,7 @@ import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
 import { WebhookManager } from './infra/webhook-manager.js';
 import { persistState, readState, writeStateAsync } from './lifecycle/state-io.js';
 import { performBootWiring } from './session/boot-wiring.js';
-import { syncSdkHistory, SessionMessagesCache } from './session/history-sync.js';
+import { SessionMessagesCache, syncSdkHistory } from './session/history-sync.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
 // G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
