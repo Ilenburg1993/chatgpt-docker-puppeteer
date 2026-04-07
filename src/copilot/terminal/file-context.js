@@ -11,6 +11,7 @@
  * @module copilot/terminal/file-context
  */
 
+import { ToolError } from '#copilot/core/errors';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
 
@@ -147,7 +148,7 @@ export async function readFileContext(filePath) {
 
     const info = await stat(absPath);
     if (info.size > MAX_EMBED_BYTES) {
-        throw new Error(`Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`);
+        throw new ToolError(`Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`);
     }
     const content = await readFile(absPath, 'utf-8');
     const ctx = {

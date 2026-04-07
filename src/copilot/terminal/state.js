@@ -26,6 +26,7 @@ import {
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config/env';
+import { CopilotError } from '#copilot/core/errors';
 import EventEmitter from 'node:events';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
@@ -146,7 +147,7 @@ export function getAttachmentQueue() {
 export function addAttachment(filePath) {
     // T-22: verificar limite antes de enfileirar
     if (_attachmentQueue.length >= MAX_ATTACHMENT_QUEUE) {
-        throw new Error(`[terminal/state] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
+        throw new CopilotError(`[terminal/state] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
     }
     if (!_attachmentQueue.includes(filePath)) {
         _attachmentQueue.push(filePath);

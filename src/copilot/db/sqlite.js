@@ -17,6 +17,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
+import { ConfigError } from '#copilot/core/errors';
 import { COPILOT_DB_PATH as ENV_DB_PATH } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import CONFIG from '#core/config';
@@ -95,7 +96,7 @@ function migrate(db) {
             } else if (typeof migration.up === 'string') {
                 db.exec(migration.up);
             } else {
-                throw new Error(`[CopilotDB] Invalid migration shape for v${migration.version}: missing up/upFn`);
+                throw new ConfigError(`[CopilotDB] Invalid migration shape for v${migration.version}: missing up/upFn`);
             }
             db.prepare('INSERT INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
                 migration.version,

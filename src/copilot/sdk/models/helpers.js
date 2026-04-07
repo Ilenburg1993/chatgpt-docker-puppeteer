@@ -12,6 +12,7 @@
  * @module copilot/lib/models
  */
 
+import { ConfigError } from '#copilot/core/errors';
 import { getClient } from '#copilot/sdk/client';
 
 /**
@@ -205,7 +206,7 @@ export function buildReasoningConfig(models, modelId, effort) {
 
     const supported = getSupportedReasoningEfforts(model);
     if (supported.length > 0 && !supported.includes(effort)) {
-        throw new Error(
+        throw new ConfigError(
             `[lib/models] reasoningEffort '${effort}' não é suportado por '${modelId}'. Suportados: ${supported.join(', ')}.`,
         );
     }

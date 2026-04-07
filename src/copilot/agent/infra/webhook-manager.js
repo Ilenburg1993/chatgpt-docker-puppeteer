@@ -197,7 +197,7 @@ export class WebhookManager {
             /^f[cd]/i.test(address) || // ULA IPv6 (fc00::/7 → fc/fd prefixes)
             /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(address); // IPv4-mapped
         if (isPrivate) {
-            throw new Error(
+            throw new ConfigError(
                 `[WebhookManager] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${address}.`,
             );
         }
