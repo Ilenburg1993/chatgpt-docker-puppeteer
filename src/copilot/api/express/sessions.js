@@ -30,8 +30,6 @@
 import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN, SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config/env';
 import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
-import { approveAll } from '@github/copilot-sdk';
-import { Router } from 'express';
 import {
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
@@ -42,6 +40,8 @@ import {
     resumeClientSession as resumeSdkSession,
 } from '#copilot/sdk/client';
 import { pickDefined } from '#copilot/sdk/utils';
+import { approveAll } from '@github/copilot-sdk';
+import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 

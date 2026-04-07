@@ -42,4 +42,11 @@ export {
 
 export { PinnedFilesLoader } from './pinned-files.js';
 
-export * from './tools/index.js';
+export {
+    BUILTIN_HANDLER_MAP,
+    getCustomToolDefinitions,
+    loadCustomTools,
+    registerCustomTool,
+    removeCustomTool,
+} from '#copilot/sdk/custom-tools';
+export { getToolsConfig, loadToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';

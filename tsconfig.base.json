@@ -28,8 +28,7 @@
       "#kernel/*": ["src/kernel/*"],
       "#driver/*": ["src/driver/*"],
       "#agent/*": ["src/agent/*"],
-      "#copilot/lib": ["src/copilot/lib/index.js"],
-      "#copilot/lib/*": ["src/copilot/lib/*"],
+
       "#copilot/observability": ["src/copilot/observability/index.js"],
       "#copilot/observability/logger": ["src/copilot/observability/logger.js"],
       "#copilot/observability/audit-log": ["src/copilot/observability/audit-log.js"],

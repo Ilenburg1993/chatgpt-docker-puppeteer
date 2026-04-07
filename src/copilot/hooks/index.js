@@ -84,4 +84,4 @@ export { createSafePreset } from './presets/safe.js';
 export { createCircuitBreakerHandler, createContextualErrorHandler, createErrorHandler } from './error-handler.js';
 
 // ─── Audit ring buffer (Gap 10) ───────────────────────────────────────────────
-export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditBuffer } from './audit.js';
+export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditBuffer } from '#copilot/audit';

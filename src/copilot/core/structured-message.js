@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/types/structured-message.js
+ * src/copilot/core/structured-message.js
  *
  * Protocolo StructuredMessage — Sprint A (Structured Dialog Protocol)
  *
@@ -16,11 +16,11 @@
  * - Serializador para envio via chat()
  * - Constantes de responseType e priority
  *
- * @module copilot/types/structured-message
+ * @module copilot/core/structured-message
  *
  * @example
  *     ```js
- *     import { buildStructuredRequest, parseStructuredResponse } from '#copilot/types/structured-message';
+ *     import { buildStructuredRequest, parseStructuredResponse } from '#copilot/core/structured-message';
  *
  *     // LLM-A cria mensagem tipada
  *     const msg = buildStructuredRequest({
