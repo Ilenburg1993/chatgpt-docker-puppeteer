@@ -2,8 +2,8 @@
 /**
  * src/copilot/conversation-hub/store-memories.js
  *
- * Queries de memórias semânticas (P5) extraídas de ConversationStore para reduzir o God Module.
- * Cada função recebe `db` (better-sqlite3 Database) como primeiro argumento.
+ * Queries de memórias semânticas (P5) extraídas de ConversationStore para reduzir o God Module. Cada função recebe `db`
+ * (better-sqlite3 Database) como primeiro argumento.
  *
  * @module copilot/conversation-hub/store-memories
  */

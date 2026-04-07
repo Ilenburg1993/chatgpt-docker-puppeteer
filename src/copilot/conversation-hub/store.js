@@ -20,7 +20,11 @@ import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from './store-helpers.js';
-import { deleteMemory as _deleteMemory, recallMemories as _recallMemories, storeMemory as _storeMemory } from './store-memories.js';
+import {
+    deleteMemory as _deleteMemory,
+    recallMemories as _recallMemories,
+    storeMemory as _storeMemory,
+} from './store-memories.js';
 import { syncFromSdkHistory as _syncFromSdkHistory } from './store-sync.js';
 
 /** @typedef {import('./store-helpers.js').TurnRole} TurnRole */
