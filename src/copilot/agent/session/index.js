@@ -5,6 +5,7 @@
  * @module copilot/agent/session
  */
 
+export { performBootWiring } from './boot-wiring.js';
 export { cleanupStaleSessions } from './cleanup.js';
 export { wireSessionEvents } from './event-wirer.js';
 export {

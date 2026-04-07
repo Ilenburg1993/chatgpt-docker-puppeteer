@@ -23,9 +23,7 @@
 import { SessionError } from '#copilot/core/errors';
 import {
     buildTelemetryConfig,
-    createAgentEventObserver,
     defaultErrorTracker,
-    defaultEventCollector,
     defaultMetrics,
     initEventCollector,
     startSpan,
@@ -35,7 +33,7 @@ import { raceEvents } from '#copilot/sdk/event-helpers';
 import { createRegistry } from '#copilot/sdk/index';
 import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
-import { buildMcpTools, startMcpAutoReconnect } from '../bridges/mcp-tool-bridge.js';
+import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../config/mcp-servers.js';
 import { conversationStore } from '../conversation-hub/store.js';
 import { getHubSessionId } from '../terminal/state.js';
@@ -46,22 +44,18 @@ import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { PermissionController } from './infra/permission-controller.js';
 import { tryReconnect } from './lifecycle/reconnect-policy.js';
-import { wireSessionEvents } from './session/event-wirer.js';
 import { createSnapshot, saveSnapshot } from './session/snapshot.js';
 // N.1: usar hooks module canônico em vez do arquivo @deprecated
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
 import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
 import {
-    BOOT_RECOVERY_DELAY_MS,
     CONTEXT_UTIL_BLOCK_THRESHOLD,
     CONTEXT_UTIL_WARN_THRESHOLD,
     COPILOT_MODEL,
     COPILOT_REASONING_EFFORT,
     MAX_LISTENERS,
-    MCP_RECONNECT_MS,
     MESSAGES_CACHE_TTL_MS,
-    METRICS_INTERVAL_MS,
     SHUTDOWN_TIMEOUT_MS,
     STATUS_SNAPSHOT_TTL_MS,
     STOP_BOOT_WAIT_MS,
@@ -72,7 +66,7 @@ import { executeTask } from './infra/task-executor.js';
 import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
 import { WebhookManager } from './infra/webhook-manager.js';
 import { persistState, readState, writeStateAsync } from './lifecycle/state-io.js';
-import { cleanupStaleSessions } from './session/cleanup.js';
+import { performBootWiring } from './session/boot-wiring.js';
 import { initOrResumeSession } from './session/initializer.js';
 import { SessionKeepalive } from './session/keepalive.js';
 // G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
@@ -530,9 +524,9 @@ export class AlwaysAliveAgent extends EventEmitter {
                 this.#initSession(client),
             );
 
-            // Wiring de eventos de compaction para observabilidade via SSE/NERV.
-            // session.on() retorna () => void (não this) — armazenado para cleanup no stop/reconnect.
-            this.#sessionEventUnsubscribers = wireSessionEvents(session, isResumed, {
+            // F29-REFACTOR: delegar wirings pós-init para boot-wiring.js
+            if (this.#agentObserver) this.#agentObserver.detach();
+            const bootResult = performBootWiring(client, session, isResumed, this, {
                 emit: (event, payload) => this.emit(event, payload),
                 getStatusSnapshot: () => this.getStatusSnapshot(),
                 onCheckpointPath: (path) => {
@@ -545,56 +539,25 @@ export class AlwaysAliveAgent extends EventEmitter {
                     this.#lastPrInfo = info;
                 },
                 isProcessing: () => this.#status === 'processing',
-                // G1-BUG-06: filtrar deltas durante waiting_for_input com dialog loop ativo
                 dialogLoopActive: () => this.#dialogLoop?.active ?? false,
+                getSessionId: () => this.sessionId,
+                getStatus: () => this.#status,
+                dialogLoop: this.#dialogLoop,
+                keepalive: this.#keepalive,
+                handoff: this.#handoff,
+                ensureDialogLoopAttached: () => this.#ensureDialogLoopAttached(),
+                resumeDialogLoop: () => this.resumeDialogLoop(),
+                startDialogLoop: () => this.startDialogLoop(),
+                getDialogPrMetrics: () => this.dialogPrMetrics,
             });
-
-            // Wiring do event-collector de observabilidade (tool calls, tokens, erros, spans SDK).
-            const _collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
-            this.#sessionEventUnsubscribers.push(..._collectorUnsubs);
-
-            // M-03 (PARTE-8): registrar lifecycle handlers no client para auditoria de sessões
-            if (typeof client.on === 'function') {
-                const unsubCreated = client.on('session.created', (/** @type {any} */ evt) => {
-                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
-                    this.emit('sdk.lifecycle', { type: 'session.created', sessionId: evt?.sessionId });
-                });
-                const unsubDeleted = client.on('session.deleted', (/** @type {any} */ evt) => {
-                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
-                    this.emit('sdk.lifecycle', { type: 'session.deleted', sessionId: evt?.sessionId });
-                });
-                const unsubUpdated = client.on('session.updated', (/** @type {any} */ evt) => {
-                    log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
-                    this.emit('sdk.lifecycle', { type: 'session.updated', sessionId: evt?.sessionId });
-                });
-                this.#sessionEventUnsubscribers.push(unsubCreated, unsubDeleted, unsubUpdated);
-            }
-
-            // F29: agent-event-observer eagerness — criar e atachar aqui para cobrir
-            // tasks via sendMessage() que ocorrem ANTES do primeiro dialog loop boot.
-            if (this.#agentObserver) this.#agentObserver.detach();
-            this.#agentObserver = createAgentEventObserver({
-                metrics: defaultMetrics,
-                errorTracker: defaultErrorTracker,
-            });
-            this.#agentObserver.attach(this);
+            this.#sessionEventUnsubscribers = bootResult.unsubs;
+            this.#agentObserver = bootResult.agentObserver;
+            this.#metricsTimer = bootResult.metricsTimer;
+            this.#mcpReconnectCancel = bootResult.mcpReconnectCancel;
 
             this.#setStatus('idle');
             this.#sendCount = readState()?.sendCount ?? 0;
 
-            // F43.1 (GAP-SD-01): limpeza assíncrona de sessões antigas no boot
-            if (this.#client) {
-                void cleanupStaleSessions(this.#client, {
-                    currentSessionId: session.sessionId,
-                })
-                    .then((result) => {
-                        if (result.deleted > 0) {
-                            for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
-                            this.emit('session.cleanup', result);
-                        }
-                    })
-                    .catch(() => {});
-            }
             log(
                 'INFO',
                 `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
@@ -605,101 +568,6 @@ export class AlwaysAliveAgent extends EventEmitter {
             }
 
             this.emit('ready', { sessionId: session.sessionId, isResumed });
-
-            // F42.1 (GAP-SD-04/GAP-SD-09): reiniciar dialog loop automaticamente após resume
-            // se ele estava ativo na sessão anterior e a sessão não está pausada
-            if (isResumed) {
-                const savedState = readState();
-                if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
-                    const utilization = this.#contextState?.utilization ?? 0;
-                    if (utilization < CONTEXT_UTIL_WARN_THRESHOLD) {
-                        log(
-                            'INFO',
-                            '[AlwaysAlive] F53/F42.1: Re-ativando dialog loop após resume — tentando zero-PR primeiro.',
-                        );
-                        // F53 (PARTE-9): Zero-PR Boot Recovery
-                        // Marcar dialogPaused=true para que resumeDialogLoop() use a Estratégia A/B
-                        // do DialogLoopManager.resume(), que tenta 0 PR antes de fallback para boot.
-                        setTimeout(async () => {
-                            if (this.#status === 'stopped') return;
-                            try {
-                                // Garantir que o DLM está attached antes de tentar resume
-                                this.#ensureDialogLoopAttached();
-                                // Simular pause para que resume() detecte dialogPaused=true
-                                await writeStateAsync({ dialogPaused: true });
-                                await this.resumeDialogLoop();
-                                log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
-                                this.emit('dialog.boot_recovery', { zeroPR: !this.#dialogLoop.active, ts: Date.now() });
-                            } catch (/** @type {any} */ e) {
-                                log(
-                                    'WARN',
-                                    `[AlwaysAlive] F53: Boot recovery falhou (${e.message}) — fallback para startDialogLoop.`,
-                                );
-                                try {
-                                    await this.startDialogLoop();
-                                } catch (/** @type {any} */ e2) {
-                                    log(
-                                        'WARN',
-                                        `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${e2.message}`,
-                                    );
-                                }
-                            }
-                        }, BOOT_RECOVERY_DELAY_MS);
-                    } else {
-                        log(
-                            'WARN',
-                            `[AlwaysAlive] F42.1: Dialog loop não re-ativado — utilização de contexto alta (${Math.round(utilization * 100)}%).`,
-                        );
-                    }
-                }
-            }
-
-            // G2-DX-17: emissão periódica de agent.metrics para SSE/NERV observers
-            const metricsMs = AlwaysAliveAgent.#METRICS_INTERVAL_MS;
-            if (metricsMs > 0) {
-                this.#metricsTimer = setInterval(() => {
-                    this.emit('agent.metrics', this.getStatusSnapshot());
-                }, metricsMs);
-                this.#metricsTimer.unref();
-            }
-
-            // F9.2: iniciar auto-reconnect periódico ao MCP Tool Registry
-            // Intervalo configurável via AGENT_MCP_RECONNECT_MS (padrão: 5 min)
-            const mcpReconnectMs = MCP_RECONNECT_MS;
-            this.#mcpReconnectCancel = startMcpAutoReconnect((tools) => {
-                this.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });
-            }, mcpReconnectMs);
-
-            // F42.2: iniciar keepalive de sessão para prevenir expiração por idle timeout
-            // M-02 (PARTE-8): usa client.ping() (0 PR) como primeiro recurso
-            this.#keepalive.start({
-                getSession: () => this.#session,
-                getClient: () => this.#client,
-                isIdle: () => this.#status === 'idle',
-                isDialogLoopActive: () => this.#dialogLoop.active,
-                onKeepalive: (ts) => {
-                    defaultMetrics.recordKeepalivePing();
-                    this.emit('session.keepalive', { ts });
-                },
-            });
-
-            // F45.1: wiring de session.handoff → HandoffManager
-            this.on(
-                'session.handoff',
-                (
-                    /**
-                     * @type {{
-                     *     fromAgent: string;
-                     *     toAgent: string;
-                     *     reason?: string;
-                     *     context?: Record<string, unknown>;
-                     * }}
-                     */ data,
-                ) => {
-                    this.#handoff.receive(data);
-                    defaultMetrics.recordHandoff();
-                },
-            );
         } catch (/** @type {any} */ e) {
             this.#setStatus('stopped');
             log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
@@ -1036,19 +904,11 @@ export class AlwaysAliveAgent extends EventEmitter {
     #statusSnapshotCache = null;
 
     /**
-     * G2-DX-17: Timer de emissão periódica de `agent.metrics`. Configurável via AGENT_METRICS_INTERVAL_MS (padrão: 30
-     * 000ms). Iniciado em `start()`, limpo em `stop()`.
+     * G2-DX-17: Timer de emissão periódica de `agent.metrics`. Iniciado em boot-wiring.js, limpo em `stop()`.
      *
      * @type {ReturnType<typeof setInterval> | null}
      */
     #metricsTimer = null;
-
-    /**
-     * Intervalo de emissão de métricas em ms. Desabilitado se ≤ 0.
-     *
-     * @type {number}
-     */
-    static #METRICS_INTERVAL_MS = METRICS_INTERVAL_MS;
 
     /**
      * Retorna um snapshot do estado atual do agente para a API HTTP.
