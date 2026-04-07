@@ -40,8 +40,8 @@ import { getHubSessionId } from '../terminal/state.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from '#copilot/core/events';
-import { handleUserInputRequest } from './dialog/user-input-handler.js';
 import { wireDialogLoopEvents } from './dialog/loop-manager.js';
+import { handleUserInputRequest } from './dialog/user-input-handler.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { PermissionController } from './infra/permission-controller.js';
 import { tryReconnect } from './lifecycle/reconnect-policy.js';
@@ -1274,7 +1274,9 @@ export class AlwaysAliveAgent extends EventEmitter {
         const { session, isResumed } = await initOrResumeSession(client, {
             model: this.#model,
             onPermissionRequest: this.#permissions.handler,
-            onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
+            onUserInputRequest: (
+                /** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input,
+            ) =>
                 handleUserInputRequest(input, {
                     isDialogLoopActive: () => this.#dialogLoop.active,
                     handleProtocolInput: (q) => this.#dialogLoop.handleProtocolInput(q),

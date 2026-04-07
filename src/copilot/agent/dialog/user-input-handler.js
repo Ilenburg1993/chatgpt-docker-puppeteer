@@ -31,6 +31,7 @@ import { persistState } from '../lifecycle/state-io.js';
  * Handler principal chamado pelo SDK quando o modelo usa `ask_user`.
  *
  * Delega para o handler especializado conforme o modo ativo:
+ *
  * - Dialog loop ativo → intercepta protocolo READY/REPLY/STOPPED via DLM
  * - Caso contrário → suspende até `answerPendingQuestion()` via API HTTP
  *
@@ -44,20 +45,17 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
     if (ctx.isDialogLoopActive()) {
         return handleDialogLoopInput({ question, allowFreeform }, ctx);
     }
-    return handleInteractiveQuestion(
-        { question, ...(choices !== undefined && { choices }), allowFreeform },
-        ctx,
-    );
+    return handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform }, ctx);
 }
 
 /**
  * Handler de protocolo no modo dialog loop.
  *
- * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução
- * aguardando `answerPendingQuestion()`.
+ * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução aguardando
+ * `answerPendingQuestion()`.
  *
- * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync
- * de pendingQuestion para evitar I/O desnecessário em cada turno do dialog loop.
+ * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync de pendingQuestion para
+ * evitar I/O desnecessário em cada turno do dialog loop.
  *
  * @param {{ question: string; allowFreeform: boolean }} input
  * @param {UserInputContext} ctx
@@ -75,8 +73,8 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
 /**
  * Handler para pergunta interativa normal (fora do dialog loop).
  *
- * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP.
- * Define `status='waiting_for_input'` e persiste a pergunta no estado para recovery.
+ * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP. Define `status='waiting_for_input'`
+ * e persiste a pergunta no estado para recovery.
  *
  * @param {{ question: string; choices?: string[]; allowFreeform: boolean; skipPersist?: boolean }} input
  * @param {UserInputContext} ctx
