@@ -19,6 +19,7 @@
  * @module copilot/routes/observability
  */
 
+import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultAuditLog, getAuditTail } from '#copilot/audit/pipeline';
 import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';
@@ -27,7 +28,6 @@ import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
 import { Router } from 'express';
-import { alwaysAliveAgent } from '#copilot/agent';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 const router = Router();

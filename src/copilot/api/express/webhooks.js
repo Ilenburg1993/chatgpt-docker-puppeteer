@@ -15,9 +15,9 @@
  * @module copilot/routes/webhooks
  */
 
-import { Router } from 'express';
 import { alwaysAliveAgent } from '#copilot/agent';
 import { validateUrlString } from '#copilot/sdk/url-validator';
+import { Router } from 'express';
 
 /**
  * @typedef {import('express').Request} Req

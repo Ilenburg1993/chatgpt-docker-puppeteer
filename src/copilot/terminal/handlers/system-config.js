@@ -8,7 +8,12 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
+import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
+import { conversationHub } from '#copilot/conversation-hub/hub';
+import { conversationStore } from '#copilot/conversation-hub/store';
+import { defaultMetrics } from '#copilot/observability/metrics';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
@@ -19,11 +24,6 @@ import { getToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
-import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
-import { conversationHub } from '#copilot/conversation-hub/hub';
-import { conversationStore } from '#copilot/conversation-hub/store';
-import { defaultMetrics } from '#copilot/observability/metrics';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from '../state.js';
 

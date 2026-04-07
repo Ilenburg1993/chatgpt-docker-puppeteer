@@ -8,8 +8,8 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { alwaysAliveAgent } from '#copilot/agent';
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { listIssues, listPrs, listRuns } from '#copilot/bridges/gh/index';
 import { gitLog, gitStatus } from '#copilot/bridges/git-bridge';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';

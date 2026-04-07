@@ -7,11 +7,11 @@
  * @module copilot/terminal/dialog/engine
  */
 
-import { log } from '#copilot/observability/logger';
 import { alwaysAliveAgent } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges/nerv-bridge';
 import { llmBridgeClient } from '#copilot/channel/client';
 import { conversationHub } from '#copilot/conversation-hub/hub';
+import { log } from '#copilot/observability/logger';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,

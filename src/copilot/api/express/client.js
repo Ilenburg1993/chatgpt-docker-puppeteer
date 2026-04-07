@@ -20,11 +20,11 @@
  * @module copilot/routes/client
  */
 
-import { log } from '#copilot/observability/logger';
-import { Router } from 'express';
 import { alwaysAliveAgent } from '#copilot/agent';
+import { log } from '#copilot/observability/logger';
 import { getClient, getClientState, stopClient } from '#copilot/sdk/client';
 import { allTools } from '#copilot/tools/index';
+import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
