@@ -9,8 +9,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import EventEmitter from 'node:events';
+import { readFile } from 'node:fs/promises';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 
 describe('agent-lifecycle › exports', () => {
@@ -30,17 +30,19 @@ describe('agent-lifecycle › agentStart guard', () => {
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle'; // não é stopped
 
-        const host = /** @type {any} */ (Object.assign(emitter, {
-            sessionId: null,
-            getStatusSnapshot: () => ({}),
-            resumeDialogLoop: async () => {},
-            startDialogLoop: async () => {},
-            dialogPrMetrics: null,
-            ensureDialogLoopAttached: () => {},
-            sendMessage: async () => '',
-            sendMessageDialogBoot: async () => '',
-            answerPendingQuestion: () => false,
-        }));
+        const host = /** @type {any} */ (
+            Object.assign(emitter, {
+                sessionId: null,
+                getStatusSnapshot: () => ({}),
+                resumeDialogLoop: async () => {},
+                startDialogLoop: async () => {},
+                dialogPrMetrics: null,
+                ensureDialogLoopAttached: () => {},
+                sendMessage: async () => '',
+                sendMessageDialogBoot: async () => '',
+                answerPendingQuestion: () => false,
+            })
+        );
 
         // Não deve lançar,  apenas retornar
         await agentStart(ctx, host);
@@ -72,7 +74,7 @@ describe('agent-lifecycle › source contracts', () => {
     });
 
     it('agentStart chama ctx.setStatus("starting")', () => {
-        assert.ok(src.includes('setStatus(\'starting\''), 'agentStart deve definir status starting');
+        assert.ok(src.includes("setStatus('starting'"), 'agentStart deve definir status starting');
     });
 
     it('agentStart usa SHUTDOWN_TIMEOUT_MS do config', () => {

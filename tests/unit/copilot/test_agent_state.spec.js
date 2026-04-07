@@ -12,7 +12,12 @@ import { getStatusSnapshot, listenerDiagnostics } from '../../../src/copilot/age
 import { AGENT_EVENTS } from '../../../src/copilot/core/events.js';
 
 describe('agent-state › getStatusSnapshot', () => {
-    /** @returns {{ ctx: AgentContext, host: EventEmitter & { sessionId: string | null, listenerCount: (e: string | symbol) => number } }} */
+    /**
+     * @returns {{
+     *     ctx: AgentContext;
+     *     host: EventEmitter & { sessionId: string | null; listenerCount: (e: string | symbol) => number };
+     * }}
+     */
     function setup() {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

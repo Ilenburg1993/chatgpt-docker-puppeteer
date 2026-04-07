@@ -8,10 +8,14 @@
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
-import { dialogStart, dialogResume, ensureDialogLoopAttached } from '../../../src/copilot/agent/dialog/agent-dialog-controller.js';
+import {
+    dialogResume,
+    dialogStart,
+    ensureDialogLoopAttached,
+} from '../../../src/copilot/agent/dialog/agent-dialog-controller.js';
 
 describe('agent-dialog-controller › dialogStart', () => {
-    /** @returns {{ ctx: AgentContext, host: EventEmitter & Record<string, any> }} */
+    /** @returns {{ ctx: AgentContext; host: EventEmitter & Record<string, any> }} */
     function setup() {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

@@ -8,10 +8,15 @@
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
-import { sendMessage, sendMessageDialogBoot, enqueueTask, answerPendingQuestion } from '../../../src/copilot/agent/messaging/agent-messaging.js';
+import {
+    answerPendingQuestion,
+    enqueueTask,
+    sendMessage,
+    sendMessageDialogBoot,
+} from '../../../src/copilot/agent/messaging/agent-messaging.js';
 
 describe('agent-messaging › sendMessage', () => {
-    /** @returns {{ ctx: AgentContext, host: EventEmitter & { emit: any } }} */
+    /** @returns {{ ctx: AgentContext; host: EventEmitter & { emit: any } }} */
     function setup() {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
@@ -115,12 +120,16 @@ describe('agent-messaging › answerPendingQuestion', () => {
 
         let resolved = '';
         ctx.pendingQuestion = /** @type {any} */ ({
-            resolve: (/** @type {string} */ v) => { resolved = v; },
+            resolve: (/** @type {string} */ v) => {
+                resolved = v;
+            },
             reject: () => {},
         });
 
         let answered = false;
-        emitter.on('question.answered', () => { answered = true; });
+        emitter.on('question.answered', () => {
+            answered = true;
+        });
 
         const result = answerPendingQuestion(ctx, emitter, 'my answer');
 
