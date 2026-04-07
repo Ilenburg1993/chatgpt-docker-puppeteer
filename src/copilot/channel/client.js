@@ -38,12 +38,14 @@
  */
 
 import { BridgeError } from '#copilot/core/errors';
-import {
-    buildStructuredRequest,
-    parseStructuredResponse,
-    serializeStructuredMessage,
-} from '#copilot/core/structured-message';
 import { log } from '#copilot/observability/logger';
+import {
+    dialogTurn as _dialogTurn,
+    startDialogMode as _startDialogMode,
+    stopDialogMode as _stopDialogMode,
+} from './client-dialog.js';
+import { getLastNPairs as _getLastNPairs } from './client-history.js';
+import { chatStructured as _chatStructured } from './client-structured.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 
@@ -320,96 +322,20 @@ export class LlmBridgeClient {
     /**
      * Envia uma mensagem estruturada (protocolo Sprint A) para LLM-B e tenta parsear a resposta.
      *
-     * Serializa o StructuredMessageInput como JSON com instrução de protocolo, envia via chat(), e tenta parsear a
-     * resposta como StructuredMessage. Se LLM-B responder com texto puro (fallback), `result.structured` será `null` e
-     * `result.raw` conterá a resposta.
-     *
-     * @example
-     *     ```js
-     *     const result = await bridge.chatStructured({
-     *         context: 'Sprint A implementado. 1419 testes passando.',
-     *         intent: 'Confirmar que novos testes passam sem regressão',
-     *         priority: 'high',
-     *         responseType: 'diagnostic',
-     *     }, { onDelta: (chunk) => process.stdout.write(chunk) });
-     *
-     *     if (result.structured) {
-     *         console.log('Tipo:', result.structured.responseType);
-     *         console.log('Output:', result.structured.output);
-     *     }
-     *     ```;
-     *
-     * @param {import('#copilot/core/structured-message').StructuredMessageInput} input - Campos da mensagem estruturada
-     * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts] - Opções de callback e metadata
-     * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>} Resultado com campo
-     *   `structured`
-     * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
+     * @param {import('#copilot/core/structured-message').StructuredMessageInput} input
+     * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts]
+     * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>}
      */
     async chatStructured(input, opts = {}) {
-        const { turnNumber, sessionId, ...chatOpts } = opts;
-
         const snap = /** @type {{ sessionId?: string }} */ (requireAgent().getStatusSnapshot());
-        const msg = buildStructuredRequest({
-            ...input,
-            ...(turnNumber !== undefined ? { turnNumber } : {}),
-            ...((sessionId ?? snap.sessionId) ? { sessionId: sessionId ?? snap.sessionId } : {}),
-        });
-
-        const serialized = serializeStructuredMessage(msg);
-        const chatResult = await this.chat(serialized, chatOpts);
-
-        let structured = parseStructuredResponse(chatResult.response);
-
-        // F11.5: segunda tentativa quando resposta não é estruturada em sessões novas
-        if (chatResult.response && !structured) {
-            log(
-                'DEBUG',
-                '[LlmBridgeClient] chatStructured: resposta não-estruturada — tentando novamente com instrução explícita.',
-            );
-            const retryPrompt =
-                `Por favor responda APENAS com JSON válido no formato StructuredMessage.\n` +
-                `Não inclua texto, markdown ou explicações fora do JSON.\n` +
-                `Minha mensagem anterior foi:\n${serialized}`;
-            const retryResult = await this.chat(retryPrompt, chatOpts);
-            const retryStructured = parseStructuredResponse(retryResult.response);
-            if (retryStructured) {
-                log('INFO', '[LlmBridgeClient] chatStructured: segunda tentativa bem-sucedida.');
-                structured = retryStructured;
-                // Atualiza resultado com dados da segunda tentativa
-                Object.assign(chatResult, {
-                    response: retryResult.response,
-                    responseLen: retryResult.responseLen,
-                    durationMs: chatResult.durationMs + retryResult.durationMs,
-                    chunks: [...chatResult.chunks, ...retryResult.chunks],
-                    taskId: retryResult.taskId,
-                });
-            }
-        }
-
-        // BUG-04 (fix): popular parseError quando a resposta não é um StructuredMessage válido após ambas as tentativas
-        /** @type {Error | undefined} */
-        let parseError;
-        if (chatResult.response && !structured) {
-            parseError = new Error(
-                `Resposta não é StructuredMessage válido (${chatResult.responseLen ?? chatResult.response.length} chars)`,
-            );
-        }
-
-        log(
-            'INFO',
-            `[LlmBridgeClient] chatStructured: responseType=${structured?.responseType ?? 'UNSTRUCTURED'}, ` +
-                `output=${structured?.output?.length ?? 0} chars`,
+        return _chatStructured(
+            {
+                chat: (msg, chatOpts) => this.chat(msg, chatOpts),
+                getSessionId: () => snap.sessionId,
+            },
+            input,
+            opts,
         );
-
-        return {
-            structured,
-            raw: chatResult.response,
-            taskId: chatResult.taskId,
-            responseLen: chatResult.responseLen,
-            chunks: chatResult.chunks,
-            durationMs: chatResult.durationMs,
-            ...(parseError !== undefined ? { parseError } : {}),
-        };
     }
 
     /**
@@ -460,28 +386,7 @@ export class LlmBridgeClient {
         return Promise.all(pending);
     }
 
-    /**
-     * Registra os event listeners de diálogo e retorna uma função de cleanup simétrica.
-     *
-     * @param {{ onReady?: () => void; onReply?: (reply: string) => void; onStopped?: () => void }} opts
-     * @returns {{ replyHandler: ((evt: { reply?: string }) => void) | null; cleanup: () => void }}
-     */
-    #registerDialogListeners(opts) {
-        const { onReady, onReply, onStopped } = opts;
-        const replyHandler = onReply ? (/** @type {{ reply?: string }} */ evt) => onReply(evt.reply ?? '') : null;
-
-        if (onReady) requireAgent().once('dialog.ready', onReady);
-        if (replyHandler) requireAgent().on('dialog.reply', replyHandler);
-        if (onStopped) requireAgent().once('dialog.stopped', onStopped);
-
-        const cleanup = () => {
-            if (onReady) requireAgent().off('dialog.ready', onReady);
-            if (replyHandler) requireAgent().off('dialog.reply', replyHandler);
-            if (onStopped) requireAgent().off('dialog.stopped', onStopped);
-        };
-
-        return { replyHandler, cleanup };
-    }
+    // ─── Dialog Mode (delegates to client-dialog.js) ────────────────────────
 
     /**
      * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
@@ -493,88 +398,42 @@ export class LlmBridgeClient {
      *     onStopped?: () => void;
      *     timeoutMs?: number;
      * }} [opts]
-     * @returns {Promise<void>} Resolve quando LLM-B sinaliza READY pela primeira vez
-     * @throws {Error} Se agente não estiver idle ou dialog loop já estiver ativo
+     * @returns {Promise<void>}
      */
     async startDialogMode(bootPrompt, opts = {}) {
-        const { cleanup } = this.#registerDialogListeners(opts);
-
-        try {
-            await requireAgent().startDialogLoop(bootPrompt);
-            log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
-        } catch (err) {
-            cleanup();
-            throw err;
-        }
+        await _startDialogMode(requireAgent(), bootPrompt, opts);
     }
 
     /**
      * Envia um turno de diálogo para a LLM-B no dialog loop.
      *
-     * A LLM-B está suspensa em ask_user aguardando input. Esta chamada fornece o input e aguarda a resposta (REPLY: ou
-     * DONE: próximo READY). O histórico local é atualizado com o turno do usuário e a resposta da LLM-B.
-     *
-     * F18.1: callback `onReasoning` para receber chunks de extended thinking em tempo real.
-     *
-     * @param {string} message - Mensagem a enviar à LLM-B
+     * @param {string} message
      * @param {{
      *     timeout?: number;
      *     onDelta?: (chunk: string) => void;
      *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
      * }} [opts]
-     * @returns {Promise<string>} Resposta da LLM-B (conteúdo após REPLY: ou confirmação de DONE:)
-     * @throws {Error} Se o dialog loop não estiver ativo ou timeout for excedido
+     * @returns {Promise<string>}
      */
     async dialogTurn(message, opts = {}) {
-        const { timeout = 60_000, onDelta, onReasoning } = opts;
         const sentAt = Date.now();
         this.#turnCount++;
 
-        const agent = requireAgent();
+        const reply = await _dialogTurn(requireAgent(), message, opts);
 
-        // BUG-H05 fix: propaga chunks de streaming para onDelta enquanto sendDialogTurn processa
-        const onDeltaTemp = onDelta
-            ? (/** @type {{ chunk?: string }} */ evt) => {
-                  if (evt.chunk) onDelta(evt.chunk);
-              }
-            : null;
-        if (onDeltaTemp) agent.on('task.delta', onDeltaTemp);
-
-        // F18.1: propaga chunks de reasoning (extended thinking) via callback
-        const onReasoningTemp = onReasoning
-            ? (/** @type {{ chunk?: string; reasoningId?: string | null }} */ evt) => {
-                  if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
-              }
-            : null;
-        if (onReasoningTemp) agent.on('task.reasoning', onReasoningTemp);
-
-        let reply;
-        try {
-            reply = await agent.sendDialogTurn(message, { timeout });
-        } finally {
-            if (onDeltaTemp) agent.off('task.delta', onDeltaTemp);
-            if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
-        }
-        // BUG-MED-02 (fix): registrar turno de usuário apenas após confirmação de envio bem-sucedido
-        // Evita histórico contaminado com menssagens do usuário sem resposta correspondente
         this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
-        // Registra resposta da LLM-B no histórico local
         this.#pushHistory({ role: 'assistant', content: reply, timestamp: Date.now() });
         return reply;
     }
 
     /**
-     * Encerra o modo de diálogo direto, sinalizando STOP_DIALOG para LLM-B.
+     * Encerra o modo de diálogo direto.
      *
-     * DL-PERM: autorizado internamente para uso pelo watchdog e mecanismos de restart do sistema.
-     *
-     * @param {string} [reason='watchdog_restart'] - Motivo do encerramento (GAP-CHAN-001). Default is
-     *   `'watchdog_restart'`
+     * @param {string} [reason='watchdog_restart']
      * @returns {Promise<void>}
      */
     async stopDialogMode(reason = 'watchdog_restart') {
-        await requireAgent().stopDialogLoop({ authorized: true, reason });
-        log('INFO', `[LlmBridgeClient] Modo diálogo encerrado (reason=${reason}).`);
+        await _stopDialogMode(requireAgent(), reason);
     }
 
     /**
@@ -597,53 +456,14 @@ export class LlmBridgeClient {
     }
 
     /**
-     * UPG-PROP-12 (fix): Retorna os últimos N pares (user + assistant) do histórico.
+     * Retorna os últimos N pares (user + assistant) do histórico.
      *
-     * Útil para enviar contexto compacto a um LLM sem incluir o histórico completo. Garante que os pares comecem sempre
-     * por uma mensagem `user`, preservando a estrutura de alternância esperada pelo protocolo.
-     *
-     * F6.9 (UPG-05): implementação cursor-based — navega do fim para o início sem criar arrays intermediários.
-     *
-     * F12.4: Opção `summarize: true` retorna versão compacta de cada turno (primeiros 200 chars), para uso em prompts
-     * onde tokens são escassos.
-     *
-     * @param {number} [pairs=5] - Número máximo de pares a retornar. Default is `5`
+     * @param {number} [pairs=5]
      * @param {{ summarize?: boolean }} [opts]
-     * @returns {ReadonlyArray<ConversationTurn>} Slice imutável dos últimos N pares
+     * @returns {ReadonlyArray<ConversationTurn>}
      */
     getLastNPairs(pairs = 5, opts = {}) {
-        const hist = /** @type {ConversationTurn[]} */ (this.#history);
-        /** @type {{ user: ConversationTurn; assistant: ConversationTurn }[]} */
-        const collected = [];
-        let i = hist.length - 1;
-        while (i >= 0 && collected.length < pairs) {
-            const cur = hist[i];
-            if (cur?.role === 'assistant') {
-                const j = i - 1;
-                const prev = j >= 0 ? hist[j] : undefined;
-                if (prev?.role === 'user') {
-                    collected.unshift({ user: prev, assistant: cur });
-                    i = j - 1;
-                    continue;
-                }
-            }
-            i--;
-        }
-        /** @type {ConversationTurn[]} */
-        let result;
-        if (!collected.length) {
-            result = /** @type {ConversationTurn[]} */ (hist.slice(-pairs * 2));
-        } else {
-            result = collected.flatMap(({ user, assistant }) => [user, assistant]);
-        }
-        // F12.4: modo compacto — truncar conteúdo a 200 chars para economia de tokens
-        if (opts.summarize) {
-            result = result.map((t) => ({
-                ...t,
-                content: t.content.length > 200 ? t.content.slice(0, 200) + '…' : t.content,
-            }));
-        }
-        return /** @type {ReadonlyArray<ConversationTurn>} */ (result);
+        return _getLastNPairs(this.#history, pairs, opts);
     }
 
     /**
