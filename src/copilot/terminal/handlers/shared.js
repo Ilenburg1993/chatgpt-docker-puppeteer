@@ -2,7 +2,7 @@
 /**
  * src/copilot/terminal/handlers-shared.js
  *
- * Shim de compatibilidade — re-exporta de `handlers/shared.js`.
+ * Tipos compartilhados entre os handlers HTTP do terminal LLM-B.
  *
  * @module copilot/terminal/handlers-shared
  */

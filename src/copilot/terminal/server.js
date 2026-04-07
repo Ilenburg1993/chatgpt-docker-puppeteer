@@ -52,7 +52,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
-import { handleMetrics } from './handlers-system.js';
+import { handleMetrics } from './handlers/system-metrics.js';
 import { registerClearRateLimiters } from './rate-limiter-state.js';
 import { matchRoute } from './route-table.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';

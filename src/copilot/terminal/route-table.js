@@ -30,7 +30,7 @@ import {
     handleInject,
     handlePipeline,
     handleRejectHandoff,
-} from './handlers-agent.js';
+} from './handlers/agent.js';
 import {
     handleDeleteMemory,
     handleHubHealth,
@@ -38,32 +38,34 @@ import {
     handleListTurns,
     handleRecallMemories,
     handleStoreMemory,
-} from './handlers-dialog.js';
+} from './handlers/dialog.js';
 import {
     handleDeleteCustomTool,
-    handleGetAudit,
     handleGetConfig,
     handleGetCustomTools,
+    handleGetSkills,
+    handleGetToolsConfig,
+    handleHealth,
+    handleRegisterCustomTool,
+    handleSetInfiniteSessionConfig,
+    handleSetSkills,
+    handleSetToolsConfig,
+} from './handlers/system-config.js';
+import {
+    handleGetAudit,
     handleGetErrors,
     handleGetHistory,
     handleGetPrBudget,
     handleGetQuota,
-    handleGetSkills,
     handleGetToolStats,
-    handleGetToolsConfig,
     handleGhCi,
     handleGhIssues,
     handleGhPrs,
     handleGitLog,
     handleGitStatus,
-    handleHealth,
     handleMetrics,
-    handleRegisterCustomTool,
-    handleSetInfiniteSessionConfig,
-    handleSetSkills,
-    handleSetToolsConfig,
     handleSystemReset,
-} from './handlers-system.js';
+} from './handlers/system-metrics.js';
 
 /**
  * @typedef {Object} RouteEntry
