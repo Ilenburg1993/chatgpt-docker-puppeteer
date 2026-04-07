@@ -4,6 +4,9 @@
 **Pré-requisitos**: Fases 1–12 concluídas.
 **Escopo**: Barrel consistency, import aliases, error handling, testes, extensibilidade.
 
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
+> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade F17–F22.
+
 ---
 
 ## Fase 13: Import Path Aliases
@@ -157,26 +160,26 @@ barrel (não imports profundos).
 
 ## Tracking de Commits
 
-| Fase | Tipo | Template |
-| --- | --- | --- |
-| F13 | refactor | `refactor(copilot): F13.N — substituir imports relativos por aliases` |
-| F14 | refactor | `refactor(copilot): F14 — barrel consistency em diretório` |
-| F15 | refactor | `refactor(copilot): F15.N — error handling consistency` |
-| F16 | docs | `docs(copilot): F16.N — plugin interface para COMPONENTE` |
+| Fase | Tipo     | Template                                                              |
+| ---- | -------- | --------------------------------------------------------------------- |
+| F13  | refactor | `refactor(copilot): F13.N — substituir imports relativos por aliases` |
+| F14  | refactor | `refactor(copilot): F14 — barrel consistency em diretório`            |
+| F15  | refactor | `refactor(copilot): F15.N — error handling consistency`               |
+| F16  | docs     | `docs(copilot): F16.N — plugin interface para COMPONENTE`             |
 
 ---
 
 ## Métricas Finais Esperadas (pós-F16)
 
-| Métrica | Anterior (pré-F1) | Alvo (pós-F16) |
-| --- | --- | --- |
-| Arquivos deprecated | 6 | 0 |
-| God Modules (>600 lines) | 11 | ≤4 |
-| Overlaps | 7 | 0 |
-| process.env fora de config | 41 | 0 |
-| Sistemas de auditoria | 3 | 1 |
-| Diretórios HTTP | 3 | 2 |
-| Imports com `../../../` | ~15 | 0 |
-| Diretórios sem barrel | ~3 | 0 |
-| Erros sem classe tipada | ~30+ | <10 |
-| Plugin interfaces documentadas | 0 | 3+ |
+| Métrica                        | Anterior (pré-F1) | Alvo (pós-F16) |
+| ------------------------------ | ----------------- | -------------- |
+| Arquivos deprecated            | 6                 | 0              |
+| God Modules (>600 lines)       | 11                | ≤4             |
+| Overlaps                       | 7                 | 0              |
+| process.env fora de config     | 41                | 0              |
+| Sistemas de auditoria          | 3                 | 1              |
+| Diretórios HTTP                | 3                 | 2              |
+| Imports com `../../../`        | ~15               | 0              |
+| Diretórios sem barrel          | ~3                | 0              |
+| Erros sem classe tipada        | ~30+              | <10            |
+| Plugin interfaces documentadas | 0                 | 3+             |

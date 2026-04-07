@@ -181,46 +181,46 @@ src/copilot/
 
 ### 3.1 Fusões
 
-| Origem | Destino | Razão |
-| --- | --- | --- |
-| `types/sdk.js` + `types/structured-message.js` | `core/` | Tipos são contratos — pertencem a core |
-| `lib/` inteiro | `sdk/` | Renomear para nome mais descritivo; eliminar deprecated |
-| `config/tools/` | `sdk/` | São abstrações SDK, não config pura |
-| `api/` + `routes/` | `api/express/` + `api/bridge/` | Unificar sob um diretório |
-| `hooks/audit.js` + `observability/audit-log.js` + `agent/infra/tool-audit-logger.js` | `audit/` | Eliminar auditoria tripla |
-| `lib/models.js` + `lib/model-registry.js` | `sdk/models.js` | Overlap parcial, mesma responsabilidade |
+| Origem                                                                               | Destino                        | Razão                                                   |
+| ------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------- |
+| `types/sdk.js` + `types/structured-message.js`                                       | `core/`                        | Tipos são contratos — pertencem a core                  |
+| `lib/` inteiro                                                                       | `sdk/`                         | Renomear para nome mais descritivo; eliminar deprecated |
+| `config/tools/`                                                                      | `sdk/`                         | São abstrações SDK, não config pura                     |
+| `api/` + `routes/`                                                                   | `api/express/` + `api/bridge/` | Unificar sob um diretório                               |
+| `hooks/audit.js` + `observability/audit-log.js` + `agent/infra/tool-audit-logger.js` | `audit/`                       | Eliminar auditoria tripla                               |
+| `lib/models.js` + `lib/model-registry.js`                                            | `sdk/models.js`                | Overlap parcial, mesma responsabilidade                 |
 
 ### 3.2 Separações (Decomposição)
 
-| Arquivo atual | Proposta | Razão |
-| --- | --- | --- |
-| `observability/event-collector.js` (1.411 lines) | `observability/events/collector.js` + decomposição interna | God Module |
-| `observability/agent-event-observer.js` (945 lines) | `observability/events/agent-observer.js` + decomposição | God Module |
-| `terminal/dialog.js` (944 lines) | `terminal/dialog/engine.js` + `terminal/dialog/loop.js` | God Module |
-| `terminal/handlers-system.js` (722 lines) | Decomposição por domínio dentro de `terminal/handlers/` | God Module |
-| `observability/metrics.js` (551 lines) | `observability/metrics/aggregator.js` + `metrics/token-tracker.js` | God Module |
+| Arquivo atual                                       | Proposta                                                           | Razão      |
+| --------------------------------------------------- | ------------------------------------------------------------------ | ---------- |
+| `observability/event-collector.js` (1.411 lines)    | `observability/events/collector.js` + decomposição interna         | God Module |
+| `observability/agent-event-observer.js` (945 lines) | `observability/events/agent-observer.js` + decomposição            | God Module |
+| `terminal/dialog.js` (944 lines)                    | `terminal/dialog/engine.js` + `terminal/dialog/loop.js`            | God Module |
+| `terminal/handlers-system.js` (722 lines)           | Decomposição por domínio dentro de `terminal/handlers/`            | God Module |
+| `observability/metrics.js` (551 lines)              | `observability/metrics/aggregator.js` + `metrics/token-tracker.js` | God Module |
 
 ### 3.3 Eliminações
 
-| Arquivo | Razão |
-| --- | --- |
-| `lib/permissions.js` | @deprecated re-export |
-| `lib/hooks.js` | @deprecated re-export |
-| `bridges/gh-bridge.js` | @deprecated barrel |
-| `terminal/bootstrap.js` | @deprecated wrapper |
-| `terminal/http-handlers.js` | @deprecated barrel |
-| `agent/events.js` | Re-export de compatibilidade (R9) |
-| `logs/` (diretório vazio) | Sem conteúdo |
-| `types/` (inteiro, após merge em core/) | Conteúdo movido |
-| `lib/` (inteiro, após merge em sdk/) | Conteúdo movido |
+| Arquivo                                 | Razão                             |
+| --------------------------------------- | --------------------------------- |
+| `lib/permissions.js`                    | @deprecated re-export             |
+| `lib/hooks.js`                          | @deprecated re-export             |
+| `bridges/gh-bridge.js`                  | @deprecated barrel                |
+| `terminal/bootstrap.js`                 | @deprecated wrapper               |
+| `terminal/http-handlers.js`             | @deprecated barrel                |
+| `agent/events.js`                       | Re-export de compatibilidade (R9) |
+| `logs/` (diretório vazio)               | Sem conteúdo                      |
+| `types/` (inteiro, após merge em core/) | Conteúdo movido                   |
+| `lib/` (inteiro, após merge em sdk/)    | Conteúdo movido                   |
 
 ### 3.4 Movimentações
 
-| Arquivo | De | Para | Razão |
-| --- | --- | --- | --- |
-| `alias-store.js` | `bridges/` | `terminal/` | Exclusivo do REPL |
-| `constants.js` | `core/` | `core/` (limpar @deprecated) | Higiene |
-| `pinned-files-loader.js` | `config/` | `config/pinned-files.js` | Naming |
+| Arquivo                  | De         | Para                         | Razão             |
+| ------------------------ | ---------- | ---------------------------- | ----------------- |
+| `alias-store.js`         | `bridges/` | `terminal/`                  | Exclusivo do REPL |
+| `constants.js`           | `core/`    | `core/` (limpar @deprecated) | Higiene           |
+| `pinned-files-loader.js` | `config/`  | `config/pinned-files.js`     | Naming            |
 
 ---
 
@@ -367,13 +367,13 @@ dois conjuntos de rotas do processo principal.
 
 ## 8. Métricas-Alvo
 
-| Métrica | Atual | Alvo |
-| --- | --- | --- |
-| Arquivos deprecated | 6 | 0 |
-| God Modules (>600 lines) | 11 | ≤4 (always-alive.js permitido como orchestrator) |
-| Overlaps identificados | 7 | 0 |
-| process.env fora de config | 41 | 0 |
-| Diretórios HTTP | 3 separados | 2 (api/ unificado + terminal server) |
-| Diretórios vazios | 1 | 0 |
-| Sistemas de auditoria | 3 | 1 |
-| Tool registries | 3 | 2 (tools-registry in-memory + custom-tools persistido) |
+| Métrica                    | Atual       | Alvo                                                   |
+| -------------------------- | ----------- | ------------------------------------------------------ |
+| Arquivos deprecated        | 6           | 0                                                      |
+| God Modules (>600 lines)   | 11          | ≤4 (always-alive.js permitido como orchestrator)       |
+| Overlaps identificados     | 7           | 0                                                      |
+| process.env fora de config | 41          | 0                                                      |
+| Diretórios HTTP            | 3 separados | 2 (api/ unificado + terminal server)                   |
+| Diretórios vazios          | 1           | 0                                                      |
+| Sistemas de auditoria      | 3           | 1                                                      |
+| Tool registries            | 3           | 2 (tools-registry in-memory + custom-tools persistido) |

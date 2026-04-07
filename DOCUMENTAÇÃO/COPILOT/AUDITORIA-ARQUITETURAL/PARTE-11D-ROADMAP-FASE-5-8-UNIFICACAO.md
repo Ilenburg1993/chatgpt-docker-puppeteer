@@ -4,6 +4,9 @@
 **Pré-requisitos**: Fases 1–4 concluídas (higiene).
 **Escopo**: Centralização de config, unificação de auditoria, merge de rotas HTTP.
 
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
+> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
+
 ---
 
 ## Fase 5: Centralização Global de `process.env`
@@ -234,9 +237,9 @@
 
 ## Tracking de Commits
 
-| Fase | Tipo | Template |
-| --- | --- | --- |
-| F5 | refactor | `refactor(copilot): F5.N — centralizar process.env de SUBSISTEMA em config/env.js` |
-| F6 | refactor | `refactor(copilot): F6.N — unificar auditoria em audit/` |
-| F7 | refactor | `refactor(copilot): F7.N — unificar rotas HTTP em api/` |
-| F8 | refactor | `refactor(copilot): F8.N — mover types/ para core/` |
+| Fase | Tipo     | Template                                                                           |
+| ---- | -------- | ---------------------------------------------------------------------------------- |
+| F5   | refactor | `refactor(copilot): F5.N — centralizar process.env de SUBSISTEMA em config/env.js` |
+| F6   | refactor | `refactor(copilot): F6.N — unificar auditoria em audit/`                           |
+| F7   | refactor | `refactor(copilot): F7.N — unificar rotas HTTP em api/`                            |
+| F8   | refactor | `refactor(copilot): F8.N — mover types/ para core/`                                |

@@ -5,6 +5,9 @@
 [11B](PARTE-11B-SITUACAO-IDEAL.md) (situação ideal).
 **Escopo**: Limpeza de código morto, deprecated, diretórios vazios, re-exports obsoletos.
 
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
+> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
+
 ---
 
 ## Fase 1: Eliminação de Arquivos @deprecated
@@ -119,9 +122,9 @@
 
 ## Tracking de Commits
 
-| Fase | Tipo | Commit Message Template |
-| --- | --- | --- |
-| F1 | cleanup | `cleanup(copilot): F1.N — eliminar deprecated ARQUIVO` |
-| F2 | cleanup | `cleanup(copilot): F2 — limpar constants.js deprecated entries` |
-| F3 | cleanup | `cleanup(copilot): F3 — remover diretório vazio logs/` |
-| F4 | cleanup | `cleanup(copilot): F4 — remover deprecated inline sem uso` |
+| Fase | Tipo    | Commit Message Template                                         |
+| ---- | ------- | --------------------------------------------------------------- |
+| F1   | cleanup | `cleanup(copilot): F1.N — eliminar deprecated ARQUIVO`          |
+| F2   | cleanup | `cleanup(copilot): F2 — limpar constants.js deprecated entries` |
+| F3   | cleanup | `cleanup(copilot): F3 — remover diretório vazio logs/`          |
+| F4   | cleanup | `cleanup(copilot): F4 — remover deprecated inline sem uso`      |

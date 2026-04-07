@@ -57,12 +57,12 @@ src/copilot/                          (raiz — sem arquivos próprios)
 Camada de contratos puros sem lógica de negócio. Define o "vocabulário" compartilhado por todos os
 módulos.
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `constants.js` | 104 | Portas, limites, nomes de eventos canônicos |
-| `errors.js` | 63 | CopilotError, SessionError, BridgeError (hierarquia de erros) |
-| `agent-events.js` | 173 | Constantes de eventos do AlwaysAliveAgent (AGENT_EVENTS, DIALOG_LOOP_EVENTS) |
-| `index.js` | 25 | Barrel |
+| Arquivo           | Linhas | Responsabilidade                                                             |
+| ----------------- | ------ | ---------------------------------------------------------------------------- |
+| `constants.js`    | 104    | Portas, limites, nomes de eventos canônicos                                  |
+| `errors.js`       | 63     | CopilotError, SessionError, BridgeError (hierarquia de erros)                |
+| `agent-events.js` | 173    | Constantes de eventos do AlwaysAliveAgent (AGENT_EVENTS, DIALOG_LOOP_EVENTS) |
+| `index.js`        | 25     | Barrel                                                                       |
 
 **Fronteira**: nenhum módulo deve depender de core/ para lógica — apenas para nomes e tipos.
 
@@ -75,20 +75,20 @@ módulos.
 
 ### 2.2 `types/` — Tipagem Compartilhada (522 lines, 3 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `sdk.js` | 112 | Re-export centralizado de tipos do `@github/copilot-sdk` (puro barrel JSDoc) |
-| `structured-message.js` | 387 | Schema canônico de comunicação LLM-A ↔ LLM-B (StructuredMessage) |
-| `index.js` | 23 | Barrel |
+| Arquivo                 | Linhas | Responsabilidade                                                             |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- |
+| `sdk.js`                | 112    | Re-export centralizado de tipos do `@github/copilot-sdk` (puro barrel JSDoc) |
+| `structured-message.js` | 387    | Schema canônico de comunicação LLM-A ↔ LLM-B (StructuredMessage)             |
+| `index.js`              | 23     | Barrel                                                                       |
 
 **Status**: bem isolado, sem overlap.
 
 ### 2.3 `db/` — Persistência SQLite (382 lines, 2 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `sqlite.js` | 188 | Singleton SQLite isolado (copilot.sqlite) separado do maestro.sqlite principal |
-| `migrations.js` | 194 | Migrations versionadas para schema copilot |
+| Arquivo         | Linhas | Responsabilidade                                                               |
+| --------------- | ------ | ------------------------------------------------------------------------------ |
+| `sqlite.js`     | 188    | Singleton SQLite isolado (copilot.sqlite) separado do maestro.sqlite principal |
+| `migrations.js` | 194    | Migrations versionadas para schema copilot                                     |
 
 **Status**: limpo, isolado, sem overlap.
 
@@ -97,21 +97,21 @@ módulos.
 Coleção de funções utilitárias e abstrações pure-function sobre o Copilot SDK. **Módulo problemático
 — contém 3 arquivos deprecated e overlap significativo com outros módulos.**
 
-| Arquivo | Linhas | Responsabilidade | Status |
-| --- | --- | --- | --- |
-| `sdk-client.js` | 300 | Singleton CopilotClient, registry de sessões | Ativo |
-| `session.js` | 203 | Operações de sessão SDK (create/resume/list/delete) | Ativo |
-| `model-registry.js` | 519 | Multi-Model Selection Pool (F40) | Ativo |
-| `models.js` | 367 | Helpers de listagem/roteamento de modelos | Ativo |
-| `tools-registry.js` | 295 | Registry de Custom Tools por categoria/tags | Ativo |
-| `event-helpers.js` | 104 | waitForEvent, waitForCondition (EventEmitter utils) | Ativo |
-| `http-request.js` | 80 | Helper HTTP interno (loopback) | Ativo |
-| `url-validator.js` | 155 | Validação SSRF (OWASP A10) | Ativo |
-| `utils.js` | 98 | pickDefined() e utilitários gerais | Ativo |
-| `agents.js` | 108 | Factory de CustomAgentConfig | Ativo |
-| `index.js` | 63 | Barrel | Ativo |
-| `permissions.js` | 28 | **@deprecated** Re-export → hooks/permission-handler | Eliminar |
-| `hooks.js` | 20 | **@deprecated** Re-export → hooks/factory | Eliminar |
+| Arquivo             | Linhas | Responsabilidade                                     | Status   |
+| ------------------- | ------ | ---------------------------------------------------- | -------- |
+| `sdk-client.js`     | 300    | Singleton CopilotClient, registry de sessões         | Ativo    |
+| `session.js`        | 203    | Operações de sessão SDK (create/resume/list/delete)  | Ativo    |
+| `model-registry.js` | 519    | Multi-Model Selection Pool (F40)                     | Ativo    |
+| `models.js`         | 367    | Helpers de listagem/roteamento de modelos            | Ativo    |
+| `tools-registry.js` | 295    | Registry de Custom Tools por categoria/tags          | Ativo    |
+| `event-helpers.js`  | 104    | waitForEvent, waitForCondition (EventEmitter utils)  | Ativo    |
+| `http-request.js`   | 80     | Helper HTTP interno (loopback)                       | Ativo    |
+| `url-validator.js`  | 155    | Validação SSRF (OWASP A10)                           | Ativo    |
+| `utils.js`          | 98     | pickDefined() e utilitários gerais                   | Ativo    |
+| `agents.js`         | 108    | Factory de CustomAgentConfig                         | Ativo    |
+| `index.js`          | 63     | Barrel                                               | Ativo    |
+| `permissions.js`    | 28     | **@deprecated** Re-export → hooks/permission-handler | Eliminar |
+| `hooks.js`          | 20     | **@deprecated** Re-export → hooks/factory            | Eliminar |
 
 **Problemas identificados**:
 
@@ -124,17 +124,17 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 ### 2.5 `config/` — Configuração SDK (1.587 lines, 9 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `session-config.js` | 185 | Builder de SessionConfig (factories: always-alive, read-only, full) |
-| `system-prompt.js` | 239 | Builders de system prompt para LLM-B |
-| `custom-agents.js` | 325 | Perfis de agentes customizados (@modo) |
-| `pinned-files-loader.js` | 268 | Carrega e monitora arquivos de contexto "pinned" |
-| `mcp-servers.js` | 139 | Config de servidores MCP |
-| `index.js` | 45 | Barrel |
-| `tools/registry.js` | 276 | Custom Tools declarativas persistidas em JSON |
-| `tools/state.js` | 99 | Estado allowlist/denylist de tools |
-| `tools/index.js` | 11 | Barrel |
+| Arquivo                  | Linhas | Responsabilidade                                                    |
+| ------------------------ | ------ | ------------------------------------------------------------------- |
+| `session-config.js`      | 185    | Builder de SessionConfig (factories: always-alive, read-only, full) |
+| `system-prompt.js`       | 239    | Builders de system prompt para LLM-B                                |
+| `custom-agents.js`       | 325    | Perfis de agentes customizados (@modo)                              |
+| `pinned-files-loader.js` | 268    | Carrega e monitora arquivos de contexto "pinned"                    |
+| `mcp-servers.js`         | 139    | Config de servidores MCP                                            |
+| `index.js`               | 45     | Barrel                                                              |
+| `tools/registry.js`      | 276    | Custom Tools declarativas persistidas em JSON                       |
+| `tools/state.js`         | 99     | Estado allowlist/denylist de tools                                  |
+| `tools/index.js`         | 11     | Barrel                                                              |
 
 **Problemas identificados**:
 
@@ -144,28 +144,28 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 ### 2.6 `hooks/` — Sistema de Hooks SDK (3.634 lines, 19 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `permission-handler.js` | 280 | Factory de PermissionHandler (whitelist/blacklist/audit) |
-| `factory.js` | 250 | Factory de SessionHooks compostos |
-| `composer.js` | 244 | Composição funcional de handlers (pipeline/chain/conditional) |
-| `bus.js` | 198 | HookBus (EventEmitter para observação sem acoplamento) |
-| `audit.js` | 224 | Buffer de auditoria de tool calls via onPostToolUse |
-| `registry.js` | 155 | HookRegistry (introspecção de hooks disponíveis) |
-| `tool-interceptor.js` | 170 | Interceptação pre/post tool use |
-| `session-lifecycle.js` | 290 | Lifecycle hooks de sessão (onSessionCreate, etc.) |
-| `error-handler.js` | 125 | Hook de tratamento de erros |
-| `prompt-transformer.js` | 128 | Transformação de prompts antes de envio |
-| `user-input.js` | 100 | Hook de input do usuário |
-| `types.js` | 220 | Typedefs centralizados do hooks system |
-| `index.js` | 60 | Barrel |
-| **presets/** | | |
-| `presets/production.js` | 220 | Preset production (completo) |
-| `presets/audit.js` | 160 | Preset audit-only |
-| `presets/safe.js` | 120 | Preset safe |
-| `presets/interactive.js` | 130 | Preset interativo |
-| `presets/minimal.js` | 100 | Preset minimal |
-| `presets/deny-all.js` | 120 | Preset deny-all |
+| Arquivo                  | Linhas | Responsabilidade                                              |
+| ------------------------ | ------ | ------------------------------------------------------------- |
+| `permission-handler.js`  | 280    | Factory de PermissionHandler (whitelist/blacklist/audit)      |
+| `factory.js`             | 250    | Factory de SessionHooks compostos                             |
+| `composer.js`            | 244    | Composição funcional de handlers (pipeline/chain/conditional) |
+| `bus.js`                 | 198    | HookBus (EventEmitter para observação sem acoplamento)        |
+| `audit.js`               | 224    | Buffer de auditoria de tool calls via onPostToolUse           |
+| `registry.js`            | 155    | HookRegistry (introspecção de hooks disponíveis)              |
+| `tool-interceptor.js`    | 170    | Interceptação pre/post tool use                               |
+| `session-lifecycle.js`   | 290    | Lifecycle hooks de sessão (onSessionCreate, etc.)             |
+| `error-handler.js`       | 125    | Hook de tratamento de erros                                   |
+| `prompt-transformer.js`  | 128    | Transformação de prompts antes de envio                       |
+| `user-input.js`          | 100    | Hook de input do usuário                                      |
+| `types.js`               | 220    | Typedefs centralizados do hooks system                        |
+| `index.js`               | 60     | Barrel                                                        |
+| **presets/**             |        |                                                               |
+| `presets/production.js`  | 220    | Preset production (completo)                                  |
+| `presets/audit.js`       | 160    | Preset audit-only                                             |
+| `presets/safe.js`        | 120    | Preset safe                                                   |
+| `presets/interactive.js` | 130    | Preset interativo                                             |
+| `presets/minimal.js`     | 100    | Preset minimal                                                |
+| `presets/deny-all.js`    | 120    | Preset deny-all                                               |
 
 **Problemas identificados**:
 
@@ -176,18 +176,18 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 ### 2.7 `observability/` — Observabilidade & Telemetria (4.453 lines, 10 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `event-collector.js` | 1.411 | Coletor central de eventos (SDK + agent + hooks) |
-| `agent-event-observer.js` | 945 | Observer que conecta AlwaysAliveAgent events → telemetria |
-| `metrics.js` | 551 | Métricas agregadas (tokens, latência, p95/p99) |
-| `audit-log.js` | 377 | Ring buffer + JSONL I/O de auditoria |
-| `logger.js` | 270 | Logger central (console + ring buffer) |
-| `error-alerting.js` | 233 | Detecção e alertas de padrões de erro |
-| `error-tracker.js` | 232 | Ring buffer de erros recentes |
-| `otel.js` | 224 | OpenTelemetry spans/tracer |
-| `tool-stats.js` | 163 | Estatísticas de uso de tools por nome |
-| `index.js` | 47 | Barrel |
+| Arquivo                   | Linhas | Responsabilidade                                          |
+| ------------------------- | ------ | --------------------------------------------------------- |
+| `event-collector.js`      | 1.411  | Coletor central de eventos (SDK + agent + hooks)          |
+| `agent-event-observer.js` | 945    | Observer que conecta AlwaysAliveAgent events → telemetria |
+| `metrics.js`              | 551    | Métricas agregadas (tokens, latência, p95/p99)            |
+| `audit-log.js`            | 377    | Ring buffer + JSONL I/O de auditoria                      |
+| `logger.js`               | 270    | Logger central (console + ring buffer)                    |
+| `error-alerting.js`       | 233    | Detecção e alertas de padrões de erro                     |
+| `error-tracker.js`        | 232    | Ring buffer de erros recentes                             |
+| `otel.js`                 | 224    | OpenTelemetry spans/tracer                                |
+| `tool-stats.js`           | 163    | Estatísticas de uso de tools por nome                     |
+| `index.js`                | 47     | Barrel                                                    |
 
 **Problemas identificados**:
 
@@ -202,17 +202,17 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 O núcleo do sistema. Já reestruturado (R1-R18) em subdiretórios.
 
-| Subdir/Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `always-alive.js` | 1.613 | Classe AlwaysAliveAgent (orchestrator principal) |
-| `config.js` | 151 | Configuração centralizada por env vars |
-| `events.js` | 13 | Re-export de compatibilidade → core/agent-events |
-| `types.js` | 122 | Typedefs centralizados do agent |
-| `index.js` | 20 | Barrel |
-| **dialog/** | 1.343 | Dialog loop (turnos de conversação SDK) |
-| **session/** | 1.532 | Gestão de sessão SDK (init, cleanup, keepalive, rotation, snapshot) |
-| **lifecycle/** | 555 | Entry point PM2, state I/O, reconnect policy |
-| **infra/** | 1.438 | Queue, tools, webhooks, permissions, handoff, audit, status |
+| Subdir/Arquivo    | Linhas | Responsabilidade                                                    |
+| ----------------- | ------ | ------------------------------------------------------------------- |
+| `always-alive.js` | 1.613  | Classe AlwaysAliveAgent (orchestrator principal)                    |
+| `config.js`       | 151    | Configuração centralizada por env vars                              |
+| `events.js`       | 13     | Re-export de compatibilidade → core/agent-events                    |
+| `types.js`        | 122    | Typedefs centralizados do agent                                     |
+| `index.js`        | 20     | Barrel                                                              |
+| **dialog/**       | 1.343  | Dialog loop (turnos de conversação SDK)                             |
+| **session/**      | 1.532  | Gestão de sessão SDK (init, cleanup, keepalive, rotation, snapshot) |
+| **lifecycle/**    | 555    | Entry point PM2, state I/O, reconnect policy                        |
+| **infra/**        | 1.438  | Queue, tools, webhooks, permissions, handoff, audit, status         |
 
 **Problemas identificados**:
 
@@ -225,17 +225,17 @@ O núcleo do sistema. Já reestruturado (R1-R18) em subdiretórios.
 
 Expõe o AlwaysAliveAgent via API REST em `/api/copilot/*`.
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `bridge-control.js` | 273 | Rotas de controle: status, health, session, start, stop |
-| `bridge-dialog.js` | 151 | Rotas de dialog loop: start, turn, stop |
-| `bridge-stream.js` | 183 | SSE (Server-Sent Events) push |
-| `bridge-tasks.js` | 148 | Rotas de tarefas: send, answer |
-| `sse-utils.js` | 294 | Helpers SSE compartilhados |
-| `sse-replay-buffer.js` | 67 | Buffer circular para replay SSE |
-| `event-fanout.js` | 94 | Fanout de eventos (pass-through local, extensível) |
-| `http-bridge.js` | 40 | Agregador de sub-módulos de rota |
-| `sdk-api.js` | 39 | Orquestrador Express que monta sub-routers |
+| Arquivo                | Linhas | Responsabilidade                                        |
+| ---------------------- | ------ | ------------------------------------------------------- |
+| `bridge-control.js`    | 273    | Rotas de controle: status, health, session, start, stop |
+| `bridge-dialog.js`     | 151    | Rotas de dialog loop: start, turn, stop                 |
+| `bridge-stream.js`     | 183    | SSE (Server-Sent Events) push                           |
+| `bridge-tasks.js`      | 148    | Rotas de tarefas: send, answer                          |
+| `sse-utils.js`         | 294    | Helpers SSE compartilhados                              |
+| `sse-replay-buffer.js` | 67     | Buffer circular para replay SSE                         |
+| `event-fanout.js`      | 94     | Fanout de eventos (pass-through local, extensível)      |
+| `http-bridge.js`       | 40     | Agregador de sub-módulos de rota                        |
+| `sdk-api.js`           | 39     | Orquestrador Express que monta sub-routers              |
 
 **Problemas identificados**:
 
@@ -248,36 +248,36 @@ Expõe o AlwaysAliveAgent via API REST em `/api/copilot/*`.
 
 Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `agent.js` | 240 | Info, tools, telemetria, estado do agente |
-| `sessions.js` | 390 | CRUD de sessões SDK |
-| `hooks.js` | 160 | Introspecção de hooks |
-| `webhooks.js` | 120 | CRUD de webhooks |
-| `client.js` | 340 | Controle CopilotClient (ping, status, auth, models) |
-| `observability.js` | 220 | Health, métricas, erros, logs de observabilidade |
-| `middleware.js` | 159 | Error wrapper, validação |
+| Arquivo            | Linhas | Responsabilidade                                    |
+| ------------------ | ------ | --------------------------------------------------- |
+| `agent.js`         | 240    | Info, tools, telemetria, estado do agente           |
+| `sessions.js`      | 390    | CRUD de sessões SDK                                 |
+| `hooks.js`         | 160    | Introspecção de hooks                               |
+| `webhooks.js`      | 120    | CRUD de webhooks                                    |
+| `client.js`        | 340    | Controle CopilotClient (ping, status, auth, models) |
+| `observability.js` | 220    | Health, métricas, erros, logs de observabilidade    |
+| `middleware.js`    | 159    | Error wrapper, validação                            |
 
 **Overlap com `api/`**:
 
-| Funcionalidade | `api/bridge-*` | `routes/*` |
-| --- | --- | --- |
-| Status do agente | `bridge-control.js` | `agent.js` |
-| Gerenciar sessão | `bridge-control.js` | `sessions.js` |
-| Dialog loop | `bridge-dialog.js` | (não presente) |
-| Webhooks | `bridge-tasks.js` | `webhooks.js` |
-| SSE streaming | `bridge-stream.js` | `agent.js` (SSE stream) |
+| Funcionalidade   | `api/bridge-*`      | `routes/*`              |
+| ---------------- | ------------------- | ----------------------- |
+| Status do agente | `bridge-control.js` | `agent.js`              |
+| Gerenciar sessão | `bridge-control.js` | `sessions.js`           |
+| Dialog loop      | `bridge-dialog.js`  | (não presente)          |
+| Webhooks         | `bridge-tasks.js`   | `webhooks.js`           |
+| SSE streaming    | `bridge-stream.js`  | `agent.js` (SSE stream) |
 
 ### 2.11 `bridges/` — Pontes Externas (2.330 lines, 10 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `nerv-bridge.js` | 385 | Bridge agent ↔ NERV event bus |
-| `mcp-tool-bridge.js` | 529 | Bridge MCP Tool Registry → SDK Custom Tools |
-| `git-bridge.js` | 402 | Git CLI wrapper (execFile seguro) |
-| `alias-store.js` | 200 | Aliases do terminal REPL |
-| `gh-bridge.js` | 44 | **@deprecated** barrel → `gh/index.js` |
-| **gh/** | 770 | GitHub CLI bridge (issues, PRs, CI) |
+| Arquivo              | Linhas | Responsabilidade                            |
+| -------------------- | ------ | ------------------------------------------- |
+| `nerv-bridge.js`     | 385    | Bridge agent ↔ NERV event bus               |
+| `mcp-tool-bridge.js` | 529    | Bridge MCP Tool Registry → SDK Custom Tools |
+| `git-bridge.js`      | 402    | Git CLI wrapper (execFile seguro)           |
+| `alias-store.js`     | 200    | Aliases do terminal REPL                    |
+| `gh-bridge.js`       | 44     | **@deprecated** barrel → `gh/index.js`      |
+| **gh/**              | 770    | GitHub CLI bridge (issues, PRs, CI)         |
 
 **Problemas identificados**:
 
@@ -286,24 +286,24 @@ Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 
 ### 2.12 `channel/` — Comunicação LLM-A ↔ LLM-B (1.354 lines, 3 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `client.js` | 729 | LLM Bridge Client (alto nível, streaming, delta) |
-| `inject.js` | 546 | Canal oficinal via POST /inject ao terminal server |
-| `index.js` | 79 | Barrel + factory |
+| Arquivo     | Linhas | Responsabilidade                                   |
+| ----------- | ------ | -------------------------------------------------- |
+| `client.js` | 729    | LLM Bridge Client (alto nível, streaming, delta)   |
+| `inject.js` | 546    | Canal oficinal via POST /inject ao terminal server |
+| `index.js`  | 79     | Barrel + factory                                   |
 
 **Status**: coeso, sem overlap significativo.
 
 ### 2.13 `conversation-hub/` — Ambiente Permanente LLM-A ↔ LLM-B (2.305 lines, 6 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `store.js` | 737 | ConversationStore (SQLite + FTS5) |
-| `orchestrator.js` | 646 | HubOrchestrator (gerencia diálogo, persiste turnos) |
-| `socket-ns.js` | 466 | Namespace Socket.io /copilot |
-| `store-helpers.js` | 162 | Helpers FTS5 e inicialização |
-| `hub.js` | 281 | ConversationHub singleton |
-| `index.js` | 13 | Barrel |
+| Arquivo            | Linhas | Responsabilidade                                    |
+| ------------------ | ------ | --------------------------------------------------- |
+| `store.js`         | 737    | ConversationStore (SQLite + FTS5)                   |
+| `orchestrator.js`  | 646    | HubOrchestrator (gerencia diálogo, persiste turnos) |
+| `socket-ns.js`     | 466    | Namespace Socket.io /copilot                        |
+| `store-helpers.js` | 162    | Helpers FTS5 e inicialização                        |
+| `hub.js`           | 281    | ConversationHub singleton                           |
+| `index.js`         | 13     | Barrel                                              |
 
 **Problemas identificados**:
 
@@ -315,24 +315,24 @@ Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 
 **O maior subsistema.** Terminal REPL interativo + servidor HTTP de injeção.
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `dialog.js` | 944 | Motor de diálogo (ensureDialogLoop, sendTurn) |
-| `index.js` | 471 | Orquestrador de inicialização |
-| `repl.js` | 574 | Interface readline REPL |
-| `server.js` | 438 | Servidor HTTP raw (node:http, porta 3009) |
-| `handlers-system.js` | 722 | Handlers HTTP de sistema (health, config, metrics, git, gh) |
-| `handlers-agent.js` | 332 | Handlers de agente/dialog (/pipeline, /inject) |
-| `file-context.js` | 378 | Leitura/embedding de contexto de arquivo |
-| `route-table.js` | 271 | Tabela declarativa de rotas |
-| `state.js` | 268 | Estado global compartilhado |
-| `handlers-dialog.js` | 161 | Handlers de sessão/memória/turnos |
-| `workspace-context.js` | 92 | Detecção de workspace (cwd, git root, branch) |
-| `http-handlers.js` | 59 | **@deprecated** barrel → handlers-*.js |
-| `bootstrap.js` | 34 | **@deprecated** wrapper → index.js |
-| `rate-limiter-state.js` | 34 | Bridge para reset de rate limiters |
-| `handlers-shared.js` | 16 | Tipos compartilhados |
-| **commands/** | 2.473 | 23 comandos REPL (/help, /git, /gh, /status, etc.) |
+| Arquivo                 | Linhas | Responsabilidade                                            |
+| ----------------------- | ------ | ----------------------------------------------------------- |
+| `dialog.js`             | 944    | Motor de diálogo (ensureDialogLoop, sendTurn)               |
+| `index.js`              | 471    | Orquestrador de inicialização                               |
+| `repl.js`               | 574    | Interface readline REPL                                     |
+| `server.js`             | 438    | Servidor HTTP raw (node:http, porta 3009)                   |
+| `handlers-system.js`    | 722    | Handlers HTTP de sistema (health, config, metrics, git, gh) |
+| `handlers-agent.js`     | 332    | Handlers de agente/dialog (/pipeline, /inject)              |
+| `file-context.js`       | 378    | Leitura/embedding de contexto de arquivo                    |
+| `route-table.js`        | 271    | Tabela declarativa de rotas                                 |
+| `state.js`              | 268    | Estado global compartilhado                                 |
+| `handlers-dialog.js`    | 161    | Handlers de sessão/memória/turnos                           |
+| `workspace-context.js`  | 92     | Detecção de workspace (cwd, git root, branch)               |
+| `http-handlers.js`      | 59     | **@deprecated** barrel → handlers-*.js                      |
+| `bootstrap.js`          | 34     | **@deprecated** wrapper → index.js                          |
+| `rate-limiter-state.js` | 34     | Bridge para reset de rate limiters                          |
+| `handlers-shared.js`    | 16     | Tipos compartilhados                                        |
+| **commands/**           | 2.473  | 23 comandos REPL (/help, /git, /gh, /status, etc.)          |
 
 **Problemas identificados**:
 
@@ -344,23 +344,23 @@ Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 
 ### 2.15 `tools/` — Custom Tools SDK (5.894 lines, 21 files)
 
-| Arquivo | Linhas | Responsabilidade |
-| --- | --- | --- |
-| `tool-factory.js` | 161 | Factory genérica de tools |
-| `index.js` | 81 | Registry centralizado |
-| `code-tools.js` | 143 | lint, typecheck, test |
-| `hook-tools.js` | 329 | Auditoria hooks + request_user_input |
-| `hub-tools.js` | 344 | ConversationHub tools |
-| `introspection-tools.js` | 419 | Introspecção do agente |
-| `permission-tools.js` | 164 | Controle runtime de permissões |
-| `session-rpc-tools.js` | 295 | RPCs do SDK |
-| `session-tools.js` | 196 | Estado da sessão hook system |
-| `task-tools.js` | 154 | Gerenciamento de tarefas |
-| `web-tools.js` | 396 | Acesso web com SSRF protection |
-| **file/** | 890 | read_file, write_file, list_dir, etc. |
-| **git/** | 272 | git tools |
-| **shell/** | 713 | Shell execution tools |
-| **todo/** | 1.537 | Sistema de tarefas completo (CRUD, bulk, query, store) |
+| Arquivo                  | Linhas | Responsabilidade                                       |
+| ------------------------ | ------ | ------------------------------------------------------ |
+| `tool-factory.js`        | 161    | Factory genérica de tools                              |
+| `index.js`               | 81     | Registry centralizado                                  |
+| `code-tools.js`          | 143    | lint, typecheck, test                                  |
+| `hook-tools.js`          | 329    | Auditoria hooks + request_user_input                   |
+| `hub-tools.js`           | 344    | ConversationHub tools                                  |
+| `introspection-tools.js` | 419    | Introspecção do agente                                 |
+| `permission-tools.js`    | 164    | Controle runtime de permissões                         |
+| `session-rpc-tools.js`   | 295    | RPCs do SDK                                            |
+| `session-tools.js`       | 196    | Estado da sessão hook system                           |
+| `task-tools.js`          | 154    | Gerenciamento de tarefas                               |
+| `web-tools.js`           | 396    | Acesso web com SSRF protection                         |
+| **file/**                | 890    | read_file, write_file, list_dir, etc.                  |
+| **git/**                 | 272    | git tools                                              |
+| **shell/**               | 713    | Shell execution tools                                  |
+| **todo/**                | 1.537  | Sistema de tarefas completo (CRUD, bulk, query, store) |
 
 **Status**: bem organizado em subdirs. `todo/store.js` é um mini-sistema independente.
 
@@ -421,14 +421,14 @@ db/    ←── conversation-hub/store, tools/todo/store
 
 ## 4. Arquivos @deprecated Pendentes de Remoção
 
-| Arquivo | Deprecado em | Substituto |
-| --- | --- | --- |
-| `lib/permissions.js` | N.4 | `hooks/permission-handler.js` |
-| `lib/hooks.js` | N.3 | `hooks/factory.js` |
-| `bridges/gh-bridge.js` | F33.1 | `bridges/gh/index.js` |
-| `terminal/bootstrap.js` | F33.1 | `terminal/index.js` |
-| `terminal/http-handlers.js` | F33.1 | `terminal/handlers-*.js` |
-| `agent/events.js` | R9 | `core/agent-events.js` |
+| Arquivo                     | Deprecado em | Substituto                    |
+| --------------------------- | ------------ | ----------------------------- |
+| `lib/permissions.js`        | N.4          | `hooks/permission-handler.js` |
+| `lib/hooks.js`              | N.3          | `hooks/factory.js`            |
+| `bridges/gh-bridge.js`      | F33.1        | `bridges/gh/index.js`         |
+| `terminal/bootstrap.js`     | F33.1        | `terminal/index.js`           |
+| `terminal/http-handlers.js` | F33.1        | `terminal/handlers-*.js`      |
+| `agent/events.js`           | R9           | `core/agent-events.js`        |
 
 Total: **6 arquivos deprecated** que podem ser eliminados após redirect de importadores.
 
@@ -436,29 +436,29 @@ Total: **6 arquivos deprecated** que podem ser eliminados após redirect de impo
 
 ## 5. God Modules (>400 lines, alta complexidade)
 
-| Arquivo | Linhas | Problema |
-| --- | --- | --- |
-| `agent/always-alive.js` | 1.613 | Orchestrator principal, 35+ métodos, 262 refs a campos privados |
-| `observability/event-collector.js` | 1.411 | Mega-coletor de eventos monolítico |
-| `observability/agent-event-observer.js` | 945 | Bridge massivo agent→telemetria |
-| `terminal/dialog.js` | 944 | Motor de diálogo do terminal |
-| `conversation-hub/store.js` | 737 | ConversationStore SQLite |
-| `channel/client.js` | 729 | LLM Bridge Client |
-| `terminal/handlers-system.js` | 722 | God handler HTTP |
-| `terminal/repl.js` | 574 | Interface REPL |
-| `agent/session/event-wirer.js` | 591 | Fiação de eventos SDK |
-| `agent/dialog/loop-manager.js` | 661 | Dialog loop manager |
-| `conversation-hub/orchestrator.js` | 646 | Hub orchestrator |
-| `observability/metrics.js` | 551 | Métricas |
-| `channel/inject.js` | 546 | Canal de injeção |
-| `bridges/mcp-tool-bridge.js` | 529 | MCP bridge |
-| `lib/model-registry.js` | 519 | Model registry |
-| `conversation-hub/socket-ns.js` | 466 | Socket.io namespace |
-| `terminal/index.js` | 471 | Orquestrador terminal |
-| `tools/todo/crud-tools.js` | 459 | CRUD tools |
-| `terminal/server.js` | 438 | HTTP server raw |
-| `tools/introspection-tools.js` | 419 | Introspecção |
-| `bridges/git-bridge.js` | 402 | Git bridge |
+| Arquivo                                 | Linhas | Problema                                                        |
+| --------------------------------------- | ------ | --------------------------------------------------------------- |
+| `agent/always-alive.js`                 | 1.613  | Orchestrator principal, 35+ métodos, 262 refs a campos privados |
+| `observability/event-collector.js`      | 1.411  | Mega-coletor de eventos monolítico                              |
+| `observability/agent-event-observer.js` | 945    | Bridge massivo agent→telemetria                                 |
+| `terminal/dialog.js`                    | 944    | Motor de diálogo do terminal                                    |
+| `conversation-hub/store.js`             | 737    | ConversationStore SQLite                                        |
+| `channel/client.js`                     | 729    | LLM Bridge Client                                               |
+| `terminal/handlers-system.js`           | 722    | God handler HTTP                                                |
+| `terminal/repl.js`                      | 574    | Interface REPL                                                  |
+| `agent/session/event-wirer.js`          | 591    | Fiação de eventos SDK                                           |
+| `agent/dialog/loop-manager.js`          | 661    | Dialog loop manager                                             |
+| `conversation-hub/orchestrator.js`      | 646    | Hub orchestrator                                                |
+| `observability/metrics.js`              | 551    | Métricas                                                        |
+| `channel/inject.js`                     | 546    | Canal de injeção                                                |
+| `bridges/mcp-tool-bridge.js`            | 529    | MCP bridge                                                      |
+| `lib/model-registry.js`                 | 519    | Model registry                                                  |
+| `conversation-hub/socket-ns.js`         | 466    | Socket.io namespace                                             |
+| `terminal/index.js`                     | 471    | Orquestrador terminal                                           |
+| `tools/todo/crud-tools.js`              | 459    | CRUD tools                                                      |
+| `terminal/server.js`                    | 438    | HTTP server raw                                                 |
+| `tools/introspection-tools.js`          | 419    | Introspecção                                                    |
+| `bridges/git-bridge.js`                 | 402    | Git bridge                                                      |
 
 ---
 
@@ -555,14 +555,14 @@ Express → routes/*.js ou api/bridge-*.js
 
 ## 8. Métricas de Saúde Arquitetural
 
-| Métrica | Valor | Avaliação |
-| --- | --- | --- |
-| Total de arquivos JS | 170 | OK |
-| Total de linhas | 42.588 | Grande |
-| Arquivos deprecated | 6 | Eliminar |
-| God Modules (>600 lines) | 11 | Alto — decomposição necessária |
-| Overlaps identificados | 7 | Alto — unificação necessária |
-| process.env fora de config | 41 | Alto — centralização necessária |
-| Diretórios HTTP duplicados | 3 (api, routes, terminal/server) | Confuso |
-| Deprecated re-exports | 6 | Eliminar |
-| Diretório vazio (logs/) | 1 | Eliminar |
+| Métrica                    | Valor                            | Avaliação                       |
+| -------------------------- | -------------------------------- | ------------------------------- |
+| Total de arquivos JS       | 170                              | OK                              |
+| Total de linhas            | 42.588                           | Grande                          |
+| Arquivos deprecated        | 6                                | Eliminar                        |
+| God Modules (>600 lines)   | 11                               | Alto — decomposição necessária  |
+| Overlaps identificados     | 7                                | Alto — unificação necessária    |
+| process.env fora de config | 41                               | Alto — centralização necessária |
+| Diretórios HTTP duplicados | 3 (api, routes, terminal/server) | Confuso                         |
+| Deprecated re-exports      | 6                                | Eliminar                        |
+| Diretório vazio (logs/)    | 1                                | Eliminar                        |

@@ -8,8 +8,8 @@
  */
 
 import { eventFanout } from '#copilot/api/sse/fanout';
-import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub/socket-ns';
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config/env';
+import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub/socket-ns';
 import { getHubSessionId, getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../state.js';
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
