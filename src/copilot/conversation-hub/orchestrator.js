@@ -14,6 +14,7 @@
  * @see module:copilot/always-alive
  */
 
+import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
@@ -184,7 +185,7 @@ export class HubOrchestrator extends EventEmitter {
         let sdkSessionId;
         try {
             const agent = this.#agent ?? _fallbackAgent;
-            if (!agent) throw new Error('agent not injected');
+            if (!agent) throw new SessionError('agent not injected', 'ORCH_NO_AGENT');
             const snap = /** @type {{ sessionId?: string }} */ (agent.getStatusSnapshot());
             sdkSessionId = snap.sessionId;
         } catch {
@@ -249,7 +250,7 @@ export class HubOrchestrator extends EventEmitter {
     sendToLlmB(hubSessionId, message, opts = {}) {
         // F6.5 (BUG-MOD-09): bloquear novas mensagens para sessões já encerradas
         if (this.#closedSessions.has(hubSessionId)) {
-            return Promise.reject(new Error(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`));
+            return Promise.reject(new SessionError(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`, 'ORCH_SESSION_ENDED'));
         }
 
         // Encadeia na cauda da Promise existente para esta sessão (mutex por sessão)
@@ -259,7 +260,7 @@ export class HubOrchestrator extends EventEmitter {
         const next = prev.then(() => {
             // Verificação dupla: pode ter sido fechada enquanto aguardava na fila
             if (this.#closedSessions.has(hubSessionId)) {
-                throw new Error(`[HubOrchestrator] Sessão encerrada durante enfileiramento: ${hubSessionId}`);
+                throw new SessionError(`[HubOrchestrator] Sessão encerrada durante enfileiramento: ${hubSessionId}`, 'ORCH_SESSION_ENDED');
             }
             return this.#executeSendToLlmB(hubSessionId, message, opts);
         });
@@ -291,13 +292,13 @@ export class HubOrchestrator extends EventEmitter {
      */
     async #executeSendToLlmB(hubSessionId, message, opts = {}) {
         if (!this.#bridge) {
-            throw new Error('[HubOrchestrator] Não inicializado. Chame init() primeiro.');
+            throw new SessionError('[HubOrchestrator] Não inicializado. Chame init() primeiro.', 'ORCH_NOT_INITIALIZED');
         }
 
         // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
         const agentCheck = this.#agent ?? _fallbackAgent;
         if (!agentCheck || agentCheck.status === 'stopped') {
-            throw new Error('[HubOrchestrator] AlwaysAliveAgent não está ativo');
+            throw new SessionError('[HubOrchestrator] AlwaysAliveAgent não está ativo', 'ORCH_AGENT_INACTIVE');
         }
 
         const useStructured = opts.useStructured !== false;
@@ -328,7 +329,7 @@ export class HubOrchestrator extends EventEmitter {
         const llmATurn = this.#store.getTurn(llmATurnId);
         const turnNumber = llmATurn?.turn_number;
         if (!turnNumber) {
-            throw new Error(`[HubOrchestrator] Turno ${llmATurnId} não encontrado após writeTurn`);
+            throw new SessionError(`[HubOrchestrator] Turno ${llmATurnId} não encontrado após writeTurn`, 'ORCH_TURN_NOT_FOUND');
         }
 
         this.emit('turn:sent', {
@@ -571,7 +572,7 @@ export class HubOrchestrator extends EventEmitter {
     async #callViaDialogLoop(message, messageContent, hubSessionId, turnNumber, timeoutMs) {
         const agentInst = this.#agent ?? _fallbackAgent;
         if (!agentInst?.sendDialogTurn) {
-            throw new Error('[HubOrchestrator] agentInst não suporta sendDialogTurn');
+            throw new SessionError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
         }
         const content = typeof message === 'string' ? message : messageContent;
         log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${turnNumber + 1}.`);
@@ -599,7 +600,7 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se não inicializado
      */
     async #callViaStructured(message, hubSessionId, turnNumber, timeoutMs) {
-        if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
+        if (!this.#bridge) throw new SessionError('[HubOrchestrator] Não inicializado.', 'ORCH_NOT_INITIALIZED');
         /** @type {string} */ let accumulated = '';
         const result = await this.#bridge.chatStructured(
             /** @type {import('#copilot/core/structured-message').StructuredMessageInput} */ (message),
@@ -630,7 +631,7 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se não inicializado
      */
     async #callViaSimpleChat(messageContent, hubSessionId, turnNumber, timeoutMs) {
-        if (!this.#bridge) throw new Error('[HubOrchestrator] Não inicializado.');
+        if (!this.#bridge) throw new SessionError('[HubOrchestrator] Não inicializado.', 'ORCH_NOT_INITIALIZED');
         log(
             'WARN',
             `[HubOrchestrator] Usando chat() simples (fallback path) para hubSession=${hubSessionId}, messageType=string`,

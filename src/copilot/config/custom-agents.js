@@ -1,4 +1,5 @@
 // @ts-check
+import { ConfigError } from '#copilot/core/errors';
 import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS } from '#copilot/config/env';
 /**
  * src/copilot/config/custom-agents.js
@@ -112,20 +113,20 @@ export function listCustomAgents() {
  *
  * @param {CustomAgentConfig} config
  * @returns {void}
- * @throws {Error} Se config.name, config.description, config.tools ou config.prompt forem inválidos
+ * @throws {ConfigError} Se config.name, config.description, config.tools ou config.prompt forem inválidos
  */
 export function registerCustomAgent(config) {
     if (!config?.name || typeof config.name !== 'string') {
-        throw new Error('CustomAgentConfig.name deve ser string não-vazia');
+        throw new ConfigError('CustomAgentConfig.name deve ser string não-vazia');
     }
     if (typeof config.description !== 'string' || !config.description) {
-        throw new Error('CustomAgentConfig.description deve ser string não-vazia');
+        throw new ConfigError('CustomAgentConfig.description deve ser string não-vazia');
     }
     if (!Array.isArray(config.tools) || config.tools.some((t) => typeof t !== 'string')) {
-        throw new Error('CustomAgentConfig.tools deve ser string[]');
+        throw new ConfigError('CustomAgentConfig.tools deve ser string[]');
     }
     if (typeof config.prompt !== 'string') {
-        throw new Error('CustomAgentConfig.prompt deve ser string');
+        throw new ConfigError('CustomAgentConfig.prompt deve ser string');
     }
     BUILTIN_AGENTS.set(config.name, config);
 }

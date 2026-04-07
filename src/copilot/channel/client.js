@@ -37,6 +37,7 @@
  * @see module:copilot/channel/inject
  */
 
+import { BridgeError } from '#copilot/core/errors';
 import {
     buildStructuredRequest,
     parseStructuredResponse,
@@ -81,7 +82,7 @@ export function setBridgeAgent(agent) {
  * @throws {Error} Se o agent não foi injetado via `setBridgeAgent()`.
  */
 function requireAgent() {
-    if (!_agent) throw new Error('[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.');
+    if (!_agent) throw new BridgeError('[LlmBridgeClient] agent não injetado — chamar setBridgeAgent() antes.', 'BRIDGE_NOT_INITIALIZED');
     return _agent;
 }
 
@@ -186,7 +187,7 @@ export class LlmBridgeClient {
             }
         }
         // Nunca alcançado (loop sempre re-throw na última iteração), mas satisfaz o tipo
-        throw new Error('[LlmBridgeClient] Falha inesperada após retries');
+        throw new BridgeError('[LlmBridgeClient] Falha inesperada após retries', 'BRIDGE_RETRY_EXHAUSTED');
     }
 
     /**
@@ -206,7 +207,7 @@ export class LlmBridgeClient {
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
-            throw new Error('[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.');
+            throw new BridgeError('[LlmBridgeClient] Agente não está ativo. Chame requireAgent().start() primeiro.', 'BRIDGE_AGENT_STOPPED');
         }
 
         // Registra turno do usuário no histórico

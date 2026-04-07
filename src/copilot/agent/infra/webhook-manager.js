@@ -7,6 +7,7 @@
  *   reuso isolado.
  */
 
+import { ConfigError } from '#copilot/core/errors';
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import dns from 'node:dns/promises';
@@ -46,17 +47,17 @@ export class WebhookManager {
      * G2-SEC-01: prevenção de SSRF básica — bloqueia acesso a RFC-1918 e loopback.
      *
      * @param {string} url
-     * @throws {Error} Se a URL for inválida ou insegura
+     * @throws {ConfigError} Se a URL for inválida ou insegura
      */
     static #validateUrl(url) {
         let parsed;
         try {
             parsed = new URL(url);
         } catch {
-            throw new Error(`[WebhookManager] URL inválida: ${url}`);
+            throw new ConfigError(`[WebhookManager] URL inválida: ${url}`);
         }
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            throw new Error(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
+            throw new ConfigError(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
         }
         const allowPrivate = WEBHOOK_ALLOW_PRIVATE_HOSTS;
         if (!allowPrivate) {
@@ -72,7 +73,7 @@ export class WebhookManager {
                 /^192\.168\./.test(hostname) ||
                 /^169\.254\./.test(hostname) // link-local
             ) {
-                throw new Error(
+                throw new ConfigError(
                     `[WebhookManager] Host privado/loopback bloqueado por segurança: ${hostname}. Use WEBHOOK_ALLOW_PRIVATE_HOSTS=true para permitir em dev.`,
                 );
             }
@@ -88,12 +89,12 @@ export class WebhookManager {
      *
      * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
      * @returns {WebhookEntry} Entrada registrada
-     * @throws {Error} Se a URL for inválida/insegura ou o limite de webhooks for atingido
+     * @throws {ConfigError} Se a URL for inválida/insegura ou o limite de webhooks for atingido
      */
     register(url) {
         WebhookManager.#validateUrl(url);
         if (this.#urls.size >= MAX_WEBHOOKS) {
-            throw new Error(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
+            throw new ConfigError(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
         }
         const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         this.#urls.set(id, url);

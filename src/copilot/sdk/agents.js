@@ -1,4 +1,5 @@
 // @ts-check
+import { ConfigError } from '#copilot/core/errors';
 /**
  * src/copilot/lib/agents.js
  *
@@ -53,13 +54,13 @@ export const READ_ONLY_TOOLS = [
  * @param {Record<string, object>} [cfg.mcpServers] - MCP servers específicos deste agente
  * @param {boolean} [cfg.infer=true] - Se disponível para inferência de modelo. Default is `true`
  * @returns {CustomAgentConfig}
- * @throws {Error} Se name ou prompt forem string vazia ou não-string
+ * @throws {ConfigError} Se name ou prompt forem string vazia ou não-string
  * @see createReadOnlyAgent
  */
 export function createAgent({ name, prompt, displayName, description, tools, mcpServers, infer }) {
-    if (!name || typeof name !== 'string') throw new Error('[lib/agents] createAgent: "name" (string) é obrigatório.');
+    if (!name || typeof name !== 'string') throw new ConfigError('[lib/agents] createAgent: "name" (string) é obrigatório.');
     if (!prompt || typeof prompt !== 'string')
-        throw new Error('[lib/agents] createAgent: "prompt" (string) é obrigatório.');
+        throw new ConfigError('[lib/agents] createAgent: "prompt" (string) é obrigatório.');
 
     /** @type {CustomAgentConfig} */
     const config = { name, prompt };

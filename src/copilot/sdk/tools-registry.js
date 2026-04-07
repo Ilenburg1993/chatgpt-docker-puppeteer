@@ -1,4 +1,5 @@
 // @ts-check
+import { ConfigError } from '#copilot/core/errors';
 /**
  * src/copilot/lib/tools-registry.js
  *
@@ -58,13 +59,13 @@ export function createRegistry() {
  * @param {string[]} [meta.tags=[]] Tags adicionais. Default is `[]`
  * @param {boolean} [meta.readOnly=false] Se a ferramenta é somente-leitura. Default is `false`
  * @returns {void}
- * @throws {Error} Se tool ou tool.name for inválido
+ * @throws {ConfigError} Se tool ou tool.name for inválido
  * @see createRegistry
  */
 export function registerTool(registry, tool, meta = {}) {
-    if (!registry || !registry.entries) throw new Error('[lib/tools-registry] registry inválido.');
+    if (!registry || !registry.entries) throw new ConfigError('[lib/tools-registry] registry inválido.');
     if (!tool || typeof tool.name !== 'string' || !tool.name)
-        throw new Error('[lib/tools-registry] registerTool: tool.name (string) é obrigatório.');
+        throw new ConfigError('[lib/tools-registry] registerTool: tool.name (string) é obrigatório.');
 
     const { category = 'uncategorized', tags = [], readOnly = false } = meta;
 

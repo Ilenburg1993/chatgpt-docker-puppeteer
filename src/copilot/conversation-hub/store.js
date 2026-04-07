@@ -15,6 +15,7 @@
  * @see module:copilot/db/sqlite
  */
 
+import { SessionError } from '#copilot/core/errors';
 import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -110,11 +111,11 @@ export class ConversationStore {
      * Garante que o store foi inicializado antes de qualquer operação.
      *
      * @returns {import('better-sqlite3').Database}
-     * @throws {Error} Se init() não foi chamado
+     * @throws {SessionError} Se init() não foi chamado
      */
     #getDb() {
         if (!this.#db || !this.#initialized) {
-            throw new Error('[ConversationStore] store.init() não foi chamado.');
+            throw new SessionError('[ConversationStore] store.init() não foi chamado.', 'STORE_NOT_INITIALIZED');
         }
         return this.#db;
     }
@@ -389,7 +390,7 @@ export class ConversationStore {
             }
         }
         /* c8 ignore next */
-        throw new Error('[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)');
+        throw new SessionError('[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)', 'STORE_WRITE_FAILED');
     }
 
     /**

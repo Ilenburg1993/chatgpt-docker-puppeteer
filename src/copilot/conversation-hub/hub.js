@@ -12,6 +12,7 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
+import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
@@ -106,7 +107,7 @@ export class ConversationHub {
      */
     get orchestrator() {
         if (!this.#orchestrator) {
-            throw new Error('[ConversationHub] Não inicializado. Chame init() primeiro.');
+            throw new SessionError('[ConversationHub] Não inicializado. Chame init() primeiro.', 'HUB_NOT_INITIALIZED');
         }
         return this.#orchestrator;
     }

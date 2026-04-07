@@ -22,6 +22,7 @@
  * @see module:copilot/lib/tools-registry
  */
 
+import { BridgeError } from '#copilot/core/errors';
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
@@ -152,7 +153,7 @@ async function rpcCall(method, params) {
             });
 
             if (!response.ok) {
-                const err = new Error(`MCP HTTP ${response.status}: ${response.statusText}`);
+                const err = new BridgeError(`MCP HTTP ${response.status}: ${response.statusText}`, 'MCP_HTTP_ERROR');
                 // Só faz retry em erros 5xx (servidor); 4xx são definitivos
                 if (response.status < 500) throw err;
                 lastError = err;
@@ -166,7 +167,7 @@ async function rpcCall(method, params) {
             const json = /** @type {{ error?: unknown; result?: unknown }} */ (await response.json());
 
             if (json.error) {
-                throw new Error(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`);
+                throw new BridgeError(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`, 'MCP_RPC_ERROR');
             }
 
             return json.result;

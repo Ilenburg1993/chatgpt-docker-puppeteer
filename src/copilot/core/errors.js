@@ -61,3 +61,35 @@ export class BridgeError extends CopilotError {
         this.name = 'BridgeError';
     }
 }
+
+/**
+ * Erro de configuração. Lançado quando parâmetros de entrada, opções ou configurações são inválidos.
+ *
+ * @extends {CopilotError}
+ */
+export class ConfigError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='CONFIG_ERROR'] - Código semântico do erro. Default is `'CONFIG_ERROR'`
+     */
+    constructor(message, code = 'CONFIG_ERROR') {
+        super(message, code);
+        this.name = 'ConfigError';
+    }
+}
+
+/**
+ * Erro de tool. Lançado quando há falha na execução, registro ou validação de tools.
+ *
+ * @extends {CopilotError}
+ */
+export class ToolError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='TOOL_ERROR'] - Código semântico do erro. Default is `'TOOL_ERROR'`
+     */
+    constructor(message, code = 'TOOL_ERROR') {
+        super(message, code);
+        this.name = 'ToolError';
+    }
+}
