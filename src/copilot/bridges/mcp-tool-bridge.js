@@ -22,8 +22,8 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { log } from '#copilot/observability/logger';
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import net from 'node:net';
 import { z } from 'zod';

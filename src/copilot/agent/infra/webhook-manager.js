@@ -7,8 +7,8 @@
  *   reuso isolado.
  */
 
-import { log } from '#copilot/observability/logger';
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import dns from 'node:dns/promises';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_TIMEOUT_MS } from '../config.js';
 

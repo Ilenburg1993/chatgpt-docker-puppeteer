@@ -9,8 +9,8 @@
  * @module copilot/api/bridge-control
  */
 
-import { log } from '#copilot/observability/logger';
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { createRequire } from 'node:module';
 import { CHANNEL_VERSION } from '../channel/index.js';
 import { conversationStore } from '../conversation-hub/index.js';

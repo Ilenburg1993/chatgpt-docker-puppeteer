@@ -25,10 +25,10 @@
  * @see module:copilot/conversation-hub/orchestrator
  */
 
+import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import { BridgeError } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
-import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 

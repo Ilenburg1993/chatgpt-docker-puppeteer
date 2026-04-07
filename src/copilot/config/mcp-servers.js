@@ -8,13 +8,13 @@
  * @module copilot/config/mcp-servers
  */
 
-import { log } from '#copilot/observability/logger';
 import {
-    COPILOT_MCP_STDIO_TIMEOUT_MS,
     COPILOT_MCP_HTTP_TIMEOUT_MS,
     COPILOT_MCP_SERVERS,
+    COPILOT_MCP_STDIO_TIMEOUT_MS,
     GITHUB_TOKEN,
 } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
 /**

@@ -7,9 +7,9 @@
  * @module copilot/bridges/gh/shared
  */
 
+import { LLM_B_GH_DEFAULT_REPO, LLM_B_GH_TIMEOUT_MS } from '#copilot/config/env';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { LLM_B_GH_TIMEOUT_MS, LLM_B_GH_DEFAULT_REPO } from '#copilot/config/env';
 
 const execFileAsync = promisify(execFile);
 
