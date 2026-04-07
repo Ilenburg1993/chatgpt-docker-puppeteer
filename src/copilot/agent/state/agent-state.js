@@ -19,11 +19,7 @@ import { readState } from '../lifecycle/state-io.js';
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
  */
 
-/**
- * @typedef {Object} StateHost
- * @property {string | null} sessionId
- * @property {(event: string | symbol) => number} listenerCount
- */
+/** @typedef {import('../types.js').StateHost} StateHost */
 
 /**
  * Constrói ou retorna snapshot cacheado do estado do agente.

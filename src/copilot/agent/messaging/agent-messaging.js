@@ -22,10 +22,7 @@ import { persistState } from '../lifecycle/state-io.js';
  * @typedef {import('../always-alive.js').AgentTask} AgentTask
  */
 
-/**
- * @typedef {Object} MessagingHost
- * @property {(event: string, payload?: unknown) => boolean} emit
- */
+/** @typedef {import('../types.js').MessagingHost} MessagingHost */
 
 /**
  * Enfileira uma task — usado por sendMessage e sendMessageDialogBoot.

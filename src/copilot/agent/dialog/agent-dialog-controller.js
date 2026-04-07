@@ -21,15 +21,7 @@ import { wireDialogLoopEvents } from './loop-manager.js';
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
  */
 
-/**
- * @typedef {Object} DialogHost
- * @property {(event: string, payload?: unknown) => boolean} emit
- * @property {(event: string, listener: (...args: any[]) => void) => void} on
- * @property {string | null} sessionId
- * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
- * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot
- * @property {(answer: string) => boolean} answerPendingQuestion
- */
+/** @typedef {import('../types.js').DialogHost} DialogHost */
 
 /**
  * Inicia o dialog loop com validações de estado e health check de contexto.

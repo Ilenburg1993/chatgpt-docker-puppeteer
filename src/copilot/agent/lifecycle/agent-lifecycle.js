@@ -47,22 +47,7 @@ import { createSnapshot, saveSnapshot } from '../session/snapshot.js';
  * @typedef {import('../always-alive.js').AgentStatus} AgentStatus
  */
 
-/**
- * @typedef {Object} LifecycleHost
- * @property {(event: string, payload?: unknown) => boolean} emit
- * @property {(event: string, listener: (...args: any[]) => void) => void} on
- * @property {(event: string, listener: (...args: any[]) => void) => void} off
- * @property {(event: string) => void} removeAllListeners
- * @property {string | null} sessionId
- * @property {() => import('../always-alive.js').AgentStatusSnapshot} getStatusSnapshot
- * @property {() => Promise<void>} resumeDialogLoop
- * @property {() => Promise<void>} startDialogLoop
- * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} dialogPrMetrics
- * @property {() => void} ensureDialogLoopAttached
- * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
- * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot
- * @property {(answer: string) => boolean} answerPendingQuestion
- */
+/** @typedef {import('../types.js').LifecycleHost} LifecycleHost */
 
 /**
  * Inicializa (ou reinicializa) a sessão SDK.

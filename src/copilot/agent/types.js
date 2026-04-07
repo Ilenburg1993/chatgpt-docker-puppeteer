@@ -71,6 +71,54 @@
  * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
  */
 
+// ─── Host Interfaces (contratos internos para módulos extraídos) ──────────────
+
+/**
+ * Contrato do host exigido pelo módulo lifecycle (agentStart, agentStop, initSession).
+ *
+ * @typedef {Object} LifecycleHost
+ * @property {(event: string, payload?: unknown) => boolean} emit
+ * @property {(event: string, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string, listener: (...args: any[]) => void) => void} off
+ * @property {(event: string) => void} removeAllListeners
+ * @property {string | null} sessionId
+ * @property {() => AgentStatusSnapshot} getStatusSnapshot
+ * @property {() => Promise<void>} resumeDialogLoop
+ * @property {() => Promise<void>} startDialogLoop
+ * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} dialogPrMetrics
+ * @property {() => void} ensureDialogLoopAttached
+ * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
+ * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot
+ * @property {(answer: string) => boolean} answerPendingQuestion
+ */
+
+/**
+ * Contrato do host exigido pelo módulo dialog (dialogStart, dialogStop, etc.).
+ *
+ * @typedef {Object} DialogHost
+ * @property {(event: string, payload?: unknown) => boolean} emit
+ * @property {(event: string, listener: (...args: any[]) => void) => void} on
+ * @property {string | null} sessionId
+ * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
+ * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot
+ * @property {(answer: string) => boolean} answerPendingQuestion
+ */
+
+/**
+ * Contrato do host exigido pelo módulo messaging (sendMessage, enqueueTask, etc.).
+ *
+ * @typedef {Object} MessagingHost
+ * @property {(event: string, payload?: unknown) => boolean} emit
+ */
+
+/**
+ * Contrato do host exigido pelo módulo state (getStatusSnapshot, listenerDiagnostics).
+ *
+ * @typedef {Object} StateHost
+ * @property {string | null} sessionId
+ * @property {(event: string | symbol) => number} listenerCount
+ */
+
 // ─── IAlwaysAliveAgent (contrato público) ─────────────────────────────────────
 
 /**
