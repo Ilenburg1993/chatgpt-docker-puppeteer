@@ -4,45 +4,41 @@
  *
  * F35: AgentContext — objeto de contexto compartilhado entre todos os módulos do agente.
  *
- * Substitui os 32 campos #private espalhados por always-alive.js, permitindo
- * que módulos extraídos (lifecycle, dialog, messaging, state) acessem o estado
- * via referência ao contexto ao invés de callbacks pesados.
+ * Substitui os 32 campos #private espalhados por always-alive.js, permitindo que módulos extraídos (lifecycle, dialog,
+ * messaging, state) acessem o estado via referência ao contexto ao invés de callbacks pesados.
  *
- * ATENÇÃO: este módulo NÃO é exportado no barrel público (index.js).
- * Uso exclusivo interno do agent/ — consumidores externos acessam via API pública
- * do AlwaysAliveAgent.
+ * ATENÇÃO: este módulo NÃO é exportado no barrel público (index.js). Uso exclusivo interno do agent/ — consumidores
+ * externos acessam via API pública do AlwaysAliveAgent.
  *
  * @module copilot/agent/agent-context
  * @internal
  */
 
+import { createRegistry } from '#copilot/sdk/index';
+import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
+import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { PermissionController } from './infra/permission-controller.js';
-import { HandoffManager } from './infra/handoff-manager.js';
 import { WebhookManager } from './infra/webhook-manager.js';
-import { SessionKeepalive } from './session/keepalive.js';
 import { SessionMessagesCache } from './session/history-sync.js';
-import { createRegistry } from '#copilot/sdk/index';
-import {
-    COPILOT_MODEL,
-    COPILOT_REASONING_EFFORT,
-    MESSAGES_CACHE_TTL_MS,
-} from './config.js';
+import { SessionKeepalive } from './session/keepalive.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ *
  * @typedef {import('./always-alive.js').PendingQuestion} PendingQuestion
+ *
  * @typedef {import('./always-alive.js').AgentStatus} AgentStatus
  */
 
 /**
  * Contexto compartilhado entre todos os módulos internos do agente.
  *
- * Ciclo de vida: criado uma vez no constructor do AlwaysAliveAgent,
- * passado por referência a todos os sub-módulos. Campos são mutáveis
- * diretamente — a semântica é idêntica aos antigos #private fields.
+ * Ciclo de vida: criado uma vez no constructor do AlwaysAliveAgent, passado por referência a todos os sub-módulos.
+ * Campos são mutáveis diretamente — a semântica é idêntica aos antigos #private fields.
  */
 export class AgentContext {
     // ─── SDK / Session ─────────────────────────────────────────────────────
@@ -58,6 +54,7 @@ export class AgentContext {
 
     /**
      * Funções de unsubscribe retornadas por session.on().
+     *
      * @type {(() => void)[]}
      */
     sessionEventUnsubscribers = [];
@@ -78,6 +75,7 @@ export class AgentContext {
 
     /**
      * Cache do status snapshot com dirty flag + TTL.
+     *
      * @type {{ snapshot: import('./always-alive.js').AgentStatusSnapshot; at: number } | null}
      */
     statusSnapshotCache = null;
@@ -94,18 +92,21 @@ export class AgentContext {
 
     /**
      * Último snapshot de billing (model, cost, quotaSnapshots, timestamp).
+     *
      * @type {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
     lastPrInfo = null;
 
     /**
      * Uso de contexto capturado do evento session.usage_info.
+     *
      * @type {{ tokens: number; tokenLimit: number; utilization: number } | null}
      */
     contextState = null;
 
     /**
      * Último caminho de checkpoint salvo pelo SDK.
+     *
      * @type {string | null}
      */
     lastCheckpointPath = null;
@@ -114,24 +115,28 @@ export class AgentContext {
 
     /**
      * Timer de emissão periódica de agent.metrics.
+     *
      * @type {ReturnType<typeof setInterval> | null}
      */
     metricsTimer = null;
 
     /**
      * Cancel do job de auto-reconnect ao MCP.
+     *
      * @type {(() => void) | null}
      */
     mcpReconnectCancel = null;
 
     /**
      * Flag de idempotência do dialog loop wiring.
+     *
      * @type {boolean}
      */
     dialogLoopAttached = false;
 
     /**
      * Agent-event-observer para cleanup no stop().
+     *
      * @type {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null}
      */
     agentObserver = null;
@@ -192,8 +197,7 @@ export class AgentContext {
     }
 
     /**
-     * Altera o status e invalida o cache de snapshot.
-     * Emite evento 'status' no emitter passado.
+     * Altera o status e invalida o cache de snapshot. Emite evento 'status' no emitter passado.
      *
      * @param {AgentStatus} status
      * @param {import('node:events').EventEmitter} emitter

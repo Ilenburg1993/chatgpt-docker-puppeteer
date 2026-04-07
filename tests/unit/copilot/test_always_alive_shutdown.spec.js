@@ -26,7 +26,11 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        const [main, lifecycle] = await Promise.all([
+            readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+        ]);
+        sourceCode = main + '\n' + lifecycle;
     });
 
     it('stop() deve aceitar opção shutdownTimeoutMs (parâmetro opcional)', () => {
@@ -49,8 +53,8 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
 
     it('stop() deve usar messageQueue.drain() para limpar a fila no shutdown', () => {
         assert.ok(
-            sourceCode.includes('this.#messageQueue.drain('),
-            'stop() deve limpar a fila via #messageQueue.drain() durante o shutdown gracioso',
+            sourceCode.includes('messageQueue.drain('),
+            'stop() deve limpar a fila via messageQueue.drain() durante o shutdown gracioso',
         );
     });
 
@@ -104,14 +108,19 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        const [main, lifecycle] = await Promise.all([
+            readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+        ]);
+        sourceCode = main + '\n' + lifecycle;
     });
 
     it('stop() deve aceitar chamada sem argumentos (parâmetro com default)', () => {
-        // A assinatura async stop({ shutdownTimeoutMs = 10_000 } = {})
-        // garante que stop() funciona sem args (= {})
-        const stopSignature = /async stop\s*\(\s*\{[^}]*\}\s*=\s*\{\}/.test(sourceCode);
-        assert.ok(stopSignature, 'stop() deve usar destructuring com default = {} para retrocompatibilidade');
+        // agentStop tem destructuring { shutdownTimeoutMs = ... } = {}
+        assert.ok(
+            sourceCode.includes('shutdownTimeoutMs') && sourceCode.includes('= {}'),
+            'stop()/agentStop() deve usar destructuring com default = {} para retrocompatibilidade',
+        );
     });
 
     it('stop() aguarda processing status antes de parar', () => {
@@ -159,10 +168,7 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
         const { readFile } = await import('node:fs/promises');
         const src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         // F.4: lógica de verificação de limite migrou para MessageQueue.enqueue()
-        assert.ok(
-            src.includes('this.#messageQueue.enqueue(task'),
-            'sendMessage deve delegar enqueue ao #messageQueue (F.4)',
-        );
+        assert.ok(src.includes('messageQueue.enqueue(task'), 'sendMessage deve delegar enqueue ao messageQueue (F.4)');
     });
 
     it('mensagem de erro ao atingir limite deve conter "Fila cheia" em message-queue.js', async () => {
@@ -187,13 +193,17 @@ describe('always-alive › stop() idempotência', async () => {
 
     before(async () => {
         const { readFile } = await import('node:fs/promises');
-        sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
+        const [main, lifecycle] = await Promise.all([
+            readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+        ]);
+        sourceCode = main + '\n' + lifecycle;
     });
 
     it('stop() deve ter guard de idempotência verificando status === stopped', () => {
         assert.ok(
-            sourceCode.includes("this.#status === 'stopped'") && sourceCode.includes('return;'),
-            "stop() deve conter guard 'if (this.#status === stopped) return'",
+            sourceCode.includes("ctx.status === 'stopped'") && sourceCode.includes('return;'),
+            "stop()/agentStop() deve conter guard 'if (ctx.status === stopped) return'",
         );
     });
 

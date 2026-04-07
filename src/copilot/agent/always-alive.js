@@ -21,50 +21,28 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
-import {
-    buildTelemetryConfig,
-    defaultErrorTracker,
-    defaultMetrics,
-    initEventCollector,
-    startSpan,
-} from '#copilot/observability';
+import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { raceEvents } from '#copilot/sdk/event-helpers';
-import { createRegistry } from '#copilot/sdk/index';
-import { CopilotClient } from '@github/copilot-sdk';
 import EventEmitter from 'node:events';
-import { buildMcpTools } from '../bridges/mcp-tool-bridge.js';
-import { buildMcpConfig } from '../config/mcp-servers.js';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from '#copilot/core/events';
-import { wireDialogLoopEvents } from './dialog/loop-manager.js';
-import { handleUserInputRequest } from './dialog/user-input-handler.js';
-import { tryReconnect } from './lifecycle/reconnect-policy.js';
-import { createSnapshot, saveSnapshot } from './session/snapshot.js';
-// N.1: usar hooks module canônico em vez do arquivo @deprecated
-import { attachBus } from '#copilot/hooks/bus';
-import { createHooks } from '#copilot/hooks/factory';
-import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
 import {
     CONTEXT_UTIL_BLOCK_THRESHOLD,
     CONTEXT_UTIL_WARN_THRESHOLD,
     MAX_LISTENERS,
-    SHUTDOWN_TIMEOUT_MS,
     STATUS_SNAPSHOT_TTL_MS,
-    STOP_BOOT_WAIT_MS,
 } from './config.js';
+import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
-import { bootstrapTools, setSessionRpc } from './infra/tools-bootstrap.js';
-import { persistState, readState, writeStateAsync } from './lifecycle/state-io.js';
-import { performBootWiring } from './session/boot-wiring.js';
-import { syncSdkHistory } from './session/history-sync.js';
-import { initOrResumeSession } from './session/initializer.js';
+import { persistState, readState } from './lifecycle/state-io.js';
 // G2-ARCH-03: import estático em vez de dinâmico (hook-tools não cria circular dependency)
 import { resolveUserInput as hookToolsResolveUserInput } from '../tools/hook-tools.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
+// F36: Lifecycle — start, stop, initSession, tryReconnect
+import { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -125,6 +103,7 @@ import { AgentContext } from './agent-context.js';
 export class AlwaysAliveAgent extends EventEmitter {
     /**
      * F35: AgentContext — contexto compartilhado com todos os módulos internos.
+     *
      * @type {AgentContext}
      */
     ctx;
@@ -335,236 +314,17 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @throws {Error} Se a conexão ao CLI ou criação/retomada de sessão SDK falhar
      */
     async start() {
-        if (this.ctx.status !== 'stopped') {
-            log('WARN', '[AlwaysAlive] start() chamado com agente já ativo.');
-            return;
-        }
-
-        this.#setStatus('starting');
-        log('INFO', '[AlwaysAlive] Iniciando agente...');
-
-        // F56.1 (PARTE-9): marcar que o shutdown não foi graceful inicialmente.
-        // Se o processo morrer aqui, o próximo boot saberá que foi um crash.
-        persistState({ gracefulShutdown: false }, '[AlwaysAlive] gracefulShutdown=false');
-
-        // R.1: inicializar o event collector com métricas e errorTracker antes de qualquer attach
-        // O defaultBus já está wired via attachBus() em #initSession() — passado aqui para
-        // que o collector possa re-emitir hooks.
-        initEventCollector({
-            metrics: defaultMetrics,
-            errorTracker: defaultErrorTracker,
-            persist: true,
-        });
-
-        // CK: Ativar global error handlers em produção (idempotente — segunda chamada é no-op).
-        if (process.env['NODE_ENV'] !== 'test') {
-            defaultErrorTracker.registerGlobalHandlers();
-        }
-
-        // T.1: ativar snapshot periódico de métricas em metrics.jsonl (Fase T)
-        defaultMetrics.startPeriodicSnapshot();
-
-        try {
-            const _otelConfig = buildTelemetryConfig();
-            const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
-            this.ctx.client = client;
-
-            const { session, isResumed } = await startSpan('session.boot', { model: this.ctx.model }, () =>
-                this.#initSession(client),
-            );
-
-            // F29-REFACTOR: delegar wirings pós-init para boot-wiring.js
-            if (this.ctx.agentObserver) this.ctx.agentObserver.detach();
-            const bootResult = performBootWiring(client, session, isResumed, this, {
-                emit: (event, payload) => this.emit(event, payload),
-                getStatusSnapshot: () => this.getStatusSnapshot(),
-                onCheckpointPath: (path) => {
-                    this.ctx.lastCheckpointPath = path;
-                },
-                onContextState: (state) => {
-                    this.ctx.contextState = state;
-                },
-                onPrInfo: (info) => {
-                    this.ctx.lastPrInfo = info;
-                },
-                isProcessing: () => this.ctx.status === 'processing',
-                dialogLoopActive: () => this.ctx.dialogLoop?.active ?? false,
-                getSessionId: () => this.sessionId,
-                getStatus: () => this.ctx.status,
-                dialogLoop: this.ctx.dialogLoop,
-                keepalive: this.ctx.keepalive,
-                handoff: this.ctx.handoff,
-                ensureDialogLoopAttached: () => this.#ensureDialogLoopAttached(),
-                resumeDialogLoop: () => this.resumeDialogLoop(),
-                startDialogLoop: () => this.startDialogLoop(),
-                getDialogPrMetrics: () => this.dialogPrMetrics,
-            });
-            this.ctx.sessionEventUnsubscribers = bootResult.unsubs;
-            this.ctx.agentObserver = bootResult.agentObserver;
-            this.ctx.metricsTimer = bootResult.metricsTimer;
-            this.ctx.mcpReconnectCancel = bootResult.mcpReconnectCancel;
-
-            this.#setStatus('idle');
-            this.ctx.sendCount = readState()?.sendCount ?? 0;
-
-            log(
-                'INFO',
-                `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
-            );
-
-            if (isResumed) {
-                void syncSdkHistory(session, (event, payload) => this.emit(event, payload));
-            }
-
-            this.emit('ready', { sessionId: session.sessionId, isResumed });
-        } catch (/** @type {any} */ e) {
-            this.#setStatus('stopped');
-            log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
-            this.emit('error', e);
-            throw e;
-        }
+        await agentStart(this.ctx, this);
     }
 
     /**
-     * Para o agente graciosamente:
-     *
-     * 1. Aguarda a tarefa atual terminar (até `shutdownTimeoutMs`)
-     * 2. Rejeita tarefas pendentes na fila
-     * 3. Desconecta a sessão SDK
+     * Para o agente graciosamente.
      *
      * @param {{ shutdownTimeoutMs?: number }} [opts]
      * @returns {Promise<void>}
      */
-    async stop({ shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
-        // Idempotente: se já está parado, retorna sem ação
-        if (this.ctx.status === 'stopped') return;
-
-        log('INFO', '[AlwaysAlive] Parando agente...');
-
-        // Sinaliza shutdown para que consumers externos removam seus próprios listeners
-        // antes do dreno da fila, evitando dead callbacks em ciclos stop()/start().
-        this.emit('before-stop');
-        this.removeAllListeners('before-stop');
-
-        // Garante que o boot não fique suspenso se stop() for chamado durante o start().
-        if (this.ctx.status === 'starting') {
-            log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-            await raceEvents(this, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch(() => {});
-        }
-
-        // Se estiver processando uma tarefa, aguarda ela terminar (com timeout)
-        if (this.ctx.status === 'processing' || this.ctx.status === 'waiting_for_input') {
-            log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
-            await Promise.race([
-                new Promise((resolve) => {
-                    const onIdle = () => {
-                        if (this.ctx.status !== 'processing' && this.ctx.status !== 'waiting_for_input') {
-                            this.off('status', onIdle);
-                            resolve(undefined);
-                        }
-                    };
-                    this.on('status', onIdle);
-                }),
-                new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
-            ]);
-        }
-
-        // G1-BUG-02 (fix): resetar listeners e flag ANTES de forceDeactivate para evitar propagação
-        // de eventos para SSE subscribers já removidos durante o shutdown.
-        if (this.ctx.dialogLoopAttached) {
-            this.ctx.dialogLoop.removeAllListeners();
-            this.ctx.dialogLoopAttached = false;
-        }
-        if (this.ctx.dialogLoop.active) {
-            this.ctx.dialogLoop.forceDeactivate();
-            this.emit('dialog.loop.changed', { active: false, ts: Date.now() });
-        }
-
-        // F41.4: auto-save snapshot antes de shutdown (para PM2 restart)
-        try {
-            const snap = createSnapshot({
-                sessionId: this.sessionId ?? null,
-                model: this.ctx.model,
-                status: this.ctx.status,
-                sendCount: this.ctx.sendCount,
-                dialogLoopActive: false, // acabou de ser desativado
-                dialogPaused: this.ctx.dialogLoop.paused,
-                pendingQuestion: this.ctx.pendingQuestion?.question ?? null,
-                prMetrics: this.dialogPrMetrics,
-                reason: 'auto-shutdown',
-            });
-            saveSnapshot(snap);
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
-        }
-
-        await writeStateAsync({ sendCount: this.ctx.sendCount, gracefulShutdown: true }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
-        );
-
-        // G2-DX-17: limpar timer de métricas antes de alterar status
-        if (this.ctx.metricsTimer) {
-            clearInterval(this.ctx.metricsTimer);
-            this.ctx.metricsTimer = null;
-        }
-        // F9.2: cancelar job de auto-reconnect MCP
-        if (this.ctx.mcpReconnectCancel) {
-            this.ctx.mcpReconnectCancel();
-            this.ctx.mcpReconnectCancel = null;
-        }
-        // F42.2: parar keepalive de sessão
-        this.ctx.keepalive.stop();
-        // Fase CB: parar snapshot periódico de métricas — sem isso, em ciclos stop→start
-        // múltiplos snapshots rodam em paralelo, causando escrita concorrente em metrics.jsonl
-        defaultMetrics.stopPeriodicSnapshot();
-
-        this.#setStatus('stopped');
-
-        // Rejeita todas as tarefas pendentes na fila
-        const remainingTasks = this.ctx.messageQueue.drain(
-            new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
-        );
-        this.ctx.statusSnapshotCache = null;
-        if (remainingTasks.length > 0) {
-            log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
-        }
-
-        // F29: detach agent-event-observer antes de limpar session event unsubscribers
-        if (this.ctx.agentObserver) {
-            this.ctx.agentObserver.detach();
-            this.ctx.agentObserver = null;
-        }
-
-        for (const unsub of this.ctx.sessionEventUnsubscribers) unsub();
-        this.ctx.sessionEventUnsubscribers = [];
-
-        if (this.ctx.session) {
-            try {
-                await this.ctx.session.disconnect();
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
-            }
-            this.ctx.session = null;
-            this.ctx.messagesCache.invalidate();
-            setSessionRpc(null);
-        }
-
-        if (this.ctx.client) {
-            try {
-                const stopErrors = await this.ctx.client.stop();
-                if (stopErrors.length > 0) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => e.message).join('; ')}`,
-                    );
-                }
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${e.message}`);
-            }
-            this.ctx.client = null;
-        }
-
-        this.emit('stopped');
+    async stop(opts) {
+        await agentStop(this.ctx, this, opts);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -835,7 +595,7 @@ export class AlwaysAliveAgent extends EventEmitter {
                 );
             }
         }
-        this.#ensureDialogLoopAttached();
+        this.ensureDialogLoopAttached();
         // F42.2: pausar keepalive enquanto dialog loop está ativo (o loop mantém a sessão viva)
         this.ctx.keepalive.stop();
         await this.ctx.dialogLoop.start(bootPrompt);
@@ -941,7 +701,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * G1-BUG-01 (fix): `attach()` é sempre chamado para atualizar host/telemetry (podem mudar após reconexão). O wiring
      * de eventos (listeners) só ocorre uma vez — guard `#dialogLoopAttached` protege apenas essa parte.
      */
-    #ensureDialogLoopAttached() {
+    ensureDialogLoopAttached() {
         /** @type {import('./dialog/loop-manager.js').AgentHost} */
         const host = {
             sendMessage: (msg, opts) => this.sendMessage(msg, opts),
@@ -1006,7 +766,13 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     #processQueue() {
         // G1-ARCH-03: bloqueia processamento durante reconexão ativa
-        if (this.ctx.isReconnecting || this.ctx.status !== 'idle' || this.ctx.messageQueue.size === 0 || !this.ctx.session) return;
+        if (
+            this.ctx.isReconnecting ||
+            this.ctx.status !== 'idle' ||
+            this.ctx.messageQueue.size === 0 ||
+            !this.ctx.session
+        )
+            return;
         const session = this.ctx.session;
 
         const task = this.ctx.messageQueue.shift();
@@ -1031,123 +797,18 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Inicializa (ou reinicializa) a sessão SDK: carrega MCP tools, reconstrói o registry, bootstrap das tools, chama
-     * `initOrResumeSession` e sincroniza o estado interno.
+     * F36: Tenta reconectar à sessão SDK. Delegado para lifecycle/agent-lifecycle.js.
      *
-     * Usado tanto no `start()` inicial quanto em cada tentativa de `#tryReconnect()`.
-     *
-     * @param {CopilotClient} client - Cliente SDK já instanciado
-     * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
-     */
-    async #initSession(client) {
-        // G1-API-05 (fix): invalidar cache de mensagens para garantir que chamadas a
-        // getSessionMessages() após reconexão não retornem mensagens da sessão anterior.
-        this.ctx.messagesCache.invalidate();
-        const mcpTools = await buildMcpTools();
-        if (mcpTools.length > 0) {
-            log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
-        }
-        // Reinicia o registry para evitar duplicação de tools em reconexões consecutivas.
-        this.ctx.toolsRegistry = createRegistry();
-        const tools = bootstrapTools(this.ctx.toolsRegistry, mcpTools);
-        log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
-
-        // N.2: compor todos os 6 hooks SDK usando o módulo canônico.
-        // - lifecycleHooks: onSessionStart (rich additionalContext G4), onSessionEnd, onErrorOccurred
-        //   com telemetria, webhooks e fallback model via injeção de dependência.
-        // - createHooks: wires onPreToolUse (auditLog) + onPostToolUse (ring buffer via auditLog)
-        //   + onUserPromptSubmitted (auditLog) com os overrides de lifecycle acima.
-        const lifecycleHooks = createSessionHooks({
-            emitWebhook: (event, payload) => this.ctx.webhooks.emit(event, payload),
-            getModel: () => this.ctx.model,
-            scheduleFallback: (model) => this.ctx.dialogLoop.scheduleFallback(model),
-            emit: (event, payload) => this.emit(event, payload),
-        });
-
-        const hooks = createHooks({
-            auditLog: true,
-            onSessionStart: lifecycleHooks.onSessionStart,
-            onSessionEnd: lifecycleHooks.onSessionEnd,
-            onErrorOccurred: lifecycleHooks.onErrorOccurred,
-        });
-
-        // O.1: attachBus wireará o defaultBus singleton como observer de todos os eventos
-        //      sem modificar o comportamento dos handlers — todos os listeners SSE (Fase P)
-        //      e ring buffer ouvirão via defaultBus.
-        const busHooks = attachBus(hooks);
-
-        const { session, isResumed } = await initOrResumeSession(client, {
-            model: this.ctx.model,
-            onPermissionRequest: this.ctx.permissions.handler,
-            onUserInputRequest: (
-                /** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input,
-            ) =>
-                handleUserInputRequest(input, {
-                    isDialogLoopActive: () => this.ctx.dialogLoop.active,
-                    handleProtocolInput: (q) => this.ctx.dialogLoop.handleProtocolInput(q),
-                    setStatus: (s) => this.#setStatus(s),
-                    setPendingQuestion: (pq) => {
-                        this.ctx.pendingQuestion = pq;
-                    },
-                    emit: (event, payload) => this.emit(event, payload),
-                }),
-            hooks: busHooks,
-            tools,
-            mcpServers: buildMcpConfig(),
-            reasoningEffort: this.ctx.reasoningEffort,
-            injectHookContext: true,
-        });
-
-        this.ctx.session = session;
-        this.ctx.isResumed = isResumed;
-        setSessionRpc(session.rpc);
-        return { session, isResumed };
-    }
-
-    /**
-     * Tenta reconectar à sessão SDK com backoff exponencial + jitter. Delega para a política centralizada em
-     * `lifecycle/reconnect-policy.js`.
-     *
-     * @param {Error} originalError - Erro original que desencadeou a reconexão
+     * @param {Error} originalError
      * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts]
-     * @returns {Promise<boolean>} true se reconexão bem-sucedida, false se esgotado
+     * @returns {Promise<boolean>}
      */
     async #tryReconnect(originalError, opts = {}) {
-        // G1-ARCH-03: sinaliza reconexão ativa para bloquear #processQueue()
-        this.ctx.isReconnecting = true;
-        try {
-            return await tryReconnect(
-                originalError,
-                /** @type {import('@github/copilot-sdk').CopilotClient} */ (this.ctx.client),
-                this.ctx.status,
-                {
-                    emit: (event, payload) => this.emit(event, payload),
-                    initSession: (client) => this.#initSession(client),
-                    dialogLoop: this.ctx.dialogLoop,
-                    clearSessionEventUnsubs: () => {
-                        for (const unsub of this.ctx.sessionEventUnsubscribers) unsub();
-                        this.ctx.sessionEventUnsubscribers = [];
-                    },
-                    // F42.5 (BUG-SD-002 fix): criar novo client a cada tentativa de reconexão
-                    createClient: () => {
-                        const _otelConfig = buildTelemetryConfig();
-                        return new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
-                    },
-                    updateClient: (newClient) => {
-                        this.ctx.client = newClient;
-                    },
-                },
-                opts,
-            );
-        } finally {
-            this.ctx.isReconnecting = false;
-        }
+        return agentTryReconnect(this.ctx, this, originalError, opts);
     }
 
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
-     *
-     * F32: Delegado ao SessionMessagesCache para encapsular TTL e invalidação.
      *
      * @returns {Promise<unknown[]>}
      */
