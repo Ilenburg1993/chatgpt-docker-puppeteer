@@ -47,7 +47,11 @@ export async function runGh(args, opts = {}) {
 export async function runGhJson(args, opts = {}) {
     const raw = await runGh(args, opts);
     if (!raw) return null;
-    return JSON.parse(raw);
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
 }
 
 /**

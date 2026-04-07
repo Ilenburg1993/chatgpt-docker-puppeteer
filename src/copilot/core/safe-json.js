@@ -1,0 +1,44 @@
+// @ts-check
+/**
+ * src/copilot/core/safe-json.js
+ *
+ * F88: Helper para parse seguro de JSON com erro tipado.
+ *
+ * @module copilot/core/safe-json
+ */
+
+import { ValidationError } from './errors.js';
+
+/**
+ * Parse seguro de JSON. Retorna `{ ok: true, data }` ou `{ ok: false, error }`.
+ *
+ * @template [T=unknown]
+ * @param {string} raw - String JSON a parsear.
+ * @param {string} [context] - Contexto descritivo para a mensagem de erro.
+ * @returns {{ ok: true; data: T } | { ok: false; error: ValidationError }}
+ */
+export function safeJsonParse(raw, context) {
+    try {
+        return { ok: true, data: /** @type {T} */ (JSON.parse(raw)) };
+    } catch (/** @type {any} */ e) {
+        const msg = context
+            ? `[safeJsonParse] Falha ao parsear JSON (${context}): ${e.message}`
+            : `[safeJsonParse] Falha ao parsear JSON: ${e.message}`;
+        return { ok: false, error: new ValidationError(msg, 'JSON_PARSE_ERROR') };
+    }
+}
+
+/**
+ * Parse de JSON que lança `ValidationError` em caso de falha.
+ *
+ * @template [T=unknown]
+ * @param {string} raw - String JSON a parsear.
+ * @param {string} [context] - Contexto descritivo para a mensagem de erro.
+ * @returns {T}
+ * @throws {ValidationError} Se o JSON for inválido.
+ */
+export function parseJsonOrThrow(raw, context) {
+    const result = safeJsonParse(raw, context);
+    if (!result.ok) throw result.error;
+    return /** @type {T} */ (result.data);
+}

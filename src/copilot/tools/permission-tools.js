@@ -22,6 +22,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
+import { ConfigError } from '#copilot/core/errors';
 import { buildTool } from './tool-factory.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
@@ -48,10 +49,10 @@ export function setPermissionAgent(agent) {
 
 /**
  * @returns {PermissionAgent}
- * @throws {Error} Se o agent não foi injetado via `setPermissionAgent()`.
+ * @throws {ConfigError} Se o agent não foi injetado via `setPermissionAgent()`.
  */
 function requireAgent() {
-    if (!_agent) throw new Error('[permission-tools] agent não injetado — chamar setPermissionAgent() antes.');
+    if (!_agent) throw new ConfigError('[permission-tools] agent não injetado — chamar setPermissionAgent() antes.');
     return _agent;
 }
 

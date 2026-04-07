@@ -18,6 +18,7 @@
  */
 
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config/env';
+import { TimeoutError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
@@ -79,7 +80,7 @@ async function wrapRpc(toolName, fn) {
         const result = await Promise.race([
             fn(r.rpc),
             new Promise((_resolve, reject) =>
-                setTimeout(() => reject(new Error(`RPC timeout (${RPC_TIMEOUT_MS}ms)`)), RPC_TIMEOUT_MS),
+                setTimeout(() => reject(new TimeoutError(`RPC timeout (${RPC_TIMEOUT_MS}ms)`)), RPC_TIMEOUT_MS),
             ),
         ]);
         return /** @type {T} */ (result);

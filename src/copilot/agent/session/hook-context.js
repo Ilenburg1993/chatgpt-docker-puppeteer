@@ -92,8 +92,8 @@ export async function buildHookSystemContext() {
             content = await readFile(BRIEFING_FILE, 'utf8');
         }
         parts.push('## Contexto da Sessão (Hook System)\n\n' + content);
-    } catch {
-        /* arquivo não existe — ignorar */
+    } catch (/** @type {any} */ e) {
+        log('DEBUG', `[hook-context] briefing indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
     }
 
     try {
@@ -135,8 +135,8 @@ export async function buildHookSystemContext() {
                 'Não inicie task_complete sem chamar vscode_askQuestions antes.',
             ].join('\n'),
         );
-    } catch {
-        /* arquivo não existe ou JSON inválido — ignorar silenciosamente */
+    } catch (/** @type {any} */ e) {
+        log('DEBUG', `[hook-context] session.json indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
     }
 
     // F5.3: skills disponíveis no diretório .github/skills/
@@ -150,8 +150,8 @@ export async function buildHookSystemContext() {
         if (skillNames.length > 0) {
             parts.push('\n## Skills Disponíveis\n\n' + skillNames.map((s) => `- \`${s}\``).join('\n'));
         }
-    } catch {
-        /* ignorar — skills são opcionais no system prompt */
+    } catch (/** @type {any} */ e) {
+        log('DEBUG', `[hook-context] skills indisponíveis: ${e?.code ?? e?.message ?? 'unknown'}`);
     }
 
     // F5.2: estado runtime do agente SDK (in-memory, sem I/O de arquivo)
@@ -177,8 +177,8 @@ export async function buildHookSystemContext() {
                 `- TODOs ativos (todo/in_progress): ${pendingCount}`,
             ].join('\n'),
         );
-    } catch {
-        /* ignorar falhas silenciosamente — estado runtime não é crítico */
+    } catch (/** @type {any} */ e) {
+        log('DEBUG', `[hook-context] estado runtime indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
     }
 
     return parts.join('\n\n');

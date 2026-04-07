@@ -12,6 +12,7 @@
  * @module copilot/agent/lifecycle/entry
  */
 
+import { TimeoutError } from '#copilot/core/errors';
 import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
@@ -131,7 +132,7 @@ try {
     const pingClient = new CopilotClient();
     await Promise.race([
         pingClient.ping(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout (5s)')), PING_TIMEOUT_MS)),
+        new Promise((_, reject) => setTimeout(() => reject(new TimeoutError('Ping timeout (5s)')), PING_TIMEOUT_MS)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
     // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
@@ -155,8 +156,8 @@ if (COPILOT_MODEL && COPILOT_MODEL !== 'gpt-4.1') {
         } else {
             log('INFO', `[copilot/agent] Modelo '${COPILOT_MODEL}' validado na lista de modelos.`);
         }
-    } catch {
-        /* não crítico — continuar sem validação */
+    } catch (/** @type {any} */ e) {
+        log('DEBUG', `[copilot/agent] Validação de modelo ignorada: ${e?.message ?? e}`);
     }
 }
 

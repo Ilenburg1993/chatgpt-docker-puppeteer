@@ -21,5 +21,7 @@
  */
 
 export * from './constants.js';
+export * as ErrorCodes from './error-codes.js';
 export * from './errors.js';
+export { parseJsonOrThrow, safeJsonParse } from './safe-json.js';
 export * from './structured-message.js';

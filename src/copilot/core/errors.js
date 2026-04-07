@@ -93,3 +93,51 @@ export class ToolError extends CopilotError {
         this.name = 'ToolError';
     }
 }
+
+/**
+ * Erro de timeout. Lançado quando uma operação excede o tempo limite.
+ *
+ * @extends {CopilotError}
+ */
+export class TimeoutError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='TIMEOUT'] - Código semântico do erro.
+     */
+    constructor(message, code = 'TIMEOUT') {
+        super(message, code);
+        this.name = 'TimeoutError';
+    }
+}
+
+/**
+ * Erro de validação. Lançado quando dados de entrada falham em validação de schema/formato.
+ *
+ * @extends {CopilotError}
+ */
+export class ValidationError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='VALIDATION_ERROR'] - Código semântico do erro.
+     */
+    constructor(message, code = 'VALIDATION_ERROR') {
+        super(message, code);
+        this.name = 'ValidationError';
+    }
+}
+
+/**
+ * Erro de transição de estado inválida (ex: FSM do AgentContext).
+ *
+ * @extends {CopilotError}
+ */
+export class StateTransitionError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='STATE_TRANSITION'] - Código semântico do erro.
+     */
+    constructor(message, code = 'STATE_TRANSITION') {
+        super(message, code);
+        this.name = 'StateTransitionError';
+    }
+}
