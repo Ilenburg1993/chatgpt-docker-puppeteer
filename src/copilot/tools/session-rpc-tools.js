@@ -18,6 +18,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
@@ -60,7 +61,7 @@ function getRpc() {
  *
  * @type {number}
  */
-const RPC_TIMEOUT_MS = Number(process.env['COPILOT_RPC_TIMEOUT_MS']) || 30_000;
+const RPC_TIMEOUT_MS = COPILOT_RPC_TIMEOUT_MS;
 
 /**
  * Executa uma operação RPC com checagem de disponibilidade e tratamento de erros padronizado.

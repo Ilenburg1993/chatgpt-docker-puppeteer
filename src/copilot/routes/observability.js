@@ -25,6 +25,7 @@ import { getLastQuotaSnapshots } from '#copilot/observability/event-collector';
 import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
+import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { Router } from 'express';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { getAuditTail } from '../hooks/audit.js';
@@ -230,7 +231,7 @@ router.get('/observability/otel-status', (_req, res) => {
     res.json({
         ok: true,
         enabled: isOtelEnabled(),
-        endpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ?? null,
+        endpoint: OTEL_EXPORTER_OTLP_ENDPOINT ?? null,
         traceFile: DEFAULT_OTEL_FILE,
         spanTypes: ['session.boot'],
     });

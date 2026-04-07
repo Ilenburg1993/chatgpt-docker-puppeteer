@@ -18,6 +18,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { COPILOT_DB_PATH as ENV_DB_PATH } from '#copilot/config/env';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -33,7 +34,7 @@ let copilotDb = null;
  * @returns {string}
  */
 function resolveCopilotDbPath() {
-    const fromEnv = process.env['COPILOT_DB_PATH'] || null;
+    const fromEnv = ENV_DB_PATH;
     const fromConfig = typeof CONFIG?.all?.['COPILOT_DB_PATH'] === 'string' ? CONFIG.all['COPILOT_DB_PATH'] : null;
     const raw = fromEnv || fromConfig || path.join(process.cwd(), 'data', 'copilot.sqlite');
 

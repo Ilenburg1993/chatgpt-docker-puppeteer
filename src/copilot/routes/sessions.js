@@ -29,6 +29,7 @@
 
 import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
+import { SDK_API_TOKEN as _SDK_API_TOKEN, BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config/env';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
@@ -70,7 +71,7 @@ const MAX_PROMPT_BYTES = 512_000;
 
 // SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
 // Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
-const SDK_API_TOKEN = process.env['SDK_API_TOKEN'] ?? null;
+const SDK_API_TOKEN = _SDK_API_TOKEN;
 
 if (SDK_API_TOKEN) {
     router.use((req, res, next) => {
@@ -369,7 +370,7 @@ router.get('/sessions/:id', (req, res) => {
  * @type {import('express').RequestHandler}
  */
 function _requireAdminForDestructive(req, res, next) {
-    const adminToken = process.env['BRIDGE_ADMIN_TOKEN'];
+    const adminToken = _BRIDGE_ADMIN_TOKEN;
     if (!adminToken) return next(); // token não configurado — comportamento legado (dev)
     const authHeader = req.headers['x-admin-token'] ?? req.headers['authorization'] ?? '';
     const provided = String(authHeader).replace(/^Bearer\s+/i, '');

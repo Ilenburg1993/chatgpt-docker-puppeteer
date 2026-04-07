@@ -22,12 +22,18 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+    COPILOT_LOG_DIR,
+    COPILOT_OTEL_DISABLED,
+    COPILOT_OTEL_ENDPOINT,
+    COPILOT_OTEL_EXPORTER_TYPE,
+    COPILOT_OTEL_SOURCE_NAME,
+    COPILOT_OTEL_CAPTURE_CONTENT,
+} from '#copilot/config/env';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const LOGS_DIR = process.env['COPILOT_LOG_DIR']
-    ? path.resolve(process.env['COPILOT_LOG_DIR'])
-    : path.resolve(__dirname, '../logs');
+const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
 
 const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');
 
@@ -51,14 +57,14 @@ const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');
  * @returns {TelemetryConfig | undefined}
  */
 export function buildTelemetryConfig() {
-    if (process.env['COPILOT_OTEL_DISABLED'] === 'true') {
+    if (COPILOT_OTEL_DISABLED) {
         return undefined;
     }
 
-    const endpoint = process.env['COPILOT_OTEL_ENDPOINT'];
-    const explicitExporterType = process.env['COPILOT_OTEL_EXPORTER_TYPE'];
-    const sourceName = process.env['COPILOT_OTEL_SOURCE_NAME'] ?? 'copilot-sdk-agent';
-    const captureContent = process.env['COPILOT_OTEL_CAPTURE_CONTENT'] === 'true';
+    const endpoint = COPILOT_OTEL_ENDPOINT;
+    const explicitExporterType = COPILOT_OTEL_EXPORTER_TYPE;
+    const sourceName = COPILOT_OTEL_SOURCE_NAME;
+    const captureContent = COPILOT_OTEL_CAPTURE_CONTENT;
 
     // Se endpoint definido → OTLP HTTP
     if (endpoint) {
@@ -85,7 +91,7 @@ export function buildTelemetryConfig() {
  * @returns {boolean}
  */
 export function isOtelEnabled() {
-    return process.env['COPILOT_OTEL_DISABLED'] !== 'true';
+    return !COPILOT_OTEL_DISABLED;
 }
 
 /** Caminho padrão do arquivo de traces quando `exporterType = 'file'`. */

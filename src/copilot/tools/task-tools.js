@@ -10,6 +10,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { SERVER_PORT } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -40,7 +41,7 @@ const getTasksTool = defineTool('get_tasks', {
     ),
     handler: async (/** @type {{ status?: string; limit?: number }} */ { status, limit }) => {
         try {
-            const port = process.env['PORT'] ?? '3008';
+            const port = SERVER_PORT;
             const url = `http://127.0.0.1:${port}/api/tasks?limit=${limit ?? 10}${status ? `&status=${status}` : ''}`;
             const { statusCode, body } = await httpRequest('GET', url);
             if (statusCode !== 200) return { tasks: [], total: 0, error: `HTTP ${statusCode}` };
@@ -87,7 +88,7 @@ const addTaskTool = defineTool('add_task', {
         },
     ) => {
         try {
-            const port = process.env['PORT'] ?? '3008';
+            const port = SERVER_PORT;
             const body = JSON.stringify({ target, spec_user_message: user_message, priority: priority ?? 50, model });
             const { statusCode, body: resBody } = await httpRequest('POST', `http://127.0.0.1:${port}/api/tasks`, body);
             if (statusCode >= 400) return { success: false, error: `HTTP ${statusCode}: ${resBody.slice(0, 200)}` };
@@ -133,7 +134,7 @@ const getSystemHealthTool = defineTool('get_system_health', {
     parameters: z.object({}),
     handler: async () => {
         try {
-            const port = process.env['PORT'] ?? '3008';
+            const port = SERVER_PORT;
             const { statusCode, body } = await httpRequest('GET', `http://127.0.0.1:${port}/api/health`);
             if (statusCode !== 200) return { healthy: false, error: `HTTP ${statusCode}` };
             return JSON.parse(body);

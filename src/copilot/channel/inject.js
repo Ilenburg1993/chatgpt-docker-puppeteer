@@ -28,12 +28,13 @@
 import { BridgeError } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
+import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import http from 'node:http';
 import { LLM_B_TURN_TIMEOUT_MS } from '../core/constants.js';
 
 /** Porta padrão do terminal LLM-B. GAP-CHAN-002: validação de range. */
 const DEFAULT_PORT = (() => {
-    const raw = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
+    const raw = LLM_B_TERMINAL_PORT;
     if (!Number.isInteger(raw) || raw < 1 || raw > 65535) {
         log('WARN', `[channel/inject] LLM_B_TERMINAL_PORT inválida (${raw}), usando 3009`);
         return 3009;

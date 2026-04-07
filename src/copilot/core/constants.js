@@ -10,13 +10,20 @@
  * @module copilot/core/constants
  */
 
+import {
+    LLM_B_TERMINAL_PORT as _LLM_B_TERMINAL_PORT,
+    LLM_B_TURN_TIMEOUT_MS as _LLM_B_TURN_TIMEOUT_MS,
+    MAX_SSE_CLIENTS as _MAX_SSE_CLIENTS,
+    MAX_SSE_CONTENT_CHARS as _MAX_SSE_CONTENT_CHARS,
+} from '#copilot/config/env';
+
 /**
  * Porta padrão do terminal LLM-B (servidor HTTP raw + endpoint /inject). Pode ser sobrescrita via variável de ambiente
  * `LLM_B_TERMINAL_PORT`.
  *
  * @type {number}
  */
-export const LLM_B_TERMINAL_PORT = 3009;
+export const LLM_B_TERMINAL_PORT = _LLM_B_TERMINAL_PORT;
 
 /**
  * Tamanho máximo da fila de mensagens do AlwaysAliveAgent. Quando a fila atinge este limite, novas mensagens são
@@ -37,9 +44,7 @@ export const MAX_QUEUE_SIZE = 100;
  * @deprecated F33.1: `LLM_B_TURN_TIMEOUT` env var é legado — usar `LLM_B_TURN_TIMEOUT_MS`.
  * @type {number}
  */
-export const LLM_B_TURN_TIMEOUT_MS = Number(
-    process.env['LLM_B_TURN_TIMEOUT_MS'] ?? process.env['LLM_B_TURN_TIMEOUT'] ?? 120_000,
-);
+export const LLM_B_TURN_TIMEOUT_MS = _LLM_B_TURN_TIMEOUT_MS;
 
 /**
  * Número máximo de clientes SSE simultâneos por endpoint. Evita leak de memória quando muitos clientes SSE abrem
@@ -47,7 +52,7 @@ export const LLM_B_TURN_TIMEOUT_MS = Number(
  *
  * @type {number}
  */
-export const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS'] ?? 50);
+export const MAX_SSE_CLIENTS = _MAX_SSE_CLIENTS;
 
 /**
  * Tamanho máximo em caracteres de um chunk de conteúdo SSE antes de truncamento. Evita mensagens de eventos SSE
@@ -56,7 +61,7 @@ export const MAX_SSE_CLIENTS = Number(process.env['MAX_SSE_CLIENTS'] ?? 50);
  *
  * @type {number}
  */
-export const MAX_SSE_CONTENT_CHARS = Number(process.env['MAX_SSE_CONTENT_CHARS'] ?? 64_000);
+export const MAX_SSE_CONTENT_CHARS = _MAX_SSE_CONTENT_CHARS;
 
 /**
  * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota. Lido em runtime (não import-time) para

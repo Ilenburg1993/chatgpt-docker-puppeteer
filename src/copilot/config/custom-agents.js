@@ -1,4 +1,5 @@
 // @ts-check
+import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS } from '#copilot/config/env';
 /**
  * src/copilot/config/custom-agents.js
  *
@@ -296,12 +297,10 @@ Regras:
  *
  * @type {string[]}
  */
-const DEFAULT_SDK_AGENTS = (process.env['COPILOT_CUSTOM_AGENTS'] ?? 'task,explore,diagnostic,planner,git-ops,shell-ops')
-    .split(',')
-    .filter(Boolean);
+const DEFAULT_SDK_AGENTS = COPILOT_CUSTOM_AGENTS.split(',').filter(Boolean);
 
 // GAP-Q03 fix: COPILOT_DISABLED_AGENTS permite desabilitar sub-agentes sem remover de COPILOT_CUSTOM_AGENTS
-const DISABLED_AGENTS = new Set((process.env['COPILOT_DISABLED_AGENTS'] ?? '').split(',').filter(Boolean));
+const DISABLED_AGENTS = new Set(COPILOT_DISABLED_AGENTS.split(',').filter(Boolean));
 
 /**
  * Constrói o array `customAgents` para injetar em `SessionConfig.customAgents`.

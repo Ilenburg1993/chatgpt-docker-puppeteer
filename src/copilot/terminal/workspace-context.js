@@ -16,6 +16,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { COPILOT_WORKING_DIRECTORY } from '#copilot/config/env';
 
 /**
  * @typedef {Object} WorkspaceContext
@@ -83,7 +84,7 @@ export function getWorkspaceContext() {
     if (_contextCache && _contextCache.expiresAt > now) {
         return _contextCache.context;
     }
-    const cwd = process.env['COPILOT_WORKING_DIRECTORY'] ?? process.cwd();
+    const cwd = COPILOT_WORKING_DIRECTORY;
     const gitRoot = detectGitRoot(cwd);
     const currentBranch = gitRoot ? tryExec('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
     const context = { cwd, gitRoot, currentBranch };

@@ -27,6 +27,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { COPILOT_AUDIT_BUFFER_SIZE } from '#copilot/config/env';
 
 /**
  * @typedef {import('./types.js').AuditEntry} AuditEntry
@@ -144,7 +145,7 @@ export class AuditRingBuffer {
  * @type {AuditRingBuffer}
  */
 export const globalAuditBuffer = new AuditRingBuffer({
-    capacity: Number(process.env['COPILOT_AUDIT_BUFFER_SIZE']) || 500,
+    capacity: COPILOT_AUDIT_BUFFER_SIZE,
 });
 
 // ─── Factory de handler onPostToolUse ─────────────────────────────────────────

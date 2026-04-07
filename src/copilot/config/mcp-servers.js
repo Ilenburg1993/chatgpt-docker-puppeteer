@@ -9,6 +9,12 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import {
+    COPILOT_MCP_STDIO_TIMEOUT_MS,
+    COPILOT_MCP_HTTP_TIMEOUT_MS,
+    COPILOT_MCP_SERVERS,
+    GITHUB_TOKEN,
+} from '#copilot/config/env';
 import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
 /**
@@ -27,10 +33,10 @@ import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
  */
 
 /** Timeout padrão para tool calls stdio MCP (ms). Configurável via COPILOT_MCP_STDIO_TIMEOUT_MS. */
-const MCP_STDIO_TIMEOUT_MS = Number(process.env['COPILOT_MCP_STDIO_TIMEOUT_MS'] ?? 30_000);
+const MCP_STDIO_TIMEOUT_MS = COPILOT_MCP_STDIO_TIMEOUT_MS;
 
 /** Timeout padrão para tool calls HTTP MCP (ms). Configurável via COPILOT_MCP_HTTP_TIMEOUT_MS. */
-const MCP_HTTP_TIMEOUT_MS = Number(process.env['COPILOT_MCP_HTTP_TIMEOUT_MS'] ?? 15_000);
+const MCP_HTTP_TIMEOUT_MS = COPILOT_MCP_HTTP_TIMEOUT_MS;
 
 /**
  * Mapa de servidores MCP pré-configurados para este workspace.
@@ -47,7 +53,7 @@ export const MCP_SERVERS = {
         type: 'stdio',
         command: 'npx',
         args: ['@modelcontextprotocol/server-github'],
-        env: { GITHUB_TOKEN: process.env['GITHUB_TOKEN'] ?? '' },
+        env: { GITHUB_TOKEN },
         timeout: MCP_STDIO_TIMEOUT_MS,
     },
 
@@ -83,13 +89,13 @@ export const MCP_SERVERS = {
         type: 'http',
         url: 'https://api.githubcopilot.com/mcp/',
         headers: {
-            Authorization: `Bearer ${process.env['GITHUB_TOKEN'] ?? ''}`,
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
         },
         timeout: MCP_HTTP_TIMEOUT_MS,
     },
 };
 
-const DEFAULT_ENABLED = (process.env['COPILOT_MCP_SERVERS'] ?? '').split(',').filter(Boolean);
+const DEFAULT_ENABLED = COPILOT_MCP_SERVERS.split(',').filter(Boolean);
 
 /**
  * Constrói o objeto `mcpServers` para injetar na SessionConfig.
@@ -115,7 +121,7 @@ export function buildMcpConfig(enabled = DEFAULT_ENABLED) {
         if (!MCP_SERVERS[name]) continue;
 
         // UPG-PROP-09 (fix): validar credenciais obrigatórias antes de registrar o servidor MCP
-        if ((name === 'github' || name === 'github-official') && !process.env['GITHUB_TOKEN']) {
+        if ((name === 'github' || name === 'github-official') && !GITHUB_TOKEN) {
             log(
                 'WARN',
                 `[MCP] Servidor '${name}' requer GITHUB_TOKEN — variável ausente no ambiente. Servidor pulado.`,

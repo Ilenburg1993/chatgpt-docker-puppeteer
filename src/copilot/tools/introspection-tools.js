@@ -12,6 +12,7 @@
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { getToolStats } from '#copilot/observability/tool-stats';
+import { COPILOT_MODEL, COPILOT_MCP_SERVERS, COPILOT_SDK_ENABLED } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
@@ -163,16 +164,16 @@ const getAgentInfoTool = defineTool('get_agent_info', {
         return {
             sdkVersion,
             nodeVersion: process.version,
-            model: process.env['COPILOT_MODEL'] ?? 'gpt-4.1',
+            model: COPILOT_MODEL ?? 'gpt-4.1',
             pid: process.pid,
             uptime: Math.round(process.uptime()),
             toolsRegistered: _registeredTools.length,
             toolNames: _registeredTools.map((t) => t.name),
             hasTelemetry: true,
             env: {
-                COPILOT_MCP_SERVERS: process.env['COPILOT_MCP_SERVERS'] ?? '',
+                COPILOT_MCP_SERVERS: COPILOT_MCP_SERVERS,
                 NODE_ENV: process.env['NODE_ENV'] ?? '',
-                COPILOT_SDK_ENABLED: process.env['COPILOT_SDK_ENABLED'] ?? '',
+                COPILOT_SDK_ENABLED: String(COPILOT_SDK_ENABLED),
             },
         };
     },

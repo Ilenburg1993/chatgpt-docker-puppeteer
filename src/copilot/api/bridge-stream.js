@@ -10,6 +10,7 @@
  */
 
 import { AGENT_EVENTS, MAX_SSE_CLIENTS } from '#copilot/core';
+import { MAX_SSE_LIFETIME_MS } from '#copilot/config/env';
 import { eventFanout } from './event-fanout.js';
 import { SseReplayBuffer } from './sse-replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from './sse-utils.js';
@@ -82,7 +83,6 @@ export function registerStreamRoutes(bridge, agent) {
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado de headers,
         // heartbeat, replay, sanitização e cleanup.
         // G2-SEC-08: limite de vida por conexão SSE (default 24h)
-        const MAX_SSE_LIFETIME_MS = Number(process.env['MAX_SSE_LIFETIME_MS']) || 24 * 60 * 60 * 1000;
         const sse = createSseWriter(req, res, {
             heartbeatMs: 15_000,
             maxLifetimeMs: MAX_SSE_LIFETIME_MS,

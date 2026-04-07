@@ -23,6 +23,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import net from 'node:net';
 import { z } from 'zod';
@@ -59,7 +60,7 @@ export function getMcpStatus() {
 }
 
 // FINDING-P4-2: usar MCP_PORT dedicado com fallback para PORT genérico e 3008
-const MCP_PORT = process.env['MCP_PORT'] ?? process.env['PORT'] ?? '3008';
+const MCP_PORT = _MCP_PORT;
 const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
 
 /**
@@ -70,7 +71,7 @@ const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
  * @returns {Promise<boolean>} true se a porta está acessível
  */
 function _isMcpPortOpen() {
-    const portProbeTimeoutMs = Number(process.env['MCP_PORT_PROBE_TIMEOUT_MS'] ?? 1_500);
+    const portProbeTimeoutMs = MCP_PORT_PROBE_TIMEOUT_MS;
     return new Promise((resolve) => {
         const socket = net.connect({ host: '127.0.0.1', port: Number(MCP_PORT) }, () => {
             socket.destroy();

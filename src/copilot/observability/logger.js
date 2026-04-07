@@ -16,15 +16,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '#copilot/config/env';
 
 // ─── Paths isolados ───────────────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Diretório de logs isolado dentro do módulo copilot. */
-export const LOG_DIR = process.env['COPILOT_LOG_DIR']
-    ? path.resolve(process.env['COPILOT_LOG_DIR'])
-    : path.resolve(__dirname, '../logs');
+export const LOG_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
 
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');
@@ -40,9 +39,7 @@ const AUDIT_FILE = path.join(LOG_DIR, 'audit.log');
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2 MB
-const MAX_ARCHIVES = process.env['COPILOT_LOG_MAX_ARCHIVES']
-    ? parseInt(process.env['COPILOT_LOG_MAX_ARCHIVES'], 10)
-    : 5;
+const MAX_ARCHIVES = COPILOT_LOG_MAX_ARCHIVES;
 
 // ─── Inicialização síncrona (evita race conditions na carga do módulo) ─────────
 
@@ -116,7 +113,7 @@ const LOG_LEVELS = /** @type {Record<string, number>} */ ({
     FATAL: 4,
 });
 
-const configuredLevel = (process.env['COPILOT_LOG_LEVEL'] ?? process.env['LOG_LEVEL'] ?? 'INFO').toUpperCase();
+let configuredLevel = COPILOT_LOG_LEVEL;
 let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS['INFO'];
 
 // ─── API pública — log ────────────────────────────────────────────────────────
@@ -196,6 +193,7 @@ log.getLevel = () => configuredLevel;
 log.setLevel = (newLevel) => {
     const upper = newLevel.toUpperCase();
     if (LOG_LEVELS[upper] !== undefined) {
+        configuredLevel = upper;
         minLevel = LOG_LEVELS[upper];
         log('INFO', `[copilot/logger] Log level alterado para: ${upper}`);
     } else {

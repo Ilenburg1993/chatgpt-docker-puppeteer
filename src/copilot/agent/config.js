@@ -2,129 +2,155 @@
 /**
  * src/copilot/agent/config.js
  *
- * Configuração centralizada do agente. Cada propriedade lê uma variável de ambiente com fallback para um default
- * razoável. Módulos internos do agent/ devem importar daqui em vez de ler `process.env` diretamente.
+ * Configuração centralizada do agente. Importa variáveis base de `config/env.js` (SSOT) e re-exporta com nomes
+ * semânticos para o subsistema agent/. Constantes derivadas (não-env) permanecem aqui.
+ *
+ * Módulos internos do agent/ devem importar daqui em vez de ler `process.env` diretamente.
  *
  * @module copilot/agent/config
  */
 
-// ── Helpers ──────────────────────────────────────────────────
-
-/** @param {string} key @param {number} fallback */
-const envInt = (key, fallback) => Number(process.env[key]) || fallback;
-
-/** @param {string} key @param {string} fallback @returns {string} */
-const envStr = (key, fallback) => process.env[key] ?? fallback;
-
-/** @param {string} key @returns {string | undefined} */
-const envStrOpt = (key) => process.env[key];
+import {
+    AGENT_HOOK_CONTEXT_MAX_BYTES,
+    AGENT_KEEPALIVE_IDLE_MS,
+    AGENT_KEEPALIVE_MS,
+    AGENT_MAX_LISTENERS,
+    AGENT_MAX_SNAPSHOTS,
+    AGENT_MAX_TASK_RETRIES,
+    AGENT_MCP_RECONNECT_MS,
+    AGENT_MESSAGES_CACHE_TTL_MS,
+    AGENT_METRICS_INTERVAL_MS,
+    AGENT_PERMISSION_MODE,
+    AGENT_ROTATION_MAX_AGE_MS,
+    AGENT_ROTATION_MAX_COMPACTIONS,
+    AGENT_ROTATION_MAX_TURNS,
+    AGENT_ROTATION_MAX_UTIL,
+    AGENT_SESSION_MAX_AGE_MS,
+    AGENT_SNAPSHOT_DIR,
+    AGENT_STARVATION_THRESHOLD_MS,
+    AGENT_STATE_FILE,
+    AGENT_STATUS_SNAPSHOT_TTL_MS,
+    AGENT_TASK_TIMEOUT_MS,
+    AGENT_TOOL_AUDIT_MAX_LOG_BYTES,
+    COPILOT_AUDIT_LOG_PATH,
+    COPILOT_MODEL as _COPILOT_MODEL,
+    COPILOT_REASONING_EFFORT,
+    COPILOT_RESTART_DELAY_MS,
+    COPILOT_TOOL_PERMISSIONS_LOG,
+    COPILOT_WORKING_DIRECTORY,
+    LLM_B_BOOT_TIMEOUT_MS,
+    LLM_B_DIALOG_QUEUE_MAX,
+    LLM_B_WATCHDOG_MS,
+    LLM_B_WATCHDOG_STALL_MS,
+    MAX_WEBHOOKS,
+    WEBHOOK_MAX_RETRIES,
+    WEBHOOK_TIMEOUT_MS,
+} from '#copilot/config/env';
 
 // ── Dialog Loop ──────────────────────────────────────────────
 
 /** Tamanho máximo da fila de diálogo */
-export const DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
+export const DIALOG_QUEUE_MAX = LLM_B_DIALOG_QUEUE_MAX;
 /** Timeout de boot do loop (ms) */
-export const BOOT_TIMEOUT_MS = envInt('LLM_B_BOOT_TIMEOUT_MS', 30_000);
+export const BOOT_TIMEOUT_MS = LLM_B_BOOT_TIMEOUT_MS;
 /** Intervalo do watchdog do loop (ms) */
-export const WATCHDOG_INTERVAL_MS = envInt('LLM_B_WATCHDOG_MS', 5 * 60 * 1_000);
+export const WATCHDOG_INTERVAL_MS = LLM_B_WATCHDOG_MS;
 /** Stall timeout do watchdog (ms) */
-export const WATCHDOG_STALL_MS = envInt('LLM_B_WATCHDOG_STALL_MS', 15 * 60 * 1_000);
+export const WATCHDOG_STALL_MS = LLM_B_WATCHDOG_STALL_MS;
 
 // ── Session ──────────────────────────────────────────────────
 
 /** Máximo de bytes para hook context */
-export const HOOK_CONTEXT_MAX_BYTES = envInt('AGENT_HOOK_CONTEXT_MAX_BYTES', 8 * 1024);
+export const HOOK_CONTEXT_MAX_BYTES = AGENT_HOOK_CONTEXT_MAX_BYTES;
 /** Idade máxima da sessão (ms) */
-export const SESSION_MAX_AGE_MS = envInt('AGENT_SESSION_MAX_AGE_MS', 24 * 60 * 60_000);
+export const SESSION_MAX_AGE_MS = AGENT_SESSION_MAX_AGE_MS;
 /** Diretório de trabalho do Copilot */
-export const WORKING_DIRECTORY = envStr('COPILOT_WORKING_DIRECTORY', process.cwd());
+export const WORKING_DIRECTORY = COPILOT_WORKING_DIRECTORY;
 
 // ── Session Rotation ─────────────────────────────────────────
 
 /** Utilização máxima antes de rotação */
-export const ROTATION_MAX_UTIL = Number(process.env['AGENT_ROTATION_MAX_UTIL'] || 0.9);
+export const ROTATION_MAX_UTIL = AGENT_ROTATION_MAX_UTIL;
 /** Idade máxima antes de rotação (ms) */
-export const ROTATION_MAX_AGE_MS = envInt('AGENT_ROTATION_MAX_AGE_MS', 4 * 60 * 60_000);
+export const ROTATION_MAX_AGE_MS = AGENT_ROTATION_MAX_AGE_MS;
 /** Compactações máximas antes de rotação */
-export const ROTATION_MAX_COMPACTIONS = envInt('AGENT_ROTATION_MAX_COMPACTIONS', 5);
+export const ROTATION_MAX_COMPACTIONS = AGENT_ROTATION_MAX_COMPACTIONS;
 /** Turnos máximos antes de rotação */
-export const ROTATION_MAX_TURNS = envInt('AGENT_ROTATION_MAX_TURNS', 200);
+export const ROTATION_MAX_TURNS = AGENT_ROTATION_MAX_TURNS;
 
 // ── Keepalive ────────────────────────────────────────────────
 
 /** Intervalo de keepalive (ms) */
-export const KEEPALIVE_INTERVAL_MS = envInt('AGENT_KEEPALIVE_MS', 10 * 60_000);
+export const KEEPALIVE_INTERVAL_MS = AGENT_KEEPALIVE_MS;
 /** Threshold de idle para keepalive (ms) */
-export const KEEPALIVE_IDLE_THRESHOLD_MS = envInt('AGENT_KEEPALIVE_IDLE_MS', 20 * 60_000);
+export const KEEPALIVE_IDLE_THRESHOLD_MS = AGENT_KEEPALIVE_IDLE_MS;
 
 // ── Snapshots ────────────────────────────────────────────────
 
 /** Diretório de snapshots */
-export const SNAPSHOT_DIR = envStrOpt('AGENT_SNAPSHOT_DIR');
+export const SNAPSHOT_DIR = AGENT_SNAPSHOT_DIR;
 /** Número máximo de snapshots */
-export const MAX_SNAPSHOTS = envInt('AGENT_MAX_SNAPSHOTS', 10);
+export const MAX_SNAPSHOTS = AGENT_MAX_SNAPSHOTS;
 
 // ── State I/O ────────────────────────────────────────────────
 
 /** Arquivo de estado persistente (undefined = usar fallback local) */
-export const STATE_FILE = envStrOpt('AGENT_STATE_FILE');
+export const STATE_FILE = AGENT_STATE_FILE;
 
 // ── Lifecycle / Entry ────────────────────────────────────────
 
 /** Delay de restart (ms) */
-export const RESTART_DELAY_MS = envInt('COPILOT_RESTART_DELAY_MS', 5_000);
+export const RESTART_DELAY_MS = COPILOT_RESTART_DELAY_MS;
 /** Modelo Copilot */
-export const COPILOT_MODEL = envStr('COPILOT_MODEL', 'gpt-4.1');
+export const COPILOT_MODEL = _COPILOT_MODEL ?? 'gpt-4.1';
 /** Reasoning effort */
-export const COPILOT_REASONING_EFFORT = envStrOpt('COPILOT_REASONING_EFFORT');
+export { COPILOT_REASONING_EFFORT };
 
 // ── Always-Alive Agent ───────────────────────────────────────
 
 /** TTL do cache de mensagens (ms) */
-export const MESSAGES_CACHE_TTL_MS = envInt('AGENT_MESSAGES_CACHE_TTL_MS', 30_000);
+export const MESSAGES_CACHE_TTL_MS = AGENT_MESSAGES_CACHE_TTL_MS;
 /** Max listeners no EventEmitter */
-export const MAX_LISTENERS = envInt('AGENT_MAX_LISTENERS', 50);
+export const MAX_LISTENERS = AGENT_MAX_LISTENERS;
 /** Intervalo de reconexão MCP (ms) */
-export const MCP_RECONNECT_MS = envInt('AGENT_MCP_RECONNECT_MS', 5 * 60_000);
+export const MCP_RECONNECT_MS = AGENT_MCP_RECONNECT_MS;
 /** Intervalo de métricas (ms) */
-export const METRICS_INTERVAL_MS = envInt('AGENT_METRICS_INTERVAL_MS', 30_000);
+export const METRICS_INTERVAL_MS = AGENT_METRICS_INTERVAL_MS;
 /** TTL do snapshot de status (ms) */
-export const STATUS_SNAPSHOT_TTL_MS = envInt('AGENT_STATUS_SNAPSHOT_TTL_MS', 500);
+export const STATUS_SNAPSHOT_TTL_MS = AGENT_STATUS_SNAPSHOT_TTL_MS;
 
 // ── Task Executor ────────────────────────────────────────────
 
 /** Máximo de retries por task */
-export const MAX_TASK_RETRIES = envInt('AGENT_MAX_TASK_RETRIES', 3);
+export const MAX_TASK_RETRIES = AGENT_MAX_TASK_RETRIES;
 /** Timeout padrão de task (ms) */
-export const TASK_TIMEOUT_MS = envInt('AGENT_TASK_TIMEOUT_MS', 60_000);
+export const TASK_TIMEOUT_MS = AGENT_TASK_TIMEOUT_MS;
 
 // ── Webhooks ─────────────────────────────────────────────────
 
 /** Timeout de webhook (ms) */
-export const WEBHOOK_TIMEOUT_MS = envInt('WEBHOOK_TIMEOUT_MS', 5_000);
+export { WEBHOOK_TIMEOUT_MS };
 /** Máximo de retries de webhook */
-export const WEBHOOK_MAX_RETRIES = envInt('WEBHOOK_MAX_RETRIES', 2);
+export { WEBHOOK_MAX_RETRIES };
 /** Máximo de webhooks registrados */
-export const MAX_WEBHOOKS = envInt('MAX_WEBHOOKS', 50);
+export { MAX_WEBHOOKS };
 
 // ── Status Snapshot ──────────────────────────────────────────
 
 /** Threshold de starvation (ms) */
-export const STARVATION_THRESHOLD_MS = envInt('AGENT_STARVATION_THRESHOLD_MS', 60_000);
+export const STARVATION_THRESHOLD_MS = AGENT_STARVATION_THRESHOLD_MS;
 
 // ── Tool Audit Logger ────────────────────────────────────────
 
 /** Caminho do log de auditoria de tools (undefined = usar fallback local) */
-export const TOOL_AUDIT_LOG = envStrOpt('COPILOT_TOOL_PERMISSIONS_LOG') ?? envStrOpt('COPILOT_AUDIT_LOG_PATH');
+export const TOOL_AUDIT_LOG = COPILOT_TOOL_PERMISSIONS_LOG ?? COPILOT_AUDIT_LOG_PATH;
 /** Tamanho máximo do log (bytes) */
-export const TOOL_AUDIT_MAX_LOG_BYTES = envInt('AGENT_TOOL_AUDIT_MAX_LOG_BYTES', 10 * 1024 * 1024);
+export const TOOL_AUDIT_MAX_LOG_BYTES = AGENT_TOOL_AUDIT_MAX_LOG_BYTES;
 
 // ── Permission Controller ────────────────────────────────────
 
 /** Modo de permissão padrão @type {'approve_all' | 'deny_all' | 'interactive'} */
-export const PERMISSION_MODE = /** @type {'approve_all' | 'deny_all' | 'interactive'} */ (
-    envStr('AGENT_PERMISSION_MODE', 'approve_all')
-);
+export const PERMISSION_MODE = /** @type {'approve_all' | 'deny_all' | 'interactive'} */ (AGENT_PERMISSION_MODE);
 
 // ── Context Utilization Thresholds ───────────────────────────
 

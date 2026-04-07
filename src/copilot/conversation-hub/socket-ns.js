@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config/env';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import jwt from 'jsonwebtoken';
 
@@ -450,14 +451,14 @@ export function broadcastGlobal(event, payload) {
  * @returns {boolean}
  */
 function _parseAuthRequired() {
-    const envVal = process.env['COPILOT_HUB_SOCKET_AUTH_REQUIRED'];
+    const envVal = COPILOT_HUB_SOCKET_AUTH_REQUIRED;
     if (envVal !== undefined) {
         const lower = String(envVal).trim().toLowerCase();
         if (lower === '0' || lower === 'false' || lower === 'no') return false;
         if (lower === '1' || lower === 'true' || lower === 'yes') return true;
     }
     // Por default, herda de DASHBOARD_SOCKET_AUTH_REQUIRED (default: true em produção)
-    const dashVal = process.env['DASHBOARD_SOCKET_AUTH_REQUIRED'];
+    const dashVal = DASHBOARD_SOCKET_AUTH_REQUIRED;
     if (dashVal !== undefined) {
         const lower = String(dashVal).trim().toLowerCase();
         if (lower === '0' || lower === 'false' || lower === 'no') return false;

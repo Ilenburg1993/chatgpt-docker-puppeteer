@@ -19,6 +19,14 @@
  */
 
 import EventEmitter from 'node:events';
+import {
+    TERMINAL_MAX_LISTENERS,
+    TERMINAL_MAX_ATTACHMENTS,
+    TERMINAL_SHOW_THINKING,
+    TERMINAL_SHOW_USAGE,
+    TERMINAL_SHOW_STREAMING,
+    TERMINAL_MAX_INJECT_HISTORY,
+} from '#copilot/config/env';
 import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────
@@ -32,7 +40,7 @@ import { SseReplayBuffer } from '../api/sse-replay-buffer.js';
  */
 export const stateEmitter = new EventEmitter();
 // T-23: setMaxListeners calculado em vez de hardcoded (base 10 + margem p/ hot patches)
-stateEmitter.setMaxListeners(Number(process.env['TERMINAL_MAX_LISTENERS'] ?? '25'));
+stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
 
 // ─── Estado compartilhado ─────────────────────────────────────────────────────
 
@@ -48,7 +56,7 @@ let _rl = null;
 /** Fila de arquivos a embutir no próximo turno (via `/attach` ou `@path`). @type {string[]} */
 let _attachmentQueue = [];
 // T-22: limite máximo da fila de attachments (configurável via ENV)
-const MAX_ATTACHMENT_QUEUE = Number(process.env['TERMINAL_MAX_ATTACHMENTS'] ?? '50');
+const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
 
 /** Modo planejamento: prefaça mensagens com instrução de plano antes de enviar. @type {boolean} */
 let _planMode = false;
@@ -170,7 +178,7 @@ export function setPlanMode(value) {
  *
  * @type {boolean}
  */
-let _showThinking = process.env['TERMINAL_SHOW_THINKING'] !== 'false';
+let _showThinking = TERMINAL_SHOW_THINKING;
 
 /** @returns {boolean} */
 export function getShowThinking() {
@@ -191,7 +199,7 @@ export function setShowThinking(value) {
  *
  * @type {boolean}
  */
-let _showUsage = process.env['TERMINAL_SHOW_USAGE'] === 'true';
+let _showUsage = TERMINAL_SHOW_USAGE;
 
 /** @returns {boolean} */
 export function getShowUsage() {
@@ -212,7 +220,7 @@ export function setShowUsage(value) {
  *
  * @type {boolean}
  */
-let _showStreaming = process.env['TERMINAL_SHOW_STREAMING'] !== 'false';
+let _showStreaming = TERMINAL_SHOW_STREAMING;
 
 /** @returns {boolean} */
 export function getShowStreaming() {
@@ -227,7 +235,7 @@ export function setShowStreaming(value) {
 
 // ─── Inject history (F16.3) ──────────────────────────────────────────────────
 
-const MAX_INJECT_HISTORY = Number(process.env['TERMINAL_MAX_INJECT_HISTORY'] ?? '100');
+const MAX_INJECT_HISTORY = TERMINAL_MAX_INJECT_HISTORY;
 
 /**
  * @typedef {{

@@ -14,6 +14,7 @@
 
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/hooks/permission';
 import { log } from '#copilot/observability/logger';
+import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config/env';
 import { approveAll } from '@github/copilot-sdk';
 import { PERMISSION_MODE } from '../config.js';
 
@@ -126,9 +127,8 @@ export class PermissionController {
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
                 // P3 (permission-controller-audit): validar tool names contra regex ^[a-zA-Z0-9_]+$
                 const _toolNameRe = /^[a-zA-Z0-9_]+$/;
-                const shellTools = process.env['AGENT_DENY_SHELL_TOOLS']
-                    ? process.env['AGENT_DENY_SHELL_TOOLS']
-                          .split(',')
+                const shellTools = AGENT_DENY_SHELL_TOOLS
+                    ? AGENT_DENY_SHELL_TOOLS.split(',')
                           .map((t) => t.trim())
                           .filter((t) => Boolean(t) && _toolNameRe.test(t))
                     : defaultShellTools;

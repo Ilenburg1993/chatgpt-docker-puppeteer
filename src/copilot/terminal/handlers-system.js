@@ -15,6 +15,7 @@ import {
     removeCustomTool,
 } from '#copilot/config/tools/registry';
 import { getToolsConfig, patchToolsConfig } from '#copilot/config/tools/state';
+import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -139,7 +140,7 @@ export function handleGetConfig() {
             dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
-            port: Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009),
+            port: LLM_B_TERMINAL_PORT,
             contextWindow: snapshot.contextWindow,
             lastCheckpointPath: snapshot.lastCheckpointPath,
             infiniteSession: getInfiniteSessionConfig(),

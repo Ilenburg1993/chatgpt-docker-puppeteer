@@ -10,6 +10,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { WEB_SEARCH_DISABLED } from '#copilot/config/env';
 import { z } from 'zod';
 import { validateUrl } from '../lib/url-validator.js';
 import { buildTool } from './tool-factory.js';
@@ -393,4 +394,4 @@ const webSearchTool = buildTool({
  * @type {import('@github/copilot-sdk').Tool[]}
  */
 // WEB-01-FIX: web_search habilitado por padrão — desativar via WEB_SEARCH_DISABLED=true
-export const webTools = [webFetchTool, ...(process.env['WEB_SEARCH_DISABLED'] === 'true' ? [] : [webSearchTool])];
+export const webTools = [webFetchTool, ...(WEB_SEARCH_DISABLED ? [] : [webSearchTool])];

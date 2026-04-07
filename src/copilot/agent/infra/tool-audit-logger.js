@@ -18,6 +18,7 @@
 
 import { defaultBus } from '#copilot/hooks/bus';
 import { log } from '#copilot/observability/logger';
+import { COPILOT_HIGH_RISK_TOOLS } from '#copilot/config/env';
 import { approveAll } from '@github/copilot-sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -64,9 +65,8 @@ const HIGH_RISK_TOOLS = (() => {
         'execute_code',
         'computer',
     ];
-    const extra = process.env['COPILOT_HIGH_RISK_TOOLS']
-        ? process.env['COPILOT_HIGH_RISK_TOOLS']
-              .split(',')
+    const extra = COPILOT_HIGH_RISK_TOOLS
+        ? COPILOT_HIGH_RISK_TOOLS.split(',')
               .map((t) => t.trim())
               .filter(Boolean)
         : [];

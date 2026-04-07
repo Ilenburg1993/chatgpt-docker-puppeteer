@@ -130,6 +130,7 @@
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
+import { COPILOT_METRICS_SNAPSHOT_INTERVAL, COPILOT_LOG_DIR } from '#copilot/config/env';
 
 /**
  * Calcula percentil de um array ordenado.
@@ -413,9 +414,9 @@ export function createMetricsStore() {
      */
     function startPeriodicSnapshot(intervalMs, logDir) {
         stopPeriodicSnapshot();
-        const ms = intervalMs ?? Number(process.env['COPILOT_METRICS_SNAPSHOT_INTERVAL'] ?? 300_000);
+        const ms = intervalMs ?? COPILOT_METRICS_SNAPSHOT_INTERVAL;
         if (ms <= 0) return;
-        const resolvedDir = logDir ?? process.env['COPILOT_LOG_DIR'] ?? './src/copilot/logs';
+        const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './src/copilot/logs');
         _snapshotTimer = setInterval(() => {
             void (async () => {
                 try {

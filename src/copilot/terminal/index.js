@@ -18,6 +18,7 @@
 
 import { AGENT_EVENTS } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
+import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config/env';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
 import { loadAliases } from '../bridges/alias-store.js';
@@ -341,7 +342,7 @@ function registerAgentEventListeners() {
  * @returns {void}
  */
 function startReflectionLoop() {
-    const reflectionIntervalMin = Number(process.env['LLM_B_REFLECTION_INTERVAL_MIN'] ?? '0');
+    const reflectionIntervalMin = LLM_B_REFLECTION_INTERVAL_MIN;
     if (reflectionIntervalMin <= 0) return;
 
     const reflectionIntervalMs = reflectionIntervalMin * 60 * 1000;

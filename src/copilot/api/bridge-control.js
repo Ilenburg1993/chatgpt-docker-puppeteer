@@ -10,6 +10,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config/env';
 import { createRequire } from 'node:module';
 import { CHANNEL_VERSION } from '../channel/index.js';
 import { conversationStore } from '../conversation-hub/index.js';
@@ -84,7 +85,7 @@ export function registerControlRoutes(bridge, agent) {
 function _makeAdminAuthMiddleware() {
     /** @type {import('express').RequestHandler} */
     return function requireAdminAuth(req, res, next) {
-        const token = process.env['BRIDGE_ADMIN_TOKEN'];
+        const token = BRIDGE_ADMIN_TOKEN;
         if (!token) {
             if (process.env['NODE_ENV'] === 'production') {
                 return res.status(503).json({ ok: false, error: 'BRIDGE_ADMIN_TOKEN não configurado.' });
@@ -145,7 +146,7 @@ function _handleHealth(res, agent) {
         nodeVersion: process.version,
         // UPG-PROP-10: diagnóstico de listeners disponível apenas em desenvolvimento
         listenerDiagnostics:
-            process.env['NODE_ENV'] === 'development' && process.env['BRIDGE_EXPOSE_DIAGNOSTICS'] === 'true'
+            process.env['NODE_ENV'] === 'development' && BRIDGE_EXPOSE_DIAGNOSTICS
                 ? agent.listenerDiagnostics?.()
                 : undefined,
         hubStore,

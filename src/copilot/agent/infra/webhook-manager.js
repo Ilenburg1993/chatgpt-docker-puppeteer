@@ -8,6 +8,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import dns from 'node:dns/promises';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_TIMEOUT_MS } from '../config.js';
 
@@ -57,7 +58,7 @@ export class WebhookManager {
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
             throw new Error(`[WebhookManager] Protocolo não permitido: ${parsed.protocol}. Use http ou https.`);
         }
-        const allowPrivate = process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] === 'true';
+        const allowPrivate = WEBHOOK_ALLOW_PRIVATE_HOSTS;
         if (!allowPrivate) {
             const hostname = parsed.hostname;
             // Bloquear loopback, localhost, e ranges RFC-1918
@@ -222,7 +223,7 @@ export class WebhookManager {
         await Promise.allSettled(
             [...this.#urls.entries()].map(async ([id, url]) => {
                 // SEC-AGENT-005: verificar IP resolvido para mitigar DNS rebinding
-                if (process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] !== 'true') {
+                if (!WEBHOOK_ALLOW_PRIVATE_HOSTS) {
                     try {
                         const hostname = new URL(url).hostname;
                         await WebhookManager.#checkResolvedIp(hostname);

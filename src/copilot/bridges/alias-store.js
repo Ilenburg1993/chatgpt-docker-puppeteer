@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
@@ -25,7 +26,7 @@ const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
 });
 
 /** Arquivo padrão de aliases customizados. */
-const ALIASES_FILE = process.env['LLM_B_ALIASES_FILE'] ?? path.join(os.homedir(), '.copilot-aliases.json');
+const ALIASES_FILE = LLM_B_ALIASES_FILE ?? path.join(os.homedir(), '.copilot-aliases.json');
 
 /** Cache em memória dos aliases (builtin + custom). @type {Record<string, string>} */
 let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });

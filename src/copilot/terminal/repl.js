@@ -16,6 +16,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { resolve } from '../bridges/alias-store.js';
@@ -65,7 +66,7 @@ import { addAttachment, getHubSessionId, setRl } from './state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
-const INJECT_PORT = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
+const INJECT_PORT = LLM_B_TERMINAL_PORT;
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 
 const BANNER = `

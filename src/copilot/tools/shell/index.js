@@ -21,6 +21,7 @@
 import { defaultAuditLog } from '#copilot/observability/audit-log';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
+import { COPILOT_NPM_SCRIPT_ALLOWLIST, COPILOT_ALLOWED_EXECUTABLES } from '#copilot/config/env';
 import { defineTool } from '@github/copilot-sdk';
 import { execFile, spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -111,7 +112,7 @@ const BLOCKED_COMMAND_PATTERNS = [
  */
 const ALLOWED_NPM_SCRIPTS = new Set(
     (() => {
-        const envAllowlist = process.env['COPILOT_NPM_SCRIPT_ALLOWLIST'];
+        const envAllowlist = COPILOT_NPM_SCRIPT_ALLOWLIST;
         if (envAllowlist) {
             return envAllowlist
                 .split(',')
@@ -152,7 +153,7 @@ const ALLOWED_NPM_SCRIPTS = new Set(
  * @type {Set<string> | null}
  */
 const ALLOWED_EXECUTABLES = (() => {
-    const env = process.env['COPILOT_ALLOWED_EXECUTABLES'];
+    const env = COPILOT_ALLOWED_EXECUTABLES;
     if (!env) return null;
     const list = env
         .split(',')

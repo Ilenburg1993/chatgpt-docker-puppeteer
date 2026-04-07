@@ -19,6 +19,7 @@
  */
 
 import { globalAuditBuffer } from '#copilot/hooks/audit';
+import { COPILOT_LOG_DIR, COPILOT_EVENTS_MAX_BYTES } from '#copilot/config/env';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,11 +28,9 @@ import { log } from './logger.js';
 // ─── Paths ────────────────────────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOGS_DIR = process.env['COPILOT_LOG_DIR']
-    ? path.resolve(process.env['COPILOT_LOG_DIR'])
-    : path.resolve(__dirname, '../logs');
+const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
 const EVENTS_FILE = path.join(LOGS_DIR, 'events.jsonl');
-const MAX_EVENTS_BYTES = Number(process.env['COPILOT_EVENTS_MAX_BYTES']) || 5 * 1024 * 1024; // 5 MB
+const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
 
 // ─── UPG-SE-005: último quotaSnapshot recebido ───────────────────────────────
 

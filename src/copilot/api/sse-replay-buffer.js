@@ -7,8 +7,10 @@
  *   header Last-Event-ID permite replay dos eventos perdidos.
  */
 
+import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config/env';
+
 /** Tamanho padrão do buffer circular (configurável via SSE_REPLAY_BUFFER_SIZE). */
-const DEFAULT_BUFFER_SIZE = Number(process.env['SSE_REPLAY_BUFFER_SIZE']) || 500;
+const DEFAULT_BUFFER_SIZE = SSE_REPLAY_BUFFER_SIZE;
 
 /**
  * @typedef {{ id: number; event: string; data: unknown }} SseBufferedEvent
