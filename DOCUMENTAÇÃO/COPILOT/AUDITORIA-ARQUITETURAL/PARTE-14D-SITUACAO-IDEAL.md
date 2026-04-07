@@ -1,7 +1,7 @@
 # PARTE 14D — Situação Atual vs. Situação Ideal
 
-**Data**: 2026-03-15  
-**Baseline**: commit `54c135c4` (pós-F44)  
+**Data**: 2026-03-15
+**Baseline**: commit `54c135c4` (pós-F44)
 **Referência**: PARTE-14A/B/C
 
 ---
@@ -23,18 +23,18 @@ O módulo `agent/` passou por 48 fases de refatoração (F1–F48) e alcançou u
 
 ### O que precisa melhorar ⚠️
 
-| Nº | Problema | Impacto | Área |
-|----|---------|---------|------|
-| 1 | 3 arquivos monolíticos (>500L): loop-manager, event-wirer, always-alive | Manutenibilidade | dialog/, session/ |
-| 2 | Cobertura de testes de 16% (6/37 arquivos) | Confiabilidade | Todos |
-| 3 | initializer.js mistura 3 responsabilidades (376L) | Coesão | session/ |
-| 4 | Padrões inconsistentes: sync/async FS, EventEmitter vs callbacks, barrels parciais | Consistência | Transversal |
-| 5 | AgentContext é God Object mutable sem invariantes | Robustez | Raiz |
-| 6 | Observabilidade parcial: OTEL apenas em task-executor | Operabilidade | infra/ |
-| 7 | messaging/ e state/ com 1 arquivo cada — assimetria | Organização | Raiz |
-| 8 | wireDialogLoopEvents() dentro de loop-manager.js | Coesão | dialog/ |
-| 9 | snapshot.js usa FS síncrono | Performance | session/ |
-| 10 | Nenhum teste de integração end-to-end no agent/ | Confiabilidade | Testes |
+| Nº  | Problema                                                                           | Impacto          | Área              |
+| --- | ---------------------------------------------------------------------------------- | ---------------- | ----------------- |
+| 1   | 3 arquivos monolíticos (>500L): loop-manager, event-wirer, always-alive            | Manutenibilidade | dialog/, session/ |
+| 2   | Cobertura de testes de 16% (6/37 arquivos)                                         | Confiabilidade   | Todos             |
+| 3   | initializer.js mistura 3 responsabilidades (376L)                                  | Coesão           | session/          |
+| 4   | Padrões inconsistentes: sync/async FS, EventEmitter vs callbacks, barrels parciais | Consistência     | Transversal       |
+| 5   | AgentContext é God Object mutable sem invariantes                                  | Robustez         | Raiz              |
+| 6   | Observabilidade parcial: OTEL apenas em task-executor                              | Operabilidade    | infra/            |
+| 7   | messaging/ e state/ com 1 arquivo cada — assimetria                                | Organização      | Raiz              |
+| 8   | wireDialogLoopEvents() dentro de loop-manager.js                                   | Coesão           | dialog/           |
+| 9   | snapshot.js usa FS síncrono                                                        | Performance      | session/          |
+| 10  | Nenhum teste de integração end-to-end no agent/                                    | Confiabilidade   | Testes            |
 
 ---
 
@@ -125,16 +125,16 @@ src/copilot/agent/
 
 ### 2.3 Mudanças Quantitativas
 
-| Métrica | Atual | Ideal | Delta |
-|---------|-------|-------|-------|
-| Arquivos (.js) | 37 | 50 | +13 novos |
-| Maior arquivo | 661L | ~360L | -45% |
-| Linhas totais | ~7.200L | ~7.600L | +5% (+ testes) |
-| Testes unitários | 46 | ~140 | +200% |
-| Cobertura (arquivos) | 16% | ~65% | +49pp |
-| Barrels | 5 | 7 | +2 |
-| FS sync calls | 8 | 1 (shutdown) | -87% |
-| OTEL spans | 1 módulo | 5+ módulos | +400% |
+| Métrica              | Atual    | Ideal        | Delta          |
+| -------------------- | -------- | ------------ | -------------- |
+| Arquivos (.js)       | 37       | 50           | +13 novos      |
+| Maior arquivo        | 661L     | ~360L        | -45%           |
+| Linhas totais        | ~7.200L  | ~7.600L      | +5% (+ testes) |
+| Testes unitários     | 46       | ~140         | +200%          |
+| Cobertura (arquivos) | 16%      | ~65%         | +49pp          |
+| Barrels              | 5        | 7            | +2             |
+| FS sync calls        | 8        | 1 (shutdown) | -87%           |
+| OTEL spans           | 1 módulo | 5+ módulos   | +400%          |
 
 ---
 
@@ -142,58 +142,58 @@ src/copilot/agent/
 
 ### 3.1 Gaps Estruturais
 
-| Gap ID | Descrição | Esforço | Risco |
-|--------|-----------|---------|-------|
-| GAP-S1 | loop-manager.js split (backpressure, model-fallback, event-wiring) | Alto | Médio |
-| GAP-S2 | event-wirer.js decomposição em event-handlers/ | Alto | Baixo |
-| GAP-S3 | initializer.js split (hook-context.js) | Médio | Baixo |
-| GAP-S4 | Barrels para messaging/ e state/ | Baixo | Nenhum |
-| GAP-S5 | session-setup.js extraído de agent-lifecycle.js | Médio | Baixo |
+| Gap ID | Descrição                                                          | Esforço | Risco  |
+| ------ | ------------------------------------------------------------------ | ------- | ------ |
+| GAP-S1 | loop-manager.js split (backpressure, model-fallback, event-wiring) | Alto    | Médio  |
+| GAP-S2 | event-wirer.js decomposição em event-handlers/                     | Alto    | Baixo  |
+| GAP-S3 | initializer.js split (hook-context.js)                             | Médio   | Baixo  |
+| GAP-S4 | Barrels para messaging/ e state/                                   | Baixo   | Nenhum |
+| GAP-S5 | session-setup.js extraído de agent-lifecycle.js                    | Médio   | Baixo  |
 
 ### 3.2 Gaps de Qualidade
 
-| Gap ID | Descrição | Esforço | Risco |
-|--------|-----------|---------|-------|
-| GAP-Q1 | Testes para loop-manager.js (mutex, backpressure) | Alto | Médio |
-| GAP-Q2 | Testes para turn-executor.js (race conditions) | Alto | Médio |
-| GAP-Q3 | Testes para initializer.js (Zod, rotation, resume) | Médio | Baixo |
-| GAP-Q4 | Testes para event-wirer.js (event routing) | Médio | Baixo |
-| GAP-Q5 | Testes para message-queue.js (AbortSignal, drain) | Médio | Baixo |
-| GAP-Q6 | Testes para task-executor.js (streaming, retry) | Médio | Médio |
-| GAP-Q7 | Testes para webhook-manager.js (SSRF, retry) | Médio | Baixo |
-| GAP-Q8 | Testes para protocol.js, rotation.js, watchdog.js | Baixo | Nenhum |
-| GAP-Q9 | Testes para cleanup.js, keepalive.js, snapshot.js | Baixo | Nenhum |
-| GAP-Q10 | Teste de integração end-to-end agent boot/send/stop | Alto | Médio |
+| Gap ID  | Descrição                                           | Esforço | Risco  |
+| ------- | --------------------------------------------------- | ------- | ------ |
+| GAP-Q1  | Testes para loop-manager.js (mutex, backpressure)   | Alto    | Médio  |
+| GAP-Q2  | Testes para turn-executor.js (race conditions)      | Alto    | Médio  |
+| GAP-Q3  | Testes para initializer.js (Zod, rotation, resume)  | Médio   | Baixo  |
+| GAP-Q4  | Testes para event-wirer.js (event routing)          | Médio   | Baixo  |
+| GAP-Q5  | Testes para message-queue.js (AbortSignal, drain)   | Médio   | Baixo  |
+| GAP-Q6  | Testes para task-executor.js (streaming, retry)     | Médio   | Médio  |
+| GAP-Q7  | Testes para webhook-manager.js (SSRF, retry)        | Médio   | Baixo  |
+| GAP-Q8  | Testes para protocol.js, rotation.js, watchdog.js   | Baixo   | Nenhum |
+| GAP-Q9  | Testes para cleanup.js, keepalive.js, snapshot.js   | Baixo   | Nenhum |
+| GAP-Q10 | Teste de integração end-to-end agent boot/send/stop | Alto    | Médio  |
 
 ### 3.3 Gaps de Consistência
 
-| Gap ID | Descrição | Esforço | Risco |
-|--------|-----------|---------|-------|
-| GAP-C1 | Migrar snapshot.js para async FS | Baixo | Nenhum |
-| GAP-C2 | Deprecar writeState() sync em state-io.js | Baixo | Nenhum |
-| GAP-C3 | cleanup.js: for...of → Promise.allSettled | Baixo | Nenhum |
-| GAP-C4 | Watchdog thresholds de config.js (não hardcoded) | Baixo | Nenhum |
-| GAP-C5 | entry.js: retry count de config.js | Baixo | Nenhum |
+| Gap ID | Descrição                                        | Esforço | Risco  |
+| ------ | ------------------------------------------------ | ------- | ------ |
+| GAP-C1 | Migrar snapshot.js para async FS                 | Baixo   | Nenhum |
+| GAP-C2 | Deprecar writeState() sync em state-io.js        | Baixo   | Nenhum |
+| GAP-C3 | cleanup.js: for...of → Promise.allSettled        | Baixo   | Nenhum |
+| GAP-C4 | Watchdog thresholds de config.js (não hardcoded) | Baixo   | Nenhum |
+| GAP-C5 | entry.js: retry count de config.js               | Baixo   | Nenhum |
 
 ### 3.4 Gaps de Observabilidade
 
-| Gap ID | Descrição | Esforço | Risco |
-|--------|-----------|---------|-------|
-| GAP-O1 | OTEL spans em dialog loop (turn start/end) | Médio | Nenhum |
-| GAP-O2 | OTEL spans em reconnect (attempt/success/fail) | Baixo | Nenhum |
-| GAP-O3 | OTEL spans em session init/resume | Baixo | Nenhum |
-| GAP-O4 | Métricas em rotation.js quando decide rotar | Baixo | Nenhum |
-| GAP-O5 | Health endpoint dedicado no agent | Médio | Nenhum |
+| Gap ID | Descrição                                      | Esforço | Risco  |
+| ------ | ---------------------------------------------- | ------- | ------ |
+| GAP-O1 | OTEL spans em dialog loop (turn start/end)     | Médio   | Nenhum |
+| GAP-O2 | OTEL spans em reconnect (attempt/success/fail) | Baixo   | Nenhum |
+| GAP-O3 | OTEL spans em session init/resume              | Baixo   | Nenhum |
+| GAP-O4 | Métricas em rotation.js quando decide rotar    | Baixo   | Nenhum |
+| GAP-O5 | Health endpoint dedicado no agent              | Médio   | Nenhum |
 
 ### 3.5 Gaps de Robustez
 
-| Gap ID | Descrição | Esforço | Risco |
-|--------|-----------|---------|-------|
-| GAP-R1 | AgentContext: validação de transições de status | Médio | Baixo |
-| GAP-R2 | boot-wiring.js: rollback parcial se etapa falha | Alto | Médio |
-| GAP-R3 | URL validation extraída de webhook-manager.js | Baixo | Nenhum |
-| GAP-R4 | HandoffManager: usar callbacks em vez de EventEmitter | Baixo | Nenhum |
-| GAP-R5 | answerPendingQuestion: fix duplicação hookToolsResolveUserInput | Baixo | Nenhum |
+| Gap ID | Descrição                                                       | Esforço | Risco  |
+| ------ | --------------------------------------------------------------- | ------- | ------ |
+| GAP-R1 | AgentContext: validação de transições de status                 | Médio   | Baixo  |
+| GAP-R2 | boot-wiring.js: rollback parcial se etapa falha                 | Alto    | Médio  |
+| GAP-R3 | URL validation extraída de webhook-manager.js                   | Baixo   | Nenhum |
+| GAP-R4 | HandoffManager: usar callbacks em vez de EventEmitter           | Baixo   | Nenhum |
+| GAP-R5 | answerPendingQuestion: fix duplicação hookToolsResolveUserInput | Baixo   | Nenhum |
 
 ---
 

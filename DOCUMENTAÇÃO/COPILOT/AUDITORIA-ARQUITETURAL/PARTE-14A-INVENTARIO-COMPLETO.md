@@ -1,9 +1,9 @@
 # PARTE 14A — Inventário Completo de `src/copilot/agent/`
 
-**Data**: 2026-03-15  
-**Baseline**: commit `54c135c4` (pós-F44)  
-**Total de arquivos**: 37 (36 `.js` + 1 `messaging/`)  
-**Total de linhas**: ~7.200L  
+**Data**: 2026-03-15
+**Baseline**: commit `54c135c4` (pós-F44)
+**Total de arquivos**: 37 (36 `.js` + 1 `messaging/`)
+**Total de linhas**: ~7.200L
 
 ---
 
@@ -27,7 +27,7 @@ src/copilot/agent/
 │   └── index.js              18L   Sub-barrel
 │
 ├── lifecycle/                     ── Subsistema de Ciclo de Vida ──
-│   ├── agent-lifecycle.js   362L   start/stop/initSession/tryReconnect  
+│   ├── agent-lifecycle.js   362L   start/stop/initSession/tryReconnect
 │   ├── entry.js             162L   Entry point PM2 com retry e signal handling
 │   ├── reconnect-policy.js  133L   Exponential backoff + jitter
 │   ├── state-io.js          251L   Persistência sdk-always-alive.json
@@ -67,85 +67,85 @@ src/copilot/agent/
 
 ### 2.1 Raiz
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `always-alive.js` | 621 | Facade orquestradora singleton. Estende EventEmitter. ~20 getters/setters/delegações + 3 métodos privados (`#setStatus`, `#processQueue`, `#tryReconnect`) | `AlwaysAliveAgent`, `alwaysAliveAgent`, `getAgent()` |
-| `agent-context.js` | 210 | Substitui 32+ campos `#private` do antigo always-alive. Instancia todos os managers | `createAgentContext()`, typedef `AgentContext` |
-| `config.js` | 177 | Renomeia env vars para nomes semânticos no domínio agent/ | ~40 constantes exportadas |
-| `types.js` | 170 | Typedefs JSDoc centralizados | `AgentStatus`, `PendingQuestion`, `AgentTask`, `AgentStatusSnapshot`, `LifecycleHost`, `DialogHost`, `MessagingHost`, `StateHost`, `IAlwaysAliveAgent` |
-| `index.js` | 20 | Barrel: re-exporta tudo via sub-barrels | — |
+| Arquivo            | Linhas | Responsabilidade                                                                                                                                           | Classes/Exports                                                                                                                                        |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `always-alive.js`  | 621    | Facade orquestradora singleton. Estende EventEmitter. ~20 getters/setters/delegações + 3 métodos privados (`#setStatus`, `#processQueue`, `#tryReconnect`) | `AlwaysAliveAgent`, `alwaysAliveAgent`, `getAgent()`                                                                                                   |
+| `agent-context.js` | 210    | Substitui 32+ campos `#private` do antigo always-alive. Instancia todos os managers                                                                        | `createAgentContext()`, typedef `AgentContext`                                                                                                         |
+| `config.js`        | 177    | Renomeia env vars para nomes semânticos no domínio agent/                                                                                                  | ~40 constantes exportadas                                                                                                                              |
+| `types.js`         | 170    | Typedefs JSDoc centralizados                                                                                                                               | `AgentStatus`, `PendingQuestion`, `AgentTask`, `AgentStatusSnapshot`, `LifecycleHost`, `DialogHost`, `MessagingHost`, `StateHost`, `IAlwaysAliveAgent` |
+| `index.js`         | 20     | Barrel: re-exporta tudo via sub-barrels                                                                                                                    | —                                                                                                                                                      |
 
 ### 2.2 dialog/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `loop-manager.js` | 661 | Turn mutex, backpressure, watchdog, pause/resume, model fallback | `DialogLoopManager`, `wireDialogLoopEvents()` |
-| `turn-executor.js` | 361 | Funções puras para send turn, buildResolutionListeners, restart-and-retry | `emitTurnStart()`, `buildTurnResolutionListeners()`, `dispatchTurnToHost()`, `waitForRestartAndReply()`, `executeTurnImpl()` |
-| `agent-dialog-controller.js` | 148 | Coordenação start/stop/resume/ensure com context health check | `dialogStart()`, `dialogStop()`, `dialogResume()`, `ensureDialogLoopAttached()` |
-| `watchdog.js` | 189 | Timer de inatividade com pre-stall warning (80%) e thresholds per-task-type | `DialogWatchdog` |
-| `protocol.js` | 115 | Parse de marcadores READY/REPLY/DONE/STOPPED em mensagens SDK | `DialogProtocol` (static) |
-| `user-input-handler.js` | 106 | Callbacks para SDK onUserInputRequest; routing dialog vs interactive | `handleDialogLoopInput()`, `handleInteractiveQuestion()` |
+| Arquivo                      | Linhas | Responsabilidade                                                            | Classes/Exports                                                                                                              |
+| ---------------------------- | ------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `loop-manager.js`            | 661    | Turn mutex, backpressure, watchdog, pause/resume, model fallback            | `DialogLoopManager`, `wireDialogLoopEvents()`                                                                                |
+| `turn-executor.js`           | 361    | Funções puras para send turn, buildResolutionListeners, restart-and-retry   | `emitTurnStart()`, `buildTurnResolutionListeners()`, `dispatchTurnToHost()`, `waitForRestartAndReply()`, `executeTurnImpl()` |
+| `agent-dialog-controller.js` | 148    | Coordenação start/stop/resume/ensure com context health check               | `dialogStart()`, `dialogStop()`, `dialogResume()`, `ensureDialogLoopAttached()`                                              |
+| `watchdog.js`                | 189    | Timer de inatividade com pre-stall warning (80%) e thresholds per-task-type | `DialogWatchdog`                                                                                                             |
+| `protocol.js`                | 115    | Parse de marcadores READY/REPLY/DONE/STOPPED em mensagens SDK               | `DialogProtocol` (static)                                                                                                    |
+| `user-input-handler.js`      | 106    | Callbacks para SDK onUserInputRequest; routing dialog vs interactive        | `handleDialogLoopInput()`, `handleInteractiveQuestion()`                                                                     |
 
 ### 2.3 lifecycle/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `agent-lifecycle.js` | 362 | Boot sequence, shutdown graceful, initSession, tryReconnect wrapper | `agentStart()`, `agentStop()`, `initSession()`, `agentTryReconnect()` |
-| `entry.js` | 162 | PM2 entry point; 5 retries, SIGTERM/SIGINT, IPC commands | `main()` (implicit) |
-| `reconnect-policy.js` | 133 | Backoff: delay = base × 2^(attempt-1) + jitter, cap 30s | `tryReconnect()` |
-| `state-io.js` | 251 | Read/write/clear `sdk-always-alive.json`; in-memory cache + async write mutex | `readState()`, `writeState()`, `writeStateAsync()`, `clearState()`, `persistState()`, `drainStateWrites()` |
+| Arquivo               | Linhas | Responsabilidade                                                              | Classes/Exports                                                                                            |
+| --------------------- | ------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `agent-lifecycle.js`  | 362    | Boot sequence, shutdown graceful, initSession, tryReconnect wrapper           | `agentStart()`, `agentStop()`, `initSession()`, `agentTryReconnect()`                                      |
+| `entry.js`            | 162    | PM2 entry point; 5 retries, SIGTERM/SIGINT, IPC commands                      | `main()` (implicit)                                                                                        |
+| `reconnect-policy.js` | 133    | Backoff: delay = base × 2^(attempt-1) + jitter, cap 30s                       | `tryReconnect()`                                                                                           |
+| `state-io.js`         | 251    | Read/write/clear `sdk-always-alive.json`; in-memory cache + async write mutex | `readState()`, `writeState()`, `writeStateAsync()`, `clearState()`, `persistState()`, `drainStateWrites()` |
 
 ### 2.4 session/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `initializer.js` | 376 | `initOrResumeSession()`: Zod validation, hook context injection, rotation check, resume-or-create SDK call | `initOrResumeSession()`, `buildHookSystemContext()`, `buildHookSystemContextSafe()`, `setBackgroundCompactionThreshold()` |
-| `event-wirer.js` | 591 | 80+ event types em 8 sub-funções: compaction, streaming, token budget, mode, system notifications, SDK responses, usage, catch-all | `wireSessionEvents()` |
-| `boot-wiring.js` | 225 | 10 etapas de wiring pós-init: events, collector, client, observer, cleanup, dialog resume, metrics, MCP, keepalive, handoff | `performBootWiring()` |
-| `snapshot.js` | 213 | CRUD de snapshots com pruning por MAX_SNAPSHOTS | `createSnapshot()`, `saveSnapshot()`, `listSnapshots()`, `loadSnapshot()`, `loadLatestSnapshot()`, `pruneSnapshots()` |
-| `keepalive.js` | 155 | Heartbeat anti-idle: client.ping() (0 PR) com fallback session.send (1 PR) | `SessionKeepalive` |
-| `history-sync.js` | 108 | Sync SDK messages → ConversationStore (SQLite) + SessionMessagesCache com TTL | `syncSdkHistory()`, `SessionMessagesCache` |
-| `cleanup.js` | 97 | Lista e deleta sessões SDK expiradas (> 24h) | `cleanupStaleSessions()` |
-| `rotation.js` | 82 | Política stateless: maxUtil, maxAge, maxCompactions, maxTurns | `shouldRotateSession()` |
+| Arquivo           | Linhas | Responsabilidade                                                                                                                   | Classes/Exports                                                                                                           |
+| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `initializer.js`  | 376    | `initOrResumeSession()`: Zod validation, hook context injection, rotation check, resume-or-create SDK call                         | `initOrResumeSession()`, `buildHookSystemContext()`, `buildHookSystemContextSafe()`, `setBackgroundCompactionThreshold()` |
+| `event-wirer.js`  | 591    | 80+ event types em 8 sub-funções: compaction, streaming, token budget, mode, system notifications, SDK responses, usage, catch-all | `wireSessionEvents()`                                                                                                     |
+| `boot-wiring.js`  | 225    | 10 etapas de wiring pós-init: events, collector, client, observer, cleanup, dialog resume, metrics, MCP, keepalive, handoff        | `performBootWiring()`                                                                                                     |
+| `snapshot.js`     | 213    | CRUD de snapshots com pruning por MAX_SNAPSHOTS                                                                                    | `createSnapshot()`, `saveSnapshot()`, `listSnapshots()`, `loadSnapshot()`, `loadLatestSnapshot()`, `pruneSnapshots()`     |
+| `keepalive.js`    | 155    | Heartbeat anti-idle: client.ping() (0 PR) com fallback session.send (1 PR)                                                         | `SessionKeepalive`                                                                                                        |
+| `history-sync.js` | 108    | Sync SDK messages → ConversationStore (SQLite) + SessionMessagesCache com TTL                                                      | `syncSdkHistory()`, `SessionMessagesCache`                                                                                |
+| `cleanup.js`      | 97     | Lista e deleta sessões SDK expiradas (> 24h)                                                                                       | `cleanupStaleSessions()`                                                                                                  |
+| `rotation.js`     | 82     | Política stateless: maxUtil, maxAge, maxCompactions, maxTurns                                                                      | `shouldRotateSession()`                                                                                                   |
 
 ### 2.5 infra/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `webhook-manager.js` | 300 | Webhooks com SSRF prevention, DNS rebinding, retry exponential backoff, payload sanitization | `WebhookManager` |
-| `message-queue.js` | 212 | FIFO queue com MAX_QUEUE_SIZE, AbortSignal, drain(err) no shutdown | `MessageQueue` |
-| `task-executor.js` | 177 | `executeTask()`: streaming, OTEL spans, retry com reconnect, AbortError guard | `executeTask()` |
-| `permission-controller.js` | 155 | Runtime permission mode switching sem restart | `PermissionController` |
-| `handoff-manager.js` | 157 | Session handoff receive/accept/reject com histórico | `HandoffManager` |
-| `tools-bootstrap.js` | 133 | Bootstrap 15 categorias de tools + MCP + custom + instrumentação wrapWithStats | `bootstrapTools()`, re-exports tool config |
-| `status-snapshot.js` | 102 | Função pura: params → AgentStatusSnapshot | `buildStatusSnapshot()` |
+| Arquivo                    | Linhas | Responsabilidade                                                                             | Classes/Exports                            |
+| -------------------------- | ------ | -------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `webhook-manager.js`       | 300    | Webhooks com SSRF prevention, DNS rebinding, retry exponential backoff, payload sanitization | `WebhookManager`                           |
+| `message-queue.js`         | 212    | FIFO queue com MAX_QUEUE_SIZE, AbortSignal, drain(err) no shutdown                           | `MessageQueue`                             |
+| `task-executor.js`         | 177    | `executeTask()`: streaming, OTEL spans, retry com reconnect, AbortError guard                | `executeTask()`                            |
+| `permission-controller.js` | 155    | Runtime permission mode switching sem restart                                                | `PermissionController`                     |
+| `handoff-manager.js`       | 157    | Session handoff receive/accept/reject com histórico                                          | `HandoffManager`                           |
+| `tools-bootstrap.js`       | 133    | Bootstrap 15 categorias de tools + MCP + custom + instrumentação wrapWithStats               | `bootstrapTools()`, re-exports tool config |
+| `status-snapshot.js`       | 102    | Função pura: params → AgentStatusSnapshot                                                    | `buildStatusSnapshot()`                    |
 
 ### 2.6 messaging/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `agent-messaging.js` | 250 | sendMessage (com dialog guard), sendMessageDialogBoot (bypass), steerMessage, answerPendingQuestion | `sendMessage()`, `sendMessageDialogBoot()`, `steerMessage()`, `answerPendingQuestion()`, `enqueueTask()` |
+| Arquivo              | Linhas | Responsabilidade                                                                                    | Classes/Exports                                                                                          |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `agent-messaging.js` | 250    | sendMessage (com dialog guard), sendMessageDialogBoot (bypass), steerMessage, answerPendingQuestion | `sendMessage()`, `sendMessageDialogBoot()`, `steerMessage()`, `answerPendingQuestion()`, `enqueueTask()` |
 
 ### 2.7 state/
 
-| Arquivo | Linhas | Responsabilidade | Classes/Exports |
-|---------|--------|-----------------|----------------|
-| `agent-state.js` | 73 | Snapshot cacheado com TTL + diagnóstico de listeners | `getStatusSnapshot()`, `listenerDiagnostics()` |
+| Arquivo          | Linhas | Responsabilidade                                     | Classes/Exports                                |
+| ---------------- | ------ | ---------------------------------------------------- | ---------------------------------------------- |
+| `agent-state.js` | 73     | Snapshot cacheado com TTL + diagnóstico de listeners | `getStatusSnapshot()`, `listenerDiagnostics()` |
 
 ---
 
 ## 3. Distribuição de Código por Subsistema
 
-| Subsistema | Arquivos | Linhas | % do Total |
-|------------|----------|--------|-----------|
-| dialog/ | 7 | 1.598 | 22,2% |
-| session/ | 8 | 1.867 | 25,9% |
-| lifecycle/ | 5 | 917 | 12,7% |
-| infra/ | 8 | 1.251 | 17,4% |
-| messaging/ | 1 | 250 | 3,5% |
-| state/ | 1 | 73 | 1,0% |
-| raiz | 5 | 1.198 | 16,6% |
-| **TOTAL** | **37** | **~7.200** | **100%** |
+| Subsistema | Arquivos | Linhas     | % do Total |
+| ---------- | -------- | ---------- | ---------- |
+| dialog/    | 7        | 1.598      | 22,2%      |
+| session/   | 8        | 1.867      | 25,9%      |
+| lifecycle/ | 5        | 917        | 12,7%      |
+| infra/     | 8        | 1.251      | 17,4%      |
+| messaging/ | 1        | 250        | 3,5%       |
+| state/     | 1        | 73         | 1,0%       |
+| raiz       | 5        | 1.198      | 16,6%      |
+| **TOTAL**  | **37**   | **~7.200** | **100%**   |
 
 ---
 
@@ -197,44 +197,44 @@ session/initializer.js ───────────────────
 
 ## 5. Dependências Externas ao Módulo agent/
 
-| Dependência | Módulos que Importam | Tipo |
-|-------------|---------------------|------|
-| `#copilot/core/events` | index.js, state/agent-state.js | Constantes |
-| `#copilot/core/errors` | messaging, message-queue | Classes de erro |
-| `#copilot/observability/logger` | 25+ arquivos | Logging |
-| `#copilot/observability/metrics` | initializer.js, rotation.js | Métricas |
-| `#copilot/observability/otel` | task-executor.js | Tracing |
-| `#copilot/sdk/session` | initializer.js, cleanup.js | SDK wrappers |
-| `#copilot/sdk/tools-state` | initializer.js | Config de tools |
-| `#copilot/sdk/tools-registry` | tools-bootstrap.js | Registry |
-| `#copilot/sdk/utils` | initializer.js | pickDefined |
-| `#copilot/config/env` | config.js, message-queue.js, permission-controller.js | Env vars |
-| `#copilot/config/session-config` | initializer.js | Defaults |
-| `#copilot/config/system-prompt` | initializer.js | System message |
-| `#copilot/config/custom-agents` | initializer.js | Sub-agents |
-| `#copilot/config/custom-tools-registry` | tools-bootstrap.js | Custom tools |
-| `#copilot/audit/pipeline` | infra/index.js, initializer.js | Audit logging |
-| `#copilot/hooks/permission` | permission-controller.js | Permission handlers |
-| `#copilot/tools/*` | tools-bootstrap.js, user-input-handler.js | Tool definitions |
-| `#copilot/tools/hook-tools` | agent-messaging.js | resolveUserInput |
-| `#copilot/tools/todo/store` | initializer.js | TODO store |
-| `@github/copilot-sdk` | lifecycle, session, dialog | SDK principal |
-| `zod` | initializer.js | Schema validation |
-| `node:*` | múltiplos | Node.js builtins |
+| Dependência                             | Módulos que Importam                                  | Tipo                |
+| --------------------------------------- | ----------------------------------------------------- | ------------------- |
+| `#copilot/core/events`                  | index.js, state/agent-state.js                        | Constantes          |
+| `#copilot/core/errors`                  | messaging, message-queue                              | Classes de erro     |
+| `#copilot/observability/logger`         | 25+ arquivos                                          | Logging             |
+| `#copilot/observability/metrics`        | initializer.js, rotation.js                           | Métricas            |
+| `#copilot/observability/otel`           | task-executor.js                                      | Tracing             |
+| `#copilot/sdk/session`                  | initializer.js, cleanup.js                            | SDK wrappers        |
+| `#copilot/sdk/tools-state`              | initializer.js                                        | Config de tools     |
+| `#copilot/sdk/tools-registry`           | tools-bootstrap.js                                    | Registry            |
+| `#copilot/sdk/utils`                    | initializer.js                                        | pickDefined         |
+| `#copilot/config/env`                   | config.js, message-queue.js, permission-controller.js | Env vars            |
+| `#copilot/config/session-config`        | initializer.js                                        | Defaults            |
+| `#copilot/config/system-prompt`         | initializer.js                                        | System message      |
+| `#copilot/config/custom-agents`         | initializer.js                                        | Sub-agents          |
+| `#copilot/config/custom-tools-registry` | tools-bootstrap.js                                    | Custom tools        |
+| `#copilot/audit/pipeline`               | infra/index.js, initializer.js                        | Audit logging       |
+| `#copilot/hooks/permission`             | permission-controller.js                              | Permission handlers |
+| `#copilot/tools/*`                      | tools-bootstrap.js, user-input-handler.js             | Tool definitions    |
+| `#copilot/tools/hook-tools`             | agent-messaging.js                                    | resolveUserInput    |
+| `#copilot/tools/todo/store`             | initializer.js                                        | TODO store          |
+| `@github/copilot-sdk`                   | lifecycle, session, dialog                            | SDK principal       |
+| `zod`                                   | initializer.js                                        | Schema validation   |
+| `node:*`                                | múltiplos                                             | Node.js builtins    |
 
 ---
 
 ## 6. Cobertura de Testes Atual
 
-| Suite | Testes | Arquivos Cobertos |
-|-------|--------|-------------------|
-| `test_agent_context.spec.js` | 7 | agent-context.js |
-| `test_agent_state.spec.js` | 6 | state/agent-state.js |
-| `test_agent_messaging.spec.js` | 7 | messaging/agent-messaging.js |
-| `test_agent_dialog_controller.spec.js` | 5 | dialog/agent-dialog-controller.js |
-| `test_agent_lifecycle.spec.js` | 9 | lifecycle/agent-lifecycle.js |
-| `test_always_alive_delegation.spec.js` | 12 | always-alive.js (delegação) |
-| **TOTAL** | **46** | **6 de 37 arquivos** |
+| Suite                                  | Testes | Arquivos Cobertos                 |
+| -------------------------------------- | ------ | --------------------------------- |
+| `test_agent_context.spec.js`           | 7      | agent-context.js                  |
+| `test_agent_state.spec.js`             | 6      | state/agent-state.js              |
+| `test_agent_messaging.spec.js`         | 7      | messaging/agent-messaging.js      |
+| `test_agent_dialog_controller.spec.js` | 5      | dialog/agent-dialog-controller.js |
+| `test_agent_lifecycle.spec.js`         | 9      | lifecycle/agent-lifecycle.js      |
+| `test_always_alive_delegation.spec.js` | 12     | always-alive.js (delegação)       |
+| **TOTAL**                              | **46** | **6 de 37 arquivos**              |
 
 **Cobertura**: 16,2% dos arquivos têm testes unitários. Nenhuma cobertura para:
 - dialog/loop-manager.js (661L — o mais complexo)

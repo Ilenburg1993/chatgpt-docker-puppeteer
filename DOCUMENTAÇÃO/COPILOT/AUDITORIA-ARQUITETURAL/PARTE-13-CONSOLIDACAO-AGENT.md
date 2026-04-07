@@ -565,34 +565,34 @@ exatamente como antes (zero mudanças na API pública).
 
 ### 7.1 Fases Executadas
 
-| Fase | Status | Descrição | Commit | ΔL always-alive |
-|------|--------|-----------|--------|-----------------|
-| F35 | ✅ | AgentContext — 26 campos #private → ctx | `ddd3c7b6` | 1348→1197 (-151L) |
-| F36 | ✅ | AgentLifecycle — start/stop/initSession/tryReconnect | `604b9878` | 1197→858 (-339L) |
-| F37 | ✅ | AgentDialogController — dialog start/stop/resume/ensure | `7e3e39ac` | 858→776 (-82L) |
-| F38 | ✅ | AgentMessaging — sendMessage/steer/answer/enqueue | `4a34d3e6` | 776→702 (-74L) |
-| F39 | ✅ | AgentState — getStatusSnapshot/listenerDiagnostics | `e2ff5693` | 702→660 (-42L) |
+| Fase | Status | Descrição                                               | Commit     | ΔL always-alive   |
+| ---- | ------ | ------------------------------------------------------- | ---------- | ----------------- |
+| F35  | ✅      | AgentContext — 26 campos #private → ctx                 | `ddd3c7b6` | 1348→1197 (-151L) |
+| F36  | ✅      | AgentLifecycle — start/stop/initSession/tryReconnect    | `604b9878` | 1197→858 (-339L)  |
+| F37  | ✅      | AgentDialogController — dialog start/stop/resume/ensure | `7e3e39ac` | 858→776 (-82L)    |
+| F38  | ✅      | AgentMessaging — sendMessage/steer/answer/enqueue       | `4a34d3e6` | 776→702 (-74L)    |
+| F39  | ✅      | AgentState — getStatusSnapshot/listenerDiagnostics      | `e2ff5693` | 702→660 (-42L)    |
 
 ### 7.2 Módulos Criados (F35-F39)
 
-| Módulo | Linhas | Responsabilidade |
-|--------|--------|------------------|
-| `agent-context.js` | 210L | 26 campos antes #private, AgentContext class |
-| `lifecycle/agent-lifecycle.js` | 377L | agentStart, agentStop, initSession, agentTryReconnect |
-| `dialog/agent-dialog-controller.js` | 156L | dialogStart, dialogStop, dialogResume, dialogEnsureAttached |
-| `messaging/agent-messaging.js` | 156L | sendMessage, sendMessageDialogBoot, steerMessage, answerPendingQuestion, enqueueTask |
-| `state/agent-state.js` | 77L | getStatusSnapshot, listenerDiagnostics |
+| Módulo                              | Linhas | Responsabilidade                                                                     |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| `agent-context.js`                  | 210L   | 26 campos antes #private, AgentContext class                                         |
+| `lifecycle/agent-lifecycle.js`      | 377L   | agentStart, agentStop, initSession, agentTryReconnect                                |
+| `dialog/agent-dialog-controller.js` | 156L   | dialogStart, dialogStop, dialogResume, dialogEnsureAttached                          |
+| `messaging/agent-messaging.js`      | 156L   | sendMessage, sendMessageDialogBoot, steerMessage, answerPendingQuestion, enqueueTask |
+| `state/agent-state.js`              | 77L    | getStatusSnapshot, listenerDiagnostics                                               |
 
 ### 7.3 Métricas Comparativas
 
-| Métrica | Pré-F35 (F34) | Pós-F39 | Delta |
-|---------|---------------|---------|-------|
-| always-alive.js | 1.348L | **660L** | **-688L (-51%)** |
-| Campos `this.#` em AA | 176 refs | **5 refs** | **-97%** |
-| Métodos privados em AA | ~12 | **3** | `#setStatus`, `#processQueue`, `#tryReconnect` |
-| God Modules >600L (agent/) | 2 | **1** (loop-mgr) | **-1** |
-| Total arquivos agent/ | 31 | **36** | +5 novos módulos |
-| Total linhas agent/ | 6.790 | **7.078** | +288L (overhead JSDoc) |
+| Métrica                    | Pré-F35 (F34) | Pós-F39          | Delta                                          |
+| -------------------------- | ------------- | ---------------- | ---------------------------------------------- |
+| always-alive.js            | 1.348L        | **660L**         | **-688L (-51%)**                               |
+| Campos `this.#` em AA      | 176 refs      | **5 refs**       | **-97%**                                       |
+| Métodos privados em AA     | ~12           | **3**            | `#setStatus`, `#processQueue`, `#tryReconnect` |
+| God Modules >600L (agent/) | 2             | **1** (loop-mgr) | **-1**                                         |
+| Total arquivos agent/      | 31            | **36**           | +5 novos módulos                               |
+| Total linhas agent/        | 6.790         | **7.078**        | +288L (overhead JSDoc)                         |
 
 ### 7.4 Padrão Arquitetural Adotado
 
@@ -630,37 +630,37 @@ Os 3 métodos privados que **devem** permanecer na classe:
 
 ### 8.1 Mapa Atualizado
 
-| Subdir | Arqs | Linhas | Maiores |
-|--------|------|--------|---------|
-| (raiz) | 5 | 1.719 | always-alive.js (660), agent-context.js (210), config.js (177), types.js (122) |
-| dialog/ | 7 | 1.305 | loop-manager.js (661), turn-executor.js (361), agent-dialog-controller.js (156) |
-| infra/ | 8 | 1.251 | webhook-manager.js (300), message-queue.js (212), task-executor.js (177) |
-| lifecycle/ | 5 | 932 | agent-lifecycle.js (377), state-io.js (251), entry.js (162) |
-| messaging/ | 1 | 156 | agent-messaging.js (156) |
-| session/ | 9 | 1.638 | event-wirer.js (591), initializer.js (376), boot-wiring.js (225), snapshot.js (213) |
-| state/ | 1 | 77 | agent-state.js (77) |
-| **Total** | **36** | **7.078** | |
+| Subdir     | Arqs   | Linhas    | Maiores                                                                             |
+| ---------- | ------ | --------- | ----------------------------------------------------------------------------------- |
+| (raiz)     | 5      | 1.719     | always-alive.js (660), agent-context.js (210), config.js (177), types.js (122)      |
+| dialog/    | 7      | 1.305     | loop-manager.js (661), turn-executor.js (361), agent-dialog-controller.js (156)     |
+| infra/     | 8      | 1.251     | webhook-manager.js (300), message-queue.js (212), task-executor.js (177)            |
+| lifecycle/ | 5      | 932       | agent-lifecycle.js (377), state-io.js (251), entry.js (162)                         |
+| messaging/ | 1      | 156       | agent-messaging.js (156)                                                            |
+| session/   | 9      | 1.638     | event-wirer.js (591), initializer.js (376), boot-wiring.js (225), snapshot.js (213) |
+| state/     | 1      | 77        | agent-state.js (77)                                                                 |
+| **Total**  | **36** | **7.078** |                                                                                     |
 
 ### 8.2 God Modules Restantes (>400L)
 
-| Arquivo | Linhas | Decomponível? | Justificativa |
-|---------|--------|---------------|---------------|
-| dialog/loop-manager.js | 661L | **NÃO** | FSM coeso, 97 refs this.#, avaliado em F18 |
-| session/event-wirer.js | 591L | Parcial | 8 sub-funções internas, composição limpa |
-| lifecycle/agent-lifecycle.js | 377L | NÃO | Lógica coesa, recém-extraído em F36 |
-| session/initializer.js | 376L | Parcial | Session creation + resume — bordas separáveis |
-| dialog/turn-executor.js | 361L | NÃO | Executor coeso, FSM de turns |
-| infra/webhook-manager.js | 300L | Parcial | Classe com 15 métodos, mas coesa por domínio |
+| Arquivo                      | Linhas | Decomponível? | Justificativa                                 |
+| ---------------------------- | ------ | ------------- | --------------------------------------------- |
+| dialog/loop-manager.js       | 661L   | **NÃO**       | FSM coeso, 97 refs this.#, avaliado em F18    |
+| session/event-wirer.js       | 591L   | Parcial       | 8 sub-funções internas, composição limpa      |
+| lifecycle/agent-lifecycle.js | 377L   | NÃO           | Lógica coesa, recém-extraído em F36           |
+| session/initializer.js       | 376L   | Parcial       | Session creation + resume — bordas separáveis |
+| dialog/turn-executor.js      | 361L   | NÃO           | Executor coeso, FSM de turns                  |
+| infra/webhook-manager.js     | 300L   | Parcial       | Classe com 15 métodos, mas coesa por domínio  |
 
 ### 8.3 Campos this.# por Arquivo (top 5)
 
-| Arquivo | Refs this.# | Nota |
-|---------|-------------|------|
-| dialog/loop-manager.js | 97 | FSM coeso, #private legítimos |
-| session/keepalive.js | 22 | Classe compacta, #private correto |
-| dialog/watchdog.js | 23 | Classe compacta |
-| infra/message-queue.js | 18 | Classe compacta |
-| infra/handoff-manager.js | 13 | Classe compacta |
+| Arquivo                  | Refs this.# | Nota                              |
+| ------------------------ | ----------- | --------------------------------- |
+| dialog/loop-manager.js   | 97          | FSM coeso, #private legítimos     |
+| session/keepalive.js     | 22          | Classe compacta, #private correto |
+| dialog/watchdog.js       | 23          | Classe compacta                   |
+| infra/message-queue.js   | 18          | Classe compacta                   |
+| infra/handoff-manager.js | 13          | Classe compacta                   |
 
 ### 8.4 API Pública — Consumo Externo (inalterado)
 
@@ -672,16 +672,16 @@ Os 3 métodos privados que **devem** permanecer na classe:
 
 ### 8.5 Cobertura de Testes
 
-| Arquivo | Testes existentes | Status |
-|---------|------------------|--------|
-| always-alive.js | 5 spec files | 2 falhas pré-existentes (timeout default, MAX_QUEUE_SIZE) |
-| message-queue.js | test_message_queue.spec.js | PASS |
-| state-io.js | test_state_io.spec.js | PASS (em isolamento) |
-| agent-context.js | **NENHUM** | ⚠ Sem cobertura |
-| agent-lifecycle.js | **NENHUM** | ⚠ Sem cobertura |
-| agent-dialog-controller.js | **NENHUM** | ⚠ Sem cobertura |
-| agent-messaging.js | **NENHUM** | ⚠ Sem cobertura |
-| agent-state.js | **NENHUM** | ⚠ Sem cobertura |
+| Arquivo                    | Testes existentes          | Status                                                    |
+| -------------------------- | -------------------------- | --------------------------------------------------------- |
+| always-alive.js            | 5 spec files               | 2 falhas pré-existentes (timeout default, MAX_QUEUE_SIZE) |
+| message-queue.js           | test_message_queue.spec.js | PASS                                                      |
+| state-io.js                | test_state_io.spec.js      | PASS (em isolamento)                                      |
+| agent-context.js           | **NENHUM**                 | ⚠ Sem cobertura                                           |
+| agent-lifecycle.js         | **NENHUM**                 | ⚠ Sem cobertura                                           |
+| agent-dialog-controller.js | **NENHUM**                 | ⚠ Sem cobertura                                           |
+| agent-messaging.js         | **NENHUM**                 | ⚠ Sem cobertura                                           |
+| agent-state.js             | **NENHUM**                 | ⚠ Sem cobertura                                           |
 
 **Risco**: 5 módulos extraídos (F35-F39) sem testes unitários diretos.
 Cobertura indireta existe (spec files de always-alive testam delegação), mas é frágil.
@@ -690,16 +690,16 @@ Cobertura indireta existe (spec files de always-alive testam delegação), mas �
 
 ### 9.1 Oportunidades Identificadas
 
-| ID | Tipo | Escopo | Impacto | Esforço |
-|----|------|--------|---------|---------|
-| F41 | Testes | Testes unitários para módulos F35-F39 | Alto (segurança) | Médio |
-| F42 | Decomposição | event-wirer.js → wirers/ sub-módulos | Médio (legibilidade) | Médio |
-| F43 | Decomposição | initializer.js — separar create vs resume | Baixo | Baixo |
-| F44 | Limpeza | Remover JSDoc orphan/duplicate em always-alive.js | Baixo | Baixo |
-| F45 | Typing | Hardening JSDoc typedefs para Host interfaces | Médio | Baixo |
-| F46 | Testes | Testes de regressão para always-alive delegações | Alto | Médio |
-| F47 | Extração | webhook-manager.js → módulo MCP-agnostic | Baixo | Médio |
-| F48 | Typing | Exportar typedefs compartilhados (AgentContext, etc.) | Médio | Baixo |
+| ID  | Tipo         | Escopo                                                | Impacto              | Esforço |
+| --- | ------------ | ----------------------------------------------------- | -------------------- | ------- |
+| F41 | Testes       | Testes unitários para módulos F35-F39                 | Alto (segurança)     | Médio   |
+| F42 | Decomposição | event-wirer.js → wirers/ sub-módulos                  | Médio (legibilidade) | Médio   |
+| F43 | Decomposição | initializer.js — separar create vs resume             | Baixo                | Baixo   |
+| F44 | Limpeza      | Remover JSDoc orphan/duplicate em always-alive.js     | Baixo                | Baixo   |
+| F45 | Typing       | Hardening JSDoc typedefs para Host interfaces         | Médio                | Baixo   |
+| F46 | Testes       | Testes de regressão para always-alive delegações      | Alto                 | Médio   |
+| F47 | Extração     | webhook-manager.js → módulo MCP-agnostic              | Baixo                | Médio   |
+| F48 | Typing       | Exportar typedefs compartilhados (AgentContext, etc.) | Médio                | Baixo   |
 
 ### 9.2 Roadmap Priorizado
 
@@ -767,13 +767,13 @@ F41 (Testes F35-F39) → F46 (Testes delegação) → F45 (Host types) → F48 (
 
 ### 9.4 Métricas-Alvo Pós-Roadmap
 
-| Métrica | Atual (F39) | Alvo |
-|---------|-------------|------|
-| always-alive.js | 660L | 660L (estável) |
-| God Modules >600L | 1 (loop-mgr) | 1 |
-| Test coverage (módulos F35-F39) | 0% direto | **≥80%** |
-| Falhas de teste | 2 pré-existentes | 0 |
-| Host interfaces documentadas | 4 ad-hoc | 1 unificada em types.js |
+| Métrica                         | Atual (F39)      | Alvo                    |
+| ------------------------------- | ---------------- | ----------------------- |
+| always-alive.js                 | 660L             | 660L (estável)          |
+| God Modules >600L               | 1 (loop-mgr)     | 1                       |
+| Test coverage (módulos F35-F39) | 0% direto        | **≥80%**                |
+| Falhas de teste                 | 2 pré-existentes | 0                       |
+| Host interfaces documentadas    | 4 ad-hoc         | 1 unificada em types.js |
 
 ---
 
