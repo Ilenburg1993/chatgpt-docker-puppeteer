@@ -32,13 +32,6 @@ export function injectRecordCompaction(fn) {
 }
 
 /**
- * Referência mutável para quotaSnapshots (compartilhada com event-collector.js).
- *
- * @type {{ snapshots: Record<string, unknown>; ts: number }}
- */
-export const quotaState = { snapshots: {}, ts: 0 };
-
-/**
  * Registra handlers de session.* na sessão SDK.
  *
  * @param {CollectorContext} ctx
