@@ -52,8 +52,8 @@ import {
 /** @typedef {'ready' | 'reply' | 'stopped' | 'question'} DialogMessageKind */
 
 /**
- * Mapa de thresholds de stall (ms) do DialogWatchdog por tipo de tarefa.
- * Tarefas mais longas recebem threshold maior para evitar watchdog kills prematuros.
+ * Mapa de thresholds de stall (ms) do DialogWatchdog por tipo de tarefa. Tarefas mais longas recebem threshold maior
+ * para evitar watchdog kills prematuros.
  *
  * @type {Readonly<Record<string, number>>}
  */

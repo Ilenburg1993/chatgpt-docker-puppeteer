@@ -29,7 +29,11 @@ describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
         const [collector, ...observers] = await Promise.all([
             readFile(new URL('event-collector.js', base), 'utf-8'),
             ...observerFiles.map(async (f) => {
-                try { return await readFile(new URL(f, base), 'utf-8'); } catch { return ''; }
+                try {
+                    return await readFile(new URL(f, base), 'utf-8');
+                } catch {
+                    return '';
+                }
             }),
         ]);
         collectorSource = collector;

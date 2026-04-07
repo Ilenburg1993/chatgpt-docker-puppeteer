@@ -16,7 +16,13 @@ import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { COPILOT_MODEL, BOOT_MAX_RETRIES, DRAIN_WRITES_TIMEOUT_MS, PING_TIMEOUT_MS, RESTART_DELAY_MS } from '../config.js';
+import {
+    BOOT_MAX_RETRIES,
+    COPILOT_MODEL,
+    DRAIN_WRITES_TIMEOUT_MS,
+    PING_TIMEOUT_MS,
+    RESTART_DELAY_MS,
+} from '../config.js';
 import { drainStateWrites } from './state-io.js';
 
 /**

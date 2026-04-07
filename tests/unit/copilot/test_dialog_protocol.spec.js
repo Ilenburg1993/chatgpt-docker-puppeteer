@@ -1,9 +1,9 @@
 import {
-    DialogProtocol,
+    DIALOG_PROTO_DONE,
     DIALOG_PROTO_READY,
     DIALOG_PROTO_REPLY,
-    DIALOG_PROTO_DONE,
     DIALOG_PROTO_STOPPED,
+    DialogProtocol,
     MESSAGE_KIND,
 } from '../../../src/copilot/agent/dialog/protocol.js';
 

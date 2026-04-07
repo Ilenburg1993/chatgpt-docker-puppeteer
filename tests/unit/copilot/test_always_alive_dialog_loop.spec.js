@@ -46,7 +46,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
             'utf-8',
         );
         wirerSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/event-wiring.js', import.meta.url),
             'utf-8',
         );
     });
@@ -241,10 +241,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 
-    it('#turnMutex é declarado como campo privado no DialogLoopManager', () => {
+    it('#turnQueue é declarado como campo privado no DialogLoopManager (F59: extraído para TurnQueue)', () => {
         assert.ok(
-            dlmSourceCode.includes('#turnMutex'),
-            '#turnMutex deve existir para serializar chamadas concorrentes a sendTurn()',
+            dlmSourceCode.includes('#turnQueue'),
+            '#turnQueue deve existir para serializar chamadas concorrentes a sendTurn() via TurnQueue',
         );
     });
 
@@ -255,10 +255,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 
-    it('sendTurn() encadeia no #turnMutex antes de executar', () => {
+    it('sendTurn() delega para #turnQueue.enqueue() para serializar execução (F59)', () => {
         assert.ok(
-            dlmSourceCode.includes('this.#turnMutex') && dlmSourceCode.includes('prev.then'),
-            'sendTurn deve encadear chamadas via #turnMutex para serializar execução',
+            dlmSourceCode.includes('#turnQueue.enqueue('),
+            'sendTurn deve delegar para #turnQueue.enqueue() para serializar execução',
         );
     });
 });
@@ -285,12 +285,12 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     });
 
     it('DL-PERM-04: sendTurn() pinga watchdog antes de serializar o turno', () => {
-        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendTurn, antes do encadeamento no mutex
+        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendTurn, antes do enqueue
         const pingIdx = dlmSourceCode.indexOf('#watchdog?.ping()');
-        const prevMutexIdx = dlmSourceCode.indexOf('const prev = this.#turnMutex');
+        const enqueueIdx = dlmSourceCode.indexOf('#turnQueue.enqueue(');
         assert.ok(pingIdx !== -1, 'sendTurn deve chamar this.#watchdog?.ping()');
-        assert.ok(prevMutexIdx !== -1, 'sendTurn deve ter "const prev = this.#turnMutex"');
-        assert.ok(pingIdx < prevMutexIdx, '#watchdog?.ping() deve ocorrer antes de "const prev = this.#turnMutex"');
+        assert.ok(enqueueIdx !== -1, 'sendTurn deve delegar para #turnQueue.enqueue()');
+        assert.ok(pingIdx < enqueueIdx, '#watchdog?.ping() deve ocorrer antes de #turnQueue.enqueue()');
     });
 
     it('DL-PERM-05: stop() aceita campo reason', () => {

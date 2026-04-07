@@ -30,7 +30,11 @@ describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
         ];
         const parts = await Promise.all(
             files.map(async (f) => {
-                try { return await readFile(new URL(f, base), 'utf-8'); } catch { return ''; }
+                try {
+                    return await readFile(new URL(f, base), 'utf-8');
+                } catch {
+                    return '';
+                }
             }),
         );
         observerSource = parts.join('\n');

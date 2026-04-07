@@ -33,6 +33,8 @@ import {
     WATCHDOG_STALL_MS,
 } from '../config.js';
 import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.js';
+import { TurnQueue } from './backpressure.js';
+import { ModelFallbackState } from './model-fallback.js';
 import { DialogProtocol } from './protocol.js';
 import { executeTurnImpl } from './turn-executor.js';
 import { DialogWatchdog } from './watchdog.js';
@@ -70,14 +72,8 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {boolean} */
     #active = false;
 
-    /** @type {Promise<void>} */
-    #turnMutex = Promise.resolve();
-
-    /** @type {number} */
-    #turnQueueDepth = 0;
-
-    /** @type {number} */
-    #turnMutexGen = 0;
+    /** @type {TurnQueue} F59: serialização e backpressure delegadas */
+    #turnQueue;
 
     /** @type {boolean} */
     #stopping = false;
@@ -88,17 +84,11 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {DialogWatchdog | null} */
     #watchdog = null;
 
-    /** @type {boolean} */
-    #pendingModelFallback = false;
+    /** @type {ModelFallbackState} F60: estado de fallback de modelo delegado */
+    #modelFallback;
 
     /** @type {boolean} F31.3: flag para evitar compaction duplicada */
     #compactionRequested = false;
-
-    /** @type {string | null} */
-    #fallbackModel;
-
-    /** @type {number} */
-    #maxQueueSize;
 
     /** @type {number} */
     #bootTimeoutMs;
@@ -123,11 +113,13 @@ export class DialogLoopManager extends EventEmitter {
      */
     constructor(options = {}) {
         super();
-        this.#maxQueueSize = options.maxQueueSize ?? DIALOG_QUEUE_MAX;
+        this.#turnQueue = new TurnQueue({ maxSize: options.maxQueueSize ?? DIALOG_QUEUE_MAX });
         this.#bootTimeoutMs = options.bootTimeoutMs ?? BOOT_TIMEOUT_MS;
         this.#watchdogIntervalMs = options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS;
         this.#watchdogStallMs = options.watchdogStallMs ?? WATCHDOG_STALL_MS;
-        this.#fallbackModel = options.fallbackModel ?? getCopilotFallbackModel();
+        this.#modelFallback = new ModelFallbackState({
+            defaultModel: options.fallbackModel ?? getCopilotFallbackModel(),
+        });
 
         // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
         const saved = readState()?.prMetrics;
@@ -161,14 +153,14 @@ export class DialogLoopManager extends EventEmitter {
 
     /** @returns {number} */
     get queueDepth() {
-        return this.#turnQueueDepth;
+        return this.#turnQueue.depth;
     }
 
     /**
      * Sinaliza que na próxima inicialização o modelo alternativo deve ser usado.
      */
     setPendingModelFallback() {
-        this.#pendingModelFallback = true;
+        this.#modelFallback.setPending();
     }
 
     /**
@@ -177,9 +169,7 @@ export class DialogLoopManager extends EventEmitter {
      * @param {string} model - Modelo de fallback a usar
      */
     scheduleFallback(model) {
-        this.#fallbackModel = model;
-        this.#pendingModelFallback = true;
-        log('INFO', `[DialogLoopManager] scheduleFallback: ${model} agendado para próximo boot.`);
+        this.#modelFallback.schedule(model);
     }
 
     /**
@@ -250,17 +240,8 @@ export class DialogLoopManager extends EventEmitter {
         this.emit('changed', { active: true, ts: Date.now() });
         persistState({ dialogLoopActive: true }, '[DialogLoopManager] writeState dialogLoopActive=true');
 
-        // Aplica fallback de modelo se previamente agendado por `scheduleFallback()`.
-        if (this.#pendingModelFallback && this.#fallbackModel) {
-            const prev = this.#host.getModel();
-            this.#pendingModelFallback = false;
-            // F41B.2: efetivamente aplicar o modelo no host (se setModel estiver disponível)
-            if (typeof this.#host.setModel === 'function') {
-                this.#host.setModel(this.#fallbackModel);
-            }
-            this.emit('model.fallback', { previousModel: prev, newModel: this.#fallbackModel, ts: Date.now() });
-            log('WARN', `[DialogLoopManager] Aplicando modelo fallback: ${prev} → ${this.#fallbackModel}`);
-        }
+        // F60: delegar aplicação de fallback ao ModelFallbackState
+        this.#modelFallback.applyIfPending(this.#host, (event, payload) => this.emit(event, payload));
 
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 
@@ -333,30 +314,11 @@ export class DialogLoopManager extends EventEmitter {
             return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
         }
 
-        if (this.#turnQueueDepth >= this.#maxQueueSize) {
-            return Promise.reject(
-                new SessionError(
-                    `[DialogLoopManager] Fila cheia (${this.#turnQueueDepth}/${this.#maxQueueSize}).`,
-                    'DIALOG_QUEUE_FULL',
-                ),
-            );
-        }
-
         this.#watchdog?.ping();
 
-        this.#turnQueueDepth++;
-        const prev = this.#turnMutex;
-        /** @type {Promise<string>} */
-        const next = prev.then(() => this.#executeTurn(message, { timeout, ...(signal !== undefined && { signal }) }));
-        this.#turnMutex = next.then(() => {}).catch(() => {});
-        const myGen = ++this.#turnMutexGen;
-        void next.finally(() => {
-            this.#turnQueueDepth--;
-            if (this.#turnQueueDepth === 0 && this.#turnMutexGen === myGen) {
-                this.#turnMutex = Promise.resolve();
-            }
-        });
-        return next;
+        return this.#turnQueue.enqueue(() =>
+            this.#executeTurn(message, { timeout, ...(signal !== undefined && { signal }) }),
+        );
     }
 
     /**
@@ -391,7 +353,7 @@ export class DialogLoopManager extends EventEmitter {
         // F41B.1: Aguardar mutex drenar dentro do timeout antes de desativar.
         // O timer de shutdown só força desativação se o turno em andamento não terminar a tempo.
         await Promise.race([
-            this.#turnMutex,
+            this.#turnQueue.drain(),
             new Promise((resolve) => {
                 const timer = setTimeout(() => {
                     log(
@@ -402,7 +364,7 @@ export class DialogLoopManager extends EventEmitter {
                     resolve(undefined);
                 }, shutdownTimeoutMs);
                 // Se o mutex resolver antes do timeout, limpar o timer
-                void this.#turnMutex.then(() => {
+                void this.#turnQueue.drain().then(() => {
                     clearTimeout(timer);
                     resolve(undefined);
                 });
@@ -544,9 +506,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#active = false;
         this.#stopping = false;
         // F42.3: reset completo do mutex pipeline — previne turns fantasma
-        this.#turnMutex = Promise.resolve();
-        this.#turnQueueDepth = 0;
-        this.#turnMutexGen++;
+        this.#turnQueue.reset();
         this.#watchdog?.stop();
         this.#watchdog = null;
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
@@ -608,54 +568,5 @@ export class DialogLoopManager extends EventEmitter {
     }
 }
 
-// ─── Event Wiring (absorvido de dialog-loop-wirer.js) ─────────────────────────
-
-/**
- * Registra todos os listeners de forwarding de eventos no DialogLoopManager.
- *
- * Esta função deve ser chamada UMA ÚNICA VEZ por instância do agente (a classe-mãe controla a idempotência via flag
- * interno). Ela:
- *
- * 1. Chama `removeAllListeners()` para os eventos conhecidos do DLM.
- * 2. Registra um listener para cada evento relevante, encaminhando-o ao agente via `emitFn`.
- *
- * @param {DialogLoopManager} dialogLoop
- * @param {(event: string, payload: Record<string, unknown>) => void} emitFn - Função de emissão do agente host.
- * @returns {void}
- */
-export function wireDialogLoopEvents(dialogLoop, emitFn) {
-    const DLM_EVENTS = [
-        'ready',
-        'reply',
-        'stopped',
-        'paused',
-        'resumed',
-        'stalled',
-        'turn_start',
-        'turn_end',
-        'turn_timeout',
-        'changed',
-        'model.fallback',
-        'compaction.requested',
-        'pre_stall_warning',
-    ];
-    for (const event of DLM_EVENTS) dialogLoop.removeAllListeners(event);
-
-    dialogLoop.on('ready', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.ready', evt));
-    dialogLoop.on('reply', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.reply', evt));
-    dialogLoop.on('stopped', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.stopped', evt));
-    dialogLoop.on('paused', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.paused', evt));
-    dialogLoop.on('resumed', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.resumed', evt));
-    dialogLoop.on('stalled', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.stalled', evt));
-    dialogLoop.on('turn_start', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_start', evt));
-    dialogLoop.on('turn_end', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_end', evt));
-    dialogLoop.on('turn_timeout', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.turn_timeout', evt));
-    dialogLoop.on('changed', (/** @type {Record<string, unknown>} */ evt) => emitFn('dialog.loop.changed', evt));
-    dialogLoop.on('model.fallback', (/** @type {Record<string, unknown>} */ evt) => emitFn('pr.fallback_model', evt));
-    dialogLoop.on('compaction.requested', (/** @type {Record<string, unknown>} */ evt) =>
-        emitFn('dialog.compaction.requested', evt),
-    );
-    dialogLoop.on('pre_stall_warning', (/** @type {Record<string, unknown>} */ evt) =>
-        emitFn('dialog.pre_stall_warning', evt),
-    );
-}
+// F61: wireDialogLoopEvents extraído para event-wiring.js — re-exportado para compatibilidade
+export { wireDialogLoopEvents } from './event-wiring.js';

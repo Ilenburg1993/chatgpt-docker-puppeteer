@@ -40,8 +40,10 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
 
     it('stop() deve ter timeout padrão de 10000ms', () => {
         assert.ok(
-            sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10_000') || sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10000') ||
-            sourceCode.includes('shutdownTimeoutMs = 10_000') || sourceCode.includes('shutdownTimeoutMs = 10000'),
+            sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10_000') ||
+                sourceCode.includes('SHUTDOWN_TIMEOUT_MS = 10000') ||
+                sourceCode.includes('shutdownTimeoutMs = 10_000') ||
+                sourceCode.includes('shutdownTimeoutMs = 10000'),
             'stop() deve ter shutdownTimeoutMs default de 10000ms (via SHUTDOWN_TIMEOUT_MS)',
         );
     });
@@ -150,7 +152,7 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
         );
         assert.ok(
             mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'") ||
-            mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config/env'"),
+                mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config/env'"),
             'MAX_QUEUE_SIZE deve ser importado em message-queue.js (onde a verificação de capacidade está)',
         );
         assert.ok(

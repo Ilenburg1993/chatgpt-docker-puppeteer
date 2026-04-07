@@ -21,18 +21,17 @@ import {
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { raceEvents } from '#copilot/sdk/event-helpers';
-import { createRegistry } from '#copilot/sdk/index';
 import { CopilotClient } from '@github/copilot-sdk';
-import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
-import { buildMcpConfig } from '../../config/mcp-servers.js';
 
-import { attachBus } from '#copilot/hooks/bus';
-import { createHooks } from '#copilot/hooks/factory';
-import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
-import { handleUserInputRequest } from '../dialog/user-input-handler.js';
-import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
+import { setSessionRpc } from '../infra/tools-bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
+import {
+    buildSessionHooks,
+    buildSessionOptions,
+    buildSessionTools,
+    finalizeSessionInit,
+} from '../lifecycle/session-setup.js';
 import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
@@ -58,55 +57,13 @@ import { createSnapshot, saveSnapshot } from '../session/snapshot.js';
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
  */
 export async function initSession(ctx, client, host) {
-    ctx.messagesCache.invalidate();
-    const mcpTools = await buildMcpTools();
-    if (mcpTools.length > 0) {
-        log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
-    }
-    ctx.toolsRegistry = createRegistry();
-    const tools = bootstrapTools(ctx.toolsRegistry, mcpTools);
-    log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
+    const { tools } = await buildSessionTools(ctx);
+    const { busHooks } = buildSessionHooks(ctx, host);
+    const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-    const lifecycleHooks = createSessionHooks({
-        emitWebhook: (event, payload) => ctx.webhooks.emit(event, payload),
-        getModel: () => ctx.model,
-        scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
-        emit: (event, payload) => host.emit(event, payload),
-    });
+    const { session, isResumed } = await initOrResumeSession(client, options);
 
-    const hooks = createHooks({
-        auditLog: true,
-        onSessionStart: lifecycleHooks.onSessionStart,
-        onSessionEnd: lifecycleHooks.onSessionEnd,
-        onErrorOccurred: lifecycleHooks.onErrorOccurred,
-    });
-
-    const busHooks = attachBus(hooks);
-
-    const { session, isResumed } = await initOrResumeSession(client, {
-        model: ctx.model,
-        onPermissionRequest: ctx.permissions.handler,
-        onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
-            handleUserInputRequest(input, {
-                isDialogLoopActive: () => ctx.dialogLoop.active,
-                handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
-                setStatus: (s) =>
-                    ctx.setStatus(s, /** @type {import('node:events').EventEmitter} */ (/** @type {unknown} */ (host))),
-                setPendingQuestion: (pq) => {
-                    ctx.pendingQuestion = pq;
-                },
-                emit: (event, payload) => host.emit(event, payload),
-            }),
-        hooks: busHooks,
-        tools,
-        mcpServers: buildMcpConfig(),
-        reasoningEffort: ctx.reasoningEffort,
-        injectHookContext: true,
-    });
-
-    ctx.session = session;
-    ctx.isResumed = isResumed;
-    setSessionRpc(session.rpc);
+    finalizeSessionInit(ctx, session, isResumed);
     return { session, isResumed };
 }
 

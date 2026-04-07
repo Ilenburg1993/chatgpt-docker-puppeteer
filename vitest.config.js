@@ -1,14 +1,12 @@
-import { defineConfig } from 'vitest/config';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { defineConfig } from 'vitest/config';
 
 /**
- * Build Vite resolve.alias from package.json "imports" field.
- * Vite does not natively support Node.js subpath imports (#foo/*),
- * so we translate them into resolve.alias entries.
+ * Build Vite resolve.alias from package.json "imports" field. Vite does not natively support Node.js subpath imports
+ * (#foo/*), so we translate them into resolve.alias entries.
  *
- * Wildcard entries: #foo/* → ./src/foo/*.EXT  become regex aliases
- * that try multiple extensions (.js, .mjs, .ts).
+ * Wildcard entries: #foo/* → ./src/foo/*.EXT become regex aliases that try multiple extensions (.js, .mjs, .ts).
  */
 function buildAliasFromImports() {
     const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf-8'));
@@ -24,9 +22,7 @@ function buildAliasFromImports() {
         if (pattern.endsWith('/*')) {
             // Wildcard: #foo/* → ./src/foo/*.js
             const prefix = pattern.slice(0, -2);
-            const targetBase = target
-                .replace('./', '')
-                .replace(/\/\*\.(js|mjs|ts)$/, '/');
+            const targetBase = target.replace('./', '').replace(/\/\*\.(js|mjs|ts)$/, '/');
             const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             alias.push({
                 find: new RegExp(`^${escapedPrefix}\\/(.+)$`),

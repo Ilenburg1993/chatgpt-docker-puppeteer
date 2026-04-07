@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * Barrel de exportação para agent/messaging.
+ *
  * @module copilot/agent/messaging
  */
 export {

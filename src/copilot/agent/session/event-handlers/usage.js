@@ -1,0 +1,41 @@
+// @ts-check
+/**
+ * @module copilot/agent/session/event-handlers/usage
+ * F62.8: Handler dedicado para billing (assistant.usage).
+ */
+
+import { log } from '#copilot/observability/logger';
+import { persistState } from '../../lifecycle/state-io.js';
+
+/**
+ * @param {import('../event-wirer.js').CopilotSessionLike} session
+ * @param {Pick<import('../event-wirer.js').SessionWirerCallbacks, 'emit' | 'onPrInfo'>} cb
+ * @returns {() => void}
+ */
+export function wireUsageEvent(session, { emit, onPrInfo }) {
+    return session.on('assistant.usage', (/** @type {any} */ evt) => {
+        const data = evt?.data ?? {};
+        const model = /** @type {string | undefined} */ (data['model']);
+        const cost = /** @type {number | undefined} */ (data['cost']);
+        const quotaSnapshots = /** @type {Record<string, unknown> | undefined} */ (data['quotaSnapshots']);
+        const prInfo = {
+            ts: Date.now(),
+            ...(model !== undefined ? { model } : {}),
+            ...(cost !== undefined ? { cost } : {}),
+            ...(quotaSnapshots !== undefined ? { quotaSnapshots } : {}),
+        };
+        log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
+        onPrInfo(prInfo);
+        emit('pr.consumed', prInfo);
+        persistState(
+            {
+                pendingTurnConsumedPR: true,
+                lastPrConsumedAt: Date.now(),
+                lastPrModel: model ?? '',
+                lastPrCost: cost ?? 0,
+                lastQuotaSnapshots: quotaSnapshots ?? null,
+            },
+            '[AlwaysAlive] writeState pendingTurnConsumedPR',
+        );
+    });
+}

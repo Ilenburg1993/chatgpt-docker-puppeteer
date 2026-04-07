@@ -14,8 +14,8 @@
  * @internal
  */
 
-import { createRegistry } from '#copilot/sdk/index';
 import { log } from '#copilot/observability/logger';
+import { createRegistry } from '#copilot/sdk/index';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 import { HandoffManager } from './infra/handoff-manager.js';
@@ -215,9 +215,9 @@ export class AgentContext {
     });
 
     /**
-     * Altera o status e invalida o cache de snapshot. Emite evento 'status' no emitter passado.
-     * Valida a transição contra o FSM — transições inválidas emitem warning mas NÃO bloqueiam
-     * (para não quebrar produção durante rollout).
+     * Altera o status e invalida o cache de snapshot. Emite evento 'status' no emitter passado. Valida a transição
+     * contra o FSM — transições inválidas emitem warning mas NÃO bloqueiam (para não quebrar produção durante
+     * rollout).
      *
      * @param {AgentStatus} status
      * @param {import('node:events').EventEmitter} emitter
