@@ -3,6 +3,7 @@
  * src/copilot/agent/session/boot-wiring.js
  *
  * Encapsula os wirings pós-init executados durante o `start()` do AlwaysAliveAgent:
+ *
  * - Wiring de eventos de sessão SDK (wireSessionEvents)
  * - Attach do event-collector de observabilidade
  * - Registro de lifecycle handlers no client
@@ -27,20 +28,20 @@ import {
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
-import {
-    BOOT_RECOVERY_DELAY_MS,
-    MCP_RECONNECT_MS,
-    METRICS_INTERVAL_MS,
-} from '../config.js';
+import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
 import { readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ *
  * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
+ *
  * @typedef {import('../infra/handoff-manager.js').HandoffManager} HandoffManager
+ *
  * @typedef {import('../dialog/loop-manager.js').DialogLoopManager} DialogLoopManager
  */
 
