@@ -40,6 +40,7 @@ import { getHubSessionId } from '../terminal/state.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 import { AGENT_EVENTS } from '#copilot/core/events';
+import { handleUserInputRequest } from './dialog/user-input-handler.js';
 import { wireDialogLoopEvents } from './dialog/loop-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { PermissionController } from './infra/permission-controller.js';
@@ -1273,7 +1274,16 @@ export class AlwaysAliveAgent extends EventEmitter {
         const { session, isResumed } = await initOrResumeSession(client, {
             model: this.#model,
             onPermissionRequest: this.#permissions.handler,
-            onUserInputRequest: this.#handleUserInputRequest.bind(this),
+            onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
+                handleUserInputRequest(input, {
+                    isDialogLoopActive: () => this.#dialogLoop.active,
+                    handleProtocolInput: (q) => this.#dialogLoop.handleProtocolInput(q),
+                    setStatus: (s) => this.#setStatus(s),
+                    setPendingQuestion: (pq) => {
+                        this.#pendingQuestion = pq;
+                    },
+                    emit: (event, payload) => this.emit(event, payload),
+                }),
             hooks: busHooks,
             tools,
             mcpServers: buildMcpConfig(),
@@ -1325,85 +1335,6 @@ export class AlwaysAliveAgent extends EventEmitter {
         } finally {
             this.#isReconnecting = false;
         }
-    }
-
-    /**
-     * Handler chamado pelo SDK quando o modelo usa a ferramenta `ask_user`.
-     *
-     * Delega para o handler especializado conforme o modo ativo:
-     *
-     * - Se dialog loop ativo: intercepta o protocolo READY/REPLY/STOPPED via DLM.
-     * - Caso contrário: suspende a execução até `answerPendingQuestion()` ser chamado via API HTTP.
-     *
-     * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
-     * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
-     */
-    async #handleUserInputRequest({ question, choices, allowFreeform }) {
-        log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
-
-        if (this.#dialogLoop.active) {
-            return this.#handleDialogLoopInput({ question, allowFreeform });
-        }
-        return this.#handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform });
-    }
-
-    /**
-     * Handler de protocolo no modo dialog loop.
-     *
-     * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução aguardando
-     * `answerPendingQuestion()` — necessário para fechar o ciclo `ask_user` do SDK.
-     *
-     * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync de pendingQuestion para
-     * evitar I/O desnecessário em cada turno do dialog loop.
-     *
-     * @param {{ question: string; allowFreeform: boolean }} input
-     * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
-     */
-    #handleDialogLoopInput({ question, allowFreeform }) {
-        // Classifica e emite eventos READY/REPLY/STOPPED via DLM — propaga para always-alive via listener
-        this.#dialogLoop.handleProtocolInput({ question });
-
-        // F44.3: detectar protocolo para skip de I/O de estado
-        const isProtocolMessage =
-            question.startsWith('READY') || question.startsWith('REPLY:') || question.startsWith('STOPPED');
-
-        // Suspende via handleInteractiveQuestion mas pula persist de pendingQuestion para protocolo
-        return this.#handleInteractiveQuestion({ question, allowFreeform, skipPersist: isProtocolMessage });
-    }
-
-    /**
-     * Handler para pergunta interativa normal (fora do dialog loop).
-     *
-     * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP. Define
-     * `status='waiting_for_input'` e persiste a pergunta no estado para recovery após restart.
-     *
-     * @param {{ question: string; choices?: string[]; allowFreeform: boolean; skipPersist?: boolean }} input
-     * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
-     */
-    #handleInteractiveQuestion({ question, choices, allowFreeform, skipPersist = false }) {
-        this.#setStatus('waiting_for_input');
-        // F44.3: pular persist para mensagens de protocolo do dialog loop (READY/REPLY/STOPPED)
-        if (!skipPersist) {
-            persistState({ pendingQuestion: question }, '[AlwaysAlive] writeState pendingQuestion');
-        }
-
-        return new Promise((resolve) => {
-            /** @type {PendingQuestion} */
-            const pq = {
-                question,
-                allowFreeform,
-                askedAt: Date.now(),
-                ...(choices !== undefined && { choices }),
-                resolve: (/** @type {string} */ answer) => {
-                    this.#setStatus('processing');
-                    resolve({ answer, wasFreeform: true });
-                },
-            };
-            this.#pendingQuestion = pq;
-            // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
-            persistState({ pendingQuestion: question, lastAskUserAt: Date.now() }, '[AlwaysAlive] lastAskUserAt');
-            this.emit('question.pending', { question, choices, allowFreeform });
-        });
     }
 
     /**

@@ -15,3 +15,4 @@ export {
     waitForRestartAndReply,
 } from './turn-executor.js';
 export { DialogWatchdog, WATCHDOG_THRESHOLDS } from './watchdog.js';
+export { handleUserInputRequest } from './user-input-handler.js';
