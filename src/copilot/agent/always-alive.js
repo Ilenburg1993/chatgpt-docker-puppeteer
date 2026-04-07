@@ -25,15 +25,14 @@ import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
-import { AGENT_EVENTS } from '#copilot/core/events';
-import { MAX_LISTENERS, STATUS_SNAPSHOT_TTL_MS } from './config.js';
+
+import { MAX_LISTENERS } from './config.js';
 import {
     ensureDialogLoopAttached as dialogEnsureAttached,
     dialogResume,
     dialogStart,
     dialogStop,
 } from './dialog/agent-dialog-controller.js';
-import { buildStatusSnapshot } from './infra/status-snapshot.js';
 import { executeTask } from './infra/task-executor.js';
 import { readState } from './lifecycle/state-io.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
@@ -47,6 +46,11 @@ import {
     steerMessage as msgSteer,
     answerPendingQuestion as msgAnswer,
 } from './messaging/agent-messaging.js';
+// F39: State — getStatusSnapshot, listenerDiagnostics
+import {
+    getStatusSnapshot as stateSnapshot,
+    listenerDiagnostics as stateDiagnostics,
+} from './state/agent-state.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -445,50 +449,16 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
-        // Dirty flag: cache não-nulo significa que nenhuma mutação ocorreu desde a última construção.
-        // TTL safety net: invalida após AGENT_STATUS_SNAPSHOT_TTL_MS para cenários extremos.
-        if (this.ctx.statusSnapshotCache) {
-            const age = Date.now() - this.ctx.statusSnapshotCache.at;
-            if (age < STATUS_SNAPSHOT_TTL_MS) {
-                return this.ctx.statusSnapshotCache.snapshot;
-            }
-            // TTL expirado — forçar rebuild como safety net
-            this.ctx.statusSnapshotCache = null;
-        }
-        const state = readState();
-        const snapshot = buildStatusSnapshot({
-            status: this.ctx.status,
-            sessionId: this.sessionId,
-            model: this.ctx.model,
-            reasoningEffort: this.ctx.reasoningEffort,
-            queueSize: this.ctx.messageQueue.size,
-            queueOldest: this.ctx.messageQueue.oldest,
-            pendingQuestion: this.ctx.pendingQuestion,
-            isResumed: this.ctx.isResumed,
-            resumeCount: state?.resumeCount ?? 0,
-            sendCount: this.ctx.sendCount,
-            startedAt: state?.startedAt ?? null,
-            contextWindow: this.ctx.contextState,
-            lastCheckpointPath: this.ctx.lastCheckpointPath,
-            permissionMode: this.ctx.permissions.getMode(),
-        });
-        this.ctx.statusSnapshotCache = { snapshot, at: Date.now() };
-        return snapshot;
+        return stateSnapshot(this.ctx, this);
     }
 
     /**
      * Retorna contagem de listeners por evento para diagnóstico de leaks.
      *
-     * @returns {{ [event: string]: number }} Mapa evento → contagem de listeners
-     * @internal Uso exclusivo em NODE_ENV=development e testes. Não expor como API pública de produção.
+     * @returns {{ [event: string]: number }}
      */
     listenerDiagnostics() {
-        /** @type {{ [event: string]: number }} */
-        const result = {};
-        for (const evt of AGENT_EVENTS) {
-            result[evt] = this.listenerCount(evt);
-        }
-        return result;
+        return stateDiagnostics(this);
     }
 
     /**
