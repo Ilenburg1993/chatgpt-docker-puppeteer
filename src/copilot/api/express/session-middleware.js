@@ -8,6 +8,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { z } from 'zod';
 
 /**
  * @typedef {import('express').Request} Req
@@ -86,3 +87,72 @@ export async function withErrorHandler(req, res, fn) {
         }
     }
 }
+
+/**
+ * F95: Middleware factory que valida req.body contra um schema Zod.
+ *
+ * Se a validação falhar, retorna 400 com detalhes. Se suceder, anexa o body validado
+ * a `req.body` (substituindo o original) e prossegue para o handler.
+ *
+ * @param {import('zod').ZodType} schema - Schema Zod para validar req.body
+ * @returns {import('express').RequestHandler}
+ */
+export function validateBody(schema) {
+    return (req, res, next) => {
+        const result = schema.safeParse(req.body);
+        if (!result.success) {
+            const zodError = /** @type {{ issues?: Array<{ path: (string|number)[]; message: string }> }} */ (
+                /** @type {unknown} */ (result.error)
+            );
+            return res.status(400).json({
+                ok: false,
+                error: 'Corpo da requisição inválido.',
+                details: zodError.issues?.map((i) => ({
+                    path: i.path.join('.'),
+                    message: i.message,
+                })) ?? [],
+            });
+        }
+        req.body = result.data;
+        return next();
+    };
+}
+
+// ─── F95: Schemas para endpoints de sessão ────────────────────────────────────
+
+/** Schema para POST /sessions body */
+export const CreateSessionBodySchema = z.object({
+    model: z.string(),
+    sessionId: z.string().optional(),
+    systemMessage: z.unknown().optional(),
+    infiniteSessions: z.unknown().optional(),
+    workingDirectory: z.string().optional(),
+    streaming: z.boolean().optional(),
+    provider: z.unknown().optional(),
+    reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    availableTools: z.array(z.string()).optional(),
+    excludedTools: z.array(z.string()).optional(),
+    customAgents: z.array(z.unknown()).optional(),
+    clientName: z.string().optional(),
+});
+
+/** Schema para POST /sessions/:id/send body */
+export const SendMessageBodySchema = z.object({
+    prompt: z.string().min(1),
+    waitForResponse: z.boolean().optional(),
+    timeoutMs: z.number().positive().finite().optional(),
+    attachments: z.array(z.unknown()).optional(),
+    mode: z.enum(['immediate', 'enqueue']).optional(),
+});
+
+/** Schema para POST /sessions/:id/model body */
+export const SetModelBodySchema = z.object({
+    model: z.string(),
+});
+
+/** Schema para POST /sessions/:id/resume body */
+export const ResumeSessionBodySchema = z
+    .object({
+        model: z.string().optional(),
+    })
+    .optional();

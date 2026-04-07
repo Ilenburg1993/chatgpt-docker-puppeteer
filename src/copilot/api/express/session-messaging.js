@@ -15,7 +15,7 @@ import {
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
-import { rateLimitMiddleware, validateModel, withErrorHandler } from './session-middleware.js';
+import { rateLimitMiddleware, validateModel, withErrorHandler, validateBody, SendMessageBodySchema, SetModelBodySchema } from './session-middleware.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -56,7 +56,7 @@ const MAX_PROMPT_BYTES = 512_000;
  * Quando waitForResponse=true, aguarda a resposta completa do modelo (blocking). Quando waitForResponse=false,
  * enfileira e retorna imediatamente (messageId).
  */
-router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), (req, res) => {
+router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), validateBody(SendMessageBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
         const id = /** @type {string} */ (req.params['id']);
         const { prompt, waitForResponse = true, attachments } = req.body ?? {};
@@ -209,7 +209,7 @@ router.get('/sessions/:id/stream', (req, res) => {
  *
  * Body: { "model": "claude-sonnet-4-5" }
  */
-router.post('/sessions/:id/model', (req, res) => {
+router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
         const { model } = req.body ?? {};

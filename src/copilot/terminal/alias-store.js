@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { AliasConfigSchema } from '../core/schemas.js';
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
@@ -39,10 +40,10 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 /**
  * Carrega aliases customizados do arquivo JSON. Mescla com built-ins (custom tem precedência).
  *
+ * @deprecated F93: Use loadAliasesAsync() em fluxos assíncronos.
  * @example
  *     loadAliases(); // carrega de .copilot-aliases.json
  *
- * @deprecated F93: Use loadAliasesAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadAliases() {
@@ -84,8 +85,14 @@ function saveCustomAliases() {
 export async function loadAliasesAsync() {
     try {
         const raw = await readFile(ALIASES_FILE, 'utf8');
-        const custom = JSON.parse(raw);
-        _aliases = { ...BUILTIN_ALIASES, ...custom };
+        const jsonData = JSON.parse(raw);
+        const result = AliasConfigSchema.safeParse(jsonData);
+        if (result.success && result.data) {
+            const custom = /** @type {Record<string, string>} */ (/** @type {unknown} */ (result.data));
+            _aliases = { ...BUILTIN_ALIASES, ...custom };
+        } else {
+            _aliases = { ...BUILTIN_ALIASES };
+        }
     } catch {
         _aliases = { ...BUILTIN_ALIASES };
     }

@@ -20,6 +20,7 @@ import { buildTool } from '#copilot/tools/tool-factory';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { CustomToolsFileSchema } from '../core/schemas.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const CUSTOM_TOOLS_PATH = join(resolve(import.meta.dirname, '../..'), 'custom-tools.json');
@@ -188,26 +189,14 @@ function persistCustomTools() {
 export async function loadCustomToolsAsync() {
     try {
         const raw = await readFile(CUSTOM_TOOLS_PATH, 'utf8');
-        const items = /** @type {unknown} */ (JSON.parse(raw));
-        if (!Array.isArray(items)) return;
-        _registry = new Map(
-            items
-                .filter(
-                    (/** @type {unknown} */ item) =>
-                        item &&
-                        typeof item === 'object' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['name']) === 'string' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['description']) === 'string' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['handlerId']) === 'string',
-                )
-                .map(
-                    (/** @type {unknown} */ item) =>
-                        /** @type {[string, CustomToolDefinition]} */ ([
-                            /** @type {string} */ (/** @type {Record<string, unknown>} */ (item)['name']),
-                            /** @type {CustomToolDefinition} */ (item),
-                        ]),
-                ),
-        );
+        const jsonData = /** @type {unknown} */ (JSON.parse(raw));
+        const result = CustomToolsFileSchema.safeParse(jsonData);
+        if (!result.success || !result.data) {
+            log('WARN', '[custom-tools-registry] custom-tools.json schema inválido — registry vazio.');
+            return;
+        }
+        const items = result.data;
+        _registry = new Map(items.map((item) => [item.name, item]));
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
     } catch {
         // Arquivo não existe ou JSON inválido — registry vazio

@@ -30,6 +30,7 @@ import { BridgeError } from '#copilot/core';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
 import http from 'node:http';
+import { HealthResponseSchema } from '../core/schemas.js';
 
 /** Porta padrão do terminal LLM-B. GAP-CHAN-002: validação de range. */
 const DEFAULT_PORT = (() => {
@@ -43,6 +44,40 @@ const DEFAULT_PORT = (() => {
 
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
+
+// ─── F96: Client-side rate limiter (sliding window) ───────────────────────────
+
+/**
+ * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC.
+ * Default: 30 req/s. Protege contra flood acidental.
+ */
+const INJECT_RATE_PER_SEC = (() => {
+    const raw = parseInt(process.env['INJECT_RATE_LIMIT_PER_SEC'] ?? '', 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 30;
+})();
+
+/** @type {number[]} Timestamps das últimas injeções (sliding window). */
+const _injectTimestamps = [];
+
+/**
+ * Verifica se a próxima injeção é permitida pelo rate limiter client-side.
+ * Usa sliding window de 1s.
+ *
+ * @returns {boolean} true se permitido
+ */
+function _checkClientRateLimit() {
+    const now = Date.now();
+    const windowStart = now - 1_000;
+    // Purga entradas expiradas (de trás para frente para eficiência com array ordenado)
+    while (_injectTimestamps.length > 0 && (_injectTimestamps[0] ?? 0) < windowStart) {
+        _injectTimestamps.shift();
+    }
+    if (_injectTimestamps.length >= INJECT_RATE_PER_SEC) {
+        return false;
+    }
+    _injectTimestamps.push(now);
+    return true;
+}
 
 /**
  * @typedef {Object} InjectOpts
@@ -143,7 +178,9 @@ export async function checkLlmBHealth(opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
     try {
         const { body } = await httpRequest('GET', '/health', null, port, 5_000);
-        const parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
+        const raw = JSON.parse(body);
+        const result = HealthResponseSchema.safeParse(raw);
+        const parsed = result.success && result.data ? result.data : /** @type {Record<string, unknown>} */ (raw);
         return {
             ok: parsed['ok'] === true,
             ready: parsed['dialogLoopActive'] === true,
@@ -177,6 +214,14 @@ export async function injectToLlmB(message, opts = {}) {
     const maxRetries = opts.retries ?? 3;
     const retryDelayMs = opts.retryDelayMs ?? 1_500;
     const retryOn503 = opts.retryOn503 ?? false;
+
+    // F96: client-side rate limiting — rejeitar antes de enviar ao servidor
+    if (!_checkClientRateLimit()) {
+        throw new BridgeError(
+            `[inject-llmb] Rate limit client-side excedido (${INJECT_RATE_PER_SEC} req/s). Aguarde antes de reenviar.`,
+            'LLM_B_RATE_LIMITED',
+        );
+    }
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {

@@ -15,6 +15,7 @@ import { log } from '#copilot/observability/logger';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { ToolsConfigSchema } from '../core/schemas.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-config.json');
@@ -78,19 +79,17 @@ function persistToolsConfig() {
 export async function loadToolsConfigAsync() {
     try {
         const raw = await readFile(TOOLS_CONFIG_PATH, 'utf8');
-        const parsed = /** @type {unknown} */ (JSON.parse(raw));
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            const data = /** @type {Record<string, unknown>} */ (parsed);
-            const allowlist =
-                data['allowlist'] === null || Array.isArray(data['allowlist'])
-                    ? /** @type {string[] | null} */ (data['allowlist'])
-                    : null;
-            const denylist = Array.isArray(data['denylist']) ? /** @type {string[]} */ (data['denylist']) : [];
-            _toolsConfig = { allowlist, denylist };
+        const jsonData = /** @type {unknown} */ (JSON.parse(raw));
+        const result = ToolsConfigSchema.safeParse(jsonData);
+        if (result.success && result.data) {
+            _toolsConfig = { allowlist: result.data.allowlist, denylist: result.data.denylist };
+            const { allowlist, denylist } = _toolsConfig;
             log(
                 'INFO',
                 `[tools-state] Configuração carregada (async): ${allowlist ? allowlist.length + ' ferramentas na allowlist' : 'sem allowlist'}, ${denylist.length} na denylist`,
             );
+        } else {
+            log('WARN', '[tools-state] tools-config.json schema inválido — mantendo defaults.');
         }
     } catch {
         // Arquivo não existe ou JSON inválido — manter defaults

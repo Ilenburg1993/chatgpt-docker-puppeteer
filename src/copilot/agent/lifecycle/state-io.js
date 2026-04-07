@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../config.js';
+import { AliveAgentStateSchema } from '../../core/schemas.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
@@ -85,8 +86,8 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
  *
  * Retorna o cache in-process quando disponível, evitando I/O síncrono no hot path.
  *
- * @deprecated F91: Use readStateAsync() em vez desta versão síncrona. readState() será mantida para
- *   callers em getters síncronos que não podem ser migrados facilmente.
+ * @deprecated F91: Use readStateAsync() em vez desta versão síncrona. readState() será mantida para callers em getters
+ *   síncronos que não podem ser migrados facilmente.
  * @example
  *     const state = readState();
  *     if (state) console.log(state.sessionId);
@@ -224,12 +225,13 @@ export async function readStateAsync() {
     }
     try {
         const raw = await readFile(STATE_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            log('WARN', '[PersistentSession] Estado inválido (não é objeto) — ignorando ficheiro.');
+        const jsonData = JSON.parse(raw);
+        const result = AliveAgentStateSchema.safeParse(jsonData);
+        if (!result.success) {
+            log('WARN', '[PersistentSession] Estado inválido (schema validation failed) — ignorando ficheiro.');
             return null;
         }
-        _stateCache = /** @type {AliveAgentState} */ (parsed);
+        _stateCache = /** @type {AliveAgentState} */ (result.data);
         return _stateCache;
     } catch (/** @type {any} */ e) {
         log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);

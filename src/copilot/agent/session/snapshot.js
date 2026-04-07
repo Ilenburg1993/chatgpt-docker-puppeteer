@@ -16,6 +16,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
 import { readState } from '../lifecycle/state-io.js';
+import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
@@ -249,7 +250,13 @@ export async function listSnapshotsAsync() {
         if (!f.endsWith('.json')) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
-            const data = JSON.parse(await readFile(filepath, 'utf8'));
+            const raw = JSON.parse(await readFile(filepath, 'utf8'));
+            const parsed = SnapshotListItemSchema.safeParse(raw);
+            if (!parsed.success) {
+                log('WARN', `[SessionSnapshot] Snapshot inválido (${f}): schema validation failed`);
+                continue;
+            }
+            const data = parsed.data;
             result.push({
                 snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
                 createdAt: Number(data.createdAt ?? 0),
@@ -282,14 +289,18 @@ export async function loadSnapshotAsync(snapshotId) {
         const first = files[0];
         if (!first) return null;
         try {
-            return JSON.parse(await readFile(join(SNAPSHOT_DIR, first), 'utf8'));
+            const raw = JSON.parse(await readFile(join(SNAPSHOT_DIR, first), 'utf8'));
+            const parsed = SessionSnapshotDataSchema.safeParse(raw);
+            return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
         } catch {
             return null;
         }
     }
 
     try {
-        return JSON.parse(await readFile(filepath, 'utf8'));
+        const raw = JSON.parse(await readFile(filepath, 'utf8'));
+        const parsed = SessionSnapshotDataSchema.safeParse(raw);
+        return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
     } catch {
         return null;
     }

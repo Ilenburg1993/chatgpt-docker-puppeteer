@@ -21,7 +21,7 @@ import {
 import { pickDefined } from '#copilot/sdk/utils';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
-import { rateLimitMiddleware, validateModel, withErrorHandler } from './session-middleware.js';
+import { rateLimitMiddleware, validateModel, withErrorHandler, validateBody, CreateSessionBodySchema, ResumeSessionBodySchema } from './session-middleware.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -146,7 +146,7 @@ router.get('/sessions', (req, res) => {
  * }
  * ```
  */
-router.post('/sessions', rateLimitMiddleware(10, 'create_session'), (req, res) => {
+router.post('/sessions', rateLimitMiddleware(10, 'create_session'), validateBody(CreateSessionBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
         const {
             model,
@@ -324,7 +324,7 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  * }
  * ```
  */
-router.post('/sessions/:id/resume', (req, res) => {
+router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
         const { model } = req.body ?? {};
