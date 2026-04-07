@@ -14,6 +14,7 @@
  * @see module:copilot/config/session-config
  */
 
+import { buildAuditingPermissionHandler } from '#copilot/audit/pipeline';
 import { buildCustomAgentsConfig } from '#copilot/config/custom-agents';
 import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
@@ -27,7 +28,6 @@ import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES, SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
-import { buildAuditingPermissionHandler } from '#copilot/audit/pipeline';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 
 /**

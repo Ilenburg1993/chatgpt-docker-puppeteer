@@ -8,6 +8,7 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
 import {
     BUILTIN_HANDLER_MAP,
@@ -25,7 +26,6 @@ import { gitLog, gitStatus } from '../bridges/git-bridge.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { conversationStore } from '../conversation-hub/store.js';
-import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { defaultErrorTracker } from '../observability/error-tracker.js';
 import { defaultMetrics } from '../observability/metrics.js';
 import { getStatsByCategory, getToolStats } from '../observability/tool-stats.js';

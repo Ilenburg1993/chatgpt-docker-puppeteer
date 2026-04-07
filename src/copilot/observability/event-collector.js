@@ -18,8 +18,8 @@
  * @module copilot/observability/event-collector
  */
 
-import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
 import { globalAuditBuffer } from '#copilot/audit/pipeline';
+import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

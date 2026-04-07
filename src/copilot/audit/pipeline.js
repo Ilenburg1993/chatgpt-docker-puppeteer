@@ -11,6 +11,7 @@
  * @module copilot/audit/pipeline
  */
 
+import { TOOL_AUDIT_MAX_LOG_BYTES } from '#copilot/agent/config';
 import {
     COPILOT_AUDIT_BUFFER_SIZE,
     COPILOT_AUDIT_LOG_PATH,
@@ -18,7 +19,6 @@ import {
     COPILOT_HIGH_RISK_TOOLS,
     COPILOT_TOOL_PERMISSIONS_LOG,
 } from '#copilot/config/env';
-import { TOOL_AUDIT_MAX_LOG_BYTES } from '#copilot/agent/config';
 import { defaultBus } from '#copilot/hooks/bus';
 import { LOG_DIR, log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
@@ -109,7 +109,7 @@ const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
  * Lê as últimas N linhas de um arquivo JSONL sem carregar o arquivo inteiro em memória.
  *
  * @param {string} filePath
- * @param {number} [n=50]
+ * @param {number} [n=50] Default is `50`
  * @returns {Promise<string[]>}
  */
 async function readLastNLines(filePath, n = 50) {
@@ -269,7 +269,7 @@ export function createAuditLog(opts = {}) {
     }
 
     /**
-     * @param {number} [n=50]
+     * @param {number} [n=50] Default is `50`
      * @returns {AuditEntry[]}
      */
     function getLast(n = 50) {
@@ -353,7 +353,7 @@ export function createAuditLog(opts = {}) {
 
     /**
      * @param {string | null} [sessionId]
-     * @param {number} [limit=50]
+     * @param {number} [limit=50] Default is `50`
      * @returns {Promise<object[]>}
      */
     async function getAuditSummary(sessionId, limit = 50) {
