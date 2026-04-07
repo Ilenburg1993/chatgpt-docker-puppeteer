@@ -41,16 +41,13 @@ import { AgentContext } from './agent-context.js';
 import { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
 // F38: Messaging — sendMessage, steerMessage, answerPendingQuestion
 import {
+    answerPendingQuestion as msgAnswer,
     sendMessage as msgSend,
     sendMessageDialogBoot as msgSendBoot,
     steerMessage as msgSteer,
-    answerPendingQuestion as msgAnswer,
 } from './messaging/agent-messaging.js';
 // F39: State — getStatusSnapshot, listenerDiagnostics
-import {
-    getStatusSnapshot as stateSnapshot,
-    listenerDiagnostics as stateDiagnostics,
-} from './state/agent-state.js';
+import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession

@@ -4,8 +4,8 @@
  *
  * F38: Lógica de envio e recebimento de mensagens — extraída de always-alive.js.
  *
- * Funções para enfileirar mensagens, responder perguntas pendentes e enviar
- * steering messages. Opera sobre o AgentContext e emite eventos via host.
+ * Funções para enfileirar mensagens, responder perguntas pendentes e enviar steering messages. Opera sobre o
+ * AgentContext e emite eventos via host.
  *
  * @module copilot/agent/messaging/agent-messaging
  * @internal
@@ -13,11 +13,12 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
-import { persistState } from '../lifecycle/state-io.js';
 import { resolveUserInput as hookToolsResolveUserInput } from '../../tools/hook-tools.js';
+import { persistState } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
+ *
  * @typedef {import('../always-alive.js').AgentTask} AgentTask
  */
 
@@ -65,7 +66,11 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
  * @param {string} message
- * @param {{ timeoutMs?: number; attachments?: import('@github/copilot-sdk').MessageOptions['attachments']; signal?: AbortSignal }} [opts]
+ * @param {{
+ *     timeoutMs?: number;
+ *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+ *     signal?: AbortSignal;
+ * }} [opts]
  * @returns {Promise<string>}
  */
 export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal } = {}) {
@@ -94,8 +99,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal
 }
 
 /**
- * Variante interna de sendMessage() para o DialogLoopManager (boot prompt).
- * Bypassa o guard de dialog loop ativo.
+ * Variante interna de sendMessage() para o DialogLoopManager (boot prompt). Bypassa o guard de dialog loop ativo.
  *
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
