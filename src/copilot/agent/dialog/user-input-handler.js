@@ -13,7 +13,7 @@ import { log } from '#copilot/observability/logger';
 import { persistState } from '../lifecycle/state-io.js';
 
 /**
- * @typedef {import('../always-alive.js').PendingQuestion} PendingQuestion
+ * @typedef {import('../types.js').PendingQuestion} PendingQuestion
  */
 
 /**
@@ -22,7 +22,7 @@ import { persistState } from '../lifecycle/state-io.js';
  * @typedef {Object} UserInputContext
  * @property {() => boolean} isDialogLoopActive — true se dialog loop está ativo
  * @property {(input: { question: string }) => void} handleProtocolInput — DLM.handleProtocolInput
- * @property {(status: import('../always-alive.js').AgentStatus) => void} setStatus — #setStatus
+ * @property {(status: import('../types.js').AgentStatus) => void} setStatus — #setStatus
  * @property {(pq: PendingQuestion | null) => void} setPendingQuestion — #pendingQuestion setter
  * @property {(event: string, payload?: unknown) => boolean} emit — EventEmitter.emit
  */

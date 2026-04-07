@@ -276,92 +276,92 @@ para módulos puros testáveis.
 
 ### 7.2 always-alive.js — Análise Método-a-Método
 
-| Método                       | Linhas | Campos #private acessados | Domínio       |
-| ---------------------------- | ------ | ------------------------- | ------------- |
-| `stop()`                     | 150    | 17                        | Lifecycle     |
-| `start()`                    | 101    | 17                        | Lifecycle     |
-| `#initSession()`             | 73     | 11                        | Session       |
-| `#ensureDialogLoopAttached()`| 52     | 4                         | Dialog        |
-| `#tryReconnect()`            | 39     | 6                         | Session       |
-| `getStatusSnapshot()`        | 38     | 11                        | Status        |
-| `startDialogLoop()`          | 37     | 5                         | Dialog        |
-| `#processQueue()`            | 35     | 9                         | Queue         |
-| `sendMessage()`              | 33     | 2                         | Messaging     |
-| `answerPendingQuestion()`    | 26     | 1                         | Input         |
-| `#enqueueTask()`             | 25     | 1                         | Queue         |
-| 22 getters/setters           | ~250   | 1-3 cada                  | Config/Status |
-| Campos + JSDoc + imports     | ~370   | (declarações)             | Infra         |
-| **TOTAL**                    |**1348**|                           |               |
+| Método                        | Linhas   | Campos #private acessados | Domínio       |
+| ----------------------------- | -------- | ------------------------- | ------------- |
+| `stop()`                      | 150      | 17                        | Lifecycle     |
+| `start()`                     | 101      | 17                        | Lifecycle     |
+| `#initSession()`              | 73       | 11                        | Session       |
+| `#ensureDialogLoopAttached()` | 52       | 4                         | Dialog        |
+| `#tryReconnect()`             | 39       | 6                         | Session       |
+| `getStatusSnapshot()`         | 38       | 11                        | Status        |
+| `startDialogLoop()`           | 37       | 5                         | Dialog        |
+| `#processQueue()`             | 35       | 9                         | Queue         |
+| `sendMessage()`               | 33       | 2                         | Messaging     |
+| `answerPendingQuestion()`     | 26       | 1                         | Input         |
+| `#enqueueTask()`              | 25       | 1                         | Queue         |
+| 22 getters/setters            | ~250     | 1-3 cada                  | Config/Status |
+| Campos + JSDoc + imports      | ~370     | (declarações)             | Infra         |
+| **TOTAL**                     | **1348** |                           |               |
 
 ### 7.3 Campos #private — Mapa de Referências
 
 **32 campos privados** com 176 acessos `this.#`:
 
-| Campo                        | Refs | Cluster            | Papel                           |
-| ---                          | ---  | ---                | ---                             |
-| `#dialogLoop`                | 25   | Dialog             | FSM do dialog loop              |
-| `#status`                    | 22   | State              | Estado do agente                |
-| `#session`                   | 19   | SDK                | Sessão SDK ativa                |
-| `#model`                     | 10   | Config             | Modelo LLM                      |
-| `#messageQueue`              | 8    | Queue              | Fila de tarefas                 |
-| `#statusSnapshotCache`       | 8    | State              | Cache do snapshot               |
-| `#pendingQuestion`           | 8    | Input              | Pergunta pendente               |
-| `#client`                    | 7    | SDK                | Cliente SDK                     |
-| `#setStatus`                 | 7    | State              | Mutador de status               |
-| `#agentObserver`             | 6    | Observability      | Observer de métricas            |
-| `#reasoningEffort`           | 5    | Config             | Nível de reasoning              |
-| `#keepalive`                 | 5    | Infra              | Heartbeat de sessão             |
-| `#sessionEventUnsubscribers` | 5    | SDK                | Cleanup de listeners            |
-| `#sendCount`                 | 5    | Counters           | Contador de sends               |
-| `#permissions`               | 4    | Config             | Controller de permissões        |
-| `#webhooks`                  | 4    | Config             | Webhook manager                 |
-| `#contextState`              | 4    | Observability      | Uso de tokens atual             |
-| `#metricsTimer`              | 4    | Infra              | Timer periódico de métricas     |
-| `#mcpReconnectCancel`        | 4    | Infra              | Cancel de reconnect MCP         |
-| `#dialogLoopAttached`        | 4    | Dialog             | Flag de idempotência            |
-| `#toolsRegistry`             | 3    | Config             | Registry de tools               |
-| `#lastPrInfo`                | 3    | Counters           | Último billing info             |
-| `#messagesCache`             | 3    | Cache              | Cache de mensagens              |
-| `#isReconnecting`            | 3    | SDK                | Flag de reconexão               |
-| `#processQueue`              | 2    | Queue              | Método ref (MessageQueue cb)    |
-| `#handoff`                   | 2    | Infra              | Handoff manager                 |
-| `#initSession`               | 2    | Session            | Método ref (tryReconnect)       |
-| `#lastCheckpointPath`        | 2    | Counters           | Último checkpoint               |
-| `#ensureDialogLoopAttached`  | 2    | Dialog             | Método ref                      |
-| `#enqueueTask`               | 2    | Queue              | Método ref                      |
-| `#isResumed`                 | 2    | State              | Flag de resume                  |
-| `#tryReconnect`              | 1    | Session            | Método ref (processQueue cb)    |
+| Campo                        | Refs | Cluster       | Papel                        |
+| ---------------------------- | ---- | ------------- | ---------------------------- |
+| `#dialogLoop`                | 25   | Dialog        | FSM do dialog loop           |
+| `#status`                    | 22   | State         | Estado do agente             |
+| `#session`                   | 19   | SDK           | Sessão SDK ativa             |
+| `#model`                     | 10   | Config        | Modelo LLM                   |
+| `#messageQueue`              | 8    | Queue         | Fila de tarefas              |
+| `#statusSnapshotCache`       | 8    | State         | Cache do snapshot            |
+| `#pendingQuestion`           | 8    | Input         | Pergunta pendente            |
+| `#client`                    | 7    | SDK           | Cliente SDK                  |
+| `#setStatus`                 | 7    | State         | Mutador de status            |
+| `#agentObserver`             | 6    | Observability | Observer de métricas         |
+| `#reasoningEffort`           | 5    | Config        | Nível de reasoning           |
+| `#keepalive`                 | 5    | Infra         | Heartbeat de sessão          |
+| `#sessionEventUnsubscribers` | 5    | SDK           | Cleanup de listeners         |
+| `#sendCount`                 | 5    | Counters      | Contador de sends            |
+| `#permissions`               | 4    | Config        | Controller de permissões     |
+| `#webhooks`                  | 4    | Config        | Webhook manager              |
+| `#contextState`              | 4    | Observability | Uso de tokens atual          |
+| `#metricsTimer`              | 4    | Infra         | Timer periódico de métricas  |
+| `#mcpReconnectCancel`        | 4    | Infra         | Cancel de reconnect MCP      |
+| `#dialogLoopAttached`        | 4    | Dialog        | Flag de idempotência         |
+| `#toolsRegistry`             | 3    | Config        | Registry de tools            |
+| `#lastPrInfo`                | 3    | Counters      | Último billing info          |
+| `#messagesCache`             | 3    | Cache         | Cache de mensagens           |
+| `#isReconnecting`            | 3    | SDK           | Flag de reconexão            |
+| `#processQueue`              | 2    | Queue         | Método ref (MessageQueue cb) |
+| `#handoff`                   | 2    | Infra         | Handoff manager              |
+| `#initSession`               | 2    | Session       | Método ref (tryReconnect)    |
+| `#lastCheckpointPath`        | 2    | Counters      | Último checkpoint            |
+| `#ensureDialogLoopAttached`  | 2    | Dialog        | Método ref                   |
+| `#enqueueTask`               | 2    | Queue         | Método ref                   |
+| `#isResumed`                 | 2    | State         | Flag de resume               |
+| `#tryReconnect`              | 1    | Session       | Método ref (processQueue cb) |
 
 ### 7.4 Clusters de Coesão
 
-| Cluster        | Campos | Refs | Descrição                          |
-| -------------- | ------ | ---- | ---------------------------------- |
-| **Dialog**     | 4      | 33   | dialogLoop, dialogLoopAttached, pendingQuestion (parcial) |
-| **SDK/Session**| 4      | 34   | session, client, sessionEventUnsubscribers, isReconnecting |
-| **State**      | 3      | 32   | status, statusSnapshotCache, isResumed |
-| **Config**     | 6      | 19   | model, reasoningEffort, permissions, webhooks, toolsRegistry, handoff |
-| **Queue**      | 2      | 10   | messageQueue, enqueueTask          |
-| **Infra**      | 4      | 15   | keepalive, metricsTimer, mcpReconnectCancel, agentObserver |
-| **Counters**   | 4      | 13   | sendCount, contextState, lastPrInfo, lastCheckpointPath |
-| **Cache**      | 1      | 3    | messagesCache                      |
+| Cluster         | Campos | Refs | Descrição                                                             |
+| --------------- | ------ | ---- | --------------------------------------------------------------------- |
+| **Dialog**      | 4      | 33   | dialogLoop, dialogLoopAttached, pendingQuestion (parcial)             |
+| **SDK/Session** | 4      | 34   | session, client, sessionEventUnsubscribers, isReconnecting            |
+| **State**       | 3      | 32   | status, statusSnapshotCache, isResumed                                |
+| **Config**      | 6      | 19   | model, reasoningEffort, permissions, webhooks, toolsRegistry, handoff |
+| **Queue**       | 2      | 10   | messageQueue, enqueueTask                                             |
+| **Infra**       | 4      | 15   | keepalive, metricsTimer, mcpReconnectCancel, agentObserver            |
+| **Counters**    | 4      | 13   | sendCount, contextState, lastPrInfo, lastCheckpointPath               |
+| **Cache**       | 1      | 3    | messagesCache                                                         |
 
 ### 7.5 API Pública — Consumo Externo (excluindo agent/)
 
 Mapeamento de todos os usos do singleton `alwaysAliveAgent` fora do agent/:
 
-| Método/Prop          | Refs externas | Consumidores principais                   |
-| -------------------- | ------------- | ----------------------------------------- |
-| `.on()`/`.off()`     | 48            | nerv-bridge, entry, engine                |
-| `getStatusSnapshot()`| 15            | observability API, engine, handlers       |
-| `dialogLoopActive`   | 14            | engine, handlers                          |
-| `model`              | 9             | engine, output                            |
-| `reasoningEffort`    | 8             | engine, output                            |
-| `status`             | 7             | engine, entry, agent API                  |
-| `lastPrInfo`         | 5             | engine                                    |
-| `start()/stop()`     | 7             | entry, nerv-bridge                        |
-| `pause/resume`       | 8             | nerv-bridge, handlers                     |
-| `sessionId`          | 4             | agent API                                 |
-| `getHandoffManager()`| 4             | handlers                                  |
+| Método/Prop           | Refs externas | Consumidores principais             |
+| --------------------- | ------------- | ----------------------------------- |
+| `.on()`/`.off()`      | 48            | nerv-bridge, entry, engine          |
+| `getStatusSnapshot()` | 15            | observability API, engine, handlers |
+| `dialogLoopActive`    | 14            | engine, handlers                    |
+| `model`               | 9             | engine, output                      |
+| `reasoningEffort`     | 8             | engine, output                      |
+| `status`              | 7             | engine, entry, agent API            |
+| `lastPrInfo`          | 5             | engine                              |
+| `start()/stop()`      | 7             | entry, nerv-bridge                  |
+| `pause/resume`        | 8             | nerv-bridge, handlers               |
+| `sessionId`           | 4             | agent API                           |
+| `getHandoffManager()` | 4             | handlers                            |
 
 **Insight**: O agente é consumido fundamentalmente como:
 1. **Event Source** — EventEmitter (48 refs on/off)
@@ -437,14 +437,14 @@ export class AgentContext {
 
 ### 8.4 Módulos Resultantes
 
-| Módulo                        | Linhas Est. | Responsabilidade                                       |
-| ----------------------------- | ----------- | ------------------------------------------------------ |
-| `always-alive.js` (orquestr.) | ~350        | Constructor, API pública, delegação, exports            |
-| `lifecycle/agent-lifecycle.js`| ~250        | start(), stop(), #initSession()                        |
-| `dialog/agent-dialog.js`      | ~150        | startDialogLoop, stopDialogLoop, pause/resume, ensure  |
-| `messaging/agent-messaging.js`| ~100        | sendMessage, steerMessage, #enqueueTask, #processQueue |
-| `state/agent-state.js`        | ~80         | getStatusSnapshot, #setStatus, getSessionMessages      |
-| `state/agent-context.js`      | ~120        | AgentContext class com todos os campos                  |
+| Módulo                         | Linhas Est. | Responsabilidade                                       |
+| ------------------------------ | ----------- | ------------------------------------------------------ |
+| `always-alive.js` (orquestr.)  | ~350        | Constructor, API pública, delegação, exports           |
+| `lifecycle/agent-lifecycle.js` | ~250        | start(), stop(), #initSession()                        |
+| `dialog/agent-dialog.js`       | ~150        | startDialogLoop, stopDialogLoop, pause/resume, ensure  |
+| `messaging/agent-messaging.js` | ~100        | sendMessage, steerMessage, #enqueueTask, #processQueue |
+| `state/agent-state.js`         | ~80         | getStatusSnapshot, #setStatus, getSessionMessages      |
+| `state/agent-context.js`       | ~120        | AgentContext class com todos os campos                 |
 
 **always-alive.js estimado**: 350L (73% de redução vs 1.348L atual)
 
@@ -460,12 +460,12 @@ A mudança é **puramente interna**: campos #private → AgentContext público (
 
 ### 8.6 Riscos e Mitigações
 
-| Risco | Impacto | Mitigação |
-| ----- | ------- | --------- |
-| AgentContext expõe campos antes privados | Médio — módulos externos podem acessar | `@internal` tag + não exportar no barrel público |
-| Migração de 176 refs `this.#field` → `this.ctx.field` | Alto — muitas mudanças | Fazer em fases incrementais |
-| Módulos extraídos compartilham estado mutável | Baixo — já era assim via this | sem mudança semântica |
-| Testes inexistentes — regressão silenciosa | Alto — sem safety net | lint + typecheck cobrem erros estruturais |
+| Risco                                                 | Impacto                                | Mitigação                                        |
+| ----------------------------------------------------- | -------------------------------------- | ------------------------------------------------ |
+| AgentContext expõe campos antes privados              | Médio — módulos externos podem acessar | `@internal` tag + não exportar no barrel público |
+| Migração de 176 refs `this.#field` → `this.ctx.field` | Alto — muitas mudanças                 | Fazer em fases incrementais                      |
+| Módulos extraídos compartilham estado mutável         | Baixo — já era assim via this          | sem mudança semântica                            |
+| Testes inexistentes — regressão silenciosa            | Alto — sem safety net                  | lint + typecheck cobrem erros estruturais        |
 
 ---
 
@@ -532,7 +532,7 @@ A mudança é **puramente interna**: campos #private → AgentContext público (
 | Métrica                    | Pós-F34 | Alvo Pós-F40     |
 | -------------------------- | ------- | ---------------- |
 | always-alive.js            | 1.348L  | **~350L (-74%)** |
-| God Modules >600L (agent/) | 2       | 1 (loop-mgr)    |
+| God Modules >600L (agent/) | 2       | 1 (loop-mgr)     |
 | Total arquivos agent/      | 31      | ~36              |
 | Total linhas agent/        | 6.790   | ~7.100           |
 | Campos #private em AA      | 32      | ~8               |

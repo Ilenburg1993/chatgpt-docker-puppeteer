@@ -50,7 +50,7 @@ import { wireSessionEvents } from './event-wirer.js';
  *
  * @typedef {Object} BootWiringContext
  * @property {(event: string, payload?: unknown) => boolean} emit — Emitir evento no agente
- * @property {() => import('../always-alive.js').AgentStatusSnapshot} getStatusSnapshot
+ * @property {() => import('../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath — Atualizar checkpoint path
  * @property {(state: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  * @property {(info: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }) => void} onPrInfo

@@ -19,7 +19,7 @@ import { persistState } from '../lifecycle/state-io.js';
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
  *
- * @typedef {import('../always-alive.js').AgentTask} AgentTask
+ * @typedef {import('../types.js').AgentTask} AgentTask
  */
 
 /** @typedef {import('../types.js').MessagingHost} MessagingHost */

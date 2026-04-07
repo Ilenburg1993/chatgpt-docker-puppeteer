@@ -44,7 +44,7 @@ import { createSnapshot, saveSnapshot } from '../session/snapshot.js';
  *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
- * @typedef {import('../always-alive.js').AgentStatus} AgentStatus
+ * @typedef {import('../types.js').AgentStatus} AgentStatus
  */
 
 /** @typedef {import('../types.js').LifecycleHost} LifecycleHost */

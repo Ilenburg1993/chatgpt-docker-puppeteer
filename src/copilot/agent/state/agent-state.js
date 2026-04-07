@@ -26,7 +26,7 @@ import { readState } from '../lifecycle/state-io.js';
  *
  * @param {AgentContext} ctx
  * @param {StateHost} host
- * @returns {import('../always-alive.js').AgentStatusSnapshot}
+ * @returns {import('../types.js').AgentStatusSnapshot}
  */
 export function getStatusSnapshot(ctx, host) {
     if (ctx.statusSnapshotCache) {

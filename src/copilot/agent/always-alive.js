@@ -50,54 +50,15 @@ import {
 import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
- */
-
-/**
- * @typedef {Object} PendingQuestion
- * @property {string} question - Texto da pergunta
- * @property {string[]} [choices] - Opções disponíveis (se houver)
- * @property {boolean} allowFreeform - Se permite resposta livre
- * @property {(answer: string) => void} resolve - Resolver a Promise do SDK
- * @property {number} askedAt - Timestamp em ms
- */
-
-/**
- * @typedef {Object} AgentTask
- * @property {string} id - ID único da tarefa
- * @property {string} message - Mensagem a enviar ao modelo
- * @property {function(string): void} resolve - Callback de resolução
- * @property {function(Error): void} reject - Callback de erro
- * @property {number} enqueuedAt - Timestamp em ms
- * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
- *   seleções) a enviar junto com a mensagem.
- */
-
-/**
- * @typedef {'idle' | 'processing' | 'waiting_for_input' | 'starting' | 'stopped'} AgentStatus
- */
-
-/**
- * Snapshot do estado atual do agente retornado por `getStatusSnapshot()`.
+ * @typedef {import('./types.js').CopilotSession} CopilotSession
  *
- * @typedef {Object} AgentStatusSnapshot
- * @property {string} status - Estado atual do agente
- * @property {string | null} sessionId - ID da sessão ativa
- * @property {string} model - Modelo ativo
- * @property {string | undefined} reasoningEffort - Nível de esforço de ragionamento
- * @property {number} queueSize - Número de tarefas na fila
- * @property {number} oldestTaskWaitMs - Tempo de espera da tarefa mais antiga em ms
- * @property {boolean} starvationAlert - true se há tarefa esperando > 60s
- * @property {object | null} pendingQuestion - Pergunta pendente do modelo (ou null)
- * @property {boolean} isResumed - true se a sessão foi retomada
- * @property {number} resumeCount - Número de retomadas desde o início
- * @property {number} sendCount - Total de mensagens enviadas
- * @property {number | null} startedAt - Epoch ms do início da sessão
- * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Dados reais de uso de
- *   contexto do SDK (ou null se não disponível)
- * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
- * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
+ * @typedef {import('./types.js').PendingQuestion} PendingQuestion
+ *
+ * @typedef {import('./types.js').AgentTask} AgentTask
+ *
+ * @typedef {import('./types.js').AgentStatus} AgentStatus
+ *
+ * @typedef {import('./types.js').AgentStatusSnapshot} AgentStatusSnapshot
  */
 
 /**

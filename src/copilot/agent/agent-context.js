@@ -29,9 +29,9 @@ import { SessionKeepalive } from './session/keepalive.js';
  *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
- * @typedef {import('./always-alive.js').PendingQuestion} PendingQuestion
+ * @typedef {import('./types.js').PendingQuestion} PendingQuestion
  *
- * @typedef {import('./always-alive.js').AgentStatus} AgentStatus
+ * @typedef {import('./types.js').AgentStatus} AgentStatus
  */
 
 /**
@@ -76,7 +76,7 @@ export class AgentContext {
     /**
      * Cache do status snapshot com dirty flag + TTL.
      *
-     * @type {{ snapshot: import('./always-alive.js').AgentStatusSnapshot; at: number } | null}
+     * @type {{ snapshot: import('./types.js').AgentStatusSnapshot; at: number } | null}
      */
     statusSnapshotCache = null;
 
