@@ -5,14 +5,14 @@
  * Helpers para listagem, roteamento e configuração de modelos do Copilot SDK. Fornece utilitários para selecionar
  * modelos compatíveis, verificar suporte a reasoningEffort e construir opções de sessão model-aware.
  *
- * Uso típico: import { listModels, pickModel, buildReasoningConfig } from '#copilot/lib/models'; const models = await
+ * Uso típico: import { listModels, pickModel, buildReasoningConfig } from '#copilot/sdk/models'; const models = await
  * listModels(client); const best = pickModel(models, { vision: true }); const opts =
  * buildReasoningConfig('claude-sonnet-4-5', 'high');
  *
  * @module copilot/lib/models
  */
 
-import { getClient } from '#copilot/lib/sdk-client';
+import { getClient } from '#copilot/sdk/client';
 
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo

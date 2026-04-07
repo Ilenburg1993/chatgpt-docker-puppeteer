@@ -138,7 +138,7 @@ try {
 // Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.
 if (COPILOT_MODEL && COPILOT_MODEL !== 'gpt-4.1') {
     try {
-        const { listModels } = await import('../../lib/models.js');
+        const { listModels } = await import('../../sdk/models.js');
         const models = await listModels();
         const valid = models.some((/** @type {{ id: string }} */ m) => m.id === COPILOT_MODEL);
         if (!valid) {

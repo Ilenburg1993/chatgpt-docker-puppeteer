@@ -40,8 +40,8 @@ import {
     incrementSessionMessageCount as incrementMessageCount,
     listActiveClientSessions as listActiveSessions,
     resumeClientSession as resumeSdkSession,
-} from '../../lib/sdk-client.js';
-import { pickDefined } from '../../lib/utils.js';
+} from '../../sdk/client.js';
+import { pickDefined } from '../../sdk/utils.js';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 

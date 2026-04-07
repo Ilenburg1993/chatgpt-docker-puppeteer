@@ -2,10 +2,9 @@
 /**
  * src/copilot/config/tools/index.js
  *
- * Barrel de re-exportação para src/copilot/config/tools/. Centraliza o estado e o registro de ferramentas.
- *
+ * @deprecated Desde F9 — migrado para sdk/. Este arquivo é um re-export de compatibilidade.
  * @module copilot/config/tools
  */
 
-export * from './registry.js';
-export * from './state.js';
+export * from '#copilot/sdk/custom-tools';
+export * from '#copilot/sdk/tools-state';

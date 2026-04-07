@@ -16,7 +16,7 @@ import {
     createAuditOnlyPermission,
     createHooks,
     createSafePermission,
-} from '#copilot/lib/index';
+} from '#copilot/sdk/index';
 import { approveAll } from '@github/copilot-sdk';
 
 /**

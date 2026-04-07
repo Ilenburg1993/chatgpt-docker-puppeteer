@@ -12,7 +12,7 @@
 import { WEB_SEARCH_DISABLED } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
-import { validateUrl } from '../lib/url-validator.js';
+import { validateUrl } from '../sdk/url-validator.js';
 import { buildTool } from './tool-factory.js';
 
 // ─── SSRF Protection (via lib/url-validator.js) ──────────────────────────────

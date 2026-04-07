@@ -21,7 +21,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 /** Caminho do arquivo de persistência. @type {string} */
-const CUSTOM_TOOLS_PATH = join(resolve(import.meta.dirname, '../../..'), 'custom-tools.json');
+const CUSTOM_TOOLS_PATH = join(resolve(import.meta.dirname, '../..'), 'custom-tools.json');
 
 /**
  * Mapa de handlers pré-autorizados para custom tools declarativas. Adicionar funções aqui para disponibilizá-las via

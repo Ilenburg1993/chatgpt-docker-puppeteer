@@ -5,7 +5,7 @@
  * Factory lib para construção de CustomAgentConfig do Copilot SDK. CustomAgents são configurações de agentes
  * especializados registrados em uma sessão SDK que podem usar subconjuntos de ferramentas e prompts customizados.
  *
- * Uso típico: import { createAgent, createReadOnlyAgent } from '#copilot/lib/agents'; const session = await
+ * Uso típico: import { createAgent, createReadOnlyAgent } from '#copilot/sdk/agents'; const session = await
  * client.createSession({ customAgents: [createReadOnlyAgent('auditor', 'Analisa código sem modificar')] });
  *
  * @module copilot/lib/agents

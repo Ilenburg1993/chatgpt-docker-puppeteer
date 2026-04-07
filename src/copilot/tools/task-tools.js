@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { httpRequest } from '../lib/http-request.js';
+import { httpRequest } from '../sdk/http-request.js';
 import { withSkipPermission } from './tool-factory.js';
 
 /**

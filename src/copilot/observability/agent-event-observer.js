@@ -22,7 +22,7 @@
  * @module copilot/observability/agent-event-observer
  */
 
-import { modelStatsTracker } from '../lib/model-registry.js';
+import { modelStatsTracker } from '../sdk/model-registry.js';
 import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { startSpanImmediate } from './otel.js';

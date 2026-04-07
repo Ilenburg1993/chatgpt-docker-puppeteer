@@ -5,7 +5,7 @@
  * Registry de Custom Tools para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
  * ferramentas por categoria, capacidade ou agente.
  *
- * Uso típico: import { createRegistry, registerTools, getToolsByCategory } from '#copilot/lib/tools-registry'; const
+ * Uso típico: import { createRegistry, registerTools, getToolsByCategory } from '#copilot/sdk/tools-registry'; const
  * reg = createRegistry(); registerTools(reg, codeTools, { category: 'code' }); const subset = getToolsByCategory(reg,
  * 'code');
  *

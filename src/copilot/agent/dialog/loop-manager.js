@@ -21,7 +21,7 @@
 
 import { getCopilotFallbackModel } from '#copilot/core/constants';
 import { SessionError } from '#copilot/core/errors';
-import { waitForEvent } from '#copilot/lib/event-helpers';
+import { waitForEvent } from '#copilot/sdk/event-helpers';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import {

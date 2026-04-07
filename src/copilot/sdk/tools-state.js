@@ -16,7 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 /** Caminho do arquivo de persistência. @type {string} */
-const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../../..'), 'tools-config.json');
+const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-config.json');
 
 /**
  * Configuração de ferramentas em runtime (allow/deny lists).

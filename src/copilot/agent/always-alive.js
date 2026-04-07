@@ -21,8 +21,8 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
-import { raceEvents } from '#copilot/lib/event-helpers';
-import { createRegistry } from '#copilot/lib/index';
+import { raceEvents } from '#copilot/sdk/event-helpers';
+import { createRegistry } from '#copilot/sdk/index';
 import {
     buildTelemetryConfig,
     createAgentEventObserver,
@@ -262,7 +262,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         onModeChanged: (mode) => this.emit('permission.mode_changed', { mode }),
     });
 
-    /** @type {import('#copilot/lib/tools-registry').ToolRegistry} */
+    /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
     #toolsRegistry = createRegistry();
 
     /**
@@ -429,7 +429,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o registry de tools da sessão atual.
      *
-     * @returns {import('#copilot/lib/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     get toolsRegistry() {
         return this.#toolsRegistry;

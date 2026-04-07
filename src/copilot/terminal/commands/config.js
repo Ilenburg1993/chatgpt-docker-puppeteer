@@ -10,8 +10,8 @@
  */
 
 import { alwaysAliveAgent } from '#copilot/agent';
-import { modelRegistry, modelStatsTracker } from '#copilot/lib/model-registry';
-import { listModels } from '#copilot/lib/models';
+import { modelRegistry, modelStatsTracker } from '#copilot/sdk/model-registry';
+import { listModels } from '#copilot/sdk/models';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 
