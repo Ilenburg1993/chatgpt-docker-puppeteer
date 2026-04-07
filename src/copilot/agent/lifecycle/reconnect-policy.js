@@ -79,7 +79,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         try {
                             await client.stop();
                         } catch (/** @type {any} */ stopErr) {
-                            log('WARN', `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`);
+                            log(
+                                'WARN',
+                                `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`,
+                            );
                         }
                     }
 
@@ -101,7 +104,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         try {
                             await activeClient.ping();
                         } catch (/** @type {any} */ pingErr) {
-                            log('WARN', `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`);
+                            log(
+                                'WARN',
+                                `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`,
+                            );
                             throw pingErr; // força retry na próxima iteração
                         }
                     }
@@ -111,7 +117,9 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
                     );
                     // M-05 (PARTE-8): registrar reconexão no timeline SDK para debug
-                    await sessionLog?.(`[reconnect-policy] Reconexão bem-sucedida na tentativa ${attempt}/${maxAttempts}`);
+                    await sessionLog?.(
+                        `[reconnect-policy] Reconexão bem-sucedida na tentativa ${attempt}/${maxAttempts}`,
+                    );
                     emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
 
                     if (dialogLoop.active) {

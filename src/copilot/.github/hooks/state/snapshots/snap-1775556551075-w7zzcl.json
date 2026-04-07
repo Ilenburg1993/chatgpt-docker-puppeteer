@@ -1,0 +1,72 @@
+{
+    "snapshotId": "snap-1775556551075-w7zzcl",
+    "createdAt": 1775556551075,
+    "sessionId": "db791ee0-fdbc-4564-b7e4-4ff3b1cbe987",
+    "model": "gpt-4.1-mini",
+    "status": "waiting_for_input",
+    "sendCount": 2,
+    "dialogLoopActive": false,
+    "dialogPaused": true,
+    "pendingQuestion": "READY: aguardando próxima mensagem",
+    "stateSnapshot": {
+        "sessionId": "db791ee0-fdbc-4564-b7e4-4ff3b1cbe987",
+        "startedAt": 1775556411949,
+        "resumedAt": 1775556527619,
+        "resumeCount": 1,
+        "sendCount": 1,
+        "model": "gpt-4.1-mini",
+        "pendingQuestion": "READY: aguardando próxima mensagem",
+        "gracefulShutdown": false,
+        "dialogLoopActive": true,
+        "pendingTurnConsumedPR": true,
+        "lastPrConsumedAt": 1775556541041,
+        "lastPrModel": "gpt-4.1",
+        "lastPrCost": 0,
+        "lastQuotaSnapshots": {
+            "chat": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            },
+            "completions": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            },
+            "premium_interactions": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 300,
+                "usedRequests": 26,
+                "usageAllowedWithExhaustedQuota": true,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": true,
+                "remainingPercentage": 91.3,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            }
+        },
+        "lastAskUserAt": 1775556541056,
+        "prMetrics": {
+            "boots": 2,
+            "resumesWithPR": 0,
+            "resumesZeroPR": 0
+        },
+        "dialogPaused": true
+    },
+    "prMetrics": {
+        "boots": 2,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 2
+    },
+    "reason": "auto-shutdown"
+}

@@ -2,8 +2,8 @@
 /**
  * src/copilot/conversation-hub/call-strategies.js
  *
- * Estratégias de chamada LLM-B: dialog loop (sendDialogTurn), chatStructured, e chat simples.
- * Cada função é autônoma e recebe as dependências necessárias (bridge, agent) como parâmetros.
+ * Estratégias de chamada LLM-B: dialog loop (sendDialogTurn), chatStructured, e chat simples. Cada função é autônoma e
+ * recebe as dependências necessárias (bridge, agent) como parâmetros.
  *
  * @module copilot/conversation-hub/call-strategies
  */
@@ -13,6 +13,7 @@ import { log } from '#copilot/observability/logger';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike
+ *
  * @typedef {import('../channel/client.js').LlmBridgeClient} LlmBridgeClient
  */
 
@@ -85,8 +86,8 @@ export async function callViaStructured(bridge, message, ctx) {
 }
 
 /**
- * Envia message via chat() simples (fallback). ARCH-03: registra WARN pois indica useStructured=false ou mensagem
- * em formato inesperado.
+ * Envia message via chat() simples (fallback). ARCH-03: registra WARN pois indica useStructured=false ou mensagem em
+ * formato inesperado.
  *
  * @param {LlmBridgeClient} bridge
  * @param {string} messageContent

@@ -2,8 +2,8 @@
 /**
  * src/copilot/channel/sse-client.js
  *
- * Cliente SSE (Server-Sent Events) com reconexão automática e backoff exponencial.
- * Extraído de inject.js (F105) para reduzir complexidade.
+ * Cliente SSE (Server-Sent Events) com reconexão automática e backoff exponencial. Extraído de inject.js (F105) para
+ * reduzir complexidade.
  *
  * @module copilot/channel/sse-client
  */
@@ -24,9 +24,8 @@ import http from 'node:http';
  */
 
 /**
- * Conecta ao endpoint SSE e entrega eventos ao callback.
- * MR-09: reconecta automaticamente com backoff exponencial quando a conexão cai.
- * PHASE-10: rastreia Last-Event-ID para replay na reconexão.
+ * Conecta ao endpoint SSE e entrega eventos ao callback. MR-09: reconecta automaticamente com backoff exponencial
+ * quando a conexão cai. PHASE-10: rastreia Last-Event-ID para replay na reconexão.
  *
  * @param {string} path - Path do endpoint, ex: '/events' ou '/events?level=critical'
  * @param {number} port

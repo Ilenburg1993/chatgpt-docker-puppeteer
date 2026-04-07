@@ -212,10 +212,4 @@ const autoDowngradeDetector = new AutoDowngradeDetector(modelStatsTracker, model
 
 // ─── Exports ────────────────────────────────────────────────────────────────
 
-export {
-    autoDowngradeDetector,
-    ModelRegistry,
-    modelRegistry,
-    modelSelector,
-    modelStatsTracker,
-};
+export { autoDowngradeDetector, ModelRegistry, modelRegistry, modelSelector, modelStatsTracker };

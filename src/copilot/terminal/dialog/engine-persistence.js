@@ -2,8 +2,8 @@
 /**
  * src/copilot/terminal/dialog/engine-persistence.js
  *
- * Persistência de turnos do dialog engine no ConversationHub (writeTurn + notificações pendentes).
- * Extraído de engine.js (F102) para reduzir complexidade.
+ * Persistência de turnos do dialog engine no ConversationHub (writeTurn + notificações pendentes). Extraído de
+ * engine.js (F102) para reduzir complexidade.
  *
  * @module copilot/terminal/dialog/engine-persistence
  */
@@ -12,7 +12,7 @@ import { emitNerv } from '#copilot/bridges/nerv-bridge';
 import { conversationHub } from '#copilot/conversation-hub/hub';
 import { log } from '#copilot/observability/logger';
 
-/** @type {Array<{ hubSessionId: string; userTurn: object; llmBTurn: object }>} */
+/** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
 const _pendingNotifications = [];
 
 const MAX_PENDING_NOTIFICATIONS = 50;

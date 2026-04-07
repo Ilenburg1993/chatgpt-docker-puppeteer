@@ -22,11 +22,7 @@ import {
     getShowUsage,
     setBusy,
 } from '../state.js';
-import {
-    drainPendingNotifications,
-    getPersistenceFailureCount,
-    persistTurnToHub,
-} from './engine-persistence.js';
+import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
     PLAN_PREFIX,

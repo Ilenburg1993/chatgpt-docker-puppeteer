@@ -2,8 +2,8 @@
 /**
  * src/copilot/tools/shell/sandbox.js
  *
- * Validação de segurança para comandos shell: blocklist, allowlist, path traversal,
- * detecção de metacaracteres, e ambientes sanitizados.
+ * Validação de segurança para comandos shell: blocklist, allowlist, path traversal, detecção de metacaracteres, e
+ * ambientes sanitizados.
  *
  * @module copilot/tools/shell/sandbox
  */

@@ -20,9 +20,9 @@
  * @see module:copilot/agent/permission-controller
  */
 
+import { ConfigError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
-import { ConfigError } from '#copilot/core/errors';
 import { buildTool } from './tool-factory.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────

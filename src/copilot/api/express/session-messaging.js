@@ -15,7 +15,14 @@ import {
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
-import { rateLimitMiddleware, validateModel, withErrorHandler, validateBody, SendMessageBodySchema, SetModelBodySchema } from './session-middleware.js';
+import {
+    rateLimitMiddleware,
+    SendMessageBodySchema,
+    SetModelBodySchema,
+    validateBody,
+    validateModel,
+    withErrorHandler,
+} from './session-middleware.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -56,79 +63,84 @@ const MAX_PROMPT_BYTES = 512_000;
  * Quando waitForResponse=true, aguarda a resposta completa do modelo (blocking). Quando waitForResponse=false,
  * enfileira e retorna imediatamente (messageId).
  */
-router.post('/sessions/:id/send', rateLimitMiddleware(30, 'session_send'), validateBody(SendMessageBodySchema), (req, res) => {
-    void withErrorHandler(req, res, async () => {
-        const id = /** @type {string} */ (req.params['id']);
-        const { prompt, waitForResponse = true, attachments } = req.body ?? {};
-        const rawTimeoutMs = (req.body ?? {}).timeoutMs;
-        // GAP-SE-001c: campo mode para steering/queueing (STREAMING-EVENTS-AUDIT Fase 2.3)
-        const rawMode = (req.body ?? {}).mode;
-        /** @type {'immediate' | 'enqueue' | undefined} */
-        const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
-        // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout
-        const timeoutMs =
-            rawTimeoutMs === undefined
-                ? 60_000
-                : typeof rawTimeoutMs === 'number' && isFinite(rawTimeoutMs) && rawTimeoutMs > 0
-                  ? rawTimeoutMs
-                  : null;
+router.post(
+    '/sessions/:id/send',
+    rateLimitMiddleware(30, 'session_send'),
+    validateBody(SendMessageBodySchema),
+    (req, res) => {
+        void withErrorHandler(req, res, async () => {
+            const id = /** @type {string} */ (req.params['id']);
+            const { prompt, waitForResponse = true, attachments } = req.body ?? {};
+            const rawTimeoutMs = (req.body ?? {}).timeoutMs;
+            // GAP-SE-001c: campo mode para steering/queueing (STREAMING-EVENTS-AUDIT Fase 2.3)
+            const rawMode = (req.body ?? {}).mode;
+            /** @type {'immediate' | 'enqueue' | undefined} */
+            const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
+            // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout
+            const timeoutMs =
+                rawTimeoutMs === undefined
+                    ? 60_000
+                    : typeof rawTimeoutMs === 'number' && isFinite(rawTimeoutMs) && rawTimeoutMs > 0
+                      ? rawTimeoutMs
+                      : null;
 
-        if (timeoutMs === null) {
-            res.status(400).json({ ok: false, error: 'Campo "timeoutMs" deve ser um número positivo finito.' });
-            return;
-        }
+            if (timeoutMs === null) {
+                res.status(400).json({ ok: false, error: 'Campo "timeoutMs" deve ser um número positivo finito.' });
+                return;
+            }
 
-        if (!prompt || typeof prompt !== 'string') {
-            res.status(400).json({ ok: false, error: 'Campo "prompt" (string) é obrigatório.' });
-            return;
-        }
+            if (!prompt || typeof prompt !== 'string') {
+                res.status(400).json({ ok: false, error: 'Campo "prompt" (string) é obrigatório.' });
+                return;
+            }
 
-        // C14-04: limit máximo de bytes em prompt para evitar uso excessivo de tokens
-        if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
-            res.status(400).json({ ok: false, error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.` });
-            return;
-        }
+            // C14-04: limit máximo de bytes em prompt para evitar uso excessivo de tokens
+            if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
+                res.status(400).json({ ok: false, error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.` });
+                return;
+            }
 
-        const entry = getSdkSession(id);
-        if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-            });
-            return;
-        }
+            const entry = getSdkSession(id);
+            if (!entry) {
+                res.status(404).json({
+                    ok: false,
+                    error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+                });
+                return;
+            }
 
-        incrementMessageCount(id);
+            incrementMessageCount(id);
 
-        /** @type {import('@github/copilot-sdk').MessageOptions} */
-        const messageOptions = {
-            prompt,
-            ...(attachments ? { attachments } : {}),
-            ...(mode !== undefined ? { mode } : {}),
-        };
+            /** @type {import('@github/copilot-sdk').MessageOptions} */
+            const messageOptions = {
+                prompt,
+                ...(attachments ? { attachments } : {}),
+                ...(mode !== undefined ? { mode } : {}),
+            };
 
-        if (waitForResponse) {
-            const event = await Promise.race([
-                entry.session.sendAndWait(messageOptions, timeoutMs),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs + 5000),
-                ),
-            ]);
-            const assistantEvent = /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */ (
-                event
-            );
-            res.json({
-                ok: true,
-                sessionId: id,
-                content: assistantEvent?.data?.content ?? null,
-                messageId: assistantEvent?.data?.messageId ?? null,
-            });
-        } else {
-            const messageId = await entry.session.send(messageOptions);
-            res.json({ ok: true, sessionId: id, messageId, enqueued: true });
-        }
-    });
-});
+            if (waitForResponse) {
+                const event = await Promise.race([
+                    entry.session.sendAndWait(messageOptions, timeoutMs),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs + 5000),
+                    ),
+                ]);
+                const assistantEvent = /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */ (
+                    event
+                );
+                res.json({
+                    ok: true,
+                    sessionId: id,
+                    content: assistantEvent?.data?.content ?? null,
+                    messageId: assistantEvent?.data?.messageId ?? null,
+                });
+            } else {
+                const messageId = await entry.session.send(messageOptions);
+                res.json({ ok: true, sessionId: id, messageId, enqueued: true });
+            }
+        });
+    },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /sessions/:id/stream  (SSE)

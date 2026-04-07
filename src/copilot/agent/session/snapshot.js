@@ -14,9 +14,9 @@ import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
 import { readState } from '../lifecycle/state-io.js';
-import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV

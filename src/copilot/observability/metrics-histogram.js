@@ -2,8 +2,8 @@
 /**
  * src/copilot/observability/metrics-histogram.js
  *
- * Histograma de latências com ring buffer e cálculo de percentis (p50/p95/p99).
- * Extraído de metrics.js (F106) para reduzir complexidade do módulo principal.
+ * Histograma de latências com ring buffer e cálculo de percentis (p50/p95/p99). Extraído de metrics.js (F106) para
+ * reduzir complexidade do módulo principal.
  *
  * @module copilot/observability/metrics-histogram
  */

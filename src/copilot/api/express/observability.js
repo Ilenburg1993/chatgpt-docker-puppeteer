@@ -21,8 +21,11 @@
 
 import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultAuditLog, getAuditTail } from '#copilot/audit/pipeline';
+import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
+import { isMounted as isNervMounted } from '#copilot/bridges/nerv-bridge';
 import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { defaultErrorTracker } from '#copilot/observability/error-tracker';
+import { getCatalog, getDeadLetters } from '#copilot/observability/event-catalog';
 import { getLastQuotaSnapshots } from '#copilot/observability/event-collector';
 import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
@@ -48,23 +51,76 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/observability');
 
 // ─── GET /observability/health ────────────────────────────────────────────────
 
+/**
+ * Determina o status de um componente.
+ *
+ * @param {boolean} available - Se o componente está acessível.
+ * @param {boolean} [hasErrors] - Se o componente reportou erros recentes.
+ * @returns {'healthy' | 'degraded' | 'unhealthy'}
+ */
+function componentStatus(available, hasErrors = false) {
+    if (!available) return 'unhealthy';
+    return hasErrors ? 'degraded' : 'healthy';
+}
+
 router.get('/observability/health', (req, res) =>
     withErrorHandler(req, res, async () => {
         const metrics = defaultMetrics.getSummary();
         const errorStats = defaultErrorTracker.getStats();
-        const recentLogs = getRecentLogs(1, 'ERROR');
+        const recentErrors = defaultErrorTracker.getErrors(5);
 
         /** @type {Record<string, unknown> | null} */
         let agentSnapshot = null;
+        let agentAvailable = false;
         try {
             agentSnapshot = alwaysAliveAgent.getStatusSnapshot();
+            agentAvailable = true;
         } catch {
-            // agente ainda não inicializado — retorna null
+            // agente ainda não inicializado
         }
 
-        res.json({
-            ok: true,
+        const mcpStatus = getMcpStatus();
+        const nervMounted = isNervMounted();
+        const hasRecentAgentErrors = recentErrors.some((e) => e.source === 'agent');
+
+        /** @type {Record<string, { status: string; details?: string }>} */
+        const components = {
+            agent: {
+                status: componentStatus(agentAvailable, hasRecentAgentErrors),
+                ...(agentSnapshot
+                    ? { details: String(/** @type {Record<string, unknown>} */ (agentSnapshot)['status'] ?? 'unknown') }
+                    : { details: 'not started' }),
+            },
+            mcp_bridge: {
+                status: componentStatus(mcpStatus.available, mcpStatus.circuitOpen),
+                details: mcpStatus.available ? 'connected' : 'unavailable',
+            },
+            nerv_bridge: {
+                status: componentStatus(nervMounted),
+                details: nervMounted ? 'mounted' : 'not mounted',
+            },
+            error_tracker: {
+                status: 'healthy',
+                details: `${errorStats.buffered} buffered`,
+            },
+            metrics: {
+                status: 'healthy',
+                details: `${Object.keys(metrics.tools).length} tools tracked`,
+            },
+        };
+
+        const overallHealthy = Object.values(components).every((c) => c.status !== 'unhealthy');
+        const overallStatus = Object.values(components).some((c) => c.status === 'unhealthy')
+            ? 'unhealthy'
+            : Object.values(components).some((c) => c.status === 'degraded')
+              ? 'degraded'
+              : 'healthy';
+
+        res.status(overallHealthy ? 200 : 503).json({
+            ok: overallHealthy,
+            status: overallStatus,
             agent: agentSnapshot,
+            components,
             observability: {
                 metricsActive: true,
                 errorTrackerBuffered: errorStats.buffered,
@@ -79,7 +135,7 @@ router.get('/observability/health', (req, res) =>
                 totalErrorsCaptured: errorStats.total,
                 sessions: metrics.sessions,
                 gauges: metrics.gauges,
-                lastError: recentLogs.length ? recentLogs[recentLogs.length - 1] : null,
+                lastError: recentErrors.length ? recentErrors[recentErrors.length - 1] : null,
             },
             ts: Date.now(),
         });
@@ -234,6 +290,20 @@ router.get('/observability/otel-status', (_req, res) => {
         traceFile: DEFAULT_OTEL_FILE,
         spanTypes: ['session.boot'],
     });
+});
+
+// ─── GET /observability/events/catalog ───────────────────────────────────────
+
+router.get('/observability/events/catalog', (_req, res) => {
+    res.json({ ok: true, catalog: getCatalog() });
+});
+
+// ─── GET /observability/events/dead-letter ────────────────────────────────────
+
+router.get('/observability/events/dead-letter', (req, res) => {
+    const limit = Math.min(Number(req.query['limit']) || 50, 200);
+    const entries = getDeadLetters(limit);
+    res.json({ ok: true, entries, count: entries.length });
 });
 
 export default router;

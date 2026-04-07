@@ -14,8 +14,7 @@
  */
 
 import { COPILOT_WORKING_DIRECTORY } from '#copilot/config/env';
-import { execSync } from 'node:child_process';
-import { exec as execCb } from 'node:child_process';
+import { exec as execCb, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';

@@ -40,3 +40,6 @@ export { createAuditLog, defaultAuditLog } from '#copilot/audit/pipeline';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
 export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan } from './otel.js';
+
+// ─── Event Catalog + Dead-Letter ──────────────────────────────────────────────
+export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';

@@ -2,9 +2,8 @@
 /**
  * src/copilot/sdk/models/selector.js
  *
- * F40.2 — ModelSelector + F40.6 — AutoDowngradeDetector.
- * Heurística de seleção dinâmica e detecção de downgrade automático.
- * Extraído de registry.js (F104) para reduzir complexidade.
+ * F40.2 — ModelSelector + F40.6 — AutoDowngradeDetector. Heurística de seleção dinâmica e detecção de downgrade
+ * automático. Extraído de registry.js (F104) para reduzir complexidade.
  *
  * @module copilot/sdk/models/selector
  */

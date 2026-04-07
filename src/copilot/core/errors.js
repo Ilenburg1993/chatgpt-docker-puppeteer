@@ -102,7 +102,7 @@ export class ToolError extends CopilotError {
 export class TimeoutError extends CopilotError {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='TIMEOUT'] - Código semântico do erro.
+     * @param {string} [code='TIMEOUT'] - Código semântico do erro. Default is `'TIMEOUT'`
      */
     constructor(message, code = 'TIMEOUT') {
         super(message, code);
@@ -118,7 +118,7 @@ export class TimeoutError extends CopilotError {
 export class ValidationError extends CopilotError {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='VALIDATION_ERROR'] - Código semântico do erro.
+     * @param {string} [code='VALIDATION_ERROR'] - Código semântico do erro. Default is `'VALIDATION_ERROR'`
      */
     constructor(message, code = 'VALIDATION_ERROR') {
         super(message, code);
@@ -134,7 +134,7 @@ export class ValidationError extends CopilotError {
 export class StateTransitionError extends CopilotError {
     /**
      * @param {string} message - Mensagem descritiva do erro.
-     * @param {string} [code='STATE_TRANSITION'] - Código semântico do erro.
+     * @param {string} [code='STATE_TRANSITION'] - Código semântico do erro. Default is `'STATE_TRANSITION'`
      */
     constructor(message, code = 'STATE_TRANSITION') {
         super(message, code);

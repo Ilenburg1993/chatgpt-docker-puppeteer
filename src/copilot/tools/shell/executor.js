@@ -2,8 +2,8 @@
 /**
  * src/copilot/tools/shell/executor.js
  *
- * Funções de execução de processos: tokenização de comandos, truncamento de output,
- * execução unitária e pipeline (pipe) com timeout e sandboxing.
+ * Funções de execução de processos: tokenização de comandos, truncamento de output, execução unitária e pipeline (pipe)
+ * com timeout e sandboxing.
  *
  * @module copilot/tools/shell/executor
  */

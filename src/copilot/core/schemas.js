@@ -4,9 +4,8 @@
  *
  * F94 — Schemas Zod para validação de dados persistidos e payloads HTTP.
  *
- * Centraliza definições de schema para evitar duplicação de lógica de validação manual em cada
- * módulo que faz JSON.parse de arquivos ou payloads. Cada schema é exported como constante
- * nomeada para uso com `z.safeParse()`.
+ * Centraliza definições de schema para evitar duplicação de lógica de validação manual em cada módulo que faz
+ * JSON.parse de arquivos ou payloads. Cada schema é exported como constante nomeada para uso com `z.safeParse()`.
  *
  * @module copilot/core/schemas
  */
@@ -55,8 +54,8 @@ export const SessionSnapshotDataSchema = z.object({
 // ─── State-IO (lifecycle/state-io.js) ────────────────────────────────────────
 
 /**
- * Schema para AliveAgentState — estado persistido do agente.
- * Usa passthrough() para não rejeitar campos extras adicionados em versões futuras.
+ * Schema para AliveAgentState — estado persistido do agente. Usa passthrough() para não rejeitar campos extras
+ * adicionados em versões futuras.
  */
 export const AliveAgentStateSchema = z
     .object({

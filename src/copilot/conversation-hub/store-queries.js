@@ -2,8 +2,8 @@
 /**
  * src/copilot/conversation-hub/store-queries.js
  *
- * Funções de consulta (read-side) para conversation turns: readTurns, searchTurns, getTurn, countTurns.
- * Extraídas do ConversationStore para reduzir complexidade da classe principal.
+ * Funções de consulta (read-side) para conversation turns: readTurns, searchTurns, getTurn, countTurns. Extraídas do
+ * ConversationStore para reduzir complexidade da classe principal.
  *
  * @module copilot/conversation-hub/store-queries
  */
@@ -102,7 +102,9 @@ export function getTurn(db, turnId) {
  */
 export function countTurns(db, hubSessionId) {
     const row = /** @type {{ count: number }} */ (
-        db.prepare('SELECT COUNT(*) as count FROM copilot_conversation_turns WHERE hub_session_id = ?').get(hubSessionId)
+        db
+            .prepare('SELECT COUNT(*) as count FROM copilot_conversation_turns WHERE hub_session_id = ?')
+            .get(hubSessionId)
     );
     return row?.count ?? 0;
 }

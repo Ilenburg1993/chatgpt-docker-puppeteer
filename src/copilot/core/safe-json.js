@@ -12,7 +12,7 @@ import { ValidationError } from './errors.js';
 /**
  * Parse seguro de JSON. Retorna `{ ok: true, data }` ou `{ ok: false, error }`.
  *
- * @template [T=unknown]
+ * @template [T=unknown] Default is `unknown`
  * @param {string} raw - String JSON a parsear.
  * @param {string} [context] - Contexto descritivo para a mensagem de erro.
  * @returns {{ ok: true; data: T } | { ok: false; error: ValidationError }}
@@ -31,7 +31,7 @@ export function safeJsonParse(raw, context) {
 /**
  * Parse de JSON que lança `ValidationError` em caso de falha.
  *
- * @template [T=unknown]
+ * @template [T=unknown] Default is `unknown`
  * @param {string} raw - String JSON a parsear.
  * @param {string} [context] - Contexto descritivo para a mensagem de erro.
  * @returns {T}

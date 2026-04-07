@@ -139,14 +139,27 @@ export function getRecentLogs(n = 50, level) {
 }
 
 /**
+ * @typedef {object} LogMetadata
+ * @property {string} [taskId] - ID da tarefa
+ * @property {string} [sessionId] - Correlation ID da sessão
+ * @property {string} [component] - Componente de origem (ex: 'git-bridge', 'agent')
+ * @property {Record<string, unknown>} [extra] - Dados adicionais
+ */
+
+/** Detecta modo produção para output JSON-line. */
+const _isProduction = process.env['NODE_ENV'] === 'production';
+
+/**
  * Log operacional isolado do copilot. Mesma assinatura de `#core/logger → log`.
+ *
+ * Aceita taskId (string) ou metadata (object) como terceiro parâmetro para retrocompatibilidade.
  *
  * @param {LogLevel} level - Nível do log.
  * @param {string | Error | Record<string, unknown>} msg - Mensagem ou objeto.
- * @param {string} [taskId='-'] - ID da tarefa. Default is `'-'`
+ * @param {string | LogMetadata} [metaOrTaskId='-'] - ID da tarefa (string) ou metadata (object). Default is `'-'`
  * @returns {void}
  */
-function log(level, msg, taskId = '-') {
+function log(level, msg, metaOrTaskId = '-') {
     const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS['INFO'] ?? 1;
     const _minLevel = minLevel ?? LOG_LEVELS['INFO'] ?? 1;
     if (levelValue < _minLevel) return;
@@ -154,6 +167,13 @@ function log(level, msg, taskId = '-') {
     rotateFile(LOG_FILE, 'copilot_agent_', MAX_LOG_SIZE);
 
     const ts = new Date().toISOString();
+
+    // Resolve metadata vs taskId legado
+    /** @type {LogMetadata} */
+    const meta = typeof metaOrTaskId === 'object' && metaOrTaskId !== null ? metaOrTaskId : { taskId: metaOrTaskId };
+    const taskId = meta.taskId ?? '-';
+    const sessionId = meta.sessionId ?? '';
+
     let content = msg;
     if (msg instanceof Error) {
         content = `${msg.message}\n${msg.stack}`;
@@ -165,15 +185,43 @@ function log(level, msg, taskId = '-') {
         }
     }
 
-    const line = `[${ts}] ${level.padEnd(5)} [${taskId}] [copilot] ${content}`;
-    console.log(line);
-    // Ring buffer para consulta via API
-    _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
-    if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
-    try {
-        fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
-    } catch (/** @type {any} */ _) {
-        // Silencioso — console.log já logou
+    // F110.2: inclui stack trace em WARN quando msg é Error
+    if (level.toUpperCase() === 'WARN' && msg instanceof Error && msg.stack) {
+        content = `${msg.message}\n${msg.stack}`;
+    }
+
+    if (_isProduction) {
+        // F110.4: JSON-line para prod
+        const jsonEntry = {
+            ts,
+            level,
+            taskId,
+            ...(sessionId ? { sessionId } : {}),
+            ...(meta.component ? { component: meta.component } : {}),
+            msg: String(content),
+            ...(meta.extra ?? {}),
+        };
+        const jsonLine = JSON.stringify(jsonEntry);
+        console.log(jsonLine);
+        _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
+        if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
+        try {
+            fs.appendFileSync(LOG_FILE, `${jsonLine}\n`, 'utf-8');
+        } catch (/** @type {any} */ _) {
+            // Silencioso — console.log já logou
+        }
+    } else {
+        // F110.4: human-readable para dev
+        const sidTag = sessionId ? ` [sid:${sessionId}]` : '';
+        const line = `[${ts}] ${level.padEnd(5)} [${taskId}]${sidTag} [copilot] ${content}`;
+        console.log(line);
+        _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
+        if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
+        try {
+            fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
+        } catch (/** @type {any} */ _) {
+            // Silencioso — console.log já logou
+        }
     }
 }
 

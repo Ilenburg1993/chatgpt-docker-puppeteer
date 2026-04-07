@@ -2,8 +2,8 @@
 /**
  * src/copilot/sdk/models/stats-tracker.js
  *
- * F40.4 — ModelStatsTracker: rastreamento de latência, success rate e custo por modelo.
- * Extraído de registry.js (F104) para reduzir complexidade.
+ * F40.4 — ModelStatsTracker: rastreamento de latência, success rate e custo por modelo. Extraído de registry.js (F104)
+ * para reduzir complexidade.
  *
  * @module copilot/sdk/models/stats-tracker
  */

@@ -2,9 +2,8 @@
 /**
  * src/copilot/bridges/mcp-tool-schema.js
  *
- * Conversão de JSON Schema (MCP) para Zod schemas.
- * Suporta: escalares, enums, arrays, objetos aninhados recursivos, allOf/oneOf/anyOf.
- * Extraído de mcp-tool-bridge.js (F107) para reduzir complexidade.
+ * Conversão de JSON Schema (MCP) para Zod schemas. Suporta: escalares, enums, arrays, objetos aninhados recursivos,
+ * allOf/oneOf/anyOf. Extraído de mcp-tool-bridge.js (F107) para reduzir complexidade.
  *
  * @module copilot/bridges/mcp-tool-schema
  */

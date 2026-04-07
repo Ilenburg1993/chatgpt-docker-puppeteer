@@ -84,7 +84,10 @@ export async function cleanupStaleSessions(client, options = {}) {
             const outcomes = await Promise.allSettled(
                 toDelete.map(({ id, ageMs }) =>
                     deleteSession(client, id).then(() => {
-                        log('DEBUG', `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`);
+                        log(
+                            'DEBUG',
+                            `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`,
+                        );
                         return id;
                     }),
                 ),

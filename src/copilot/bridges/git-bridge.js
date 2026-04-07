@@ -8,6 +8,8 @@
  * @see module:copilot/tools/git-tools
  */
 
+import { defaultMetrics } from '#copilot/observability/metrics';
+import { startSpanImmediate } from '#copilot/observability/otel';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,12 +30,36 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
  */
 async function runGit(args, opts = {}) {
     const timeoutMs = opts.timeoutMs ?? 10000;
-    const { stdout } = await execFileAsync('git', args, {
-        cwd: PROJECT_ROOT,
-        timeout: timeoutMs,
-        maxBuffer: 4 * 1024 * 1024,
+    const method = args[0] ?? 'unknown';
+    const span = startSpanImmediate('copilot.bridge.git', {
+        bridge_type: 'git',
+        method,
     });
-    return stdout.trim();
+    const t0 = Date.now();
+    try {
+        const { stdout } = await execFileAsync('git', args, {
+            cwd: PROJECT_ROOT,
+            timeout: timeoutMs,
+            maxBuffer: 4 * 1024 * 1024,
+        });
+        const elapsed = Date.now() - t0;
+        span?.setAttribute('duration_ms', elapsed);
+        span?.setAttribute('status_code', 0);
+        span?.setStatus({ code: 1 });
+        defaultMetrics.recordToolCall(`bridge.git.${method}`, elapsed, true);
+        return stdout.trim();
+    } catch (/** @type {any} */ err) {
+        const elapsed = Date.now() - t0;
+        span?.setAttribute('duration_ms', elapsed);
+        span?.setAttribute('status_code', 2);
+        span?.setStatus({ code: 2, message: err.message });
+        span?.recordException(err);
+        defaultMetrics.recordToolCall(`bridge.git.${method}`, elapsed, false);
+        defaultMetrics.recordCounter('copilot.bridge.errors_total');
+        throw err;
+    } finally {
+        span?.end();
+    }
 }
 
 // ---------------------------------------------------------------------------

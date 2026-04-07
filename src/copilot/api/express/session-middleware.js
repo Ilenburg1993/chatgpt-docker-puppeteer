@@ -91,8 +91,8 @@ export async function withErrorHandler(req, res, fn) {
 /**
  * F95: Middleware factory que valida req.body contra um schema Zod.
  *
- * Se a validação falhar, retorna 400 com detalhes. Se suceder, anexa o body validado
- * a `req.body` (substituindo o original) e prossegue para o handler.
+ * Se a validação falhar, retorna 400 com detalhes. Se suceder, anexa o body validado a `req.body` (substituindo o
+ * original) e prossegue para o handler.
  *
  * @param {import('zod').ZodType} schema - Schema Zod para validar req.body
  * @returns {import('express').RequestHandler}
@@ -101,16 +101,17 @@ export function validateBody(schema) {
     return (req, res, next) => {
         const result = schema.safeParse(req.body);
         if (!result.success) {
-            const zodError = /** @type {{ issues?: Array<{ path: (string|number)[]; message: string }> }} */ (
+            const zodError = /** @type {{ issues?: { path: (string | number)[]; message: string }[] }} */ (
                 /** @type {unknown} */ (result.error)
             );
             return res.status(400).json({
                 ok: false,
                 error: 'Corpo da requisição inválido.',
-                details: zodError.issues?.map((i) => ({
-                    path: i.path.join('.'),
-                    message: i.message,
-                })) ?? [],
+                details:
+                    zodError.issues?.map((i) => ({
+                        path: i.path.join('.'),
+                        message: i.message,
+                    })) ?? [],
             });
         }
         req.body = result.data;

@@ -21,7 +21,14 @@ import {
 import { pickDefined } from '#copilot/sdk/utils';
 import { approveAll } from '@github/copilot-sdk';
 import { Router } from 'express';
-import { rateLimitMiddleware, validateModel, withErrorHandler, validateBody, CreateSessionBodySchema, ResumeSessionBodySchema } from './session-middleware.js';
+import {
+    CreateSessionBodySchema,
+    rateLimitMiddleware,
+    ResumeSessionBodySchema,
+    validateBody,
+    validateModel,
+    withErrorHandler,
+} from './session-middleware.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -146,34 +153,14 @@ router.get('/sessions', (req, res) => {
  * }
  * ```
  */
-router.post('/sessions', rateLimitMiddleware(10, 'create_session'), validateBody(CreateSessionBodySchema), (req, res) => {
-    void withErrorHandler(req, res, async () => {
-        const {
-            model,
-            sessionId,
-            systemMessage,
-            infiniteSessions,
-            workingDirectory,
-            streaming,
-            provider,
-            reasoningEffort,
-            availableTools,
-            excludedTools,
-            customAgents,
-            clientName,
-        } = req.body ?? {};
-
-        const modelResult = validateModel(model);
-        if (!modelResult.ok) {
-            res.status(400).json({ ok: false, error: modelResult.error });
-            return;
-        }
-        const safeModel = modelResult.model;
-
-        const session = await createSdkSession({
-            onPermissionRequest: approveAll,
-            model: safeModel,
-            ...pickDefined({
+router.post(
+    '/sessions',
+    rateLimitMiddleware(10, 'create_session'),
+    validateBody(CreateSessionBodySchema),
+    (req, res) => {
+        void withErrorHandler(req, res, async () => {
+            const {
+                model,
                 sessionId,
                 systemMessage,
                 infiniteSessions,
@@ -185,17 +172,42 @@ router.post('/sessions', rateLimitMiddleware(10, 'create_session'), validateBody
                 excludedTools,
                 customAgents,
                 clientName,
-            }),
-        });
+            } = req.body ?? {};
 
-        res.status(201).json({
-            ok: true,
-            sessionId: session.sessionId,
-            model: safeModel,
-            workspacePath: session.workspacePath ?? null,
+            const modelResult = validateModel(model);
+            if (!modelResult.ok) {
+                res.status(400).json({ ok: false, error: modelResult.error });
+                return;
+            }
+            const safeModel = modelResult.model;
+
+            const session = await createSdkSession({
+                onPermissionRequest: approveAll,
+                model: safeModel,
+                ...pickDefined({
+                    sessionId,
+                    systemMessage,
+                    infiniteSessions,
+                    workingDirectory,
+                    streaming,
+                    provider,
+                    reasoningEffort,
+                    availableTools,
+                    excludedTools,
+                    customAgents,
+                    clientName,
+                }),
+            });
+
+            res.status(201).json({
+                ok: true,
+                sessionId: session.sessionId,
+                model: safeModel,
+                workspacePath: session.workspacePath ?? null,
+            });
         });
-    });
-});
+    },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /sessions/:id

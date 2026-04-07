@@ -189,8 +189,8 @@ function registerExitHandler() {
 }
 
 /**
- * F93: Garante que o diretório do banco exista via fs/promises.
- * Chamar no boot (antes de getCopilotDb) para evitar mkdirSync no lazy init.
+ * F93: Garante que o diretório do banco exista via fs/promises. Chamar no boot (antes de getCopilotDb) para evitar
+ * mkdirSync no lazy init.
  *
  * @returns {Promise<void>}
  */

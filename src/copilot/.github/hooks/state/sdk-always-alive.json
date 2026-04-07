@@ -1,0 +1,54 @@
+{
+    "sessionId": "db791ee0-fdbc-4564-b7e4-4ff3b1cbe987",
+    "startedAt": 1775556411949,
+    "resumedAt": 1775558298788,
+    "resumeCount": 3,
+    "sendCount": 4,
+    "model": "gpt-4.1-mini",
+    "pendingQuestion": null,
+    "gracefulShutdown": true,
+    "dialogLoopActive": true,
+    "pendingTurnConsumedPR": true,
+    "lastPrConsumedAt": 1775558311083,
+    "lastPrModel": "gpt-4.1",
+    "lastPrCost": 0,
+    "lastQuotaSnapshots": {
+        "chat": {
+            "isUnlimitedEntitlement": true,
+            "entitlementRequests": -1,
+            "usedRequests": 0,
+            "usageAllowedWithExhaustedQuota": false,
+            "overage": 0,
+            "overageAllowedWithExhaustedQuota": false,
+            "remainingPercentage": 100,
+            "resetDate": "2026-05-01T00:00:00.000Z"
+        },
+        "completions": {
+            "isUnlimitedEntitlement": true,
+            "entitlementRequests": -1,
+            "usedRequests": 0,
+            "usageAllowedWithExhaustedQuota": false,
+            "overage": 0,
+            "overageAllowedWithExhaustedQuota": false,
+            "remainingPercentage": 100,
+            "resetDate": "2026-05-01T00:00:00.000Z"
+        },
+        "premium_interactions": {
+            "isUnlimitedEntitlement": false,
+            "entitlementRequests": 300,
+            "usedRequests": 26,
+            "usageAllowedWithExhaustedQuota": true,
+            "overage": 0,
+            "overageAllowedWithExhaustedQuota": true,
+            "remainingPercentage": 91.3,
+            "resetDate": "2026-05-01T00:00:00.000Z"
+        }
+    },
+    "lastAskUserAt": 1775558311099,
+    "prMetrics": {
+        "boots": 4,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0
+    },
+    "dialogPaused": true
+}

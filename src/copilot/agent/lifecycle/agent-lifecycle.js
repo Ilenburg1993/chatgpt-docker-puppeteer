@@ -91,9 +91,8 @@ export async function agentStart(ctx, host) {
         persist: true,
     });
 
-    if (process.env['NODE_ENV'] !== 'test') {
-        defaultErrorTracker.registerGlobalHandlers();
-    }
+    // registerGlobalHandlers é chamado por entry.js (process.on handlers com logging)
+    // para evitar duplicação, não registramos aqui.
 
     defaultMetrics.startPeriodicSnapshot();
 

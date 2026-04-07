@@ -10,8 +10,8 @@
  * @module copilot/agent/session/rotation
  */
 
-import { log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability';
+import { log } from '#copilot/observability/logger';
 import { ROTATION_MAX_AGE_MS, ROTATION_MAX_COMPACTIONS, ROTATION_MAX_TURNS, ROTATION_MAX_UTIL } from '../config.js';
 
 /**
@@ -84,6 +84,7 @@ export function shouldRotateSession(ctx, policyOverride) {
 
 /**
  * F70.1: Registra métrica quando shouldRotate = true.
+ *
  * @param {RotationDecision} decision
  * @returns {RotationDecision}
  */

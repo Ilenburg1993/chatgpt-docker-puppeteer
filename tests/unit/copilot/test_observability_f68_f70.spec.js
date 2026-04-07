@@ -98,11 +98,11 @@ vi.mock('#copilot/observability', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { startSpan, startSpanImmediate } from '#copilot/observability/otel';
 import { defaultMetrics } from '#copilot/observability';
-import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';
-import { listSessions, deleteSession } from '#copilot/sdk/session';
+import { startSpan, startSpanImmediate } from '#copilot/observability/otel';
+import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
+import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';
 
 // ── F68.3: reconnect-policy span ────────────────────────────────────────────
 
@@ -122,13 +122,11 @@ describe('F68: OTEL Spans', () => {
                 clearSessionEventUnsubs: vi.fn(),
             };
 
-            const result = await tryReconnect(
-                new Error('test'),
-                { stop: vi.fn() },
-                'running',
-                callbacks,
-                { maxAttempts: 1, baseDelayMs: 0, jitterFn: () => 0 },
-            );
+            const result = await tryReconnect(new Error('test'), { stop: vi.fn() }, 'running', callbacks, {
+                maxAttempts: 1,
+                baseDelayMs: 0,
+                jitterFn: () => 0,
+            });
 
             expect(result).toBe(true);
             expect(vi.mocked(startSpan)).toHaveBeenCalledWith(
@@ -232,9 +230,7 @@ describe('F70: Métricas e Cleanup paralelo', () => {
                 { sessionId: 'ok-1', startTime: oldTime },
                 { sessionId: 'fail-1', startTime: oldTime },
             ]);
-            vi.mocked(deleteSession)
-                .mockResolvedValueOnce(undefined)
-                .mockRejectedValueOnce(new Error('network error'));
+            vi.mocked(deleteSession).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('network error'));
 
             const client = /** @type {any} */ ({});
             const result = await cleanupStaleSessions(client, { maxAgeMs: 86_400_000 });

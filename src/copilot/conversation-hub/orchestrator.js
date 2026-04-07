@@ -17,8 +17,8 @@
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
-import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 import { LlmBridgeClient } from '../channel/client.js';
+import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 
 // ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
 
@@ -569,5 +569,4 @@ export class HubOrchestrator extends EventEmitter {
             return undefined;
         }
     }
-
 }

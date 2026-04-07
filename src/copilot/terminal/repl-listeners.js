@@ -2,8 +2,8 @@
 /**
  * src/copilot/terminal/repl-listeners.js
  *
- * Listeners de eventos do AlwaysAliveAgent para exibição no terminal REPL.
- * Extraído de repl.js (F103) para reduzir complexidade.
+ * Listeners de eventos do AlwaysAliveAgent para exibição no terminal REPL. Extraído de repl.js (F103) para reduzir
+ * complexidade.
  *
  * @module copilot/terminal/repl-listeners
  */

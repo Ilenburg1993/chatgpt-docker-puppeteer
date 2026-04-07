@@ -509,6 +509,7 @@ export class DialogLoopManager extends EventEmitter {
 
     /**
      * F68.2: Encerra o span OTEL do dialog loop.
+     *
      * @param {boolean} success - Se o loop encerrou com sucesso (stop) ou forçadamente.
      */
     #endLoopSpan(success) {

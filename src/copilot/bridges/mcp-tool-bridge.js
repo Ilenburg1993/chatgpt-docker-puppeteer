@@ -25,6 +25,8 @@
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config/env';
 import { BridgeError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
+import { defaultMetrics } from '#copilot/observability/metrics';
+import { startSpanImmediate } from '#copilot/observability/otel';
 import { defineTool } from '@github/copilot-sdk';
 import net from 'node:net';
 import { buildZodSchema } from './mcp-tool-schema.js';
@@ -126,49 +128,74 @@ async function rpcCall(method, params) {
         params: params ?? {},
     });
 
+    const span = startSpanImmediate('copilot.bridge.mcp', {
+        bridge_type: 'mcp',
+        method,
+    });
+    const t0 = Date.now();
+
     const MAX_ATTEMPTS = 3;
     /** @type {unknown} */
     let lastError;
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        try {
-            const response = await fetch(MCP_BASE, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body,
-                signal: AbortSignal.timeout(8000),
-            });
+    try {
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            try {
+                const response = await fetch(MCP_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body,
+                    signal: AbortSignal.timeout(8000),
+                });
 
-            if (!response.ok) {
-                const err = new BridgeError(`MCP HTTP ${response.status}: ${response.statusText}`, 'MCP_HTTP_ERROR');
-                // Só faz retry em erros 5xx (servidor); 4xx são definitivos
-                if (response.status < 500) throw err;
-                lastError = err;
-                if (attempt < MAX_ATTEMPTS - 1) {
-                    await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
-                    continue;
+                if (!response.ok) {
+                    const err = new BridgeError(
+                        `MCP HTTP ${response.status}: ${response.statusText}`,
+                        'MCP_HTTP_ERROR',
+                    );
+                    // Só faz retry em erros 5xx (servidor); 4xx são definitivos
+                    if (response.status < 500) throw err;
+                    lastError = err;
+                    if (attempt < MAX_ATTEMPTS - 1) {
+                        await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
+                        continue;
+                    }
+                    throw err;
                 }
-                throw err;
+
+                const json = /** @type {{ error?: unknown; result?: unknown }} */ (await response.json());
+
+                if (json.error) {
+                    throw new BridgeError(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`, 'MCP_RPC_ERROR');
+                }
+
+                span?.setAttribute('duration_ms', Date.now() - t0);
+                span?.setAttribute('status_code', 0);
+                span?.setStatus({ code: 1 });
+                defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
+                return json.result;
+            } catch (/** @type {any} */ e) {
+                lastError = e;
+                const isTransient = e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.name === 'TimeoutError';
+                if (!isTransient || attempt >= MAX_ATTEMPTS - 1) throw e;
+                log(
+                    'WARN',
+                    `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt + 1}/${MAX_ATTEMPTS}): ${e.message}`,
+                );
+                await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
             }
-
-            const json = /** @type {{ error?: unknown; result?: unknown }} */ (await response.json());
-
-            if (json.error) {
-                throw new BridgeError(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`, 'MCP_RPC_ERROR');
-            }
-
-            return json.result;
-        } catch (/** @type {any} */ e) {
-            lastError = e;
-            const isTransient = e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.name === 'TimeoutError';
-            if (!isTransient || attempt >= MAX_ATTEMPTS - 1) throw e;
-            log(
-                'WARN',
-                `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt + 1}/${MAX_ATTEMPTS}): ${e.message}`,
-            );
-            await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
         }
+        throw lastError;
+    } catch (/** @type {any} */ err) {
+        span?.setAttribute('duration_ms', Date.now() - t0);
+        span?.setAttribute('status_code', 2);
+        span?.setStatus({ code: 2, message: err?.message });
+        span?.recordException(err);
+        defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, false);
+        defaultMetrics.recordCounter('copilot.bridge.errors_total');
+        throw err;
+    } finally {
+        span?.end();
     }
-    throw lastError;
 }
 
 /**
