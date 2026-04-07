@@ -2,9 +2,8 @@
 /**
  * Contrato de plugin para Channels do Copilot.
  *
- * Define a interface mínima que um Channel plugin deve implementar para mediar a
- * comunicação entre LLM-A (Copilot SDK) e LLM-B (terminal interativo).
- * O {@link LlmBridgeClient} satisfaz este contrato.
+ * Define a interface mínima que um Channel plugin deve implementar para mediar a comunicação entre LLM-A (Copilot SDK)
+ * e LLM-B (terminal interativo). O {@link LlmBridgeClient} satisfaz este contrato.
  *
  * @module copilot/sdk/channel-contract
  */
@@ -12,18 +11,15 @@
 /**
  * Interface mínima de um Channel plugin.
  *
- * Channels são pontes de comunicação que conectam dois endpoints LLM,
- * gerenciam histórico de conversa e suportam mensagens estruturadas.
+ * Channels são pontes de comunicação que conectam dois endpoints LLM, gerenciam histórico de conversa e suportam
+ * mensagens estruturadas.
  *
  * @typedef {Object} ChannelPlugin
- * @property {(message: string, opts?: ChannelChatOptions) => Promise<ChannelChatResult>} chat
- *   Envia mensagem e aguarda resposta completa.
- * @property {() => ChannelTurn[]} getHistory
- *   Retorna o histórico de turnos da conversa atual.
- * @property {() => void} clearHistory
- *   Limpa o histórico de conversa.
- * @property {() => number} turnCount
- *   Retorna o número total de turnos enviados.
+ * @property {(message: string, opts?: ChannelChatOptions) => Promise<ChannelChatResult>} chat Envia mensagem e aguarda
+ *   resposta completa.
+ * @property {() => ChannelTurn[]} getHistory Retorna o histórico de turnos da conversa atual.
+ * @property {() => void} clearHistory Limpa o histórico de conversa.
+ * @property {() => number} turnCount Retorna o número total de turnos enviados.
  */
 
 /**
@@ -33,7 +29,7 @@
  * @property {(chunk: string) => void} [onDelta] - Callback para streaming de chunks.
  * @property {(question: object) => void} [onQuestion] - Callback para perguntas interativas.
  * @property {number} [timeoutMs] - Timeout em ms.
- * @property {Array<{ type: string; data: string }>} [attachments] - Anexos para o turno.
+ * @property {{ type: string; data: string }[]} [attachments] - Anexos para o turno.
  */
 
 /**
