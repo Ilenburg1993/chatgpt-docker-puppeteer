@@ -17,4 +17,6 @@ export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, Agent
 export * from './dialog/index.js';
 export * from './infra/index.js';
 export * from './lifecycle/index.js';
+export * from './messaging/index.js';
 export * from './session/index.js';
+export * from './state/index.js';

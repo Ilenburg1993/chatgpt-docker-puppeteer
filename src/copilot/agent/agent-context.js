@@ -15,6 +15,7 @@
  */
 
 import { createRegistry } from '#copilot/sdk/index';
+import { log } from '#copilot/observability/logger';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 import { HandoffManager } from './infra/handoff-manager.js';
@@ -196,13 +197,36 @@ export class AgentContext {
         this.messagesCache = new SessionMessagesCache(MESSAGES_CACHE_TTL_MS);
     }
 
+    // ─── Status FSM ─────────────────────────────────────────────────────
+
+    /**
+     * Transições válidas do FSM de status do agente.
+     *
+     * Regra: qualquer estado pode transitar para 'stopped' (shutdown é sempre permitido).
+     *
+     * @type {Readonly<Record<AgentStatus, ReadonlySet<AgentStatus>>>}
+     */
+    static STATUS_TRANSITIONS = Object.freeze({
+        stopped: new Set(/** @type {const} */ (['starting'])),
+        starting: new Set(/** @type {const} */ (['idle', 'stopped'])),
+        idle: new Set(/** @type {const} */ (['processing', 'stopped'])),
+        processing: new Set(/** @type {const} */ (['idle', 'waiting_for_input', 'stopped'])),
+        waiting_for_input: new Set(/** @type {const} */ (['processing', 'stopped'])),
+    });
+
     /**
      * Altera o status e invalida o cache de snapshot. Emite evento 'status' no emitter passado.
+     * Valida a transição contra o FSM — transições inválidas emitem warning mas NÃO bloqueiam
+     * (para não quebrar produção durante rollout).
      *
      * @param {AgentStatus} status
      * @param {import('node:events').EventEmitter} emitter
      */
     setStatus(status, emitter) {
+        const allowed = AgentContext.STATUS_TRANSITIONS[this.status];
+        if (allowed && !allowed.has(status)) {
+            log('WARN', `[AgentContext] Transição de status inválida: ${this.status} → ${status}`);
+        }
         this.status = status;
         this.statusSnapshotCache = null;
         emitter.emit('status', status);

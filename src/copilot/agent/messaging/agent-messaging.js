@@ -138,6 +138,7 @@ export async function steerMessage(ctx, host, prompt) {
  */
 export function answerPendingQuestion(ctx, host, answer) {
     if (!ctx.pendingQuestion) {
+        // Fallback: tenta resolver hook-tools pending input (idempotente — retorna false se sem resolvers)
         if (!hookToolsResolveUserInput(answer)) {
             log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
         }
@@ -148,6 +149,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     ctx.pendingQuestion = null;
     persistState({ pendingQuestion: null }, '[AlwaysAlive] writeState pendingQuestion=null');
     host.emit('question.answered', { answer });
+    // Resolve hook-tools pending input associado (idempotente — second call retorna false)
     hookToolsResolveUserInput(answer);
     return true;
 }

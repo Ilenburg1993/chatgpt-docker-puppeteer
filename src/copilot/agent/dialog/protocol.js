@@ -16,6 +16,18 @@
 /** @typedef {'ready' | 'reply' | 'stopped' | 'question'} DialogMessageKind */
 
 /**
+ * Constantes de classificação de mensagens do dialog loop.
+ *
+ * @type {Readonly<Record<string, DialogMessageKind>>}
+ */
+export const MESSAGE_KIND = /** @type {const} */ ({
+    READY: 'ready',
+    REPLY: 'reply',
+    STOPPED: 'stopped',
+    QUESTION: 'question',
+});
+
+/**
  * Prefixo que o modelo usa ao sinalizar prontidão para o próximo turno.
  *
  * @type {string}

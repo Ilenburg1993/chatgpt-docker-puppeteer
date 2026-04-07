@@ -9,6 +9,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { WATCHDOG_THRESHOLDS } from '../config.js';
 
 /**
  * @typedef {Object} DialogWatchdogOptions
@@ -18,22 +19,8 @@ import { log } from '#copilot/observability/logger';
  * @property {(stalledMs: number) => void} onStall - Callback chamado quando o loop está travado
  */
 
-/**
- * F8.3: Mapa de thresholds de stall em ms por tipo de tarefa.
- *
- * Tarefas de análise ou longa duração recebem threshold maior para evitar watchdog kills prematuros. Chave `default` é
- * o fallback quando o tipo não estiver mapeado.
- *
- * @type {Readonly<Record<string, number>>}
- */
-export const WATCHDOG_THRESHOLDS = Object.freeze({
-    default: 15 * 60_000, // 15 min — threshold padrão
-    analysis: 45 * 60_000, // 45 min — análise/auditoria profunda
-    refactor: 30 * 60_000, // 30 min — refatoração com múltiplos arquivos
-    simple: 8 * 60_000, // 8 min — respostas simples / perguntas
-    codegen: 20 * 60_000, // 20 min — geração de código
-    test: 20 * 60_000, // 20 min — execução de testes
-});
+// Re-export para backward compatibility (consumidores existentes que importam de watchdog.js)
+export { WATCHDOG_THRESHOLDS };
 
 /**
  * Monitor de inatividade para o dialog loop.

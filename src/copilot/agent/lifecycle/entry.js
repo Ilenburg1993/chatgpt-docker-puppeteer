@@ -16,16 +16,16 @@ import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { alwaysAliveAgent } from '../always-alive.js';
-import { COPILOT_MODEL, DRAIN_WRITES_TIMEOUT_MS, PING_TIMEOUT_MS, RESTART_DELAY_MS } from '../config.js';
+import { COPILOT_MODEL, BOOT_MAX_RETRIES, DRAIN_WRITES_TIMEOUT_MS, PING_TIMEOUT_MS, RESTART_DELAY_MS } from '../config.js';
 import { drainStateWrites } from './state-io.js';
 
 /**
- * Inicializa o agente com loop de retry (até 5 tentativas) em vez de recursão.
+ * Inicializa o agente com loop de retry (até {@link BOOT_MAX_RETRIES} tentativas) em vez de recursão.
  *
  * @returns {Promise<void>}
  */
 async function startWithRetry() {
-    const MAX_ATTEMPTS = 5;
+    const MAX_ATTEMPTS = BOOT_MAX_RETRIES;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
             log('INFO', `[copilot/agent] Iniciando Always-Alive Agent (tentativa ${attempt})...`);

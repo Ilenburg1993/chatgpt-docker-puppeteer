@@ -517,9 +517,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @param {AgentStatus} status
      */
     #setStatus(status) {
-        this.ctx.status = status;
-        this.ctx.statusSnapshotCache = null;
-        this.emit('status', status);
+        this.ctx.setStatus(status, this);
     }
 
     /**

@@ -11,14 +11,7 @@ import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import dns from 'node:dns/promises';
-import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_TIMEOUT_MS } from '../config.js';
-
-/**
- * Delay base (ms) para backoff exponencial entre retries de webhook.
- *
- * @type {number}
- */
-const WEBHOOK_RETRY_BASE_MS = 500;
+import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config.js';
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry

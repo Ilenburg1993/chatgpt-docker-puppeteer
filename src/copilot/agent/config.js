@@ -49,6 +49,23 @@ import {
 
 // ── Dialog Loop ──────────────────────────────────────────────
 
+/** @typedef {'ready' | 'reply' | 'stopped' | 'question'} DialogMessageKind */
+
+/**
+ * Mapa de thresholds de stall (ms) do DialogWatchdog por tipo de tarefa.
+ * Tarefas mais longas recebem threshold maior para evitar watchdog kills prematuros.
+ *
+ * @type {Readonly<Record<string, number>>}
+ */
+export const WATCHDOG_THRESHOLDS = Object.freeze({
+    default: 15 * 60_000,
+    analysis: 45 * 60_000,
+    refactor: 30 * 60_000,
+    simple: 8 * 60_000,
+    codegen: 20 * 60_000,
+    test: 20 * 60_000,
+});
+
 /** Tamanho máximo da fila de diálogo */
 export const DIALOG_QUEUE_MAX = LLM_B_DIALOG_QUEUE_MAX;
 /** Timeout de boot do loop (ms) */
@@ -175,3 +192,13 @@ export const DRAIN_WRITES_TIMEOUT_MS = 3_000;
 export const PING_TIMEOUT_MS = 5_000;
 /** Timeout para aguardar question.pending em resume (ms) */
 export const RESUME_QUESTION_WAIT_MS = 5_000;
+
+// ── Boot ─────────────────────────────────────────────────────
+
+/** Máximo de tentativas de boot antes de desistir */
+export const BOOT_MAX_RETRIES = 5;
+
+// ── Webhook Retry ────────────────────────────────────────────
+
+/** Base do backoff exponencial de webhook retry (ms) */
+export const WEBHOOK_RETRY_BASE_MS = 500;
