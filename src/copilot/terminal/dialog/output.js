@@ -85,11 +85,7 @@ export function printExchange(actor, message, reply, durationMs) {
 
     const secsNum = durationMs / 1000;
     const secsColor =
-        secsNum < 5
-            ? `\x1b[32m${secs}s\x1b[0m`
-            : secsNum < 15
-              ? `\x1b[33m${secs}s\x1b[0m`
-              : `\x1b[31m${secs}s\x1b[0m`;
+        secsNum < 5 ? `\x1b[32m${secs}s\x1b[0m` : secsNum < 15 ? `\x1b[33m${secs}s\x1b[0m` : `\x1b[31m${secs}s\x1b[0m`;
 
     if (actor === 'llm-a') {
         println(SEPARATOR);

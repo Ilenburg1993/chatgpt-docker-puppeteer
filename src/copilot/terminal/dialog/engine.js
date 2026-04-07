@@ -23,7 +23,16 @@ import {
     getShowUsage,
     setBusy,
 } from '../state.js';
-import { BOOT_PROMPT, PLAN_PREFIX, PROMPT_USER, PROMPT_WAITING, SEPARATOR, TURN_TIMEOUT_MS, printExchange, println } from './output.js';
+import {
+    BOOT_PROMPT,
+    PLAN_PREFIX,
+    PROMPT_USER,
+    PROMPT_WAITING,
+    SEPARATOR,
+    TURN_TIMEOUT_MS,
+    printExchange,
+    println,
+} from './output.js';
 import { broadcastSse } from './sse.js';
 
 // ─── F35.1: Queue local para notifyTerminalTurn em standalone ─────────────────

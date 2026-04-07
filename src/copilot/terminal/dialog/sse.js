@@ -47,7 +47,7 @@ export function broadcastSse(event, data) {
     if (
         data !== null &&
         typeof data === 'object' &&
-        typeof /** @type {Record<string, unknown>} */ (data)['content'] === 'string' &&
+        typeof (/** @type {Record<string, unknown>} */ (data)['content']) === 'string' &&
         /** @type {{ content: string }} */ (data).content.length > MAX_SSE_CONTENT_CHARS
     ) {
         safeData = {
@@ -69,7 +69,10 @@ export function broadcastSse(event, data) {
  * @param {import('node:http').ServerResponse} client
  * @param {string} event
  * @param {object} data
- * @param {{ hubSessionId?: string | null; replayBuffer?: import('../../api/sse/replay-buffer.js').SseReplayBuffer }} [ctx]
+ * @param {{
+ *     hubSessionId?: string | null;
+ *     replayBuffer?: import('../../api/sse/replay-buffer.js').SseReplayBuffer;
+ * }} [ctx]
  * @returns {boolean}
  */
 function writeSseEvent(client, event, data, ctx = {}) {

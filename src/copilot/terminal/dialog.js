@@ -5,6 +5,7 @@
  * Shim de compatibilidade — re-exporta do submódulo `dialog/`.
  *
  * A implementação real foi decomposta em:
+ *
  * - `dialog/output.js` — helpers de output e constantes
  * - `dialog/sse.js` — transmissão SSE e Socket.io
  * - `dialog/engine.js` — dialog loop e execução de turnos

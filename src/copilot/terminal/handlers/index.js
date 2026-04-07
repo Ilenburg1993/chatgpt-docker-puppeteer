@@ -7,7 +7,6 @@
  * @module copilot/terminal/handlers
  */
 
-export * from './shared.js';
 export {
     handleAcceptHandoff,
     handleDialogPause,
@@ -26,9 +25,10 @@ export {
     handleRecallMemories,
     handleStoreMemory,
 } from './dialog.js';
+export * from './shared.js';
 export {
-    getSseClientSets,
     getInfiniteSessionConfig,
+    getSseClientSets,
     handleDeleteCustomTool,
     handleGetConfig,
     handleGetCustomTools,
