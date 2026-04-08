@@ -52,7 +52,7 @@ export async function runShutdown(reason = 'unknown') {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    log('info', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
+    log('INFO', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
 
     for (const handler of handlers) {
         try {
@@ -62,13 +62,13 @@ export async function runShutdown(reason = 'unknown') {
                     setTimeout(() => reject(new Error(`Shutdown handler "${handler.name}" timeout`)), 5_000),
                 ),
             ]);
-            log('info', `  ✓ ${handler.name}`);
+            log('INFO', `  ✓ ${handler.name}`);
         } catch (/** @type {any} */ err) {
-            log('warn', `  ✗ ${handler.name}: ${err?.message ?? err}`);
+            log('WARN', `  ✗ ${handler.name}: ${err?.message ?? err}`);
         }
     }
 
-    log('info', 'Graceful shutdown concluído');
+    log('INFO', 'Graceful shutdown concluído');
 }
 
 /**
