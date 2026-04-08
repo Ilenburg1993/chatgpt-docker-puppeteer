@@ -20,9 +20,12 @@
  *     ```;
  */
 
+export { withTimeout } from './abort-utils.js';
 export * from './constants.js';
 export * as ErrorCodes from './error-codes.js';
 export * from './errors.js';
+export { withRetry } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse } from './safe-json.js';
 export * from './schemas.js';
+export { isShuttingDown, registerShutdownHandler, runShutdown } from './shutdown.js';
 export * from './structured-message.js';

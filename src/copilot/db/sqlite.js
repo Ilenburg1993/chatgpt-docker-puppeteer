@@ -19,6 +19,7 @@
 
 import { COPILOT_DB_PATH as ENV_DB_PATH } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
+import { registerShutdownHandler } from '#copilot/core/shutdown';
 import { log } from '#copilot/observability/logger';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
@@ -186,6 +187,9 @@ function registerExitHandler() {
     process.on('exit', handler);
     process.once('SIGTERM', handler);
     process.once('SIGINT', handler);
+
+    // Participar do shutdown gracioso centralizado (prioridade 15: após agent.stop)
+    registerShutdownHandler('copilot-db.close', async () => handler(), 15);
 }
 
 /**

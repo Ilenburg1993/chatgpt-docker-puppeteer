@@ -13,6 +13,8 @@
  */
 
 import { TimeoutError } from '#copilot/core/errors';
+import { withRetry } from '#copilot/core/retry';
+import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
 import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
@@ -27,45 +29,66 @@ import {
 import { drainStateWrites } from './state-io.js';
 
 /**
- * Inicializa o agente com loop de retry (até {@link BOOT_MAX_RETRIES} tentativas) em vez de recursão.
+ * Inicializa o agente com retry centralizado (até {@link BOOT_MAX_RETRIES} tentativas).
  *
  * @returns {Promise<void>}
  */
 async function startWithRetry() {
-    const MAX_ATTEMPTS = BOOT_MAX_RETRIES;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        try {
-            log('INFO', `[copilot/agent] Iniciando Always-Alive Agent (tentativa ${attempt})...`);
-            await alwaysAliveAgent.start();
-            log('INFO', '[copilot/agent] Agente ativo e aguardando mensagens via HTTP bridge.');
-            return;
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${e.message}`);
-            if (attempt < MAX_ATTEMPTS) {
-                log('INFO', `[copilot/agent] Tentando novamente em ${RESTART_DELAY_MS}ms...`);
-                await new Promise((r) => setTimeout(r, RESTART_DELAY_MS));
-            } else {
-                log('ERROR', '[copilot/agent] Máximo de tentativas atingido. Encerrando processo.');
-                process.exitCode = 1;
-                process.exit(1);
-            }
-        }
+    try {
+        await withRetry(
+            async () => {
+                await alwaysAliveAgent.start();
+            },
+            {
+                maxAttempts: BOOT_MAX_RETRIES,
+                baseDelayMs: RESTART_DELAY_MS,
+                maxDelayMs: RESTART_DELAY_MS * 4,
+                jitter: true,
+                onRetry: (/** @type {unknown} */ err, /** @type {number} */ attempt) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${msg}`);
+                    log('INFO', `[copilot/agent] Tentando novamente em ~${RESTART_DELAY_MS}ms...`);
+                },
+            },
+        );
+        log('INFO', '[copilot/agent] Agente ativo e aguardando mensagens via HTTP bridge.');
+    } catch (/** @type {any} */ e) {
+        log('ERROR', `[copilot/agent] Máximo de tentativas atingido (${BOOT_MAX_RETRIES}). Encerrando processo.`);
+        process.exitCode = 1;
+        process.exit(1);
     }
 }
 
 // ─── Tratamento de sinais ─────────────────────────────────────────────────────
 
+/** @param {string} signal */
 async function shutdown(signal = 'SIGTERM') {
     log('INFO', `[copilot/agent] Sinal ${signal} recebido — encerrando graciosamente...`);
-    try {
-        await alwaysAliveAgent.stop();
-        log('INFO', '[copilot/agent] Agente parado. Processo encerrado.');
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[copilot/agent] Erro no shutdown: ${e.message}`);
-    } finally {
-        process.exit(0);
-    }
+    await runShutdown(signal);
+    process.exit(0);
 }
+
+// Registrar handlers centralizados por prioridade
+registerShutdownHandler(
+    'agent.stop',
+    async () => {
+        try {
+            await alwaysAliveAgent.stop();
+            log('INFO', '[copilot/agent] Agente parado.');
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[copilot/agent] Erro no shutdown: ${e.message}`);
+        }
+    },
+    0,
+);
+
+registerShutdownHandler(
+    'state.drain',
+    async () => {
+        await drainStateWrites(DRAIN_WRITES_TIMEOUT_MS);
+    },
+    5,
+);
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
@@ -113,16 +136,10 @@ alwaysAliveAgent.on('error', (err) => {
 alwaysAliveAgent.on('session.fatal', (/** @type {Record<string, unknown>} */ evt) => {
     const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
     log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
-    // P3 (entry-audit): chamar stop() para liberar recursos antes de sair (evita corrupção de state-io)
-    void alwaysAliveAgent
-        .stop()
-        .catch(() => {})
-        .finally(() => {
-            void drainStateWrites(DRAIN_WRITES_TIMEOUT_MS).finally(() => {
-                process.exitCode = 1;
-                process.exit(1);
-            });
-        });
+    void runShutdown('session.fatal').finally(() => {
+        process.exitCode = 1;
+        process.exit(1);
+    });
 });
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
