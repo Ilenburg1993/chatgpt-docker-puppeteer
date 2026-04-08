@@ -6,6 +6,7 @@
  *   Suporta aliases built-in e customizados pelo usuário. Aliases customizados são persistidos em arquivo JSON.
  */
 
+import { log } from '#copilot/observability/logger';
 import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
 import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -60,21 +61,13 @@ export function loadAliases() {
 /**
  * Salva aliases customizados (apenas os não-builtin) no arquivo JSON.
  *
+ * @deprecated F128: Use _saveCustomAliasesAsync() em vez desta versão síncrona.
  * @returns {void}
  */
 function saveCustomAliases() {
-    /** @type {Record<string, string>} */
-    const custom = {};
-    for (const [k, v] of Object.entries(_aliases)) {
-        if (BUILTIN_ALIASES[k] === undefined || BUILTIN_ALIASES[k] !== v) {
-            custom[k] = v;
-        }
-    }
-    try {
-        fs.writeFileSync(ALIASES_FILE, JSON.stringify(custom, null, 2));
-    } catch {
-        // silently ignore write errors
-    }
+    _saveCustomAliasesAsync().catch((/** @type {any} */ e) => {
+        log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
+    });
 }
 
 /**

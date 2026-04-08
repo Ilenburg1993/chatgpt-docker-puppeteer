@@ -1099,5 +1099,5 @@
   "github.copilot.chat.inlineEdits.triggerOnEditorChangeAfterSeconds": 20,
   "github.copilot.chat.useResponsesApiTruncation": true,
   "js/ts.tsserver.tracing.enabled": false,
-  "chat.agent.sandbox": false,
+  "chat.agent.sandbox.enabled": "off",
 }

@@ -42,3 +42,19 @@ export function parseJsonOrThrow(raw, context) {
     if (!result.ok) throw result.error;
     return /** @type {T} */ (result.data);
 }
+
+/**
+ * Stringify seguro de JSON. Nunca lança — retorna `'{}'` em caso de falha (ex: referência circular, BigInt sem
+ * serializer).
+ *
+ * @param {unknown} value - Valor a serializar.
+ * @param {number} [indent] - Espaços de indentação (0 = compact).
+ * @returns {string}
+ */
+export function safeJsonStringify(value, indent) {
+    try {
+        return JSON.stringify(value, null, indent);
+    } catch {
+        return '{}';
+    }
+}

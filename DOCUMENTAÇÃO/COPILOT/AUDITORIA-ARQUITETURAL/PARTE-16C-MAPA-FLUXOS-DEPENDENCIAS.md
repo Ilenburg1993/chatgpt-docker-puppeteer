@@ -1,7 +1,7 @@
 # PARTE-16C — Mapa de Fluxos e Dependências Críticas
 
-**Data**: 2026-04-08  
-**Baseline**: commit `bfe96b57`  
+**Data**: 2026-04-08
+**Baseline**: commit `bfe96b57`
 **Referência**: PARTE-16A (inventário), PARTE-16B (dívida técnica)
 
 ---
@@ -77,12 +77,12 @@
 
 ### 1.3 Fan-Out Crítico (dependências que mais se propagam)
 
-| Módulo Importado                                 | Importado Por N Arquivos | Risco     |
-| ------------------------------------------------ | -----------------------: | --------- |
-| `#copilot/observability/logger`                  |                      108 | 🔴 Altíssimo |
-| `#copilot/core/errors`                           |                       26 | 🟡 Alto    |
-| `#copilot/config/env`                            |                       22 | 🟡 Alto    |
-| `#copilot/agent/session` (diversas paths)        |                       15 | 🟡 Alto    |
+| Módulo Importado                          | Importado Por N Arquivos | Risco       |
+| ----------------------------------------- | -----------------------: | ----------- |
+| `#copilot/observability/logger`           |                      108 | 🔴 Altíssimo |
+| `#copilot/core/errors`                    |                       26 | 🟡 Alto      |
+| `#copilot/config/env`                     |                       22 | 🟡 Alto      |
+| `#copilot/agent/session` (diversas paths) |                       15 | 🟡 Alto      |
 
 ---
 
@@ -150,7 +150,7 @@ Signal (SIGTERM/SIGINT) or session.fatal
         ├─→ isShuttingDown = true
         ├─→ Handlers por prioridade:
         │     10: agent.stop → AlwaysAlive.stop()
-        │     20: bridges → NervBridge.disconnect()  
+        │     20: bridges → NervBridge.disconnect()
         │     30: copilot.db → SQLite.close()
         │     40: terminal → ??? ⚠️ NÃO REGISTRADO
         │     50: ??? ⚠️ NÃO REGISTRADO
@@ -158,7 +158,7 @@ Signal (SIGTERM/SIGINT) or session.fatal
 
 ⚠️ GAPS no shutdown:
   - terminal/server.js: usa process.on('exit') próprio
-  - terminal/inject.js: usa process.on('exit') próprio  
+  - terminal/inject.js: usa process.on('exit') próprio
   - socket-ns.js: cleanup manual não integrado
   - Timers (setInterval) não cancelados
   - ConversationHub: sem handler de shutdown
@@ -172,24 +172,24 @@ Signal (SIGTERM/SIGINT) or session.fatal
 
 Latência estimada por estágio:
 
-| Estágio                        | Async? | Latência Est. | Gargalo?   |
-| ------------------------------ | ------ | ------------- | ---------- |
-| `LoopManager.runLoop()`       | Sim    | ~50ms         | ✅ OK       |
-| `SDK.createMessage()`          | Sim    | 1-30s (LLM)   | I/O bound  |
-| `ToolRegistry.execute()`       | Sim    | 10ms-5s       | Variável   |
-| `ConversationHub.store()`      | Sim    | ~5ms          | ✅ OK       |
-| `EventCollector.collect()`     | **NÃO**| ~1ms          | ⚠️ Sync    |
-| `MetricsTracker.increment()`   | **NÃO**| ~0.1ms        | ✅ OK       |
+| Estágio                      | Async?  | Latência Est. | Gargalo?  |
+| ---------------------------- | ------- | ------------- | --------- |
+| `LoopManager.runLoop()`      | Sim     | ~50ms         | ✅ OK      |
+| `SDK.createMessage()`        | Sim     | 1-30s (LLM)   | I/O bound |
+| `ToolRegistry.execute()`     | Sim     | 10ms-5s       | Variável  |
+| `ConversationHub.store()`    | Sim     | ~5ms          | ✅ OK      |
+| `EventCollector.collect()`   | **NÃO** | ~1ms          | ⚠️ Sync    |
+| `MetricsTracker.increment()` | **NÃO** | ~0.1ms        | ✅ OK      |
 
 ### 3.2 Background Paths
 
-| Path                           | Tipo        | Intervalo   | Problema                       |
-| ------------------------------ | ----------- | ----------- | ------------------------------ |
-| AlwaysAlive heartbeat          | setInterval | 30s         | Sem clearInterval              |
-| Terminal cleanup               | setInterval | 60s         | Sem clearInterval              |
-| Socket heartbeat               | setInterval | 25s         | Sem clearInterval              |
-| Metrics flush                  | setTimeout  | Variável    | Sem cancelamento               |
-| DB WAL checkpoint              | setTimeout  | 300s        | OK (timeout)                   |
+| Path                  | Tipo        | Intervalo | Problema          |
+| --------------------- | ----------- | --------- | ----------------- |
+| AlwaysAlive heartbeat | setInterval | 30s       | Sem clearInterval |
+| Terminal cleanup      | setInterval | 60s       | Sem clearInterval |
+| Socket heartbeat      | setInterval | 25s       | Sem clearInterval |
+| Metrics flush         | setTimeout  | Variável  | Sem cancelamento  |
+| DB WAL checkpoint     | setTimeout  | 300s      | OK (timeout)      |
 
 ---
 
@@ -197,38 +197,38 @@ Latência estimada por estágio:
 
 ### 4.1 Acoplamento Aferente (Ca) — "Quem depende de mim?"
 
-| Módulo              |   Ca | Interpretação                       |
-| ------------------- | ---: | ----------------------------------- |
-| `observability/`    |  108 | ⚠️ Mudança aqui quebra tudo          |
-| `core/`             |   52 | ⚠️ Foundation crítico               |
-| `config/`           |   22 | Estável (muda pouco)                |
-| `agent/session/`    |   15 | Estado compartilhado                |
-| `db/`               |   10 | Interface estável                   |
+| Módulo           |   Ca | Interpretação              |
+| ---------------- | ---: | -------------------------- |
+| `observability/` |  108 | ⚠️ Mudança aqui quebra tudo |
+| `core/`          |   52 | ⚠️ Foundation crítico       |
+| `config/`        |   22 | Estável (muda pouco)       |
+| `agent/session/` |   15 | Estado compartilhado       |
+| `db/`            |   10 | Interface estável          |
 
 ### 4.2 Acoplamento Eferente (Ce) — "De quem eu dependo?"
 
-| Módulo              |   Ce | Interpretação                       |
-| ------------------- | ---: | ----------------------------------- |
-| `terminal/`         |   45 | Depende de quase tudo               |
-| `agent/`            |   38 | Hub central, esperado               |
-| `tools/`            |   32 | Depende de agent, db, bridges       |
-| `bridges/`          |   20 | Depende de core, config, logger     |
-| `conversation-hub/` |   18 | Depende de db, sockets, config      |
+| Módulo              |   Ce | Interpretação                   |
+| ------------------- | ---: | ------------------------------- |
+| `terminal/`         |   45 | Depende de quase tudo           |
+| `agent/`            |   38 | Hub central, esperado           |
+| `tools/`            |   32 | Depende de agent, db, bridges   |
+| `bridges/`          |   20 | Depende de core, config, logger |
+| `conversation-hub/` |   18 | Depende de db, sockets, config  |
 
 ### 4.3 Instability Index (I = Ce / (Ca + Ce))
 
-| Módulo              |    I | Classe        | Nota                                |
-| ------------------- | ---: | ------------- | ----------------------------------- |
-| `core/`             | 0.08 | Estável       | ✅ Foundation correto               |
-| `config/`           | 0.15 | Estável       | ✅ Configuração estável             |
-| `observability/`    | 0.20 | Estável       | ✅ Logger/metrics estáveis          |
-| `db/`               | 0.30 | Semi-estável  | ✅ Interface clara                  |
-| `hooks/`            | 0.55 | Balanceado    | OK                                  |
-| `agent/`            | 0.72 | Instável      | ⚠️ Depende de muitos módulos       |
-| `bridges/`          | 0.80 | Instável      | OK (é adapter — deve ser instável)  |
-| `tools/`            | 0.82 | Instável      | OK (leaf node)                      |
-| `terminal/`         | 0.90 | Muito instável| ⚠️ Acumula deps de todos           |
-| `conversation-hub/` | 0.90 | Muito instável| OK se tests existirem              |
+| Módulo              |    I | Classe         | Nota                               |
+| ------------------- | ---: | -------------- | ---------------------------------- |
+| `core/`             | 0.08 | Estável        | ✅ Foundation correto               |
+| `config/`           | 0.15 | Estável        | ✅ Configuração estável             |
+| `observability/`    | 0.20 | Estável        | ✅ Logger/metrics estáveis          |
+| `db/`               | 0.30 | Semi-estável   | ✅ Interface clara                  |
+| `hooks/`            | 0.55 | Balanceado     | OK                                 |
+| `agent/`            | 0.72 | Instável       | ⚠️ Depende de muitos módulos        |
+| `bridges/`          | 0.80 | Instável       | OK (é adapter — deve ser instável) |
+| `tools/`            | 0.82 | Instável       | OK (leaf node)                     |
+| `terminal/`         | 0.90 | Muito instável | ⚠️ Acumula deps de todos            |
+| `conversation-hub/` | 0.90 | Muito instável | OK se tests existirem              |
 
 ---
 
@@ -236,24 +236,24 @@ Latência estimada por estágio:
 
 ### 5.1 Single Points of Failure
 
-| Componente                    | Impacto se falhar                      | Mitigation Atual        | Gap          |
-| ----------------------------- | -------------------------------------- | ----------------------- | ------------ |
-| `always-alive.js`             | Processo inteiro para                  | withRetry no start      | ✅ OK        |
-| `sqlite.js` (DB)              | Perda de state                         | registerShutdownHandler | ✅ OK        |
-| `logger.js`                   | Sem observabilidade                    | Fallback console        | ✅ OK        |
-| `NervBridge`                  | Sem comunicação com bus                | ❌ Sem fallback         | ⚠️ Gap       |
-| `TerminalServer`              | Sem REPL/WebSocket                     | ❌ Sem fallback         | ⚠️ Gap       |
-| `ConversationHub.store`       | Perda de contexto de conversação       | ❌ Sem fallback         | 🔴 Crítico   |
+| Componente              | Impacto se falhar                | Mitigation Atual        | Gap       |
+| ----------------------- | -------------------------------- | ----------------------- | --------- |
+| `always-alive.js`       | Processo inteiro para            | withRetry no start      | ✅ OK      |
+| `sqlite.js` (DB)        | Perda de state                   | registerShutdownHandler | ✅ OK      |
+| `logger.js`             | Sem observabilidade              | Fallback console        | ✅ OK      |
+| `NervBridge`            | Sem comunicação com bus          | ❌ Sem fallback          | ⚠️ Gap     |
+| `TerminalServer`        | Sem REPL/WebSocket               | ❌ Sem fallback          | ⚠️ Gap     |
+| `ConversationHub.store` | Perda de contexto de conversação | ❌ Sem fallback          | 🔴 Crítico |
 
 ### 5.2 Race Conditions Potenciais
 
-| ID    | Módulo                 | Condição                                           | Severidade |
-| ----- | ---------------------- | -------------------------------------------------- | ---------- |
-| RC-01 | `state-io.js`          | Read/Write sync concorrente de state.json          | 🟡 Média   |
-| RC-02 | `snapshot.js`          | Multiple snapshot writes simultâneos               | 🟡 Média   |
-| RC-03 | `store.js` (conv-hub)  | INSERT concorrente no SQLite                       | 🟢 Baixa   |
-| RC-04 | `alias-store.js`       | Read-modify-write sem lock                         | 🟢 Baixa   |
-| RC-05 | `tools-state.js`       | File-based state sem atomicidade                   | 🟢 Baixa   |
+| ID    | Módulo                | Condição                                  | Severidade |
+| ----- | --------------------- | ----------------------------------------- | ---------- |
+| RC-01 | `state-io.js`         | Read/Write sync concorrente de state.json | 🟡 Média    |
+| RC-02 | `snapshot.js`         | Multiple snapshot writes simultâneos      | 🟡 Média    |
+| RC-03 | `store.js` (conv-hub) | INSERT concorrente no SQLite              | 🟢 Baixa    |
+| RC-04 | `alias-store.js`      | Read-modify-write sem lock                | 🟢 Baixa    |
+| RC-05 | `tools-state.js`      | File-based state sem atomicidade          | 🟢 Baixa    |
 
 ---
 
@@ -293,16 +293,16 @@ Faixa 14: Coverage targets + CI hardening + relatório final
 
 ### 6.2 Métricas Alvo para Fim do PARTE-16
 
-| Métrica                    | Atual       | Alvo        | Delta   |
-| -------------------------- | ----------- | ----------- | ------- |
-| Arquivos >400L             | 22          | ≤8          | -14     |
-| Catch blocks vazios        | ~133        | ≤20         | -113    |
-| FS sync calls (runtime)    | ~60         | ≤10         | -50     |
-| Modules com 0 testes       | 2 (5156L)   | 0           | -2      |
-| Testes totais              | 2.342       | ≥3.000      | +658    |
-| Coverage lines             | 30%         | ≥45%        | +15%    |
-| Coverage branches          | 20%         | ≥30%        | +10%    |
-| Retry duplicados           | 4           | 0           | -4      |
-| process.on dispersos       | ~14         | ≤3          | -11     |
-| Timers sem cleanup         | ~15         | ≤3          | -12     |
-| SEC issues médias          | 4           | 0           | -4      |
+| Métrica                 | Atual     | Alvo   | Delta |
+| ----------------------- | --------- | ------ | ----- |
+| Arquivos >400L          | 22        | ≤8     | -14   |
+| Catch blocks vazios     | ~133      | ≤20    | -113  |
+| FS sync calls (runtime) | ~60       | ≤10    | -50   |
+| Modules com 0 testes    | 2 (5156L) | 0      | -2    |
+| Testes totais           | 2.342     | ≥3.000 | +658  |
+| Coverage lines          | 30%       | ≥45%   | +15%  |
+| Coverage branches       | 20%       | ≥30%   | +10%  |
+| Retry duplicados        | 4         | 0      | -4    |
+| process.on dispersos    | ~14       | ≤3     | -11   |
+| Timers sem cleanup      | ~15       | ≤3     | -12   |
+| SEC issues médias       | 4         | 0      | -4    |

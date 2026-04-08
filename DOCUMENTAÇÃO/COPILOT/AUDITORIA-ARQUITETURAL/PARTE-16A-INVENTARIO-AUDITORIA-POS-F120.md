@@ -1,8 +1,8 @@
 # PARTE-16A — Inventário e Auditoria Profunda Pós-F120
 
-**Data**: 2026-04-08  
-**Baseline**: commit `bfe96b57` (pós-PARTE-14E completo)  
-**Escopo**: Todo o módulo `src/copilot/` (260 arquivos, 45.750 linhas, 42 diretórios)  
+**Data**: 2026-04-08
+**Baseline**: commit `bfe96b57` (pós-PARTE-14E completo)
+**Escopo**: Todo o módulo `src/copilot/` (260 arquivos, 45.750 linhas, 42 diretórios)
 **Referência**: PARTE-14A/B/C/D, PARTE-15B
 
 ---
@@ -16,18 +16,18 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 ### Métricas Gerais
 
-| Métrica                          | Valor   | Avaliação                                  |
-| -------------------------------- | ------- | ------------------------------------------ |
-| Arquivos `.js`                   | 260     | Boa granularidade                          |
-| Linhas totais                    | 45.750  | Módulo grande mas organizado               |
-| Diretórios (subsistemas)         | 42      | Boa separação                              |
-| Arquivos >400L                   | **22**  | ⚠️ Ainda excessivo — alvo <10              |
-| Arquivos sem nenhum teste        | ~200    | ⚠️ Cobertura de teste deficiente           |
-| FS sync calls (não-shutdown)     | **84**  | ⚠️ Bloqueiam event loop                    |
-| Catch blocks vazios/silenciosos  | **133** | ⚠️ Erros potencialmente engolidos          |
-| `.catch(() => {})` void          | 9       | ⚠️ Promessas silenciosamente ignoradas     |
-| TODO/FIXME/HACK markers          | 8       | ✅ Poucos — bom                             |
-| process.on listeners dispersos   | 16      | ⚠️ Deveria usar shutdown centralizado      |
+| Métrica                         | Valor   | Avaliação                             |
+| ------------------------------- | ------- | ------------------------------------- |
+| Arquivos `.js`                  | 260     | Boa granularidade                     |
+| Linhas totais                   | 45.750  | Módulo grande mas organizado          |
+| Diretórios (subsistemas)        | 42      | Boa separação                         |
+| Arquivos >400L                  | **22**  | ⚠️ Ainda excessivo — alvo <10          |
+| Arquivos sem nenhum teste       | ~200    | ⚠️ Cobertura de teste deficiente       |
+| FS sync calls (não-shutdown)    | **84**  | ⚠️ Bloqueiam event loop                |
+| Catch blocks vazios/silenciosos | **133** | ⚠️ Erros potencialmente engolidos      |
+| `.catch(() => {})` void         | 9       | ⚠️ Promessas silenciosamente ignoradas |
+| TODO/FIXME/HACK markers         | 8       | ✅ Poucos — bom                        |
+| process.on listeners dispersos  | 16      | ⚠️ Deveria usar shutdown centralizado  |
 
 ---
 
@@ -37,15 +37,15 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🔴 ALTO** — Segundo maior subsistema, cobertura de testes mínima.
 
-| Arquivo                          | Linhas | Problema                                               |
-| -------------------------------- | -----: | ------------------------------------------------------ |
-| `terminal/index.js`             |    472 | God module: bootstrap + cleanup + scheduling           |
-| `terminal/dialog/engine.js`     |    459 | Mistura persistência + dialog logic (pós-extração)     |
-| `terminal/server.js`            |    447 | Express server + WebSocket + middleware inline          |
-| `terminal/repl.js`              |    436 | REPL + event handling (pós-extração repl-listeners)    |
-| `handlers/system-metrics.js`    |    387 | Handler monolítico de métricas                         |
-| `commands/gh.js`                |    382 | GitHub commands sem decomposição                       |
-| `file-context.js`               |    381 | Workspace scanning com FS sync pesado                  |
+| Arquivo                      | Linhas | Problema                                            |
+| ---------------------------- | -----: | --------------------------------------------------- |
+| `terminal/index.js`          |    472 | God module: bootstrap + cleanup + scheduling        |
+| `terminal/dialog/engine.js`  |    459 | Mistura persistência + dialog logic (pós-extração)  |
+| `terminal/server.js`         |    447 | Express server + WebSocket + middleware inline      |
+| `terminal/repl.js`           |    436 | REPL + event handling (pós-extração repl-listeners) |
+| `handlers/system-metrics.js` |    387 | Handler monolítico de métricas                      |
+| `commands/gh.js`             |    382 | GitHub commands sem decomposição                    |
+| `file-context.js`            |    381 | Workspace scanning com FS sync pesado               |
 
 **Achados críticos:**
 - `file-context.js` usa `readdirSync`, `readFileSync`, `statSync` extensivamente para scan de workspace
@@ -57,13 +57,13 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🔴 ALTO** — Ponto de entrada de input externo (defineTool handlers).
 
-| Arquivo                      | Linhas | Problema                                           |
-| ---------------------------- | -----: | -------------------------------------------------- |
-| `todo/crud-tools.js`        |    459 | God module: 7 tools CRUD em arquivo único          |
-| `todo/store.js`              |    421 | Store SQLite monolítico                            |
-| `introspection-tools.js`     |    409 | 12+ tools em arquivo único                         |
-| `file/read-tools.js`         |    398 | File reading com potencial path traversal          |
-| `web-tools.js`               |    397 | Web scraping + URL handling                        |
+| Arquivo                  | Linhas | Problema                                  |
+| ------------------------ | -----: | ----------------------------------------- |
+| `todo/crud-tools.js`     |    459 | God module: 7 tools CRUD em arquivo único |
+| `todo/store.js`          |    421 | Store SQLite monolítico                   |
+| `introspection-tools.js` |    409 | 12+ tools em arquivo único                |
+| `file/read-tools.js`     |    398 | File reading com potencial path traversal |
+| `web-tools.js`           |    397 | Web scraping + URL handling               |
 
 **Achados críticos:**
 - `session-tools.js` usa `execSync` 3x sem sanitização de input (`git rev-parse`)
@@ -77,12 +77,12 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🔴 ALTO** — Zero testes, 4 arquivos >400L.
 
-| Arquivo                  | Linhas | Problema                                               |
-| ------------------------ | -----: | ------------------------------------------------------ |
-| `orchestrator.js`        |    572 | Lógica complexa de chamada multi-modelo                |
-| `store.js`               |    561 | SQLite store com migrations inline                     |
-| `socket-ns.js`           |    467 | Socket.IO namespace com event handling denso           |
-| `hub.js`                 |    282 | Coordenação de sessions + orchestration                |
+| Arquivo           | Linhas | Problema                                     |
+| ----------------- | -----: | -------------------------------------------- |
+| `orchestrator.js` |    572 | Lógica complexa de chamada multi-modelo      |
+| `store.js`        |    561 | SQLite store com migrations inline           |
+| `socket-ns.js`    |    467 | Socket.IO namespace com event handling denso |
+| `hub.js`          |    282 | Coordenação de sessions + orchestration      |
 
 **Achados críticos:**
 - Nenhum teste unitário para nenhum dos 10 arquivos
@@ -94,11 +94,11 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🟡 MÉDIO** — Zero testes, lógica de rede.
 
-| Arquivo                  | Linhas | Problema                                               |
-| ------------------------ | -----: | ------------------------------------------------------ |
-| `mcp-tool-bridge.js`    |    432 | Retry manual, circuit breaker custom                   |
-| `git-bridge.js`          |    428 | `execFile` com args não sanitizados                    |
-| `nerv-bridge.js`         |    385 | HTTP bridge sem retry centralizado                     |
+| Arquivo              | Linhas | Problema                             |
+| -------------------- | -----: | ------------------------------------ |
+| `mcp-tool-bridge.js` |    432 | Retry manual, circuit breaker custom |
+| `git-bridge.js`      |    428 | `execFile` com args não sanitizados  |
+| `nerv-bridge.js`     |    385 | HTTP bridge sem retry centralizado   |
 
 **Achados críticos:**
 - `git-bridge.js` passa args diretamente para `execFile` — seguro por natureza do execFile, mas
@@ -111,12 +111,12 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🟡 MÉDIO** — Código defensivo mas sem testes.
 
-| Arquivo                              | Linhas | Problema                                           |
-| ------------------------------------ | -----: | -------------------------------------------------- |
-| `observers/dialog-task-handlers.js`  |    424 | God observer monolítico                            |
-| `metrics.js`                         |    419 | Ainda grande após extração                         |
-| `collectors/session-handlers.js`     |    391 | Session event collection denso                     |
-| `event-collector.js`                 |    386 | Collector core com many catch {} vazios            |
+| Arquivo                             | Linhas | Problema                                |
+| ----------------------------------- | -----: | --------------------------------------- |
+| `observers/dialog-task-handlers.js` |    424 | God observer monolítico                 |
+| `metrics.js`                        |    419 | Ainda grande após extração              |
+| `collectors/session-handlers.js`    |    391 | Session event collection denso          |
+| `event-collector.js`                |    386 | Collector core com many catch {} vazios |
 
 **Achados críticos:**
 - `otel.js` tem 4 catch blocks vazios — erros silenciados sem log
@@ -128,9 +128,9 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🟡 MÉDIO** — `factory.js` (402L) é god module.
 
-| Arquivo       | Linhas | Problema                                               |
-| ------------- | -----: | ------------------------------------------------------ |
-| `factory.js`  |    402 | Mistura criação, validação, merge e resolução de hooks  |
+| Arquivo      | Linhas | Problema                                               |
+| ------------ | -----: | ------------------------------------------------------ |
+| `factory.js` |    402 | Mistura criação, validação, merge e resolução de hooks |
 
 **Achados críticos:**
 - `factory.js` implementa lógica de merge complexa que deveria ser testada
@@ -141,9 +141,9 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🟡 MÉDIO** — Wrappers do SDK com complexidade moderada.
 
-| Arquivo        | Linhas | Problema                                               |
-| -------------- | -----: | ------------------------------------------------------ |
-| `client.js`    |    413 | God client com session + model + streaming methods     |
+| Arquivo     | Linhas | Problema                                           |
+| ----------- | -----: | -------------------------------------------------- |
+| `client.js` |    413 | God client com session + model + streaming methods |
 
 ### 2.8 `channel/` — 1.495L, 7 arquivos, 1 teste
 
@@ -157,10 +157,10 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 **Risco: 🟢 BAIXO** — Melhor cobertura de testes, arquitetura sólida pós-PARTE-14E.
 
-| Arquivo                 | Linhas | Problema                                               |
-| ----------------------- | -----: | ------------------------------------------------------ |
-| `always-alive.js`       |    619 | Facade legítima mas grande                             |
-| `dialog/loop-manager.js`|    597 | Ainda o maior após 3 extrações                         |
+| Arquivo                  | Linhas | Problema                       |
+| ------------------------ | -----: | ------------------------------ |
+| `always-alive.js`        |    619 | Facade legítima mas grande     |
+| `dialog/loop-manager.js` |    597 | Ainda o maior após 3 extrações |
 
 **Achados críticos:**
 - `session/snapshot.js` ainda usa 8 FS sync calls
@@ -173,16 +173,16 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 ### 3.1 Vetores de Risco Identificados
 
-| ID     | Severidade | Módulo                    | Descrição                                                              |
-| ------ | ---------- | ------------------------- | ---------------------------------------------------------------------- |
-| SEC-01 | 🟡 Média   | `session-tools.js`        | `execSync('git ...')` sem sanitização do CWD                           |
-| SEC-02 | 🟡 Média   | `socket-ns.js`            | Validação fraca de `socket.handshake.auth`                             |
-| SEC-03 | 🟡 Média   | `terminal/server.js`      | WebSocket sem validação de origin rigorosa                             |
-| SEC-04 | 🟢 Baixa   | `file/read-tools.js`      | Path traversal via symlink não verificado                              |
-| SEC-05 | 🟢 Baixa   | `web-tools.js`            | fetch de URLs externas sem timeout ceiling (potencial SSRF lento)      |
-| SEC-06 | ✅ OK       | `shell/sandbox.js`        | Sanitização regex robusta mas frágil para edge cases                   |
-| SEC-07 | ✅ OK       | `todo/store.js`           | Prepared statements — seguro contra SQLi                               |
-| SEC-08 | ✅ OK       | `webhook-manager.js`      | SSRF prevention + DNS rebinding check implementados                    |
+| ID     | Severidade | Módulo               | Descrição                                                         |
+| ------ | ---------- | -------------------- | ----------------------------------------------------------------- |
+| SEC-01 | 🟡 Média    | `session-tools.js`   | `execSync('git ...')` sem sanitização do CWD                      |
+| SEC-02 | 🟡 Média    | `socket-ns.js`       | Validação fraca de `socket.handshake.auth`                        |
+| SEC-03 | 🟡 Média    | `terminal/server.js` | WebSocket sem validação de origin rigorosa                        |
+| SEC-04 | 🟢 Baixa    | `file/read-tools.js` | Path traversal via symlink não verificado                         |
+| SEC-05 | 🟢 Baixa    | `web-tools.js`       | fetch de URLs externas sem timeout ceiling (potencial SSRF lento) |
+| SEC-06 | ✅ OK       | `shell/sandbox.js`   | Sanitização regex robusta mas frágil para edge cases              |
+| SEC-07 | ✅ OK       | `todo/store.js`      | Prepared statements — seguro contra SQLi                          |
+| SEC-08 | ✅ OK       | `webhook-manager.js` | SSRF prevention + DNS rebinding check implementados               |
 
 ### 3.2 Recomendações de Segurança
 
@@ -200,26 +200,26 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 Top ofensores por módulo:
 
-| Módulo           | Catch blocks | Vazios/silenciosos | Impacto                           |
-| ---------------- | ------------ | ------------------- | --------------------------------- |
-| `observability/` | 31           | ~10                 | Erros de métricas silenciados     |
-| `tools/`         | 25           | ~3                  | Falhas de tool silenciadas        |
-| `terminal/`      | 22           | ~5                  | Erros de REPL silenciados         |
-| `agent/`         | 18           | ~2                  | Melhor — maioria tem log          |
-| `bridges/`       | 15           | ~4                  | Erros de rede silenciados         |
-| `channel/`       | 10           | ~2                  | Erros de SSE silenciados          |
+| Módulo           | Catch blocks | Vazios/silenciosos | Impacto                       |
+| ---------------- | ------------ | ------------------ | ----------------------------- |
+| `observability/` | 31           | ~10                | Erros de métricas silenciados |
+| `tools/`         | 25           | ~3                 | Falhas de tool silenciadas    |
+| `terminal/`      | 22           | ~5                 | Erros de REPL silenciados     |
+| `agent/`         | 18           | ~2                 | Melhor — maioria tem log      |
+| `bridges/`       | 15           | ~4                 | Erros de rede silenciados     |
+| `channel/`       | 10           | ~2                 | Erros de SSE silenciados      |
 
 ### 4.2 FS Síncrono (84 chamadas)
 
-| Padrão        | Contagem | Risco                                             |
-| ------------- | -------: | ------------------------------------------------- |
-| `readFileSync`  |       25 | Bloqueia event loop em I/O de disco               |
-| `existsSync`    |       22 | Geralmente aceitável (TOCTOU risk mínimo)         |
-| `writeFileSync` |       12 | Bloqueia event loop + risco de corrupção parcial  |
-| `mkdirSync`     |        8 | Aceitável em bootstrap, não em runtime            |
-| `readdirSync`   |        7 | Bloqueia em diretórios grandes                    |
-| `statSync`      |        6 | Bloqueante                                        |
-| `rmSync`        |        4 | Bloqueante + risco de race condition              |
+| Padrão          | Contagem | Risco                                            |
+| --------------- | -------: | ------------------------------------------------ |
+| `readFileSync`  |       25 | Bloqueia event loop em I/O de disco              |
+| `existsSync`    |       22 | Geralmente aceitável (TOCTOU risk mínimo)        |
+| `writeFileSync` |       12 | Bloqueia event loop + risco de corrupção parcial |
+| `mkdirSync`     |        8 | Aceitável em bootstrap, não em runtime           |
+| `readdirSync`   |        7 | Bloqueia em diretórios grandes                   |
+| `statSync`      |        6 | Bloqueante                                       |
+| `rmSync`        |        4 | Bloqueante + risco de race condition             |
 
 ### 4.3 Timers sem Cleanup
 
@@ -232,41 +232,41 @@ Top ofensores por módulo:
 
 ### 5.1 Mapa de Cobertura
 
-| Subsistema         | Linhas | Testes | Cobertura | Avaliação                  |
-| ------------------ | -----: | -----: | --------: | -------------------------- |
-| `agent/`           |  7.736 |     11 |     ~25%  | 🟢 Aceitável (pós-PARTE-14E)|
-| `terminal/`        |  7.618 |      3 |      ~5%  | 🔴 Crítico                  |
-| `tools/`           |  6.120 |      6 |     ~10%  | 🔴 Crítico                  |
-| `observability/`   |  4.434 |      1 |      ~3%  | 🔴 Crítico                  |
-| `hooks/`           |  3.423 |      4 |     ~15%  | 🟡 Baixo mas existente      |
-| `sdk/`             |  3.231 |      2 |      ~8%  | 🔴 Crítico                  |
-| `api/`             |  3.173 |      3 |     ~10%  | 🟡 Baixo                    |
-| `conversation-hub/`|  2.473 |      0 |       0%  | 🔴 **Zero testes**          |
-| `bridges/`         |  2.183 |      0 |       0%  | 🔴 **Zero testes**          |
-| `channel/`         |  1.495 |      1 |      ~8%  | 🔴 Crítico                  |
-| `config/`          |  1.413 |      6 |     ~30%  | 🟢 Razoável                 |
-| `core/`            |  1.328 |      4 |     ~25%  | 🟢 Razoável                 |
-| `audit/`           |    713 |      8 |     ~40%  | 🟢 Bom                      |
-| `db/`              |    410 |      4 |     ~35%  | 🟢 Bom                      |
+| Subsistema          | Linhas | Testes | Cobertura | Avaliação                   |
+| ------------------- | -----: | -----: | --------: | --------------------------- |
+| `agent/`            |  7.736 |     11 |      ~25% | 🟢 Aceitável (pós-PARTE-14E) |
+| `terminal/`         |  7.618 |      3 |       ~5% | 🔴 Crítico                   |
+| `tools/`            |  6.120 |      6 |      ~10% | 🔴 Crítico                   |
+| `observability/`    |  4.434 |      1 |       ~3% | 🔴 Crítico                   |
+| `hooks/`            |  3.423 |      4 |      ~15% | 🟡 Baixo mas existente       |
+| `sdk/`              |  3.231 |      2 |       ~8% | 🔴 Crítico                   |
+| `api/`              |  3.173 |      3 |      ~10% | 🟡 Baixo                     |
+| `conversation-hub/` |  2.473 |      0 |        0% | 🔴 **Zero testes**           |
+| `bridges/`          |  2.183 |      0 |        0% | 🔴 **Zero testes**           |
+| `channel/`          |  1.495 |      1 |       ~8% | 🔴 Crítico                   |
+| `config/`           |  1.413 |      6 |      ~30% | 🟢 Razoável                  |
+| `core/`             |  1.328 |      4 |      ~25% | 🟢 Razoável                  |
+| `audit/`            |    713 |      8 |      ~40% | 🟢 Bom                       |
+| `db/`               |    410 |      4 |      ~35% | 🟢 Bom                       |
 
 ### 5.2 Módulos Críticos sem Teste
 
 Arquivos com complexidade alta e zero testes unitários:
 
-| Prioridade | Arquivo                                      | Linhas | Justificativa                            |
-| ---------- | -------------------------------------------- | -----: | ---------------------------------------- |
-| P0         | `conversation-hub/orchestrator.js`           |    572 | Multi-model orchestration, 0 testes      |
-| P0         | `conversation-hub/store.js`                  |    561 | SQLite persistent store, 0 testes        |
-| P0         | `channel/client.js`                          |    556 | HTTP/SSE client, 0 testes                |
-| P0         | `terminal/server.js`                         |    447 | Express+WS server, 0 testes             |
-| P1         | `bridges/mcp-tool-bridge.js`                 |    432 | MCP JSON-RPC bridge, 0 testes            |
-| P1         | `bridges/git-bridge.js`                      |    428 | Git execFile bridge, 0 testes            |
-| P1         | `tools/web-tools.js`                         |    397 | Web scraping tools, 0 testes             |
-| P1         | `observability/observers/dialog-task-handlers`|   424 | Observer monolítico, 0 testes           |
-| P2         | `terminal/dialog/engine.js`                  |    459 | Dialog engine, 0 testes                  |
-| P2         | `tools/todo/crud-tools.js`                   |    459 | CRUD tools, 0 testes                     |
-| P2         | `terminal/repl.js`                           |    436 | REPL loop, 0 testes                      |
-| P2         | `hooks/factory.js`                           |    402 | Hook creation logic, 0 testes            |
+| Prioridade | Arquivo                                        | Linhas | Justificativa                       |
+| ---------- | ---------------------------------------------- | -----: | ----------------------------------- |
+| P0         | `conversation-hub/orchestrator.js`             |    572 | Multi-model orchestration, 0 testes |
+| P0         | `conversation-hub/store.js`                    |    561 | SQLite persistent store, 0 testes   |
+| P0         | `channel/client.js`                            |    556 | HTTP/SSE client, 0 testes           |
+| P0         | `terminal/server.js`                           |    447 | Express+WS server, 0 testes         |
+| P1         | `bridges/mcp-tool-bridge.js`                   |    432 | MCP JSON-RPC bridge, 0 testes       |
+| P1         | `bridges/git-bridge.js`                        |    428 | Git execFile bridge, 0 testes       |
+| P1         | `tools/web-tools.js`                           |    397 | Web scraping tools, 0 testes        |
+| P1         | `observability/observers/dialog-task-handlers` |    424 | Observer monolítico, 0 testes       |
+| P2         | `terminal/dialog/engine.js`                    |    459 | Dialog engine, 0 testes             |
+| P2         | `tools/todo/crud-tools.js`                     |    459 | CRUD tools, 0 testes                |
+| P2         | `terminal/repl.js`                             |    436 | REPL loop, 0 testes                 |
+| P2         | `hooks/factory.js`                             |    402 | Hook creation logic, 0 testes       |
 
 ---
 
@@ -276,37 +276,37 @@ Arquivos com complexidade alta e zero testes unitários:
 
 Distribuição:
 
-| Subsistema           | Count | Maiores                                                       |
-| -------------------- | ----: | ------------------------------------------------------------- |
-| `terminal/`          |     5 | index(472), engine(459), server(447), repl(436), metrics(387) |
-| `conversation-hub/`  |     4 | orchestrator(572), store(561), socket-ns(467)                 |
-| `agent/`             |     3 | always-alive(619), loop-manager(597)                          |
-| `bridges/`           |     3 | mcp-tool(432), git(428)                                       |
-| `tools/`             |     3 | todo/crud(459), todo/store(421), introspection(409)           |
-| `observability/`     |     2 | dialog-task-handlers(424), metrics(419)                       |
-| `channel/`           |     1 | client(556)                                                   |
-| `audit/`             |     1 | pipeline(530)                                                 |
+| Subsistema          | Count | Maiores                                                       |
+| ------------------- | ----: | ------------------------------------------------------------- |
+| `terminal/`         |     5 | index(472), engine(459), server(447), repl(436), metrics(387) |
+| `conversation-hub/` |     4 | orchestrator(572), store(561), socket-ns(467)                 |
+| `agent/`            |     3 | always-alive(619), loop-manager(597)                          |
+| `bridges/`          |     3 | mcp-tool(432), git(428)                                       |
+| `tools/`            |     3 | todo/crud(459), todo/store(421), introspection(409)           |
+| `observability/`    |     2 | dialog-task-handlers(424), metrics(419)                       |
+| `channel/`          |     1 | client(556)                                                   |
+| `audit/`            |     1 | pipeline(530)                                                 |
 
 ### 6.2 Padrões Duplicados
 
-| Padrão                         | Ocorrências | Alternativa centralizada |
-| ------------------------------ | ----------: | ------------------------ |
-| Retry manual (for loop)        |          3+ | `core/retry.js`          |
-| Promise.race timeout           |          8+ | `core/abort-utils.js`    |
-| process.on shutdown            |          16 | `core/shutdown.js`       |
-| JSON.parse com try/catch       |         10+ | `core/safe-json.js`      |
-| Circuit breaker manual         |           2 | Não centralizado         |
-| Logger metadata construction   |         15+ | Logger com metadata obj  |
+| Padrão                       | Ocorrências | Alternativa centralizada |
+| ---------------------------- | ----------: | ------------------------ |
+| Retry manual (for loop)      |          3+ | `core/retry.js`          |
+| Promise.race timeout         |          8+ | `core/abort-utils.js`    |
+| process.on shutdown          |          16 | `core/shutdown.js`       |
+| JSON.parse com try/catch     |         10+ | `core/safe-json.js`      |
+| Circuit breaker manual       |           2 | Não centralizado         |
+| Logger metadata construction |         15+ | Logger com metadata obj  |
 
 ### 6.3 Inconsistências de API
 
-| Aspecto          | Estado Atual              | Estado Ideal                    |
-| ---------------- | ------------------------- | ------------------------------- |
-| Error handling   | 3 padrões (throw, log, silent) | Throw + log no caller       |
-| FS I/O           | Misto sync/async          | 100% async (exceto shutdown)    |
-| Event patterns   | EventEmitter + callbacks  | EventEmitter unificado          |
-| Config loading   | Import time + lazy        | Lazy-only via getConfig()       |
-| Timer management | setTimeout sem cleanup    | Timer registry com auto-cleanup |
+| Aspecto          | Estado Atual                   | Estado Ideal                    |
+| ---------------- | ------------------------------ | ------------------------------- |
+| Error handling   | 3 padrões (throw, log, silent) | Throw + log no caller           |
+| FS I/O           | Misto sync/async               | 100% async (exceto shutdown)    |
+| Event patterns   | EventEmitter + callbacks       | EventEmitter unificado          |
+| Config loading   | Import time + lazy             | Lazy-only via getConfig()       |
+| Timer management | setTimeout sem cleanup         | Timer registry com auto-cleanup |
 
 ---
 
@@ -314,15 +314,15 @@ Distribuição:
 
 Análise dos 10 módulos mais complexos (baseada em branching):
 
-| Arquivo                              | Linhas | If/else + switch | Try/catch | Loops | Complexidade |
-| ------------------------------------ | -----: | ---------------: | --------: | ----: | -----------: |
-| `agent/always-alive.js`             |    619 |               32 |        12 |     3 |         Alto |
-| `agent/dialog/loop-manager.js`      |    597 |               28 |         8 |     5 |         Alto |
-| `conversation-hub/orchestrator.js`   |    572 |               24 |        10 |     4 |         Alto |
-| `conversation-hub/store.js`          |    561 |               18 |         6 |     3 |        Médio |
-| `channel/client.js`                  |    556 |               22 |         8 |     2 |         Alto |
-| `audit/pipeline.js`                  |    530 |               20 |         6 |     4 |        Médio |
-| `terminal/index.js`                  |    472 |               15 |         7 |     4 |        Médio |
-| `terminal/dialog/engine.js`          |    459 |               18 |         5 |     3 |        Médio |
-| `tools/todo/crud-tools.js`           |    459 |               16 |         7 |     2 |        Médio |
-| `channel/inject.js`                  |    451 |               14 |         6 |     3 |        Médio |
+| Arquivo                            | Linhas | If/else + switch | Try/catch | Loops | Complexidade |
+| ---------------------------------- | -----: | ---------------: | --------: | ----: | -----------: |
+| `agent/always-alive.js`            |    619 |               32 |        12 |     3 |         Alto |
+| `agent/dialog/loop-manager.js`     |    597 |               28 |         8 |     5 |         Alto |
+| `conversation-hub/orchestrator.js` |    572 |               24 |        10 |     4 |         Alto |
+| `conversation-hub/store.js`        |    561 |               18 |         6 |     3 |        Médio |
+| `channel/client.js`                |    556 |               22 |         8 |     2 |         Alto |
+| `audit/pipeline.js`                |    530 |               20 |         6 |     4 |        Médio |
+| `terminal/index.js`                |    472 |               15 |         7 |     4 |        Médio |
+| `terminal/dialog/engine.js`        |    459 |               18 |         5 |     3 |        Médio |
+| `tools/todo/crud-tools.js`         |    459 |               16 |         7 |     2 |        Médio |
+| `channel/inject.js`                |    451 |               14 |         6 |     3 |        Médio |

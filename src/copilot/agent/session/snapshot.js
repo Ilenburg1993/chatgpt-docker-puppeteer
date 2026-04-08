@@ -12,7 +12,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
@@ -242,7 +242,7 @@ export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
  * @returns {Promise<SnapshotListItem[]>}
  */
 export async function listSnapshotsAsync() {
-    if (!existsSync(SNAPSHOT_DIR)) return [];
+    try { await access(SNAPSHOT_DIR); } catch { return []; }
 
     /** @type {SnapshotListItem[]} */
     const result = [];
@@ -280,10 +280,12 @@ export async function listSnapshotsAsync() {
  * @returns {Promise<SessionSnapshotData | null>}
  */
 export async function loadSnapshotAsync(snapshotId) {
-    if (!existsSync(SNAPSHOT_DIR)) return null;
+    try { await access(SNAPSHOT_DIR); } catch { return null; }
 
     const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
-    if (!existsSync(filepath)) {
+    let fileExists = true;
+    try { await access(filepath); } catch { fileExists = false; }
+    if (!fileExists) {
         const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
         if (files.length === 0) return null;
         const first = files[0];

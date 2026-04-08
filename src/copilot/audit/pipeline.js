@@ -393,9 +393,9 @@ export function createAuditLog(opts = {}) {
 /** Singleton global de audit log. */
 export const defaultAuditLog = createAuditLog();
 
-process.once('beforeExit', () => {
-    void defaultAuditLog.flush();
-});
+// F129: flush audit log via shutdown centralizado (priority 90 — low, runs late)
+import { registerShutdownHandler } from '#copilot/core/shutdown';
+registerShutdownHandler('audit.flush', async () => { await defaultAuditLog.flush(); }, 90);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Part 3: Permission Audit Logger (ex-agent/infra/tool-audit-logger.js)

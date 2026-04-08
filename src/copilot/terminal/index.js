@@ -437,16 +437,21 @@ export async function startTerminalServer() {
     // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
     startTodoCleanupJob();
 
-    // T-21: graceful shutdown handlers para SIGTERM/SIGINT
-    const _onShutdown = () => {
-        log('INFO', '[TerminalServer] Sinal de encerramento recebido — cleanup...');
+    // T-21: graceful shutdown handlers via registerShutdownHandler
+    const { registerShutdownHandler } = await import('#copilot/core/shutdown');
+
+    registerShutdownHandler('terminal.reflectionTimer', async () => {
         if (_reflectionTimer !== null) {
             clearInterval(_reflectionTimer);
             _reflectionTimer = null;
         }
-    };
-    process.once('SIGTERM', _onShutdown);
-    process.once('SIGINT', _onShutdown);
+        log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
+    }, 10);
+
+    registerShutdownHandler('terminal.injectServer', async () => {
+        await new Promise((resolve) => injectServer.close(resolve));
+        log('INFO', '[TerminalServer] Inject server encerrado via shutdown handler.');
+    }, 20);
 
     // T-22: SIGHUP é enviado pelo VS Code quando o painel do terminal é fechado.
     // Ignorar para manter o inject server HTTP ativo mesmo após o painel ser fechado.

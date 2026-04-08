@@ -9,7 +9,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';
@@ -43,11 +43,11 @@ const writeFileContentTool = buildTool({
         log('INFO', `[copilot/write_file_content] ${resolved}`);
 
         try {
-            if (!fs.existsSync(resolved)) {
+            try { await fs.access(resolved); } catch {
                 return { success: false, error: 'Arquivo não encontrado. Use create_file para criar um novo arquivo.' };
             }
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
-            fs.writeFileSync(resolved, buf);
+            await fs.writeFile(resolved, buf);
             return {
                 success: true,
                 path: resolved,
@@ -92,16 +92,19 @@ const createFileTool = buildTool({
         log('INFO', `[copilot/create_file] ${resolved}`);
 
         try {
-            if (fs.existsSync(resolved) && !overwrite) {
-                return {
-                    success: false,
-                    error: 'Arquivo já existe. Passe overwrite: true para sobrescrever ou use write_file_content.',
-                };
+            if (!overwrite) {
+                try {
+                    await fs.access(resolved);
+                    return {
+                        success: false,
+                        error: 'Arquivo já existe. Passe overwrite: true para sobrescrever ou use write_file_content.',
+                    };
+                } catch { /* file does not exist — ok */ }
             }
             if (createParentDirs) {
-                fs.mkdirSync(path.dirname(resolved), { recursive: true });
+                await fs.mkdir(path.dirname(resolved), { recursive: true });
             }
-            fs.writeFileSync(resolved, content ?? '', 'utf8');
+            await fs.writeFile(resolved, content ?? '', 'utf8');
             return {
                 success: true,
                 path: resolved,
@@ -134,11 +137,11 @@ const deleteFileTool = buildTool({
         log('INFO', `[copilot/delete_file] ${resolved}`);
 
         try {
-            const stats = fs.statSync(resolved);
+            const stats = await fs.stat(resolved);
             if (stats.isDirectory()) {
                 return { success: false, error: 'É um diretório. delete_file só opera em arquivos.' };
             }
-            fs.unlinkSync(resolved);
+            await fs.unlink(resolved);
             return { success: true, path: resolved, deleted: true };
         } catch (/** @type {any} */ err) {
             return { success: false, error: err.message };
@@ -171,16 +174,19 @@ const copyFileTool = buildTool({
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
 
         try {
-            if (fs.existsSync(dst.resolved) && !overwrite) {
-                return {
-                    success: false,
-                    error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
-                };
+            if (!overwrite) {
+                try {
+                    await fs.access(dst.resolved);
+                    return {
+                        success: false,
+                        error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
+                    };
+                } catch { /* dest does not exist — ok */ }
             }
-            fs.mkdirSync(path.dirname(dst.resolved), { recursive: true });
-            fs.copyFileSync(src.resolved, dst.resolved);
-            const size = fs.statSync(dst.resolved).size;
-            return { success: true, source: src.resolved, destination: dst.resolved, bytesWritten: size };
+            await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
+            await fs.copyFile(src.resolved, dst.resolved);
+            const stats = await fs.stat(dst.resolved);
+            return { success: true, source: src.resolved, destination: dst.resolved, bytesWritten: stats.size };
         } catch (/** @type {any} */ err) {
             return { success: false, error: err.message };
         }
@@ -212,14 +218,17 @@ const moveFileTool = buildTool({
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
 
         try {
-            if (fs.existsSync(dst.resolved) && !overwrite) {
-                return {
-                    success: false,
-                    error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
-                };
+            if (!overwrite) {
+                try {
+                    await fs.access(dst.resolved);
+                    return {
+                        success: false,
+                        error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
+                    };
+                } catch { /* dest does not exist — ok */ }
             }
-            fs.mkdirSync(path.dirname(dst.resolved), { recursive: true });
-            fs.renameSync(src.resolved, dst.resolved);
+            await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
+            await fs.rename(src.resolved, dst.resolved);
             return { success: true, source: src.resolved, destination: dst.resolved };
         } catch (/** @type {any} */ err) {
             return { success: false, error: err.message };
@@ -249,13 +258,13 @@ const patchFileTool = buildTool({
         const v = await validatePath(filePath);
         if (!v.ok) return { success: false, error: v.reason };
 
-        if (!fs.existsSync(v.resolved)) {
+        try { await fs.access(v.resolved); } catch {
             return { success: false, error: `Arquivo não encontrado: ${v.resolved}` };
         }
 
         let content;
         try {
-            content = fs.readFileSync(v.resolved, 'utf8');
+            content = await fs.readFile(v.resolved, 'utf8');
         } catch (/** @type {any} */ e) {
             return { success: false, error: `Erro ao ler arquivo: ${e.message}` };
         }
@@ -275,7 +284,7 @@ const patchFileTool = buildTool({
         const safeNewString = new_string.replace(/\$/g, '$$$$');
         const updated = content.replace(old_string, safeNewString);
         try {
-            fs.writeFileSync(v.resolved, updated, 'utf8');
+            await fs.writeFile(v.resolved, updated, 'utf8');
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
             return { success: true, path: v.resolved };
         } catch (/** @type {any} */ e) {
