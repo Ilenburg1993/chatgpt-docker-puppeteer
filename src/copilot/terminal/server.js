@@ -423,7 +423,11 @@ export function createInjectServer() {
                     res.end(JSON.stringify({ ok: false, error: 'Payload too large (máx 2 MB)' }));
                 }
             } else {
-                log('ERROR', `[TerminalServer] Erro não tratado: ${err?.message ?? err}`);
+                // F133: Em produção, não logar stack traces completos (apenas mensagem)
+                const logMsg = process.env.NODE_ENV === 'production'
+                    ? `[TerminalServer] Erro interno: ${err?.message ?? 'unknown'}`
+                    : `[TerminalServer] Erro não tratado: ${err?.stack ?? err?.message ?? err}`;
+                log('ERROR', logMsg);
                 if (!res.headersSent) {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: 'Internal server error' }));

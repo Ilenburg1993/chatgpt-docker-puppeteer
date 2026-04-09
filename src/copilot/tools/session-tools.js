@@ -11,7 +11,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
@@ -90,9 +90,9 @@ const getWorkspaceInfoTool = defineTool('get_workspace_info', {
         let gitRoot = null;
         let gitCommit = null;
         try {
-            gitBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
-            gitRoot = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
-            gitCommit = execSync('git rev-parse --short HEAD', { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
         } catch {
             // not a git repo or git not available
         }

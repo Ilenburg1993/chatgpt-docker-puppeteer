@@ -14,6 +14,7 @@ import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from
 import { log } from '#copilot/observability/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,11 @@ import jwt from 'jsonwebtoken';
  *
  * @typedef {import('socket.io').Socket} SocketClient
  */
+
+// F132: Schema Zod para validação do token de handshake
+const HandshakeAuthSchema = z.object({
+    token: z.string().min(10).max(8192),
+});
 
 // ─── Namespace /copilot ───────────────────────────────────────────────────────
 
@@ -132,17 +138,21 @@ function _setupAuthMiddleware(ns) {
     // BUG-09 (fix): importações JWT movidas para top-level para evitar overhead por conexão
     ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {
         try {
-            const token =
+            // F132: Validar shape do auth via Zod antes de verificação JWT
+            const rawToken =
                 socket.handshake.auth?.['token'] || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
-            if (!token) {
-                return next(new Error('COPILOT_NS: Token de autenticação ausente.'));
+            const authResult = HandshakeAuthSchema.safeParse({ token: rawToken });
+            if (!authResult.success) {
+                log('WARN', `[socket-ns/copilot] Auth rejeitado — token malformado (IP: ${socket.handshake.address})`);
+                return next(new Error('COPILOT_NS: Token de autenticação ausente ou malformado.'));
             }
+            const { token } = authResult.data;
             const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
             /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
                 /** @type {{ sub?: string }} */ (payload).sub;
             next();
         } catch (/** @type {any} */ err) {
-            log('WARN', `[socket-ns/copilot] Auth falhou: ${err.message}`);
+            log('WARN', `[socket-ns/copilot] Auth falhou (IP: ${socket.handshake.address}): ${err.message}`);
             next(new Error('COPILOT_NS: Token inválido ou expirado.'));
         }
     });
