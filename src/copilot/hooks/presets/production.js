@@ -284,15 +284,30 @@ export function createProductionHooks(opts = {}) {
     const circuitBreaker = createCircuitBreakerHandler({
         maxRetries: circuitBreakerMaxRetries,
         resetAfterMs: circuitBreakerResetMs,
-        onTrip: (ctx) => {
-            log('WARN', `[preset/production] circuit breaker ativado para '${ctx}'`);
+        fatalPatterns: ['ERR_SOCKET_CLOSED', 'ERR_IPC_CHANNEL_CLOSED', 'ERR_IPC_DISCONNECTED', 'SESSION_FATAL'],
+        transientPatterns: [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ECONNRESET',
+            'EPIPE',
+            'ENOTFOUND',
+            'EAI_AGAIN',
+            '429',
+            '502',
+            '503',
+            '504',
+        ],
+        onError: (input) => {
             if (errorNotifier) {
                 try {
-                    errorNotifier(new Error(`Circuit breaker aberto para ${ctx}`), ctx);
+                    errorNotifier(new Error(input.error), input.errorContext);
                 } catch (_) {
                     // ignora
                 }
             }
+        },
+        onTrip: (ctx) => {
+            log('WARN', `[preset/production] circuit breaker ativado para '${ctx}'`);
         },
     });
 

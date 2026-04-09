@@ -22,7 +22,7 @@ const _PENDING_TTL_MS = 10 * 60 * 1000;
  * @returns {(() => void)[]}
  */
 export function attachToolHandlers(ctx) {
-    const { session, sessionId, metrics, hookBus, persist, persistSet, persistEvent, pending } = ctx;
+    const { session, sessionId, metrics, errorTracker, hookBus, persist, persistSet, persistEvent, pending } = ctx;
     /** @type {(() => void)[]} */
     const unsubs = [];
 
@@ -65,6 +65,13 @@ export function attachToolHandlers(ctx) {
             const toolName = pendingEntry?.toolName ?? toolCallId;
 
             metrics?.recordToolCall(toolName, durationMs, success);
+            if (!success && errorTracker) {
+                errorTracker.trackError(new Error(`Tool failed: ${toolName}`), {
+                    source: 'sdk:tool.execution_complete',
+                    sessionId,
+                    metadata: { toolName, durationMs },
+                });
+            }
             hookBus?.emitHook('post_tool_use', sessionId, { toolName, success }, { durationMs });
 
             globalAuditBuffer.push({

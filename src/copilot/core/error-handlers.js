@@ -12,16 +12,16 @@
  * @module copilot/core/error-handlers
  */
 
-import { log } from '../observability/logger.js';
 import { defaultErrorTracker } from '../observability/error-tracker.js';
-import { CopilotError, BridgeError } from './errors.js';
+import { log } from '../observability/logger.js';
 import { CircuitOpenError } from './circuit-breaker.js';
+import { BridgeError, CopilotError } from './errors.js';
 
 // ─── logSwallowed ─────────────────────────────────────────────────────────────
 
 /**
- * Loga um erro silenciado com nível DEBUG e registra no ErrorTracker.
- * Substitui catches comment-only que perdem informação de diagnóstico.
+ * Loga um erro silenciado com nível DEBUG e registra no ErrorTracker. Substitui catches comment-only que perdem
+ * informação de diagnóstico.
  *
  * @param {unknown} err - Erro capturado (pode ser qualquer coisa).
  * @param {string} context - Identificador do local (ex: 'tool:git_status', 'bridge.mcp.connect').
@@ -36,8 +36,8 @@ export function logSwallowed(err, context) {
 // ─── wrapAsync ────────────────────────────────────────────────────────────────
 
 /**
- * Envolve uma função async para capturar erros e logá-los via logSwallowed.
- * Retorna undefined em caso de erro — uso para operações best-effort.
+ * Envolve uma função async para capturar erros e logá-los via logSwallowed. Retorna undefined em caso de erro — uso
+ * para operações best-effort.
  *
  * @template T
  * @param {() => Promise<T>} fn - Função async a executar.
@@ -56,17 +56,13 @@ export async function wrapAsync(fn, context) {
 // ─── isFatalError ─────────────────────────────────────────────────────────────
 
 /** @type {ReadonlySet<string>} */
-const FATAL_CODES = new Set([
-    'SESSION_FATAL',
-    'ERR_SOCKET_CLOSED',
-    'ERR_IPC_CHANNEL_CLOSED',
-    'ERR_IPC_DISCONNECTED',
-]);
+const FATAL_CODES = new Set(['SESSION_FATAL', 'ERR_SOCKET_CLOSED', 'ERR_IPC_CHANNEL_CLOSED', 'ERR_IPC_DISCONNECTED']);
 
 /**
  * Determina se um erro é fatal (irrecuperável) e deve causar shutdown/session.fatal.
  *
  * Fatal:
+ *
  * - `SessionError` com code `SESSION_FATAL`
  * - `CircuitOpenError` (circuit breaker aberto)
  * - Erros com codes de socket/IPC fechado
@@ -104,6 +100,7 @@ const TRANSIENT_HTTP_CODES = new Set([429, 502, 503, 504]);
  * Determina se um erro é transiente e pode ser retriado.
  *
  * Transiente:
+ *
  * - `BridgeError` (erros de comunicação externa)
  * - Erros com codes de rede (`ECONNREFUSED`, `ETIMEDOUT`, etc.)
  * - Erros HTTP com status 429, 502, 503, 504

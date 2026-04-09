@@ -743,6 +743,44 @@ describe('createCircuitBreakerHandler', () => {
         const r = await handler({ error: 'e', errorContext: 'ctx_2', recoverable: true }, { sessionId: 's' });
         assert.strictEqual(r.errorHandling, 'retry');
     });
+
+    it('fatalPatterns força abort imediato independente de recoverable', async () => {
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 5,
+            resetAfterMs: 10_000,
+            fatalPatterns: ['ERR_SOCKET_CLOSED', 'SESSION_FATAL'],
+        });
+        const r = await handler(
+            { error: 'ERR_SOCKET_CLOSED: connection lost', errorContext: 'ctx', recoverable: true },
+            { sessionId: 's' },
+        );
+        assert.strictEqual(r.errorHandling, 'abort');
+    });
+
+    it('transientPatterns trata como recuperável quando recoverable=false', async () => {
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 3,
+            resetAfterMs: 10_000,
+            transientPatterns: ['ECONNREFUSED', 'ETIMEDOUT'],
+        });
+        const r = await handler(
+            { error: 'connect ECONNREFUSED 127.0.0.1:3000', errorContext: 'ctx', recoverable: false },
+            { sessionId: 's' },
+        );
+        assert.strictEqual(r.errorHandling, 'retry');
+    });
+
+    it('onError callback é chamado para cada erro', async () => {
+        const errors = [];
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 3,
+            resetAfterMs: 10_000,
+            onError: (input) => errors.push(input.error),
+        });
+        await handler({ error: 'test-error', errorContext: 'ctx', recoverable: true }, { sessionId: 's' });
+        assert.strictEqual(errors.length, 1);
+        assert.strictEqual(errors[0], 'test-error');
+    });
 });
 
 describe('createContextualErrorHandler', () => {

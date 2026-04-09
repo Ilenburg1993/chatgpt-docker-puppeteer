@@ -14,8 +14,8 @@
 | ----: | --------- | --------------------------------------- | --------------------------------------- |
 |     1 | F121-F130 | Foundation Hardening                    | core/ expansion, FS async, shutdown     |
 |     2 | F131-F138 | Security Hardening                      | execSync, auth, SSRF, origin            |
-|     3 | F139-F148 | Error Handling Standardization          | catch blocks, error flow, logging       |
-|     4 | F149-F156 | Timer & Lifecycle Management            | setInterval cleanup, timer registry     |
+|     3 | F139-F150 | Error Handling Standardization ✅       | catch blocks, error flow, logging       |
+|     4 | F151-F158 | Timer & Lifecycle Management            | setInterval cleanup, timer registry     |
 |     5 | F157-F168 | Conversation-Hub: Testes + Decomposição | 0→100% test coverage, god module split  |
 |     6 | F169-F178 | Bridges: Testes + Retry Migration       | 0→100% test coverage, centralizar retry |
 |     7 | F179-F192 | Terminal Hardening + Decomposição       | 5 god modules, server security, tests   |
@@ -194,23 +194,23 @@
 
 ### Auditoria pré-execução (atualizada 2026-03-15)
 
-| Diretório | `catch {}` (comment) | `catch {}` (code) | `catch(e)` | `.catch(()=>{})` | **Total** |
-|---|---|---|---|---|---|
-| bridges | 0 | 28 | — | — | 28 |
-| tools | 8 | 19 | — | — | 27 |
-| agent | 10 | 12 | — | 6 | 28 |
-| terminal | 6 | 14 | — | 1 | 21 |
-| audit | 4 | 6 | — | — | 10 |
-| observability | 4 | 4 | — | — | 8 |
-| conversation-hub | 4 | 3 | — | 2 | 9 |
-| channel | 3 | 3 | — | — | 6 |
-| config | 4 | 1 | — | — | 5 |
-| sdk | 3 | 1 | — | — | 4 |
-| api | 1 | 1 | — | — | 2 |
-| core | 0 | 2 | — | — | 2 |
-| db | 1 | 0 | — | — | 1 |
-| *c/ param (global)* | *5* | *20* | *25* | — | — |
-| **TOTAL** | **48** | **94** | **25** | **9** | **176** |
+| Diretório           | `catch {}` (comment) | `catch {}` (code) | `catch(e)` | `.catch(()=>{})` | **Total** |
+| ------------------- | -------------------- | ----------------- | ---------- | ---------------- | --------- |
+| bridges             | 0                    | 28                | —          | —                | 28        |
+| tools               | 8                    | 19                | —          | —                | 27        |
+| agent               | 10                   | 12                | —          | 6                | 28        |
+| terminal            | 6                    | 14                | —          | 1                | 21        |
+| audit               | 4                    | 6                 | —          | —                | 10        |
+| observability       | 4                    | 4                 | —          | —                | 8         |
+| conversation-hub    | 4                    | 3                 | —          | 2                | 9         |
+| channel             | 3                    | 3                 | —          | —                | 6         |
+| config              | 4                    | 1                 | —          | —                | 5         |
+| sdk                 | 3                    | 1                 | —          | —                | 4         |
+| api                 | 1                    | 1                 | —          | —                | 2         |
+| core                | 0                    | 2                 | —          | —                | 2         |
+| db                  | 1                    | 0                 | —          | —                | 1         |
+| *c/ param (global)* | *5*                  | *20*              | *25*       | —                | —         |
+| **TOTAL**           | **48**               | **94**            | **25**     | **9**            | **176**   |
 
 **Achados críticos da auditoria:**
 1. **Hierarquia de erros ociosa**: 51 `throw new <CopilotSubclass>`, 0 `instanceof CopilotError|SessionError|...` — hierarquia nunca discriminada em catches
@@ -297,6 +297,46 @@
 - **F150.3**: Grep validate: catches comment-only should be 0 (all converted to logSwallowed)
 - **F150.4**: Grep validate: `.catch(() => {})` void patterns should be 0
 - **F150.5**: Commit: `fix(reliability): Faixa 3 (F139-F150) — error handling standardization`
+
+### Deep Review Faixa 3 (pós-commit)
+
+#### Auditoria quantitativa final (328 catches totais em src/copilot/)
+| Categoria     | Contagem | Nota                                                          |
+| ------------- | -------- | ------------------------------------------------------------- |
+| logSwallowed  | 46       | Substituídos via F140-F147                                    |
+| log_error     | 19       | Adequados — usam `log('ERROR', ...)` antes de rethrow/return  |
+| log_warn      | 65       | Adequados — catches com ação + log de warning                 |
+| rethrow       | 8        | Corretos — `catch` que re-lança ou transforma                 |
+| code_only     | 175      | Catches com lógica executada (fallback, cleanup, retry)       |
+| comment_only  | 4        | Intencionais: `tools/file/shared.js:116`, `write-tools.js:119,203,249` (control flow) |
+| empty         | 0        | Eliminados                                                    |
+
+#### Leitura de documentação oficial do SDK (`@github/copilot-sdk` v0.2.1)
+
+**Achados relevantes:**
+
+1. **`onErrorOccurred` hook** — SDK fornece `input: { error: string, errorContext: string, recoverable: boolean }` e espera `{ errorHandling: 'retry' | 'skip' | 'abort' }`. Nossa implementação em `hooks/error-handler.js` está **100% alinhada** com a API.
+
+2. **`client.stop()` → `Promise<Error[]>`** — SDK retorna lista de erros de cleanup. Nossa integração em `sdk/client.js:161` e `agent-lifecycle.js:271` **já trata corretamente** (log WARN + retorna array).
+
+3. **Telemetria OTEL** — SDK suporta `telemetry.otlpEndpoint` nativamente. Nossa configuração via `OTEL_EXPORTER_OTLP_ENDPOINT` no env está coerente.
+
+4. **Tipos de erro** — SDK **não exporta** error classes tipadas. Todos os erros são `Error` genéricos com mensagem string. Nossa hierarquia `CopilotError → SessionError, BridgeError, etc.` é uma **extensão de domínio correta** que adiciona categorização ausente no SDK.
+
+5. **`session.error` event** — Emite `{ errorType: string, message: string }`. Nosso `session-handlers.js` já alimenta `errorTracker.trackError()` corretamente.
+
+6. **Eventos não cobertos** — O SDK documenta `session.compaction_start`, `session.compaction_complete`. Já cobertos nos coletores.
+
+#### Gaps identificados e correções implementadas
+
+| Gap | Descrição | Correção |
+| --- | --------- | -------- |
+| G1  | `tool.execution_complete` com `!success` não alimentava `errorTracker` | Adicionado `errorTracker.trackError()` em `collectors/tool-handlers.js` |
+| G2  | `createCircuitBreakerHandler` não distinguia erros fatais/transientes por conteúdo string | Adicionados `fatalPatterns` e `transientPatterns` ao circuit-breaker |
+| G3  | `onErrorOccurred` no preset production não notificava ErrorTracker a cada erro (só no trip) | Adicionado `onError` callback para tracking de todo erro SDK |
+| G4  | `wrapAsync` exportado mas sem uso em produção | Documentado — disponível como utilitário para uso futuro (nenhuma ação necessária) |
+
+#### Status final Faixa 3: ✅ COMPLETA + DEEP REVIEW APLICADA
 
 ---
 

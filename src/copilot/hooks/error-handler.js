@@ -43,6 +43,10 @@ import { log } from '#copilot/observability/logger';
  * @property {number} [resetAfterMs] - Milissegundos antes de fechar o circuito novamente. Padrão: 30000
  * @property {(context: string) => void} [onTrip] - Callback quando o circuito é aberto
  * @property {(context: string) => void} [onReset] - Callback quando o circuito é fechado
+ * @property {(input: ErrorOccurredHookInput) => void} [onError] - Callback chamado para cada erro (ex: tracking)
+ * @property {string[]} [fatalPatterns] - Substrings no campo `error` que forçam abort imediato
+ * @property {string[]} [transientPatterns] - Substrings no campo `error` que tratam como recuperável mesmo quando
+ *   `recoverable=false`
  */
 
 /**
@@ -163,7 +167,15 @@ export function createErrorHandler(opts = {}) {
  * @returns {(input: ErrorOccurredHookInput, invocation: InvocationContext) => ErrorOccurredHookOutput}
  */
 export function createCircuitBreakerHandler(opts = {}) {
-    const { maxRetries = 3, resetAfterMs = 30_000, onTrip, onReset } = opts;
+    const {
+        maxRetries = 3,
+        resetAfterMs = 30_000,
+        onTrip,
+        onReset,
+        onError,
+        fatalPatterns = [],
+        transientPatterns = [],
+    } = opts;
 
     /** @type {Map<string, CircuitBreakerState>} */
     const circuits = new Map();
@@ -179,11 +191,36 @@ export function createCircuitBreakerHandler(opts = {}) {
         return /** @type {CircuitBreakerState} */ (circuits.get(contextKey));
     }
 
+    /**
+     * @param {string} text
+     * @param {string[]} patterns
+     * @returns {boolean}
+     */
+    function matchesAny(text, patterns) {
+        const lower = text.toLowerCase();
+        return patterns.some((p) => lower.includes(p.toLowerCase()));
+    }
+
     return function onErrorOccurred(input) {
         const { error, errorContext, recoverable } = input;
         const contextKey = errorContext ?? 'unknown';
         const state = getState(contextKey);
         const now = Date.now();
+
+        // Notificar callback de tracking (ErrorTracker, etc.)
+        if (onError) {
+            try {
+                onError(input);
+            } catch (_) {
+                // ignora erros no callback
+            }
+        }
+
+        // Fatal pattern → abort imediato sem retry
+        if (fatalPatterns.length > 0 && matchesAny(error, fatalPatterns)) {
+            log('WARN', `[hooks/circuit-breaker] padrão fatal detectado em '${contextKey}': ${error} — abort`);
+            return { errorHandling: 'abort' };
+        }
 
         // Circuito aberto?
         if (state.openedAt !== null) {
@@ -209,8 +246,16 @@ export function createCircuitBreakerHandler(opts = {}) {
         }
 
         if (!recoverable) {
-            log('WARN', `[hooks/circuit-breaker] irrecuperável '${contextKey}': ${error} — abort`);
-            return { errorHandling: 'abort' };
+            // Transient pattern override: tratar como recuperável mesmo com recoverable=false
+            if (transientPatterns.length > 0 && matchesAny(error, transientPatterns)) {
+                log(
+                    'DEBUG',
+                    `[hooks/circuit-breaker] padrão transiente detectado em '${contextKey}' — tratando como recuperável`,
+                );
+            } else {
+                log('WARN', `[hooks/circuit-breaker] irrecuperável '${contextKey}': ${error} — abort`);
+                return { errorHandling: 'abort' };
+            }
         }
 
         state.failures++;
