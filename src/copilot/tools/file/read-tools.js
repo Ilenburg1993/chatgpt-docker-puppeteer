@@ -10,7 +10,7 @@
 
 import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs';
-import { stat as fsStat } from 'node:fs/promises';
+import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool, withSkipPermission } from '../tool-factory.js';
@@ -164,13 +164,13 @@ const listDirectoryTool = buildTool({
             /**
              * @param {string} dir
              * @param {number} currentDepth
-             * @returns {DirEntry[]}
+             * @returns {Promise<DirEntry[]>}
              */
-            function readDir(dir, currentDepth) {
+            async function readDir(dir, currentDepth) {
                 /** @type {string[]} */
                 let entries;
                 try {
-                    entries = fs.readdirSync(dir);
+                    entries = await fsReaddir(dir);
                 } catch {
                     return [];
                 }
@@ -181,7 +181,13 @@ const listDirectoryTool = buildTool({
                     if (!showHidden && name.startsWith('.')) continue;
                     if (filter) {
                         const globMatch = filter.startsWith('*.') ? name.endsWith(filter.slice(1)) : name === filter;
-                        if (!globMatch && !fs.statSync(path.join(dir, name)).isDirectory()) continue;
+                        if (!globMatch) {
+                            try {
+                                if (!(await fsStat(path.join(dir, name))).isDirectory()) continue;
+                            } catch {
+                                continue;
+                            }
+                        }
                     }
                     if (result.length >= MAX_LIST_ENTRIES) break;
 
@@ -189,7 +195,7 @@ const listDirectoryTool = buildTool({
                     const rel = path.relative(WORKSPACE_ROOT, full);
                     let entryStats;
                     try {
-                        entryStats = fs.statSync(full);
+                        entryStats = await fsStat(full);
                     } catch {
                         continue;
                     }
@@ -202,14 +208,14 @@ const listDirectoryTool = buildTool({
                     };
                     if (!isDir) entry.size = entryStats.size;
                     if (isDir && recursive && currentDepth < (depth ?? 3)) {
-                        entry.children = readDir(full, currentDepth + 1);
+                        entry.children = await readDir(full, currentDepth + 1);
                     }
                     result.push(entry);
                 }
                 return result;
             }
 
-            const entries = readDir(resolved, 1);
+            const entries = await readDir(resolved, 1);
             return {
                 success: true,
                 path: resolved,

@@ -23,8 +23,7 @@
 import { getAuditTail } from '#copilot/audit/pipeline';
 import { log } from '#copilot/observability/logger';
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -154,7 +153,14 @@ const hookGetAuditTailTool = buildTool({
 
         // Fallback: audit.jsonl do sistema operacional de compliance (.github/hooks/state/)
         const auditPath = join(HOOK_STATE_DIR, 'audit.jsonl');
-        if (!existsSync(auditPath)) {
+        let auditExists = false;
+        try {
+            await access(auditPath);
+            auditExists = true;
+        } catch {
+            // file does not exist
+        }
+        if (!auditExists) {
             log('WARN', '[hook-tools/get_audit_tail] Ring buffer vazio e audit.jsonl não encontrado.');
             return { entries: [], total: 0, source: 'none', note: 'Nenhuma fonte de auditoria disponível.' };
         }
@@ -303,7 +309,14 @@ const hookGetPendingTasksTool = buildTool({
     parameters: z.object({}),
     handler: async () => {
         const pendingPath = join(HOOK_STATE_DIR, 'pending-tasks.md');
-        if (!existsSync(pendingPath)) {
+        let pendingExists = false;
+        try {
+            await access(pendingPath);
+            pendingExists = true;
+        } catch {
+            // file does not exist
+        }
+        if (!pendingExists) {
             return { content: '', exists: false };
         }
         try {

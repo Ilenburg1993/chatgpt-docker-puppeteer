@@ -12,7 +12,7 @@
 import { SERVER_PORT } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
-import { existsSync, readFileSync } from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -117,7 +117,12 @@ const getSessionStateTool = defineTool('get_session_state', {
             const result = {};
             for (const file of files) {
                 const p = join(stateDir, file);
-                if (existsSync(p)) result[file] = readFileSync(p, 'utf8');
+                try {
+                    await access(p);
+                    result[file] = await readFile(p, 'utf8');
+                } catch {
+                    // file does not exist — skip
+                }
             }
             return result;
         } catch (/** @type {any} */ e) {

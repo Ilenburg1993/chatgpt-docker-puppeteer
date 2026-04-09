@@ -36,7 +36,7 @@ let _toolsConfig = { allowlist: null, denylist: [] };
  * @deprecated F92: Use loadToolsConfigAsync() em fluxos assíncronos.
  * @returns {void}
  */
-export function loadToolsConfig() {
+export function loadToolsConfig() { // FS-SYNC: init-time-safe (deprecated sync fallback)
     if (!existsSync(TOOLS_CONFIG_PATH)) return;
     try {
         const raw = readFileSync(TOOLS_CONFIG_PATH, 'utf8');
@@ -66,7 +66,7 @@ export function loadToolsConfig() {
  * @deprecated F92: Use persistToolsConfigAsync() em fluxos assíncronos.
  * @returns {void}
  */
-function persistToolsConfig() {
+function persistToolsConfig() { // FS-SYNC: init-time-safe (deprecated sync fallback)
     try {
         writeFileSync(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
     } catch (/** @type {any} */ err) {
