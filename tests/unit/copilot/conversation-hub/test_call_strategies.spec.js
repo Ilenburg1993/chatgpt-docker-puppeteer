@@ -6,7 +6,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from '../../../../src/copilot/conversation-hub/call-strategies.js';
+import {
+    callViaDialogLoop,
+    callViaSimpleChat,
+    callViaStructured,
+} from '../../../../src/copilot/conversation-hub/call-strategies.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -73,9 +77,11 @@ describe('callViaDialogLoop', () => {
         };
         const ctx = makeCtx();
         await callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx);
-        assert.ok(/** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
-            (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'chunk1',
-        ));
+        assert.ok(
+            /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
+                (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'chunk1',
+            ),
+        );
     });
 
     it('remove listener mesmo quando sendDialogTurn lança', async () => {
@@ -88,7 +94,10 @@ describe('callViaDialogLoop', () => {
         };
         const ctx = makeCtx();
         await assert.rejects(() => callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx));
-        assert.ok(agent.off.mock.calls.some((c) => c[0] === 'task.delta'), 'off deve ser chamado no finally');
+        assert.ok(
+            agent.off.mock.calls.some((c) => c[0] === 'task.delta'),
+            'off deve ser chamado no finally',
+        );
     });
 });
 
@@ -147,8 +156,10 @@ describe('callViaSimpleChat', () => {
         };
         const ctx = makeCtx();
         await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);
-        assert.ok(/** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
-            (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'delta1',
-        ));
+        assert.ok(
+            /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
+                (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'delta1',
+            ),
+        );
     });
 });

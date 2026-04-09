@@ -2,15 +2,15 @@
 /**
  * tests/unit/copilot/conversation-hub/test_orchestrator.spec.js
  *
- * F161: Testes para HubOrchestrator — lifecycle, session management, sendToLlmB, user messages,
- * mutex serialization, event emission, error paths.
+ * F161: Testes para HubOrchestrator — lifecycle, session management, sendToLlmB, user messages, mutex serialization,
+ * event emission, error paths.
  */
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
+import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 const require = createRequire(import.meta.url);
@@ -103,7 +103,9 @@ describe('HubOrchestrator lifecycle', () => {
         orch.init(/** @type {any} */ (createMockBridge()));
 
         let eventFired = false;
-        orch.on('session:created', () => { eventFired = true; });
+        orch.on('session:created', () => {
+            eventFired = true;
+        });
         orch.destroy();
 
         // Após destroy, listeners foram removidos
@@ -333,7 +335,8 @@ describe('HubOrchestrator notifyTerminalTurn', () => {
         orch.on('turn:sent', (d) => sentEvents.push(d));
         orch.on('turn:complete', (d) => completeEvents.push(d));
 
-        orch.notifyTerminalTurn('hub-001',
+        orch.notifyTerminalTurn(
+            'hub-001',
             { turnId: 1, role: 'user', content: 'user msg', turnNumber: 1 },
             { turnId: 2, content: 'llm response', turnNumber: 2, durationMs: 100 },
         );

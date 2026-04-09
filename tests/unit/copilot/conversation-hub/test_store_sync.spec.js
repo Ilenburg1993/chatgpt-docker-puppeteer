@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/conversation-hub/test_store_sync.spec.js
  *
- * F158: Testes para store-sync.js (sincronização SDK → ConversationStore).
- * Usa better-sqlite3 in-memory com migrations copilot.
+ * F158: Testes para store-sync.js (sincronização SDK → ConversationStore). Usa better-sqlite3 in-memory com migrations
+ * copilot.
  */
 
 import assert from 'node:assert/strict';
@@ -67,10 +67,12 @@ describe('syncFromSdkHistory', () => {
 
     it('mapeia type=assistant para role=llm_b', () => {
         const row = /** @type {{ role: string } | undefined} */ (
-            db.prepare(
-                `SELECT role FROM copilot_conversation_turns
+            db
+                .prepare(
+                    `SELECT role FROM copilot_conversation_turns
                  WHERE hub_session_id = ? AND sdk_turn_id = ?`,
-            ).get(HUB_SESSION, 'msg-2')
+                )
+                .get(HUB_SESSION, 'msg-2')
         );
         assert.ok(row);
         assert.strictEqual(row.role, 'llm_b');
@@ -78,10 +80,12 @@ describe('syncFromSdkHistory', () => {
 
     it('mapeia type=user para role=user', () => {
         const row = /** @type {{ role: string } | undefined} */ (
-            db.prepare(
-                `SELECT role FROM copilot_conversation_turns
+            db
+                .prepare(
+                    `SELECT role FROM copilot_conversation_turns
                  WHERE hub_session_id = ? AND sdk_turn_id = ?`,
-            ).get(HUB_SESSION, 'msg-1')
+                )
+                .get(HUB_SESSION, 'msg-1')
         );
         assert.ok(row);
         assert.strictEqual(row.role, 'user');
@@ -99,10 +103,12 @@ describe('syncFromSdkHistory', () => {
 
     it('atribui turn_number sequencial', () => {
         const rows = /** @type {{ turn_number: number }[]} */ (
-            db.prepare(
-                `SELECT turn_number FROM copilot_conversation_turns
+            db
+                .prepare(
+                    `SELECT turn_number FROM copilot_conversation_turns
                  WHERE hub_session_id = ? ORDER BY turn_number ASC`,
-            ).all(HUB_SESSION)
+                )
+                .all(HUB_SESSION)
         );
         for (let i = 0; i < rows.length; i++) {
             assert.strictEqual(rows[i].turn_number, i + 1);
@@ -111,10 +117,12 @@ describe('syncFromSdkHistory', () => {
 
     it('marca mensagens sincronizadas como user_read=1', () => {
         const rows = /** @type {{ user_read: number }[]} */ (
-            db.prepare(
-                `SELECT user_read FROM copilot_conversation_turns
+            db
+                .prepare(
+                    `SELECT user_read FROM copilot_conversation_turns
                  WHERE hub_session_id = ?`,
-            ).all(HUB_SESSION)
+                )
+                .all(HUB_SESSION)
         );
         for (const row of rows) {
             assert.strictEqual(row.user_read, 1);

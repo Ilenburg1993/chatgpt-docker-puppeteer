@@ -2,16 +2,20 @@
 /**
  * tests/unit/copilot/conversation-hub/test_store_helpers.spec.js
  *
- * F157: Testes para store-helpers.js, store-queries.js e store-memories.js.
- * Usa better-sqlite3 in-memory com migrations copilot.
+ * F157: Testes para store-helpers.js, store-queries.js e store-memories.js. Usa better-sqlite3 in-memory com migrations
+ * copilot.
  */
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-import { initTurnsFts, migrateFts5Tokenizer, sanitizeFtsQuery } from '../../../../src/copilot/conversation-hub/store-helpers.js';
-import { countTurns, getTurn, readTurns, searchTurns } from '../../../../src/copilot/conversation-hub/store-queries.js';
+import {
+    initTurnsFts,
+    migrateFts5Tokenizer,
+    sanitizeFtsQuery,
+} from '../../../../src/copilot/conversation-hub/store-helpers.js';
 import { deleteMemory, recallMemories, storeMemory } from '../../../../src/copilot/conversation-hub/store-memories.js';
+import { countTurns, getTurn, readTurns, searchTurns } from '../../../../src/copilot/conversation-hub/store-queries.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 const require = createRequire(import.meta.url);

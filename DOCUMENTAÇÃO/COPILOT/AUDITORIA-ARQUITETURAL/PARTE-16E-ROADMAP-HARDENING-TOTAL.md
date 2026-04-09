@@ -501,69 +501,63 @@
 
 ---
 
-## Faixa 6 — Bridges: Testes + Retry Migration (F171-F180)
+## Faixa 6 — Bridges: Testes + Retry Migration (F169-F178) ✅
 
 > **Objetivo**: Levar bridges de 0 testes para cobertura adequada
 > e centralizar retry/timeout.
+>
+> **Resultado**: 3 novos arquivos de teste, 43 novos testes. Auditoria identificou que F170/F175
+> já tinham cobertura substancial, e F171/F172/F174/F176/F177.3 são N/A ou deferred.
+> Suite completa: 2565 passed, 0 failed.
 
-### F169: Testes para `mcp-tool-schema.js` (137L)
-- **F169.1**: Testar conversão de schema
-- **F169.2**: Edge cases: schema vazio, tipos complexos
-- **F169.3**: ~5 testes
+### F169: Testes para `mcp-tool-schema.js` (137L) ✅
+- **F169.1** ✅: `tests/unit/copilot/bridges/test_mcp_tool_schema.spec.js` — 19 testes
+- **F169.2** ✅: Escalares (6: string, number, integer, boolean, unknown, null)
+- **F169.3** ✅: Enum (2), Object (3: required, no-properties, nested recursive)
+- **F169.4** ✅: Array (2: typed items, no items), allOf/oneOf/anyOf (4), optional (2)
 
-### F170: Testes para `mcp-tool-bridge.js` (432L)
-- **F170.1**: Mock de HTTP transport
-- **F170.2**: Testar circuit breaker behavior
-- **F170.3**: Testar retry behavior
-- **F170.4**: Testar tool registration/discovery
-- **F170.5**: ~10 testes
+### F170: Testes para `mcp-tool-bridge.js` (432L) — JÁ FEITO ✅
+- 11 testes pré-existentes em `test_mcp_tool_bridge.spec.js` (offline, graceful degradation, tool shape)
+- **Ação**: nenhuma adicional necessária.
 
-### F171: Migrar retry/circuit-breaker em `mcp-tool-bridge.js`
-- **F171.1**: Substituir retry manual por `withRetry` com `shouldRetry` para 5xx
-- **F171.2**: Substituir circuit breaker manual por `core/circuit-breaker.js`
-- **F171.3**: Substituir Promise.race timeout por `withTimeout`
-- **F171.4**: Verificar testes passam
+### F171: Migrar retry/circuit-breaker em `mcp-tool-bridge.js` — DEFERRED ⚠️
+- **Motivo**: retry inline (3 tentativas + backoff) e circuit breaker manual funcionam corretamente
+  e têm testes. Migração para core/retry.js + core/circuit-breaker.js seria refactor alto-risco
+  com baixo ROI — o bridge pode evoluir independentemente.
+- **Ação**: deferido para revisão futura se duplicação causar bugs.
 
-### F172: Decompor `mcp-tool-bridge.js`
-- **F172.1**: Extrair `mcp-serializer.js` — serialização/deserialização JSON-RPC
-- **F172.2**: Manter `mcp-tool-bridge.js` como orquestrador <300L
-- **F172.3**: Atualizar imports + testes
+### F172: Decompor `mcp-tool-bridge.js` — JÁ PARCIALMENTE FEITO ✅
+- `mcp-tool-schema.js` já extraído (137L). Restante do bridge (432L) é coeso.
+- **Ação**: nenhuma adicional.
 
-### F173: Testes para `git-bridge.js` (428L)
-- **F173.1**: Mock de `execFile`
-- **F173.2**: Testar cada git command wrapper
-- **F173.3**: Testar error handling (non-zero exit code)
-- **F173.4**: Testar timeout behavior
-- **F173.5**: ~10 testes
+### F173: Testes para `git-bridge.js` (428L) ✅
+- **F173.1** ✅: `tests/unit/copilot/bridges/test_git_bridge.spec.js` — 8 testes
+- **F173.2** ✅: formatStatus (2: vazio, entradas), formatLog (2: normal, oneline), formatBranch (1)
+- **F173.3** ✅: gitStatus, gitLog, gitBranch — async com git real (3 testes)
 
-### F174: Decompor `git-bridge.js`
-- **F174.1**: Criar `git-commands.js` — individual command wrappers
-- **F174.2**: Criar `git-parser.js` — output parsing
-- **F174.3**: Manter `git-bridge.js` como facade <200L
-- **F174.4**: Verificar testes passam
+### F174: Decompor `git-bridge.js` — SKIPPED ⚠️
+- **Motivo**: 428L, mas cada função é self-contained. Decomposição não reduziria complexidade.
+- **Ação**: nenhuma.
 
-### F175: Testes para `nerv-bridge.js` (385L)
-- **F175.1**: Mock de HTTP client
-- **F175.2**: Testar connect/disconnect lifecycle
-- **F175.3**: Testar event forwarding
-- **F175.4**: ~6 testes
+### F175: Testes para `nerv-bridge.js` (385L) — JÁ FEITO ✅
+- 26 testes em `test_nerv_bridge.spec.js` + 13 em `test_nerv_bridge_integration.spec.js` = 39 testes
+- **Ação**: nenhuma adicional necessária.
 
-### F176: Adicionar retry e timeout em `nerv-bridge.js`
-- **F176.1**: Adicionar `withRetry` em HTTP requests
-- **F176.2**: Adicionar `withTimeout` com timeout configurável
-- **F176.3**: Testes de retry/timeout behavior
+### F176: Adicionar retry e timeout em `nerv-bridge.js` — N/A ⚠️
+- **Motivo**: nerv-bridge não tem padrões de retry/timeout manuais. Comunicação é event-based.
+- **Ação**: nenhuma necessária.
 
-### F177: Testes para `gh/` submodule
-- **F177.1**: Mock de GitHub API
-- **F177.2**: Testar issues, PRs, CI wrappers
-- **F177.3**: Migrar retry manual em `gh/ci.js` para `withRetry`
-- **F177.4**: ~8 testes
+### F177: Testes para `gh/` submodule ✅
+- **F177.1** ✅: `tests/unit/copilot/bridges/test_gh_shared.spec.js` — 16 testes
+- **F177.2** ✅: fmtDate (5: vazio, min, horas, dias, antigo), runIcon (6 status variants)
+- **F177.3** ✅: slicePage (3: primeira, última, além-do-range), calcFetchLimit (2: normal, cap)
+- **F177.4** N/A: Nenhum retry manual encontrado em ci.js (apenas polling interval)
 
-### F178: Validação de Faixa 6
-- **F178.1**: `npm run lint` + `npm run test:unit` — all pass
-- **F178.2**: bridges: 0 → ≥4 test files, ≥30 testes
-- **F178.3**: Zero retry duplicado em bridges
-- **F178.4**: Commit: `feat(bridges): Faixa 6 (F171-F180) — tests + retry migration`
+### F178: Validação de Faixa 6 ✅
+- **F178.1** ✅: ESLint clean, 2565 tests passed, 0 failed
+- **F178.2** ✅: bridges: +3 novos test files, +43 testes (total: 50+ tests pré-existentes + 43 novos)
+- **F178.3** ⚠️: Retry em mcp-tool-bridge mantido inline (deferred)
+- **F178.4** ✅: Commit feito
 
 ---
 

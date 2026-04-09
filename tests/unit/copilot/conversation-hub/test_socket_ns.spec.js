@@ -2,16 +2,16 @@
 /**
  * tests/unit/copilot/conversation-hub/test_socket_ns.spec.js
  *
- * F163: Testes para socket-ns.js — mount/unmount, event bridging, user:inject rate limiting.
- * Usa mocks de Socket.io para evitar dependência de servidor real.
+ * F163: Testes para socket-ns.js — mount/unmount, event bridging, user:inject rate limiting. Usa mocks de Socket.io
+ * para evitar dependência de servidor real.
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
 import EventEmitter from 'node:events';
+import { createRequire } from 'node:module';
 
-import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
+import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
 const require = createRequire(import.meta.url);
@@ -150,10 +150,13 @@ describe('socket-ns mountCopilotNamespace', () => {
 
         const ns = createMockNamespace();
         const mockIo = createMockIo(ns);
-        const orch = new HubOrchestrator(store, /** @type {any} */ ({
-            getStatusSnapshot: () => ({}),
-            status: 'running',
-        }));
+        const orch = new HubOrchestrator(
+            store,
+            /** @type {any} */ ({
+                getStatusSnapshot: () => ({}),
+                status: 'running',
+            }),
+        );
         orch.init(/** @type {any} */ ({ chat: vi.fn(), chatStructured: vi.fn() }));
 
         mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
@@ -177,10 +180,13 @@ describe('socket-ns unmountCopilotNamespace', () => {
 
         const ns = createMockNamespace();
         const mockIo = createMockIo(ns);
-        const orch = new HubOrchestrator(store, /** @type {any} */ ({
-            getStatusSnapshot: () => ({}),
-            status: 'running',
-        }));
+        const orch = new HubOrchestrator(
+            store,
+            /** @type {any} */ ({
+                getStatusSnapshot: () => ({}),
+                status: 'running',
+            }),
+        );
         orch.init(/** @type {any} */ ({ chat: vi.fn(), chatStructured: vi.fn() }));
 
         mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
