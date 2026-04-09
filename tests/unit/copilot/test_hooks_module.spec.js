@@ -58,6 +58,7 @@ import {
     HookBus,
     HookRegistry,
     pipeline,
+    raceWithTimeout,
     SDK_HOOKS,
 } from '../../../src/copilot/hooks/index.js';
 
@@ -512,6 +513,29 @@ describe('hooks/composer', () => {
         const r2 = await hook(preInput('shell'), inv());
         assert.strictEqual(r2?.permissionDecision, 'deny');
         assert.ok(executed);
+    });
+
+    it('raceWithTimeout: retorna resultado do handler quando resolve antes do timeout', async () => {
+        const handler = async () => ({ permissionDecision: 'deny' });
+        const wrapped = raceWithTimeout(handler, 5000);
+        const result = await wrapped(preInput('shell'), inv());
+        assert.strictEqual(result?.permissionDecision, 'deny');
+    });
+
+    it('raceWithTimeout: retorna undefined quando handler excede timeout', async () => {
+        const handler = () => new Promise((resolve) => setTimeout(() => resolve({ permissionDecision: 'deny' }), 500));
+        const wrapped = raceWithTimeout(handler, 10);
+        const result = await wrapped(preInput('shell'), inv());
+        assert.strictEqual(result, undefined);
+    });
+
+    it('raceWithTimeout: limpa timer quando handler resolve primeiro (sem leak)', async () => {
+        // Se o timer não for limpo, o teste pode vazar o setTimeout.
+        // Verificamos indiretamente: handler rápido deve resolver sem pendências.
+        const handler = async () => ({ additionalContext: 'ok' });
+        const wrapped = raceWithTimeout(handler, 60_000);
+        const result = await wrapped(postInput('shell'), inv());
+        assert.strictEqual(result?.additionalContext, 'ok');
     });
 });
 

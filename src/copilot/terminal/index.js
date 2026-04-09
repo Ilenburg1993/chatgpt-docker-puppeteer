@@ -441,6 +441,7 @@ export async function startTerminalServer() {
     // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
     // F152: registrar no timer-registry para evitar leak (handle era descartado)
     const todoCleanupTimer = startTodoCleanupJob();
+    if (typeof todoCleanupTimer.unref === 'function') todoCleanupTimer.unref();
     registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
     // T-21: graceful shutdown handlers via registerShutdownHandler
