@@ -2,11 +2,10 @@
 /**
  * tests/unit/copilot/hooks/test_presets.spec.js
  *
- * Testes unitários para src/copilot/hooks/presets/*.js
- * Cobre: minimal, deny-all, interactive, safe, audit, production
+ * Testes unitários para src/copilot/hooks/presets/*.js Cobre: minimal, deny-all, interactive, safe, audit, production
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies before imports
 vi.mock('#copilot/observability/logger', () => ({
@@ -30,43 +29,41 @@ vi.mock('../../../src/copilot/hooks/permission-handler.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/hooks/error-handler.js', () => ({
-    createCircuitBreakerHandler: vi.fn(() =>
-        vi.fn().mockResolvedValue({ errorHandling: 'retry', retryCount: 3 }),
-    ),
+    createCircuitBreakerHandler: vi.fn(() => vi.fn().mockResolvedValue({ errorHandling: 'retry', retryCount: 3 })),
 }));
 
 vi.mock('../../../src/copilot/hooks/prompt-transformer.js', () => ({
-    createPromptTransformer: vi.fn(() =>
-        vi.fn().mockResolvedValue({}),
-    ),
+    createPromptTransformer: vi.fn(() => vi.fn().mockResolvedValue({})),
 }));
 
-import { createMinimalPreset } from '../../../../src/copilot/hooks/presets/minimal.js';
+import { createHooksAuditPreset } from '../../../../src/copilot/hooks/presets/audit.js';
 import { createDenyAllPreset } from '../../../../src/copilot/hooks/presets/deny-all.js';
 import { createInteractivePreset } from '../../../../src/copilot/hooks/presets/interactive.js';
-import { createSafePreset } from '../../../../src/copilot/hooks/presets/safe.js';
-import { createHooksAuditPreset } from '../../../../src/copilot/hooks/presets/audit.js';
+import { createMinimalPreset } from '../../../../src/copilot/hooks/presets/minimal.js';
 import { createProductionHooks } from '../../../../src/copilot/hooks/presets/production.js';
+import { createSafePreset } from '../../../../src/copilot/hooks/presets/safe.js';
 
 /** @param {string} toolName */
 const makeInput = (toolName) => /** @type {any} */ ({ toolName, toolArgs: {} });
 
-/** @param {string} [sid='sess-1'] */
+/** @param {string} [sid='sess-1'] Default is `'sess-1'` */
 const makeInvocation = (sid = 'sess-1') => /** @type {any} */ ({ sessionId: sid });
 
 const makePromptInput = (prompt = 'hello') => /** @type {any} */ ({ prompt });
 const makeSessionStartInput = (source = 'chat') => /** @type {any} */ ({ source, cwd: '/tmp' });
 const makeSessionEndInput = (reason = 'user_closed') => /** @type {any} */ ({ reason });
-const makeErrorInput = (opts = {}) => /** @type {any} */ ({
-    error: 'some error',
-    errorContext: 'tool_execution',
-    recoverable: true,
-    ...opts,
-});
-const makePostToolInput = (toolName = 'read_file') => /** @type {any} */ ({
-    toolName,
-    toolResult: 'ok',
-});
+const makeErrorInput = (opts = {}) =>
+    /** @type {any} */ ({
+        error: 'some error',
+        errorContext: 'tool_execution',
+        recoverable: true,
+        ...opts,
+    });
+const makePostToolInput = (toolName = 'read_file') =>
+    /** @type {any} */ ({
+        toolName,
+        toolResult: 'ok',
+    });
 
 // ─── createMinimalPreset ────────────────────────────────────────────────────
 
@@ -353,7 +350,9 @@ describe('hooks/presets/production', () => {
     });
 
     it('auditSink que lança erro não propaga', () => {
-        const sink = vi.fn(() => { throw new Error('sink fail'); });
+        const sink = vi.fn(() => {
+            throw new Error('sink fail');
+        });
         const { hooks } = createProductionHooks({ auditSink: sink });
         expect(() => hooks.onPreToolUse(makeInput('bash'), makeInvocation())).not.toThrow();
     });

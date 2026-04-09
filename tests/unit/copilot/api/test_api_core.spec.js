@@ -114,7 +114,9 @@ describe('api/express/withErrorHandler', () => {
         const res = mockRes();
         await withErrorHandler('test', req, res, fn);
         expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: expect.any(String) }));
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ ok: false, error: expect.any(String), code: 'INTERNAL_ERROR', status: 500 }),
+        );
     });
 
     it('não envia resposta se headers já foram enviados', async () => {
@@ -133,5 +135,75 @@ describe('api/express/withErrorHandler', () => {
         await withErrorHandler('test', req, res, fn);
         const errorMsg = res.json.mock.calls[0][0].error;
         expect(errorMsg).not.toContain('/workspaces/');
+    });
+
+    it('retorna 400 para ValidationError', async () => {
+        const { ValidationError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new ValidationError('bad input'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(400);
+        const body = res.json.mock.calls[0][0];
+        expect(body).toMatchObject({ ok: false, code: 'VALIDATION_ERROR', status: 400 });
+    });
+
+    it('retorna 400 para ConfigError', async () => {
+        const { ConfigError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new ConfigError('invalid config'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json.mock.calls[0][0].code).toBe('CONFIG_ERROR');
+    });
+
+    it('retorna 422 para ToolError', async () => {
+        const { ToolError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new ToolError('tool failed'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(422);
+        expect(res.json.mock.calls[0][0].code).toBe('TOOL_ERROR');
+    });
+
+    it('retorna 409 para SessionError', async () => {
+        const { SessionError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new SessionError('conflict'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json.mock.calls[0][0].code).toBe('SESSION_ERROR');
+    });
+
+    it('retorna 504 para TimeoutError', async () => {
+        const { TimeoutError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new TimeoutError('timed out'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(504);
+        expect(res.json.mock.calls[0][0].code).toBe('TIMEOUT');
+    });
+
+    it('retorna 500 para CopilotError genérica', async () => {
+        const { CopilotError } = await import('../../../../src/copilot/core/errors.js');
+        const fn = vi.fn().mockRejectedValue(new CopilotError('generic'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json.mock.calls[0][0].code).toBe('COPILOT_ERROR');
+    });
+
+    it('retorna INTERNAL_ERROR code para erros não-CopilotError', async () => {
+        const fn = vi.fn().mockRejectedValue(new Error('plain'));
+        const req = mockReq();
+        const res = mockRes();
+        await withErrorHandler('test', req, res, fn);
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json.mock.calls[0][0].code).toBe('INTERNAL_ERROR');
     });
 });

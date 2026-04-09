@@ -2,21 +2,21 @@
 /**
  * tests/unit/copilot/tools/file/test_read_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/file/read-tools.js
- * Cobre: readFileContentTool, listDirectoryTool, searchInFilesTool, diffFilesTool
+ * Testes unitários para src/copilot/tools/file/read-tools.js Cobre: readFileContentTool, listDirectoryTool,
+ * searchInFilesTool, diffFilesTool
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
 
 import {
-    readFileContentTool,
-    listDirectoryTool,
-    searchInFilesTool,
     diffFilesTool,
+    listDirectoryTool,
+    readFileContentTool,
+    searchInFilesTool,
 } from '../../../../../src/copilot/tools/file/read-tools.js';
 
 /** Extract handler from buildTool result */

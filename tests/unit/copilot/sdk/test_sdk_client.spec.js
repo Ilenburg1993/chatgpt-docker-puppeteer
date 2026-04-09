@@ -2,12 +2,11 @@
 /**
  * tests/unit/copilot/sdk/test_sdk_client.spec.js
  *
- * Testes unitários para src/copilot/sdk/client.js
- * Cobre: buildClientOptions, getClient, stopClient, forceStopClient,
- *        session CRUD, registry, getClientState, state reset/inject
+ * Testes unitários para src/copilot/sdk/client.js Cobre: buildClientOptions, getClient, stopClient, forceStopClient,
+ * session CRUD, registry, getClientState, state reset/inject
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
 vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
@@ -70,21 +69,21 @@ vi.mock('@github/copilot-sdk', () => {
 });
 
 import {
-    buildClientOptions,
-    getClient,
-    stopClient,
-    forceStopClient,
-    getClientState,
-    createClientSession,
-    resumeClientSession,
-    disconnectClientSession,
-    deleteClientSession,
-    getClientSession,
-    listActiveClientSessions,
-    incrementSessionMessageCount,
-    getActiveSessionCount,
-    _resetClientState,
     _injectClientForTest,
+    _resetClientState,
+    buildClientOptions,
+    createClientSession,
+    deleteClientSession,
+    disconnectClientSession,
+    forceStopClient,
+    getActiveSessionCount,
+    getClient,
+    getClientSession,
+    getClientState,
+    incrementSessionMessageCount,
+    listActiveClientSessions,
+    resumeClientSession,
+    stopClient,
 } from '../../../../src/copilot/sdk/client.js';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────

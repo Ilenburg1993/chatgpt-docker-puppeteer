@@ -2,11 +2,10 @@
 /**
  * tests/unit/copilot/terminal/test_commands_context.spec.js
  *
- * Testes unitários para src/copilot/terminal/commands/context.js
- * Cobre: cmdContext, cmdCompact
+ * Testes unitários para src/copilot/terminal/commands/context.js Cobre: cmdContext, cmdCompact
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
 vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
@@ -16,7 +15,9 @@ vi.mock('#copilot/channel/client', () => {
     const _history = [];
     return {
         llmBridgeClient: {
-            get history() { return _history; },
+            get history() {
+                return _history;
+            },
             clearHistory: vi.fn(),
             seedHistory: vi.fn(),
         },
@@ -44,9 +45,9 @@ vi.mock('../../../../src/copilot/terminal/dialog.js', () => ({
     sendTurn: vi.fn().mockResolvedValue('Resumo compactado...'),
 }));
 
-import { cmdContext, cmdCompact } from '../../../../src/copilot/terminal/commands/context.js';
 import { alwaysAliveAgent } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel/client';
+import { cmdCompact, cmdContext } from '../../../../src/copilot/terminal/commands/context.js';
 
 // ─── cmdContext ─────────────────────────────────────────────────────────────
 
@@ -76,9 +77,11 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('exibe dados do SDK real quando disponível', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(/** @type {any} */ ({
-            contextWindow: { tokens: 5000, tokenLimit: 128000, utilization: 0.039 },
-        }));
+        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
+            /** @type {any} */ ({
+                contextWindow: { tokens: 5000, tokenLimit: 128000, utilization: 0.039 },
+            }),
+        );
         llmBridgeClient.history.push({ role: 'user', content: 'test' });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -87,9 +90,11 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('alerta quando context window > 85%', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(/** @type {any} */ ({
-            contextWindow: { tokens: 110000, tokenLimit: 128000, utilization: 0.86 },
-        }));
+        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
+            /** @type {any} */ ({
+                contextWindow: { tokens: 110000, tokenLimit: 128000, utilization: 0.86 },
+            }),
+        );
         llmBridgeClient.history.push({ role: 'user', content: 'x' });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -97,9 +102,11 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('alerta moderado quando context window > 65%', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(/** @type {any} */ ({
-            contextWindow: { tokens: 85000, tokenLimit: 128000, utilization: 0.66 },
-        }));
+        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
+            /** @type {any} */ ({
+                contextWindow: { tokens: 85000, tokenLimit: 128000, utilization: 0.66 },
+            }),
+        );
         llmBridgeClient.history.push({ role: 'user', content: 'x' });
         cmdContext({ println });
         const output = lines.join('\n');
