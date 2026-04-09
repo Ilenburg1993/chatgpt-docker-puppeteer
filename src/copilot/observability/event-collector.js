@@ -19,7 +19,7 @@
  */
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
-import { registerShutdownHandler } from '#copilot/core';
+import { logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,8 +113,8 @@ async function _flushOnExit() {
     try {
         await mkdir(LOGS_DIR, { recursive: true });
         await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-    } catch {
-        /* silencioso */
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'event-collector.flush');
     }
 }
 
@@ -146,12 +146,12 @@ function scheduleFlush() {
                 if (size >= MAX_EVENTS_BYTES) {
                     await rename(EVENTS_FILE, EVENTS_FILE + '.1');
                 }
-            } catch {
-                /* arquivo ainda não existe */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'event-collector.stat');
             }
             await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-        } catch {
-            // Falha silenciosa — telemetria não deve bloquear
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'event-collector.persist');
         }
     });
 }

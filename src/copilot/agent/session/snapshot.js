@@ -10,6 +10,7 @@
  * @module copilot/agent/session/snapshot
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -158,8 +159,8 @@ export function listSnapshots() {
                 ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
                 filepath,
             });
-        } catch {
-            // skip corrupt files
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'snapshot.listSync.parseFile');
         }
     }
     result.sort((a, b) => b.createdAt - a.createdAt);
@@ -231,13 +232,9 @@ export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
                 rmSync(snap.filepath, { force: true });
                 removed++;
             }
-        } catch {
-            // ignore
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'snapshot.pruneSync.rmFile');
         }
-    }
-
-    if (removed > 0) {
-        log('INFO', `[SessionSnapshot] Pruning: ${removed} snapshot(s) antigo(s) removido(s).`);
     }
     return removed;
 }
@@ -279,8 +276,8 @@ export async function listSnapshotsAsync() {
                 reason: data.reason,
                 filepath,
             });
-        } catch {
-            // skip corrupt files
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'snapshot.listAsync.parseFile');
         }
     }
     result.sort((a, b) => b.createdAt - a.createdAt);
@@ -364,13 +361,9 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
                 await rm(snap.filepath, { force: true });
                 removed++;
             }
-        } catch {
-            // ignore
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'snapshot.pruneAsync.rmFile');
         }
-    }
-
-    if (removed > 0) {
-        log('INFO', `[SessionSnapshot] Pruning (async): ${removed} snapshot(s) antigo(s) removido(s).`);
     }
     return removed;
 }

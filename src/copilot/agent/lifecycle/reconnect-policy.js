@@ -10,6 +10,7 @@
  * @module copilot/agent/lifecycle/reconnect-policy
  */
 
+import { isFatalError } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { startSpan } from '#copilot/observability/otel';
 
@@ -138,6 +139,11 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     return true;
                 } catch (/** @type {any} */ reconnectError) {
                     log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
+                    // F149: se o erro é fatal (CircuitOpenError, SESSION_FATAL, etc.), não vale insistir
+                    if (isFatalError(reconnectError)) {
+                        log('ERROR', '[AlwaysAlive] Erro fatal detectado durante reconexão — abortando retry loop.');
+                        break;
+                    }
                 }
             }
 

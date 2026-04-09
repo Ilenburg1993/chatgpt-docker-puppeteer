@@ -20,6 +20,7 @@
 import { COPILOT_CLI_URL, OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
+import { logSwallowed } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -320,8 +321,8 @@ export async function deleteClientSession(sessionId) {
     if (entry) {
         try {
             await entry.session.disconnect();
-        } catch {
-            // Ignora erro de desconexão — prosseguimos com a deleção de disco
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'sdk.client.disconnect');
         }
         _sessions.delete(sessionId);
     }

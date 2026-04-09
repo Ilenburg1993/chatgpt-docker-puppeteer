@@ -12,10 +12,11 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { safeJsonParse } from '../core/safe-json.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
+import { safeJsonParse } from '../core/safe-json.js';
 import { ToolsConfigSchema } from '../core/schemas.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
@@ -98,8 +99,8 @@ export async function loadToolsConfigAsync() {
         } else {
             log('WARN', '[tools-state] tools-config.json schema inválido — mantendo defaults.');
         }
-    } catch {
-        // Arquivo não existe ou JSON inválido — manter defaults
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }
 

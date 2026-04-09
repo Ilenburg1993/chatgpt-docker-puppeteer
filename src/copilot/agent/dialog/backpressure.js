@@ -15,6 +15,7 @@
  */
 
 import { SessionError } from '#copilot/core/errors';
+import { logSwallowed } from '../../core/error-handlers.js';
 
 /**
  * Serializa execução de turnos com backpressure baseada em profundidade da fila.
@@ -68,7 +69,7 @@ export class TurnQueue {
         const prev = this.#mutex;
         /** @type {Promise<T>} */
         const next = prev.then(fn);
-        this.#mutex = next.then(() => {}).catch(() => {});
+        this.#mutex = next.then(() => {}).catch((/** @type {any} */ e) => logSwallowed(e, 'agent.backpressure.mutex'));
         const myGen = ++this.#gen;
         void next.finally(() => {
             this.#depth--;

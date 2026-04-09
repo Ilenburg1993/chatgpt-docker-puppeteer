@@ -20,6 +20,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
@@ -268,8 +269,8 @@ export class AlwaysAliveAgent extends EventEmitter {
         if (!this.ctx.session || typeof this.ctx.session.log !== 'function') return;
         try {
             await this.ctx.session.log(message, options);
-        } catch {
-            // best-effort — não bloqueia fluxo principal
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'agent.sessionLog');
         }
     }
 

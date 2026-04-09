@@ -24,6 +24,7 @@ export { withTimeout } from './abort-utils.js';
 export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 export * from './constants.js';
 export * as ErrorCodes from './error-codes.js';
+export { isFatalError, isTransientError, logSwallowed, wrapAsync } from './error-handlers.js';
 export * from './errors.js';
 export { withRetry } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';

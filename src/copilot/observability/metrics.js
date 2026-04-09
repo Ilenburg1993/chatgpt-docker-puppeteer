@@ -59,6 +59,7 @@
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config/env';
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
 import { createHistogram } from './metrics-histogram.js';
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -291,8 +292,8 @@ export function createMetricsStore() {
                     await _mkdir(resolvedDir, { recursive: true });
                     const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
                     await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
-                } catch {
-                    // Falha silenciosa — métricas não devem bloquear
+                } catch (/** @type {any} */ e) {
+                    logSwallowed(e, 'metrics.snapshot');
                 }
             })();
         }, ms);

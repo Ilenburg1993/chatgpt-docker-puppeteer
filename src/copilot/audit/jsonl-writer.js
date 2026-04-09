@@ -7,6 +7,7 @@
  * @module copilot/audit/jsonl-writer
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -57,8 +58,8 @@ export function createJsonlWriter(opts) {
                 }
                 await appendFile(filePath, data, 'utf8');
                 _sizeBytes += dataBytes;
-            } catch {
-                // Falha silenciosa — auditoria não deve interromper o agente
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'audit.jsonlWriter.write');
             }
         });
     }

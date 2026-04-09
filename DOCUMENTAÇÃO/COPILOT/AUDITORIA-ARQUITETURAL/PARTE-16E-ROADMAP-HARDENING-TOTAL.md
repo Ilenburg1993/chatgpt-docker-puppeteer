@@ -187,121 +187,162 @@
 
 ---
 
-## Faixa 3 — Error Handling Standardization (F139-F148)
+## Faixa 3 — Error Handling Standardization (F139-F150)
 
-> **Objetivo**: Auditar e corrigir os ~133 catch blocks, padronizar error flow.
+> **Objetivo**: Auditar e corrigir os 176 catch points (142 `catch {}` + 25 `catch(e){}` + 9 `.catch(() => {})`),
+> padronizar error flow, integrar com hierarquia de erros tipados e telemetria.
+
+### Auditoria pré-execução (atualizada 2026-03-15)
+
+| Diretório | `catch {}` (comment) | `catch {}` (code) | `catch(e)` | `.catch(()=>{})` | **Total** |
+|---|---|---|---|---|---|
+| bridges | 0 | 28 | — | — | 28 |
+| tools | 8 | 19 | — | — | 27 |
+| agent | 10 | 12 | — | 6 | 28 |
+| terminal | 6 | 14 | — | 1 | 21 |
+| audit | 4 | 6 | — | — | 10 |
+| observability | 4 | 4 | — | — | 8 |
+| conversation-hub | 4 | 3 | — | 2 | 9 |
+| channel | 3 | 3 | — | — | 6 |
+| config | 4 | 1 | — | — | 5 |
+| sdk | 3 | 1 | — | — | 4 |
+| api | 1 | 1 | — | — | 2 |
+| core | 0 | 2 | — | — | 2 |
+| db | 1 | 0 | — | — | 1 |
+| *c/ param (global)* | *5* | *20* | *25* | — | — |
+| **TOTAL** | **48** | **94** | **25** | **9** | **176** |
+
+**Achados críticos da auditoria:**
+1. **Hierarquia de erros ociosa**: 51 `throw new <CopilotSubclass>`, 0 `instanceof CopilotError|SessionError|...` — hierarquia nunca discriminada em catches
+2. **48 catches comment-only**: silenciam erros com `// best-effort` sem nenhum log ou métrica
+3. **ErrorTracker isolado**: usado apenas em `observability/observers/` e `event-collector` — bridges/tools/agent não alimentam o tracker
+4. **tool-stats.recordToolCall** existe mas só é chamado via `wrapWithStats` — tools não wrappadas não registram métricas de erro
+5. **Log levels**: 40× `log('ERROR')` vs 142 catches silenciosos — grande gap de visibilidade
+6. **9 `.catch(() => {})` void patterns**: erros de promise perdidos sem nenhum rastro
 
 ### F139: Criar `core/error-handlers.js` utility
-- **F139.1**: `logSwallowed(err, context)` — log warn + métricas sem rethrow
-- **F139.2**: `wrapAsync(fn)` — wrapper que captura e loga erros não-críticos
-- **F139.3**: `isFatalError(err)` — classifica erros em fatal vs recoverable
-- **F139.4**: Testes unitários
+- **F139.1**: `logSwallowed(err, context)` — `log('DEBUG')` + `defaultErrorTracker.trackError()` sem rethrow
+- **F139.2**: `wrapAsync(fn, context)` — wrapper que captura, loga via `logSwallowed` e retorna undefined/fallback
+- **F139.3**: `isFatalError(err)` — classifica erros: `SessionError` com `SESSION_FATAL` = fatal; `CircuitOpenError` = fatal; genérico `Error` com `code === 'ERR_SOCKET_CLOSED'` = fatal; demais = recoverable
+- **F139.4**: `isTransientError(err)` — identifica erros retriáveis: `BridgeError`, `ECONNREFUSED`, `ETIMEDOUT`, `502/503`
+- **F139.5**: Testes unitários cobrindo todos os cenários
 
-### F140: Corrigir catch blocks em `observability/`
-- **F140.1**: `otel.js` — 4 catch {} → adicionar `logSwallowed(err, 'otel.init')`
-- **F140.2**: `event-collector.js` — 3 catch {} → adicionar `logSwallowed`
-- **F140.3**: `metrics.js` — catch {} → `logSwallowed(err, 'metrics.export')`
-- **F140.4**: `agent-event-observer.js` — verificar e padronizar
-- **F140.5**: `tool-stats.js` — adicionar metric counter para erros silenciados
-- **Resultado**: ~10 catch blocks corrigidos
+### F140: Corrigir catch blocks em `observability/` (8 catches)
+- **F140.1**: 4 catches comment-only → `logSwallowed(err, '<módulo>.<operação>')`
+- **F140.2**: 4 catches com código → verificar que já logam; adicionar `trackError` onde ausente
+- **Resultado**: 8 catch blocks padronizados
 
-### F141: Corrigir catch blocks em `tools/`
-- **F141.1**: Auditar 25 catch blocks em tools/
-- **F141.2**: Substituir catch silenciosos por `logSwallowed` onde seguro
-- **F141.3**: Adicionar rethrow onde o erro deveria propagar
-- **F141.4**: Padronizar error messages com contexto (tool name, args summary)
-- **Resultado**: ~25 catch blocks corrigidos
+### F141: Corrigir catch blocks em `tools/` (27 catches)
+- **F141.1**: 8 catches comment-only → `logSwallowed(err, 'tool:<name>')`
+- **F141.2**: 19 catches com código → verificar log adequado; adicionar `trackError` em falhas de tool exec
+- **F141.3**: Padronizar error messages com contexto (tool name + operação)
+- **Resultado**: 27 catch blocks padronizados
 
-### F142: Corrigir catch blocks em `terminal/`
-- **F142.1**: Auditar 22 catch blocks em terminal/
-- **F142.2**: Substituir catch {} por `logSwallowed` em handlers
-- **F142.3**: Garantir que erros em comandos REPL são reportados ao usuário
-- **F142.4**: Padronizar error messages em server/WebSocket handlers
-- **Resultado**: ~22 catch blocks corrigidos
+### F142: Corrigir catch blocks em `terminal/` (20 catches + 1 void)
+- **F142.1**: 6 catches comment-only → `logSwallowed(err, 'terminal.<handler>')`
+- **F142.2**: 14 catches com código → verificar log + padronizar mensagens
+- **F142.3**: 1 `.catch(() => {})` → `.catch(err => logSwallowed(err, 'terminal.ensureDialog'))`
+- **F142.4**: Garantir erros em REPL são reportados ao usuário
+- **Resultado**: 21 catch points padronizados
 
-### F143: Corrigir catch blocks em `agent/`
-- **F143.1**: Auditar 18 catch blocks em agent/
-- **F143.2**: Verificar que erros fatais propagam para session.fatal
-- **F143.3**: Verificar que erros transientes são retriados (via withRetry)
-- **F143.4**: Padronizar logging de erros com session context
-- **Resultado**: ~18 catch blocks corrigidos
+### F143: Corrigir catch blocks em `agent/` (22 catches + 6 void)
+- **F143.1**: 10 catches comment-only → `logSwallowed(err, 'agent.<operação>')`
+- **F143.2**: 12 catches com código → verificar propagação para session.fatal
+- **F143.3**: 6 `.catch(() => {})` → `.catch(err => logSwallowed(err, 'agent.<ctx>'))`
+- **F143.4**: Verificar integração com `isFatalError` para erros no dialog loop
+- **Resultado**: 28 catch points padronizados
 
-### F144: Corrigir catch blocks em `bridges/`
-- **F144.1**: Auditar 15 catch blocks em bridges/
-- **F144.2**: `mcp-tool-bridge.js` — padronizar com logSwallowed + metric
-- **F144.3**: `nerv-bridge.js` — adicionar retry + log para erros de conexão
-- **F144.4**: `git-bridge.js` — log com contexto (git command, args)
-- **Resultado**: ~15 catch blocks corrigidos
+### F144: Corrigir catch blocks em `bridges/` (28 catches)
+- **F144.1**: 0 catches comment-only (todos têm código) → verificar que logam adequadamente
+- **F144.2**: Adicionar `trackError` em falhas de bridge relevantes (MCP, NERV, Git)
+- **F144.3**: Padronizar: `BridgeError` deveria ser identificado via `instanceof` em retry logic
+- **Resultado**: 28 catch blocks auditados e padronizados
 
-### F145: Corrigir catch blocks em `channel/`
-- **F145.1**: Auditar 10 catch blocks em channel/
-- **F145.2**: `client.js` — erros de SSE devem propagar para retry logic
-- **F145.3**: `inject.js` — erros de injeção devem ser logados com contexto
-- **Resultado**: ~10 catch blocks corrigidos
+### F145: Corrigir catch blocks em `channel/` (6 catches)
+- **F145.1**: 3 catches comment-only → `logSwallowed(err, 'channel.<handler>')`
+- **F145.2**: 3 catches com código → verificar log + SSE retry propagation
+- **Resultado**: 6 catch blocks padronizados
 
-### F146: Corrigir `.catch(() => {})` void patterns
-- **F146.1**: Identificar 9 ocorrências de `.catch(() => {})` ou `.catch(() => void 0)`
-- **F146.2**: Substituir por `.catch(err => logSwallowed(err, 'context'))`
-- **F146.3**: Verificar se algum deveria ter retry ao invés de swallow
-- **Resultado**: 9 void catches eliminados
+### F146: Corrigir catch blocks em `conversation-hub/` (7 catches + 2 void)
+- **F146.1**: 4 catches comment-only → `logSwallowed(err, 'hub.<operação>')`
+- **F146.2**: 3 catches com código → verificar log
+- **F146.3**: 2 `.catch(() => {})` → `.catch(err => logSwallowed(err, 'hub.<ctx>'))`
+- **Resultado**: 9 catch points padronizados
 
-### F147: Corrigir catch blocks em `hooks/`, `sdk/`, `config/`
-- **F147.1**: Auditar catch blocks restantes (~15)
-- **F147.2**: Aplicar mesmo padrão: logSwallowed onde safe, rethrow onde não
-- **F147.3**: Cleanup final — verificar zero catch {} vazios restantes
-- **Resultado**: Últimos ~15 catch blocks corrigidos
+### F147: Corrigir catch blocks em `config/`, `sdk/`, `audit/`, `api/`, `core/`, `db/` (24 catches)
+- **F147.1**: `config/` (5): 4 comment-only → `logSwallowed`
+- **F147.2**: `sdk/` (4): 3 comment-only → `logSwallowed`
+- **F147.3**: `audit/` (10): 4 comment-only → `logSwallowed`; 6 com código → verificar
+- **F147.4**: `api/` (2): 1 comment-only → `logSwallowed`
+- **F147.5**: `core/` (2): ambos com código → verificar
+- **F147.6**: `db/` (1): 1 comment-only → `logSwallowed`
+- **Resultado**: 24 catch blocks padronizados
 
-### F148: Validação de Faixa 3
-- **F148.1**: `npm run lint` — zero errors
-- **F148.2**: `npm run test:unit` — all pass
-- **F148.3**: Grep: `catch.*{` sem log/throw/emit deveria retornar < 20
-- **F148.4**: Commit: `fix(reliability): Faixa 3 (F139-F148) — error handling standardization`
+### F148: Corrigir catches `catch(e)` com parâmetro não utilizado (25 catches)
+- **F148.1**: 5 catches comment-only com param → converter para `catch { logSwallowed(err, ctx) }` ou usar o param
+- **F148.2**: 20 catches com código → verificar que o param `e` é realmente utilizado no corpo
+- **F148.3**: Onde param não é usado → remover param (`catch {`) + adicionar `logSwallowed`
+- **Resultado**: 25 catch(e) blocks auditados
+
+### F149: Integrar `instanceof` de erros tipados em catches críticos
+- **F149.1**: Identificar catches em paths críticos (dialog loop, reconnect, session boot) que fazem catch genérico
+- **F149.2**: Adicionar discriminação: `if (err instanceof SessionError && err.code === 'SESSION_FATAL')` → emit fatal
+- **F149.3**: Adicionar discriminação: `if (isTransientError(err))` → retriar; else → log + propagate
+- **F149.4**: Priorizar: `always-alive.js`, `reconnect-policy.js`, `loop-manager.js`, `session-crud.js`
+- **Resultado**: 4-6 catches críticos com discriminação de erro tipado
+
+### F150: Validação de Faixa 3
+- **F150.1**: `npm run lint` — zero errors
+- **F150.2**: `npm run test:unit` — all pass
+- **F150.3**: Grep validate: catches comment-only should be 0 (all converted to logSwallowed)
+- **F150.4**: Grep validate: `.catch(() => {})` void patterns should be 0
+- **F150.5**: Commit: `fix(reliability): Faixa 3 (F139-F150) — error handling standardization`
 
 ---
 
-## Faixa 4 — Timer & Lifecycle Management (F149-F156)
+## Faixa 4 — Timer & Lifecycle Management (F151-F158)
 
 > **Objetivo**: Registrar todos os timers no sistema de shutdown + cleanup.
 
-### F149: Auditar todos os timers existentes
-- **F149.1**: Grep completo de setTimeout/setInterval em src/copilot
-- **F149.2**: Classificar cada timer: bootstrap-only, runtime-recurring, one-shot
-- **F149.3**: Identificar quais já tem cleanup e quais não
-- **F149.4**: Gerar lista de migração priorizada
+### F151: Auditar todos os timers existentes
+- **F151.1**: Grep completo de setTimeout/setInterval em src/copilot
+- **F151.2**: Classificar cada timer: bootstrap-only, runtime-recurring, one-shot
+- **F151.3**: Identificar quais já tem cleanup e quais não
+- **F151.4**: Gerar lista de migração priorizada
 
-### F150: Integrar timers em `always-alive.js` com timer-registry
-- **F150.1**: Heartbeat setInterval → `TimerRegistry.register('heartbeat', ...)`
-- **F150.2**: Reconnect setTimeout → `TimerRegistry.register('reconnect', ...)`
-- **F150.3**: Verificar que cancelAll() é chamado no shutdown
-- **F150.4**: Testes: timer registration, cancel on shutdown
+### F152: Integrar timers em `always-alive.js` com timer-registry
+- **F152.1**: Heartbeat setInterval → `TimerRegistry.register('heartbeat', ...)`
+- **F152.2**: Reconnect setTimeout → `TimerRegistry.register('reconnect', ...)`
+- **F152.3**: Verificar que cancelAll() é chamado no shutdown
+- **F152.4**: Testes: timer registration, cancel on shutdown
 
-### F151: Integrar timers em `terminal/index.js`
-- **F151.1**: Cleanup setInterval → `TimerRegistry.register('terminal.cleanup', ...)`
-- **F151.2**: Qualquer outro timer recorrente → registry
-- **F151.3**: Testes
+### F153: Integrar timers em `terminal/index.js`
+- **F153.1**: Cleanup setInterval → `TimerRegistry.register('terminal.cleanup', ...)`
+- **F153.2**: Qualquer outro timer recorrente → registry
+- **F153.3**: Testes
 
-### F152: Integrar timers em `socket-ns.js`
-- **F152.1**: Heartbeat interval → `TimerRegistry.register('socket.heartbeat', ...)`
-- **F152.2**: Testes
-
-### F153: Integrar timers em `terminal/server.js`
-- **F153.1**: HTTP keep-alive / server close timers → registry
-- **F153.2**: Testes
-
-### F154: Integrar timers em `loop-manager.js`
-- **F154.1**: Turn timeout → `TimerRegistry.register('turn.timeout', ...)` com clearTimeout no finally
+### F154: Integrar timers em `socket-ns.js`
+- **F154.1**: Heartbeat interval → `TimerRegistry.register('socket.heartbeat', ...)`
 - **F154.2**: Testes
 
-### F155: Auditar e integrar timers restantes
-- **F155.1**: Varrer todos os timers restantes (~10-15 em files menores)
-- **F155.2**: Migrar para registry ou documentar como safe-to-leak com `// TIMER: one-shot-safe`
-- **F155.3**: Documentar decisões
+### F155: Integrar timers em `terminal/server.js`
+- **F155.1**: HTTP keep-alive / server close timers → registry
+- **F155.2**: Testes
 
-### F156: Validação de Faixa 4
-- **F156.1**: `npm run lint` — zero errors
-- **F156.2**: `npm run test:unit` — all pass
-- **F156.3**: Verificar: timers sem cleanup ≤ 3
-- **F156.4**: Commit: `fix(lifecycle): Faixa 4 (F149-F156) — timer & lifecycle management`
+### F156: Integrar timers em `loop-manager.js`
+- **F156.1**: Turn timeout → `TimerRegistry.register('turn.timeout', ...)` com clearTimeout no finally
+- **F156.2**: Testes
+
+### F157: Auditar e integrar timers restantes
+- **F157.1**: Varrer todos os timers restantes (~10-15 em files menores)
+- **F157.2**: Migrar para registry ou documentar como safe-to-leak com `// TIMER: one-shot-safe`
+- **F157.3**: Documentar decisões
+
+### F158: Validação de Faixa 4
+- **F158.1**: `npm run lint` — zero errors
+- **F158.2**: `npm run test:unit` — all pass
+- **F158.3**: Verificar: timers sem cleanup ≤ 3
+- **F158.4**: Commit: `fix(lifecycle): Faixa 4 (F151-F158) — timer & lifecycle management`
 
 ---
 

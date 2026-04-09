@@ -10,6 +10,7 @@
 
 import { log } from '#copilot/observability/logger';
 import http from 'node:http';
+import { logSwallowed } from '../core/error-handlers.js';
 
 /**
  * @typedef {Object} SseEvent
@@ -91,8 +92,8 @@ export function subscribeSse(path, port, onEvent) {
                             try {
                                 const data = JSON.parse(dataLines.join('\n'));
                                 onEvent({ type: currentEvent || 'message', data });
-                            } catch {
-                                /* ignora JSON inválido */
+                            } catch (/** @type {any} */ e) {
+                                logSwallowed(e, 'channel.sseClient.parseJson');
                             }
                         }
                     }

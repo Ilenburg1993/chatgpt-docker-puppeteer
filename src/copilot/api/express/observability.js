@@ -31,6 +31,7 @@ import { getRecentLogs, log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
 import { Router } from 'express';
+import { logSwallowed } from '../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 const router = Router();
@@ -75,8 +76,8 @@ router.get('/observability/health', (req, res) =>
         try {
             agentSnapshot = alwaysAliveAgent.getStatusSnapshot();
             agentAvailable = true;
-        } catch {
-            // agente ainda não inicializado
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'api.observability.getAgent');
         }
 
         const mcpStatus = getMcpStatus();

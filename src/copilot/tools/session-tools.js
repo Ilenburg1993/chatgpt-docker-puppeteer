@@ -9,6 +9,7 @@
  * @see module:copilot/always-alive
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
 import { execFileSync } from 'node:child_process';
@@ -61,8 +62,8 @@ const writePendingTaskTool = defineTool('write_pending_task', {
             let existing = '# Tarefas Pendentes\n\n';
             try {
                 existing = await readFile(p, 'utf8');
-            } catch {
-                /* file may not exist yet */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'session-tools.readPendingTasks');
             }
             const entry = `\n## [${(priority ?? 'medium').toUpperCase()}] ${title}\n${description ? `\n${description}\n` : ''}_Adicionado pelo SDK Agent em ${new Date().toISOString()}_\n`;
             await writeFile(p, existing + entry, 'utf8');
@@ -105,8 +106,8 @@ const getWorkspaceInfoTool = defineTool('get_workspace_info', {
                 encoding: 'utf8',
                 timeout: 5000,
             }).trim();
-        } catch {
-            // not a git repo or git not available
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'session-tools.gitInfo');
         }
 
         return {

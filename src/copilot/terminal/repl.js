@@ -20,6 +20,7 @@ import { log } from '#copilot/observability/logger';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { llmBridgeClient } from '../channel/client.js';
+import { logSwallowed } from '../core/error-handlers.js';
 import { resolve } from './alias-store.js';
 import {
     cmdAlias as _cmdAlias,
@@ -252,7 +253,7 @@ async function _cmdRestart() {
         }
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
-        await ensureDialogLoop().catch(() => {});
+        await ensureDialogLoop().catch((/** @type {any} */ e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
     }
     println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
 }
@@ -305,8 +306,8 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     cleanup();
     try {
         await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
-    } catch {
-        /* ignora — loop pode já estar parado */
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'terminal.repl.stopLoop');
     }
     rl.close();
     injectServer.close();

@@ -12,6 +12,7 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { HubOrchestrator } from './orchestrator.js';
@@ -223,12 +224,12 @@ export class ConversationHub {
                 for (const session of activeSessions) {
                     try {
                         this.#orchestrator.closeSession(session.id);
-                    } catch {
-                        // Ignorar erros individuais — prosseguir com as demais
+                    } catch (/** @type {any} */ e) {
+                        logSwallowed(e, 'hub.closeSession');
                     }
                 }
-            } catch {
-                // listHubSessions pode falhar se DB já estiver fechado
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'hub.listSessionsOnShutdown');
             }
         }
 

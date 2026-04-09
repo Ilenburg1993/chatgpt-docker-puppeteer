@@ -18,6 +18,7 @@
  * @see module:copilot/db/sqlite
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs';
@@ -204,8 +205,8 @@ async function _readStoreRaw() {
         for (const row of rows) {
             try {
                 tasks[row.id] = JSON.parse(row.data);
-            } catch {
-                // ignora linhas corrompidas
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'todo.store.parseRow');
             }
         }
         return { version: SCHEMA_VERSION, tasks };

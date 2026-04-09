@@ -15,6 +15,7 @@
  * @see module:copilot/db/sqlite
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { SessionError } from '#copilot/core/errors';
 import { getCopilotDb } from '#copilot/db/sqlite';
 import { log } from '#copilot/observability/logger';
@@ -246,8 +247,8 @@ export class ConversationStore {
         let existing = {};
         try {
             existing = JSON.parse(/** @type {any} */ (row).metadata ?? '{}') ?? {};
-        } catch {
-            /* parse falhou — começa com objeto vazio */
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'hub.store.parseMetadata');
         }
         const merged = {
             ...existing,

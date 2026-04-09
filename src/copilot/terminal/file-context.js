@@ -14,6 +14,7 @@
 import { ToolError } from '#copilot/core/errors';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -279,8 +280,8 @@ export async function readDirectoryContext(dirPath) {
             const ctx = { path: filePath, content, size, lang: detectLang(filePath) };
             ctxs.push(ctx);
             totalBytes += size;
-        } catch {
-            // Ignora arquivos ilegíveis ou binários
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'terminal.fileContext.readFile');
         }
     }
 

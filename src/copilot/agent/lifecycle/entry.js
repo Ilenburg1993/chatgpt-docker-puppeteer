@@ -18,6 +18,7 @@ import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
 import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
+import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
     BOOT_MAX_RETRIES,
@@ -116,7 +117,7 @@ if (process.send) {
             process.send?.({ ok: true, status: alwaysAliveAgent.status });
         } else if (cmd === 'stop') {
             log('INFO', '[copilot/agent] IPC stop recebido — encerrando...');
-            shutdown('IPC:stop').catch(() => {});
+            shutdown('IPC:stop').catch((/** @type {any} */ e) => logSwallowed(e, 'agent.entry.ipcShutdown'));
         } else {
             process.send?.({ ok: false, error: `Comando desconhecido: ${cmd}` });
         }
@@ -153,7 +154,7 @@ try {
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
     // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
-    pingClient.stop().catch(() => {});
+    pingClient.stop().catch((/** @type {any} */ e) => logSwallowed(e, 'agent.entry.pingStop'));
 } catch (/** @type {any} */ e) {
     log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${e.message}`);
     // Continuar de qualquer forma — startWithRetry() tratará a falha

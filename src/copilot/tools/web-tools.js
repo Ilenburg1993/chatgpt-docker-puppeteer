@@ -10,6 +10,7 @@
  */
 
 import { WEB_SEARCH_DISABLED } from '#copilot/config/env';
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { z } from 'zod';
 import { validateUrl } from '../sdk/url-validator.js';
@@ -354,8 +355,8 @@ const webSearchTool = buildTool({
                 try {
                     const u = new URL(rawUrl.startsWith('/') ? `https://html.duckduckgo.com${rawUrl}` : rawUrl);
                     finalUrl = u.searchParams.get('uddg') ?? rawUrl;
-                } catch {
-                    /* usa rawUrl */
+                } catch (/** @type {any} */ e) {
+                    logSwallowed(e, 'web-tools.parseUrl');
                 }
 
                 results.push({

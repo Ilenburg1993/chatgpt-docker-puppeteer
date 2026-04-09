@@ -18,6 +18,7 @@ import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
+import { logSwallowed } from '../core/error-handlers.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 
 // ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
@@ -272,7 +273,7 @@ export class HubOrchestrator extends EventEmitter {
         });
 
         // Cauda sem valor — quando completa (ok ou erro), limpa o mapa se ninguém mais se encadeou
-        const tail = next.then(() => {}).catch(() => {});
+        const tail = next.then(() => {}).catch((/** @type {any} */ e) => logSwallowed(e, 'hub.orchestrator.tail'));
         // F6.5: só inserir no mapa se a sessão ainda não foi fechada
         if (!this.#closedSessions.has(hubSessionId)) {
             this.#inflightBySession.set(hubSessionId, tail);
@@ -282,7 +283,7 @@ export class HubOrchestrator extends EventEmitter {
             if (this.#inflightBySession.get(hubSessionId) === tail) {
                 this.#inflightBySession.delete(hubSessionId);
             }
-        }).catch(() => {});
+        }).catch((/** @type {any} */ e) => logSwallowed(e, 'hub.orchestrator.inflightCleanup'));
 
         return next;
     }

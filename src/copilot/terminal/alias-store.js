@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
 import { safeJsonParse } from '../core/safe-json.js';
 import { AliasConfigSchema } from '../core/schemas.js';
 
@@ -115,8 +116,8 @@ async function _saveCustomAliasesAsync() {
     }
     try {
         await writeFile(ALIASES_FILE, JSON.stringify(custom, null, 2));
-    } catch {
-        // silently ignore write errors
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'terminal.aliasStore.write');
     }
 }
 

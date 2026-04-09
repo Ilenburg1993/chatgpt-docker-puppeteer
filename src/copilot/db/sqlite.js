@@ -26,6 +26,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
 import { COPILOT_MIGRATIONS } from './migrations.js';
 
 /** @type {import('better-sqlite3').Database | null} */
@@ -175,8 +176,8 @@ function registerExitHandler() {
         if (copilotDb) {
             try {
                 copilotDb.close();
-            } catch {
-                /* best-effort */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'db.sqlite.close');
             }
             copilotDb = null;
         }

@@ -22,6 +22,7 @@ import {
 import { log } from '#copilot/observability/logger';
 import { raceEvents } from '#copilot/sdk/event-helpers';
 import { CopilotClient } from '@github/copilot-sdk';
+import { logSwallowed } from '../../core/error-handlers.js';
 
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
 import { setSessionRpc } from '../infra/tools-bootstrap.js';
@@ -174,7 +175,9 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
 
     if (ctx.status === 'starting') {
         log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-        await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch(() => {});
+        await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((/** @type {any} */ e) =>
+            logSwallowed(e, 'agent.lifecycle.stopBootWait'),
+        );
     }
 
     if (ctx.status === 'processing' || ctx.status === 'waiting_for_input') {

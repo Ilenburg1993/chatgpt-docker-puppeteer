@@ -13,6 +13,7 @@
  * @see module:copilot/agent/session/initializer
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { readStore as _readTodoStore } from '#copilot/tools/todo/store';
@@ -105,11 +106,13 @@ export async function buildHookSystemContext() {
         if (!jsonResult.ok) {
             log('WARN', `[hook-context] session.json corrompido (JSON inválido)`);
         }
-        const parseResult = jsonResult.ok ? SessionJsonSchema.safeParse(jsonResult.data) : { success: false, error: null, data: null };
+        const parseResult = jsonResult.ok
+            ? SessionJsonSchema.safeParse(jsonResult.data)
+            : { success: false, error: null, data: null };
         if (jsonResult.ok && !parseResult.success) {
             log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error?.message}`);
         }
-        const state = parseResult.success ? parseResult.data : (jsonResult.ok ? jsonResult.data : {});
+        const state = parseResult.success ? parseResult.data : jsonResult.ok ? jsonResult.data : {};
         // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
         // antes de usá-los no system prompt para prevenir prompt injection
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;
@@ -170,8 +173,8 @@ export async function buildHookSystemContext() {
             pendingCount = Object.values(todoStore.tasks).filter(
                 (t) => t.status === 'todo' || t.status === 'in_progress',
             ).length;
-        } catch {
-            /* ignorar */
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'hookContext.readTodoStore');
         }
         parts.push(
             [

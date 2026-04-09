@@ -25,6 +25,7 @@ import { log } from '#copilot/observability/logger';
 import { startSpanImmediate } from '#copilot/observability/otel';
 import { waitForEvent } from '#copilot/sdk/event-helpers';
 import EventEmitter from 'node:events';
+import { logSwallowed } from '../../core/error-handlers.js';
 import {
     BOOT_TIMEOUT_MS,
     DIALOG_QUEUE_MAX,
@@ -474,7 +475,9 @@ export class DialogLoopManager extends EventEmitter {
             this.#watchdog?.stop();
             this.#watchdog = null;
             this.#active = false;
-            await writeStateAsync({ dialogLoopActive: false }).catch(() => {});
+            await writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
+                logSwallowed(e, 'agent.loopManager.writeState'),
+            );
             await this.start();
             // F41B.8: contabilizar resume com PR
             this.#prMetrics.resumesWithPR++;

@@ -39,6 +39,7 @@
 
 import { BridgeError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
+import { logSwallowed } from '../core/error-handlers.js';
 import {
     dialogTurn as _dialogTurn,
     startDialogMode as _startDialogMode,
@@ -243,8 +244,8 @@ export class LlmBridgeClient {
                 if (onDelta) {
                     try {
                         onDelta(evt.chunk ?? '', evt.taskId);
-                    } catch {
-                        /* seguro */
+                    } catch (/** @type {any} */ e) {
+                        logSwallowed(e, 'channel.client.onDelta');
                     }
                 }
             }
@@ -254,8 +255,8 @@ export class LlmBridgeClient {
             if (onQuestion) {
                 try {
                     onQuestion(evt);
-                } catch {
-                    /* seguro */
+                } catch (/** @type {any} */ e) {
+                    logSwallowed(e, 'channel.client.onQuestion');
                 }
             }
         };

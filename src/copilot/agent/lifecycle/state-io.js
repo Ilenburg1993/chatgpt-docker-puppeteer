@@ -13,6 +13,7 @@
  * @see module:copilot/agent/session/initializer
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -112,8 +113,8 @@ export function readState() {
         log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
         try {
             rmSync(STATE_FILE, { force: true });
-        } catch {
-            // Ignorar falha de remoção — próxima leitura retornará null via existsSync
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'stateIo.readState.rmCorrupt');
         }
         return null;
     }
@@ -231,8 +232,8 @@ export async function readStateAsync() {
             log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
             try {
                 await rm(STATE_FILE, { force: true });
-            } catch {
-                /* best-effort */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'stateIo.readStateAsync.rmCorrupt');
             }
             return null;
         }
@@ -247,8 +248,8 @@ export async function readStateAsync() {
         log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
         try {
             await rm(STATE_FILE, { force: true });
-        } catch {
-            // Ignorar falha de remoção
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'stateIo.readStateAsync.rmCorruptOuter');
         }
         return null;
     }
@@ -265,8 +266,8 @@ export async function clearStateAsync() {
     try {
         await rm(STATE_FILE, { force: true });
         log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
-    } catch {
-        // Arquivo pode não existir
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'stateIo.clearStateAsync.rm');
     }
     _stateCache = null;
     _stateDirReady = false;

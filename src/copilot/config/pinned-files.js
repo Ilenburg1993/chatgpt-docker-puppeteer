@@ -13,6 +13,7 @@ import { EventEmitter } from 'node:events';
 import { existsSync, readdirSync, statSync, watch } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
 
 const DEBOUNCE_MS = 500;
 const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.yml'];
@@ -138,7 +139,8 @@ export class PinnedFilesLoader extends EventEmitter {
         let entries;
         try {
             entries = await readdir(dir);
-        } catch {
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'config.pinnedFiles.readdir');
             return;
         }
 
@@ -149,8 +151,8 @@ export class PinnedFilesLoader extends EventEmitter {
                 const info = await stat(filePath);
                 if (!info.isFile()) continue;
                 await this.#loadFile(filePath);
-            } catch {
-                // arquivo pode ter sido removido entre readdir e stat
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'config.pinnedFiles.stat');
             }
         }
     }
@@ -165,8 +167,8 @@ export class PinnedFilesLoader extends EventEmitter {
         try {
             const content = await readFile(filePath, 'utf8');
             this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
-        } catch {
-            // arquivo inacessível — ignorar silenciosamente
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'config.pinnedFiles.loadFile');
         }
     }
 
@@ -210,8 +212,8 @@ export class PinnedFilesLoader extends EventEmitter {
                             );
                             this.#watchers.set(subPath, subWatcher);
                         }
-                    } catch {
-                        // subdirs indisponíveis — continuar com watch do dir raiz
+                    } catch (/** @type {any} */ e) {
+                        logSwallowed(e, 'config.pinnedFiles.watchSubdirs');
                     }
                 }
             } catch (err) {
@@ -258,8 +260,8 @@ export class PinnedFilesLoader extends EventEmitter {
                 /** @type {PinnedFileChangedEvent} */
                 const event = { file: filePath, content, type };
                 this.emit('changed', event);
-            } catch {
-                // arquivo protegido ou inacessível
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'config.pinnedFiles.reloadFile');
             }
         }, DEBOUNCE_MS);
 

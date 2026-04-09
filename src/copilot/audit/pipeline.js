@@ -19,6 +19,7 @@ import {
     COPILOT_HIGH_RISK_TOOLS,
     COPILOT_TOOL_PERMISSIONS_LOG,
 } from '#copilot/config/env';
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { defaultBus } from '#copilot/hooks/bus';
 import { LOG_DIR, log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
@@ -231,12 +232,12 @@ export function createAuditLog(opts = {}) {
                 try {
                     const { size } = await stat(toolAuditFile);
                     if (size >= MAX_TOOL_AUDIT_BYTES) await rename(toolAuditFile, toolAuditRotate);
-                } catch {
-                    // arquivo ainda não existe
+                } catch (/** @type {any} */ e) {
+                    logSwallowed(e, 'audit.pipeline.statToolAudit');
                 }
                 await appendFile(toolAuditFile, batch.join(''), 'utf8');
-            } catch {
-                // Falha silenciosa
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'audit.pipeline.flushToolAudit');
             }
         });
     }
@@ -479,8 +480,8 @@ export function logToolAudit(entry) {
             }
             await appendFile(TOOL_PERMISSIONS_LOG, line, 'utf8');
             _permLogBytes += lineBytes;
-        } catch {
-            // falha silenciosa
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'audit.pipeline.logPermission');
         }
     })();
 }

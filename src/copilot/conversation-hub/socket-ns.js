@@ -11,6 +11,7 @@
  */
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config/env';
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import jwt from 'jsonwebtoken';
@@ -419,8 +420,8 @@ export function unmountCopilotNamespace() {
     try {
         copilotNamespace.disconnectSockets(true);
         copilotNamespace.removeAllListeners();
-    } catch {
-        // ignorar erros de desmonte
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'hub.socketNs.unmount');
     }
     copilotNamespace = null;
 }

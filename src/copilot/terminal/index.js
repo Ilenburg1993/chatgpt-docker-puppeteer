@@ -26,6 +26,7 @@ import { llmBridgeClient, setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
+import { logSwallowed } from '../core/error-handlers.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliases } from './alias-store.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
@@ -124,8 +125,8 @@ function registerAgentEventListeners() {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
-            } catch {
-                /* best-effort */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'terminal.index.watchdogWriteTurn');
             }
         }
         // DL-PERM-06: stopDialogMode() usará reason='watchdog_restart', que o handler de
@@ -230,8 +231,8 @@ function registerAgentEventListeners() {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
-            } catch {
-                /* best-effort */
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'terminal.index.reconnectWriteTurn');
             }
         },
     );
@@ -243,8 +244,8 @@ function registerAgentEventListeners() {
                 role: 'user',
                 content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
             });
-        } catch {
-            /* best-effort */
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'terminal.index.fatalWriteTurn');
         }
     });
 

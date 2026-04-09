@@ -28,6 +28,7 @@ import {
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
+import { logSwallowed } from '../../core/error-handlers.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
 import { readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
@@ -139,7 +140,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
                 ctx.emit('session.cleanup', result);
             }
         })
-        .catch(() => {});
+        .catch((/** @type {any} */ e) => logSwallowed(e, 'agent.bootWiring.cleanup'));
 
     // ── 6. Dialog loop resume após boot recovery ──
     if (isResumed) {

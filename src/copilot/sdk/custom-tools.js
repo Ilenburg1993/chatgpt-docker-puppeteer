@@ -17,10 +17,11 @@
 
 import { log } from '#copilot/observability/logger';
 import { buildTool } from '#copilot/tools/tool-factory';
-import { safeJsonParse } from '../core/safe-json.js';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { logSwallowed } from '../core/error-handlers.js';
+import { safeJsonParse } from '../core/safe-json.js';
 import { CustomToolsFileSchema } from '../core/schemas.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
@@ -205,8 +206,8 @@ export async function loadCustomToolsAsync() {
         const items = result.data;
         _registry = new Map(items.map((item) => [item.name, item]));
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
-    } catch {
-        // Arquivo não existe ou JSON inválido — registry vazio
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'sdk.customTools.loadRegistry');
     }
 }
 
