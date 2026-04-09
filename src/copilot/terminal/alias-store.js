@@ -83,8 +83,12 @@ function saveCustomAliases() {
 export async function loadAliasesAsync() {
     try {
         const raw = await readFile(ALIASES_FILE, 'utf8');
-        const jsonData = JSON.parse(raw);
-        const result = AliasConfigSchema.safeParse(jsonData);
+        const jsonResult = safeJsonParse(raw, '[alias-store/loadAliasesAsync]');
+        if (!jsonResult.ok) {
+            _aliases = { ...BUILTIN_ALIASES };
+            return;
+        }
+        const result = AliasConfigSchema.safeParse(jsonResult.data);
         if (result.success && result.data) {
             const custom = /** @type {Record<string, string>} */ (/** @type {unknown} */ (result.data));
             _aliases = { ...BUILTIN_ALIASES, ...custom };

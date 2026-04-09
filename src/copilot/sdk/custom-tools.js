@@ -17,6 +17,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { buildTool } from '#copilot/tools/tool-factory';
+import { safeJsonParse } from '../core/safe-json.js';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -138,7 +139,8 @@ export function loadCustomTools() {
     if (!existsSync(CUSTOM_TOOLS_PATH)) return;
     try {
         const raw = readFileSync(CUSTOM_TOOLS_PATH, 'utf8');
-        const items = /** @type {unknown} */ (JSON.parse(raw));
+        const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomTools]');
+        const items = /** @type {unknown} */ (jsonResult.ok ? jsonResult.data : null);
         if (!Array.isArray(items)) return;
         _registry = new Map(
             items
@@ -189,7 +191,12 @@ function persistCustomTools() {
 export async function loadCustomToolsAsync() {
     try {
         const raw = await readFile(CUSTOM_TOOLS_PATH, 'utf8');
-        const jsonData = /** @type {unknown} */ (JSON.parse(raw));
+        const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomToolsAsync]');
+        if (!jsonResult.ok) {
+            log('WARN', '[custom-tools-registry] custom-tools.json JSON inválido.');
+            return;
+        }
+        const jsonData = /** @type {unknown} */ (jsonResult.data);
         const result = CustomToolsFileSchema.safeParse(jsonData);
         if (!result.success || !result.data) {
             log('WARN', '[custom-tools-registry] custom-tools.json schema inválido — registry vazio.');

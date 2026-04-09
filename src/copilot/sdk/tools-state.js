@@ -12,6 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { safeJsonParse } from '../core/safe-json.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -38,7 +39,8 @@ export function loadToolsConfig() {
     if (!existsSync(TOOLS_CONFIG_PATH)) return;
     try {
         const raw = readFileSync(TOOLS_CONFIG_PATH, 'utf8');
-        const parsed = /** @type {unknown} */ (JSON.parse(raw));
+        const result = safeJsonParse(raw, '[tools-state/loadToolsConfig]');
+        const parsed = /** @type {unknown} */ (result.ok ? result.data : null);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             const data = /** @type {Record<string, unknown>} */ (parsed);
             const allowlist =
@@ -79,7 +81,12 @@ function persistToolsConfig() {
 export async function loadToolsConfigAsync() {
     try {
         const raw = await readFile(TOOLS_CONFIG_PATH, 'utf8');
-        const jsonData = /** @type {unknown} */ (JSON.parse(raw));
+        const jsonResult = safeJsonParse(raw, '[tools-state/loadToolsConfigAsync]');
+        if (!jsonResult.ok) {
+            log('WARN', '[tools-state] tools-config.json JSON inválido — mantendo defaults.');
+            return;
+        }
+        const jsonData = /** @type {unknown} */ (jsonResult.data);
         const result = ToolsConfigSchema.safeParse(jsonData);
         if (result.success && result.data) {
             _toolsConfig = { allowlist: result.data.allowlist, denylist: result.data.denylist };

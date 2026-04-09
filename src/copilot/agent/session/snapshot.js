@@ -11,10 +11,10 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { safeJsonParse } from '../../core/safe-json.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
 import { readState } from '../lifecycle/state-io.js';
@@ -146,13 +146,16 @@ export function listSnapshots() {
         if (!f.endsWith('.json')) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
-            const data = JSON.parse(readFileSync(filepath, 'utf8'));
+            const raw = readFileSync(filepath, 'utf8');
+            const jsonResult = safeJsonParse(raw, `[SessionSnapshot/list/${f}]`);
+            if (!jsonResult.ok) continue;
+            const data = /** @type {Record<string, unknown>} */ (jsonResult.data);
             result.push({
                 snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
                 createdAt: Number(data.createdAt ?? 0),
-                sessionId: data.sessionId ?? null,
+                sessionId: /** @type {string | null} */ (data.sessionId ?? null),
                 model: String(data.model ?? 'unknown'),
-                reason: data.reason,
+                ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
                 filepath,
             });
         } catch {
@@ -181,14 +184,18 @@ export function loadSnapshot(snapshotId) {
         if (!first) return null;
         const fullPath = join(SNAPSHOT_DIR, first);
         try {
-            return JSON.parse(readFileSync(fullPath, 'utf8'));
+            const raw = readFileSync(fullPath, 'utf8');
+            const jsonResult = safeJsonParse(raw, `[SessionSnapshot/load/${fullPath}]`);
+            return jsonResult.ok ? /** @type {SessionSnapshotData} */ (jsonResult.data) : null;
         } catch {
             return null;
         }
     }
 
     try {
-        return JSON.parse(readFileSync(filepath, 'utf8'));
+        const raw = readFileSync(filepath, 'utf8');
+        const jsonResult = safeJsonParse(raw, `[SessionSnapshot/load/${filepath}]`);
+        return jsonResult.ok ? /** @type {SessionSnapshotData} */ (jsonResult.data) : null;
     } catch {
         return null;
     }

@@ -118,9 +118,13 @@ async function _flushOnExit() {
     }
 }
 
-registerShutdownHandler('event-collector.flush', async () => {
-    await _flushOnExit();
-}, 90);
+registerShutdownHandler(
+    'event-collector.flush',
+    async () => {
+        await _flushOnExit();
+    },
+    90,
+);
 
 /**
  * Agenda flush assíncrono de eventos para disco.

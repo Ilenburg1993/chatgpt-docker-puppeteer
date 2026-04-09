@@ -19,6 +19,7 @@ import { readStore as _readTodoStore } from '#copilot/tools/todo/store';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../config.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -100,11 +101,15 @@ export async function buildHookSystemContext() {
         await access(SESSION_JSON_FILE);
         const raw = await readFile(SESSION_JSON_FILE, 'utf8');
         // F5.1 (ARCH-01): valida session.json com schema Zod para detectar corrupcao precocemente
-        const parseResult = SessionJsonSchema.safeParse(JSON.parse(raw));
-        if (!parseResult.success) {
-            log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error.message}`);
+        const jsonResult = safeJsonParse(raw, '[hook-context/session.json]');
+        if (!jsonResult.ok) {
+            log('WARN', `[hook-context] session.json corrompido (JSON inválido)`);
         }
-        const state = parseResult.success ? parseResult.data : JSON.parse(raw);
+        const parseResult = jsonResult.ok ? SessionJsonSchema.safeParse(jsonResult.data) : { success: false, error: null, data: null };
+        if (jsonResult.ok && !parseResult.success) {
+            log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error?.message}`);
+        }
+        const state = parseResult.success ? parseResult.data : (jsonResult.ok ? jsonResult.data : {});
         // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
         // antes de usá-los no system prompt para prevenir prompt injection
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;

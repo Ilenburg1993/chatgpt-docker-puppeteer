@@ -29,8 +29,8 @@ const execFileAsync = promisify(execFileCb);
  */
 
 /**
- * Executa um comando síncrono e retorna stdout, ou null em caso de erro.
- * F131+: usa execFileSync (sem shell) para evitar command injection.
+ * Executa um comando síncrono e retorna stdout, ou null em caso de erro. F131+: usa execFileSync (sem shell) para
+ * evitar command injection.
  *
  * @param {string} bin
  * @param {string[]} args
@@ -39,7 +39,12 @@ const execFileAsync = promisify(execFileCb);
  */
 function tryExec(bin, args, cwd) {
     try {
-        return execFileSync(bin, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim();
+        return execFileSync(bin, args, {
+            cwd,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 5000,
+        }).trim();
     } catch {
         return null;
     }

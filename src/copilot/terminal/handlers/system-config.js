@@ -24,6 +24,7 @@ import { getToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from '../state.js';
 
@@ -183,7 +184,8 @@ async function readSkillsConfig() {
     if (!existsSync(SKILLS_PATH)) return { paths: [] };
     try {
         const raw = await readFileAsync(SKILLS_PATH, 'utf8');
-        return JSON.parse(raw);
+        const result = safeJsonParse(raw, '[system-config/readSkillsConfig]');
+        return result.ok ? /** @type {SkillsConfig} */ (result.data) : { paths: [] };
     } catch {
         return { paths: [] };
     }

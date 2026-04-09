@@ -231,7 +231,9 @@ export async function readStateAsync() {
             log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
             try {
                 await rm(STATE_FILE, { force: true });
-            } catch { /* best-effort */ }
+            } catch {
+                /* best-effort */
+            }
             return null;
         }
         const result = AliveAgentStateSchema.safeParse(parseResult.data);
