@@ -60,6 +60,7 @@ import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/con
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
+import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 import { createHistogram } from './metrics-histogram.js';
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -298,6 +299,8 @@ export function createMetricsStore() {
             })();
         }, ms);
         if (_snapshotTimer.unref) _snapshotTimer.unref();
+        // F155: registrar no timer-registry para cleanup automático via shutdown
+        registerTimer('metrics.snapshot', 'interval', _snapshotTimer);
     }
 
     /**
@@ -309,6 +312,8 @@ export function createMetricsStore() {
         if (_snapshotTimer) {
             clearInterval(_snapshotTimer);
             _snapshotTimer = null;
+            // F155: cancelar também no registry (idempotente)
+            cancelTimer('metrics.snapshot');
         }
     }
 

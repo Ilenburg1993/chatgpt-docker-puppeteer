@@ -27,6 +27,7 @@ import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { logSwallowed } from '../core/error-handlers.js';
+import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliases } from './alias-store.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
@@ -364,8 +365,10 @@ function startReflectionLoop() {
     };
 
     // T-20: armazenar referência em variável de módulo para permitir cancelamento no graceful shutdown
+    // F153: registrar no timer-registry para cleanup automático via shutdown handler centralizado
     _reflectionTimer = setInterval(runReflection, reflectionIntervalMs);
     if (typeof _reflectionTimer.unref === 'function') _reflectionTimer.unref();
+    registerTimer('terminal.reflection', 'interval', _reflectionTimer);
 }
 
 /**
@@ -436,11 +439,15 @@ export async function startTerminalServer() {
     startReflectionLoop();
 
     // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
-    startTodoCleanupJob();
+    // F152: registrar no timer-registry para evitar leak (handle era descartado)
+    const todoCleanupTimer = startTodoCleanupJob();
+    registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
     // T-21: graceful shutdown handlers via registerShutdownHandler
     const { registerShutdownHandler } = await import('#copilot/core/shutdown');
 
+    // F153: reflectionTimer agora é gerenciado via timer-registry (cancelAll no shutdown),
+    // mas manter shutdown handler para log explícito + nullify da referência local
     registerShutdownHandler(
         'terminal.reflectionTimer',
         async () => {

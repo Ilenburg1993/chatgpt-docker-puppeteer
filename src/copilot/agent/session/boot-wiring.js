@@ -29,6 +29,7 @@ import {
 import { log } from '#copilot/observability/logger';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
+import { registerTimer } from '../../core/timer-registry.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
 import { readState, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
@@ -158,6 +159,8 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
             ctx.emit('agent.metrics', ctx.getStatusSnapshot());
         }, METRICS_INTERVAL_MS);
         metricsTimer.unref();
+        // F154: registrar no timer-registry para cleanup automático via shutdown
+        registerTimer('agent.metricsEmit', 'interval', metricsTimer);
     }
 
     // ── 8. Auto-reconnect MCP ──

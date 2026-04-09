@@ -123,14 +123,16 @@ export function fallback(primary, fallbackFn) {
  */
 export function raceWithTimeout(handler, ms) {
     const fn = async (/** @type {unknown} */ input, /** @type {InvocationContext} */ invocation) => {
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
+        let timer;
         return Promise.race([
-            handler(input, invocation),
-            new Promise((resolve) =>
-                setTimeout(() => {
+            Promise.resolve(handler(input, invocation)).finally(() => clearTimeout(timer)),
+            new Promise((resolve) => {
+                timer = setTimeout(() => {
                     log('WARN', `[hooks/composer] handler timeout após ${ms}ms`);
                     resolve(undefined);
-                }, ms),
-            ),
+                }, ms);
+            }),
         ]);
     };
     return /** @type {T} */ (/** @type {unknown} */ (fn));

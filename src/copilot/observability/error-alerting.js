@@ -18,6 +18,8 @@
 
 import { log } from './logger.js';
 
+import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
@@ -219,6 +221,8 @@ export function createErrorAlerter(tracker, config = {}) {
         if (_interval) {
             clearInterval(_interval);
             _interval = null;
+            // F156: cancelar também no registry (idempotente)
+            cancelTimer('observability.errorAlerting');
         }
         reset();
     }
@@ -228,6 +232,8 @@ export function createErrorAlerter(tracker, config = {}) {
     if (typeof _interval === 'object' && 'unref' in _interval) {
         _interval.unref();
     }
+    // F156: registrar no timer-registry para cleanup automático via shutdown
+    registerTimer('observability.errorAlerting', 'interval', _interval);
 
     return { check, getLastAlert, getAlertStats, reset, destroy };
 }
