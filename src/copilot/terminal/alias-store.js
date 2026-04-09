@@ -13,6 +13,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { AliasConfigSchema } from '../core/schemas.js';
+import { safeJsonParse } from '../core/safe-json.js';
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
