@@ -10,6 +10,7 @@
 
 import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs';
+import { stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool, withSkipPermission } from '../tool-factory.js';
@@ -62,7 +63,7 @@ const readFileContentTool = buildTool({
         log('INFO', `[copilot/read_file_content] ${resolved}`);
 
         try {
-            const stats = fs.statSync(resolved);
+            const stats = await fsStat(resolved);
             if (stats.isDirectory()) return { success: false, error: 'É um diretório, use list_directory.' };
 
             if (encoding === 'base64') {
@@ -157,7 +158,7 @@ const listDirectoryTool = buildTool({
          */
 
         try {
-            const stats = fs.statSync(resolved);
+            const stats = await fsStat(resolved);
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
 
             /**

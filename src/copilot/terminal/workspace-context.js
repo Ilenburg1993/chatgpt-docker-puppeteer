@@ -14,12 +14,12 @@
  */
 
 import { COPILOT_WORKING_DIRECTORY } from '#copilot/config/env';
-import { exec as execCb, execSync } from 'node:child_process';
+import { execFile as execFileCb, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
 
 /**
  * @typedef {Object} WorkspaceContext
@@ -30,14 +30,16 @@ const execAsync = promisify(execCb);
 
 /**
  * Executa um comando síncrono e retorna stdout, ou null em caso de erro.
+ * F131+: usa execFileSync (sem shell) para evitar command injection.
  *
- * @param {string} cmd
+ * @param {string} bin
+ * @param {string[]} args
  * @param {string} cwd
  * @returns {string | null}
  */
-function tryExec(cmd, cwd) {
+function tryExec(bin, args, cwd) {
     try {
-        return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        return execFileSync(bin, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim();
     } catch {
         return null;
     }
@@ -65,7 +67,7 @@ function detectGitRoot(cwd) {
         dir = parent;
     }
     if (!found) return null;
-    return tryExec('git rev-parse --show-toplevel', cwd);
+    return tryExec('git', ['rev-parse', '--show-toplevel'], cwd);
 }
 
 /** @type {number} */
@@ -89,7 +91,7 @@ export function getWorkspaceContext() {
     }
     const cwd = COPILOT_WORKING_DIRECTORY;
     const gitRoot = detectGitRoot(cwd);
-    const currentBranch = gitRoot ? tryExec('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
+    const currentBranch = gitRoot ? tryExec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot) : null;
     const context = { cwd, gitRoot, currentBranch };
     _contextCache = { context, expiresAt: now + CONTEXT_CACHE_TTL_MS };
     return context;
@@ -98,13 +100,14 @@ export function getWorkspaceContext() {
 /**
  * F93: Executa um comando assíncrono e retorna stdout, ou null em caso de erro.
  *
- * @param {string} cmd
+ * @param {string} bin
+ * @param {string[]} args
  * @param {string} cwd
  * @returns {Promise<string | null>}
  */
-async function tryExecAsync(cmd, cwd) {
+async function tryExecAsync(bin, args, cwd) {
     try {
-        const { stdout } = await execAsync(cmd, { cwd, timeout: 5000 });
+        const { stdout } = await execFileAsync(bin, args, { cwd, timeout: 5000 });
         return stdout.trim();
     } catch {
         return null;
@@ -123,7 +126,7 @@ export async function getWorkspaceContextAsync() {
     }
     const cwd = COPILOT_WORKING_DIRECTORY;
     const gitRoot = detectGitRoot(cwd);
-    const currentBranch = gitRoot ? await tryExecAsync('git rev-parse --abbrev-ref HEAD', gitRoot) : null;
+    const currentBranch = gitRoot ? await tryExecAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot) : null;
     const context = { cwd, gitRoot, currentBranch };
     _contextCache = { context, expiresAt: now + CONTEXT_CACHE_TTL_MS };
     return context;

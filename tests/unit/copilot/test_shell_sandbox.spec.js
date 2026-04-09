@@ -6,7 +6,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { checkCommandBlocklist, hasShellMetaOutsideQuotes, validateCwd, WORKSPACE_ROOT } from '../../../src/copilot/tools/shell/sandbox.js';
+import {
+    checkCommandBlocklist,
+    hasShellMetaOutsideQuotes,
+    validateCwd,
+    WORKSPACE_ROOT,
+} from '../../../src/copilot/tools/shell/sandbox.js';
 
 // ─── hasShellMetaOutsideQuotes ───────────────────────────────────────────────
 

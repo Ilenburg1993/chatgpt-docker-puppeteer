@@ -9,8 +9,8 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import * as fs from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';

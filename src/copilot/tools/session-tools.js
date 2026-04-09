@@ -90,9 +90,21 @@ const getWorkspaceInfoTool = defineTool('get_workspace_info', {
         let gitRoot = null;
         let gitCommit = null;
         try {
-            gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
-            gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
-            gitCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+            gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+                cwd,
+                encoding: 'utf8',
+                timeout: 5000,
+            }).trim();
+            gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+                cwd,
+                encoding: 'utf8',
+                timeout: 5000,
+            }).trim();
+            gitCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+                cwd,
+                encoding: 'utf8',
+                timeout: 5000,
+            }).trim();
         } catch {
             // not a git repo or git not available
         }

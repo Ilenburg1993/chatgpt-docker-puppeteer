@@ -14,10 +14,10 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { safeJsonParse } from '../../core/safe-json.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
 import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../config.js';
 
@@ -226,8 +226,15 @@ export async function readStateAsync() {
     }
     try {
         const raw = await readFile(STATE_FILE, 'utf8');
-        const jsonData = JSON.parse(raw);
-        const result = AliveAgentStateSchema.safeParse(jsonData);
+        const parseResult = safeJsonParse(raw, '[PersistentSession/readStateAsync]');
+        if (!parseResult.ok) {
+            log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
+            try {
+                await rm(STATE_FILE, { force: true });
+            } catch { /* best-effort */ }
+            return null;
+        }
+        const result = AliveAgentStateSchema.safeParse(parseResult.data);
         if (!result.success) {
             log('WARN', '[PersistentSession] Estado inválido (schema validation failed) — ignorando ficheiro.');
             return null;

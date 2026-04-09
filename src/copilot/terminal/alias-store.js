@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { AliasConfigSchema } from '../core/schemas.js';
 import { safeJsonParse } from '../core/safe-json.js';
+import { AliasConfigSchema } from '../core/schemas.js';
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({
@@ -53,9 +53,10 @@ export function loadAliases() {
         const raw = fs.readFileSync(ALIASES_FILE, 'utf8');
         const result = safeJsonParse(raw, '[alias-store/loadAliases]');
         const custom = result.ok ? result.data : null;
-        _aliases = custom && typeof custom === 'object' && !Array.isArray(custom)
-            ? { ...BUILTIN_ALIASES, .../** @type {Record<string, string>} */ (custom) }
-            : { ...BUILTIN_ALIASES };
+        _aliases =
+            custom && typeof custom === 'object' && !Array.isArray(custom)
+                ? { ...BUILTIN_ALIASES, .../** @type {Record<string, string>} */ (custom) }
+                : { ...BUILTIN_ALIASES };
     } catch {
         // arquivo não existe ou inválido — usar apenas built-ins
         _aliases = { ...BUILTIN_ALIASES };

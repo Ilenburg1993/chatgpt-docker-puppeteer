@@ -19,6 +19,7 @@
  */
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
+import { registerShutdownHandler } from '#copilot/core';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -117,9 +118,9 @@ async function _flushOnExit() {
     }
 }
 
-process.once('beforeExit', () => {
-    void _flushOnExit();
-});
+registerShutdownHandler('event-collector.flush', async () => {
+    await _flushOnExit();
+}, 90);
 
 /**
  * Agenda flush assíncrono de eventos para disco.

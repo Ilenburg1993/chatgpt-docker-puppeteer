@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -254,8 +255,10 @@ export async function listSnapshotsAsync() {
         if (!f.endsWith('.json')) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
-            const raw = JSON.parse(await readFile(filepath, 'utf8'));
-            const parsed = SnapshotListItemSchema.safeParse(raw);
+            const text = await readFile(filepath, 'utf8');
+            const jsonResult = safeJsonParse(text, `[SessionSnapshot/listAsync/${f}]`);
+            if (!jsonResult.ok) continue;
+            const parsed = SnapshotListItemSchema.safeParse(jsonResult.data);
             if (!parsed.success) {
                 log('WARN', `[SessionSnapshot] Snapshot inválido (${f}): schema validation failed`);
                 continue;
@@ -303,8 +306,10 @@ export async function loadSnapshotAsync(snapshotId) {
         const first = files[0];
         if (!first) return null;
         try {
-            const raw = JSON.parse(await readFile(join(SNAPSHOT_DIR, first), 'utf8'));
-            const parsed = SessionSnapshotDataSchema.safeParse(raw);
+            const text = await readFile(join(SNAPSHOT_DIR, first), 'utf8');
+            const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${first}]`);
+            if (!jsonResult.ok) return null;
+            const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
             return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
         } catch {
             return null;
@@ -312,8 +317,10 @@ export async function loadSnapshotAsync(snapshotId) {
     }
 
     try {
-        const raw = JSON.parse(await readFile(filepath, 'utf8'));
-        const parsed = SessionSnapshotDataSchema.safeParse(raw);
+        const text = await readFile(filepath, 'utf8');
+        const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
+        if (!jsonResult.ok) return null;
+        const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
         return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
     } catch {
         return null;

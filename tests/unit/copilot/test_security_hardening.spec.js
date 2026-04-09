@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * F131: Testes de segurança para session-tools.js — verifica que shell metacaracteres não são interpretados.
- * F136: Testes para sanitizeErrorMessage em middleware.
+ * F131: Testes de segurança para session-tools.js — verifica que shell metacaracteres não são interpretados. F136:
+ * Testes para sanitizeErrorMessage em middleware.
  */
 
 import assert from 'node:assert/strict';
@@ -25,8 +25,8 @@ describe('session-tools — execFileSync security (F131)', () => {
     });
 
     it('session-tools não importa execSync', async () => {
-        const source = await import('node:fs/promises').then(fs =>
-            fs.readFile(new URL('../../../src/copilot/tools/session-tools.js', import.meta.url), 'utf8')
+        const source = await import('node:fs/promises').then((fs) =>
+            fs.readFile(new URL('../../../src/copilot/tools/session-tools.js', import.meta.url), 'utf8'),
         );
         assert.ok(!source.includes('execSync'), 'Não deve importar execSync (usar execFileSync)');
         assert.ok(source.includes('execFileSync'), 'Deve usar execFileSync');

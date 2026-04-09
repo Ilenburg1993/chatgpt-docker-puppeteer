@@ -424,9 +424,10 @@ export function createInjectServer() {
                 }
             } else {
                 // F133: Em produção, não logar stack traces completos (apenas mensagem)
-                const logMsg = process.env.NODE_ENV === 'production'
-                    ? `[TerminalServer] Erro interno: ${err?.message ?? 'unknown'}`
-                    : `[TerminalServer] Erro não tratado: ${err?.stack ?? err?.message ?? err}`;
+                const logMsg =
+                    process.env.NODE_ENV === 'production'
+                        ? `[TerminalServer] Erro interno: ${err?.message ?? 'unknown'}`
+                        : `[TerminalServer] Erro não tratado: ${err?.stack ?? err?.message ?? err}`;
                 log('ERROR', logMsg);
                 if (!res.headersSent) {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
