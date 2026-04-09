@@ -8,11 +8,11 @@
 import assert from 'node:assert/strict';
 
 import {
-    registerTimer,
+    _resetForTesting,
+    activeCount,
     cancel,
     cancelAll,
-    activeCount,
-    _resetForTesting,
+    registerTimer,
 } from '../../../src/copilot/core/timer-registry.js';
 
 import { _resetForTesting as resetShutdown } from '../../../src/copilot/core/shutdown.js';
@@ -77,9 +77,21 @@ describe('core/timer-registry.js › cancel', () => {
 
 describe('core/timer-registry.js › cancelAll', () => {
     it('cancela todos os timers registrados', () => {
-        registerTimer('a', 'timeout', setTimeout(() => {}, 100_000));
-        registerTimer('b', 'interval', setInterval(() => {}, 100_000));
-        registerTimer('c', 'timeout', setTimeout(() => {}, 100_000));
+        registerTimer(
+            'a',
+            'timeout',
+            setTimeout(() => {}, 100_000),
+        );
+        registerTimer(
+            'b',
+            'interval',
+            setInterval(() => {}, 100_000),
+        );
+        registerTimer(
+            'c',
+            'timeout',
+            setTimeout(() => {}, 100_000),
+        );
         const cancelled = cancelAll();
         assert.equal(cancelled, 3);
         assert.equal(activeCount(), 0);

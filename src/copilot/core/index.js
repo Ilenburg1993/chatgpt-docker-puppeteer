@@ -21,8 +21,8 @@
  */
 
 export { withTimeout } from './abort-utils.js';
-export * from './constants.js';
 export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
+export * from './constants.js';
 export * as ErrorCodes from './error-codes.js';
 export * from './errors.js';
 export { withRetry } from './retry.js';
@@ -30,4 +30,9 @@ export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.
 export * from './schemas.js';
 export { isShuttingDown, registerShutdownHandler, runShutdown } from './shutdown.js';
 export * from './structured-message.js';
-export { registerTimer, cancel as cancelTimer, cancelAll as cancelAllTimers, activeCount as activeTimerCount } from './timer-registry.js';
+export {
+    activeCount as activeTimerCount,
+    cancelAll as cancelAllTimers,
+    cancel as cancelTimer,
+    registerTimer,
+} from './timer-registry.js';

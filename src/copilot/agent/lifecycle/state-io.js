@@ -14,6 +14,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { safeJsonParse } from '../../core/safe-json.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -99,9 +100,9 @@ export function readState() {
     if (!existsSync(STATE_FILE)) return null;
     try {
         const raw = readFileSync(STATE_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        // G2-DX-15: validação mínima — rejeitar valores não-objeto para evitar falsos positivos
-        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        const result = safeJsonParse(raw, '[PersistentSession/readState]');
+        const parsed = result.ok ? result.data : null;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             log('WARN', '[PersistentSession] Estado inválido (não é objeto) — ignorando ficheiro.');
             return null;
         }

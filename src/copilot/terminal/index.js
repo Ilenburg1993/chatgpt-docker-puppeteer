@@ -440,18 +440,26 @@ export async function startTerminalServer() {
     // T-21: graceful shutdown handlers via registerShutdownHandler
     const { registerShutdownHandler } = await import('#copilot/core/shutdown');
 
-    registerShutdownHandler('terminal.reflectionTimer', async () => {
-        if (_reflectionTimer !== null) {
-            clearInterval(_reflectionTimer);
-            _reflectionTimer = null;
-        }
-        log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
-    }, 10);
+    registerShutdownHandler(
+        'terminal.reflectionTimer',
+        async () => {
+            if (_reflectionTimer !== null) {
+                clearInterval(_reflectionTimer);
+                _reflectionTimer = null;
+            }
+            log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
+        },
+        10,
+    );
 
-    registerShutdownHandler('terminal.injectServer', async () => {
-        await new Promise((resolve) => injectServer.close(resolve));
-        log('INFO', '[TerminalServer] Inject server encerrado via shutdown handler.');
-    }, 20);
+    registerShutdownHandler(
+        'terminal.injectServer',
+        async () => {
+            await new Promise((resolve) => injectServer.close(resolve));
+            log('INFO', '[TerminalServer] Inject server encerrado via shutdown handler.');
+        },
+        20,
+    );
 
     // T-22: SIGHUP é enviado pelo VS Code quando o painel do terminal é fechado.
     // Ignorar para manter o inject server HTTP ativo mesmo após o painel ser fechado.

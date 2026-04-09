@@ -2,8 +2,8 @@
 /**
  * src/copilot/core/circuit-breaker.js
  *
- * Circuit breaker centralizado (padrão Closed → Open → Half-Open).
- * Protege chamadas a serviços remotos contra falhas em cascata.
+ * Circuit breaker centralizado (padrão Closed → Open → Half-Open). Protege chamadas a serviços remotos contra falhas em
+ * cascata.
  *
  * @module copilot/core/circuit-breaker
  */
@@ -23,13 +23,13 @@ export class CircuitOpenError extends CopilotError {
     }
 }
 
-/** @typedef {'closed'|'open'|'half-open'} CircuitState */
+/** @typedef {'closed' | 'open' | 'half-open'} CircuitState */
 
 /**
  * @typedef {object} CircuitBreakerOptions
- * @property {number} [failThreshold=5] - Falhas consecutivas para abrir o circuito
- * @property {number} [resetTimeoutMs=30000] - Tempo em ms para transitar de open → half-open
- * @property {number} [halfOpenMax=2] - Tentativas permitidas em half-open antes de reabrir
+ * @property {number} [failThreshold=5] - Falhas consecutivas para abrir o circuito. Default is `5`
+ * @property {number} [resetTimeoutMs=30000] - Tempo em ms para transitar de open → half-open. Default is `30000`
+ * @property {number} [halfOpenMax=2] - Tentativas permitidas em half-open antes de reabrir. Default is `2`
  */
 
 export class CircuitBreaker {
@@ -62,8 +62,8 @@ export class CircuitBreaker {
     }
 
     /**
-     * Executa a função protegida pelo circuit breaker. Lança `CircuitOpenError` se o circuito
-     * estiver aberto e o timeout de reset ainda não expirou.
+     * Executa a função protegida pelo circuit breaker. Lança `CircuitOpenError` se o circuito estiver aberto e o
+     * timeout de reset ainda não expirou.
      *
      * @template T
      * @param {() => Promise<T>} fn - Função async a executar

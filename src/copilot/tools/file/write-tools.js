@@ -10,10 +10,25 @@
 
 import { log } from '#copilot/observability/logger';
 import * as fs from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';
 import { validatePath } from './shared.js';
+
+/**
+ * Escrita atômica: grava em arquivo temporário e renomeia (evita corrupção se crash durante write).
+ *
+ * @param {string} filePath - Caminho final do arquivo
+ * @param {string | Buffer} content - Conteúdo a escrever
+ * @param {BufferEncoding} [encoding] - Encoding (utf8 se string)
+ * @returns {Promise<void>}
+ */
+async function atomicWrite(filePath, content, encoding) {
+    const tmpPath = `${filePath}.${randomBytes(4).toString('hex')}.tmp`;
+    await fs.writeFile(tmpPath, content, encoding);
+    await fs.rename(tmpPath, filePath);
+}
 
 // ---------------------------------------------------------------------------
 // Tool: write_file_content
@@ -43,11 +58,13 @@ const writeFileContentTool = buildTool({
         log('INFO', `[copilot/write_file_content] ${resolved}`);
 
         try {
-            try { await fs.access(resolved); } catch {
+            try {
+                await fs.access(resolved);
+            } catch {
                 return { success: false, error: 'Arquivo não encontrado. Use create_file para criar um novo arquivo.' };
             }
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
-            await fs.writeFile(resolved, buf);
+            await atomicWrite(resolved, buf);
             return {
                 success: true,
                 path: resolved,
@@ -99,12 +116,14 @@ const createFileTool = buildTool({
                         success: false,
                         error: 'Arquivo já existe. Passe overwrite: true para sobrescrever ou use write_file_content.',
                     };
-                } catch { /* file does not exist — ok */ }
+                } catch {
+                    /* file does not exist — ok */
+                }
             }
             if (createParentDirs) {
                 await fs.mkdir(path.dirname(resolved), { recursive: true });
             }
-            await fs.writeFile(resolved, content ?? '', 'utf8');
+            await atomicWrite(resolved, content ?? '', 'utf8');
             return {
                 success: true,
                 path: resolved,
@@ -181,7 +200,9 @@ const copyFileTool = buildTool({
                         success: false,
                         error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
                     };
-                } catch { /* dest does not exist — ok */ }
+                } catch {
+                    /* dest does not exist — ok */
+                }
             }
             await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
             await fs.copyFile(src.resolved, dst.resolved);
@@ -225,7 +246,9 @@ const moveFileTool = buildTool({
                         success: false,
                         error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
                     };
-                } catch { /* dest does not exist — ok */ }
+                } catch {
+                    /* dest does not exist — ok */
+                }
             }
             await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
             await fs.rename(src.resolved, dst.resolved);
@@ -258,7 +281,9 @@ const patchFileTool = buildTool({
         const v = await validatePath(filePath);
         if (!v.ok) return { success: false, error: v.reason };
 
-        try { await fs.access(v.resolved); } catch {
+        try {
+            await fs.access(v.resolved);
+        } catch {
             return { success: false, error: `Arquivo não encontrado: ${v.resolved}` };
         }
 
@@ -284,7 +309,7 @@ const patchFileTool = buildTool({
         const safeNewString = new_string.replace(/\$/g, '$$$$');
         const updated = content.replace(old_string, safeNewString);
         try {
-            await fs.writeFile(v.resolved, updated, 'utf8');
+            await atomicWrite(v.resolved, updated, 'utf8');
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
             return { success: true, path: v.resolved };
         } catch (/** @type {any} */ e) {

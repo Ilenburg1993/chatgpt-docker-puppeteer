@@ -2,8 +2,8 @@
 /**
  * src/copilot/core/timer-registry.js
  *
- * Registro centralizado de timers (setTimeout/setInterval) com cleanup
- * automático via shutdown handler. Evita memory leaks de timers órfãos.
+ * Registro centralizado de timers (setTimeout/setInterval) com cleanup automático via shutdown handler. Evita memory
+ * leaks de timers órfãos.
  *
  * @module copilot/core/timer-registry
  */
@@ -11,7 +11,7 @@
 import { registerShutdownHandler } from './shutdown.js';
 
 /**
- * @typedef {'timeout'|'interval'} TimerType
+ * @typedef {'timeout' | 'interval'} TimerType
  */
 
 /**
@@ -28,8 +28,8 @@ const timers = new Map();
 let shutdownRegistered = false;
 
 /**
- * Registra um timer no registry. Se já existir um timer com o mesmo `id`,
- * o anterior é cancelado automaticamente antes do novo ser registrado.
+ * Registra um timer no registry. Se já existir um timer com o mesmo `id`, o anterior é cancelado automaticamente antes
+ * do novo ser registrado.
  *
  * @param {string} id - Identificador único do timer
  * @param {TimerType} type - 'timeout' ou 'interval'
@@ -102,5 +102,11 @@ export function _resetForTesting() {
 function ensureShutdownRegistered() {
     if (shutdownRegistered) return;
     shutdownRegistered = true;
-    registerShutdownHandler('timers.cancelAll', async () => { cancelAll(); }, 5);
+    registerShutdownHandler(
+        'timers.cancelAll',
+        async () => {
+            cancelAll();
+        },
+        5,
+    );
 }

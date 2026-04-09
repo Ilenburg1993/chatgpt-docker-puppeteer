@@ -24,10 +24,7 @@ describe('core/circuit-breaker.js › CircuitBreaker', () => {
 
     it('propaga erro da fn quando closed', async () => {
         const cb = new CircuitBreaker('test', { failThreshold: 5 });
-        await assert.rejects(
-            () => cb.execute(() => Promise.reject(new Error('boom'))),
-            { message: 'boom' },
-        );
+        await assert.rejects(() => cb.execute(() => Promise.reject(new Error('boom'))), { message: 'boom' });
         assert.equal(cb.getState(), 'closed');
     });
 

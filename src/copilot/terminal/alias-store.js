@@ -6,8 +6,8 @@
  *   Suporta aliases built-in e customizados pelo usuário. Aliases customizados são persistidos em arquivo JSON.
  */
 
-import { log } from '#copilot/observability/logger';
 import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
+import { log } from '#copilot/observability/logger';
 import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -50,8 +50,11 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 export function loadAliases() {
     try {
         const raw = fs.readFileSync(ALIASES_FILE, 'utf8');
-        const custom = JSON.parse(raw);
-        _aliases = { ...BUILTIN_ALIASES, ...custom };
+        const result = safeJsonParse(raw, '[alias-store/loadAliases]');
+        const custom = result.ok ? result.data : null;
+        _aliases = custom && typeof custom === 'object' && !Array.isArray(custom)
+            ? { ...BUILTIN_ALIASES, .../** @type {Record<string, string>} */ (custom) }
+            : { ...BUILTIN_ALIASES };
     } catch {
         // arquivo não existe ou inválido — usar apenas built-ins
         _aliases = { ...BUILTIN_ALIASES };

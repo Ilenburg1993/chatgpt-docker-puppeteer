@@ -242,7 +242,11 @@ export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
  * @returns {Promise<SnapshotListItem[]>}
  */
 export async function listSnapshotsAsync() {
-    try { await access(SNAPSHOT_DIR); } catch { return []; }
+    try {
+        await access(SNAPSHOT_DIR);
+    } catch {
+        return [];
+    }
 
     /** @type {SnapshotListItem[]} */
     const result = [];
@@ -280,11 +284,19 @@ export async function listSnapshotsAsync() {
  * @returns {Promise<SessionSnapshotData | null>}
  */
 export async function loadSnapshotAsync(snapshotId) {
-    try { await access(SNAPSHOT_DIR); } catch { return null; }
+    try {
+        await access(SNAPSHOT_DIR);
+    } catch {
+        return null;
+    }
 
     const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
     let fileExists = true;
-    try { await access(filepath); } catch { fileExists = false; }
+    try {
+        await access(filepath);
+    } catch {
+        fileExists = false;
+    }
     if (!fileExists) {
         const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
         if (files.length === 0) return null;
