@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/bridges/test_git_bridge.spec.js
  *
- * F173: Testes para git-bridge.js — wrappers git CLI.
- * Testa funções puras (format*) e funções async que usam git real (estamos num repo git).
+ * F173: Testes para git-bridge.js — wrappers git CLI. Testa funções puras (format*) e funções async que usam git real
+ * (estamos num repo git).
  */
 
 import assert from 'node:assert/strict';

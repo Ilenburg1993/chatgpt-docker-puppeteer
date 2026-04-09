@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/bridges/test_mcp_tool_schema.spec.js
  *
- * F169: Testes para mcp-tool-schema.js — conversão de JSON Schema para Zod.
- * buildZodSchema é uma função pura: ideal para testes unitários exaustivos.
+ * F169: Testes para mcp-tool-schema.js — conversão de JSON Schema para Zod. buildZodSchema é uma função pura: ideal
+ * para testes unitários exaustivos.
  */
 
 import assert from 'node:assert/strict';
