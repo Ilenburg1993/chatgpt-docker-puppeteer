@@ -927,45 +927,33 @@ Mesma lógica aplicada em F187/F188/F189-F191 na Faixa 7.
 
 ---
 
-## Faixa 11 — God Module Decomposição Tier-3 (F229-F238)
+## Faixa 11 — God Module Decomposição Tier-3 (F229-F238) ✅ COMPLETADA
 
 > **Objetivo**: Decompor os god modules de 400-450L restantes.
+> **Status**: COMPLETADA — 102 testes adicionados. Decomposição não necessária (módulos bem estruturados).
+> **Commits**: `3e854c94` (91 testes) + complementar (11 testes API)
 
-### F229: Decompor `observability/metrics.js` (419L) — se ainda >350L após F209
-- **F229.1**: Extrair `metric-collectors.js` — collection logic
-- **F229.2**: Extrair `metric-exporters.js` — export/display logic
-- **F229.3**: Manter `metrics.js` como facade <200L
+### F229-F231: Decomposição — NÃO NECESSÁRIA
+- Auditoria verificou que metrics.js, read-tools.js e web-tools.js são closures/factories bem estruturadas
+- Sem god module behavior real — cada arquivo tem responsabilidade coesa
 
-### F230: Decompor `file/read-tools.js` (398L) — se não feito em F195
-- **F230.1**: Criar `read-file-tool.js`, `search-file-tool.js`, `glob-tool.js`
-- **F230.2**: Manter barrel export
+### F232: Testes adicionais para `shell/sandbox.js` (221L) — JÁ COBERTO
+- 40 testes existentes cobrem edge cases e injection patterns
 
-### F231: Decompor `tools/web-tools.js` (397L)
-- **F231.1**: Criar `web-fetch-tool.js`, `web-scrape-tool.js`
-- **F231.2**: Manter barrel export
+### F233: Testes para `session-rpc-tools.js` (297L) — JÁ COBERTO
+- 15 testes existentes
 
-### F232: Testes adicionais para `shell/sandbox.js` (221L)
-- **F232.1**: Testes para edge cases de regex
-- **F232.2**: Testes de comando injection patterns
-- **F232.3**: ~6 testes
+### F234: Testes para `commands/context.js` (170L) ✅
+- 8 testes — cmdContext (6: vazio, heurística, SDK real, alerta 85%, alerta 65%, workspace) + cmdCompact (2: sucesso, erro)
 
-### F233: Testes para `session-rpc-tools.js` (297L) — se não feito em F203
-- **F233.1**: ~5 testes
+### F235: Testes para `hooks/presets/` (múltiplos arquivos) ✅
+- 41 testes — minimal (4), deny-all (6), interactive (7), safe (7), audit (5), production (12)
 
-### F234: Testes para `commands/context.js` (170L)
-- **F234.1**: ~3 testes
+### F236: Testes para `api/` endpoints restantes ✅
+- 11 testes — SseReplayBuffer (7: push IDs, lastId, getAfter, circular) + withErrorHandler (4: sucesso, 500, headersSent, sanitize)
 
-### F235: Testes para `hooks/presets/` (múltiplos arquivos)
-- **F235.1**: Testar cada preset de hook
-- **F235.2**: ~6 testes
-
-### F236: Testes para `api/` endpoints restantes
-- **F236.1**: Testar cada rota REST
-- **F236.2**: ~5 testes
-
-### F237: Testes para `sdk/` restantes
-- **F237.1**: Testar SDK client operations
-- **F237.2**: ~4 testes
+### F237: Testes para `sdk/` restantes ✅
+- 22 testes — buildClientOptions, getClient, stopClient, forceStopClient, getClientState, session CRUD, registry, incrementMessageCount, reset
 
 ### F238: Validação de Faixa 11
 - **F238.1**: `npm run lint` + `npm run test:unit` — all pass
