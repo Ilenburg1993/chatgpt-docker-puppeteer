@@ -53,9 +53,9 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'html'],
             thresholds: {
-                lines: 30,
-                branches: 20,
-                functions: 30,
+                lines: 45,
+                branches: 30,
+                functions: 40,
             },
         },
         watch: false,
