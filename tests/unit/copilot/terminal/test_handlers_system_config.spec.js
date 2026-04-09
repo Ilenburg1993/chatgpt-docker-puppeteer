@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/terminal/test_handlers_system_config.spec.js
  *
- * Testes para handlers/system-config.js — config, infinite session, tools config, custom tools.
- * Mock pesado dos singletons para testar lógica de validação dos handlers.
+ * Testes para handlers/system-config.js — config, infinite session, tools config, custom tools. Mock pesado dos
+ * singletons para testar lógica de validação dos handlers.
  */
 
 // ─── Mock singletons ─────────────────────────────────────────────────────────

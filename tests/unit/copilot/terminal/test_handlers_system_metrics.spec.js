@@ -2,16 +2,16 @@
 /**
  * tests/unit/copilot/terminal/test_handlers_system_metrics.spec.js
  *
- * Testes para handlers/system-metrics.js — endpoints de history, git status/log.
- * Foca nos handlers testáveis sem mocks pesados de agent singletons.
+ * Testes para handlers/system-metrics.js — endpoints de history, git status/log. Foca nos handlers testáveis sem mocks
+ * pesados de agent singletons.
  */
 
-import { recordInjectHistory } from '../../../../src/copilot/terminal/state.js';
 import {
     handleGetHistory,
     handleGitLog,
     handleGitStatus,
 } from '../../../../src/copilot/terminal/handlers/system-metrics.js';
+import { recordInjectHistory } from '../../../../src/copilot/terminal/state.js';
 
 describe('handlers/system-metrics — handleGetHistory', () => {
     it('retorna status 200 com array de entries', () => {

@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/terminal/test_commands_session.spec.js
  *
- * Testes para commands/session.js — comandos REPL de sessão (/status, /history, /who, etc).
- * Usa mocks dos singletons; testa saída via println mock.
+ * Testes para commands/session.js — comandos REPL de sessão (/status, /history, /who, etc). Usa mocks dos singletons;
+ * testa saída via println mock.
  */
 
 vi.mock('#copilot/agent', () => ({

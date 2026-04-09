@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/terminal/test_handlers_agent.spec.js
  *
- * Testes para handlers/agent.js — context, pipeline, inject, dialog pause/resume, handoff.
- * Mock do alwaysAliveAgent e sendTurn para testar validação e fluxo dos handlers.
+ * Testes para handlers/agent.js — context, pipeline, inject, dialog pause/resume, handoff. Mock do alwaysAliveAgent e
+ * sendTurn para testar validação e fluxo dos handlers.
  */
 
 const mockSendTurn = vi.fn(async (/** @type {string} */ _msg, /** @type {string} */ _from) => 'reply');
@@ -25,9 +25,7 @@ vi.mock('#copilot/agent', () => ({
         getHandoffManager: () => ({
             getPending: () => [],
             getHistory: () => [],
-            accept: vi.fn((/** @type {string} */ id) =>
-                id === 'h-1' ? { accepted: true } : { accepted: false },
-            ),
+            accept: vi.fn((/** @type {string} */ id) => (id === 'h-1' ? { accepted: true } : { accepted: false })),
             reject: vi.fn((/** @type {string} */ _id, /** @type {string | undefined} */ _reason) => ({
                 rejected: true,
             })),

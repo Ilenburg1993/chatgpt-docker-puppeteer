@@ -5,10 +5,10 @@
  * Testes para funções puras de formatação em gh/issues.js, gh/prs.js, gh/ci.js e gh/index.js.
  */
 
-import { formatIssueList } from '../../../../src/copilot/bridges/gh/issues.js';
-import { formatPrList } from '../../../../src/copilot/bridges/gh/prs.js';
 import { formatRunList } from '../../../../src/copilot/bridges/gh/ci.js';
 import { formatReleaseList } from '../../../../src/copilot/bridges/gh/index.js';
+import { formatIssueList } from '../../../../src/copilot/bridges/gh/issues.js';
+import { formatPrList } from '../../../../src/copilot/bridges/gh/prs.js';
 
 // ─── formatIssueList ──────────────────────────────────────────────────────────
 

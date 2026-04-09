@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/terminal/test_handlers_dialog.spec.js
  *
- * Testes para handlers/dialog.js — endpoints de sessions, turns, memory, hub-health.
- * Usa in-memory SQLite para testar integração real com ConversationStore.
+ * Testes para handlers/dialog.js — endpoints de sessions, turns, memory, hub-health. Usa in-memory SQLite para testar
+ * integração real com ConversationStore.
  */
 
 import { createRequire } from 'node:module';
