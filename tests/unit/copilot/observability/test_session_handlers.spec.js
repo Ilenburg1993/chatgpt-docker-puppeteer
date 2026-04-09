@@ -7,7 +7,7 @@
  * F214: Mock session events, test metrics recording, persistência, compaction.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -18,8 +18,8 @@ vi.mock('../../../../src/copilot/observability/logger.js', () => ({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Cria uma sessão mock que suporta `.on(eventType, handler)` estilo SDK.
- * Retorna a sessão e um método `fire(type, data)` para simular eventos.
+ * Cria uma sessão mock que suporta `.on(eventType, handler)` estilo SDK. Retorna a sessão e um método `fire(type,
+ * data)` para simular eventos.
  */
 function createMockSession() {
     /** @type {Map<string, Function>} */
@@ -62,11 +62,19 @@ function createMockCtx(/** @type {ReturnType<typeof createMockSession>} */ { ses
         hookBus: null,
         persist: true,
         persistSet: new Set([
-            'session.error', 'session.usage_info', 'session.truncation',
-            'session.start', 'session.resume', 'session.context_changed',
-            'session.handoff', 'session.skills_loaded', 'session.extensions_loaded',
-            'session.mcp_server_status_changed', 'session.info',
-            'session.workspace_file_changed', 'session.snapshot_rewind',
+            'session.error',
+            'session.usage_info',
+            'session.truncation',
+            'session.start',
+            'session.resume',
+            'session.context_changed',
+            'session.handoff',
+            'session.skills_loaded',
+            'session.extensions_loaded',
+            'session.mcp_server_status_changed',
+            'session.info',
+            'session.workspace_file_changed',
+            'session.snapshot_rewind',
             'session.idle',
         ]),
         persistEvent: vi.fn(),
@@ -251,9 +259,7 @@ describe('session-handlers', () => {
         it('registra counter e persiste título', () => {
             mock.fire('session.title_changed', { title: 'New Title' });
             expect(ctx.metrics.recordCounter).toHaveBeenCalledWith('session.title_changed');
-            expect(ctx.persistEvent).toHaveBeenCalledWith(
-                expect.objectContaining({ title: 'New Title' }),
-            );
+            expect(ctx.persistEvent).toHaveBeenCalledWith(expect.objectContaining({ title: 'New Title' }));
         });
     });
 

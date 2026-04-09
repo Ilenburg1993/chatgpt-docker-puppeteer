@@ -7,7 +7,7 @@
  * F207: buildTelemetryConfig, isOtelEnabled, startSpan fallback, startSpanImmediate fallback.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock dinâmico do módulo env ──────────────────────────────────────────────
 
@@ -15,12 +15,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let envOverrides = {};
 
 vi.mock('#copilot/config/env', () => ({
-    get COPILOT_LOG_DIR() { return envOverrides.COPILOT_LOG_DIR ?? '/tmp/test-logs'; },
-    get COPILOT_OTEL_DISABLED() { return envOverrides.COPILOT_OTEL_DISABLED ?? false; },
-    get COPILOT_OTEL_ENDPOINT() { return envOverrides.COPILOT_OTEL_ENDPOINT ?? ''; },
-    get COPILOT_OTEL_EXPORTER_TYPE() { return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined; },
-    get COPILOT_OTEL_SOURCE_NAME() { return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'copilot-sdk-agent'; },
-    get COPILOT_OTEL_CAPTURE_CONTENT() { return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false; },
+    get COPILOT_LOG_DIR() {
+        return envOverrides.COPILOT_LOG_DIR ?? '/tmp/test-logs';
+    },
+    get COPILOT_OTEL_DISABLED() {
+        return envOverrides.COPILOT_OTEL_DISABLED ?? false;
+    },
+    get COPILOT_OTEL_ENDPOINT() {
+        return envOverrides.COPILOT_OTEL_ENDPOINT ?? '';
+    },
+    get COPILOT_OTEL_EXPORTER_TYPE() {
+        return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined;
+    },
+    get COPILOT_OTEL_SOURCE_NAME() {
+        return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'copilot-sdk-agent';
+    },
+    get COPILOT_OTEL_CAPTURE_CONTENT() {
+        return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
+    },
 }));
 
 describe('otel.js', () => {

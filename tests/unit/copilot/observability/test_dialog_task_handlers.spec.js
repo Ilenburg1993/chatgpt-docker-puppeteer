@@ -7,8 +7,8 @@
  * F212: Mock event bus, test dialog/task/tool handlers via ObserverContext.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -42,7 +42,9 @@ describe('dialog-task-handlers', () => {
     let metrics;
     /** @type {Record<string, any>} */
     let errorTracker;
-    /** @type {ReturnType<typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js').attachDialogTaskHandlers>} */
+    /** @type {ReturnType<
+    typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js').attachDialogTaskHandlers
+>} */
     let accessors;
 
     beforeEach(async () => {
@@ -237,7 +239,12 @@ describe('dialog-task-handlers', () => {
     describe('tool.execution_start / complete', () => {
         it('registra start e complete com duração', () => {
             agent.emit('tool.execution_start', { toolName: 'read_file', callId: 'C1' });
-            agent.emit('tool.execution_complete', { toolName: 'read_file', callId: 'C1', durationMs: 120, success: true });
+            agent.emit('tool.execution_complete', {
+                toolName: 'read_file',
+                callId: 'C1',
+                durationMs: 120,
+                success: true,
+            });
             expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.start');
             expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.complete');
             expect(metrics.recordToolCall).toHaveBeenCalledWith('read_file', 120, true);
@@ -270,10 +277,13 @@ describe('dialog-task-handlers', () => {
             const { modelStatsTracker } = await import('#copilot/sdk/models/registry');
             agent.emit('session.usage', { model: 'gpt-4o', inputTokens: 100, outputTokens: 50 });
             expect(metrics.recordCounter).toHaveBeenCalledWith('session.usage');
-            expect(modelStatsTracker.record).toHaveBeenCalledWith('gpt-4o', expect.objectContaining({
-                inputTokens: 100,
-                outputTokens: 50,
-            }));
+            expect(modelStatsTracker.record).toHaveBeenCalledWith(
+                'gpt-4o',
+                expect.objectContaining({
+                    inputTokens: 100,
+                    outputTokens: 50,
+                }),
+            );
         });
     });
 

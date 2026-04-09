@@ -61,6 +61,7 @@ function resolveToolDecision(toolName, allowTools, denyTools, denyPatterns) {
 
     // 2. denyPatterns como segunda precedência
     for (const pattern of denyPatterns) {
+        pattern.lastIndex = 0; // Reset para safety com regex /g (stateful)
         if (pattern.test(toolName)) return 'deny';
     }
 
@@ -101,7 +102,12 @@ function buildPreToolUseHandler({
         // Se a tool não está em denyTools mas também não está em allowTools, delegamos ao askHandler.
         // Usamos permissionDecision:'ask' (SDK-native) ao invés de callback manual.
         if (askHandler) {
-            const explicitlyDenied = denyTools.includes(toolName) || denyPatterns.some((p) => p.test(toolName));
+            const explicitlyDenied =
+                denyTools.includes(toolName) ||
+                denyPatterns.some((p) => {
+                    p.lastIndex = 0;
+                    return p.test(toolName);
+                });
             const inAllowList = allowTools.length === 0 || allowTools.includes(toolName);
             if (!explicitlyDenied && !inAllowList) {
                 // Tool não é deny-explícito nem allow-explícito → pede aprovação via callback
@@ -120,6 +126,14 @@ function buildPreToolUseHandler({
                         additionalContext: `Ferramenta '${toolName}' não aprovada pelo usuário.`,
                     };
                 }
+                // askHandler aprovou → early return com allow (bypass resolveToolDecision)
+                if (auditLog || debugTools) {
+                    log(
+                        'DEBUG',
+                        `[hooks/factory] onPreToolUse: tool='${toolName}' decision='allow' (askHandler) sessionId='${invocation?.sessionId}'`,
+                    );
+                }
+                return { permissionDecision: /** @type {'allow'} */ ('allow') };
             }
         }
 

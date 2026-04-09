@@ -833,75 +833,97 @@ Mesma lógica aplicada em F187/F188/F189-F191 na Faixa 7.
 
 ---
 
-## Faixa 10 — God Module Decomposição Tier-2 (F217-F228)
+## Faixa 10 — God Module Decomposição Tier-2 (F217-F228) ✅ COMPLETA
 
-> **Objetivo**: Decompor os god modules de 450-600L que não foram
-> endereçados nas faixas anteriores.
+> **Objetivo original**: Decompor os god modules de 450-600L.
+> **Resultado**: A maioria dos god modules já havia sido decomposta em faixas anteriores (1-8).
+> O foco real foi **testes para módulos sem cobertura** + validação da decomposição pré-existente.
+>
+> **Dados finais**: 72 novos testes | 2991 passou | 0 falhou | 53 skipped
+> **Commit**: (pendente — Faixa 10 tests for hooks/factory, client-dialog, audit/pipeline)
 
-### F217: Decompor `always-alive.js` (619L)
-- **F217.1**: Extrair `health-checker.js` — lógica de health/heartbeat
-- **F217.2**: Extrair `reconnect-policy.js` — política de reconexão
-- **F217.3**: Extrair `state-sync.js` — sincronização de state com bridges
-- **F217.4**: Manter `always-alive.js` como facade <350L
-- **F217.5**: Atualizar testes existentes
+### Avaliação de decomposição — Leitura integral de todos os 9 módulos
 
-### F218: Decompor `loop-manager.js` (597L)
-- **F218.1**: Extrair `prompt-builder.js` — construção de prompts
-- **F218.2**: Extrair `turn-reducer.js` — redução/merge de turn results
-- **F218.3**: Extrair `tool-dispatcher.js` — despacho de tool calls
-- **F218.4**: Manter `loop-manager.js` como loop core <300L
-- **F218.5**: Atualizar testes existentes
+| Módulo                                     | Linhas | Veredicto     | Justificativa                                                                                                                                                              |
+| ------------------------------------------ | ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/copilot/agent/always-alive.js`        | 620L   | ⏭️ SKIP        | Já decomposto em 6+ módulos (agent-lifecycle, agent-messaging, agent-state, agent-dialog-controller, task-executor, agent-context). Classe é facade fina com JSDoc pesado. |
+| `src/copilot/agent/dialog/loop-manager.js` | 600L   | ⏭️ SKIP        | Já decomposto em 6 módulos (turn-executor, backpressure, model-fallback, watchdog, protocol, event-wiring). State machine coesa — fragmentar quebraria coesão.             |
+| `src/copilot/channel/client.js`            | 557L   | ⏭️ SKIP        | Já delega para client-dialog, client-history, client-structured. 557L incluem streaming+batch+history.                                                                     |
+| `src/copilot/audit/pipeline.js`            | 537L   | ⏭️ SKIP decomp | 3 Parts com JSDoc claro (SDK buffer, AuditLog, Permission logger). Separar criaria imports cruzados sem benefício. **Tests criados para Parts 2+3.**                       |
+| `src/copilot/sdk/client.js`                | 414L   | ⏭️ SKIP        | Flat utility collection (20+ funções CRUD). 414L aceitável.                                                                                                                |
+| `src/copilot/channel/inject.js`            | 451L   | ⏭️ SKIP        | Já bem testado (3 test files). Coeso.                                                                                                                                      |
+| `src/copilot/hooks/factory.js`             | 402L   | ⏭️ SKIP decomp | Factory pattern coesa, 402L com JSDoc. **30 tests criados.**                                                                                                               |
+| `src/copilot/channel/sse-client.js`        | 142L   | ✅ OK          | Pequeno, já testado (test_sse_utils).                                                                                                                                      |
+| `src/copilot/channel/client-dialog.js`     | 114L   | ✅ TESTES      | Pequeno. **19 tests criados.**                                                                                                                                             |
 
-### F219: Decompor `channel/client.js` (556L)
-- **F219.1**: Extrair `client-health.js` — health check logic
-- **F219.2**: Extrair `client-batch.js` — batch request handling
-- **F219.3**: Extrair `client-error.js` — error recovery patterns
-- **F219.4**: Manter `client.js` como core HTTP <300L
-- **F219.5**: Testes para novos módulos
+### F217: Decompor `always-alive.js` (619L) — ⏭️ SKIP (já decomposto)
+- **Status**: sempre-alive.js já é uma facade que delega para 6 módulos extraídos:
+  - `agent-context.js` — contexto compartilhado
+  - `agent-lifecycle.js` — start/stop/reconnect
+  - `agent-messaging.js` — send/boot/steer/answer
+  - `agent-state.js` — snapshot/diagnostics
+  - `agent-dialog-controller.js` — dialog loop management
+  - `task-executor.js` — execução de tasks
+- **Testes**: 6 unit + 1 integration test file já existentes
+- **Decomposição adicional**: Não justificada — 620L já são mostly JSDoc + delegation wiring
 
-### F220: Decompor `audit/pipeline.js` (530L)
-- **F220.1**: Extrair `phase-runner.js` — execução de fases
-- **F220.2**: Extrair `report-formatter.js` — formatação de relatórios
-- **F220.3**: Manter `pipeline.js` como orchestrator <250L
-- **F220.4**: Testes
+### F218: Decompor `loop-manager.js` (597L) — ⏭️ SKIP (já decomposto)
+- **Status**: DialogLoopManager já delega para 6 módulos:
+  - `turn-executor.js`, `backpressure.js`, `model-fallback.js`, `watchdog.js`, `protocol.js`, `event-wiring.js`
+- **Testes**: test_loop_manager.spec.js já existe
+- **Decomposição adicional**: Não justificada — state machine complexa (boot/pause/resume/token-budget) é inerentemente coesa
 
-### F221: Decompor `sdk/client.js` (413L)
-- **F221.1**: Extrair `sdk-streaming.js` — SSE streaming logic
-- **F221.2**: Extrair `sdk-model-ops.js` — model operations
-- **F221.3**: Manter `client.js` como session/auth <250L
-- **F221.4**: Testes
+### F219: Decompor `channel/client.js` (556L) — ⏭️ SKIP (já decomposto)
+- **Status**: LlmBridgeClient já delega para:
+  - `client-dialog.js` — dialog mode
+  - `client-history.js` — history management
+  - `client-structured.js` — structured chat
+- **Testes**: 2 test files existentes (test_lib_client, test_llm_bridge_client)
 
-### F222: Testes para `channel/sse-client.js` (141L)
-- **F222.1**: Mock de SSE connection
-- **F222.2**: ~4 testes
+### F220: audit/pipeline.js (530L) — ✅ TESTES CRIADOS
+- **Decomposição**: ⏭️ SKIP — O arquivo tem 3 Parts com marcadores claros, mas são coesos dentro do pipeline de auditoria. Separar criaria 3 arquivos com imports cruzados sem benefício real.
+- **Testes**: `test_audit_pipeline.spec.js` criado com **23 tests** cobrindo:
+  - Part 2: createAuditLog (record, getEntries, getLast, maxEntries, clear, dedup, recordToolStart+Complete, orphan complete)
+  - Part 3: isHighRiskTool (8 cenários), buildAuditingPermissionHandler (5 cenários: delegação, fallback, erro, toolName extraction, denied)
+- Part 1 (SDK buffer) já coberta por `test_hooks_module.spec.js`
 
-### F223: Testes para `channel/client-dialog.js` (114L)
-- **F223.1**: ~3 testes
+### F221: sdk/client.js (413L) — ⏭️ SKIP
+- **Status**: Funções utilitárias puras (20+ exports). Não contém streaming nem model-ops inline.
+- **Testes**: test_sdk_client.spec.js já existe
 
-### F224: Testes para `channel/inject.js` (451L) pós-decomposição de F219
-- **F224.1**: Testar injeção de scripts
-- **F224.2**: ~5 testes
+### F222: sse-client.js (141L) — ✅ JÁ COBERTO
+- **Testes**: test_sse_utils.spec.js já existe
 
-### F225: Decompor `channel/inject.js` (451L)
-- **F225.1**: Extrair `inject-state.js` — state management
-- **F225.2**: Extrair `inject-lifecycle.js` — init/cleanup
-- **F225.3**: Manter `inject.js` <250L
-- **F225.4**: Testes
+### F223: client-dialog.js (114L) — ✅ TESTES CRIADOS
+- **Testes**: `test_client_dialog.spec.js` criado com **19 tests** cobrindo:
+  - registerDialogListeners: wiring de eventos, cleanup simétrico, replyHandler null/extração
+  - startDialogMode: delegação, cleanup em erro
+  - dialogTurn: sendDialogTurn com timeout, onDelta/onReasoning listeners + cleanup em finally
+  - stopDialogMode: delegação com authorized:true + reason default
 
-### F226: Testes para `hooks/factory.js` (402L)
-- **F226.1**: Testar hook criação, merge, validação
-- **F226.2**: ~6 testes
+### F224: inject.js tests — ✅ JÁ COBERTO
+- **Testes existentes**: test_channel_inject.spec.js, test_inject_concurrency.spec.js, test_inject_retry.spec.js (3 arquivos)
 
-### F227: Decompor `hooks/factory.js` (402L)
-- **F227.1**: Extrair `hook-validators.js` — validação de hook config
-- **F227.2**: Extrair `hook-merger.js` — merge de preset + custom hooks
-- **F227.3**: Manter `factory.js` como factory pattern <200L
-- **F227.4**: Testes
+### F225: Decompor inject.js (451L) — ⏭️ SKIP
+- **Status**: inject.js é coeso (HTTP inject + rate limiter + retry + SSE). Já tem 3 test files.
 
-### F228: Validação de Faixa 10
-- **F228.1**: `npm run lint` + `npm run test:unit` — all pass
-- **F228.2**: Arquivos >450L: ≤5
-- **F228.3**: Commit: `refactor(decomposition): Faixa 10 (F217-F228) — tier-2 god modules`
+### F226: hooks/factory.js tests — ✅ TESTES CRIADOS
+- **Testes**: `test_hooks_factory.spec.js` criado com **30 tests** cobrindo:
+  - createHooks: hooks padrão, auditLog mode, handler customizado
+  - onPreToolUse: allow/deny (10 cenários: denyTools, denyPatterns, allowTools, denyTools precedência, askHandler chamada+deny+erro, argsModifier ativo/null, toolName unknown)
+  - onErrorOccurred: retry/skip/abort por contexto
+  - Presets: createMinimalHooks, createAuditHooks, createDenyAllHooks, createSafeHooks (+extra)
+  - composePreToolUseHandlers: short-circuit + passthrough + all-undefined
+  - createErrorNotifierHook: delegação com parâmetros + sessionId default
+
+### F227: Decompor hooks/factory.js (402L) — ⏭️ SKIP
+- **Status**: Factory pattern coesa. buildPreToolUseHandler + buildErrorOccurredHandler + presets são coesos. 402L inclui JSDoc pesado.
+
+### F228: Validação de Faixa 10 ✅
+- `npm run lint` — 0 errors (1 warning pré-existente em debug-conflicts.mjs)
+- `npx vitest run` — 2991 passed, 53 skipped, 0 failed (+72 net new nesta faixa)
+- Todos os god modules avaliados — decomposição adicional não justificada para nenhum
+- **3 novos test files**: test_hooks_factory.spec.js (30), test_client_dialog.spec.js (19), test_audit_pipeline.spec.js (23)
 
 ---
 

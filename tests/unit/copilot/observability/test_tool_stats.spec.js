@@ -7,13 +7,13 @@
  * F215: recordToolCall, getToolStats, getStatsByCategory, wrapWithStats, _resetToolStats.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-    recordToolCall,
-    getToolStats,
-    getStatsByCategory,
-    wrapWithStats,
     _resetToolStats,
+    getStatsByCategory,
+    getToolStats,
+    recordToolCall,
+    wrapWithStats,
 } from '../../../../src/copilot/observability/tool-stats.js';
 
 describe('tool-stats', () => {
