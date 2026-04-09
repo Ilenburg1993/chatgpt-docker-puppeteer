@@ -5,6 +5,7 @@
  * Testes unitários para src/copilot/tools/session-rpc-tools.js.
  *
  * Valida:
+ *
  * - sessionRpcTools exporta array com 8 tools
  * - setSessionRpc injeta o RPC handle
  * - Todas as tools retornam erro quando RPC indisponível
@@ -19,7 +20,7 @@
  * - wrapRpc: timeout, erro genérico
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,9 @@ function createFakeRpc() {
             delete: vi.fn(async () => ({ deleted: true })),
         },
         agent: {
-            list: vi.fn(async () => ({ agents: [{ name: 'auditor', displayName: 'Auditor', description: 'Audit agent' }] })),
+            list: vi.fn(async () => ({
+                agents: [{ name: 'auditor', displayName: 'Auditor', description: 'Audit agent' }],
+            })),
             select: vi.fn(async (/** @type {any} */ opts) => ({ agent: { name: opts.name } })),
             deselect: vi.fn(async () => ({})),
         },
@@ -250,7 +253,10 @@ describe('session-rpc-tools', () => {
 
         it('timeout do RPC retorna erro', async () => {
             fakeRpc.plan.read.mockImplementationOnce(
-                () => new Promise((_resolve) => {/* never resolves */}),
+                () =>
+                    new Promise((_resolve) => {
+                        /* never resolves */
+                    }),
             );
 
             const tool = mod.sessionRpcTools.find((t) => t.name === 'session_plan_read');

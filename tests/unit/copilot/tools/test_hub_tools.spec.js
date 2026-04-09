@@ -5,6 +5,7 @@
  * Testes unitários para src/copilot/tools/hub-tools.js.
  *
  * Valida:
+ *
  * - hubTools exporta array com 5 tools
  * - setHub injeta o hub corretamente
  * - hub_create_session: sucesso, hub indisponível, erro interno
@@ -14,7 +15,7 @@
  * - hub_list_sessions: sucesso, filtro por status, hub indisponível
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -284,7 +285,10 @@ describe('hub-tools', () => {
         it('passa limit e offset para store', async () => {
             await find().handler({ hubSessionId: 'hub-session-123', limit: 50, offset: 10 });
 
-            expect(fakeHub.store.readTurns).toHaveBeenCalledWith('hub-session-123', expect.objectContaining({ limit: 50, offset: 10 }));
+            expect(fakeHub.store.readTurns).toHaveBeenCalledWith(
+                'hub-session-123',
+                expect.objectContaining({ limit: 50, offset: 10 }),
+            );
         });
 
         it('passa after para polling incremental', async () => {
@@ -298,7 +302,15 @@ describe('hub-tools', () => {
 
         it('trunca conteúdo longo a 500 chars', async () => {
             fakeHub.store.readTurns.mockReturnValueOnce([
-                { id: 't', role: 'user', content: 'A'.repeat(1000), turn_number: 1, duration_ms: 0, model: 'm', created_at: '' },
+                {
+                    id: 't',
+                    role: 'user',
+                    content: 'A'.repeat(1000),
+                    turn_number: 1,
+                    duration_ms: 0,
+                    model: 'm',
+                    created_at: '',
+                },
             ]);
 
             const result = await find().handler({ hubSessionId: 's' });

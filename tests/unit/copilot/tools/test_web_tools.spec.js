@@ -5,13 +5,14 @@
  * Testes unitários para src/copilot/tools/web-tools.js.
  *
  * Valida:
+ *
  * - webTools exporta array com web_fetch (sempre) + web_search (quando habilitado)
  * - web_fetch: URL válida, URL inválida, SSRF blocked, content-type blocked, timeout, rate limit
  * - web_search: resultados DDG JSON API, fallback HTML scraping, SSRF filter nos resultados
  * - Rate limiting compartilhado entre web_fetch e web_search
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
 
 /**
  * Cria um mock fetch Response.
+ *
  * @param {string} body
  * @param {object} [opts]
  * @param {number} [opts.status]
@@ -164,7 +166,10 @@ describe('web-tools', () => {
 
         it('rejeita content-type não-text', async () => {
             fetchSpy.mockResolvedValueOnce(
-                mockResponse('binary', { contentType: 'application/octet-stream', url: 'https://example.com/file.bin' }),
+                mockResponse('binary', {
+                    contentType: 'application/octet-stream',
+                    url: 'https://example.com/file.bin',
+                }),
             );
 
             const tool = findFetch();
@@ -175,7 +180,9 @@ describe('web-tools', () => {
         });
 
         it('retorna erro em timeout (AbortError)', async () => {
-            fetchSpy.mockRejectedValueOnce(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }));
+            fetchSpy.mockRejectedValueOnce(
+                Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
+            );
 
             const tool = findFetch();
             const result = await tool.handler({ url: 'https://slow.example.com', timeoutMs: 1000 });

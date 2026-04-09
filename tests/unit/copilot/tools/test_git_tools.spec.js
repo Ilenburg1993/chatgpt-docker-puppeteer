@@ -5,6 +5,7 @@
  * Testes unitários para src/copilot/tools/git/index.js.
  *
  * Valida:
+ *
  * - gitTools exporta array com 9 tools
  * - safeGitArgs: trunca stdout a 4000 chars, captura stderr/exitCode
  * - git_status: combina status --short + log --oneline -5
@@ -18,7 +19,7 @@
  * - git_is_dirty: isDirty true/false, changedFiles count
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,8 @@ function mockGitError(stderr = 'error', code = 1, stdout = '') {
 
 /**
  * Configura sequência de respostas do git (para commands que chamam safeGitArgs múltiplas vezes).
- * @param {Array<{stdout?: string, stderr?: string, error?: boolean, code?: number}>} seq
+ *
+ * @param {{ stdout?: string; stderr?: string; error?: boolean; code?: number }[]} seq
  */
 function mockGitSequence(seq) {
     let idx = 0;
@@ -205,8 +207,8 @@ describe('git-tools', () => {
 
         it('comita com all=true', async () => {
             mockGitSequence([
-                { stdout: '' },               // git add -A
-                { stdout: 'file.js\n' },       // diff --cached --name-only
+                { stdout: '' }, // git add -A
+                { stdout: 'file.js\n' }, // diff --cached --name-only
                 { stdout: '[main abc1234] feat: test' }, // commit
             ]);
 
@@ -217,7 +219,7 @@ describe('git-tools', () => {
 
         it('comita com paths específicos', async () => {
             mockGitSequence([
-                { stdout: '' },               // git add -- pathA pathB
+                { stdout: '' }, // git add -- pathA pathB
                 { stdout: 'pathA\npathB\n' }, // diff --cached
                 { stdout: '[main 123] fix' }, // commit
             ]);
@@ -238,8 +240,8 @@ describe('git-tools', () => {
 
         it('retorna erro quando commit falha', async () => {
             mockGitSequence([
-                { stdout: '' },               // git add -A
-                { stdout: 'staged.js\n' },    // diff --cached
+                { stdout: '' }, // git add -A
+                { stdout: 'staged.js\n' }, // diff --cached
                 { error: true, stderr: 'nothing to commit' }, // commit falha
             ]);
 

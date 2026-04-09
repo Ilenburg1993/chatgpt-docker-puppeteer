@@ -5,6 +5,7 @@
  * Testes unitários para src/copilot/tools/introspection-tools.js.
  *
  * Valida:
+ *
  * - introspectionTools exporta array com 6 tools
  * - registerForIntrospection, isToolDisabled, getDisabledTools helpers
  * - list_tools: listagem, filtro por search, filtro por categoria, exclui disabled
@@ -15,7 +16,7 @@
  * - get_tool_health: retorna stats, sort, limit, tool individual
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -147,7 +148,11 @@ describe('introspection-tools', () => {
 
         it('filtra por categoria', async () => {
             const result = await find().handler({ category: 'git' });
-            expect(result.tools.every((t) => ['git_status', 'git_diff', 'git_commit', 'git_changed_files'].includes(t.name))).toBe(true);
+            expect(
+                result.tools.every((t) =>
+                    ['git_status', 'git_diff', 'git_commit', 'git_changed_files'].includes(t.name),
+                ),
+            ).toBe(true);
         });
 
         it('exclui tools desabilitadas', async () => {
