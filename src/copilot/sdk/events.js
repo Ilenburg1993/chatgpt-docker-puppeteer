@@ -25,7 +25,7 @@ import { SESSION_EVENTS } from './constants.js';
  */
 
 /**
- * @typedef {import('@github/copilot-sdk/dist/generated/session-events.js').SessionEvent} SessionEvent
+ * @typedef {import('@github/copilot-sdk').SessionEvent} SessionEvent
  */
 
 /**

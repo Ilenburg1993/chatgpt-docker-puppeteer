@@ -338,7 +338,7 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  */
 router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const { id } = req.params;
+        const id = /** @type {string} */ (req.params.id);
         const { model } = req.body ?? {};
 
         const session = await resumeSdkSession(

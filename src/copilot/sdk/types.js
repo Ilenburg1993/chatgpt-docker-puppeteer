@@ -60,7 +60,7 @@
 /**
  * Nível de esforço de reasoning (low, medium, high, xhigh).
  *
- * @typedef {import('@github/copilot-sdk').ReasoningEffort} ReasoningEffort
+ * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
  */
 
 // ─── Tools ────────────────────────────────────────────────────────────────────
@@ -94,31 +94,31 @@
 /**
  * Resultado de tool binário.
  *
- * @typedef {import('@github/copilot-sdk').ToolBinaryResult} ToolBinaryResult
+ * @typedef {{ type: 'binary'; mimeType: string; data: Buffer | Uint8Array }} ToolBinaryResult
  */
 
 /**
- * Resultado de tool: string | ToolResultObject.
+ * Resultado de tool: string | ToolResultObject | ToolBinaryResult.
  *
- * @typedef {import('@github/copilot-sdk').ToolResult} ToolResult
+ * @typedef {string | ToolResultObject | ToolBinaryResult} ToolResult
  */
 
 /**
  * Tipo do resultado de tool (success, failure, rejected, denied).
  *
- * @typedef {import('@github/copilot-sdk').ToolResultType} ToolResultType
+ * @typedef {'success' | 'failure' | 'rejected' | 'denied'} ToolResultType
  */
 
 /**
  * Payload de requisição de tool call.
  *
- * @typedef {import('@github/copilot-sdk').ToolCallRequestPayload} ToolCallRequestPayload
+ * @typedef {{ toolName: string; toolCallId: string; args: Record<string, unknown> }} ToolCallRequestPayload
  */
 
 /**
  * Payload de resposta de tool call.
  *
- * @typedef {import('@github/copilot-sdk').ToolCallResponsePayload} ToolCallResponsePayload
+ * @typedef {{ toolCallId: string; result: ToolResult; type?: ToolResultType }} ToolCallResponsePayload
  */
 
 /**
@@ -153,19 +153,19 @@
 /**
  * Pedido de input interativo do usuário (elicitation).
  *
- * @typedef {import('@github/copilot-sdk').UserInputRequest} UserInputRequest
+ * @typedef {{ title?: string; message?: string; fields: Array<{ id: string; label: string; type?: string; required?: boolean; default?: string }> }} UserInputRequest
  */
 
 /**
  * Resposta do input interativo do usuário.
  *
- * @typedef {import('@github/copilot-sdk').UserInputResponse} UserInputResponse
+ * @typedef {{ values: Record<string, string>; cancelled?: boolean }} UserInputResponse
  */
 
 /**
  * Handler de input interativo do usuário.
  *
- * @typedef {import('@github/copilot-sdk').UserInputHandler} UserInputHandler
+ * @typedef {(request: UserInputRequest) => Promise<UserInputResponse>} UserInputHandler
  */
 
 // ─── System Message ───────────────────────────────────────────────────────────
@@ -223,121 +223,121 @@
 /**
  * Campos base compartilhados por todos os hook inputs (sessionId, etc.).
  *
- * @typedef {import('@github/copilot-sdk').BaseHookInput} BaseHookInput
+ * @typedef {{ sessionId: string; [key: string]: unknown }} BaseHookInput
  */
 
 /**
  * Configuração de hooks de sessão (preToolUse, postToolUse, sessionStart, sessionEnd, etc.).
  *
- * @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks
+ * @typedef {{ preToolUse?: PreToolUseHandler; postToolUse?: PostToolUseHandler; userPromptSubmitted?: UserPromptSubmittedHandler; sessionStart?: SessionStartHandler; sessionEnd?: SessionEndHandler; errorOccurred?: ErrorOccurredHandler }} SessionHooks
  */
 
 /**
  * Input do hook preToolUse (toolName, args, etc.).
  *
- * @typedef {import('@github/copilot-sdk').PreToolUseHookInput} PreToolUseHookInput
+ * @typedef {BaseHookInput & { toolName: string; toolCallId: string; args: Record<string, unknown> }} PreToolUseHookInput
  */
 
 /**
  * Output do hook preToolUse (allow, deny, modify).
  *
- * @typedef {import('@github/copilot-sdk').PreToolUseHookOutput} PreToolUseHookOutput
+ * @typedef {{ decision?: 'allow' | 'deny' | 'modify'; modifiedArgs?: Record<string, unknown>; systemMessage?: string; [key: string]: unknown } | void} PreToolUseHookOutput
  */
 
 /**
  * Handler do hook preToolUse.
  *
- * @typedef {import('@github/copilot-sdk').PreToolUseHandler} PreToolUseHandler
+ * @typedef {(input: PreToolUseHookInput) => Promise<PreToolUseHookOutput> | PreToolUseHookOutput} PreToolUseHandler
  */
 
 /**
  * Input do hook postToolUse (toolName, result, etc.).
  *
- * @typedef {import('@github/copilot-sdk').PostToolUseHookInput} PostToolUseHookInput
+ * @typedef {BaseHookInput & { toolName: string; toolCallId: string; result: ToolResult }} PostToolUseHookInput
  */
 
 /**
  * Output do hook postToolUse.
  *
- * @typedef {import('@github/copilot-sdk').PostToolUseHookOutput} PostToolUseHookOutput
+ * @typedef {{ systemMessage?: string; [key: string]: unknown } | void} PostToolUseHookOutput
  */
 
 /**
  * Handler do hook postToolUse.
  *
- * @typedef {import('@github/copilot-sdk').PostToolUseHandler} PostToolUseHandler
+ * @typedef {(input: PostToolUseHookInput) => Promise<PostToolUseHookOutput> | PostToolUseHookOutput} PostToolUseHandler
  */
 
 /**
  * Input do hook userPromptSubmitted (message text).
  *
- * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHookInput} UserPromptSubmittedHookInput
+ * @typedef {BaseHookInput & { message: string }} UserPromptSubmittedHookInput
  */
 
 /**
  * Output do hook userPromptSubmitted.
  *
- * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHookOutput} UserPromptSubmittedHookOutput
+ * @typedef {{ systemMessage?: string; modifiedMessage?: string; [key: string]: unknown } | void} UserPromptSubmittedHookOutput
  */
 
 /**
  * Handler do hook userPromptSubmitted.
  *
- * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHandler} UserPromptSubmittedHandler
+ * @typedef {(input: UserPromptSubmittedHookInput) => Promise<UserPromptSubmittedHookOutput> | UserPromptSubmittedHookOutput} UserPromptSubmittedHandler
  */
 
 /**
  * Input do hook sessionStart.
  *
- * @typedef {import('@github/copilot-sdk').SessionStartHookInput} SessionStartHookInput
+ * @typedef {BaseHookInput & { model?: string }} SessionStartHookInput
  */
 
 /**
  * Output do hook sessionStart.
  *
- * @typedef {import('@github/copilot-sdk').SessionStartHookOutput} SessionStartHookOutput
+ * @typedef {{ systemMessage?: string; [key: string]: unknown } | void} SessionStartHookOutput
  */
 
 /**
  * Handler do hook sessionStart.
  *
- * @typedef {import('@github/copilot-sdk').SessionStartHandler} SessionStartHandler
+ * @typedef {(input: SessionStartHookInput) => Promise<SessionStartHookOutput> | SessionStartHookOutput} SessionStartHandler
  */
 
 /**
  * Input do hook sessionEnd.
  *
- * @typedef {import('@github/copilot-sdk').SessionEndHookInput} SessionEndHookInput
+ * @typedef {BaseHookInput & { reason?: string }} SessionEndHookInput
  */
 
 /**
  * Output do hook sessionEnd.
  *
- * @typedef {import('@github/copilot-sdk').SessionEndHookOutput} SessionEndHookOutput
+ * @typedef {{ [key: string]: unknown } | void} SessionEndHookOutput
  */
 
 /**
  * Handler do hook sessionEnd.
  *
- * @typedef {import('@github/copilot-sdk').SessionEndHandler} SessionEndHandler
+ * @typedef {(input: SessionEndHookInput) => Promise<SessionEndHookOutput> | SessionEndHookOutput} SessionEndHandler
  */
 
 /**
  * Input do hook errorOccurred.
  *
- * @typedef {import('@github/copilot-sdk').ErrorOccurredHookInput} ErrorOccurredHookInput
+ * @typedef {BaseHookInput & { error: Error | unknown; context?: string }} ErrorOccurredHookInput
  */
 
 /**
  * Output do hook errorOccurred.
  *
- * @typedef {import('@github/copilot-sdk').ErrorOccurredHookOutput} ErrorOccurredHookOutput
+ * @typedef {{ handled?: boolean; [key: string]: unknown } | void} ErrorOccurredHookOutput
  */
 
 /**
  * Handler do hook errorOccurred.
  *
- * @typedef {import('@github/copilot-sdk').ErrorOccurredHandler} ErrorOccurredHandler
+ * @typedef {(input: ErrorOccurredHookInput) => Promise<ErrorOccurredHookOutput> | ErrorOccurredHookOutput} ErrorOccurredHandler
  */
 
 // ─── Events ───────────────────────────────────────────────────────────────────
@@ -474,7 +474,7 @@
 /**
  * Configuração de provider externo (OpenAI, Azure, Anthropic).
  *
- * @typedef {import('@github/copilot-sdk').ProviderConfig} ProviderConfig
+ * @typedef {{ provider: 'openai' | 'azure' | 'anthropic' | string; apiKey?: string; baseUrl?: string; model?: string; [key: string]: unknown }} ProviderConfig
  */
 
 // ─── Session Context & Metadata ───────────────────────────────────────────────

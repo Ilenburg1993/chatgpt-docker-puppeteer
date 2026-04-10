@@ -220,7 +220,7 @@ router.get('/sessions/:id/stream', (req, res) => {
  */
 router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const { id } = req.params;
+        const id = /** @type {string} */ (req.params.id);
         const { model } = req.body ?? {};
         const modelValidation = validateModel(model);
         if (!modelValidation.ok) {
