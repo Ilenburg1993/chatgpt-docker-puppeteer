@@ -13,7 +13,6 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
-import { resolveUserInput as hookToolsResolveUserInput } from '../../tools/hook-tools.js';
 import { persistState } from '../lifecycle/state-io.js';
 
 /**
@@ -116,9 +115,11 @@ export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
  * @param {string} prompt
+ * @param {{ signal?: AbortSignal }} [opts]
  * @returns {Promise<string>}
  */
-export async function steerMessage(ctx, host, prompt) {
+export async function steerMessage(ctx, host, prompt, { signal } = {}) {
+    signal?.throwIfAborted();
     if (!ctx.session) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
@@ -138,18 +139,15 @@ export async function steerMessage(ctx, host, prompt) {
  */
 export function answerPendingQuestion(ctx, host, answer) {
     if (!ctx.pendingQuestion) {
-        // Fallback: tenta resolver hook-tools pending input (idempotente — retorna false se sem resolvers)
-        if (!hookToolsResolveUserInput(answer)) {
-            log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
-        }
+        // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
+        host.emit('question.answered', { answer, hadPending: false });
+        log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
         return false;
     }
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.pendingQuestion.resolve(answer);
     ctx.pendingQuestion = null;
     persistState({ pendingQuestion: null }, '[AlwaysAlive] writeState pendingQuestion=null');
-    host.emit('question.answered', { answer });
-    // Resolve hook-tools pending input associado (idempotente — second call retorna false)
-    hookToolsResolveUserInput(answer);
+    host.emit('question.answered', { answer, hadPending: true });
     return true;
 }

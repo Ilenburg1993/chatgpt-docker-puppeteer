@@ -280,16 +280,16 @@ Estratégia: extrair responsabilidades em módulos focados.
 
 ### Meta ao Final da Faixa 58
 
-| Indicador                | Início |  Após F56 |       Meta |
-| ------------------------ | -----: | --------: | ---------: |
-| God modules (>400L)      |     26 |        25 |    **≤20** |
-| Sync I/O calls           |     56 |      ≤ 5¹ |    **≤ 5** |
-| Deprecated APIs em uso   |     17 |      ≤ 3² |    **≤ 3** |
-| Magic strings em eventos |    408 |     ~100³ |   **≤ 30** |
-| Console.log bypass       |     35 |       0⁴  |      **0** |
-| Unsafe JSON.parse        |     20 |       0⁴  |      **0** |
-| Suite passando           |  4.496 |     4.492 | **4.496+** |
-| Typecheck errors         |      0 |         0 |      **0** |
+| Indicador                | Início | Após F56 |       Meta |
+| ------------------------ | -----: | -------: | ---------: |
+| God modules (>400L)      |     26 |      255 |    **≤20** |
+| Sync I/O calls           |     56 |     ≤ 5¹ |    **≤ 5** |
+| Deprecated APIs em uso   |     17 |     ≤ 3² |    **≤ 3** |
+| Magic strings em eventos |    408 |    ~100³ |   **≤ 30** |
+| Console.log bypass       |     35 |       0⁴ |      **0** |
+| Unsafe JSON.parse        |     20 |       0⁴ |      **0** |
+| Suite passando           |  4.496 |    4.492 | **4.496+** |
+| Typecheck errors         |      0 |        0 |      **0** |
 
 ¹ F51+F52 eliminaram sync I/O em SDK, config, agent lifecycle
 ² F53+F54 removeram tools-registry.js, sdk-types.js, deprecated re-exports
@@ -312,12 +312,12 @@ Estratégia: extrair responsabilidades em módulos focados.
 
 ### Resumo F57-F58
 
-| Faixa | Ação | Resultado |
-|:---:|---|---|
-| F57 | `always-alive.js` → extraído `queue-processor.js` (~50L) | 620→585L (−35L) |
-| F58 | `orchestrator.js` → extraído `send-pipeline.js` (~190L) | 574→438L (−136L) |
-| F58 | `engine.js` → extraído `turn-display.js` (~166L) | 459→365L (−94L) |
-| F58 | `loop-manager.js` — já decomposto (6 módulos extraídos) | 600L (core state machine) |
+| Faixa | Ação                                                     | Resultado                 |
+| :---: | -------------------------------------------------------- | ------------------------- |
+|  F57  | `always-alive.js` → extraído `queue-processor.js` (~50L) | 620→585L (−35L)           |
+|  F58  | `orchestrator.js` → extraído `send-pipeline.js` (~190L)  | 574→438L (−136L)          |
+|  F58  | `engine.js` → extraído `turn-display.js` (~166L)         | 459→365L (−94L)           |
+|  F58  | `loop-manager.js` — já decomposto (6 módulos extraídos)  | 600L (core state machine) |
 
 **Nota**: `loop-manager.js` permanece em 600L porque já delega turn execution, event wiring,
 protocol, watchdog, backpressure e model fallback a módulos dedicados. O restante é a state machine
@@ -325,16 +325,44 @@ core (start/stop/pause/resume) que não beneficia de separação adicional (168L
 
 ### Commits F51-F58
 
-| Faixa | Commit | Descrição |
-|:---:|---|---|
-| F51 | `4538db49` | Eliminar sync I/O em SDK, config e terminal |
-| F52 | `79aac189` | Eliminar sync I/O em agent lifecycle |
-| F53 | `b31fd8e9` | Undeprecate tools-registry.js, limpar barrel |
-| F54 | `b4563693` | Remove sdk-types.js + deprecated config re-exports |
-| F55 | `1ae81293` | Unify event constants, eliminate magic strings |
-| F56 | `7030fcf8` | Standardize logging + safe JSON parse |
-| F57 | `03b5b580` | Extract queue-processor from always-alive.js |
-| F58 | `7e8fee9c` | Extract send-pipeline + turn-display |
+| Faixa | Commit     | Descrição                                          |
+| :---: | ---------- | -------------------------------------------------- |
+|  F51  | `4538db49` | Eliminar sync I/O em SDK, config e terminal        |
+|  F52  | `79aac189` | Eliminar sync I/O em agent lifecycle               |
+|  F53  | `b31fd8e9` | Undeprecate tools-registry.js, limpar barrel       |
+|  F54  | `b4563693` | Remove sdk-types.js + deprecated config re-exports |
+|  F55  | `1ae81293` | Unify event constants, eliminate magic strings     |
+|  F56  | `7030fcf8` | Standardize logging + safe JSON parse              |
+|  F57  | `03b5b580` | Extract queue-processor from always-alive.js       |
+|  F58  | `7e8fee9c` | Extract send-pipeline + turn-display               |
+
+---
+
+*Documento gerado pela auditoria PARTE-17D. Base: 281 arquivos JS em `src/copilot/`, 4.492
+
+| Faixa | Ação                                                     | Resultado                 |
+| :---: | -------------------------------------------------------- | ------------------------- |
+|  F57  | `always-alive.js` → extraído `queue-processor.js` (~50L) | 620→585L (−35L)           |
+|  F58  | `orchestrator.js` → extraído `send-pipeline.js` (~190L)  | 574→438L (−136L)          |
+|  F58  | `engine.js` → extraído `turn-display.js` (~166L)         | 459→365L (−94L)           |
+|  F58  | `loop-manager.js` — já decomposto (6 módulos extraídos)  | 600L (core state machine) |
+
+**Nota**: `loop-manager.js` permanece em 600L porque já delega turn execution, event wiring,
+protocol, watchdog, backpressure e model fallback a módulos dedicados. O restante é a state machine
+core (start/stop/pause/resume) que não beneficia de separação adicional (168L são JSDoc, ~365L exec).
+
+### Commits F51-F58
+
+| Faixa | Commit     | Descrição                                          |
+| :---: | ---------- | -------------------------------------------------- |
+|  F51  | `4538db49` | Eliminar sync I/O em SDK, config e terminal        |
+|  F52  | `79aac189` | Eliminar sync I/O em agent lifecycle               |
+|  F53  | `b31fd8e9` | Undeprecate tools-registry.js, limpar barrel       |
+|  F54  | `b4563693` | Remove sdk-types.js + deprecated config re-exports |
+|  F55  | `1ae81293` | Unify event constants, eliminate magic strings     |
+|  F56  | `7030fcf8` | Standardize logging + safe JSON parse              |
+|  F57  | `03b5b580` | Extract queue-processor from always-alive.js       |
+|  F58  | `7e8fee9c` | Extract send-pipeline + turn-display               |
 
 ---
 

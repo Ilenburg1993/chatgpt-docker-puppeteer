@@ -153,13 +153,14 @@ export function loadSnapshot(snapshotId) {
 /**
  * Carrega o snapshot mais recente.
  *
- * @returns {SessionSnapshotData | null}
+ * @deprecated F61 (BUG-A01): Use loadLatestSnapshotAsync().
+ * @returns {null} Sempre null — delega para async.
  */
 export function loadLatestSnapshot() {
-    const snapshots = listSnapshots();
-    if (snapshots.length === 0) return null;
-    const latest = snapshots[0];
-    return latest ? loadSnapshot(latest.snapshotId) : null;
+    // F61: versão sync é broken (listSnapshots() retorna []). Mantida apenas para compat;
+    // callers devem migrar para loadLatestSnapshotAsync().
+    loadLatestSnapshotAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.loadLatestSync.fallback'));
+    return null;
 }
 
 /**

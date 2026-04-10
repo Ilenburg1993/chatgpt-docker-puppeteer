@@ -331,10 +331,11 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Envia uma mensagem em modo "steering" (immediate).
      *
      * @param {string} prompt
+     * @param {{ signal?: AbortSignal }} [opts]
      * @returns {Promise<string>}
      */
-    async steerMessage(prompt) {
-        return msgSteer(this.ctx, this, prompt);
+    async steerMessage(prompt, opts) {
+        return msgSteer(this.ctx, this, prompt, opts);
     }
 
     /**

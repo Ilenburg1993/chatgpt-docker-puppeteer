@@ -176,29 +176,35 @@ describe('F70: Métricas e Cleanup paralelo', () => {
     });
 
     describe('rotation metrics', () => {
-        it('recordSessionRotation é chamado quando shouldRotate = true', () => {
+        it('shouldRotateSession é pura: retorna shouldRotate=true sem chamar métricas', () => {
             const result = shouldRotateSession({ contextUtilization: 0.95 }, { maxUtilization: 0.9 });
             expect(result.shouldRotate).toBe(true);
-            expect(vi.mocked(defaultMetrics.recordSessionRotation)).toHaveBeenCalledOnce();
+            expect(result.reason).toBeDefined();
+            // F74: shouldRotateSession é agora uma função pura — métricas são gravadas externamente em initializer.js
+            expect(vi.mocked(defaultMetrics.recordSessionRotation)).not.toHaveBeenCalled();
         });
 
-        it('recordSessionRotation NÃO é chamado quando shouldRotate = false', () => {
+        it('shouldRotateSession retorna shouldRotate=false sem chamar métricas', () => {
             const result = shouldRotateSession({ contextUtilization: 0.5 }, { maxUtilization: 0.9 });
             expect(result.shouldRotate).toBe(false);
             expect(vi.mocked(defaultMetrics.recordSessionRotation)).not.toHaveBeenCalled();
         });
 
-        it('recordSessionRotation é chamado para cada trigger (age, compaction, turns)', () => {
-            shouldRotateSession({ sessionAgeMs: 999_999_999 }, { maxAgeMs: 1000 });
-            expect(vi.mocked(defaultMetrics.recordSessionRotation)).toHaveBeenCalledOnce();
+        it('shouldRotateSession retorna reason correto para cada trigger', () => {
+            const r1 = shouldRotateSession({ sessionAgeMs: 999_999_999 }, { maxAgeMs: 1000 });
+            expect(r1.shouldRotate).toBe(true);
+            expect(r1.reason).toContain('idade');
 
-            vi.clearAllMocks();
-            shouldRotateSession({ compactionCount: 10 }, { maxCompactions: 5 });
-            expect(vi.mocked(defaultMetrics.recordSessionRotation)).toHaveBeenCalledOnce();
+            const r2 = shouldRotateSession({ compactionCount: 10 }, { maxCompactions: 5 });
+            expect(r2.shouldRotate).toBe(true);
+            expect(r2.reason).toMatch(/compaction/i);
 
-            vi.clearAllMocks();
-            shouldRotateSession({ totalTurns: 300 }, { maxTurns: 100 });
-            expect(vi.mocked(defaultMetrics.recordSessionRotation)).toHaveBeenCalledOnce();
+            const r3 = shouldRotateSession({ totalTurns: 300 }, { maxTurns: 100 });
+            expect(r3.shouldRotate).toBe(true);
+            expect(r3.reason).toMatch(/turno/i);
+
+            // F74: nenhuma chamada de métricas — função pura
+            expect(vi.mocked(defaultMetrics.recordSessionRotation)).not.toHaveBeenCalled();
         });
     });
 

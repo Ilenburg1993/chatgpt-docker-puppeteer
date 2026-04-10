@@ -227,6 +227,22 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
         },
     );
 
+    // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
+    agentEmitter.on('question.answered', (/** @type {{ answer?: string }} */ evt) => {
+        if (typeof evt?.answer !== 'string') return;
+        import('../../tools/hook-tools.js')
+            .then(({ resolveUserInput }) => resolveUserInput(evt.answer))
+            .catch((/** @type {any} */ e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
+    });
+
+    // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
+    agentEmitter.on('question.answered', (/** @type {{ answer?: string }} */ evt) => {
+        if (typeof evt?.answer !== 'string') return;
+        import('../../tools/hook-tools.js')
+            .then(({ resolveUserInput }) => resolveUserInput(evt.answer))
+            .catch((/** @type {any} */ e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
+    });
+
     return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
 }
 

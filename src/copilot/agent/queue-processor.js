@@ -17,13 +17,7 @@ import { executeTask } from './infra/task-executor.js';
  */
 export function processQueue(ctx, host, callbacks) {
     // G1-ARCH-03: bloqueia processamento durante reconexão ativa
-    if (
-        ctx.isReconnecting ||
-        ctx.status !== 'idle' ||
-        ctx.messageQueue.size === 0 ||
-        !ctx.session
-    )
-        return;
+    if (ctx.isReconnecting || ctx.status !== 'idle' || ctx.messageQueue.size === 0 || !ctx.session) return;
     const session = ctx.session;
 
     const task = ctx.messageQueue.shift();
