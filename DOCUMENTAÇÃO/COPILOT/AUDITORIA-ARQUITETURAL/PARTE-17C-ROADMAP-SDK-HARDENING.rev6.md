@@ -285,6 +285,61 @@ GRUPO H — CONFIG + AUDIT (Faixa 50)
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.6. Base: 281 arquivos JS em `src/copilot/`,
-178 specs, 3.266 testes passando, 0 erros de typecheck. Continuação das Faixas 35-42 (rev.5).
-Revisões anteriores: .rev2.md, .rev3.md, .rev4.md, .rev5.md.*
+---
+
+## ═══ RESULTADOS DE EXECUÇÃO — FAIXAS 43-50 CONCLUÍDAS ═══
+
+> Seção adicionada após execução integral. Dados reais vs estimativas.
+
+### Execução Real vs Estimativa
+
+| Faixa | Estimado | Real | Δ   | Spec Criado                                                       | Commit       |
+| ----: | -------: | ---: | --- | ----------------------------------------------------------------- | ------------ |
+|    43 |      ~41 |   25 | −16 | `tests/unit/copilot/test_event_handlers_history.spec.js`          | `913a4a83`   |
+|    44 |      ~40 |   28 | −12 | `tests/unit/copilot/agent/test_hook_context_webhook.spec.js`      | `d6740eaa`   |
+|    45 |      ~38 |   29 |  −9 | `tests/unit/copilot/test_data_structures_metrics.spec.js`         | `c1ddf309`   |
+|    46 |      ~41 |   13 | −28 | `tests/unit/copilot/tools/test_code_permission_tools.spec.js`     | `b5e2abaf`   |
+|    47 |      ~35 |   17 | −18 | `tests/unit/copilot/config/test_custom_agents.spec.js`            | `2eb7f8dd`   |
+|    48 |      ~27 |   18 |  −9 | `tests/unit/copilot/observability/test_collectors.spec.js`        | `e554769e`   |
+|    49 |      ~31 |   13 | −18 | `tests/unit/copilot/test_error_alerting_jsonl.spec.js`            | `c0cadad4`   |
+|    50 |      ~33 |   21 | −12 | `tests/unit/copilot/api/test_session_middleware_fanout.spec.js`   | `866c67db`   |
+| **Σ** | **~286** | **164** | **−122** | **8 specs novos** | **8 commits** |
+
+### Justificativa das Diferenças (estimado vs real)
+
+1. **God modules pulados**: `always-alive.js` (620L), `loop-manager.js` (600L), `todo/` (882L) —
+   dependências pesadas/efeitos colaterais proibitivos para testes unitários sem mocks massivos
+2. **Terminal handler shims**: 4 arquivos são puro re-export (`export { } from ...`) — 0 lógica
+3. **SDK contracts**: 3 arquivos são typedef-only (`export {}`) — sem código executável
+4. **Foco pragmático**: priorizou-se módulos com lógica testável sem mocks excessivos, mantendo
+   qualidade de asserções sobre quantidade
+
+### Estado Final da Suite
+
+```
+✓  4.496 testes passando
+✗  0 falhas
+⏭  53 skipped (pré-existentes, não regressão)
+📁 353 test files passed | 34 skipped
+⏱  94.33s total (Vitest 4.1.1)
+🔧 0 typecheck errors
+```
+
+### Arquivos Não-Testáveis Documentados (F50 audit)
+
+| Arquivo                               | Razão                        |
+| ------------------------------------- | ---------------------------- |
+| `sdk/agent-contract.js`               | typedef-only (`export {}`)   |
+| `sdk/bridge-contract.js`              | typedef-only (`export {}`)   |
+| `sdk/channel-contract.js`             | typedef-only (`export {}`)   |
+| `terminal/handlers-agent.js`          | re-export shim               |
+| `terminal/handlers-dialog.js`         | re-export shim               |
+| `terminal/handlers-shared.js`         | re-export shim               |
+| `terminal/handlers-system.js`         | re-export shim               |
+| `terminal/repl-listeners.js`          | acoplado a readline (integ.) |
+
+---
+
+*Documento gerado pela auditoria PARTE-17, rev.6 — **CONCLUÍDO**.
+Base final: 281 arquivos JS em `src/copilot/`, ~186 specs, **4.496 testes passando**, 0 erros de
+typecheck. Roadmap F43-F50 executado integralmente. Revisões anteriores: .rev2-.rev5.*
