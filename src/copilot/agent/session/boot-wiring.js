@@ -27,6 +27,7 @@ import {
     defaultMetrics,
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
+import { createQuotaMonitor } from '#copilot/sdk/quota-monitor';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
@@ -77,6 +78,7 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
+ * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
  */
 
 /**
@@ -180,7 +182,33 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
         },
     });
 
-    // ── 10. Wiring de handoff ──
+    // ── 10. Quota Monitor (F118 — Faixa 25) ──
+    // Inicia monitoramento periódico de quota para logging e alertas proativos.
+    /** @type {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} */
+    let quotaMonitor = null;
+    try {
+        quotaMonitor = createQuotaMonitor({
+            client,
+            intervalMs: 5 * 60 * 1000, // 5 min
+            warningThreshold: 20,
+            onWarning: (quotaId, snapshot) => {
+                log(
+                    'WARN',
+                    `[boot-wiring] Quota baixa — id=${quotaId}, restante=${snapshot.remainingPercentage?.toFixed(1)}%`,
+                );
+                ctx.emit('quota.warning', { quotaId, snapshot, ts: Date.now() });
+            },
+            onUpdate: (snapshots) => {
+                defaultMetrics.recordQuotaPoll?.();
+                log('DEBUG', `[boot-wiring] Quota atualizada — types=${Object.keys(snapshots).join(', ')}`);
+            },
+        });
+        quotaMonitor.start();
+    } catch (/** @type {any} */ e) {
+        logSwallowed(e, 'agent.bootWiring.quotaMonitor');
+    }
+
+    // ── 11. Wiring de handoff ──
     agentEmitter.on(
         'session.handoff',
         (
@@ -198,7 +226,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
         },
     );
 
-    return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel };
+    return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
 }
 
 /**

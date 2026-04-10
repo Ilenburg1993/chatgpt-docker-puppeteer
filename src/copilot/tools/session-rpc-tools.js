@@ -20,7 +20,7 @@
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config/env';
 import { TimeoutError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
 
@@ -95,7 +95,7 @@ async function wrapRpc(toolName, fn) {
 /**
  * Tool: session_mode_get — retorna o modo atual da sessão SDK.
  */
-const sessionModeGetTool = defineTool('session_mode_get', {
+const sessionModeGetTool = createTool({ name: 'session_mode_get',
     description:
         'Retorna o modo atual da sessão (interactive | plan | autopilot). ' +
         'Use para verificar em que modo o agente está antes de mudar.',
@@ -116,7 +116,7 @@ const sessionModeGetTool = defineTool('session_mode_get', {
 /**
  * Tool: session_mode_set — muda o modo da sessão SDK.
  */
-const sessionModeSetTool = defineTool('session_mode_set', {
+const sessionModeSetTool = createTool({ name: 'session_mode_set',
     description:
         'Muda o modo da sessão: "interactive" (responde imediatamente), "plan" (cria plan.md antes de agir) ' +
         'ou "autopilot" (age continuamente sem confirmação). Use "plan" para tarefas complexas que exigem ' +
@@ -143,7 +143,7 @@ const sessionModeSetTool = defineTool('session_mode_set', {
 /**
  * Tool: session_plan_read — lê o plan.md da sessão infinita.
  */
-const sessionPlanReadTool = defineTool('session_plan_read', {
+const sessionPlanReadTool = createTool({ name: 'session_plan_read',
     description:
         'Lê o conteúdo do plan.md da sessão infinita (infiniteSessions). Retorna null se o plano não existe ' +
         'ou a sessão não tiver workspace habilitado. Use para inspecionar o plano estruturado atual da sessão.',
@@ -163,7 +163,7 @@ const sessionPlanReadTool = defineTool('session_plan_read', {
 /**
  * Tool: session_plan_update — atualiza/cria o plan.md da sessão infinita.
  */
-const sessionPlanUpdateTool = defineTool('session_plan_update', {
+const sessionPlanUpdateTool = createTool({ name: 'session_plan_update',
     description:
         'Atualiza ou cria o plan.md da sessão infinita com o conteúdo fornecido (Markdown). ' +
         'Use no modo "plan" para escrever o plano estruturado antes da execução. ' +
@@ -188,7 +188,7 @@ const sessionPlanUpdateTool = defineTool('session_plan_update', {
 /**
  * Tool: session_plan_delete — remove o plan.md da sessão infinita.
  */
-const sessionPlanDeleteTool = defineTool('session_plan_delete', {
+const sessionPlanDeleteTool = createTool({ name: 'session_plan_delete',
     description:
         'Remove o plan.md da sessão infinita. Use quando o plano foi concluído ou for reiniciado do zero. ' +
         'Idempotente: não retorna erro se o plan.md não existir.',
@@ -208,7 +208,7 @@ const sessionPlanDeleteTool = defineTool('session_plan_delete', {
 /**
  * Tool: session_agent_list — lista os agentes disponíveis na sessão.
  */
-const sessionAgentListTool = defineTool('session_agent_list', {
+const sessionAgentListTool = createTool({ name: 'session_agent_list',
     description:
         'Lista todos os agentes customizados disponíveis na sessão atual (auditor, docs, reviewer, etc.). ' +
         'Retorna nome, displayName e descrição de cada agente. Use para descobrir quais sub-agentes estão disponíveis.',
@@ -228,7 +228,7 @@ const sessionAgentListTool = defineTool('session_agent_list', {
 /**
  * Tool: session_agent_select — seleciona um agente customizado para o turno atual.
  */
-const sessionAgentSelectTool = defineTool('session_agent_select', {
+const sessionAgentSelectTool = createTool({ name: 'session_agent_select',
     description:
         'Seleciona um sub-agente pelo nome para o turno atual (ex: "auditor", "docs", "reviewer"). ' +
         'Passe name="" ou null para voltar ao agente padrão. ' +
@@ -258,7 +258,7 @@ const sessionAgentSelectTool = defineTool('session_agent_select', {
 /**
  * Tool: session_compact — aciona compaction manual da sessão infinita.
  */
-const sessionCompactTool = defineTool('session_compact', {
+const sessionCompactTool = createTool({ name: 'session_compact',
     description:
         'Aciona compaction manual da sessão infinita para liberar tokens de contexto. ' +
         'Use quando o budget de tokens estiver alto (>75%) e a sessão precisar continuar operando. ' +

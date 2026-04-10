@@ -21,7 +21,7 @@
 import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { getClient } from '#copilot/sdk/client';
+import { getClient } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';

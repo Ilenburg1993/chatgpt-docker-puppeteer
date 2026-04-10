@@ -8,7 +8,7 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';
 import { MAX_LIST, PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
@@ -21,7 +21,7 @@ import { MAX_LIST, PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zS
  * Tool: todo_list — lista tarefas com filtros compostos.
  */
 export const todoListTool = withSkipPermission(
-    defineTool('todo_list', {
+    createTool({ name: 'todo_list',
         description:
             'Lista tarefas com filtros opcionais compostos. Pode filtrar por status, prioridade, ' +
             'tag, parent_id (listar subtarefas de uma tarefa), texto de busca, e overdue. ' +
@@ -132,7 +132,7 @@ export const todoListTool = withSkipPermission(
  * Tool: todo_search — busca full-text avançada em todos os campos de texto.
  */
 export const todoSearchTool = withSkipPermission(
-    defineTool('todo_search', {
+    createTool({ name: 'todo_search',
         description:
             'Busca full-text avançada em todas as tarefas. Pesquisa simultânea em título, ' +
             'descrição, notas e tags. Suporta múltiplos termos (todos devem corresponder). ' +
@@ -215,7 +215,7 @@ export const todoSearchTool = withSkipPermission(
  * Tool: todo_stats — estatísticas completas do sistema de tarefas.
  */
 export const todoStatsTool = withSkipPermission(
-    defineTool('todo_stats', {
+    createTool({ name: 'todo_stats',
         description:
             'Retorna estatísticas completas do sistema de tarefas: contagem por status e prioridade, ' +
             'tarefas vencidas (overdue), taxa de conclusão, distribuição de tags, ' +

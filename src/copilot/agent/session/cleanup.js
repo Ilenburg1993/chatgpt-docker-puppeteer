@@ -12,7 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { deleteSession, listSessions } from '#copilot/sdk/session';
+import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../config.js';
 
 /**

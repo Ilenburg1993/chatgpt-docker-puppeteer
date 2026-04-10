@@ -27,7 +27,7 @@ import { BridgeError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { defaultMetrics } from '#copilot/observability/metrics';
 import { startSpanImmediate } from '#copilot/observability/otel';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import net from 'node:net';
 import { buildZodSchema } from './mcp-tool-schema.js';
 
@@ -225,7 +225,7 @@ function createSdkToolFromMcp(mcpTool) {
     const schema = buildZodSchema(mcpTool.inputSchema ?? {});
     const toolName = `mcp_${mcpTool.name}`;
 
-    return defineTool(toolName, {
+    return createTool({ name: toolName,
         description: `[MCP] ${mcpTool.description ?? mcpTool.name}`,
         parameters: schema,
         // GAP-SDK-07 (fix): MCP tools devem override built-ins com o mesmo nome

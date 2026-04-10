@@ -9,7 +9,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';
 import {
@@ -32,7 +32,7 @@ import {
 /**
  * Tool: todo_create — cria uma nova tarefa com metadados ricos.
  */
-export const todoCreateTool = defineTool('todo_create', {
+export const todoCreateTool = createTool({ name: 'todo_create',
     description:
         'Cria uma nova tarefa no sistema de gerenciamento profundo. ' +
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
@@ -112,7 +112,7 @@ export const todoCreateTool = defineTool('todo_create', {
  * Tool: todo_get — obtém uma tarefa completa com sua árvore de subtarefas.
  */
 export const todoGetTool = withSkipPermission(
-    defineTool('todo_get', {
+    createTool({ name: 'todo_get',
         description:
             'Obtém uma tarefa pelo ID com todos os seus metadados e subtarefas. ' +
             'Retorna a árvore de subtarefas (1 nível de profundidade como objetos completos). ' +
@@ -160,7 +160,7 @@ export const todoGetTool = withSkipPermission(
 /**
  * Tool: todo_update — atualiza qualquer campo de uma tarefa existente.
  */
-export const todoUpdateTool = defineTool('todo_update', {
+export const todoUpdateTool = createTool({ name: 'todo_update',
     description:
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
         'alterados (patch parcial). Status segue máquina de estados validada. ' +
@@ -257,7 +257,7 @@ export const todoUpdateTool = defineTool('todo_update', {
 /**
  * Tool: todo_set_status — transiciona o status de uma tarefa com validação.
  */
-export const todoSetStatusTool = defineTool('todo_set_status', {
+export const todoSetStatusTool = createTool({ name: 'todo_set_status',
     description:
         'Altera o status de uma tarefa seguindo a máquina de estados validada. ' +
         'Transições válidas: todo → in_progress | cancelled | blocked; ' +
@@ -324,7 +324,7 @@ export const todoSetStatusTool = defineTool('todo_set_status', {
 /**
  * Tool: todo_delete — exclui uma tarefa e desvincula do pai.
  */
-export const todoDeleteTool = defineTool('todo_delete', {
+export const todoDeleteTool = createTool({ name: 'todo_delete',
     description:
         'Exclui uma tarefa permanentemente. Por padrão, subtarefas são desvinculadas (tornam-se raiz). ' +
         'Com cascade: true, remove também todas as subtarefas recursivamente. ' +
@@ -400,7 +400,7 @@ export const todoDeleteTool = defineTool('todo_delete', {
 /**
  * Tool: todo_add_subtask — adiciona uma nova subtarefa a uma tarefa pai existente.
  */
-export const todoAddSubtaskTool = defineTool('todo_add_subtask', {
+export const todoAddSubtaskTool = createTool({ name: 'todo_add_subtask',
     description:
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +
         'Equivale a todo_create com parent_id preenchido, mas com interface mais direta. ' +

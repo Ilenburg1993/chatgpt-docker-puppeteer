@@ -15,7 +15,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { createRegistry } from '#copilot/sdk/index';
+import { createRegistry } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 import { HandoffManager } from './infra/handoff-manager.js';
@@ -127,6 +127,13 @@ export class AgentContext {
      * @type {(() => void) | null}
      */
     mcpReconnectCancel = null;
+
+    /**
+     * Monitor de quota periódico — F118 (Faixa 25).
+     *
+     * @type {import('#copilot/sdk/quota-monitor').QuotaMonitor | null}
+     */
+    quotaMonitor = null;
 
     /**
      * Flag de idempotência do dialog loop wiring.

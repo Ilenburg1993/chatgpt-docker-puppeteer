@@ -10,14 +10,14 @@
  * @module copilot/hooks/types
  */
 
-// ─── Re-exports de tipos do SDK ───────────────────────────────────────────────
+// ─── Re-exports de tipos do SDK (via sdk/types.js como fonte canônica) ──────
 
 /**
- * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ * @typedef {import('#copilot/sdk/types.js').PermissionHandler} PermissionHandler
  *
- * @typedef {import('@github/copilot-sdk').PermissionRequest} PermissionRequest
+ * @typedef {import('#copilot/sdk/types.js').PermissionRequest} PermissionRequest
  *
- * @typedef {import('@github/copilot-sdk').PermissionRequestResult} PermissionRequestResult
+ * @typedef {import('#copilot/sdk/types.js').PermissionRequestResult} PermissionRequestResult
  */
 
 // ─── Tipos dos 6 hooks SDK ────────────────────────────────────────────────────

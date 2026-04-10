@@ -49,7 +49,8 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
  *
  * @returns {void}
  */
-export function loadAliases() { // FS-SYNC: init-time-safe (deprecated sync fallback)
+export function loadAliases() {
+    // FS-SYNC: init-time-safe (deprecated sync fallback)
     try {
         const raw = fs.readFileSync(ALIASES_FILE, 'utf8');
         const result = safeJsonParse(raw, '[alias-store/loadAliases]');

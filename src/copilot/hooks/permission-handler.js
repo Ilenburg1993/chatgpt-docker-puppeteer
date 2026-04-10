@@ -20,7 +20,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { approveAll } from '@github/copilot-sdk';
+import { approveAll } from '#copilot/sdk';
 
 /**
  * @typedef {import('./types.js').PermissionHandler} PermissionHandler

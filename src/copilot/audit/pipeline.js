@@ -22,7 +22,7 @@ import {
 import { logSwallowed } from '#copilot/core/error-handlers';
 import { defaultBus } from '#copilot/hooks/bus';
 import { LOG_DIR, log } from '#copilot/observability/logger';
-import { approveAll } from '@github/copilot-sdk';
+import { approveAll } from '#copilot/sdk';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';

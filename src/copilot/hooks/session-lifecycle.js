@@ -19,7 +19,7 @@ import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { getCopilotFallbackModel } from '#copilot/config/env';
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { modelSelector } from '#copilot/sdk/models/registry';
+import { modelSelector } from '#copilot/sdk';
 import { hostname } from 'node:os';
 
 /**

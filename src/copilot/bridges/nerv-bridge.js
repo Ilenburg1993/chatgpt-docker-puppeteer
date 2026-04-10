@@ -25,6 +25,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { onSessionEvent } from '#copilot/sdk';
 import { alwaysAliveAgent } from '../agent/index.js';
 
 /**
@@ -382,4 +383,20 @@ export function _resetNervBridgeState() {
     _beforeStopRegistered = false;
     _pendingReadyHandler = null;
     _listeners.clear();
+}
+
+// ─── F114: Typed SDK event helper ────────────────────────────────────────────
+
+/**
+ * Registra um handler typed em um evento da sessão SDK usando `onSessionEvent`. Utilitário para bridges que precisam
+ * ouvir eventos tipados do SDK diretamente (sessão copilot), em contraste com eventos do AlwaysAliveAgent
+ * (EventEmitter).
+ *
+ * @param {import('@github/copilot-sdk').CopilotSession} session - Sessão SDK ativa.
+ * @param {string} eventType - Tipo de evento SDK (e.g., 'assistant.message').
+ * @param {(event: any) => void} handler - Callback.
+ * @returns {() => void} Função de unsubscribe.
+ */
+export function subscribeSessionEvent(session, eventType, handler) {
+    return onSessionEvent(session, eventType, handler);
 }

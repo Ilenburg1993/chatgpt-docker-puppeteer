@@ -128,7 +128,8 @@ export const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, none: 4
  *
  * @returns {void}
  */
-function _migrateJsonLegacy() { // FS-SYNC: init-time-safe (one-shot migration)
+function _migrateJsonLegacy() {
+    // FS-SYNC: init-time-safe (one-shot migration)
     try {
         const db = getCopilotDb();
         const count = /** @type {{ n: number }} */ (db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get());

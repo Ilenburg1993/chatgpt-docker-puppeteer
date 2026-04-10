@@ -20,6 +20,7 @@
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
 import { logSwallowed, registerShutdownHandler } from '#copilot/core';
+import { onSessionEvent } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -389,3 +390,18 @@ export const defaultEventCollector = {
 
 /** Tamanho máximo do arquivo de eventos (bytes). */
 export { MAX_EVENTS_BYTES };
+
+// ─── F113: Typed event attachment helper ─────────────────────────────────────
+
+/**
+ * Registra um handler tipado em um evento da sessão SDK usando o wrapper `onSessionEvent` do sdk/events.js. Utilitário
+ * para collectors que preferem eventos tipados com validação integrada.
+ *
+ * @param {import('@github/copilot-sdk').CopilotSession} session - Sessão SDK ativa.
+ * @param {string} eventType - Tipo de evento (e.g., 'assistant.message').
+ * @param {(event: any) => void} handler - Handler do evento.
+ * @returns {() => void} Função de unsubscribe.
+ */
+export function attachSdkEventTyped(session, eventType, handler) {
+    return onSessionEvent(session, eventType, handler);
+}

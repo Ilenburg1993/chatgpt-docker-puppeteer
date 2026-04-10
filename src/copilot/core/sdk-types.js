@@ -1,112 +1,109 @@
 // @ts-check
 /**
- * src/copilot/types/sdk.js
+ * src/copilot/core/sdk-types.js
  *
- * Re-exportação centralizada dos tipos do `@github/copilot-sdk` mais usados em `src/copilot/`.
- *
- * Em vez de repetir `import('@github/copilot-sdk').CopilotSession` em dezenas de arquivos, cada módulo pode usar
- * `import('./types/sdk.js').CopilotSession` (ou o alias).
- *
- * Este módulo **não contém runtime** — é puro barrel de tipos para JSDoc.
- *
- * @module copilot/types/sdk
+ * @module copilot/core/sdk-types
+ * @deprecated Use `import('#copilot/sdk/types')` ou `import('../sdk/types.js')` em vez deste módulo. Este arquivo é
+ *   mantido por backward compatibility e será removido em versão futura. A fonte canônica de tipos SDK agora é
+ *   `src/copilot/sdk/types.js` (78+ tipos completos).
+ * @see module:copilot/sdk/types
  */
 
 /**
  * Cliente principal do SDK. Gerencia conexão, autenticação e criação de sessões.
  *
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ * @typedef {import('#copilot/sdk/types.js').CopilotClient} CopilotClient
  */
 
 /**
  * Sessão ativa do SDK. Expõe `sendAndWait`, `on`, event listeners e lifecycle.
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types.js').CopilotSession} CopilotSession
  */
 
 /**
  * Configuração para criação de sessão (`client.startSession(config)`).
  *
- * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ * @typedef {import('#copilot/sdk/types.js').SessionConfig} SessionConfig
  */
 
 /**
  * Evento genérico da sessão SDK (união discriminada pelo campo `type`).
  *
- * @typedef {import('@github/copilot-sdk').SessionEvent} SessionEvent
+ * @typedef {import('#copilot/sdk/types.js').SessionEvent} SessionEvent
  */
 
 /**
  * Tipo de evento da sessão SDK (string literal union).
  *
- * @typedef {import('@github/copilot-sdk').SessionEventType} SessionEventType
+ * @typedef {import('#copilot/sdk/types.js').SessionEventType} SessionEventType
  */
 
 /**
  * Handler tipado para eventos da sessão SDK.
  *
- * @typedef {import('@github/copilot-sdk').SessionEventHandler} SessionEventHandler
+ * @typedef {import('#copilot/sdk/types.js').SessionEventHandler} SessionEventHandler
  */
 
 /**
  * Definição de tool para o SDK (retornada por `defineTool`).
  *
- * @typedef {import('@github/copilot-sdk').Tool} Tool
+ * @typedef {import('#copilot/sdk/types.js').Tool} Tool
  */
 
 /**
  * Handler de permissão do SDK. Recebe `PermissionRequest`, retorna `PermissionRequestResult`.
  *
- * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ * @typedef {import('#copilot/sdk/types.js').PermissionHandler} PermissionHandler
  */
 
 /**
  * Pedido de permissão emitido pelo SDK quando uma tool quer executar ação protegida.
  *
- * @typedef {import('@github/copilot-sdk').PermissionRequest} PermissionRequest
+ * @typedef {import('#copilot/sdk/types.js').PermissionRequest} PermissionRequest
  */
 
 /**
  * Resultado da decisão de permissão.
  *
- * @typedef {import('@github/copilot-sdk').PermissionRequestResult} PermissionRequestResult
+ * @typedef {import('#copilot/sdk/types.js').PermissionRequestResult} PermissionRequestResult
  */
 
 /**
  * Opções para `session.sendAndWait(message, options)`.
  *
- * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
+ * @typedef {import('#copilot/sdk/types.js').MessageOptions} MessageOptions
  */
 
 /**
  * Opções de conexão do CopilotClient.
  *
- * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
+ * @typedef {import('#copilot/sdk/types.js').CopilotClientOptions} CopilotClientOptions
  */
 
 /**
  * Configuração de sessão infinita (compaction).
  *
- * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
+ * @typedef {import('#copilot/sdk/types.js').InfiniteSessionConfig} InfiniteSessionConfig
  */
 
 /**
  * Opções para retomar sessão existente.
  *
- * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ * @typedef {import('#copilot/sdk/types.js').ResumeSessionConfig} ResumeSessionConfig
  */
 
 /**
  * Invocação de tool pelo SDK.
  *
- * @typedef {import('@github/copilot-sdk').ToolInvocation} ToolInvocation
+ * @typedef {import('#copilot/sdk/types.js').ToolInvocation} ToolInvocation
  */
 
 /**
  * Schema Zod usado pelo SDK para validação de parâmetros de tool.
  *
  * @template T
- * @typedef {import('@github/copilot-sdk').ZodSchema<T>} ZodSchema
+ * @typedef {import('#copilot/sdk/types.js').ZodSchema<T>} ZodSchema
  */
 
 export {};

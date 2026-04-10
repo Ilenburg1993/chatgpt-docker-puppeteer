@@ -11,7 +11,7 @@
 
 import { SERVER_PORT } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,7 @@ import { withSkipPermission } from './tool-factory.js';
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
  */
-const getTasksTool = defineTool('get_tasks', {
+const getTasksTool = createTool({ name: 'get_tasks',
     description: 'Lista as tarefas mais recentes do sistema. Use para verificar estado atual da fila.',
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -60,7 +60,7 @@ const getTasksTool = defineTool('get_tasks', {
 /**
  * Tool: add_task — enfileira uma nova tarefa no sistema.
  */
-const addTaskTool = defineTool('add_task', {
+const addTaskTool = createTool({ name: 'add_task',
     description: 'Cria e enfileira uma nova tarefa no sistema de missões. A tarefa será executada pelo kernel.',
     parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -105,7 +105,7 @@ const addTaskTool = defineTool('add_task', {
 /**
  * Tool: get_session_state — lê o estado da sessão do hook system.
  */
-const getSessionStateTool = defineTool('get_session_state', {
+const getSessionStateTool = createTool({ name: 'get_session_state',
     description: 'Lê o estado da sessão atual do hook system (briefing, tarefas pendentes).',
     parameters: z.object({}),
     handler: async () => {
@@ -134,7 +134,7 @@ const getSessionStateTool = defineTool('get_session_state', {
 /**
  * Tool: get_system_health — verifica saúde geral do sistema.
  */
-const getSystemHealthTool = defineTool('get_system_health', {
+const getSystemHealthTool = createTool({ name: 'get_system_health',
     description: 'Verifica a saúde dos serviços principais (API, Chrome, Queue).',
     parameters: z.object({}),
     handler: async () => {

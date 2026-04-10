@@ -16,8 +16,8 @@ import {
     createAuditOnlyPermission,
     createHooks,
     createSafePermission,
-} from '#copilot/sdk/index';
-import { approveAll } from '@github/copilot-sdk';
+} from '#copilot/sdk';
+import { approveAll } from '#copilot/sdk';
 
 /**
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig

@@ -21,7 +21,7 @@
 import { defaultAuditLog } from '#copilot/audit/pipeline';
 import { log } from '#copilot/observability/logger';
 import { recordToolCall } from '#copilot/observability/tool-stats';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -52,7 +52,7 @@ const sdkParam = (schema) =>
 /**
  * Tool: exec_command — executa um comando shell arbitrário (sandboxado).
  */
-const execCommandTool = defineTool('exec_command', {
+const execCommandTool = createTool({ name: 'exec_command',
     description:
         'Executa um comando shell no workspace. O comando é executado via /bin/sh com sandbox de segurança: ' +
         'cwd restrito ao workspace, blocklist de comandos perigosos, timeout máximo de 120s e output limitado. ' +
@@ -76,7 +76,7 @@ const execCommandTool = defineTool('exec_command', {
                 .describe('Timeout em segundos (1-120). Default: 30.'),
         }),
     ),
-    handler: async ({ command, cwd, timeoutSeconds = 30 }) => {
+    handler: async (/** @type {{ command: string; cwd?: string; timeoutSeconds?: number }} */ { command, cwd, timeoutSeconds = 30 }) => {
         const blockCheck = checkCommandBlocklist(command);
         if (!blockCheck.ok) {
             log('WARN', `[ShellTools] exec_command bloqueado: ${blockCheck.reason}`);
@@ -192,7 +192,7 @@ const execCommandTool = defineTool('exec_command', {
 /**
  * Tool: run_npm_script — executa um script npm definido em package.json.
  */
-const runNpmScriptTool = defineTool('run_npm_script', {
+const runNpmScriptTool = createTool({ name: 'run_npm_script',
     description:
         'Executa um script npm (npm run <script>) no workspace. ' +
         'Scripts permitidos: lint, lint:fix, format, format:check, test:unit, test:fast, test:integration, ' +
@@ -214,7 +214,7 @@ const runNpmScriptTool = defineTool('run_npm_script', {
                 .describe('Timeout em segundos (1-120). Default: 60.'),
         }),
     ),
-    handler: async ({ script, timeoutSeconds = 60 }) => {
+    handler: async (/** @type {{ script: string; timeoutSeconds?: number }} */ { script, timeoutSeconds = 60 }) => {
         if (!ALLOWED_NPM_SCRIPTS.has(script)) {
             const allowed = [...ALLOWED_NPM_SCRIPTS].join(', ');
             log('WARN', `[ShellTools] run_npm_script bloqueado: script "${script}" não está na whitelist`);
@@ -265,7 +265,7 @@ const runNpmScriptTool = defineTool('run_npm_script', {
 /**
  * Tool: run_node_file — executa um arquivo JavaScript com Node.js.
  */
-const runNodeFileTool = defineTool('run_node_file', {
+const runNodeFileTool = createTool({ name: 'run_node_file',
     description:
         'Executa um arquivo JavaScript com Node.js no workspace. ' +
         'O arquivo deve estar dentro do workspace (/workspaces/). ' +
@@ -286,7 +286,7 @@ const runNodeFileTool = defineTool('run_node_file', {
                 .describe('Timeout em segundos (1-120). Default: 30.'),
         }),
     ),
-    handler: async ({ filePath, args = [], timeoutSeconds = 30 }) => {
+    handler: async (/** @type {{ filePath: string; args?: string[]; timeoutSeconds?: number }} */ { filePath, args = [], timeoutSeconds = 30 }) => {
         // Valida extensão
         if (!/\.(js|mjs|cjs)$/.test(filePath)) {
             return { success: false, error: 'Apenas arquivos .js, .mjs e .cjs são permitidos.' };

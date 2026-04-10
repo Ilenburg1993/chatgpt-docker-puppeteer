@@ -12,7 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { createRegistry } from '#copilot/sdk/index';
+import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
 

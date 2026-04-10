@@ -19,8 +19,8 @@ import {
     getCustomToolDefinitions,
     registerCustomTool,
     removeCustomTool,
-} from '#copilot/sdk/custom-tools';
-import { getToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';
+} from '#copilot/sdk';
+import { getToolsConfig, patchToolsConfig } from '#copilot/sdk';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

@@ -20,8 +20,8 @@ import {
     startSpan,
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { raceEvents } from '#copilot/sdk/event-helpers';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient } from '#copilot/sdk';
+import { raceEvents } from '#copilot/sdk';
 import { logSwallowed } from '../../core/error-handlers.js';
 
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
@@ -135,6 +135,7 @@ export async function agentStart(ctx, host) {
         ctx.agentObserver = bootResult.agentObserver;
         ctx.metricsTimer = bootResult.metricsTimer;
         ctx.mcpReconnectCancel = bootResult.mcpReconnectCancel;
+        ctx.quotaMonitor = bootResult.quotaMonitor ?? null;
 
         ctx.setStatus('idle', host);
         ctx.sendCount = readState()?.sendCount ?? 0;
@@ -233,6 +234,10 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
     if (ctx.mcpReconnectCancel) {
         ctx.mcpReconnectCancel();
         ctx.mcpReconnectCancel = null;
+    }
+    if (ctx.quotaMonitor) {
+        ctx.quotaMonitor.stop();
+        ctx.quotaMonitor = null;
     }
     ctx.keepalive.stop();
     defaultMetrics.stopPeriodicSnapshot();

@@ -11,15 +11,15 @@ import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config/env';
 import { getCompactionHistory } from '#copilot/observability/event-collector';
 import { log } from '#copilot/observability/logger';
 import {
+    approveAll,
     createClientSession as createSdkSession,
     disconnectClientSession as disconnectSdkSession,
     getClient,
     getClientSession as getSdkSession,
     listActiveClientSessions as listActiveSessions,
+    pickDefined,
     resumeClientSession as resumeSdkSession,
-} from '#copilot/sdk/client';
-import { pickDefined } from '#copilot/sdk/utils';
-import { approveAll } from '@github/copilot-sdk';
+} from '#copilot/sdk';
 import { Router } from 'express';
 import {
     CreateSessionBodySchema,

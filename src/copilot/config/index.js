@@ -42,11 +42,20 @@ export {
 
 export { PinnedFilesLoader } from './pinned-files.js';
 
+/**
+ * @deprecated Importe diretamente de `#copilot/sdk/custom-tools` ou `#copilot/sdk`. Re-exports mantidos por backward
+ *   compatibility.
+ */
 export {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
     loadCustomTools,
     registerCustomTool,
     removeCustomTool,
-} from '#copilot/sdk/custom-tools';
+} from '#copilot/sdk';
+
+/**
+ * @deprecated Importe diretamente de `#copilot/sdk/tools-state` ou `#copilot/sdk`. Re-exports mantidos por backward
+ *   compatibility.
+ */
 export { getToolsConfig, loadToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';

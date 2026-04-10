@@ -19,7 +19,7 @@
 /**
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
  */
-import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '@github/copilot-sdk';
+import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '#copilot/sdk';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de identidade e instruções do LLM-B

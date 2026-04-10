@@ -8,10 +8,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import {
-    getClientSession as getSdkSession,
-    incrementSessionMessageCount as incrementMessageCount,
-} from '#copilot/sdk/client';
+import { getClientSession as getSdkSession, incrementSessionMessageCount as incrementMessageCount } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';

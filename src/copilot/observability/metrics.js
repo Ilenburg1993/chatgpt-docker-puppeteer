@@ -51,6 +51,7 @@
  * @property {() => void} reset
  * @property {(intervalMs?: number, logDir?: string) => void} startPeriodicSnapshot
  * @property {() => void} stopPeriodicSnapshot
+ * @property {() => void} [recordQuotaPoll] - Registra uma sondagem de quota (opcional)
  */
 
 // ─── Helpers e Histogramas (de metrics-histogram.js) ──────────────────────────

@@ -8,7 +8,7 @@
  */
 
 import { TimeoutError } from '#copilot/core/errors';
-import { modelStatsTracker } from '#copilot/sdk/models/registry';
+import { modelStatsTracker } from '#copilot/sdk';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 

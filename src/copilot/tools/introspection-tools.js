@@ -13,7 +13,7 @@ import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilo
 import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
 import { getToolStats } from '#copilot/observability/tool-stats';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';
@@ -92,7 +92,7 @@ const CATEGORY_TOOL_MAP = Object.freeze({
 /**
  * Tool: list_tools — lista as ferramentas disponíveis na sessão.
  */
-const listToolsTool = defineTool('list_tools', {
+const listToolsTool = createTool({ name: 'list_tools',
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
         'Retorna nome, descrição e parâmetros de cada ferramenta.',
@@ -143,7 +143,7 @@ const listToolsTool = defineTool('list_tools', {
 /**
  * Tool: get_agent_info — retorna informações sobre a sessão e o agente atual.
  */
-const getAgentInfoTool = defineTool('get_agent_info', {
+const getAgentInfoTool = createTool({ name: 'get_agent_info',
     description:
         'Retorna informações sobre o agente atual: versão do SDK, modelo configurado, status da sessão, ' +
         'quantidade de tools registradas e variáveis de ambiente relevantes.',
@@ -182,7 +182,7 @@ const getAgentInfoTool = defineTool('get_agent_info', {
 /**
  * Tool: get_telemetry — retorna o sumário de telemetria de chamadas de ferramentas desta sessão.
  */
-const getTelemetryTool = defineTool('get_telemetry', {
+const getTelemetryTool = createTool({ name: 'get_telemetry',
     description:
         'Retorna o sumário de telemetria da sessão: total de chamadas, taxa de sucesso, tools mais usadas, ' +
         'chamadas recentes e sessões registradas.',
@@ -239,7 +239,7 @@ const getTelemetryTool = defineTool('get_telemetry', {
  * Tool: report_intent — registra em log a intenção da LLM antes de executar uma ação sensível. Análogo ao
  * `report_intent` built-in do GitHub Copilot CLI. Garante auditabilidade e rastreabilidade.
  */
-const reportIntentTool = defineTool('report_intent', {
+const reportIntentTool = createTool({ name: 'report_intent',
     description:
         'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
         'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
@@ -277,7 +277,7 @@ const reportIntentTool = defineTool('report_intent', {
  */
 const PROTECTED_TOOLS = new Set(['list_tools', 'get_agent_info', 'get_telemetry', 'report_intent', 'toggle_tool']);
 
-const toggleToolTool = defineTool('toggle_tool', {
+const toggleToolTool = createTool({ name: 'toggle_tool',
     description:
         'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
         'Use para restringir temporariamente o acesso a tools durante operações sensíveis. ' +
@@ -326,7 +326,7 @@ const toggleToolTool = defineTool('toggle_tool', {
  *
  * F7.3: introspecção por tool individual para diagnóstico de saúde.
  */
-const getToolHealthTool = defineTool('get_tool_health', {
+const getToolHealthTool = createTool({ name: 'get_tool_health',
     description:
         'Retorna métricas de saúde por ferramenta: total de chamadas, taxa de erro, latência média e última execução. ' +
         'Útil para identificar tools com alta taxa de falha ou lentidão. ' +

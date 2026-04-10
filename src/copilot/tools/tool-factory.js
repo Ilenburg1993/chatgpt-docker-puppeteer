@@ -65,7 +65,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { defineTool } from '@github/copilot-sdk';
+import { createTool } from '#copilot/sdk';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
@@ -141,7 +141,7 @@ export function buildTool({
         }
     );
 
-    return defineTool(name, {
+    return createTool({ name,
         description,
         ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
         handler: wrappedHandler,

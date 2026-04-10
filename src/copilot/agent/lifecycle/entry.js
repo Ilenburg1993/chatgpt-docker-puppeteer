@@ -17,7 +17,7 @@ import { withRetry } from '#copilot/core/retry';
 import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
 import { defaultErrorTracker } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient } from '#copilot/sdk';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
@@ -153,6 +153,23 @@ try {
         new Promise((_, reject) => setTimeout(() => reject(new TimeoutError('Ping timeout (5s)')), PING_TIMEOUT_MS)),
     ]);
     log('INFO', '[copilot/agent] CLI conectado — ping OK.');
+
+    // F113 (Faixa 24): Verificar autenticação no boot para falhar rápido antes de criar sessão.
+    try {
+        const { checkAuthStatus } = await import('#copilot/sdk');
+        const authStatus = await checkAuthStatus(pingClient);
+        if (!authStatus.authenticated) {
+            log(
+                'WARN',
+                '[copilot/agent] Usuário não autenticado no Copilot — sessão pode falhar. Verifique suas credenciais.',
+            );
+        } else {
+            log('INFO', '[copilot/agent] Autenticação Copilot OK.');
+        }
+    } catch (/** @type {any} */ authErr) {
+        log('DEBUG', `[copilot/agent] Verificação de auth ignorada: ${authErr?.message ?? authErr}`);
+    }
+
     // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
     pingClient.stop().catch((/** @type {any} */ e) => logSwallowed(e, 'agent.entry.pingStop'));
 } catch (/** @type {any} */ e) {
