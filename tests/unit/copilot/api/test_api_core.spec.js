@@ -2,11 +2,11 @@
 /**
  * tests/unit/copilot/api/test_api_core.spec.js
  *
- * Testes unitários para src/copilot/api — middleware + SSE replay buffer.
- * F236: testes para endpoints e infraestrutura API restante.
+ * Testes unitários para src/copilot/api — middleware + SSE replay buffer. F236: testes para endpoints e infraestrutura
+ * API restante.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── SSE Replay Buffer ─────────────────────────────────────────────────────
 

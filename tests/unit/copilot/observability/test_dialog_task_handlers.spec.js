@@ -13,6 +13,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock('#copilot/core/errors', () => ({
+    CopilotError: class CopilotError extends Error {
+        constructor(/** @type {string} */ msg, /** @type {any} */ opts = {}) {
+            super(msg);
+            this.name = 'CopilotError';
+            this.code = opts.code ?? 'UNKNOWN';
+        }
+    },
     TimeoutError: class TimeoutError extends Error {
         constructor(/** @type {string} */ msg) {
             super(msg);

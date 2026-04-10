@@ -49,7 +49,13 @@ vi.mock('node:child_process', () => ({
     },
 }));
 
-vi.mock('@github/copilot-sdk', () => ({
+vi.mock('#copilot/sdk', () => ({
+    createTool: vi.fn((config) => ({
+        name: config.name,
+        description: config.description,
+        handler: config.handler,
+        parameters: config.parameters,
+    })),
     defineTool: vi.fn((name, config) => ({
         name,
         description: config.description,

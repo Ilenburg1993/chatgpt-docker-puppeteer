@@ -166,6 +166,6 @@ describe('copilot/config/session-config.js — structural', () => {
     });
 
     it('deve importar approveAll do SDK', () => {
-        assert.ok(SRC.includes("from '@github/copilot-sdk'"));
+        assert.ok(SRC.includes("from '@github/copilot-sdk'") || SRC.includes("from '#copilot/sdk'"));
     });
 });

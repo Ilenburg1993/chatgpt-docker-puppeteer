@@ -29,6 +29,13 @@ vi.mock('#copilot/config/env', () => ({
 }));
 
 vi.mock('#copilot/core/errors', () => ({
+    CopilotError: class CopilotError extends Error {
+        constructor(/** @type {string} */ msg, /** @type {any} */ opts = {}) {
+            super(msg);
+            this.name = 'CopilotError';
+            this.code = opts.code ?? 'UNKNOWN';
+        }
+    },
     TimeoutError: class TimeoutError extends Error {
         constructor(/** @type {string} */ msg) {
             super(msg);
@@ -41,7 +48,12 @@ vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
 }));
 
-vi.mock('@github/copilot-sdk', () => ({
+vi.mock('#copilot/sdk', () => ({
+    createTool: vi.fn((config) => ({
+        name: config.name,
+        description: config.description,
+        handler: config.handler,
+    })),
     defineTool: vi.fn((name, config) => ({
         name,
         description: config.description,
