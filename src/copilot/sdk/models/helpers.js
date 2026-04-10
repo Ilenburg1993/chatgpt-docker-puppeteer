@@ -252,3 +252,103 @@ export function indexModelsById(models) {
 export function getContextWindowSize(models, modelId) {
     return getModelById(models, modelId)?.capabilities.limits.max_context_window_tokens;
 }
+
+// ─── Faixa 14: Capability helpers adicionais ──────────────────────────────────
+
+/**
+ * Verifica se um modelo suporta vision (imagens).
+ *
+ * @param {ModelInfo} model - modelo a verificar
+ * @returns {boolean}
+ */
+export function hasVision(model) {
+    if (!model || !model.capabilities) return false;
+    return model.capabilities.supports?.vision === true;
+}
+
+/**
+ * Retorna o max context window tokens de um modelo. Retorna `undefined` se capabilities nao disponivel.
+ *
+ * @param {ModelInfo} model - modelo a consultar
+ * @returns {number | undefined}
+ */
+export function getMaxContextTokens(model) {
+    if (!model || !model.capabilities) return undefined;
+    return model.capabilities.limits?.max_context_window_tokens;
+}
+
+/**
+ * Retorna o max prompt tokens de um modelo. Retorna `undefined` se nao disponivel.
+ *
+ * @param {ModelInfo} model - modelo a consultar
+ * @returns {number | undefined}
+ */
+export function getMaxPromptTokens(model) {
+    if (!model || !model.capabilities) return undefined;
+    return model.capabilities.limits?.max_prompt_tokens;
+}
+
+/**
+ * Verifica se um modelo esta habilitado pela policy. Retorna `true` se policy nao definida (assume enabled).
+ *
+ * @param {ModelInfo} model - modelo a verificar
+ * @returns {boolean}
+ */
+export function isModelEnabled(model) {
+    if (!model) return false;
+    if (!model.policy) return true;
+    return model.policy.state === 'enabled';
+}
+
+/**
+ * Retorna o billing multiplier de um modelo. Retorna `1` como default se billing nao disponivel.
+ *
+ * @param {ModelInfo} model - modelo a consultar
+ * @returns {number}
+ */
+export function getBillingMultiplier(model) {
+    if (!model || !model.billing) return 1;
+    return model.billing.multiplier;
+}
+
+/**
+ * Retorna os media types suportados para vision de um modelo. Retorna array vazio se vision nao suportado.
+ *
+ * @param {ModelInfo} model - modelo a consultar
+ * @returns {string[]}
+ */
+export function getVisionMediaTypes(model) {
+    if (!model || !model.capabilities) return [];
+    return model.capabilities.limits?.vision?.supported_media_types ?? [];
+}
+
+/**
+ * Retorna o default reasoning effort de um modelo. Retorna `undefined` se nao disponivel.
+ *
+ * @param {ModelInfo} model - modelo a consultar
+ * @returns {ReasoningEffort | undefined}
+ */
+export function getDefaultReasoningEffort(model) {
+    if (!model) return undefined;
+    return /** @type {ReasoningEffort | undefined} */ (model.defaultReasoningEffort);
+}
+
+/**
+ * Filtra modelos por capacidade.
+ *
+ * @param {ModelInfo[]} models - lista de modelos
+ * @param {object} filter - filtro de capacidades
+ * @param {boolean} [filter.vision] - filtrar por suporte a vision
+ * @param {boolean} [filter.reasoningEffort] - filtrar por suporte a reasoning effort
+ * @param {boolean} [filter.enabled] - filtrar por policy enabled
+ * @returns {ModelInfo[]}
+ */
+export function filterModels(models, filter) {
+    if (!Array.isArray(models)) return [];
+    return models.filter((m) => {
+        if (filter.vision !== undefined && hasVision(m) !== filter.vision) return false;
+        if (filter.reasoningEffort !== undefined && supportsReasoning(m) !== filter.reasoningEffort) return false;
+        if (filter.enabled !== undefined && isModelEnabled(m) !== filter.enabled) return false;
+        return true;
+    });
+}

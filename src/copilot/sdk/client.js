@@ -22,6 +22,9 @@ import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '@github/copilot-sdk';
 import { logSwallowed } from '../core/error-handlers.js';
 
+// Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
+export { CopilotClient };
+
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *

@@ -1,18 +1,15 @@
 // @ts-check
 import { ConfigError } from '#copilot/core/errors';
 /**
- * src/copilot/lib/tools-registry.js
+ * src/copilot/sdk/tools-registry.js
  *
- * Registry de Custom Tools para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
- * ferramentas por categoria, capacidade ou agente.
+ * @module copilot/sdk/tools-registry
+ * @deprecated Prefer sdk/tools.js + sdk/custom-tools.js. This module is retained for backward compatibility.
  *
- * Uso típico: import { createRegistry, registerTools, getToolsByCategory } from '#copilot/sdk/tools-registry'; const
- * reg = createRegistry(); registerTools(reg, codeTools, { category: 'code' }); const subset = getToolsByCategory(reg,
- * 'code');
- *
- * @module copilot/lib/tools-registry
- * @see module:copilot/tools
- * @see module:copilot/tools/tool-factory
+ *   Registry de Custom Tools para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
+ *   ferramentas por categoria, capacidade ou agente.
+ * @see module:copilot/sdk/tools
+ * @see module:copilot/sdk/custom-tools
  */
 
 /**

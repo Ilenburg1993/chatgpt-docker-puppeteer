@@ -1,15 +1,17 @@
 // @ts-check
 import { ConfigError } from '#copilot/core/errors';
+import { log as appLog } from '#copilot/observability/logger';
 /**
- * src/copilot/lib/agents.js
+ * src/copilot/sdk/agents.js
  *
- * Factory lib para construção de CustomAgentConfig do Copilot SDK. CustomAgents são configurações de agentes
- * especializados registrados em uma sessão SDK que podem usar subconjuntos de ferramentas e prompts customizados.
+ * Factory lib para construcao de CustomAgentConfig do Copilot SDK + funcoes RPC de runtime para listagem,
+ * selecao/deselecao e reload de agents em sessao ativa.
  *
- * Uso típico: import { createAgent, createReadOnlyAgent } from '#copilot/sdk/agents'; const session = await
- * client.createSession({ customAgents: [createReadOnlyAgent('auditor', 'Analisa código sem modificar')] });
+ * Uso tipico: import { createAgent, createReadOnlyAgent, listAgents } from '#copilot/sdk/agents'; const session = await
+ * client.createSession({ customAgents: [createReadOnlyAgent('auditor', 'Analisa codigo')] }); const { agents } = await
+ * listAgents(session);
  *
- * @module copilot/lib/agents
+ * @module copilot/sdk/agents
  */
 
 /**
@@ -172,4 +174,94 @@ export function isValidAgentName(name) {
  */
 export function filterInferableAgents(agents) {
     return agents.filter((a) => a.infer !== false);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Faixa 15 - Agent Runtime Management (RPC)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ */
+
+/**
+ * @typedef {{ name: string; displayName: string; description: string }} AgentInfo
+ */
+
+/**
+ * Valida sessao para chamadas RPC de agent.
+ *
+ * @param {unknown} session
+ * @param {string} caller
+ * @returns {asserts session is CopilotSession}
+ */
+function assertAgentSession(session, caller) {
+    if (!session || typeof session !== 'object' || !('rpc' in session)) {
+        throw new TypeError(`[sdk/agents/${caller}] Sessao invalida ou sem RPC disponivel.`);
+    }
+}
+
+/**
+ * Lista todos os agents customizados disponiveis na sessao.
+ *
+ * @param {CopilotSession} session - Sessao ativa com RPC
+ * @returns {Promise<{ agents: AgentInfo[] }>} Lista de agents
+ */
+export async function listAgents(session) {
+    assertAgentSession(session, 'listAgents');
+    appLog('DEBUG', `[sdk/agents] listAgents: sessionId='${session.sessionId}'`);
+    return session.rpc.agent.list();
+}
+
+/**
+ * Retorna o agent customizado atualmente selecionado, ou null se usando agent padrao.
+ *
+ * @param {CopilotSession} session - Sessao ativa com RPC
+ * @returns {Promise<{ agent: AgentInfo | null }>} Agent atual ou null
+ */
+export async function getCurrentAgent(session) {
+    assertAgentSession(session, 'getCurrentAgent');
+    appLog('DEBUG', `[sdk/agents] getCurrentAgent: sessionId='${session.sessionId}'`);
+    return session.rpc.agent.getCurrent();
+}
+
+/**
+ * Seleciona um agent customizado na sessao pelo nome.
+ *
+ * @param {CopilotSession} session - Sessao ativa com RPC
+ * @param {string} name - Nome unico do agent a selecionar
+ * @returns {Promise<{ agent: AgentInfo }>} Agent selecionado
+ * @throws {TypeError} Se name nao for string nao-vazia
+ */
+export async function selectAgent(session, name) {
+    assertAgentSession(session, 'selectAgent');
+    if (typeof name !== 'string' || name.length === 0) {
+        throw new TypeError('[sdk/agents/selectAgent] name deve ser string nao-vazia.');
+    }
+    appLog('INFO', `[sdk/agents] selectAgent: name='${name}', sessionId='${session.sessionId}'`);
+    return session.rpc.agent.select({ name });
+}
+
+/**
+ * Remove selecao de agent customizado, revertendo para o agent padrao.
+ *
+ * @param {CopilotSession} session - Sessao ativa com RPC
+ * @returns {Promise<{}>} Resultado vazio (deselect nao retorna dados)
+ */
+export async function deselectAgent(session) {
+    assertAgentSession(session, 'deselectAgent');
+    appLog('INFO', `[sdk/agents] deselectAgent: sessionId='${session.sessionId}'`);
+    return session.rpc.agent.deselect();
+}
+
+/**
+ * Recarrega a lista de agents customizados da sessao.
+ *
+ * @param {CopilotSession} session - Sessao ativa com RPC
+ * @returns {Promise<{ agents: AgentInfo[] }>} Lista atualizada de agents
+ */
+export async function reloadAgents(session) {
+    assertAgentSession(session, 'reloadAgents');
+    appLog('INFO', `[sdk/agents] reloadAgents: sessionId='${session.sessionId}'`);
+    return session.rpc.agent.reload();
 }

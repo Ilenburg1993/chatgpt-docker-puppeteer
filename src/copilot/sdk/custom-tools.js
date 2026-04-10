@@ -136,7 +136,8 @@ let _registry = new Map();
  * @deprecated F92: Use loadCustomToolsAsync() em fluxos assíncronos.
  * @returns {void}
  */
-export function loadCustomTools() { // FS-SYNC: init-time-safe (deprecated sync fallback)
+export function loadCustomTools() {
+    // FS-SYNC: init-time-safe (deprecated sync fallback)
     if (!existsSync(CUSTOM_TOOLS_PATH)) return;
     try {
         const raw = readFileSync(CUSTOM_TOOLS_PATH, 'utf8');
@@ -173,7 +174,8 @@ export function loadCustomTools() { // FS-SYNC: init-time-safe (deprecated sync 
  * @deprecated F92: Use persistCustomToolsAsync() em fluxos assíncronos.
  * @returns {void}
  */
-function persistCustomTools() { // FS-SYNC: init-time-safe (deprecated sync fallback)
+function persistCustomTools() {
+    // FS-SYNC: init-time-safe (deprecated sync fallback)
     try {
         // C12-04: write atômico — escreve em tmpfile e faz rename para evitar JSON corrompido em crash
         const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
