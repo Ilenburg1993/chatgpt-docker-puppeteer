@@ -34,8 +34,8 @@ import {
     dialogStart,
     dialogStop,
 } from './dialog/agent-dialog-controller.js';
-import { executeTask } from './infra/task-executor.js';
 import { readState } from './lifecycle/state-io.js';
+import { processQueue } from './queue-processor.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
 // F36: Lifecycle — start, stop, initSession, tryReconnect
@@ -515,47 +515,12 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * @param {AgentStatus} status
-     */
-    #setStatus(status) {
-        this.ctx.setStatus(status, this);
-    }
-
-    /**
      * Processa a próxima tarefa da fila (se idle e sessão ativa).
      *
      * @returns {void}
      */
     #processQueue() {
-        // G1-ARCH-03: bloqueia processamento durante reconexão ativa
-        if (
-            this.ctx.isReconnecting ||
-            this.ctx.status !== 'idle' ||
-            this.ctx.messageQueue.size === 0 ||
-            !this.ctx.session
-        )
-            return;
-        const session = this.ctx.session;
-
-        const task = this.ctx.messageQueue.shift();
-        if (!task) return;
-
-        this.#setStatus('processing');
-        this.emit('task.started', { taskId: task.id });
-
-        log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
-        this.ctx.sendCount++;
-        // F42.2: registrar atividade para reset do timer de idle do keepalive
-        this.ctx.keepalive.ping();
-
-        void executeTask(session, task, {
-            onDelta: (chunk, taskId) => this.emit('task.delta', { taskId, chunk }),
-            setStatus: (s) => this.#setStatus(s),
-            emit: (event, payload) => this.emit(event, payload),
-            tryReconnect: (e) => this.#tryReconnect(e),
-            requeueTask: (t) => this.ctx.messageQueue.unshift(t),
-            scheduleNext: () => this.#processQueue(),
-        });
+        processQueue(this.ctx, this, { tryReconnect: (e) => this.#tryReconnect(e) });
     }
 
     /**
