@@ -11,10 +11,6 @@ const TEST_SNAPSHOT_DIR = join(import.meta.dirname, '.tmp-test-snapshots');
 // Setar env antes do import
 process.env['AGENT_SNAPSHOT_DIR'] = TEST_SNAPSHOT_DIR;
 
-// Stub state-io readState — retorna null por default
-/** @type {() => null} */
-const _readStateStub = () => null;
-
 describe('session-snapshot', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/snapshot.js')} */
     let mod;
@@ -79,8 +75,8 @@ describe('session-snapshot', async () => {
         });
     });
 
-    describe('saveSnapshot() + loadSnapshot()', () => {
-        it('salva e carrega snapshot por ID', () => {
+    describe('saveSnapshotAsync() + loadSnapshotAsync()', () => {
+        it('salva e carrega snapshot por ID', async () => {
             const snap = mod.createSnapshot({
                 sessionId: 'sess-abc',
                 model: 'gpt-4.1',
@@ -91,23 +87,23 @@ describe('session-snapshot', async () => {
                 pendingQuestion: null,
             });
 
-            const path = mod.saveSnapshot(snap);
+            const path = await mod.saveSnapshotAsync(snap);
             assert.ok(existsSync(path));
 
-            const loaded = mod.loadSnapshot(snap.snapshotId);
+            const loaded = await mod.loadSnapshotAsync(snap.snapshotId);
             assert.ok(loaded);
             assert.equal(loaded.snapshotId, snap.snapshotId);
             assert.equal(loaded.sessionId, 'sess-abc');
         });
 
-        it('retorna null para snapshot inexistente', () => {
-            const loaded = mod.loadSnapshot('nonexistent-id');
+        it('retorna null para snapshot inexistente', async () => {
+            const loaded = await mod.loadSnapshotAsync('nonexistent-id');
             assert.equal(loaded, null);
         });
     });
 
-    describe('listSnapshots()', () => {
-        it('lista snapshots ordenados do mais recente', () => {
+    describe('listSnapshotsAsync()', () => {
+        it('lista snapshots ordenados do mais recente', async () => {
             const s1 = mod.createSnapshot({
                 sessionId: '1',
                 model: 'a',
@@ -118,7 +114,7 @@ describe('session-snapshot', async () => {
                 pendingQuestion: null,
             });
             s1.createdAt = 1000;
-            mod.saveSnapshot(s1);
+            await mod.saveSnapshotAsync(s1);
 
             const s2 = mod.createSnapshot({
                 sessionId: '2',
@@ -130,23 +126,23 @@ describe('session-snapshot', async () => {
                 pendingQuestion: null,
             });
             s2.createdAt = 2000;
-            mod.saveSnapshot(s2);
+            await mod.saveSnapshotAsync(s2);
 
-            const list = mod.listSnapshots();
+            const list = await mod.listSnapshotsAsync();
             assert.equal(list.length, 2);
             assert.equal(list[0].createdAt, 2000);
             assert.equal(list[1].createdAt, 1000);
         });
 
-        it('retorna array vazio se diretório não existe', () => {
+        it('retorna array vazio se diretório não existe', async () => {
             // Não criar o diretório
-            const list = mod.listSnapshots();
+            const list = await mod.listSnapshotsAsync();
             assert.deepEqual(list, []);
         });
     });
 
-    describe('loadLatestSnapshot()', () => {
-        it('carrega o snapshot mais recente', () => {
+    describe('loadLatestSnapshotAsync()', () => {
+        it('carrega o snapshot mais recente', async () => {
             const s1 = mod.createSnapshot({
                 sessionId: 'old',
                 model: 'a',
@@ -157,7 +153,7 @@ describe('session-snapshot', async () => {
                 pendingQuestion: null,
             });
             s1.createdAt = 1000;
-            mod.saveSnapshot(s1);
+            await mod.saveSnapshotAsync(s1);
 
             const s2 = mod.createSnapshot({
                 sessionId: 'new',
@@ -169,20 +165,20 @@ describe('session-snapshot', async () => {
                 pendingQuestion: null,
             });
             s2.createdAt = 2000;
-            mod.saveSnapshot(s2);
+            await mod.saveSnapshotAsync(s2);
 
-            const latest = mod.loadLatestSnapshot();
+            const latest = await mod.loadLatestSnapshotAsync();
             assert.ok(latest);
             assert.equal(latest.sessionId, 'new');
         });
 
-        it('retorna null sem snapshots', () => {
-            assert.equal(mod.loadLatestSnapshot(), null);
+        it('retorna null sem snapshots', async () => {
+            assert.equal(await mod.loadLatestSnapshotAsync(), null);
         });
     });
 
-    describe('pruneSnapshots()', () => {
-        it('remove snapshots antigos mantendo keep', () => {
+    describe('pruneSnapshotsAsync()', () => {
+        it('remove snapshots antigos mantendo keep', async () => {
             // Criar 5 snapshots
             for (let i = 0; i < 5; i++) {
                 const s = mod.createSnapshot({
@@ -195,18 +191,18 @@ describe('session-snapshot', async () => {
                     pendingQuestion: null,
                 });
                 s.createdAt = 1000 + i;
-                mod.saveSnapshot(s);
+                await mod.saveSnapshotAsync(s);
             }
 
-            assert.equal(mod.listSnapshots().length, 5);
+            assert.equal((await mod.listSnapshotsAsync()).length, 5);
 
             // Prunar mantendo 2
-            const removed = mod.pruneSnapshots(2);
+            const removed = await mod.pruneSnapshotsAsync(2);
             assert.equal(removed, 3);
-            assert.equal(mod.listSnapshots().length, 2);
+            assert.equal((await mod.listSnapshotsAsync()).length, 2);
         });
 
-        it('não remove nada se count <= keep', () => {
+        it('não remove nada se count <= keep', async () => {
             const s = mod.createSnapshot({
                 sessionId: 's1',
                 model: 'a',
@@ -216,9 +212,9 @@ describe('session-snapshot', async () => {
                 dialogPaused: false,
                 pendingQuestion: null,
             });
-            mod.saveSnapshot(s);
+            await mod.saveSnapshotAsync(s);
 
-            const removed = mod.pruneSnapshots(5);
+            const removed = await mod.pruneSnapshotsAsync(5);
             assert.equal(removed, 0);
         });
     });

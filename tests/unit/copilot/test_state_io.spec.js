@@ -7,13 +7,14 @@
  * Cobre:
  *
  * - G2-TEST-14: writeStateAsync() com escritas concorrentes (mutex serial)
- * - G2-DX-15: readState() valida JSON — rejeita arrays e primitivos
- * - clearState() invalida cache
- * - writeState() síncrono persiste e atualiza cache
+ * - G2-DX-15: readStateAsync() valida JSON — rejeita arrays e primitivos
+ * - clearStateAsync() invalida cache
+ * - writeStateAsync() persiste e atualiza cache
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
@@ -22,7 +23,9 @@ const TEST_STATE_FILE = join(TEST_STATE_DIR, 'test-state.json');
 process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
 
 // Importar após definir env
-const { readState, writeState, writeStateAsync, clearState } = await import('#copilot/agent/lifecycle/state-io');
+const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync } = await import(
+    '#copilot/agent/lifecycle/state-io'
+);
 
 describe('state-io', () => {
     beforeAll(() => {
@@ -37,39 +40,44 @@ describe('state-io', () => {
     });
 
     // ---------------------------------------------------------------------------
-    // readState() básico
+    // readState() / readStateAsync() básico
     // ---------------------------------------------------------------------------
     describe('readState()', () => {
-        it('retorna null quando arquivo não existe', () => {
+        it('retorna null quando arquivo não existe', async () => {
             clearState();
+            await clearStateAsync();
             if (existsSync(TEST_STATE_FILE)) rmSync(TEST_STATE_FILE);
             const result = readState();
             assert.equal(result, null);
         });
 
-        it('G2-DX-15: rejeita array como estado inválido', () => {
+        it('G2-DX-15: rejeita array como estado inválido', async () => {
             clearState();
-            writeFileSync(TEST_STATE_FILE, JSON.stringify([1, 2, 3]), 'utf8');
-            const result = readState();
+            await clearStateAsync();
+            await writeFile(TEST_STATE_FILE, JSON.stringify([1, 2, 3]), 'utf8');
+            const result = await readStateAsync();
             assert.equal(result, null, 'array não é um estado válido');
         });
 
-        it('G2-DX-15: rejeita null literal como estado inválido', () => {
+        it('G2-DX-15: rejeita null literal como estado inválido', async () => {
             clearState();
-            writeFileSync(TEST_STATE_FILE, 'null', 'utf8');
-            const result = readState();
+            await clearStateAsync();
+            await writeFile(TEST_STATE_FILE, 'null', 'utf8');
+            const result = await readStateAsync();
             assert.equal(result, null, 'null literal não é estado válido');
         });
 
-        it('G2-DX-15: rejeita primitivo (string) como estado inválido', () => {
+        it('G2-DX-15: rejeita primitivo (string) como estado inválido', async () => {
             clearState();
-            writeFileSync(TEST_STATE_FILE, '"hello"', 'utf8');
-            const result = readState();
+            await clearStateAsync();
+            await writeFile(TEST_STATE_FILE, '"hello"', 'utf8');
+            const result = await readStateAsync();
             assert.equal(result, null, 'string não é estado válido');
         });
 
-        it('retorna estado válido quando arquivo contém objeto', () => {
+        it('retorna estado válido quando arquivo contém objeto', async () => {
             clearState();
+            await clearStateAsync();
             const state = {
                 sessionId: 's-1',
                 startedAt: 100,
@@ -79,20 +87,21 @@ describe('state-io', () => {
                 model: 'gpt-4.1',
                 pendingQuestion: null,
             };
-            writeFileSync(TEST_STATE_FILE, JSON.stringify(state), 'utf8');
-            const result = readState();
+            await writeFile(TEST_STATE_FILE, JSON.stringify(state), 'utf8');
+            const result = await readStateAsync();
             assert.equal(result?.sendCount, 5);
             assert.equal(result?.sessionId, 's-1');
         });
     });
 
     // ---------------------------------------------------------------------------
-    // writeState() síncrono
+    // writeStateAsync()
     // ---------------------------------------------------------------------------
     describe('writeState()', () => {
-        it('persiste e atualiza cache', () => {
+        it('persiste e atualiza cache', async () => {
             clearState();
-            const result = writeState({ sendCount: 42 });
+            await clearStateAsync();
+            const result = await writeStateAsync({ sendCount: 42 });
             assert.equal(result.sendCount, 42);
             // Cache deve estar populado
             const cached = readState();
@@ -106,7 +115,7 @@ describe('state-io', () => {
     describe('writeStateAsync() concorrente (G2-TEST-14)', () => {
         it('escritas concorrentes são serializadas — resultado final reflete última escrita', async () => {
             clearState();
-            writeState({
+            await writeStateAsync({
                 sendCount: 0,
                 sessionId: 'mutex-test',
                 startedAt: 1,
@@ -137,7 +146,7 @@ describe('state-io', () => {
 
         it('escritas concorrentes não corrompem o arquivo', async () => {
             clearState();
-            writeState({
+            await writeStateAsync({
                 sendCount: 0,
                 sessionId: 'corruption-test',
                 startedAt: 1,
@@ -165,10 +174,10 @@ describe('state-io', () => {
     // clearState()
     // ---------------------------------------------------------------------------
     describe('clearState()', () => {
-        it('remove arquivo e invalida cache', () => {
-            writeState({ sendCount: 99 });
+        it('remove arquivo e invalida cache', async () => {
+            await writeStateAsync({ sendCount: 99 });
             assert.ok(existsSync(TEST_STATE_FILE));
-            clearState();
+            await clearStateAsync();
             assert.ok(!existsSync(TEST_STATE_FILE), 'arquivo deve ter sido removido');
             assert.equal(readState(), null, 'cache deve estar invalidado');
         });

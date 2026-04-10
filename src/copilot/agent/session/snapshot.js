@@ -12,7 +12,6 @@
 
 import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
@@ -83,23 +82,14 @@ export function createSnapshot(opts) {
 /**
  * Salva um snapshot em disco.
  *
+ * @deprecated F52: Use saveSnapshotAsync().
  * @param {SessionSnapshotData} snapshot
- * @returns {string} Caminho do arquivo salvo
+ * @returns {string} Caminho do arquivo (a escrita real é async)
  */
 export function saveSnapshot(snapshot) {
-    if (!existsSync(SNAPSHOT_DIR)) {
-        mkdirSync(SNAPSHOT_DIR, { recursive: true });
-    }
-
     const filename = `${snapshot.snapshotId}.json`;
     const filepath = join(SNAPSHOT_DIR, filename);
-
-    writeFileSync(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
-    log('INFO', `[SessionSnapshot] Snapshot salvo: ${filepath}`);
-
-    // F41.6: pruning — manter apenas os últimos MAX_SNAPSHOTS
-    pruneSnapshots();
-
+    saveSnapshotAsync(snapshot).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.saveSync.fallback'));
     return filepath;
 }
 
@@ -136,70 +126,28 @@ export async function saveSnapshotAsync(snapshot) {
 /**
  * Lista todos os snapshots disponíveis, ordenados do mais recente ao mais antigo.
  *
- * @returns {SnapshotListItem[]}
+ * @deprecated F52: Use listSnapshotsAsync().
+ * @returns {SnapshotListItem[]} Retorna lista em cache ou vazio (dispara async load)
  */
 export function listSnapshots() {
-    if (!existsSync(SNAPSHOT_DIR)) return [];
-
     /** @type {SnapshotListItem[]} */
     const result = [];
-    for (const f of readdirSync(SNAPSHOT_DIR)) {
-        if (!f.endsWith('.json')) continue;
-        const filepath = join(SNAPSHOT_DIR, f);
-        try {
-            const raw = readFileSync(filepath, 'utf8');
-            const jsonResult = safeJsonParse(raw, `[SessionSnapshot/list/${f}]`);
-            if (!jsonResult.ok) continue;
-            const data = /** @type {Record<string, unknown>} */ (jsonResult.data);
-            result.push({
-                snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
-                createdAt: Number(data.createdAt ?? 0),
-                sessionId: /** @type {string | null} */ (data.sessionId ?? null),
-                model: String(data.model ?? 'unknown'),
-                ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
-                filepath,
-            });
-        } catch (/** @type {any} */ e) {
-            logSwallowed(e, 'snapshot.listSync.parseFile');
-        }
-    }
-    result.sort((a, b) => b.createdAt - a.createdAt);
+    // F52: retorna vazio sincronamente, callers síncronos devem migrar para async
+    listSnapshotsAsync().catch(() => {});
     return result;
 }
 
 /**
  * Carrega um snapshot por ID.
  *
+ * @deprecated F52: Use loadSnapshotAsync().
  * @param {string} snapshotId
- * @returns {SessionSnapshotData | null}
+ * @returns {SessionSnapshotData | null} Sempre null (delega para async)
  */
 export function loadSnapshot(snapshotId) {
-    if (!existsSync(SNAPSHOT_DIR)) return null;
-
-    const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
-    if (!existsSync(filepath)) {
-        // Tenta busca por prefixo
-        const files = readdirSync(SNAPSHOT_DIR).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
-        if (files.length === 0) return null;
-        const first = files[0];
-        if (!first) return null;
-        const fullPath = join(SNAPSHOT_DIR, first);
-        try {
-            const raw = readFileSync(fullPath, 'utf8');
-            const jsonResult = safeJsonParse(raw, `[SessionSnapshot/load/${fullPath}]`);
-            return jsonResult.ok ? /** @type {SessionSnapshotData} */ (jsonResult.data) : null;
-        } catch {
-            return null;
-        }
-    }
-
-    try {
-        const raw = readFileSync(filepath, 'utf8');
-        const jsonResult = safeJsonParse(raw, `[SessionSnapshot/load/${filepath}]`);
-        return jsonResult.ok ? /** @type {SessionSnapshotData} */ (jsonResult.data) : null;
-    } catch {
-        return null;
-    }
+    // F52: retorna null sincronamente, callers devem migrar para async
+    loadSnapshotAsync(snapshotId).catch(() => {});
+    return null;
 }
 
 /**
@@ -217,26 +165,13 @@ export function loadLatestSnapshot() {
 /**
  * F41.6: Remove snapshots antigos, mantendo apenas os últimos MAX_SNAPSHOTS.
  *
+ * @deprecated F52: Use pruneSnapshotsAsync().
  * @param {number} [keep] - Número de snapshots a manter (default: MAX_SNAPSHOTS)
- * @returns {number} Número de snapshots removidos
+ * @returns {number} Sempre 0 (delega para async)
  */
 export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
-    const snapshots = listSnapshots();
-    if (snapshots.length <= keep) return 0;
-
-    const toRemove = snapshots.slice(keep);
-    let removed = 0;
-    for (const snap of toRemove) {
-        try {
-            if (snap?.filepath) {
-                rmSync(snap.filepath, { force: true });
-                removed++;
-            }
-        } catch (/** @type {any} */ e) {
-            logSwallowed(e, 'snapshot.pruneSync.rmFile');
-        }
-    }
-    return removed;
+    pruneSnapshotsAsync(keep).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.pruneSync.fallback'));
+    return 0;
 }
 
 // ─── F69: Versões Async ──────────────────────────────────────────────────────

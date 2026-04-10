@@ -15,7 +15,6 @@
 
 import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
@@ -86,68 +85,37 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
 /**
  * Lê o estado persistido do agente da sessão em disco.
  *
- * Retorna o cache in-process quando disponível, evitando I/O síncrono no hot path.
+ * Retorna o cache in-process quando disponível. Se o cache estiver frio, dispara
+ * readStateAsync() internamente e retorna null (o cache será populado para a próxima chamada).
  *
- * @deprecated F91: Use readStateAsync() em vez desta versão síncrona. readState() será mantida para callers em getters
- *   síncronos que não podem ser migrados facilmente.
- * @example
- *     const state = readState();
- *     if (state) console.log(state.sessionId);
- *
- * @returns {AliveAgentState | null} Estado persistido ou null se o arquivo não existir
+ * @deprecated F91/F52: Use readStateAsync() em vez desta versão síncrona.
+ * @returns {AliveAgentState | null} Estado em cache ou null se indisponível
  */
 export function readState() {
     if (_stateCache !== null) return _stateCache;
-    if (!existsSync(STATE_FILE)) return null;
-    try {
-        const raw = readFileSync(STATE_FILE, 'utf8');
-        const result = safeJsonParse(raw, '[PersistentSession/readState]');
-        const parsed = result.ok ? result.data : null;
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            log('WARN', '[PersistentSession] Estado inválido (não é objeto) — ignorando ficheiro.');
-            return null;
-        }
-        _stateCache = /** @type {AliveAgentState} */ (parsed);
-        return _stateCache;
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
-        try {
-            rmSync(STATE_FILE, { force: true });
-        } catch (/** @type {any} */ e) {
-            logSwallowed(e, 'stateIo.readState.rmCorrupt');
-        }
-        return null;
-    }
+    // F52: em vez de readFileSync, dispara async load e retorna null
+    readStateAsync().catch(() => {});
+    return null;
 }
 
 /**
- * Persiste o estado da sessão em disco (síncrono).
+ * Persiste o estado da sessão em disco (shim síncrono).
  *
- * Atualiza `_stateCache` e reseta `_writeQueue` após a escrita para garantir consistência entre o path síncrono e o
- * mutex serial de `writeStateAsync`. Chamar `writeState()` enquanto há escritas async pendentes na fila as descarta — o
- * arquivo em disco já contém o estado mais recente após retorno desta função.
+ * F52: Delega para writeStateAsync internamente. Atualiza _stateCache imediatamente
+ * para manter consistência síncrona, mas a escrita real em disco é async.
  *
- * Preferir `writeStateAsync` em fluxos assíncronos para não bloquear o event loop.
- *
- * @deprecated F69: Use writeStateAsync() em vez desta versão síncrona. Será removida em versão futura.
- * @example
- *     writeState({ sessionId: 'abc-123', lastActive: Date.now() });
- *
- * @param {Partial<AliveAgentState>} updates - Campos a atualizar no estado atual
- * @returns {AliveAgentState} Estado completo após a atualização
+ * @deprecated F69/F52: Use writeStateAsync().
+ * @param {Partial<AliveAgentState>} updates - Campos a atualizar
+ * @returns {AliveAgentState} Estado completo após a atualização (do cache)
  */
 export function writeState(updates) {
-    if (!_stateDirReady) {
-        mkdirSync(STATE_DIR, { recursive: true });
-        _stateDirReady = true;
-    }
-    const current = readState() ?? _defaultState();
+    const current = _stateCache ?? _defaultState();
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
-    writeFileSync(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
     _stateCache = next;
-    // RACE-AGENT-003 fix: resetar o mutex para que escritas async subsequentes partam do
-    // estado que acabou de ser commitado em disco, e não de uma snapshot anterior.
-    _writeQueue = Promise.resolve(next);
+    // Dispara escrita async via mutex serial
+    writeStateAsync(updates).catch((/** @type {any} */ e) =>
+        logSwallowed(e, 'stateIo.writeState.asyncFallback'),
+    );
     return next;
 }
 
@@ -193,22 +161,16 @@ async function _doWriteState(updates) {
 }
 
 /**
- * Remove o estado persistido e invalida o cache. Força uma nova sessão SDK na próxima inicialização.
+ * Remove o estado persistido e invalida o cache.
  *
- * @deprecated F91: Use clearStateAsync() em vez desta versão síncrona.
- * @example
- *     clearState(); // remove state.json e força nova sessão
- *
+ * @deprecated F91/F52: Use clearStateAsync().
  * @returns {void}
  */
 export function clearState() {
-    if (existsSync(STATE_FILE)) {
-        rmSync(STATE_FILE);
-        log('INFO', '[PersistentSession] Estado removido — próxima inicialização criará nova sessão.');
-    }
     _stateCache = null;
     _stateDirReady = false;
     _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+    clearStateAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }
 
 /**
