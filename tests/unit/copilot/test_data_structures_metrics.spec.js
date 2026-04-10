@@ -2,11 +2,12 @@
 /**
  * @file Faixa 45 — Data structures & metrics: histogram, ring-buffer, known-models, stats-tracker
  *
- * Cobre módulos de lógica pura verdadeiramente sem cobertura:
- * - observability/metrics-histogram.js (157L) — percentile() + createHistogram()
- * - audit/ring-buffer.js (79L) — AuditRingBuffer
- * - sdk/models/known-models.js (130L) — KNOWN_MODELS catalog + COST/SPEED tiers
- * - sdk/models/stats-tracker.js (125L) — ModelStatsTracker
+ *   Cobre módulos de lógica pura verdadeiramente sem cobertura:
+ *
+ *   - observability/metrics-histogram.js (157L) — percentile() + createHistogram()
+ *   - audit/ring-buffer.js (79L) — AuditRingBuffer
+ *   - sdk/models/known-models.js (130L) — KNOWN_MODELS catalog + COST/SPEED tiers
+ *   - sdk/models/stats-tracker.js (125L) — ModelStatsTracker
  */
 
 import { describe, expect, it } from 'vitest';

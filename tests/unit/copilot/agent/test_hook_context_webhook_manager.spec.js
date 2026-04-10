@@ -2,13 +2,14 @@
 /**
  * @file Faixa 44 — Agent: hook-context + WebhookManager + mode-and-tools
  *
- * Cobre módulos verdadeiramente sem cobertura:
- * - agent/session/hook-context.js (216L) — buildHookSystemContext, SessionJsonSchema, buildHookSystemContextSafe
- * - agent/infra/webhook-manager.js (233L) — WebhookManager CRUD + sanitize + retry
- * - agent/session/event-handlers/mode-and-tools.js (21L) — wireModeAndToolEvents
+ *   Cobre módulos verdadeiramente sem cobertura:
+ *
+ *   - agent/session/hook-context.js (216L) — buildHookSystemContext, SessionJsonSchema, buildHookSystemContextSafe
+ *   - agent/infra/webhook-manager.js (233L) — WebhookManager CRUD + sanitize + retry
+ *   - agent/session/event-handlers/mode-and-tools.js (21L) — wireModeAndToolEvents
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -17,10 +18,16 @@ const mocks = vi.hoisted(() => ({
     logSwallowed: vi.fn(),
     validateWebhookUrl: vi.fn(),
     checkResolvedIp: vi.fn(),
-    defaultMetrics: { getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })) },
+    defaultMetrics: {
+        getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })),
+    },
     readTodoStore: vi.fn(async () => ({ tasks: {} })),
     safeJsonParse: vi.fn((/** @type {string} */ raw) => {
-        try { return { ok: true, data: JSON.parse(raw) }; } catch { return { ok: false, data: null }; }
+        try {
+            return { ok: true, data: JSON.parse(raw) };
+        } catch {
+            return { ok: false, data: null };
+        }
     }),
     fsAccess: vi.fn(),
     fsStat: vi.fn(),
@@ -31,14 +38,21 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#copilot/observability/logger', () => ({ log: mocks.log }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
-vi.mock('#copilot/config/env', () => new Proxy({
-    WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
-    CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
-    MAX_WEBHOOKS: 50,
-    WEBHOOK_MAX_RETRIES: 2,
-    WEBHOOK_TIMEOUT_MS: 5000,
-    AGENT_HOOK_CONTEXT_MAX_BYTES: 8192,
-}, { get: (t, p) => p in t ? t[p] : typeof p === 'string' ? 0 : undefined, has: () => true }));
+vi.mock(
+    '#copilot/config/env',
+    () =>
+        new Proxy(
+            {
+                WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
+                CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
+                MAX_WEBHOOKS: 50,
+                WEBHOOK_MAX_RETRIES: 2,
+                WEBHOOK_TIMEOUT_MS: 5000,
+                AGENT_HOOK_CONTEXT_MAX_BYTES: 8192,
+            },
+            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? 0 : undefined), has: () => true },
+        ),
+);
 vi.mock('#copilot/observability/metrics', () => ({ defaultMetrics: mocks.defaultMetrics }));
 vi.mock('#copilot/tools/todo/store', () => ({ readStore: mocks.readTodoStore }));
 
@@ -69,7 +83,10 @@ function createMockSession() {
             const arr = listeners.get(event) || [];
             arr.push(handler);
             listeners.set(event, arr);
-            return () => { const i = arr.indexOf(handler); if (i >= 0) arr.splice(i, 1); };
+            return () => {
+                const i = arr.indexOf(handler);
+                if (i >= 0) arr.splice(i, 1);
+            };
         },
         /** @param {string} event @param {object} [data] */
         _emit(event, data) {
@@ -135,7 +152,9 @@ describe('F44 — buildHookSystemContext', () => {
 
     it('retorna string vazia quando todos os arquivos estão indisponíveis (graceful degradation)', async () => {
         const { buildHookSystemContext } = await import('#copilot/agent/session/hook-context');
-        mocks.defaultMetrics.getSummary.mockImplementation(() => { throw new Error('no metrics'); });
+        mocks.defaultMetrics.getSummary.mockImplementation(() => {
+            throw new Error('no metrics');
+        });
         const result = await buildHookSystemContext();
         expect(typeof result).toBe('string');
     });
@@ -267,7 +286,9 @@ describe('F44 — WebhookManager', () => {
         });
 
         it('register propaga erro de validateWebhookUrl', () => {
-            mocks.validateWebhookUrl.mockImplementation(() => { throw new Error('invalid'); });
+            mocks.validateWebhookUrl.mockImplementation(() => {
+                throw new Error('invalid');
+            });
             expect(() => wm.register('not-a-url')).toThrow('invalid');
         });
 
@@ -347,7 +368,8 @@ describe('F44 — WebhookManager', () => {
         it('emit() entrega com retry em 5xx', async () => {
             wm.register('https://example.com/hook');
             mocks.checkResolvedIp.mockResolvedValue(undefined);
-            const fetchSpy = vi.spyOn(globalThis, 'fetch')
+            const fetchSpy = vi
+                .spyOn(globalThis, 'fetch')
                 .mockResolvedValueOnce(new Response('error', { status: 500 }))
                 .mockResolvedValueOnce(new Response('ok', { status: 200 }));
             await wm.emit('test.event', { a: 1 });
@@ -358,7 +380,8 @@ describe('F44 — WebhookManager', () => {
         it('emit() não retria em 4xx (erro permanente)', async () => {
             wm.register('https://example.com/hook');
             mocks.checkResolvedIp.mockResolvedValue(undefined);
-            const fetchSpy = vi.spyOn(globalThis, 'fetch')
+            const fetchSpy = vi
+                .spyOn(globalThis, 'fetch')
                 .mockResolvedValue(new Response('bad request', { status: 400 }));
             await wm.emit('test.event', { a: 1 });
             expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -373,9 +396,7 @@ describe('F44 — WebhookManager', () => {
 
 describe('F44 — wireModeAndToolEvents', () => {
     it('retorna array com 1 unsubscribe function', async () => {
-        const { wireModeAndToolEvents } = await import(
-            '#copilot/agent/session/event-handlers/mode-and-tools'
-        );
+        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireModeAndToolEvents(/** @type {any} */ (session), { emit });
@@ -384,23 +405,22 @@ describe('F44 — wireModeAndToolEvents', () => {
     });
 
     it('emite session.mode_changed com previousMode/newMode', async () => {
-        const { wireModeAndToolEvents } = await import(
-            '#copilot/agent/session/event-handlers/mode-and-tools'
-        );
+        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         wireModeAndToolEvents(/** @type {any} */ (session), { emit });
         session._emit('session.mode_changed', { previousMode: 'agent', newMode: 'edit' });
-        expect(emit).toHaveBeenCalledWith('session.mode_changed', expect.objectContaining({
-            previousMode: 'agent',
-            newMode: 'edit',
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.mode_changed',
+            expect.objectContaining({
+                previousMode: 'agent',
+                newMode: 'edit',
+            }),
+        );
     });
 
     it('loga mudança de modo com INFO', async () => {
-        const { wireModeAndToolEvents } = await import(
-            '#copilot/agent/session/event-handlers/mode-and-tools'
-        );
+        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();

@@ -7,6 +7,7 @@
  * @module copilot/observability/collectors/interaction-handlers
  */
 
+import { SESSION_EVENTS as SE } from '#copilot/sdk';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -24,14 +25,14 @@ export function attachInteractionHandlers(ctx) {
 
     // ── permission.requested / completed ─────────────────────────────────
     unsubs.push(
-        session.on('permission.requested', (event) => {
+        session.on(SE.PERMISSION_REQUESTED, (event) => {
             if (persist && persistSet.has('permission.requested')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }
         }),
     );
     unsubs.push(
-        session.on('permission.completed', (event) => {
+        session.on(SE.PERMISSION_COMPLETED, (event) => {
             if (persist && persistSet.has('permission.completed')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }
@@ -40,52 +41,52 @@ export function attachInteractionHandlers(ctx) {
 
     // ── hook.start / hook.end ─────────────────────────────────────────────
     unsubs.push(
-        session.on('hook.start', (event) => {
+        session.on(SE.HOOK_START, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
     unsubs.push(
-        session.on('hook.end', (event) => {
+        session.on(SE.HOOK_END, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
 
     // ── skill.invoked ─────────────────────────────────────────────────────
     unsubs.push(
-        session.on('skill.invoked', (event) => {
+        session.on(SE.SKILL_INVOKED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
 
     // ── subagent.started / completed / failed / deselected / selected ────
     unsubs.push(
-        session.on('subagent.started', (event) => {
+        session.on(SE.SUBAGENT_STARTED, (event) => {
             metrics?.recordCounter('subagent.started');
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('DEBUG', `[event-collector] subagent.started session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('subagent.completed', (event) => {
+        session.on(SE.SUBAGENT_COMPLETED, (event) => {
             metrics?.recordCounter('subagent.completed');
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
     unsubs.push(
-        session.on('subagent.failed', (event) => {
+        session.on(SE.SUBAGENT_FAILED, (event) => {
             metrics?.recordCounter('subagent.failed');
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('WARN', `[event-collector] subagent.failed session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('subagent.deselected', (event) => {
+        session.on(SE.SUBAGENT_DESELECTED, (event) => {
             metrics?.recordCounter('subagent.deselected');
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
     unsubs.push(
-        session.on('subagent.selected', (event) => {
+        session.on(SE.SUBAGENT_SELECTED, (event) => {
             metrics?.recordCounter('subagent.selected');
             if (persist && persistSet.has('subagent.selected')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
@@ -95,7 +96,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── elicitation.requested / completed ────────────────────────────────
     unsubs.push(
-        session.on('elicitation.requested', (event) => {
+        session.on(SE.ELICITATION_REQUESTED, (event) => {
             metrics?.recordCounter('elicitation.requested');
             if (persist && persistSet.has('elicitation.requested')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
@@ -104,7 +105,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('elicitation.completed', (event) => {
+        session.on(SE.ELICITATION_COMPLETED, (event) => {
             metrics?.recordCounter('elicitation.completed');
             if (persist && persistSet.has('elicitation.completed')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
@@ -114,7 +115,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── user_input.requested / completed ────────────────────────────────
     unsubs.push(
-        session.on('user_input.requested', (event) => {
+        session.on(SE.USER_INPUT_REQUESTED, (event) => {
             metrics?.recordCounter('user_input.requested');
             if (persist && persistSet.has('user_input.requested')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
@@ -122,7 +123,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('user_input.completed', (event) => {
+        session.on(SE.USER_INPUT_COMPLETED, (event) => {
             metrics?.recordCounter('user_input.completed');
             if (persist && persistSet.has('user_input.completed')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
@@ -132,7 +133,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── mcp.oauth_required / oauth_completed ─────────────────────────────
     unsubs.push(
-        session.on('mcp.oauth_required', (event) => {
+        session.on(SE.MCP_OAUTH_REQUIRED, (event) => {
             const { serverName } = event.data;
             metrics?.recordCounter('mcp.oauth_required');
             if (persist && persistSet.has('mcp.oauth_required')) {
@@ -142,7 +143,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('mcp.oauth_completed', (event) => {
+        session.on(SE.MCP_OAUTH_COMPLETED, (event) => {
             const { requestId } = event.data;
             metrics?.recordCounter('mcp.oauth_completed');
             if (persist && persistSet.has('mcp.oauth_completed')) {
@@ -153,7 +154,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── external_tool.requested / completed ──────────────────────────────
     unsubs.push(
-        session.on('external_tool.requested', (event) => {
+        session.on(SE.EXTERNAL_TOOL_REQUESTED, (event) => {
             const { requestId, toolName, traceparent, tracestate } = event.data;
             metrics?.recordCounter('external_tool.requested');
             if (persist && persistSet.has('external_tool.requested')) {
@@ -172,7 +173,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('external_tool.completed', (event) => {
+        session.on(SE.EXTERNAL_TOOL_COMPLETED, (event) => {
             const { requestId } = event.data;
             const extra = /** @type {{ toolName?: string; durationMs?: number }} */ (
                 /** @type {unknown} */ (event.data)
@@ -199,7 +200,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── command.execute / queued / completed ─────────────────────────────
     unsubs.push(
-        session.on('command.execute', (event) => {
+        session.on(SE.COMMAND_EXECUTE, (event) => {
             const { commandName, args } = event.data;
             metrics?.recordCounter(`command.execute.${commandName ?? 'unknown'}`);
             if (persist && persistSet.has('command.execute')) {
@@ -209,7 +210,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('command.queued', (event) => {
+        session.on(SE.COMMAND_QUEUED, (event) => {
             const { requestId } = event.data;
             metrics?.recordCounter('command.queued');
             if (persist && persistSet.has('command.queued')) {
@@ -219,7 +220,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('command.completed', (event) => {
+        session.on(SE.COMMAND_COMPLETED, (event) => {
             const { requestId } = event.data;
             metrics?.recordCounter('command.completed');
             if (persist && persistSet.has('command.completed')) {
@@ -231,7 +232,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── commands.changed ─────────────────────────────────────────────────
     unsubs.push(
-        session.on('commands.changed', (event) => {
+        session.on(SE.COMMANDS_CHANGED, (event) => {
             const { commands } = event.data;
             const count = Array.isArray(commands) ? commands.length : 0;
             metrics?.recordCounter('commands.changed');
@@ -241,7 +242,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── exit_plan_mode.requested / completed ─────────────────────────────
     unsubs.push(
-        session.on('exit_plan_mode.requested', (event) => {
+        session.on(SE.EXIT_PLAN_MODE_REQUESTED, (event) => {
             const { summary, actions, recommendedAction } = event.data;
             metrics?.recordCounter('exit_plan_mode.requested');
             if (persist && persistSet.has('exit_plan_mode.requested')) {
@@ -261,7 +262,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('exit_plan_mode.completed', (event) => {
+        session.on(SE.EXIT_PLAN_MODE_COMPLETED, (event) => {
             const { requestId } = event.data;
             metrics?.recordCounter('exit_plan_mode.completed');
             if (persist && persistSet.has('exit_plan_mode.completed')) {
@@ -273,7 +274,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── system.message / notification ────────────────────────────────────
     unsubs.push(
-        session.on('system.message', (event) => {
+        session.on(SE.SYSTEM_MESSAGE, (event) => {
             const { role, metadata } = event.data;
             const promptVersion = metadata?.promptVersion;
             metrics?.recordCounter('system.message');
@@ -284,7 +285,7 @@ export function attachInteractionHandlers(ctx) {
         }),
     );
     unsubs.push(
-        session.on('system.notification', (event) => {
+        session.on(SE.SYSTEM_NOTIFICATION, (event) => {
             const { kind } = event.data;
             metrics?.recordCounter(`system.notification.${kind.type}`);
             if (kind.type === 'agent_completed') {
@@ -305,7 +306,7 @@ export function attachInteractionHandlers(ctx) {
 
     // ── pending_messages.modified ─────────────────────────────────────────
     unsubs.push(
-        session.on('pending_messages.modified', () => {
+        session.on(SE.PENDING_MESSAGES_MODIFIED, () => {
             metrics?.recordCounter('pending_messages.modified');
         }),
     );

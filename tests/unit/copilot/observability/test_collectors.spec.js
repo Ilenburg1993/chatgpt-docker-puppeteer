@@ -2,11 +2,11 @@
 /**
  * @file Faixa 48 — observability/collectors: tool-handlers, assistant-handlers, interaction-handlers
  *
- * Testa os 3 módulos de event collectors que registram handlers em sessões SDK.
- * Usa mock de CollectorContext para validar wiring sem deps reais.
+ *   Testa os 3 módulos de event collectors que registram handlers em sessões SDK. Usa mock de CollectorContext para
+ *   validar wiring sem deps reais.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,10 @@ vi.mock('#copilot/observability/logger', () => ({
 
 /**
  * Cria um context mock mínimo para os collectors.
- * @returns {import('#copilot/observability/collectors/context').CollectorContext & { _emit: (event: string, data: any) => void }}
+ *
+ * @returns {import('#copilot/observability/collectors/context').CollectorContext & {
+ *     _emit: (event: string, data: any) => void;
+ * }}
  */
 function createMockContext() {
     /** @type {Map<string, Function[]>} */
@@ -49,9 +52,14 @@ function createMockContext() {
         hookBus: { emitHook: vi.fn() },
         persist: true,
         persistSet: new Set([
-            'tool.execution_start', 'tool.execution_complete', 'tool.user_requested',
-            'assistant.usage', 'permission.requested', 'permission.completed',
-            'subagent.selected', 'elicitation.requested',
+            'tool.execution_start',
+            'tool.execution_complete',
+            'tool.user_requested',
+            'assistant.usage',
+            'permission.requested',
+            'permission.completed',
+            'subagent.selected',
+            'elicitation.requested',
         ]),
         persistEvent: vi.fn(),
         pending: new Map(),

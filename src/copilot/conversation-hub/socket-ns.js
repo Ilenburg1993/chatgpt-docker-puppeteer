@@ -16,6 +16,7 @@ import { log } from '#copilot/observability/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { HUB_EVENTS } from './events.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ function _setupAuthMiddleware(ns) {
  * @returns {void}
  */
 function _setupConnectionHandlers(ns, orchestrator, store, checkRate) {
-    ns.on('connection', (/** @type {SocketClient} */ socket) => {
+    ns.on(HUB_EVENTS.CONNECTION, (/** @type {SocketClient} */ socket) => {
         const clientId = socket.id;
         const clientIp = socket.handshake.address ?? 'unknown';
         log('DEBUG', `[socket-ns/copilot] Cliente conectado: ${clientId}`);
@@ -180,7 +181,7 @@ function _setupConnectionHandlers(ns, orchestrator, store, checkRate) {
         _handleSessionsList(socket, store);
         _handleTurnsHistory(socket, store);
 
-        socket.on('disconnect', () => {
+        socket.on(HUB_EVENTS.DISCONNECT, () => {
             log('DEBUG', `[socket-ns/copilot] Cliente desconectado: ${clientId}`);
         });
     });
@@ -192,7 +193,7 @@ function _setupConnectionHandlers(ns, orchestrator, store, checkRate) {
  * @param {string} clientId
  */
 function _handleJoinSession(socket, store, clientId) {
-    socket.on('join:session', (/** @type {{ hubSession: string }} */ data) => {
+    socket.on(HUB_EVENTS.JOIN_SESSION, (/** @type {{ hubSession: string }} */ data) => {
         if (!data?.hubSession) return;
         // SEC-05 (fix): verificar que a sessão existe antes de entrar na sala
         const sessionExists = store.getHubSession(data.hubSession);
@@ -201,12 +202,12 @@ function _handleJoinSession(socket, store, clientId) {
                 'WARN',
                 `[socket-ns/copilot] join:session negado — sessão '${data.hubSession}' não existe (clientId=${clientId})`,
             );
-            socket.emit('error:join', { hubSession: data.hubSession, reason: 'session_not_found' });
+            socket.emit(HUB_EVENTS.ERROR_JOIN, { hubSession: data.hubSession, reason: 'session_not_found' });
             return;
         }
         void socket.join(data.hubSession);
         log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
-        socket.emit('joined:session', { hubSession: data.hubSession });
+        socket.emit(HUB_EVENTS.JOINED_SESSION, { hubSession: data.hubSession });
     });
 }
 
@@ -215,7 +216,7 @@ function _handleJoinSession(socket, store, clientId) {
  * @param {string} clientId
  */
 function _handleLeaveSession(socket, clientId) {
-    socket.on('leave:session', (/** @type {{ hubSession: string }} */ data) => {
+    socket.on(HUB_EVENTS.LEAVE_SESSION, (/** @type {{ hubSession: string }} */ data) => {
         if (!data?.hubSession) return;
         void socket.leave(data.hubSession);
         log('DEBUG', `[socket-ns/copilot] Cliente ${clientId} saiu da sala: ${data.hubSession}`);
@@ -232,14 +233,14 @@ function _handleLeaveSession(socket, clientId) {
  */
 function _handleUserInject(socket, orchestrator, store, clientId, clientIp, checkRate) {
     // BUG-CRIT-02 fix: handler assíncrono para await injectUserMessage
-    socket.on('user:inject', async (/** @type {{ hubSession: string; content: string }} */ data) => {
+    socket.on(HUB_EVENTS.USER_INJECT, async (/** @type {{ hubSession: string; content: string }} */ data) => {
         if (!data?.hubSession || !data?.content) {
-            socket.emit('error:inject', { reason: 'hubSession e content são obrigatórios.' });
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'hubSession e content são obrigatórios.' });
             return;
         }
         // SEC-N04 + SEC-P2-06: rate limit por socket e por IP
         if (!checkRate(clientId, clientIp)) {
-            socket.emit('error:inject', { reason: 'Rate limit excedido. Tente novamente em breve.' });
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'Rate limit excedido. Tente novamente em breve.' });
             log('WARN', `[socket-ns/copilot] Rate limit atingido pelo socket ${clientId}`);
             return;
         }
@@ -254,7 +255,7 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
         try {
             const session = store.getHubSession(data.hubSession);
             if (!session || session.status !== 'active') {
-                socket.emit('error:inject', { reason: `Sessão ${data.hubSession} não está ativa.` });
+                socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: `Sessão ${data.hubSession} não está ativa.` });
                 return;
             }
             const turnId = await orchestrator.injectUserMessage(data.hubSession, safeContent, {
@@ -265,10 +266,10 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
                     socketId: clientId,
                 },
             });
-            socket.emit('inject:ack', { hubSession: data.hubSession, turnId });
+            socket.emit(HUB_EVENTS.INJECT_ACK, { hubSession: data.hubSession, turnId });
             log('INFO', `[socket-ns/copilot] Mensagem injetada pelo usuário na sessão ${data.hubSession}.`);
         } catch (/** @type {any} */ err) {
-            socket.emit('error:inject', { reason: err.message ?? String(err) });
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: err.message ?? String(err) });
             log('ERROR', `[socket-ns/copilot] Erro ao injetar mensagem: ${err.message ?? String(err)}`);
         }
     });
@@ -279,13 +280,13 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
  * @param {import('./store.js').ConversationStore} store
  */
 function _handleSessionsList(socket, store) {
-    socket.on('sessions:list', (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
+    socket.on(HUB_EVENTS.SESSIONS_LIST, (/** @type {{ limit?: number; offset?: number; status?: string }} */ opts) => {
         try {
             // FINDING-P4-2: validar status para evitar valores arbitrários no banco
             const VALID_STATUS = new Set(['active', 'closed', 'error']);
             const rawStatus = opts?.status;
             if (rawStatus !== undefined && !VALID_STATUS.has(rawStatus)) {
-                socket.emit('error:sessions', { reason: `status inválido: "${rawStatus}"` });
+                socket.emit(HUB_EVENTS.ERROR_SESSIONS, { reason: `status inválido: "${rawStatus}"` });
                 return;
             }
             const statusVal = /** @type {import('./store-helpers.js').HubSessionStatus | undefined} */ (rawStatus);
@@ -302,9 +303,9 @@ function _handleSessionsList(socket, store) {
                 created_at: s.created_at,
                 updated_at: s.updated_at,
             }));
-            socket.emit('sessions:list:result', { sessions: publicSessions });
+            socket.emit(HUB_EVENTS.SESSIONS_LIST_RESULT, { sessions: publicSessions });
         } catch (/** @type {any} */ err) {
-            socket.emit('error:sessions', { reason: err.message });
+            socket.emit(HUB_EVENTS.ERROR_SESSIONS, { reason: err.message });
         }
     });
 }
@@ -315,12 +316,12 @@ function _handleSessionsList(socket, store) {
  */
 function _handleTurnsHistory(socket, store) {
     socket.on(
-        'turns:history',
+        HUB_EVENTS.TURNS_HISTORY,
         (/** @type {{ hubSession: string; limit?: number; offset?: number; after?: number }} */ data) => {
             if (!data?.hubSession) return;
             // C11-01: verificar que o socket está na room da sessão antes de retornar histórico
             if (!socket.rooms.has(data.hubSession)) {
-                socket.emit('error:history', { reason: 'not_in_session: execute join:session primeiro.' });
+                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: 'not_in_session: execute join:session primeiro.' });
                 return;
             }
             try {
@@ -329,9 +330,9 @@ function _handleTurnsHistory(socket, store) {
                     offset: data.offset ?? 0,
                     ...(data.after !== undefined && { after: data.after }),
                 });
-                socket.emit('turns:history:result', { hubSession: data.hubSession, turns });
+                socket.emit(HUB_EVENTS.TURNS_HISTORY_RESULT, { hubSession: data.hubSession, turns });
             } catch (/** @type {any} */ err) {
-                socket.emit('error:history', { reason: err.message });
+                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: err.message });
             }
         },
     );
@@ -345,29 +346,32 @@ function _handleTurnsHistory(socket, store) {
  * @returns {void}
  */
 function _bridgeOrchestratorEvents(ns, orchestrator) {
-    orchestrator.on('session:created', (/** @type {{ hubSessionId: string; title: string }} */ data) => {
-        ns.emit('session:created', data);
+    orchestrator.on(HUB_EVENTS.SESSION_CREATED, (/** @type {{ hubSessionId: string; title: string }} */ data) => {
+        ns.emit(HUB_EVENTS.SESSION_CREATED, data);
     });
 
-    orchestrator.on('session:closed', (/** @type {{ hubSessionId: string }} */ data) => {
-        ns.to(data.hubSessionId).emit('session:closed', data);
+    orchestrator.on(HUB_EVENTS.SESSION_CLOSED, (/** @type {{ hubSessionId: string }} */ data) => {
+        ns.to(data.hubSessionId).emit(HUB_EVENTS.SESSION_CLOSED, data);
     });
 
     orchestrator.on(
-        'turn:sent',
+        HUB_EVENTS.TURN_SENT,
         (
             /** @type {{ hubSessionId: string; turnId: number; role: string; content: string; turnNumber: number }} */ data,
         ) => {
-            ns.to(data.hubSessionId).emit('turn:sent', data);
+            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_SENT, data);
         },
     );
 
-    orchestrator.on('turn:delta', (/** @type {{ hubSessionId: string; chunk: string; turnNumber: number }} */ data) => {
-        ns.to(data.hubSessionId).emit('turn:delta', data);
-    });
+    orchestrator.on(
+        HUB_EVENTS.TURN_DELTA,
+        (/** @type {{ hubSessionId: string; chunk: string; turnNumber: number }} */ data) => {
+            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_DELTA, data);
+        },
+    );
 
     orchestrator.on(
-        'turn:complete',
+        HUB_EVENTS.TURN_COMPLETE,
         (
             /**
              * @type {{
@@ -381,19 +385,19 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
              * }}
              */ data,
         ) => {
-            ns.to(data.hubSessionId).emit('turn:complete', data);
+            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_COMPLETE, data);
         },
     );
 
     orchestrator.on(
-        'user:injected',
+        HUB_EVENTS.USER_INJECTED,
         (/** @type {{ hubSessionId: string; turnId: number; content: string }} */ data) => {
-            ns.to(data.hubSessionId).emit('user:injected', data);
+            ns.to(data.hubSessionId).emit(HUB_EVENTS.USER_INJECTED, data);
         },
     );
 
     orchestrator.on('error', (/** @type {{ hubSessionId: string; message: string; error: Error }} */ data) => {
-        ns.to(data.hubSessionId).emit('hub:error', {
+        ns.to(data.hubSessionId).emit(HUB_EVENTS.HUB_ERROR, {
             hubSessionId: data.hubSessionId,
             message: data.message,
         });

@@ -10,6 +10,7 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
+import { HUB_EVENTS } from './events.js';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike
@@ -44,7 +45,8 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
     const onDelta = (/** @type {{ chunk: string }} */ evt) => {
         const chunk = evt?.chunk ?? '';
-        if (chunk) ctx.emit('turn:delta', { hubSessionId: ctx.hubSessionId, chunk, turnNumber: ctx.turnNumber + 1 });
+        if (chunk)
+            ctx.emit(HUB_EVENTS.TURN_DELTA, { hubSessionId: ctx.hubSessionId, chunk, turnNumber: ctx.turnNumber + 1 });
     };
     agent.on?.('task.delta', onDelta);
     try {
@@ -69,7 +71,7 @@ export async function callViaStructured(bridge, message, ctx) {
         {
             onDelta: (chunk) => {
                 accumulated += chunk;
-                ctx.emit('turn:delta', {
+                ctx.emit(HUB_EVENTS.TURN_DELTA, {
                     hubSessionId: ctx.hubSessionId,
                     chunk,
                     turnNumber: ctx.turnNumber + 1,
@@ -101,7 +103,7 @@ export async function callViaSimpleChat(bridge, messageContent, ctx) {
     );
     const result = await bridge.chat(messageContent, {
         onDelta: (chunk) => {
-            ctx.emit('turn:delta', {
+            ctx.emit(HUB_EVENTS.TURN_DELTA, {
                 hubSessionId: ctx.hubSessionId,
                 chunk,
                 turnNumber: ctx.turnNumber + 1,

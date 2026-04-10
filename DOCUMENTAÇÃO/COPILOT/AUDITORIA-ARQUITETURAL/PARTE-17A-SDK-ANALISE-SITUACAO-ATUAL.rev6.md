@@ -12,14 +12,14 @@
 
 A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 faixas, 164 testes novos):
 
-| Métrica                      |            Rev.5 |           Rev.6 |         Δ |
-| ---------------------------- | ---------------: | --------------: | --------: |
-| Testes passando              |    **3.266** (✓) |  **4.496** (✓)  | **+1.230**|
-| Specs em `copilot/`          |        **178**   |      **186**    |    **+8** |
-| Testes novos (F43-F50)       |              —   |      **164**    |  **+164** |
-| Typecheck errors             |          **0**   |        **0**    |     — (0) |
-| Test files passed            |             —    |      **353**    |         — |
-| Suite total (passando+skip)  |             —    |   **4.496+53**  |         — |
+| Métrica                     |         Rev.5 |         Rev.6 |          Δ |
+| --------------------------- | ------------: | ------------: | ---------: |
+| Testes passando             | **3.266** (✓) | **4.496** (✓) | **+1.230** |
+| Specs em `copilot/`         |       **178** |       **186** |     **+8** |
+| Testes novos (F43-F50)      |             — |       **164** |   **+164** |
+| Typecheck errors            |         **0** |         **0** |      — (0) |
+| Test files passed           |             — |       **353** |          — |
+| Suite total (passando+skip) |             — |  **4.496+53** |          — |
 
 > **Nota**: O delta total de +1.230 testes inclui contribuições de outros specs criados entre rev.5
 > e rev.6 (faixas de SDK, agent e infra fora do escopo deste roadmap). Os 164 testes são
@@ -40,21 +40,21 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 ## §1. Estado de Cobertura por Módulo (atualizado pós-F50)
 
-| Módulo                   | Arquivos |  Linhas | # Specs | # Testes (est.) | Δ vs rev.5 |
-| ------------------------ | -------: | ------: | ------: | ---------------: | ---------: |
-| `sdk/`                   |       32 |  ~6.679 |      40 |          ~1.071  |          — |
-| `tools/`                 |      ~40 |  ~6.195 |      10 |            ~213  |       +13  |
-| `terminal/`              |      ~50 |  ~5.000 |      10 |            ~150  |          — |
-| `agent/`                 |       52 | ~10.200 |      16 |            ~303  |       +53  |
-| `observability/`         |       21 |  ~4.458 |       7 |            ~111  |       +31  |
-| `hooks/`                 |       19 |  ~3.499 |       1 |             ~20  |          — |
-| `api/`                   |       21 |  ~3.233 |       4 |             ~91  |       +21  |
-| `conversation-hub/`      |       10 |  ~2.487 |       6 |            ~100  |          — |
-| `bridges/`               |       10 |  ~2.183 |       4 |             ~60  |          — |
-| `channel/`               |        7 |  ~1.497 |       1 |             ~19  |          — |
-| `config/`                |        6 |  ~1.415 |       1 |             ~17  |       +17  |
-| `core/`                  |       14 |  ~1.715 |      10 |            ~179  |       +29  |
-| `audit/`                 |        4 |    ~721 |       1 |             ~10  |          — |
+| Módulo              | Arquivos |  Linhas | # Specs | # Testes (est.) | Δ vs rev.5 |
+| ------------------- | -------: | ------: | ------: | --------------: | ---------: |
+| `sdk/`              |       32 |  ~6.679 |      40 |          ~1.071 |          — |
+| `tools/`            |      ~40 |  ~6.195 |      10 |            ~213 |        +13 |
+| `terminal/`         |      ~50 |  ~5.000 |      10 |            ~150 |          — |
+| `agent/`            |       52 | ~10.200 |      16 |            ~303 |        +53 |
+| `observability/`    |       21 |  ~4.458 |       7 |            ~111 |        +31 |
+| `hooks/`            |       19 |  ~3.499 |       1 |             ~20 |          — |
+| `api/`              |       21 |  ~3.233 |       4 |             ~91 |        +21 |
+| `conversation-hub/` |       10 |  ~2.487 |       6 |            ~100 |          — |
+| `bridges/`          |       10 |  ~2.183 |       4 |             ~60 |          — |
+| `channel/`          |        7 |  ~1.497 |       1 |             ~19 |          — |
+| `config/`           |        6 |  ~1.415 |       1 |             ~17 |        +17 |
+| `core/`             |       14 |  ~1.715 |      10 |            ~179 |        +29 |
+| `audit/`            |        4 |    ~721 |       1 |             ~10 |          — |
 
 ### Arquivos sem testes diretos remanescentes (categorias)
 
@@ -81,24 +81,24 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 ## §2. Histórico Completo de Faixas (35-50)
 
-| Faixa | Descrição                                    | Testes | Commit       | Grupo |
-| ----: | -------------------------------------------- | -----: | ------------ | ----- |
-|    35 | Write-tools test suite                       |     36 | `aeb3ae93`   | C     |
-|    36 | Session-tools + shell expanded               |     49 | `e707a747`   | C     |
-|    37 | API Session CRUD + Messaging                 |     26 | `bb72c3b3`   | C     |
-|    38 | API Observability routes                     |     24 | `e66ebcdf`   | C     |
-|    39 | SDK custom-tools registry                    |     28 | `b1eb8a84`   | D     |
-|    40 | Channel module coverage                      |     19 | `d26ae91f`   | D     |
-|    41 | RPC facade edge cases + error propagation    |     31 | `16d75b25`   | D     |
-|    42 | Typecheck hardening (33 → 0 erros)           |      — | `a41a287f`   | D     |
-|    43 | Event handlers + history-sync                |     25 | `913a4a83`   | E     |
-|    44 | Hook-context + WebhookManager                |     28 | `d6740eaa`   | E     |
-|    45 | Data structures & metrics                    |     29 | `c1ddf309`   | E     |
-|    46 | Code-tools + permission-tools + rate-limiter |     13 | `b5e2abaf`   | F     |
-|    47 | Custom-agents registry + SDK integration     |     17 | `2eb7f8dd`   | F     |
-|    48 | Observability collectors (tool/asst/intx)    |     18 | `e554769e`   | G     |
-|    49 | Error-alerting + JSONL writer                |     13 | `c0cadad4`   | G     |
-|    50 | API session-middleware + EventFanout          |     21 | `866c67db`   | H     |
+| Faixa | Descrição                                    | Testes | Commit     | Grupo |
+| ----: | -------------------------------------------- | -----: | ---------- | ----- |
+|    35 | Write-tools test suite                       |     36 | `aeb3ae93` | C     |
+|    36 | Session-tools + shell expanded               |     49 | `e707a747` | C     |
+|    37 | API Session CRUD + Messaging                 |     26 | `bb72c3b3` | C     |
+|    38 | API Observability routes                     |     24 | `e66ebcdf` | C     |
+|    39 | SDK custom-tools registry                    |     28 | `b1eb8a84` | D     |
+|    40 | Channel module coverage                      |     19 | `d26ae91f` | D     |
+|    41 | RPC facade edge cases + error propagation    |     31 | `16d75b25` | D     |
+|    42 | Typecheck hardening (33 → 0 erros)           |      — | `a41a287f` | D     |
+|    43 | Event handlers + history-sync                |     25 | `913a4a83` | E     |
+|    44 | Hook-context + WebhookManager                |     28 | `d6740eaa` | E     |
+|    45 | Data structures & metrics                    |     29 | `c1ddf309` | E     |
+|    46 | Code-tools + permission-tools + rate-limiter |     13 | `b5e2abaf` | F     |
+|    47 | Custom-agents registry + SDK integration     |     17 | `2eb7f8dd` | F     |
+|    48 | Observability collectors (tool/asst/intx)    |     18 | `e554769e` | G     |
+|    49 | Error-alerting + JSONL writer                |     13 | `c0cadad4` | G     |
+|    50 | API session-middleware + EventFanout         |     21 | `866c67db` | H     |
 
 **Total Faixas 35-50**: 377 testes + typecheck hardening
 
@@ -108,15 +108,15 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 ### 3.1 Métricas-chave pós-F50
 
-| Indicador                          |     Valor |
-| ---------------------------------- | --------: |
-| Suite total (pass)                 |   4.496   |
-| Suite total (pass+skip)            |   4.549   |
-| Test files passed                  |       353 |
-| Test files skipped                 |        34 |
-| Typecheck errors                   |         0 |
-| Pre-commit hook: lint errors       | 5 (pré-existentes, não bloqueiam) |
-| Pre-commit hook: format warnings   | 19+ em DOCUMENTAÇÃO/ (não bloqueiam) |
+| Indicador                        |                                Valor |
+| -------------------------------- | -----------------------------------: |
+| Suite total (pass)               |                                4.496 |
+| Suite total (pass+skip)          |                                4.549 |
+| Test files passed                |                                  353 |
+| Test files skipped               |                                   34 |
+| Typecheck errors                 |                                    0 |
+| Pre-commit hook: lint errors     |    5 (pré-existentes, não bloqueiam) |
+| Pre-commit hook: format warnings | 19+ em DOCUMENTAÇÃO/ (não bloqueiam) |
 
 ### 3.2 Áreas cobertas vs não-cobertas (estimativa)
 

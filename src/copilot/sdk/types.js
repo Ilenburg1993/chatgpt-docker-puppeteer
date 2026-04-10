@@ -153,7 +153,11 @@
 /**
  * Pedido de input interativo do usuário (elicitation).
  *
- * @typedef {{ title?: string; message?: string; fields: Array<{ id: string; label: string; type?: string; required?: boolean; default?: string }> }} UserInputRequest
+ * @typedef {{
+ *     title?: string;
+ *     message?: string;
+ *     fields: { id: string; label: string; type?: string; required?: boolean; default?: string }[];
+ * }} UserInputRequest
  */
 
 /**
@@ -229,7 +233,14 @@
 /**
  * Configuração de hooks de sessão (preToolUse, postToolUse, sessionStart, sessionEnd, etc.).
  *
- * @typedef {{ preToolUse?: PreToolUseHandler; postToolUse?: PostToolUseHandler; userPromptSubmitted?: UserPromptSubmittedHandler; sessionStart?: SessionStartHandler; sessionEnd?: SessionEndHandler; errorOccurred?: ErrorOccurredHandler }} SessionHooks
+ * @typedef {{
+ *     preToolUse?: PreToolUseHandler;
+ *     postToolUse?: PostToolUseHandler;
+ *     userPromptSubmitted?: UserPromptSubmittedHandler;
+ *     sessionStart?: SessionStartHandler;
+ *     sessionEnd?: SessionEndHandler;
+ *     errorOccurred?: ErrorOccurredHandler;
+ * }} SessionHooks
  */
 
 /**
@@ -241,7 +252,12 @@
 /**
  * Output do hook preToolUse (allow, deny, modify).
  *
- * @typedef {{ decision?: 'allow' | 'deny' | 'modify'; modifiedArgs?: Record<string, unknown>; systemMessage?: string; [key: string]: unknown } | void} PreToolUseHookOutput
+ * @typedef {{
+ *     decision?: 'allow' | 'deny' | 'modify';
+ *     modifiedArgs?: Record<string, unknown>;
+ *     systemMessage?: string;
+ *     [key: string]: unknown;
+ * } | void} PreToolUseHookOutput
  */
 
 /**
@@ -283,7 +299,9 @@
 /**
  * Handler do hook userPromptSubmitted.
  *
- * @typedef {(input: UserPromptSubmittedHookInput) => Promise<UserPromptSubmittedHookOutput> | UserPromptSubmittedHookOutput} UserPromptSubmittedHandler
+ * @typedef {(
+ *     input: UserPromptSubmittedHookInput,
+ * ) => Promise<UserPromptSubmittedHookOutput> | UserPromptSubmittedHookOutput} UserPromptSubmittedHandler
  */
 
 /**
@@ -474,7 +492,13 @@
 /**
  * Configuração de provider externo (OpenAI, Azure, Anthropic).
  *
- * @typedef {{ provider: 'openai' | 'azure' | 'anthropic' | string; apiKey?: string; baseUrl?: string; model?: string; [key: string]: unknown }} ProviderConfig
+ * @typedef {{
+ *     provider: 'openai' | 'azure' | 'anthropic' | string;
+ *     apiKey?: string;
+ *     baseUrl?: string;
+ *     model?: string;
+ *     [key: string]: unknown;
+ * }} ProviderConfig
  */
 
 // ─── Session Context & Metadata ───────────────────────────────────────────────

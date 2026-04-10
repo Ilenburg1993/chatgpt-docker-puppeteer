@@ -17,10 +17,11 @@ import { defaultMetrics } from '#copilot/observability/metrics';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
+    getToolsConfig,
+    patchToolsConfig,
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
-import { getToolsConfig, patchToolsConfig } from '#copilot/sdk';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

@@ -2,9 +2,10 @@
 /**
  * @file Faixa 36 — Session Tools Test Suite (F189-F196)
  *
- * Testes para src/copilot/tools/session-tools.js:
- * - read_briefing, write_pending_task, get_workspace_info, set_session_context, invoke_skill
- * - export shape (sessionTools array)
+ *   Testes para src/copilot/tools/session-tools.js:
+ *
+ *   - read_briefing, write_pending_task, get_workspace_info, set_session_context, invoke_skill
+ *   - export shape (sessionTools array)
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -158,9 +159,9 @@ describe('F36 — get_workspace_info (F193)', () => {
 
     it('retorna info básica do workspace com git', async () => {
         mockExecFileSync
-            .mockReturnValueOnce('main\n')   // branch
-            .mockReturnValueOnce('/workspaces/project\n')  // root
-            .mockReturnValueOnce('abc1234\n');  // commit
+            .mockReturnValueOnce('main\n') // branch
+            .mockReturnValueOnce('/workspaces/project\n') // root
+            .mockReturnValueOnce('abc1234\n'); // commit
 
         const result = await handler({});
 
@@ -241,9 +242,7 @@ describe('F36 — invoke_skill (F195)', () => {
 
     it('carrega conteúdo de uma skill existente', async () => {
         fsMock.stat.mockResolvedValue({});
-        fsMock.readdir.mockResolvedValue([
-            { name: 'code-audit', isDirectory: () => true },
-        ]);
+        fsMock.readdir.mockResolvedValue([{ name: 'code-audit', isDirectory: () => true }]);
         fsMock.readFile.mockResolvedValue('# Code Audit Skill\nInstruções...');
 
         const result = await handler({ name: 'code-audit' });

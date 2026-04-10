@@ -2,14 +2,15 @@
 /**
  * @file Faixa 40 — Channel Module Test Suite (F221-F228)
  *
- * Testes para:
- * - src/copilot/channel/client-dialog.js (registerDialogListeners, startDialogMode, dialogTurn, stopDialogMode)
- * - src/copilot/channel/client-history.js (getLastNPairs)
- * - src/copilot/channel/client-structured.js (chatStructured)
- * - src/copilot/channel/sse-client.js (subscribeSse)
+ *   Testes para:
+ *
+ *   - src/copilot/channel/client-dialog.js (registerDialogListeners, startDialogMode, dialogTurn, stopDialogMode)
+ *   - src/copilot/channel/client-history.js (getLastNPairs)
+ *   - src/copilot/channel/client-structured.js (chatStructured)
+ *   - src/copilot/channel/sse-client.js (subscribeSse)
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
@@ -23,12 +24,8 @@ vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed 
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
 
-const {
-    registerDialogListeners,
-    startDialogMode,
-    dialogTurn,
-    stopDialogMode,
-} = await import('#copilot/channel/client-dialog');
+const { registerDialogListeners, startDialogMode, dialogTurn, stopDialogMode } =
+    await import('#copilot/channel/client-dialog');
 
 const { getLastNPairs } = await import('#copilot/channel/client-history');
 
@@ -258,7 +255,9 @@ vi.mock('#copilot/core/structured-message', () => ({
         try {
             const parsed = JSON.parse(raw);
             if (parsed.responseType) return parsed;
-        } catch { /* não é JSON */ }
+        } catch {
+            /* não é JSON */
+        }
         return null;
     }),
     serializeStructuredMessage: vi.fn((msg) => JSON.stringify(msg)),
@@ -314,7 +313,8 @@ describe('F40 — chatStructured', () => {
 
     it('retenta com instrução explícita quando primeira resposta não é estruturada', async () => {
         const deps = {
-            chat: vi.fn()
+            chat: vi
+                .fn()
                 .mockResolvedValueOnce({
                     response: 'not json',
                     responseLen: 8,
@@ -355,8 +355,6 @@ describe('F40 — chatStructured', () => {
 
         // buildStructuredRequest should have received custom-sess
         const { buildStructuredRequest } = await import('#copilot/core/structured-message');
-        expect(buildStructuredRequest).toHaveBeenCalledWith(
-            expect.objectContaining({ sessionId: 'custom-sess' }),
-        );
+        expect(buildStructuredRequest).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'custom-sess' }));
     });
 });

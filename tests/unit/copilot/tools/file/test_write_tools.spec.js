@@ -2,9 +2,10 @@
 /**
  * @file Faixa 35 — Write Tools Test Suite (F181-F188)
  *
- * Testes para src/copilot/tools/file/write-tools.js:
- * - write_file_content, create_file, delete_file, copy_file, move_file, patch_file
- * - atomicWrite, validatePath safety, export shape
+ *   Testes para src/copilot/tools/file/write-tools.js:
+ *
+ *   - write_file_content, create_file, delete_file, copy_file, move_file, patch_file
+ *   - atomicWrite, validatePath safety, export shape
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -383,7 +384,11 @@ describe('F35 — move_file (F186)', () => {
 
         const result = await handler({ source: 'old.txt', destination: 'new.txt', overwrite: false });
 
-        expect(result).toMatchObject({ success: true, source: '/workspace/old.txt', destination: '/workspace/new.txt' });
+        expect(result).toMatchObject({
+            success: true,
+            source: '/workspace/old.txt',
+            destination: '/workspace/new.txt',
+        });
     });
 
     it('falha se destino existe sem overwrite', async () => {

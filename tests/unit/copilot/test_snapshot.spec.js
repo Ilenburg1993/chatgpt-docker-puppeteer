@@ -187,9 +187,7 @@ describe('snapshot', () => {
 
         it('não remove nada se dentro do limite', async () => {
             mockReaddir.mockResolvedValue(['s1.json']);
-            mockReadFile.mockResolvedValue(
-                JSON.stringify({ snapshotId: 's1', createdAt: 100, model: 'm' }),
-            );
+            mockReadFile.mockResolvedValue(JSON.stringify({ snapshotId: 's1', createdAt: 100, model: 'm' }));
 
             const removed = await pruneSnapshotsAsync(5);
             expect(removed).toBe(0);

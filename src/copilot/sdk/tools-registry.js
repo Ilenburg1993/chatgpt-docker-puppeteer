@@ -3,8 +3,8 @@ import { ConfigError } from '#copilot/core/errors';
 /**
  * src/copilot/sdk/tools-registry.js
  *
- * Registry de ferramentas para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
- * ferramentas por categoria, capacidade ou agente.
+ * Registry de ferramentas para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de ferramentas
+ * por categoria, capacidade ou agente.
  *
  * @module copilot/sdk/tools-registry
  * @see module:copilot/sdk/tools

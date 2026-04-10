@@ -5,6 +5,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**
  * @param {import('../event-wirer.js').CopilotSessionLike} session
@@ -16,11 +17,11 @@ import { log } from '#copilot/observability/logger';
  */
 export function wireCompactionEvents(session, { emit, getStatusSnapshot, onCheckpointPath }) {
     return [
-        session.on('session.compaction_start', (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_COMPACTION_START, (/** @type {any} */ evt) => {
             log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
             emit('session.compaction_start', evt?.data ?? {});
         }),
-        session.on('session.compaction_complete', (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_COMPACTION_COMPLETE, (/** @type {any} */ evt) => {
             const data = /** @type {{ success?: boolean; checkpointPath?: string }} */ (evt?.data ?? {});
             if (data['success'] === false) {
                 log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');

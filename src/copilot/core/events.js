@@ -115,6 +115,18 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'subagent.started',
     'subagent.completed',
     'subagent.failed',
+    // ── F55: agent lifecycle events (boot, cleanup, handoff) ──────────────
+    'sdk.lifecycle',
+    'session.cleanup',
+    'session.keepalive',
+    'mcp.reconnected',
+    'quota.warning',
+    'dialog.boot_recovery',
+    'dialog.compaction.requested',
+    'dialog.pre_stall_warning',
+    'handoff.accepted',
+    'handoff.received',
+    'handoff.rejected',
 ]);
 
 /**
@@ -157,6 +169,9 @@ export const DIALOG_LOOP_EVENTS = /** @type {ReadonlySet<string>} */ (
         'dialog.turn_start',
         'dialog.turn_end',
         'dialog.turn_timeout',
+        'dialog.boot_recovery',
+        'dialog.compaction.requested',
+        'dialog.pre_stall_warning',
     ])
 );
 

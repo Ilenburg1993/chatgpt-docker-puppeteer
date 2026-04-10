@@ -2,20 +2,21 @@
 /**
  * @file Faixa 36 — Shell Tools Expanded Test Suite (F189-F196)
  *
- * Testes complementares para src/copilot/tools/shell/index.js:
- * - exec_command: pipelines (UPG-01), pipeline blocklist, pipeline limit
- * - exec_command: timeout, audit response fields, durationMs
- * - run_npm_script: resultado completo, script field
- * - run_node_file: .cjs extension, args passthrough
- * - contratos de resposta expandidos
+ *   Testes complementares para src/copilot/tools/shell/index.js:
  *
- * Estilo: integração leve (sem mocks dos módulos internos).
- * Complementa test_shell_tools.spec.js (Sprint 21 — 31 testes).
+ *   - exec_command: pipelines (UPG-01), pipeline blocklist, pipeline limit
+ *   - exec_command: timeout, audit response fields, durationMs
+ *   - run_npm_script: resultado completo, script field
+ *   - run_node_file: .cjs extension, args passthrough
+ *   - contratos de resposta expandidos
+ *
+ *   Estilo: integração leve (sem mocks dos módulos internos). Complementa test_shell_tools.spec.js (Sprint 21 — 31
+ *   testes).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
     execCommandTool,
     runNodeFileTool,

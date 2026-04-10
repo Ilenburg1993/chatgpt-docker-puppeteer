@@ -8,6 +8,7 @@
  */
 
 import { globalAuditBuffer } from '#copilot/audit/pipeline';
+import { SESSION_EVENTS as SE } from '#copilot/sdk';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -28,7 +29,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_start ──────────────────────────────────────────────
     unsubs.push(
-        session.on('tool.execution_start', (event) => {
+        session.on(SE.TOOL_EXECUTION_START, (event) => {
             const { toolCallId, toolName, mcpServerName } = event.data;
             const _now = Date.now();
             for (const [id, entry] of pending) {
@@ -57,7 +58,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_complete ───────────────────────────────────────────
     unsubs.push(
-        session.on('tool.execution_complete', (event) => {
+        session.on(SE.TOOL_EXECUTION_COMPLETE, (event) => {
             const { toolCallId, success } = event.data;
             const pendingEntry = pending.get(toolCallId);
             pending.delete(toolCallId);
@@ -103,7 +104,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_progress (ephemeral — não persistir) ──────────────
     unsubs.push(
-        session.on('tool.execution_progress', (event) => {
+        session.on(SE.TOOL_EXECUTION_PROGRESS, (event) => {
             hookBus?.emitHook(
                 'post_tool_use',
                 sessionId,
@@ -119,14 +120,14 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_partial_result — contador apenas ──────────────────
     unsubs.push(
-        session.on('tool.execution_partial_result', () => {
+        session.on(SE.TOOL_EXECUTION_PARTIAL_RESULT, () => {
             metrics?.recordCounter('tool.execution_partial_result');
         }),
     );
 
     // ── tool.user_requested ──────────────────────────────────────────────
     unsubs.push(
-        session.on('tool.user_requested', (event) => {
+        session.on(SE.TOOL_USER_REQUESTED, (event) => {
             const { toolCallId, toolName } = event.data;
             metrics?.recordCounter('tool.user_requested');
             if (persist && persistSet.has('tool.user_requested')) {

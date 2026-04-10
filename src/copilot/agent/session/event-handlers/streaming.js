@@ -4,6 +4,8 @@
  * F62.3: Handler de eventos de streaming de tokens (reasoning + message delta).
  */
 
+import { SESSION_EVENTS } from '#copilot/sdk';
+
 /**
  * @param {import('../event-wirer.js').CopilotSessionLike} session
  * @param {Pick<import('../event-wirer.js').SessionWirerCallbacks, 'emit' | 'isProcessing' | 'dialogLoopActive'>} cb
@@ -11,7 +13,7 @@
  */
 export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive }) {
     return [
-        session.on('assistant.reasoning_delta', (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_REASONING_DELTA, (/** @type {any} */ evt) => {
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? '');
             if (chunk)
                 emit('task.reasoning', {
@@ -19,7 +21,7 @@ export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopAct
                     reasoningId: /** @type {string | null} */ (evt?.data?.['reasoningId'] ?? null),
                 });
         }),
-        session.on('assistant.message_delta', (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_MESSAGE_DELTA, (/** @type {any} */ evt) => {
             const chunk = /** @type {string} */ (evt?.data?.['deltaContent'] ?? evt?.data?.['content'] ?? '');
             if (!chunk) return;
 

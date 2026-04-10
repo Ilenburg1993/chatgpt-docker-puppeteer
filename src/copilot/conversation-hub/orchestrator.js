@@ -20,6 +20,7 @@ import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
+import { HUB_EVENTS } from './events.js';
 
 // ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
 
@@ -202,7 +203,7 @@ export class HubOrchestrator extends EventEmitter {
 
         this.#turnCounters.set(hubSessionId, 0);
 
-        this.emit('session:created', { hubSessionId, title: opts.title });
+        this.emit(HUB_EVENTS.SESSION_CREATED, { hubSessionId, title: opts.title });
         log('INFO', `[HubOrchestrator] Hub session criada: ${hubSessionId}`);
         return hubSessionId;
     }
@@ -224,7 +225,7 @@ export class HubOrchestrator extends EventEmitter {
             if (first !== undefined) this.#closedSessions.delete(first);
         }
         this.#closedSessions.add(hubSessionId);
-        this.emit('session:closed', { hubSessionId });
+        this.emit(HUB_EVENTS.SESSION_CLOSED, { hubSessionId });
         log('INFO', `[HubOrchestrator] Hub session encerrada: ${hubSessionId}`);
     }
 
@@ -345,7 +346,7 @@ export class HubOrchestrator extends EventEmitter {
             );
         }
 
-        this.emit('turn:sent', {
+        this.emit(HUB_EVENTS.TURN_SENT, {
             hubSessionId,
             turnId: llmATurnId,
             role: 'llm_a',
@@ -422,7 +423,7 @@ export class HubOrchestrator extends EventEmitter {
         const llmBTurn = this.#store.getTurn(llmBTurnId);
         const llmBTurnNumber = llmBTurn?.turn_number ?? turnNumber + 1;
 
-        this.emit('turn:complete', {
+        this.emit(HUB_EVENTS.TURN_COMPLETE, {
             hubSessionId,
             turnId: llmBTurnId,
             role: 'llm_b',
@@ -456,14 +457,14 @@ export class HubOrchestrator extends EventEmitter {
      */
     async injectUserMessage(hubSessionId, content, opts = {}) {
         const turnId = await this.#store.injectUserMessage(hubSessionId, content, opts);
-        this.emit('user:injected', { hubSessionId, turnId, content });
+        this.emit(HUB_EVENTS.USER_INJECTED, { hubSessionId, turnId, content });
 
         // Notifica LLM-A que há uma mensagem pendente do usuário para processar.
         // Se um sendToLlmB() estiver em andamento (inflight), o evento serve como sinal para
         // que LLM-A chame pollUserMessages() ao completar o turn atual.
         const hasTurnInFlight = this.#inflightBySession.has(hubSessionId);
         if (hasTurnInFlight) {
-            this.emit('turn:user_pending', { hubSessionId, turnId, content });
+            this.emit(HUB_EVENTS.TURN_USER_PENDING, { hubSessionId, turnId, content });
             log(
                 'INFO',
                 `[HubOrchestrator] Mensagem do usuário injetada (turn em andamento) na sessão ${hubSessionId} — turn:user_pending emitido.`,
@@ -505,7 +506,7 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {void}
      */
     notifyTerminalTurn(hubSessionId, userTurn, llmBTurn) {
-        this.emit('turn:sent', {
+        this.emit(HUB_EVENTS.TURN_SENT, {
             hubSessionId,
             turnId: userTurn.turnId,
             role: userTurn.role,
@@ -513,7 +514,7 @@ export class HubOrchestrator extends EventEmitter {
             turnNumber: userTurn.turnNumber,
             source: userTurn.source ?? 'terminal',
         });
-        this.emit('turn:complete', {
+        this.emit(HUB_EVENTS.TURN_COMPLETE, {
             hubSessionId,
             turnId: llmBTurn.turnId,
             role: 'llm_b',

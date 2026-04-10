@@ -40,9 +40,8 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 // ---------------------------------------------------------------------------
 
 /**
- * @deprecated F51: Removida. Use loadAliasesAsync().
- * Shim: delega para loadAliasesAsync() e ignora a Promise silenciosamente.
- *
+ * @deprecated F51: Removida. Use loadAliasesAsync(). Shim: delega para loadAliasesAsync() e ignora a Promise
+ *   silenciosamente.
  * @returns {void}
  */
 export function loadAliases() {

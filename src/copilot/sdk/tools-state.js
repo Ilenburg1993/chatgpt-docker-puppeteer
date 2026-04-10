@@ -29,9 +29,8 @@ const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-con
 let _toolsConfig = { allowlist: null, denylist: [] };
 
 /**
- * @deprecated F51: Removida. Use loadToolsConfigAsync().
- * Shim: delega para loadToolsConfigAsync() e ignora a Promise silenciosamente.
- *
+ * @deprecated F51: Removida. Use loadToolsConfigAsync(). Shim: delega para loadToolsConfigAsync() e ignora a Promise
+ *   silenciosamente.
  * @returns {void}
  */
 export function loadToolsConfig() {

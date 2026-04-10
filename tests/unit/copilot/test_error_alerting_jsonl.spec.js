@@ -2,13 +2,14 @@
 /**
  * @file Faixa 49 — error-alerting, jsonl-writer, engine-persistence
  *
- * Cobre:
- * - observability/error-alerting.js (239L) — createErrorAlerter
- * - audit/jsonl-writer.js (79L) — createJsonlWriter
- * - terminal/dialog/engine-persistence.js (148L) — persistTurnToHub, failure count
+ *   Cobre:
+ *
+ *   - observability/error-alerting.js (239L) — createErrorAlerter
+ *   - audit/jsonl-writer.js (79L) — createJsonlWriter
+ *   - terminal/dialog/engine-persistence.js (148L) — persistTurnToHub, failure count
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
 
@@ -77,9 +78,7 @@ describe('F49 — createErrorAlerter', () => {
 
     it('check() dispara CRITICAL quando erros >= criticalThreshold', () => {
         const now = Date.now();
-        tracker.getErrors.mockReturnValue(
-            Array.from({ length: 6 }, (_, i) => ({ timestamp: now - i * 1000 })),
-        );
+        tracker.getErrors.mockReturnValue(Array.from({ length: 6 }, (_, i) => ({ timestamp: now - i * 1000 })));
         alerter.check();
         expect(alerter.getLastAlert()?.level).toBe('critical');
         expect(alerter.getAlertStats().criticals).toBe(1);

@@ -18,7 +18,13 @@ import { buildAuditingPermissionHandler } from '#copilot/audit/pipeline';
 import { buildCustomAgentsConfig } from '#copilot/config/custom-agents';
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import { log } from '#copilot/observability/logger';
-import { DEFAULT_EXCLUDED_TOOLS, getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import {
+    DEFAULT_EXCLUDED_TOOLS,
+    getToolsConfig,
+    loadToolsConfigAsync,
+    pickDefined,
+    resumeOrCreate,
+} from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
 import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 import { buildHookSystemContextSafe } from './hook-context.js';

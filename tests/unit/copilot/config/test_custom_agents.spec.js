@@ -2,16 +2,20 @@
 /**
  * @file Faixa 47 — config/custom-agents.js (325L)
  *
- * Cobre BUILTIN_AGENTS (auditor/docs/reviewer), getCustomAgent, listCustomAgents,
- * registerCustomAgent, removeCustomAgent, buildCustomAgentsConfig, listAvailableSdkAgents.
+ *   Cobre BUILTIN_AGENTS (auditor/docs/reviewer), getCustomAgent, listCustomAgents, registerCustomAgent,
+ *   removeCustomAgent, buildCustomAgentsConfig, listAvailableSdkAgents.
  */
 
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/config/env', () => new Proxy(
-    { COPILOT_CUSTOM_AGENTS: 'task,explore,diagnostic', COPILOT_DISABLED_AGENTS: '' },
-    { get: (t, p) => p in t ? t[p] : typeof p === 'string' ? '' : undefined, has: () => true },
-));
+vi.mock(
+    '#copilot/config/env',
+    () =>
+        new Proxy(
+            { COPILOT_CUSTOM_AGENTS: 'task,explore,diagnostic', COPILOT_DISABLED_AGENTS: '' },
+            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? '' : undefined), has: () => true },
+        ),
+);
 
 const mod = await import('#copilot/config/custom-agents');
 
@@ -81,18 +85,19 @@ describe('F47 — registerCustomAgent', () => {
     });
 
     it('lança ConfigError se name vazio', () => {
-        expect(() => mod.registerCustomAgent({ name: '', description: 'D', tools: [], prompt: 'P' }))
-            .toThrow(/name/);
+        expect(() => mod.registerCustomAgent({ name: '', description: 'D', tools: [], prompt: 'P' })).toThrow(/name/);
     });
 
     it('lança ConfigError se tools não é array de strings', () => {
-        expect(() => mod.registerCustomAgent({ name: 'x', description: 'D', tools: /** @type {any} */ ([123]), prompt: 'P' }))
-            .toThrow(/tools/);
+        expect(() =>
+            mod.registerCustomAgent({ name: 'x', description: 'D', tools: /** @type {any} */ ([123]), prompt: 'P' }),
+        ).toThrow(/tools/);
     });
 
     it('lança ConfigError se description ausente', () => {
-        expect(() => mod.registerCustomAgent({ name: 'x', description: /** @type {any} */ (null), tools: [], prompt: 'P' }))
-            .toThrow(/description/);
+        expect(() =>
+            mod.registerCustomAgent({ name: 'x', description: /** @type {any} */ (null), tools: [], prompt: 'P' }),
+        ).toThrow(/description/);
     });
 });
 

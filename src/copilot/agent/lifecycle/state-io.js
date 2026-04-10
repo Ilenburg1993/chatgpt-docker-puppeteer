@@ -85,8 +85,8 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
 /**
  * Lê o estado persistido do agente da sessão em disco.
  *
- * Retorna o cache in-process quando disponível. Se o cache estiver frio, dispara
- * readStateAsync() internamente e retorna null (o cache será populado para a próxima chamada).
+ * Retorna o cache in-process quando disponível. Se o cache estiver frio, dispara readStateAsync() internamente e
+ * retorna null (o cache será populado para a próxima chamada).
  *
  * @deprecated F91/F52: Use readStateAsync() em vez desta versão síncrona.
  * @returns {AliveAgentState | null} Estado em cache ou null se indisponível
@@ -101,8 +101,8 @@ export function readState() {
 /**
  * Persiste o estado da sessão em disco (shim síncrono).
  *
- * F52: Delega para writeStateAsync internamente. Atualiza _stateCache imediatamente
- * para manter consistência síncrona, mas a escrita real em disco é async.
+ * F52: Delega para writeStateAsync internamente. Atualiza _stateCache imediatamente para manter consistência síncrona,
+ * mas a escrita real em disco é async.
  *
  * @deprecated F69/F52: Use writeStateAsync().
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar
@@ -113,9 +113,7 @@ export function writeState(updates) {
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     _stateCache = next;
     // Dispara escrita async via mutex serial
-    writeStateAsync(updates).catch((/** @type {any} */ e) =>
-        logSwallowed(e, 'stateIo.writeState.asyncFallback'),
-    );
+    writeStateAsync(updates).catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.writeState.asyncFallback'));
     return next;
 }
 

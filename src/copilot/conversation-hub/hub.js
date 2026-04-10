@@ -15,6 +15,7 @@
 import { logSwallowed } from '#copilot/core/error-handlers';
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
+import { HUB_EVENTS } from './events.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
 import { conversationStore } from './store.js';
@@ -262,11 +263,11 @@ export class ConversationHub {
             }
         };
 
-        this.#orchestrator.on('session:created', (d) => emit('copilot.hub.session.created', d));
-        this.#orchestrator.on('session:closed', (d) => emit('copilot.hub.session.closed', d));
-        this.#orchestrator.on('turn:sent', (d) => emit('copilot.hub.turn.sent', d));
-        this.#orchestrator.on('turn:complete', (d) => emit('copilot.hub.turn.complete', d));
-        this.#orchestrator.on('user:injected', (d) => emit('copilot.hub.user.injected', d));
+        this.#orchestrator.on(HUB_EVENTS.SESSION_CREATED, (d) => emit('copilot.hub.session.created', d));
+        this.#orchestrator.on(HUB_EVENTS.SESSION_CLOSED, (d) => emit('copilot.hub.session.closed', d));
+        this.#orchestrator.on(HUB_EVENTS.TURN_SENT, (d) => emit('copilot.hub.turn.sent', d));
+        this.#orchestrator.on(HUB_EVENTS.TURN_COMPLETE, (d) => emit('copilot.hub.turn.complete', d));
+        this.#orchestrator.on(HUB_EVENTS.USER_INJECTED, (d) => emit('copilot.hub.user.injected', d));
         this.#orchestrator.on('error', (d) => emit('copilot.hub.error', d));
 
         log('DEBUG', '[ConversationHub] Bridge NERV vinculado.');

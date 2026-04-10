@@ -2,24 +2,25 @@
 /**
  * @file Faixa 37 — API Session CRUD + Messaging Test Suite (F197-F204)
  *
- * Testes para src/copilot/api/express/session-crud.js e session-messaging.js:
- * - GET /sessions/active, GET /sessions/last, GET /sessions/foreground
- * - PUT /sessions/foreground/:id
- * - GET /sessions, GET /sessions/:id
- * - POST /sessions (create)
- * - DELETE /sessions/:id (com admin token + confirm header)
- * - POST /sessions/:id/disconnect, resume
- * - GET /sessions/:id/compaction-history
- * - POST /sessions/:id/send
- * - POST /sessions/:id/model, abort
- * - GET /sessions/:id/messages
+ *   Testes para src/copilot/api/express/session-crud.js e session-messaging.js:
  *
- * Usa supertest com Express app montado sobre os routers mockados.
+ *   - GET /sessions/active, GET /sessions/last, GET /sessions/foreground
+ *   - PUT /sessions/foreground/:id
+ *   - GET /sessions, GET /sessions/:id
+ *   - POST /sessions (create)
+ *   - DELETE /sessions/:id (com admin token + confirm header)
+ *   - POST /sessions/:id/disconnect, resume
+ *   - GET /sessions/:id/compaction-history
+ *   - POST /sessions/:id/send
+ *   - POST /sessions/:id/model, abort
+ *   - GET /sessions/:id/messages
+ *
+ *   Usa supertest com Express app montado sobre os routers mockados.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
@@ -238,8 +239,7 @@ describe('F37 — GET /sessions/:id (F200)', () => {
 
 describe('F37 — DELETE /sessions/:id (F201)', () => {
     it('exige header X-Confirm-Delete', async () => {
-        const res = await request(app)
-            .delete('/api/sdk/sessions/s1');
+        const res = await request(app).delete('/api/sdk/sessions/s1');
 
         expect(res.status).toBe(400);
         expect(res.body.error).toContain('X-Confirm-Delete');
@@ -251,9 +251,7 @@ describe('F37 — DELETE /sessions/:id (F201)', () => {
         });
         mockDisconnectSdkSession.mockResolvedValue(undefined);
 
-        const res = await request(app)
-            .delete('/api/sdk/sessions/s1')
-            .set('X-Confirm-Delete', 'true');
+        const res = await request(app).delete('/api/sdk/sessions/s1').set('X-Confirm-Delete', 'true');
 
         expect(res.status).toBe(200);
         expect(res.body.ok).toBe(true);
@@ -267,8 +265,7 @@ describe('F37 — DELETE /sessions/:id (F201)', () => {
 
 describe('F37 — POST /sessions/:id/disconnect (F202)', () => {
     it('retorna 404 se sessão não ativa', async () => {
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/disconnect');
+        const res = await request(app).post('/api/sdk/sessions/s1/disconnect');
 
         expect(res.status).toBe(404);
     });
@@ -277,8 +274,7 @@ describe('F37 — POST /sessions/:id/disconnect (F202)', () => {
         mockGetSdkSession.mockReturnValue({ session: {} });
         mockDisconnectSdkSession.mockResolvedValue(undefined);
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/disconnect');
+        const res = await request(app).post('/api/sdk/sessions/s1/disconnect');
 
         expect(res.status).toBe(200);
         expect(res.body.ok).toBe(true);
@@ -292,9 +288,7 @@ describe('F37 — POST /sessions/:id/resume (F202)', () => {
             workspacePath: '/ws',
         });
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/resume')
-            .send({});
+        const res = await request(app).post('/api/sdk/sessions/s1/resume').send({});
 
         expect(res.status).toBe(200);
         expect(res.body.sessionId).toBe('s1');
@@ -312,8 +306,7 @@ describe('F37 — GET /sessions/:id/compaction-history (F203)', () => {
             { type: 'complete', timestamp: 2000 },
         ]);
 
-        const res = await request(app)
-            .get('/api/sdk/sessions/s1/compaction-history');
+        const res = await request(app).get('/api/sdk/sessions/s1/compaction-history');
 
         expect(res.status).toBe(200);
         expect(res.body.count).toBe(2);
@@ -327,9 +320,7 @@ describe('F37 — GET /sessions/:id/compaction-history (F203)', () => {
 
 describe('F37 — POST /sessions/:id/send (F204)', () => {
     it('retorna 404 se sessão não ativa', async () => {
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/send')
-            .send({ prompt: 'hello' });
+        const res = await request(app).post('/api/sdk/sessions/s1/send').send({ prompt: 'hello' });
 
         expect(res.status).toBe(404);
     });
@@ -337,9 +328,7 @@ describe('F37 — POST /sessions/:id/send (F204)', () => {
     it('rejeita prompt vazio', async () => {
         mockGetSdkSession.mockReturnValue({ session: {} });
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/send')
-            .send({ prompt: '' });
+        const res = await request(app).post('/api/sdk/sessions/s1/send').send({ prompt: '' });
 
         expect(res.status).toBe(400);
     });
@@ -384,9 +373,7 @@ describe('F37 — POST /sessions/:id/send (F204)', () => {
     it('rejeita timeoutMs negativo (validação Zod)', async () => {
         mockGetSdkSession.mockReturnValue({ session: {} });
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/send')
-            .send({ prompt: 'hello', timeoutMs: -1 });
+        const res = await request(app).post('/api/sdk/sessions/s1/send').send({ prompt: 'hello', timeoutMs: -1 });
 
         expect(res.status).toBe(400);
         expect(res.body.ok).toBe(false);
@@ -396,9 +383,7 @@ describe('F37 — POST /sessions/:id/send (F204)', () => {
         mockGetSdkSession.mockReturnValue({ session: {} });
 
         const bigPrompt = 'x'.repeat(512_001);
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/send')
-            .send({ prompt: bigPrompt });
+        const res = await request(app).post('/api/sdk/sessions/s1/send').send({ prompt: bigPrompt });
 
         // Express pode rejeitar com 413 (body parser limit) ou 400 (handler validation)
         expect([400, 413]).toContain(res.status);
@@ -411,9 +396,7 @@ describe('F37 — POST /sessions/:id/send (F204)', () => {
 
 describe('F37 — POST /sessions/:id/model', () => {
     it('retorna 404 se sessão não existe', async () => {
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/model')
-            .send({ model: 'gpt-4o' });
+        const res = await request(app).post('/api/sdk/sessions/s1/model').send({ model: 'gpt-4o' });
 
         expect(res.status).toBe(404);
     });
@@ -425,9 +408,7 @@ describe('F37 — POST /sessions/:id/model', () => {
             },
         });
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/model')
-            .send({ model: 'gpt-4o' });
+        const res = await request(app).post('/api/sdk/sessions/s1/model').send({ model: 'gpt-4o' });
 
         expect(res.status).toBe(200);
         expect(res.body.model).toBe('gpt-4o');
@@ -436,8 +417,7 @@ describe('F37 — POST /sessions/:id/model', () => {
 
 describe('F37 — POST /sessions/:id/abort', () => {
     it('retorna 404 se sessão não existe', async () => {
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/abort');
+        const res = await request(app).post('/api/sdk/sessions/s1/abort');
 
         expect(res.status).toBe(404);
     });
@@ -449,8 +429,7 @@ describe('F37 — POST /sessions/:id/abort', () => {
             },
         });
 
-        const res = await request(app)
-            .post('/api/sdk/sessions/s1/abort');
+        const res = await request(app).post('/api/sdk/sessions/s1/abort');
 
         expect(res.status).toBe(200);
         expect(res.body.ok).toBe(true);
@@ -459,8 +438,7 @@ describe('F37 — POST /sessions/:id/abort', () => {
 
 describe('F37 — GET /sessions/:id/messages', () => {
     it('retorna 404 se sessão não existe', async () => {
-        const res = await request(app)
-            .get('/api/sdk/sessions/s1/messages');
+        const res = await request(app).get('/api/sdk/sessions/s1/messages');
 
         expect(res.status).toBe(404);
     });
@@ -475,8 +453,7 @@ describe('F37 — GET /sessions/:id/messages', () => {
             },
         });
 
-        const res = await request(app)
-            .get('/api/sdk/sessions/s1/messages');
+        const res = await request(app).get('/api/sdk/sessions/s1/messages');
 
         expect(res.status).toBe(200);
         expect(res.body.count).toBe(2);

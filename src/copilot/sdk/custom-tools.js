@@ -130,9 +130,8 @@ export const BUILTIN_HANDLER_MAP = new Map([
 let _registry = new Map();
 
 /**
- * @deprecated F51: Removida. Use loadCustomToolsAsync().
- * Shim: delega para loadCustomToolsAsync() e ignora a Promise silenciosamente.
- *
+ * @deprecated F51: Removida. Use loadCustomToolsAsync(). Shim: delega para loadCustomToolsAsync() e ignora a Promise
+ *   silenciosamente.
  * @returns {void}
  */
 export function loadCustomTools() {

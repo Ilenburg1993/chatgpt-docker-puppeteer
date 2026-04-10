@@ -2,23 +2,24 @@
 /**
  * @file Faixa 38 — API Observability Routes Test Suite (F205-F212)
  *
- * Testes para src/copilot/api/express/observability.js:
- * - GET /observability/health
- * - GET /observability/metrics
- * - GET /observability/quota
- * - GET /observability/errors + /errors/stats
- * - GET /observability/logs
- * - POST /observability/errors/clear
- * - POST /observability/log-level
- * - GET /observability/audit + /audit-tail
- * - POST /observability/audit/flush
- * - GET /observability/otel-status
- * - GET /observability/events/catalog + /events/dead-letter
+ *   Testes para src/copilot/api/express/observability.js:
+ *
+ *   - GET /observability/health
+ *   - GET /observability/metrics
+ *   - GET /observability/quota
+ *   - GET /observability/errors + /errors/stats
+ *   - GET /observability/logs
+ *   - POST /observability/errors/clear
+ *   - POST /observability/log-level
+ *   - GET /observability/audit + /audit-tail
+ *   - POST /observability/audit/flush
+ *   - GET /observability/otel-status
+ *   - GET /observability/events/catalog + /events/dead-letter
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
@@ -215,9 +216,7 @@ describe('F38 — GET /observability/metrics', () => {
     });
 
     it('filtra counters por prefix', async () => {
-        const res = await request(app)
-            .get('/api/sdk/observability/metrics')
-            .query({ prefix: 'tool.' });
+        const res = await request(app).get('/api/sdk/observability/metrics').query({ prefix: 'tool.' });
 
         expect(res.status).toBe(200);
         expect(res.body.counters).toHaveProperty('tool.a');
@@ -270,9 +269,7 @@ describe('F38 — GET /observability/errors', () => {
     it('filtra por source', async () => {
         mockGetErrors.mockReturnValue([]);
 
-        const res = await request(app)
-            .get('/api/sdk/observability/errors')
-            .query({ source: 'agent', n: 5 });
+        const res = await request(app).get('/api/sdk/observability/errors').query({ source: 'agent', n: 5 });
 
         expect(mockGetErrors).toHaveBeenCalledWith(5, 'agent');
     });
@@ -319,9 +316,7 @@ describe('F38 — GET /observability/logs', () => {
     });
 
     it('filtra por level', async () => {
-        const res = await request(app)
-            .get('/api/sdk/observability/logs')
-            .query({ level: 'error', n: 10 });
+        const res = await request(app).get('/api/sdk/observability/logs').query({ level: 'error', n: 10 });
 
         expect(mockGetRecentLogs).toHaveBeenCalledWith(10, 'ERROR');
     });
@@ -333,18 +328,14 @@ describe('F38 — GET /observability/logs', () => {
 
 describe('F38 — POST /observability/log-level', () => {
     it('rejeita nível inválido', async () => {
-        const res = await request(app)
-            .post('/api/sdk/observability/log-level')
-            .send({ level: 'TRACE' });
+        const res = await request(app).post('/api/sdk/observability/log-level').send({ level: 'TRACE' });
 
         expect(res.status).toBe(400);
         expect(res.body.ok).toBe(false);
     });
 
     it('aceita nível válido', async () => {
-        const res = await request(app)
-            .post('/api/sdk/observability/log-level')
-            .send({ level: 'DEBUG' });
+        const res = await request(app).post('/api/sdk/observability/log-level').send({ level: 'DEBUG' });
 
         expect(res.status).toBe(200);
         expect(res.body.level).toBe('DEBUG');
@@ -371,9 +362,7 @@ describe('F38 — GET /observability/audit', () => {
             { type: 'session_start', ts: 2000 },
         ]);
 
-        const res = await request(app)
-            .get('/api/sdk/observability/audit')
-            .query({ type: 'tool_call' });
+        const res = await request(app).get('/api/sdk/observability/audit').query({ type: 'tool_call' });
 
         expect(res.body.count).toBe(1);
     });
@@ -386,9 +375,7 @@ describe('F38 — GET /observability/audit-tail', () => {
             { sessionId: 's2', toolName: 't2' },
         ]);
 
-        const res = await request(app)
-            .get('/api/sdk/observability/audit-tail')
-            .query({ sessionId: 's1' });
+        const res = await request(app).get('/api/sdk/observability/audit-tail').query({ sessionId: 's1' });
 
         expect(res.body.count).toBe(1);
         expect(res.body.entries[0].sessionId).toBe('s1');
@@ -446,9 +433,7 @@ describe('F38 — GET /observability/events/dead-letter', () => {
     });
 
     it('respeita limit query param', async () => {
-        const res = await request(app)
-            .get('/api/sdk/observability/events/dead-letter')
-            .query({ limit: 5 });
+        const res = await request(app).get('/api/sdk/observability/events/dead-letter').query({ limit: 5 });
 
         expect(res.status).toBe(200);
         expect(mockGetDeadLetters).toHaveBeenCalledWith(5);

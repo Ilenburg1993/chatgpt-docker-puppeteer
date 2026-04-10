@@ -5,6 +5,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { SESSION_EVENTS } from '#copilot/sdk';
 import { persistState } from '../../lifecycle/state-io.js';
 
 /**
@@ -13,7 +14,7 @@ import { persistState } from '../../lifecycle/state-io.js';
  * @returns {() => void}
  */
 export function wireUsageEvent(session, { emit, onPrInfo }) {
-    return session.on('assistant.usage', (/** @type {any} */ evt) => {
+    return session.on(SESSION_EVENTS.ASSISTANT_USAGE, (/** @type {any} */ evt) => {
         const data = evt?.data ?? {};
         const model = /** @type {string | undefined} */ (data['model']);
         const cost = /** @type {number | undefined} */ (data['cost']);

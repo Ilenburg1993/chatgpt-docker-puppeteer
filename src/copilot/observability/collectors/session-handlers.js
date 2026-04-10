@@ -7,6 +7,7 @@
  * @module copilot/observability/collectors/session-handlers
  */
 
+import { SESSION_EVENTS as SE } from '#copilot/sdk';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -44,7 +45,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.error ─────────────────────────────────────────────────────
     unsubs.push(
-        session.on('session.error', (event) => {
+        session.on(SE.SESSION_ERROR, (event) => {
             const { errorType, message } = event.data;
             errorTracker?.trackError(new Error(message ?? String(errorType)), {
                 source: 'sdk:session.error',
@@ -61,7 +62,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.usage_info ────────────────────────────────────────────────
     unsubs.push(
-        session.on('session.usage_info', (event) => {
+        session.on(SE.SESSION_USAGE_INFO, (event) => {
             if (persist && persistSet.has('session.usage_info')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }
@@ -70,7 +71,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.truncation ────────────────────────────────────────────────
     unsubs.push(
-        session.on('session.truncation', (event) => {
+        session.on(SE.SESSION_TRUNCATION, (event) => {
             if (persist && persistSet.has('session.truncation')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             }
@@ -80,14 +81,14 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.compaction_start / complete ───────────────────────────────
     unsubs.push(
-        session.on('session.compaction_start', (event) => {
+        session.on(SE.SESSION_COMPACTION_START, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp });
             _recordCompaction?.(sessionId, { type: event.type, ts: event.timestamp });
             log('INFO', `[event-collector] compaction_start session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.compaction_complete', (event) => {
+        session.on(SE.SESSION_COMPACTION_COMPLETE, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             _recordCompaction?.(sessionId, { type: event.type, ts: event.timestamp, data: event.data });
             log('INFO', `[event-collector] compaction_complete session=${sessionId}`);
@@ -96,13 +97,13 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.tools_updated / mcp_servers_loaded ────────────────────────
     unsubs.push(
-        session.on('session.tools_updated', (event) => {
+        session.on(SE.SESSION_TOOLS_UPDATED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('DEBUG', `[event-collector] session.tools_updated session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.mcp_servers_loaded', (event) => {
+        session.on(SE.SESSION_MCP_SERVERS_LOADED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('DEBUG', `[event-collector] session.mcp_servers_loaded session=${sessionId}`);
         }),
@@ -110,46 +111,46 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.mode_changed / model_change / plan_changed ────────────────
     unsubs.push(
-        session.on('session.mode_changed', (event) => {
+        session.on(SE.SESSION_MODE_CHANGED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('INFO', `[event-collector] session.mode_changed session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.model_change', (event) => {
+        session.on(SE.SESSION_MODEL_CHANGE, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('INFO', `[event-collector] session.model_change session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.plan_changed', (event) => {
+        session.on(SE.SESSION_PLAN_CHANGED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
 
     // ── session.background_tasks_changed ─────────────────────────────────
     unsubs.push(
-        session.on('session.background_tasks_changed', (event) => {
+        session.on(SE.SESSION_BACKGROUND_TASKS_CHANGED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
         }),
     );
 
     // ── session.warning / idle / shutdown ─────────────────────────────────
     unsubs.push(
-        session.on('session.warning', (event) => {
+        session.on(SE.SESSION_WARNING, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('WARN', `[event-collector] session.warning session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.idle', (event) => {
+        session.on(SE.SESSION_IDLE, (event) => {
             if (persist && persistSet.has('session.idle'))
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('DEBUG', `[event-collector] session.idle session=${sessionId}`);
         }),
     );
     unsubs.push(
-        session.on('session.shutdown', (event) => {
+        session.on(SE.SESSION_SHUTDOWN, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('INFO', `[event-collector] session.shutdown session=${sessionId}`);
         }),
@@ -157,7 +158,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.task_complete ─────────────────────────────────────────────
     unsubs.push(
-        session.on('session.task_complete', (event) => {
+        session.on(SE.SESSION_TASK_COMPLETE, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
             log('INFO', `[event-collector] session.task_complete session=${sessionId}`);
         }),
@@ -165,7 +166,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.start / resume — Fase AP ─────────────────────────────────
     unsubs.push(
-        session.on('session.start', (event) => {
+        session.on(SE.SESSION_START, (event) => {
             const { sessionId: sdkSessionId, copilotVersion, selectedModel, reasoningEffort, context } = event.data;
             metrics?.recordSessionStart();
             metrics?.recordCounter(`model.${selectedModel ?? 'unknown'}`);
@@ -189,7 +190,7 @@ export function attachSessionHandlers(ctx) {
     );
 
     unsubs.push(
-        session.on('session.resume', (event) => {
+        session.on(SE.SESSION_RESUME, (event) => {
             const { eventCount, selectedModel, reasoningEffort, context, alreadyInUse } = event.data;
             metrics?.recordCounter('session.resumed');
             if (alreadyInUse) metrics?.recordCounter('session.already_in_use');
@@ -214,7 +215,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.context_changed / handoff — Fase AT ──────────────────────
     unsubs.push(
-        session.on('session.context_changed', (event) => {
+        session.on(SE.SESSION_CONTEXT_CHANGED, (event) => {
             const { branch, repository, cwd } = event.data;
             if (persist && persistSet.has('session.context_changed')) {
                 persistEvent({
@@ -231,7 +232,7 @@ export function attachSessionHandlers(ctx) {
     );
 
     unsubs.push(
-        session.on('session.handoff', (event) => {
+        session.on(SE.SESSION_HANDOFF, (event) => {
             const { handoffTime, sourceType, summary, remoteSessionId } = event.data;
             metrics?.recordCounter('session.handoff');
             metrics?.recordCounter(`session.handoff.source.${sourceType ?? 'unknown'}`);
@@ -252,7 +253,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.skills_loaded / extensions_loaded — Fase AU ──────────────
     unsubs.push(
-        session.on('session.skills_loaded', (event) => {
+        session.on(SE.SESSION_SKILLS_LOADED, (event) => {
             const { skills } = event.data;
             const enabledCount = skills.filter((/** @type {{ enabled?: boolean }} */ s) => s.enabled).length;
             metrics?.recordCounter('session.skills_loaded');
@@ -279,7 +280,7 @@ export function attachSessionHandlers(ctx) {
     );
 
     unsubs.push(
-        session.on('session.extensions_loaded', (event) => {
+        session.on(SE.SESSION_EXTENSIONS_LOADED, (event) => {
             const { extensions } = event.data;
             const runningCount = extensions.filter(
                 (/** @type {{ status?: string }} */ e) => e.status === 'running',
@@ -306,7 +307,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.mcp_server_status_changed — Fase AV ──────────────────────
     unsubs.push(
-        session.on('session.mcp_server_status_changed', (event) => {
+        session.on(SE.SESSION_MCP_SERVER_STATUS_CHANGED, (event) => {
             const { serverName, status } = event.data;
             metrics?.recordCounter(`mcp.server.status.${status}`);
             if (status === 'failed') {
@@ -324,7 +325,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.title_changed ────────────────────────────────────────────
     unsubs.push(
-        session.on('session.title_changed', (event) => {
+        session.on(SE.SESSION_TITLE_CHANGED, (event) => {
             const { title } = event.data;
             metrics?.recordCounter('session.title_changed');
             if (persist) {
@@ -336,7 +337,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.workspace_file_changed ───────────────────────────────────
     unsubs.push(
-        session.on('session.workspace_file_changed', (event) => {
+        session.on(SE.SESSION_WORKSPACE_FILE_CHANGED, (event) => {
             const { path, operation } = event.data;
             metrics?.recordCounter(`session.workspace_file_changed.${operation ?? 'unknown'}`);
             if (persist && persistSet.has('session.workspace_file_changed')) {
@@ -348,7 +349,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.snapshot_rewind ──────────────────────────────────────────
     unsubs.push(
-        session.on('session.snapshot_rewind', (event) => {
+        session.on(SE.SESSION_SNAPSHOT_REWIND, (event) => {
             metrics?.recordCounter('session.snapshot_rewind');
             const removed = /** @type {number | undefined} */ (event.data?.eventsRemoved);
             log(
@@ -369,7 +370,7 @@ export function attachSessionHandlers(ctx) {
 
     // ── session.info ─────────────────────────────────────────────────────
     unsubs.push(
-        session.on('session.info', (event) => {
+        session.on(SE.SESSION_INFO, (event) => {
             metrics?.recordCounter('session.info');
             const infoType = /** @type {string | undefined} */ (event.data?.infoType);
             const logLevel = infoType === 'authentication' || infoType === 'model' ? 'WARN' : 'DEBUG';

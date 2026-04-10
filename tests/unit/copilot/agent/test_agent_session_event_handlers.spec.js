@@ -2,17 +2,18 @@
 /**
  * @file Faixa 43 — Agent: session event-wirer + event-handlers + history-sync + webhook-manager
  *
- * Cobre módulos verdadeiramente sem cobertura no agent/:
- * - event-wirer.js (73L) — wireSessionEvents orchestration
- * - event-handlers/catch-all.js (99L) — KNOWN_SDK_EVENTS + wireCatchAll
- * - event-handlers/sdk-responses.js (126L) — wireSdkResponseEvents
- * - event-handlers/token-budget.js (54L) — wireTokenBudgetEvents
- * - event-handlers/system-notifications.js (67L) — wireSystemNotificationEvents
- * - session/history-sync.js (108L) — syncSdkHistory + SessionMessagesCache
- * - infra/webhook-manager.js (233L) — WebhookManager
+ *   Cobre módulos verdadeiramente sem cobertura no agent/:
+ *
+ *   - event-wirer.js (73L) — wireSessionEvents orchestration
+ *   - event-handlers/catch-all.js (99L) — KNOWN_SDK_EVENTS + wireCatchAll
+ *   - event-handlers/sdk-responses.js (126L) — wireSdkResponseEvents
+ *   - event-handlers/token-budget.js (54L) — wireTokenBudgetEvents
+ *   - event-handlers/system-notifications.js (67L) — wireSystemNotificationEvents
+ *   - session/history-sync.js (108L) — syncSdkHistory + SessionMessagesCache
+ *   - infra/webhook-manager.js (233L) — WebhookManager
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -23,37 +24,50 @@ const mocks = vi.hoisted(() => ({
     checkResolvedIp: vi.fn(),
     conversationStore: { syncFromSdkHistory: vi.fn(() => ({ synced: 3, skipped: 1 })) },
     getHubSessionId: vi.fn(() => 'hub-1'),
-    defaultMetrics: { getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })) },
+    defaultMetrics: {
+        getSummary: vi.fn(() => ({ dialog: { turnsTotal: 5 }, tokens: { inputTokens: 100, outputTokens: 200 } })),
+    },
     readTodoStore: vi.fn(async () => ({ tasks: {} })),
     safeJsonParse: vi.fn((/** @type {string} */ raw) => {
-        try { return { ok: true, data: JSON.parse(raw) }; } catch { return { ok: false, data: null }; }
+        try {
+            return { ok: true, data: JSON.parse(raw) };
+        } catch {
+            return { ok: false, data: null };
+        }
     }),
 }));
 
 vi.mock('#copilot/observability/logger', () => ({ log: mocks.log }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
 // Mock env com Proxy que retorna defaults para qualquer export não explicitamente definido
-vi.mock('#copilot/config/env', () => new Proxy({
-    WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
-    BRIDGE_ADMIN_TOKEN: 'test',
-    SSE_REPLAY_BUFFER_SIZE: 100,
-    SSE_MAX_CONCURRENT: 10,
-    LLM_B_DIALOG_QUEUE_MAX: 50,
-    TERMINAL_MAX_INJECT_HISTORY: 20,
-    TERMINAL_MAX_LISTENERS: 50,
-    TERMINAL_MAX_ATTACHMENTS: 10,
-    TERMINAL_SHOW_STREAMING: true,
-    TERMINAL_SHOW_THINKING: true,
-    TERMINAL_SHOW_USAGE: true,
-    CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
-    COPILOT_MODEL: 'gpt-4o',
-    COPILOT_REASONING_EFFORT: '',
-    COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
-    DASHBOARD_SOCKET_AUTH_REQUIRED: false,
-}, {
-    get: (target, prop) => prop in target ? target[prop] : typeof prop === 'string' ? 0 : undefined,
-    has: () => true,
-}));
+vi.mock(
+    '#copilot/config/env',
+    () =>
+        new Proxy(
+            {
+                WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
+                BRIDGE_ADMIN_TOKEN: 'test',
+                SSE_REPLAY_BUFFER_SIZE: 100,
+                SSE_MAX_CONCURRENT: 10,
+                LLM_B_DIALOG_QUEUE_MAX: 50,
+                TERMINAL_MAX_INJECT_HISTORY: 20,
+                TERMINAL_MAX_LISTENERS: 50,
+                TERMINAL_MAX_ATTACHMENTS: 10,
+                TERMINAL_SHOW_STREAMING: true,
+                TERMINAL_SHOW_THINKING: true,
+                TERMINAL_SHOW_USAGE: true,
+                CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
+                COPILOT_MODEL: 'gpt-4o',
+                COPILOT_REASONING_EFFORT: '',
+                COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
+                DASHBOARD_SOCKET_AUTH_REQUIRED: false,
+            },
+            {
+                get: (target, prop) => (prop in target ? target[prop] : typeof prop === 'string' ? 0 : undefined),
+                has: () => true,
+            },
+        ),
+);
 // Mock conversationStore e terminal/state (deep deps from history-sync)
 vi.mock('#copilot/conversation-hub/store', () => ({
     conversationStore: mocks.conversationStore,
@@ -68,8 +82,8 @@ vi.mock('#copilot/terminal/state', () => ({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Cria mock de CopilotSession com suporte a `.on(event, handler)` + `.on(handler)`.
- * Retorna unsubscribe functions e permite emitir eventos.
+ * Cria mock de CopilotSession com suporte a `.on(event, handler)` + `.on(handler)`. Retorna unsubscribe functions e
+ * permite emitir eventos.
  */
 function createMockSession() {
     /** @type {Map<string, Function[]>} */
@@ -83,13 +97,19 @@ function createMockSession() {
         on(eventOrHandler, handler) {
             if (typeof eventOrHandler === 'function') {
                 catchAll.push(eventOrHandler);
-                return () => { const idx = catchAll.indexOf(eventOrHandler); if (idx >= 0) catchAll.splice(idx, 1); };
+                return () => {
+                    const idx = catchAll.indexOf(eventOrHandler);
+                    if (idx >= 0) catchAll.splice(idx, 1);
+                };
             }
             const arr = listeners.get(eventOrHandler) || [];
             const fn = /** @type {Function} */ (handler);
             arr.push(fn);
             listeners.set(eventOrHandler, arr);
-            return () => { const i = arr.indexOf(fn); if (i >= 0) arr.splice(i, 1); };
+            return () => {
+                const i = arr.indexOf(fn);
+                if (i >= 0) arr.splice(i, 1);
+            };
         },
         /** @param {string} event @param {object} [data] */
         _emit(event, data) {
@@ -111,35 +131,27 @@ function createMockSession() {
 
 describe('F43 — event-handlers/catch-all', () => {
     it('KNOWN_SDK_EVENTS é um Set com >50 eventos conhecidos', async () => {
-        const { KNOWN_SDK_EVENTS } = await import(
-            '#copilot/agent/session/event-handlers/catch-all'
-        );
+        const { KNOWN_SDK_EVENTS } = await import('#copilot/agent/session/event-handlers/catch-all');
         expect(KNOWN_SDK_EVENTS).toBeInstanceOf(Set);
         expect(KNOWN_SDK_EVENTS.size).toBeGreaterThan(50);
     });
 
     it('KNOWN_SDK_EVENTS contém eventos fundamentais', async () => {
-        const { KNOWN_SDK_EVENTS } = await import(
-            '#copilot/agent/session/event-handlers/catch-all'
-        );
+        const { KNOWN_SDK_EVENTS } = await import('#copilot/agent/session/event-handlers/catch-all');
         for (const evt of ['assistant.message', 'session.idle', 'session.error', 'tool.execution_start', 'abort']) {
             expect(KNOWN_SDK_EVENTS.has(evt)).toBe(true);
         }
     });
 
     it('wireCatchAll retorna unsubscribe function', async () => {
-        const { wireCatchAll } = await import(
-            '#copilot/agent/session/event-handlers/catch-all'
-        );
+        const { wireCatchAll } = await import('#copilot/agent/session/event-handlers/catch-all');
         const session = createMockSession();
         const unsub = wireCatchAll(/** @type {any} */ (session));
         expect(typeof unsub).toBe('function');
     });
 
     it('wireCatchAll ignora eventos conhecidos sem logar WARN', async () => {
-        const { wireCatchAll } = await import(
-            '#copilot/agent/session/event-handlers/catch-all'
-        );
+        const { wireCatchAll } = await import('#copilot/agent/session/event-handlers/catch-all');
         const session = createMockSession();
         wireCatchAll(/** @type {any} */ (session));
         mocks.log.mockClear();
@@ -148,9 +160,7 @@ describe('F43 — event-handlers/catch-all', () => {
     });
 
     it('wireCatchAll loga WARN para eventos desconhecidos', async () => {
-        const { wireCatchAll } = await import(
-            '#copilot/agent/session/event-handlers/catch-all'
-        );
+        const { wireCatchAll } = await import('#copilot/agent/session/event-handlers/catch-all');
         const session = createMockSession();
         wireCatchAll(/** @type {any} */ (session));
         mocks.log.mockClear();
@@ -165,9 +175,7 @@ describe('F43 — event-handlers/catch-all', () => {
 
 describe('F43 — event-handlers/sdk-responses', () => {
     it('wireSdkResponseEvents retorna array de unsubscribe functions', async () => {
-        const { wireSdkResponseEvents } = await import(
-            '#copilot/agent/session/event-handlers/sdk-responses'
-        );
+        const { wireSdkResponseEvents } = await import('#copilot/agent/session/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireSdkResponseEvents(/** @type {any} */ (session), { emit });
@@ -177,9 +185,7 @@ describe('F43 — event-handlers/sdk-responses', () => {
     });
 
     it('emite assistant.intent ao receber evento', async () => {
-        const { wireSdkResponseEvents } = await import(
-            '#copilot/agent/session/event-handlers/sdk-responses'
-        );
+        const { wireSdkResponseEvents } = await import('#copilot/agent/session/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
@@ -188,45 +194,48 @@ describe('F43 — event-handlers/sdk-responses', () => {
     });
 
     it('emite session.error com errorType e message', async () => {
-        const { wireSdkResponseEvents } = await import(
-            '#copilot/agent/session/event-handlers/sdk-responses'
-        );
+        const { wireSdkResponseEvents } = await import('#copilot/agent/session/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         session._emit('session.error', { errorType: 'rate_limit', message: 'Too many requests' });
-        expect(emit).toHaveBeenCalledWith('session.error', expect.objectContaining({
-            errorType: 'rate_limit',
-            message: 'Too many requests',
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.error',
+            expect.objectContaining({
+                errorType: 'rate_limit',
+                message: 'Too many requests',
+            }),
+        );
     });
 
     it('emite session.handoff com fromAgent/toAgent', async () => {
-        const { wireSdkResponseEvents } = await import(
-            '#copilot/agent/session/event-handlers/sdk-responses'
-        );
+        const { wireSdkResponseEvents } = await import('#copilot/agent/session/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         session._emit('session.handoff', { fromAgent: 'a1', toAgent: 'a2', reason: 'capacity' });
-        expect(emit).toHaveBeenCalledWith('session.handoff', expect.objectContaining({
-            fromAgent: 'a1',
-            toAgent: 'a2',
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.handoff',
+            expect.objectContaining({
+                fromAgent: 'a1',
+                toAgent: 'a2',
+            }),
+        );
     });
 
     it('emite session.truncation com contadores', async () => {
-        const { wireSdkResponseEvents } = await import(
-            '#copilot/agent/session/event-handlers/sdk-responses'
-        );
+        const { wireSdkResponseEvents } = await import('#copilot/agent/session/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         session._emit('session.truncation', { messageTruncatedCount: 5, tokensTruncated: 1000, reason: 'overflow' });
-        expect(emit).toHaveBeenCalledWith('session.truncation', expect.objectContaining({
-            messageTruncatedCount: 5,
-            tokensTruncated: 1000,
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.truncation',
+            expect.objectContaining({
+                messageTruncatedCount: 5,
+                tokensTruncated: 1000,
+            }),
+        );
     });
 });
 
@@ -236,9 +245,7 @@ describe('F43 — event-handlers/sdk-responses', () => {
 
 describe('F43 — event-handlers/token-budget', () => {
     it('wireTokenBudgetEvents retorna array com 1 unsubscribe', async () => {
-        const { wireTokenBudgetEvents } = await import(
-            '#copilot/agent/session/event-handlers/token-budget'
-        );
+        const { wireTokenBudgetEvents } = await import('#copilot/agent/session/event-handlers/token-budget');
         const session = createMockSession();
         const emit = vi.fn();
         const onContextState = vi.fn();
@@ -247,49 +254,41 @@ describe('F43 — event-handlers/token-budget', () => {
     });
 
     it('emite session.usage e atualiza contextState', async () => {
-        const { wireTokenBudgetEvents } = await import(
-            '#copilot/agent/session/event-handlers/token-budget'
-        );
+        const { wireTokenBudgetEvents } = await import('#copilot/agent/session/event-handlers/token-budget');
         const session = createMockSession();
         const emit = vi.fn();
         const onContextState = vi.fn();
         wireTokenBudgetEvents(/** @type {any} */ (session), false, { emit, onContextState });
         session._emit('session.usage_info', { currentTokens: 5000, tokenLimit: 10000 });
         expect(emit).toHaveBeenCalledWith('session.usage', expect.objectContaining({ currentTokens: 5000 }));
-        expect(onContextState).toHaveBeenCalledWith(expect.objectContaining({
-            tokens: 5000,
-            tokenLimit: 10000,
-            utilization: 0.5,
-        }));
+        expect(onContextState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                tokens: 5000,
+                tokenLimit: 10000,
+                utilization: 0.5,
+            }),
+        );
     });
 
     it('emite token_budget_warning quando utilização >90%', async () => {
-        const { wireTokenBudgetEvents } = await import(
-            '#copilot/agent/session/event-handlers/token-budget'
-        );
+        const { wireTokenBudgetEvents } = await import('#copilot/agent/session/event-handlers/token-budget');
         const session = createMockSession();
         const emit = vi.fn();
         const onContextState = vi.fn();
         wireTokenBudgetEvents(/** @type {any} */ (session), false, { emit, onContextState });
         session._emit('session.usage_info', { currentTokens: 9500, tokenLimit: 10000 });
-        const warningCall = emit.mock.calls.find(
-            (/** @type {any[]} */ c) => c[0] === 'session.token_budget_warning'
-        );
+        const warningCall = emit.mock.calls.find((/** @type {any[]} */ c) => c[0] === 'session.token_budget_warning');
         expect(warningCall).toBeDefined();
     });
 
     it('emite token_budget_warning de startup heavy em sessão retomada (>70%)', async () => {
-        const { wireTokenBudgetEvents } = await import(
-            '#copilot/agent/session/event-handlers/token-budget'
-        );
+        const { wireTokenBudgetEvents } = await import('#copilot/agent/session/event-handlers/token-budget');
         const session = createMockSession();
         const emit = vi.fn();
         const onContextState = vi.fn();
         wireTokenBudgetEvents(/** @type {any} */ (session), true, { emit, onContextState });
         session._emit('session.usage_info', { currentTokens: 8000, tokenLimit: 10000 });
-        const warningCall = emit.mock.calls.find(
-            (/** @type {any[]} */ c) => c[0] === 'session.token_budget_warning'
-        );
+        const warningCall = emit.mock.calls.find((/** @type {any[]} */ c) => c[0] === 'session.token_budget_warning');
         expect(warningCall).toBeDefined();
         expect(warningCall?.[1]?.reason).toBe('startup_heavy');
     });
@@ -301,9 +300,8 @@ describe('F43 — event-handlers/token-budget', () => {
 
 describe('F43 — event-handlers/system-notifications', () => {
     it('wireSystemNotificationEvents retorna array com 1 unsubscribe', async () => {
-        const { wireSystemNotificationEvents } = await import(
-            '#copilot/agent/session/event-handlers/system-notifications'
-        );
+        const { wireSystemNotificationEvents } =
+            await import('#copilot/agent/session/event-handlers/system-notifications');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireSystemNotificationEvents(/** @type {any} */ (session), { emit });
@@ -311,37 +309,40 @@ describe('F43 — event-handlers/system-notifications', () => {
     });
 
     it('emite agent.background.completed para system.notification type=agent_completed', async () => {
-        const { wireSystemNotificationEvents } = await import(
-            '#copilot/agent/session/event-handlers/system-notifications'
-        );
+        const { wireSystemNotificationEvents } =
+            await import('#copilot/agent/session/event-handlers/system-notifications');
         const session = createMockSession();
         const emit = vi.fn();
         wireSystemNotificationEvents(/** @type {any} */ (session), { emit });
         session._emit('system.notification', { kind: { type: 'agent_completed', agentId: 'a1', status: 'success' } });
-        expect(emit).toHaveBeenCalledWith('agent.background.completed', expect.objectContaining({
-            agentId: 'a1',
-            status: 'success',
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'agent.background.completed',
+            expect.objectContaining({
+                agentId: 'a1',
+                status: 'success',
+            }),
+        );
     });
 
     it('emite agent.shell.completed para type=shell_completed', async () => {
-        const { wireSystemNotificationEvents } = await import(
-            '#copilot/agent/session/event-handlers/system-notifications'
-        );
+        const { wireSystemNotificationEvents } =
+            await import('#copilot/agent/session/event-handlers/system-notifications');
         const session = createMockSession();
         const emit = vi.fn();
         wireSystemNotificationEvents(/** @type {any} */ (session), { emit });
         session._emit('system.notification', { kind: { type: 'shell_completed', shellId: 's1', exitCode: 0 } });
-        expect(emit).toHaveBeenCalledWith('agent.shell.completed', expect.objectContaining({
-            shellId: 's1',
-            exitCode: 0,
-        }));
+        expect(emit).toHaveBeenCalledWith(
+            'agent.shell.completed',
+            expect.objectContaining({
+                shellId: 's1',
+                exitCode: 0,
+            }),
+        );
     });
 
     it('ignora notificações sem kind.type', async () => {
-        const { wireSystemNotificationEvents } = await import(
-            '#copilot/agent/session/event-handlers/system-notifications'
-        );
+        const { wireSystemNotificationEvents } =
+            await import('#copilot/agent/session/event-handlers/system-notifications');
         const session = createMockSession();
         const emit = vi.fn();
         wireSystemNotificationEvents(/** @type {any} */ (session), { emit });
@@ -356,18 +357,14 @@ describe('F43 — event-handlers/system-notifications', () => {
 
 describe('F43 — SessionMessagesCache', () => {
     it('retorna array vazio quando session é null', async () => {
-        const { SessionMessagesCache } = await import(
-            '#copilot/agent/session/history-sync'
-        );
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(5000);
         const result = await cache.get(null);
         expect(result).toEqual([]);
     });
 
     it('retorna mensagens da sessão na primeira chamada', async () => {
-        const { SessionMessagesCache } = await import(
-            '#copilot/agent/session/history-sync'
-        );
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         const result = await cache.get(/** @type {any} */ (session));
@@ -376,9 +373,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('retorna do cache na segunda chamada dentro do TTL', async () => {
-        const { SessionMessagesCache } = await import(
-            '#copilot/agent/session/history-sync'
-        );
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         await cache.get(/** @type {any} */ (session));
@@ -389,9 +384,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('invalidate() limpa o cache', async () => {
-        const { SessionMessagesCache } = await import(
-            '#copilot/agent/session/history-sync'
-        );
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         await cache.get(/** @type {any} */ (session));
@@ -402,9 +395,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('retorna [] quando getMessages lança erro', async () => {
-        const { SessionMessagesCache } = await import(
-            '#copilot/agent/session/history-sync'
-        );
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         session.getMessages.mockRejectedValueOnce(new Error('network'));
@@ -419,9 +410,7 @@ describe('F43 — SessionMessagesCache', () => {
 
 describe('F43 — event-wirer.js wireSessionEvents', () => {
     it('retorna array de unsubscribe functions', async () => {
-        const { wireSessionEvents } = await import(
-            '#copilot/agent/session/event-wirer'
-        );
+        const { wireSessionEvents } = await import('#copilot/agent/session/event-wirer');
         const session = createMockSession();
         const callbacks = {
             emit: vi.fn(),
@@ -439,9 +428,7 @@ describe('F43 — event-wirer.js wireSessionEvents', () => {
     });
 
     it('unsubscribe functions são chamáveis sem erro', async () => {
-        const { wireSessionEvents } = await import(
-            '#copilot/agent/session/event-wirer'
-        );
+        const { wireSessionEvents } = await import('#copilot/agent/session/event-wirer');
         const session = createMockSession();
         const callbacks = {
             emit: vi.fn(),

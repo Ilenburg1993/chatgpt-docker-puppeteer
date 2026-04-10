@@ -2,25 +2,26 @@
 /**
  * @file Faixa 41 — RPC Facade Edge Cases + Integration Contracts (F229-F235)
  *
- * Testes complementares para src/copilot/sdk/rpc.js focados em:
- * - createSessionRpcFacade facade delegation (workspace subsystem)
- * - Error propagation patterns across subsystems
- * - modelSwitchTo reasoningEffort edge cases
- * - workspaceCreateFile content validation edge cases
- * - assertSession error messages consistency
- * - shellKill signal parameter handling
- * - toolsHandlePendingCall result variants
+ *   Testes complementares para src/copilot/sdk/rpc.js focados em:
+ *
+ *   - createSessionRpcFacade facade delegation (workspace subsystem)
+ *   - Error propagation patterns across subsystems
+ *   - modelSwitchTo reasoningEffort edge cases
+ *   - workspaceCreateFile content validation edge cases
+ *   - assertSession error messages consistency
+ *   - shellKill signal parameter handling
+ *   - toolsHandlePendingCall result variants
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
-    compactionCompact,
     commandsHandlePending,
+    compactionCompact,
     createSessionRpcFacade,
+    modeGet,
     modelGetCurrent,
     modelSwitchTo,
-    modeGet,
     modeSet,
     permissionsHandlePending,
     planDelete,
@@ -45,16 +46,44 @@ function mockSession(overrides = {}) {
     return {
         sessionId: 'test-session-1',
         rpc: {
-            model: { getCurrent: async () => ({ modelId: 'gpt-4o' }), switchTo: async () => ({ modelId: 'gpt-4o' }), ...overrides['model'] },
-            mode: { get: async () => ({ mode: 'interactive' }), set: async () => ({ mode: 'plan' }), ...overrides['mode'] },
-            plan: { read: async () => ({ exists: true, content: 'plan', path: '/plan.md' }), update: async () => ({}), delete: async () => ({}), ...overrides['plan'] },
-            workspace: { listFiles: async () => ({ files: ['a.js'] }), readFile: async () => ({ content: 'code' }), createFile: async () => ({}), ...overrides['workspace'] },
+            model: {
+                getCurrent: async () => ({ modelId: 'gpt-4o' }),
+                switchTo: async () => ({ modelId: 'gpt-4o' }),
+                ...overrides['model'],
+            },
+            mode: {
+                get: async () => ({ mode: 'interactive' }),
+                set: async () => ({ mode: 'plan' }),
+                ...overrides['mode'],
+            },
+            plan: {
+                read: async () => ({ exists: true, content: 'plan', path: '/plan.md' }),
+                update: async () => ({}),
+                delete: async () => ({}),
+                ...overrides['plan'],
+            },
+            workspace: {
+                listFiles: async () => ({ files: ['a.js'] }),
+                readFile: async () => ({ content: 'code' }),
+                createFile: async () => ({}),
+                ...overrides['workspace'],
+            },
             log: { event: async () => ({ eventId: 'e1' }), ...overrides['log'] },
-            compaction: { compact: async () => ({ success: true, tokensRemoved: 100, messagesRemoved: 5 }), ...overrides['compaction'] },
-            shell: { exec: async () => ({ processId: 'p1' }), kill: async () => ({ killed: true }), ...overrides['shell'] },
+            compaction: {
+                compact: async () => ({ success: true, tokensRemoved: 100, messagesRemoved: 5 }),
+                ...overrides['compaction'],
+            },
+            shell: {
+                exec: async () => ({ processId: 'p1' }),
+                kill: async () => ({ killed: true }),
+                ...overrides['shell'],
+            },
             ui: { elicitation: async () => ({ action: 'accept' }), ...overrides['ui'] },
             commands: { handlePendingCommand: async () => ({ success: true }), ...overrides['commands'] },
-            permissions: { handlePendingPermissionRequest: async () => ({ success: true }), ...overrides['permissions'] },
+            permissions: {
+                handlePendingPermissionRequest: async () => ({ success: true }),
+                ...overrides['permissions'],
+            },
             tools: { handlePendingToolCall: async () => ({ success: true }), ...overrides['tools'] },
         },
     };
@@ -150,45 +179,55 @@ describe('F41 — createSessionRpcFacade workspace delegation', () => {
 describe('F41 — Error propagation across subsystems', () => {
     it('compactionCompact propaga erro custom do SDK', async () => {
         const s = mockSession({
-            compaction: { compact: async () => { throw new Error('quota exhausted'); } },
+            compaction: {
+                compact: async () => {
+                    throw new Error('quota exhausted');
+                },
+            },
         });
 
-        await expect(compactionCompact(/** @type {any} */ (s)))
-            .rejects.toThrow('quota exhausted');
+        await expect(compactionCompact(/** @type {any} */ (s))).rejects.toThrow('quota exhausted');
     });
 
     it('shellExec propaga erro de timeout', async () => {
         const s = mockSession({
             shell: {
-                exec: async () => { throw new Error('process timed out'); },
+                exec: async () => {
+                    throw new Error('process timed out');
+                },
                 kill: async () => ({ killed: true }),
             },
         });
 
-        await expect(shellExec(/** @type {any} */ (s), 'slow-cmd'))
-            .rejects.toThrow('process timed out');
+        await expect(shellExec(/** @type {any} */ (s), 'slow-cmd')).rejects.toThrow('process timed out');
     });
 
     it('uiElicitation propaga erro de cancelamento', async () => {
         const s = mockSession({
-            ui: { elicitation: async () => { throw new Error('user cancelled'); } },
+            ui: {
+                elicitation: async () => {
+                    throw new Error('user cancelled');
+                },
+            },
         });
 
-        await expect(uiElicitation(/** @type {any} */ (s), 'question', { type: 'string' }))
-            .rejects.toThrow('user cancelled');
+        await expect(uiElicitation(/** @type {any} */ (s), 'question', { type: 'string' })).rejects.toThrow(
+            'user cancelled',
+        );
     });
 
     it('workspaceReadFile propaga ENOENT', async () => {
         const s = mockSession({
             workspace: {
                 listFiles: async () => ({ files: [] }),
-                readFile: async () => { throw new Error('ENOENT: no such file'); },
+                readFile: async () => {
+                    throw new Error('ENOENT: no such file');
+                },
                 createFile: async () => ({}),
             },
         });
 
-        await expect(workspaceReadFile(/** @type {any} */ (s), 'missing.js'))
-            .rejects.toThrow('ENOENT');
+        await expect(workspaceReadFile(/** @type {any} */ (s), 'missing.js')).rejects.toThrow('ENOENT');
     });
 });
 
@@ -202,7 +241,10 @@ describe('F41 — shellKill signal handling', () => {
         const s = mockSession({
             shell: {
                 exec: async () => ({ processId: 'p1' }),
-                kill: async (/** @type {any} */ params) => { captured = params; return { killed: true }; },
+                kill: async (/** @type {any} */ params) => {
+                    captured = params;
+                    return { killed: true };
+                },
             },
         });
 
@@ -216,7 +258,10 @@ describe('F41 — shellKill signal handling', () => {
         const s = mockSession({
             shell: {
                 exec: async () => ({ processId: 'p1' }),
-                kill: async (/** @type {any} */ params) => { captured = params; return { killed: true }; },
+                kill: async (/** @type {any} */ params) => {
+                    captured = params;
+                    return { killed: true };
+                },
             },
         });
 
@@ -232,8 +277,7 @@ describe('F41 — shellKill signal handling', () => {
 describe('F41 — toolsHandlePendingCall edge cases', () => {
     it('aceita result=undefined (sem options)', async () => {
         const s = mockSession();
-        await expect(toolsHandlePendingCall(/** @type {any} */ (s), 'r1'))
-            .resolves.toEqual({ success: true });
+        await expect(toolsHandlePendingCall(/** @type {any} */ (s), 'r1')).resolves.toEqual({ success: true });
     });
 
     it('aceita result com textResultForLlm objeto', async () => {

@@ -2,12 +2,13 @@
 /**
  * @file Faixa 50 — API: session-middleware + event-fanout
  *
- * Cobre:
- * - api/express/session-middleware.js — rateLimitMiddleware, validateModel, withErrorHandler, validateBody
- * - api/sse/fanout.js — EventFanout publish/subscribe/destroy
+ *   Cobre:
+ *
+ *   - api/express/session-middleware.js — rateLimitMiddleware, validateModel, withErrorHandler, validateBody
+ *   - api/sse/fanout.js — EventFanout publish/subscribe/destroy
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
 
@@ -133,10 +134,12 @@ describe('F50 — validateBody', () => {
         mw(/** @type {any} */ (req), /** @type {any} */ (res), next);
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-            ok: false,
-            error: 'Corpo da requisição inválido.',
-        }));
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                ok: false,
+                error: 'Corpo da requisição inválido.',
+            }),
+        );
     });
 });
 
@@ -165,11 +168,13 @@ describe('F50 — EventFanout', () => {
         const handler = vi.fn();
         fanout.subscribe('terminal', handler);
         fanout.publish('terminal', 'input', { text: 'hello' });
-        expect(handler).toHaveBeenCalledWith(expect.objectContaining({
-            channel: 'terminal',
-            event: 'input',
-            data: { text: 'hello' },
-        }));
+        expect(handler).toHaveBeenCalledWith(
+            expect.objectContaining({
+                channel: 'terminal',
+                event: 'input',
+                data: { text: 'hello' },
+            }),
+        );
         fanout.destroy();
     });
 

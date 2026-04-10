@@ -245,7 +245,11 @@ export class PinnedFilesLoader extends EventEmitter {
             this.#debounceTimers.delete(filePath);
 
             let fileExists = true;
-            try { await access(filePath); } catch { fileExists = false; }
+            try {
+                await access(filePath);
+            } catch {
+                fileExists = false;
+            }
             if (!fileExists) {
                 if (this.#files.has(filePath)) {
                     this.#files.delete(filePath);

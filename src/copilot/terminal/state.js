@@ -43,6 +43,17 @@ export const stateEmitter = new EventEmitter();
 // T-23: setMaxListeners calculado em vez de hardcoded (base 10 + margem p/ hot patches)
 stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
 
+/**
+ * F55/F314 — Constantes de eventos do stateEmitter do terminal.
+ */
+export const TERMINAL_EVENTS = /** @type {const} */ ({
+    HUB_SESSION_CHANGED: 'hubSessionId:changed',
+    BUSY_CHANGED: 'busy:changed',
+    SHOW_THINKING_CHANGED: 'showThinking:changed',
+    SHOW_USAGE_CHANGED: 'showUsage:changed',
+    SHOW_STREAMING_CHANGED: 'showStreaming:changed',
+});
+
 // ─── Estado compartilhado ─────────────────────────────────────────────────────
 
 /** ID da hub_session permanente criada no boot. @type {string | null} */
@@ -93,7 +104,7 @@ export function getHubSessionId() {
 export function setHubSessionId(id) {
     const prev = _hubSessionId;
     _hubSessionId = id;
-    if (prev !== id) stateEmitter.emit('hubSessionId:changed', id, prev);
+    if (prev !== id) stateEmitter.emit(TERMINAL_EVENTS.HUB_SESSION_CHANGED, id, prev);
 }
 
 /** @returns {boolean} */
@@ -104,7 +115,7 @@ export function getBusy() {
 export function setBusy(value) {
     const prev = _busy;
     _busy = value;
-    if (prev !== value) stateEmitter.emit('busy:changed', value);
+    if (prev !== value) stateEmitter.emit(TERMINAL_EVENTS.BUSY_CHANGED, value);
 }
 
 /** @returns {import('node:readline').Interface | null} */
@@ -189,7 +200,7 @@ export function getShowThinking() {
 /** @param {boolean} value @returns {void} */
 export function setShowThinking(value) {
     _showThinking = value;
-    stateEmitter.emit('showThinking:changed', value);
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_THINKING_CHANGED, value);
 }
 
 // ─── Usage display (F20.2) ────────────────────────────────────────────────────
@@ -210,7 +221,7 @@ export function getShowUsage() {
 /** @param {boolean} value @returns {void} */
 export function setShowUsage(value) {
     _showUsage = value;
-    stateEmitter.emit('showUsage:changed', value);
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_USAGE_CHANGED, value);
 }
 
 // ─── Streaming display (F19.2) ───────────────────────────────────────────────
@@ -231,7 +242,7 @@ export function getShowStreaming() {
 /** @param {boolean} value @returns {void} */
 export function setShowStreaming(value) {
     _showStreaming = value;
-    stateEmitter.emit('showStreaming:changed', value);
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_STREAMING_CHANGED, value);
 }
 
 // ─── Inject history (F16.3) ──────────────────────────────────────────────────
