@@ -10,8 +10,8 @@
 
 import { log } from '#copilot/observability/logger';
 import { EventEmitter } from 'node:events';
-import { existsSync, readdirSync, statSync, watch } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { watch } from 'node:fs';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
 
@@ -81,7 +81,7 @@ export class PinnedFilesLoader extends EventEmitter {
         // F10.5: #startWatchers já silencia erros individuais via watcher.on('error'); o try/catch
         // aqui garante que falhas globais (ex: fs.watch não disponível) não bloqueiam o boot.
         try {
-            this.#startWatchers();
+            await this.#startWatchers();
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             log('WARN', `[PinnedFilesLoader] Watchers não iniciados (continuando sem hot-reload): ${msg}`);
@@ -134,8 +134,6 @@ export class PinnedFilesLoader extends EventEmitter {
      * @returns {Promise<void>}
      */
     async #loadDir(dir) {
-        if (!existsSync(dir)) return;
-
         let entries;
         try {
             entries = await readdir(dir);
@@ -173,14 +171,18 @@ export class PinnedFilesLoader extends EventEmitter {
     }
 
     /**
-     * @returns {void}
+     * @returns {Promise<void>}
      */
-    #startWatchers() {
+    async #startWatchers() {
         // BUG-CRIT-07 (fix): fs.watch com recursive só funciona em macOS/Windows nativamente.
         // Em Linux (DevContainer), usar recursive: true nos dirs e monitorar subdirs manualmente.
         const supportsRecursive = process.platform === 'darwin' || process.platform === 'win32';
         for (const dir of this.#dirs) {
-            if (!existsSync(dir)) continue;
+            try {
+                await access(dir);
+            } catch {
+                continue;
+            }
             try {
                 const watchOpts = supportsRecursive ? { persistent: false, recursive: true } : { persistent: false };
                 const watcher = watch(dir, watchOpts, (_eventType, filename) => {
@@ -199,9 +201,11 @@ export class PinnedFilesLoader extends EventEmitter {
                 // BUG-CRIT-07 (fix): em Linux, monitorar subdirs de primeiro nível também
                 if (!supportsRecursive) {
                     try {
-                        for (const entry of readdirSync(dir)) {
+                        const entries = await readdir(dir);
+                        for (const entry of entries) {
                             const subPath = join(dir, entry);
-                            if (!statSync(subPath).isDirectory()) continue;
+                            const info = await stat(subPath);
+                            if (!info.isDirectory()) continue;
                             const subWatcher = watch(subPath, { persistent: false }, (_evtType, fname) => {
                                 if (!fname) return;
                                 if (!SUPPORTED_EXTENSIONS.some((ext) => fname.endsWith(ext))) return;
@@ -240,7 +244,9 @@ export class PinnedFilesLoader extends EventEmitter {
         const timer = setTimeout(async () => {
             this.#debounceTimers.delete(filePath);
 
-            if (!existsSync(filePath)) {
+            let fileExists = true;
+            try { await access(filePath); } catch { fileExists = false; }
+            if (!fileExists) {
                 if (this.#files.has(filePath)) {
                     this.#files.delete(filePath);
                     log('INFO', `[PinnedFilesLoader] Arquivo removido: ${filePath}`);

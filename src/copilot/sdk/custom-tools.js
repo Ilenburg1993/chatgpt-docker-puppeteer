@@ -17,7 +17,6 @@
 
 import { log } from '#copilot/observability/logger';
 import { buildTool } from '#copilot/tools/tool-factory';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
@@ -131,59 +130,13 @@ export const BUILTIN_HANDLER_MAP = new Map([
 let _registry = new Map();
 
 /**
- * Carrega o registry do disco. Chamado na inicialização do módulo.
+ * @deprecated F51: Removida. Use loadCustomToolsAsync().
+ * Shim: delega para loadCustomToolsAsync() e ignora a Promise silenciosamente.
  *
- * @deprecated F92: Use loadCustomToolsAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadCustomTools() {
-    // FS-SYNC: init-time-safe (deprecated sync fallback)
-    if (!existsSync(CUSTOM_TOOLS_PATH)) return;
-    try {
-        const raw = readFileSync(CUSTOM_TOOLS_PATH, 'utf8');
-        const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomTools]');
-        const items = /** @type {unknown} */ (jsonResult.ok ? jsonResult.data : null);
-        if (!Array.isArray(items)) return;
-        _registry = new Map(
-            items
-                .filter(
-                    (/** @type {unknown} */ item) =>
-                        item &&
-                        typeof item === 'object' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['name']) === 'string' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['description']) === 'string' &&
-                        typeof (/** @type {Record<string, unknown>} */ (item)['handlerId']) === 'string',
-                )
-                .map(
-                    (/** @type {unknown} */ item) =>
-                        /** @type {[string, CustomToolDefinition]} */ ([
-                            /** @type {string} */ (/** @type {Record<string, unknown>} */ (item)['name']),
-                            /** @type {CustomToolDefinition} */ (item),
-                        ]),
-                ),
-        );
-        log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco.`);
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[custom-tools-registry] Falha ao carregar custom-tools.json: ${err.message}`);
-    }
-}
-
-/**
- * Persiste o registry atual no disco.
- *
- * @deprecated F92: Use persistCustomToolsAsync() em fluxos assíncronos.
- * @returns {void}
- */
-function persistCustomTools() {
-    // FS-SYNC: init-time-safe (deprecated sync fallback)
-    try {
-        // C12-04: write atômico — escreve em tmpfile e faz rename para evitar JSON corrompido em crash
-        const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
-        writeFileSync(tmpPath, JSON.stringify([..._registry.values()], null, 2), 'utf8');
-        renameSync(tmpPath, CUSTOM_TOOLS_PATH);
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json: ${err.message}`);
-    }
+    loadCustomToolsAsync().catch(() => {});
 }
 
 /**
@@ -241,9 +194,9 @@ export function getCustomToolDefinitions() {
  * Registra uma nova custom tool declarativa. Retorna erro se o `handlerId` não for reconhecido.
  *
  * @param {CustomToolDefinition} def
- * @returns {{ ok: boolean; error?: string }}
+ * @returns {Promise<{ ok: boolean; error?: string }>}
  */
-export function registerCustomTool(def) {
+export async function registerCustomTool(def) {
     if (!def.name || typeof def.name !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(def.name)) {
         return { ok: false, error: 'name inválido: deve ser snake_case, 1–64 caracteres' };
     }
@@ -259,7 +212,7 @@ export function registerCustomTool(def) {
         handlerId: def.handlerId,
         ...(def.parameters ? { parameters: def.parameters } : {}),
     });
-    persistCustomTools();
+    await _persistCustomToolsAsync();
     log('INFO', `[custom-tools-registry] Tool '${def.name}' registrada (handler: ${def.handlerId}).`);
     return { ok: true };
 }
@@ -268,14 +221,14 @@ export function registerCustomTool(def) {
  * Remove uma custom tool pelo nome.
  *
  * @param {string} name
- * @returns {{ ok: boolean; error?: string }}
+ * @returns {Promise<{ ok: boolean; error?: string }>}
  */
-export function removeCustomTool(name) {
+export async function removeCustomTool(name) {
     if (!_registry.has(name)) {
         return { ok: false, error: `Tool '${name}' não encontrada.` };
     }
     _registry.delete(name);
-    persistCustomTools();
+    await _persistCustomToolsAsync();
     log('INFO', `[custom-tools-registry] Tool '${name}' removida.`);
     return { ok: true };
 }
@@ -313,8 +266,8 @@ export function buildCustomTools() {
     return tools;
 }
 
-// Carrega ao inicializar o módulo
-loadCustomTools();
+// F51: Carrega ao inicializar o módulo (async)
+await loadCustomToolsAsync();
 
 /**
  * Reseta o estado interno do registry para isolamento de testes. **Não usar em produção.**

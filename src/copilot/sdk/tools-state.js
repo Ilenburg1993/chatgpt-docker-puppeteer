@@ -12,7 +12,6 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
@@ -30,50 +29,13 @@ const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-con
 let _toolsConfig = { allowlist: null, denylist: [] };
 
 /**
- * Carrega a configuração de ferramentas do disco. Deve ser chamada na inicialização do agente. Idempotente — se o
- * arquivo não existir ou estiver inválido, mantém os defaults em memória.
+ * @deprecated F51: Removida. Use loadToolsConfigAsync().
+ * Shim: delega para loadToolsConfigAsync() e ignora a Promise silenciosamente.
  *
- * @deprecated F92: Use loadToolsConfigAsync() em fluxos assíncronos.
  * @returns {void}
  */
 export function loadToolsConfig() {
-    // FS-SYNC: init-time-safe (deprecated sync fallback)
-    if (!existsSync(TOOLS_CONFIG_PATH)) return;
-    try {
-        const raw = readFileSync(TOOLS_CONFIG_PATH, 'utf8');
-        const result = safeJsonParse(raw, '[tools-state/loadToolsConfig]');
-        const parsed = /** @type {unknown} */ (result.ok ? result.data : null);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            const data = /** @type {Record<string, unknown>} */ (parsed);
-            const allowlist =
-                data['allowlist'] === null || Array.isArray(data['allowlist'])
-                    ? /** @type {string[] | null} */ (data['allowlist'])
-                    : null;
-            const denylist = Array.isArray(data['denylist']) ? /** @type {string[]} */ (data['denylist']) : [];
-            _toolsConfig = { allowlist, denylist };
-            log(
-                'INFO',
-                `[tools-state] Configuração carregada: ${allowlist ? allowlist.length + ' ferramentas na allowlist' : 'sem allowlist'}, ${denylist.length} na denylist`,
-            );
-        }
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[tools-state] Falha ao carregar tools-config.json: ${err.message}`);
-    }
-}
-
-/**
- * Persiste a configuração atual de ferramentas no disco.
- *
- * @deprecated F92: Use persistToolsConfigAsync() em fluxos assíncronos.
- * @returns {void}
- */
-function persistToolsConfig() {
-    // FS-SYNC: init-time-safe (deprecated sync fallback)
-    try {
-        writeFileSync(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[tools-state] Falha ao persistir tools-config.json: ${err.message}`);
-    }
+    loadToolsConfigAsync().catch(() => {});
 }
 
 /**
@@ -132,12 +94,12 @@ export function getToolsConfig() {
 }
 
 /**
- * Atualiza parcialmente a configuração de ferramentas e persiste no disco.
+ * Atualiza parcialmente a configuração de ferramentas e persiste no disco (async).
  *
  * @param {{ allowlist?: string[] | null; denylist?: string[] }} updates
- * @returns {void}
+ * @returns {Promise<void>}
  */
-export function patchToolsConfig(updates) {
+export async function patchToolsConfig(updates) {
     if ('allowlist' in updates) {
         _toolsConfig = {
             ..._toolsConfig,
@@ -147,5 +109,5 @@ export function patchToolsConfig(updates) {
     if ('denylist' in updates) {
         _toolsConfig = { ..._toolsConfig, denylist: updates.denylist ? [...updates.denylist] : [] };
     }
-    persistToolsConfig();
+    await _persistToolsConfigAsync();
 }

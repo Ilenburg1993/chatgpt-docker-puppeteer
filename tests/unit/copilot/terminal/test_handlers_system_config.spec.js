@@ -48,7 +48,7 @@ vi.mock('#copilot/observability/metrics', () => ({
 const _toolsState = { current: { allowlist: ['read_file', 'write_file'], denylist: ['run_shell_command'] } };
 vi.mock('#copilot/sdk/tools-state', () => ({
     getToolsConfig: () => ({ ..._toolsState.current }),
-    patchToolsConfig: (/** @type {Record<string, unknown>} */ patch) => {
+    patchToolsConfig: async (/** @type {Record<string, unknown>} */ patch) => {
         Object.assign(_toolsState.current, patch);
     },
 }));
@@ -125,18 +125,18 @@ describe('handlers/system-config — tools config', () => {
         expect(result.body.ok).toBe(true);
     });
 
-    it('handleSetToolsConfig rejeita allowlist inválido (não-array)', () => {
-        const result = handleSetToolsConfig({ allowlist: 'invalid' });
+    it('handleSetToolsConfig rejeita allowlist inválido (não-array)', async () => {
+        const result = await handleSetToolsConfig({ allowlist: 'invalid' });
         expect(result.status).toBe(400);
     });
 
-    it('handleSetToolsConfig rejeita denylist com não-strings', () => {
-        const result = handleSetToolsConfig({ denylist: [123] });
+    it('handleSetToolsConfig rejeita denylist com não-strings', async () => {
+        const result = await handleSetToolsConfig({ denylist: [123] });
         expect(result.status).toBe(400);
     });
 
-    it('handleSetToolsConfig aceita denylist válida', () => {
-        const result = handleSetToolsConfig({ denylist: ['tool-a', 'tool-b'] });
+    it('handleSetToolsConfig aceita denylist válida', async () => {
+        const result = await handleSetToolsConfig({ denylist: ['tool-a', 'tool-b'] });
         expect(result.status).toBe(200);
         expect(result.body.ok).toBe(true);
     });
@@ -151,28 +151,28 @@ describe('handlers/system-config — custom tools', () => {
         expect(Array.isArray(result.body.availableHandlers)).toBe(true);
     });
 
-    it('handleRegisterCustomTool rejeita sem name', () => {
-        const result = handleRegisterCustomTool({ description: 'test', handlerId: 'echo' });
+    it('handleRegisterCustomTool rejeita sem name', async () => {
+        const result = await handleRegisterCustomTool({ description: 'test', handlerId: 'echo' });
         expect(result.status).toBe(400);
     });
 
-    it('handleRegisterCustomTool rejeita sem description', () => {
-        const result = handleRegisterCustomTool({ name: 'test', handlerId: 'echo' });
+    it('handleRegisterCustomTool rejeita sem description', async () => {
+        const result = await handleRegisterCustomTool({ name: 'test', handlerId: 'echo' });
         expect(result.status).toBe(400);
     });
 
-    it('handleRegisterCustomTool rejeita sem handlerId', () => {
-        const result = handleRegisterCustomTool({ name: 'test', description: 'desc' });
+    it('handleRegisterCustomTool rejeita sem handlerId', async () => {
+        const result = await handleRegisterCustomTool({ name: 'test', description: 'desc' });
         expect(result.status).toBe(400);
     });
 
-    it('handleDeleteCustomTool rejeita sem name', () => {
-        const result = handleDeleteCustomTool({});
+    it('handleDeleteCustomTool rejeita sem name', async () => {
+        const result = await handleDeleteCustomTool({});
         expect(result.status).toBe(400);
     });
 
-    it('handleDeleteCustomTool retorna 404 para tool inexistente', () => {
-        const result = handleDeleteCustomTool({ name: 'nonexistent-tool-xyz' });
+    it('handleDeleteCustomTool retorna 404 para tool inexistente', async () => {
+        const result = await handleDeleteCustomTool({ name: 'nonexistent-tool-xyz' });
         expect(result.status).toBe(404);
     });
 });

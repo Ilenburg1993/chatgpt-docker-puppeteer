@@ -8,7 +8,6 @@
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
-import fs from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -41,28 +40,13 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 // ---------------------------------------------------------------------------
 
 /**
- * Carrega aliases customizados do arquivo JSON. Mescla com built-ins (custom tem precedência).
- *
- * @deprecated F93: Use loadAliasesAsync() em fluxos assíncronos.
- * @example
- *     loadAliases(); // carrega de .copilot-aliases.json
+ * @deprecated F51: Removida. Use loadAliasesAsync().
+ * Shim: delega para loadAliasesAsync() e ignora a Promise silenciosamente.
  *
  * @returns {void}
  */
 export function loadAliases() {
-    // FS-SYNC: init-time-safe (deprecated sync fallback)
-    try {
-        const raw = fs.readFileSync(ALIASES_FILE, 'utf8');
-        const result = safeJsonParse(raw, '[alias-store/loadAliases]');
-        const custom = result.ok ? result.data : null;
-        _aliases =
-            custom && typeof custom === 'object' && !Array.isArray(custom)
-                ? { ...BUILTIN_ALIASES, .../** @type {Record<string, string>} */ (custom) }
-                : { ...BUILTIN_ALIASES };
-    } catch {
-        // arquivo não existe ou inválido — usar apenas built-ins
-        _aliases = { ...BUILTIN_ALIASES };
-    }
+    loadAliasesAsync().catch(() => {});
 }
 
 /**

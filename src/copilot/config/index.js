@@ -58,4 +58,4 @@ export {
  * @deprecated Importe diretamente de `#copilot/sdk/tools-state` ou `#copilot/sdk`. Re-exports mantidos por backward
  *   compatibility.
  */
-export { getToolsConfig, loadToolsConfig, patchToolsConfig } from '#copilot/sdk/tools-state';
+export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from '#copilot/sdk/tools-state';

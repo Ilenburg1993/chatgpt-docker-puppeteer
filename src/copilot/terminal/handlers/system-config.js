@@ -242,9 +242,9 @@ export function handleGetToolsConfig() {
  * PUT /config/tools — atualiza allowlist e/ou denylist de ferramentas em runtime.
  *
  * @param {unknown} rawBody
- * @returns {HandlerResult}
+ * @returns {Promise<HandlerResult>}
  */
-export function handleSetToolsConfig(rawBody) {
+export async function handleSetToolsConfig(rawBody) {
     const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
 
     if ('allowlist' in body) {
@@ -255,7 +255,7 @@ export function handleSetToolsConfig(rawBody) {
         ) {
             return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
         }
-        patchToolsConfig({ allowlist: body['allowlist'] });
+        await patchToolsConfig({ allowlist: body['allowlist'] });
     }
 
     if ('denylist' in body) {
@@ -265,7 +265,7 @@ export function handleSetToolsConfig(rawBody) {
         ) {
             return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
         }
-        patchToolsConfig({ denylist: body['denylist'] });
+        await patchToolsConfig({ denylist: body['denylist'] });
     }
 
     return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
@@ -288,9 +288,9 @@ export function handleGetCustomTools() {
  * POST /config/tools/custom — registra uma nova custom tool declarativa.
  *
  * @param {unknown} rawBody
- * @returns {HandlerResult}
+ * @returns {Promise<HandlerResult>}
  */
-export function handleRegisterCustomTool(rawBody) {
+export async function handleRegisterCustomTool(rawBody) {
     const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
     if (typeof body['name'] !== 'string' || !body['name']) {
         return { status: 400, body: { ok: false, error: 'name (string) é obrigatório' } };
@@ -301,7 +301,7 @@ export function handleRegisterCustomTool(rawBody) {
     if (typeof body['handlerId'] !== 'string' || !body['handlerId']) {
         return { status: 400, body: { ok: false, error: 'handlerId (string) é obrigatório' } };
     }
-    const result = registerCustomTool({
+    const result = await await registerCustomTool({
         name: body['name'],
         description: body['description'],
         handlerId: body['handlerId'],
@@ -317,12 +317,12 @@ export function handleRegisterCustomTool(rawBody) {
  * DELETE /config/tools/custom/:name — remove uma custom tool pelo nome.
  *
  * @param {{ name: string } | string} nameOrParams
- * @returns {HandlerResult}
+ * @returns {Promise<HandlerResult>}
  */
-export function handleDeleteCustomTool(nameOrParams) {
+export async function handleDeleteCustomTool(nameOrParams) {
     const name = typeof nameOrParams === 'string' ? nameOrParams : nameOrParams?.name;
     if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
-    const result = removeCustomTool(name);
+    const result = await await removeCustomTool(name);
     if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };
     return { status: 200, cors: true, body: { ok: true } };
 }

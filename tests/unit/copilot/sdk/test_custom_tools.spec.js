@@ -2,13 +2,14 @@
 /**
  * @file Faixa 39 — SDK Custom Tools Registry Test Suite (F213-F220)
  *
- * Testes para src/copilot/sdk/custom-tools.js:
- * - BUILTIN_HANDLER_MAP (echo, timestamp, env_read, process_info, uptime, math_eval)
- * - registerCustomTool / removeCustomTool
- * - getCustomToolDefinitions
- * - buildCustomTools
- * - loadCustomToolsAsync
- * - _resetRegistry
+ *   Testes para src/copilot/sdk/custom-tools.js:
+ *
+ *   - BUILTIN_HANDLER_MAP (echo, timestamp, env_read, process_info, uptime, math_eval)
+ *   - registerCustomTool / removeCustomTool
+ *   - getCustomToolDefinitions
+ *   - buildCustomTools
+ *   - loadCustomToolsAsync
+ *   - _resetRegistry
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -168,8 +169,8 @@ describe('F39 — BUILTIN_HANDLER_MAP', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F39 — registerCustomTool', () => {
-    it('registra tool com handler válido', () => {
-        const result = registerCustomTool({
+    it('registra tool com handler válido', async () => {
+        const result = await registerCustomTool({
             name: 'my_tool',
             description: 'Test tool',
             handlerId: 'echo',
@@ -179,8 +180,8 @@ describe('F39 — registerCustomTool', () => {
         expect(getCustomToolDefinitions()).toHaveLength(1);
     });
 
-    it('rejeita name inválido', () => {
-        const result = registerCustomTool({
+    it('rejeita name inválido', async () => {
+        const result = await registerCustomTool({
             name: 'Invalid-Name',
             description: 'Test',
             handlerId: 'echo',
@@ -190,8 +191,8 @@ describe('F39 — registerCustomTool', () => {
         expect(result.error).toContain('snake_case');
     });
 
-    it('rejeita handlerId desconhecido', () => {
-        const result = registerCustomTool({
+    it('rejeita handlerId desconhecido', async () => {
+        const result = await registerCustomTool({
             name: 'my_tool',
             description: 'Test',
             handlerId: 'nonexistent_handler',
@@ -201,8 +202,8 @@ describe('F39 — registerCustomTool', () => {
         expect(result.error).toContain('não reconhecido');
     });
 
-    it('preserva parameters opcionais', () => {
-        registerCustomTool({
+    it('preserva parameters opcionais', async () => {
+        await registerCustomTool({
             name: 'with_params',
             description: 'Test',
             handlerId: 'echo',
@@ -215,17 +216,17 @@ describe('F39 — registerCustomTool', () => {
 });
 
 describe('F39 — removeCustomTool', () => {
-    it('remove tool registrada', () => {
-        registerCustomTool({ name: 'temp_tool', description: 'temp', handlerId: 'echo' });
+    it('remove tool registrada', async () => {
+        await registerCustomTool({ name: 'temp_tool', description: 'temp', handlerId: 'echo' });
         expect(getCustomToolDefinitions()).toHaveLength(1);
 
-        const result = removeCustomTool('temp_tool');
+        const result = await removeCustomTool('temp_tool');
         expect(result.ok).toBe(true);
         expect(getCustomToolDefinitions()).toHaveLength(0);
     });
 
-    it('retorna erro ao remover tool inexistente', () => {
-        const result = removeCustomTool('nope');
+    it('retorna erro ao remover tool inexistente', async () => {
+        const result = await removeCustomTool('nope');
         expect(result.ok).toBe(false);
         expect(result.error).toContain('não encontrada');
     });
@@ -241,19 +242,17 @@ describe('F39 — buildCustomTools', () => {
         expect(tools).toHaveLength(0);
     });
 
-    it('constrói Tool a partir do registry', () => {
-        registerCustomTool({ name: 'my_echo', description: 'Echo', handlerId: 'echo' });
+    it('constrói Tool a partir do registry', async () => {
+        await registerCustomTool({ name: 'my_echo', description: 'Echo', handlerId: 'echo' });
         const tools = buildCustomTools();
 
         expect(tools).toHaveLength(1);
-        expect(mockBuildTool).toHaveBeenCalledWith(
-            expect.objectContaining({ name: 'my_echo', description: 'Echo' }),
-        );
+        expect(mockBuildTool).toHaveBeenCalledWith(expect.objectContaining({ name: 'my_echo', description: 'Echo' }));
     });
 
-    it('ignora tools com handlerId inválido no registry', () => {
+    it('ignora tools com handlerId inválido no registry', async () => {
         // Insere diretamente no registry com handlerId inválido
-        registerCustomTool({ name: 'valid_tool', description: 'valid', handlerId: 'echo' });
+        await registerCustomTool({ name: 'valid_tool', description: 'valid', handlerId: 'echo' });
         // Agora resetamos e criamos cenário onde o file tem handler inválido:
         // Vamos testar via handler invocation
         const tools = buildCustomTools();
@@ -261,7 +260,7 @@ describe('F39 — buildCustomTools', () => {
     });
 
     it('handler do Tool retorna string do builtin handler', async () => {
-        registerCustomTool({ name: 'my_echo', description: 'Echo', handlerId: 'echo' });
+        await registerCustomTool({ name: 'my_echo', description: 'Echo', handlerId: 'echo' });
         buildCustomTools();
 
         // buildTool was called with a handler function
@@ -281,9 +280,7 @@ describe('F39 — loadCustomToolsAsync', () => {
         /** @type {import('vitest').Mock} */
         const mockReadFile = /** @type {any} */ (readFile);
         mockReadFile.mockResolvedValue(
-            JSON.stringify([
-                { name: 'disk_tool', description: 'From disk', handlerId: 'echo' },
-            ]),
+            JSON.stringify([{ name: 'disk_tool', description: 'From disk', handlerId: 'echo' }]),
         );
 
         await loadCustomToolsAsync();
@@ -323,8 +320,8 @@ describe('F39 — getCustomToolDefinitions', () => {
         expect(getCustomToolDefinitions()).toEqual([]);
     });
 
-    it('retorna cópia do registry', () => {
-        registerCustomTool({ name: 'tool_a', description: 'A', handlerId: 'echo' });
+    it('retorna cópia do registry', async () => {
+        await registerCustomTool({ name: 'tool_a', description: 'A', handlerId: 'echo' });
         const defs = getCustomToolDefinitions();
         defs.pop(); // mutate the returned array
         expect(getCustomToolDefinitions()).toHaveLength(1); // original unchanged

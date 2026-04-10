@@ -29,7 +29,7 @@ import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
-import { loadAliases } from './alias-store.js';
+import { loadAliasesAsync } from './alias-store.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
@@ -379,7 +379,7 @@ function startReflectionLoop() {
 export async function startTerminalServer() {
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
 
-    loadAliases();
+    await loadAliasesAsync();
 
     // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
     setHub(conversationHub);
