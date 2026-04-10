@@ -49,9 +49,11 @@ describe('dialog-task-handlers', () => {
     let metrics;
     /** @type {Record<string, any>} */
     let errorTracker;
-    /** @type {ReturnType<
-    typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js').attachDialogTaskHandlers
->} */
+    /**
+     * @type {ReturnType<
+     *     typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js').attachDialogTaskHandlers
+     * >}
+     */
     let accessors;
 
     beforeEach(async () => {

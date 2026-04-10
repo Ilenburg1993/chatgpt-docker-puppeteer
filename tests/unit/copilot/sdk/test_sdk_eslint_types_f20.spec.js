@@ -127,8 +127,6 @@ describe('F20 — config/index.js boundary fix', () => {
 // ---------------------------------------------------------------------------
 describe('F20 — Cleanup: zero runtime imports de @github/copilot-sdk fora de sdk/', () => {
     it('Nenhum arquivo fora de sdk/ tem runtime import (import statement) de @github/copilot-sdk', () => {
-
-
         /**
          * @param {string} dir
          * @returns {string[]}

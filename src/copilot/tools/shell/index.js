@@ -52,7 +52,8 @@ const sdkParam = (schema) =>
 /**
  * Tool: exec_command — executa um comando shell arbitrário (sandboxado).
  */
-const execCommandTool = createTool({ name: 'exec_command',
+const execCommandTool = createTool({
+    name: 'exec_command',
     description:
         'Executa um comando shell no workspace. O comando é executado via /bin/sh com sandbox de segurança: ' +
         'cwd restrito ao workspace, blocklist de comandos perigosos, timeout máximo de 120s e output limitado. ' +
@@ -76,7 +77,9 @@ const execCommandTool = createTool({ name: 'exec_command',
                 .describe('Timeout em segundos (1-120). Default: 30.'),
         }),
     ),
-    handler: async (/** @type {{ command: string; cwd?: string; timeoutSeconds?: number }} */ { command, cwd, timeoutSeconds = 30 }) => {
+    handler: async (
+        /** @type {{ command: string; cwd?: string; timeoutSeconds?: number }} */ { command, cwd, timeoutSeconds = 30 },
+    ) => {
         const blockCheck = checkCommandBlocklist(command);
         if (!blockCheck.ok) {
             log('WARN', `[ShellTools] exec_command bloqueado: ${blockCheck.reason}`);
@@ -192,7 +195,8 @@ const execCommandTool = createTool({ name: 'exec_command',
 /**
  * Tool: run_npm_script — executa um script npm definido em package.json.
  */
-const runNpmScriptTool = createTool({ name: 'run_npm_script',
+const runNpmScriptTool = createTool({
+    name: 'run_npm_script',
     description:
         'Executa um script npm (npm run <script>) no workspace. ' +
         'Scripts permitidos: lint, lint:fix, format, format:check, test:unit, test:fast, test:integration, ' +
@@ -265,7 +269,8 @@ const runNpmScriptTool = createTool({ name: 'run_npm_script',
 /**
  * Tool: run_node_file — executa um arquivo JavaScript com Node.js.
  */
-const runNodeFileTool = createTool({ name: 'run_node_file',
+const runNodeFileTool = createTool({
+    name: 'run_node_file',
     description:
         'Executa um arquivo JavaScript com Node.js no workspace. ' +
         'O arquivo deve estar dentro do workspace (/workspaces/). ' +
@@ -286,7 +291,13 @@ const runNodeFileTool = createTool({ name: 'run_node_file',
                 .describe('Timeout em segundos (1-120). Default: 30.'),
         }),
     ),
-    handler: async (/** @type {{ filePath: string; args?: string[]; timeoutSeconds?: number }} */ { filePath, args = [], timeoutSeconds = 30 }) => {
+    handler: async (
+        /** @type {{ filePath: string; args?: string[]; timeoutSeconds?: number }} */ {
+            filePath,
+            args = [],
+            timeoutSeconds = 30,
+        },
+    ) => {
         // Valida extensão
         if (!/\.(js|mjs|cjs)$/.test(filePath)) {
             return { success: false, error: 'Apenas arquivos .js, .mjs e .cjs são permitidos.' };
