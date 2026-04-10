@@ -391,4 +391,25 @@ export default tseslint.config(
             ],
         },
     },
+
+    // ── F20: Proíbe imports diretos de @github/copilot-sdk fora de sdk/ ──
+    {
+        files: ['src/copilot/**/*.js'],
+        ignores: ['src/copilot/sdk/**'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: '@github/copilot-sdk',
+                            message:
+                                'Importe de "#copilot/sdk" (barrel) ou "#copilot/sdk/*.js" (módulo individual). ' +
+                                'Apenas os wrappers em src/copilot/sdk/ podem importar diretamente de @github/copilot-sdk.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 );
