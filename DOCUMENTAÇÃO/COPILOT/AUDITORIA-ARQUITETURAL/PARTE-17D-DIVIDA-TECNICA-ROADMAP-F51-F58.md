@@ -282,7 +282,7 @@ Estratégia: extrair responsabilidades em módulos focados.
 
 | Indicador                | Início |  Após F56 |       Meta |
 | ------------------------ | -----: | --------: | ---------: |
-| God modules (>400L)      |     26 |        26 |    **≤20** |
+| God modules (>400L)      |     26 |        25 |    **≤20** |
 | Sync I/O calls           |     56 |      ≤ 5¹ |    **≤ 5** |
 | Deprecated APIs em uso   |     17 |      ≤ 3² |    **≤ 3** |
 | Magic strings em eventos |    408 |     ~100³ |   **≤ 30** |
@@ -295,21 +295,49 @@ Estratégia: extrair responsabilidades em módulos focados.
 ² F53+F54 removeram tools-registry.js, sdk-types.js, deprecated re-exports
 ³ F55 migrou 147 magic strings; ~100 residuais são internal emitters (DLM/agent)
 ⁴ F56 — 1 console.warn migrado, 12 JSON.parse já protegidos com try-catch
+⁵ F57 — queue-processor.js extraído de always-alive.js (620→585L)
+⁶ F58 — send-pipeline.js extraído de orchestrator.js (574→438L), turn-display.js de engine.js (459→365L)
 
 ---
 
 ## §4. Progresso e Próximos Passos
 
-**Status atual**: F51-F56 concluídas. Próxima faixa: **F57**.
+**Status atual**: F51-F58 **TODAS CONCLUÍDAS**. Roadmap completo.
 
 **Ordem de execução**:
 1. ~~**F51** → F52 (sync I/O — impacto runtime direto)~~ ✅ CONCLUÍDA
 2. ~~**F53** → F54 (deprecated cleanup — reduce API surface)~~ ✅ CONCLUÍDA
 3. ~~**F55** → **F56** (event hygiene + logging — observabilidade)~~ ✅ CONCLUÍDA
-4. **F57** → F58 (god modules — complexidade arquitetural) ← **PRÓXIMA**
+4. ~~**F57** → **F58** (god modules — complexidade arquitetural)~~ ✅ CONCLUÍDA
+
+### Resumo F57-F58
+
+| Faixa | Ação | Resultado |
+|:---:|---|---|
+| F57 | `always-alive.js` → extraído `queue-processor.js` (~50L) | 620→585L (−35L) |
+| F58 | `orchestrator.js` → extraído `send-pipeline.js` (~190L) | 574→438L (−136L) |
+| F58 | `engine.js` → extraído `turn-display.js` (~166L) | 459→365L (−94L) |
+| F58 | `loop-manager.js` — já decomposto (6 módulos extraídos) | 600L (core state machine) |
+
+**Nota**: `loop-manager.js` permanece em 600L porque já delega turn execution, event wiring,
+protocol, watchdog, backpressure e model fallback a módulos dedicados. O restante é a state machine
+core (start/stop/pause/resume) que não beneficia de separação adicional (168L são JSDoc, ~365L exec).
+
+### Commits F51-F58
+
+| Faixa | Commit | Descrição |
+|:---:|---|---|
+| F51 | `4538db49` | Eliminar sync I/O em SDK, config e terminal |
+| F52 | `79aac189` | Eliminar sync I/O em agent lifecycle |
+| F53 | `b31fd8e9` | Undeprecate tools-registry.js, limpar barrel |
+| F54 | `b4563693` | Remove sdk-types.js + deprecated config re-exports |
+| F55 | `1ae81293` | Unify event constants, eliminate magic strings |
+| F56 | `7030fcf8` | Standardize logging + safe JSON parse |
+| F57 | `03b5b580` | Extract queue-processor from always-alive.js |
+| F58 | `7e8fee9c` | Extract send-pipeline + turn-display |
 
 ---
 
-*Documento gerado pela auditoria PARTE-17D. Base: 281 arquivos JS em `src/copilot/`, 4.496 testes
+*Documento gerado pela auditoria PARTE-17D. Base: 281 arquivos JS em `src/copilot/`, 4.492 testes
 passando, 0 erros de typecheck. Foco: dívida técnica e refatoração (não testes).
 Referências: PARTE-17A rev.6, PARTE-17C rev.6.*
