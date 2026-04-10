@@ -9,7 +9,7 @@
  *   - `config/index.js` marca re-exports de sdk/ como deprecated
  *   - Zero imports diretos residuais em toda a codebase copilot
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -80,40 +80,27 @@ describe('F20 — hooks/types.js alinhamento', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. core/sdk-types.js deprecated e migrado
+// 3. F54: core/sdk-types.js removido — não há mais nada para testar
 // ---------------------------------------------------------------------------
-describe('F20 — core/sdk-types.js deprecation', () => {
-    it('core/sdk-types.js tem @deprecated', () => {
-        const src = readSource('core/sdk-types.js');
-        expect(src).toContain('@deprecated');
-    });
-
-    it('core/sdk-types.js NÃO importa de @github/copilot-sdk', () => {
-        const src = readSource('core/sdk-types.js');
-        expect(src).not.toContain('@github/copilot-sdk');
-    });
-
-    it('core/sdk-types.js importa de #copilot/sdk/types.js', () => {
-        const src = readSource('core/sdk-types.js');
-        expect(src).toContain('#copilot/sdk/types.js');
+describe('F54 — core/sdk-types.js removido', () => {
+    it('core/sdk-types.js não existe mais', () => {
+        const path = join(ROOT, 'core/sdk-types.js');
+        expect(existsSync(path)).toBe(false);
     });
 });
 
 // ---------------------------------------------------------------------------
-// 4. config/index.js boundary fix
+// 4. F54: config/index.js — deprecated re-exports removidos
 // ---------------------------------------------------------------------------
-describe('F20 — config/index.js boundary fix', () => {
-    it('config/index.js marca re-exports de custom-tools como deprecated', () => {
+describe('F54 — config/index.js cleanup', () => {
+    it('config/index.js NÃO possui re-exports deprecated de custom-tools', () => {
         const src = readSource('config/index.js');
-        // Procura pattern: @deprecated seguido (em poucas linhas) por #copilot/sdk/custom-tools
-        const deprecatedCustomTools = /@deprecated[\s\S]{0,300}#copilot\/sdk\/custom-tools/.test(src);
-        expect(deprecatedCustomTools).toBe(true);
+        expect(src).not.toContain('getCustomToolDefinitions');
     });
 
-    it('config/index.js marca re-exports de tools-state como deprecated', () => {
+    it('config/index.js NÃO possui re-exports deprecated de tools-state', () => {
         const src = readSource('config/index.js');
-        const deprecatedToolsState = /@deprecated[\s\S]{0,300}#copilot\/sdk\/tools-state/.test(src);
-        expect(deprecatedToolsState).toBe(true);
+        expect(src).not.toContain('patchToolsConfig');
     });
 
     it('config/index.js preserva exports locais (não-sdk)', () => {

@@ -38,7 +38,7 @@ export const SessionSnapshotDataSchema = z.object({
     dialogLoopActive: z.boolean(),
     dialogPaused: z.boolean(),
     pendingQuestion: z.string().nullable(),
-    stateSnapshot: z.record(z.unknown()).nullable().optional(),
+    stateSnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
     prMetrics: z
         .object({
             boots: z.number(),
@@ -78,7 +78,7 @@ export const CustomToolDefinitionSchema = z.object({
     name: z.string(),
     description: z.string(),
     handlerId: z.string(),
-    parameters: z.record(z.unknown()).optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**

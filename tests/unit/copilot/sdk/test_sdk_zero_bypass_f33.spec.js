@@ -110,10 +110,7 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
         expect(src).toContain("from '#copilot/sdk/quota-monitor'");
     });
 
-    it('config/index.js mantém re-export intencional de tools-state', () => {
-        const src = read('src/copilot/config/index.js');
-        expect(src).toContain("from '#copilot/sdk/tools-state'");
-    });
+    // F54: re-export de tools-state removido de config/index.js (zero consumers)
 });
 
 // ─── F167: tools/ sem bypass ───────────────────────────────────────────────

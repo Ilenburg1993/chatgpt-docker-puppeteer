@@ -9,7 +9,6 @@
  * - `constants` — portas, limites e nomes de eventos canônicos
  * - `errors` — CopilotError, SessionError, BridgeError, ConfigError, ToolError
  * - `structured-message` — StructuredMessage schema, builders, serializers, parser
- * - `sdk-types` — JSDoc typedefs para SDK (@github/copilot-sdk)
  *
  * @module copilot/core
  *
