@@ -19,8 +19,8 @@ import { log } from '#copilot/observability/logger';
 import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
-import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 import { HUB_EVENTS } from './events.js';
+import { executeSendToLlmB } from './send-pipeline.js';
 
 // ─── Lazy resolution do AlwaysAliveAgent (ARCH-03: break circular dep) ────────
 
@@ -299,150 +299,14 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se não inicializado, agente parado, ou turno não encontrado após writeTurn
      */
     async #executeSendToLlmB(hubSessionId, message, opts = {}) {
-        if (!this.#bridge) {
-            throw new SessionError(
-                '[HubOrchestrator] Não inicializado. Chame init() primeiro.',
-                'ORCH_NOT_INITIALIZED',
-            );
-        }
-
-        // ARCH-02 fix: verificar que o agente está ativo antes de prosseguir
-        const agentCheck = this.#agent ?? _fallbackAgent;
-        if (!agentCheck || agentCheck.status === 'stopped') {
-            throw new SessionError('[HubOrchestrator] AlwaysAliveAgent não está ativo', 'ORCH_AGENT_INACTIVE');
-        }
-
-        const useStructured = opts.useStructured !== false;
-        const timeoutMs = opts.timeoutMs ?? 120_000;
-        const modelLabel = opts.model ?? 'gpt-4.1';
-
-        // Conteúdo normalizado para string para persistência
-        const messageContent = typeof message === 'string' ? message : JSON.stringify(message);
-
-        // Persistir turn de LLM-A
-        const sdkSessionId = this.#getActiveSdkSessionId();
-        // F6.7 (BUG-MOD-14): logar traceId/correlationId no metadata do turn para rastreabilidade distribuída
-        const structuredMeta =
-            typeof message === 'object' && message !== null
-                ? {
-                      traceId: /** @type {Record<string, unknown>} */ (message)['traceId'],
-                      correlationId: /** @type {Record<string, unknown>} */ (message)['correlationId'],
-                  }
-                : {};
-        const llmATurnId = await this.#store.writeTurn(hubSessionId, {
-            role: 'llm_a',
-            content: messageContent,
-            ...(sdkSessionId !== undefined && { sdkSessionId }),
-            model: 'copilot-claude-sonnet-4.6',
-            structured: typeof message === 'object' ? message : null,
-            metadata: Object.keys(structuredMeta).length > 0 ? structuredMeta : null,
+        return executeSendToLlmB(hubSessionId, message, opts, {
+            store: this.#store,
+            bridge: this.#bridge,
+            agent: this.#agent,
+            fallbackAgent: _fallbackAgent,
+            emit: this.emit.bind(this),
+            getActiveSdkSessionId: () => this.#getActiveSdkSessionId(),
         });
-        const llmATurn = this.#store.getTurn(llmATurnId);
-        const turnNumber = llmATurn?.turn_number;
-        if (!turnNumber) {
-            throw new SessionError(
-                `[HubOrchestrator] Turno ${llmATurnId} não encontrado após writeTurn`,
-                'ORCH_TURN_NOT_FOUND',
-            );
-        }
-
-        this.emit(HUB_EVENTS.TURN_SENT, {
-            hubSessionId,
-            turnId: llmATurnId,
-            role: 'llm_a',
-            content: messageContent,
-            turnNumber,
-        });
-
-        log(
-            'DEBUG',
-            `[HubOrchestrator] Turno #${turnNumber} (LLM-A) enviado para LLM-B: ${messageContent.slice(0, 80)}...`,
-        );
-
-        // Invocar LLM-B com streaming
-        const startTime = Date.now();
-        /** @type {string} */ let llmBResponse;
-        let llmBStructured = null;
-        let parseError = null;
-
-        try {
-            // Preferir dialog loop (sendDialogTurn) quando ativo — mais eficiente (0 PR por turno)
-            // Senão, usar LlmBridgeClient.chat() (1 PR por turno)
-            const agentInst = this.#agent ?? _fallbackAgent;
-            const useDialogLoop = agentInst?.dialogLoopActive === true;
-
-            /** @type {import('./call-strategies.js').CallStrategyContext} */
-            const ctx = {
-                hubSessionId,
-                turnNumber,
-                timeoutMs,
-                emit: this.emit.bind(this),
-            };
-
-            if (useDialogLoop) {
-                if (!agentInst) {
-                    throw new SessionError('[HubOrchestrator] Agent não disponível', 'ORCH_AGENT_INACTIVE');
-                }
-                llmBResponse = await callViaDialogLoop(agentInst, message, messageContent, ctx);
-            } else if (useStructured && typeof message === 'object') {
-                ({ llmBResponse, llmBStructured, parseError } = await callViaStructured(this.#bridge, message, ctx));
-            } else {
-                llmBResponse = await callViaSimpleChat(this.#bridge, messageContent, ctx);
-            }
-        } catch (/** @type {any} */ err) {
-            const errMsg = `[HubOrchestrator] Erro na resposta de LLM-B: ${err.message}`;
-            log('ERROR', errMsg);
-            this.emit('error', { hubSessionId, message: errMsg, error: err });
-
-            // Persistir o erro como turn de LLM-B para manter histórico completo
-            await this.#store.writeTurn(hubSessionId, {
-                role: 'llm_b',
-                content: `[ERRO] ${err.message}`,
-                ...(sdkSessionId !== undefined && { sdkSessionId }),
-                model: modelLabel,
-                durationMs: Date.now() - startTime,
-                metadata: { error: true, errorMessage: err.message },
-            });
-
-            throw err;
-        }
-
-        const durationMs = Date.now() - startTime;
-
-        // Persistir resposta de LLM-B
-        const llmBTurnId = await this.#store.writeTurn(hubSessionId, {
-            role: 'llm_b',
-            content: llmBResponse,
-            ...(sdkSessionId !== undefined && { sdkSessionId }),
-            model: modelLabel,
-            structured: llmBStructured,
-            durationMs,
-            metadata: parseError !== null ? { parseError } : null,
-        });
-
-        const llmBTurn = this.#store.getTurn(llmBTurnId);
-        const llmBTurnNumber = llmBTurn?.turn_number ?? turnNumber + 1;
-
-        this.emit(HUB_EVENTS.TURN_COMPLETE, {
-            hubSessionId,
-            turnId: llmBTurnId,
-            role: 'llm_b',
-            content: llmBResponse,
-            structured: llmBStructured,
-            durationMs,
-            turnNumber: llmBTurnNumber,
-        });
-
-        log('INFO', `[HubOrchestrator] Turno #${llmBTurnNumber} (LLM-B) completado em ${durationMs}ms.`);
-
-        return {
-            turnId: llmBTurnId,
-            content: llmBResponse,
-            structured: llmBStructured,
-            durationMs,
-            hubSessionId,
-            turnNumber: llmBTurnNumber,
-        };
     }
 
     // ─── Mensagens do usuário ─────────────────────────────────────────────────

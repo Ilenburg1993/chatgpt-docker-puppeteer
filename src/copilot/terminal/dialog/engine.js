@@ -34,6 +34,12 @@ import {
     println,
 } from './output.js';
 import { broadcastSse } from './sse.js';
+import {
+    createDeltaCallback,
+    createDisplayState,
+    createReasoningCallback,
+    renderStreamingFooter,
+} from './turn-display.js';
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
@@ -275,86 +281,16 @@ async function _executeTurn(message, actor) {
 
         // ── Thinking display (reasoning deltas) ─────────────────────────────
         const showThinking = getShowThinking();
-        let _reasoningStarted = false;
-        let _reasoningChars = 0;
-        let _reasoningContent = '';
-        let _reasoningId = /** @type {string | null} */ (null);
-        const tThinkingStart = Date.now();
+        const model = alwaysAliveAgent.model;
+        const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+        const displayState = createDisplayState({ model, effort, turnStartTime: t0 });
 
         /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
-        const onReasoning = showThinking
-            ? (chunk, rId) => {
-                  if (!_reasoningStarted) {
-                      _reasoningStarted = true;
-                      _reasoningId = rId;
-                      process.stdout.write('\r\x1b[K');
-                      const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                      });
-                      println(SEPARATOR);
-                      println(`  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[2m\x1b[35mpensando…\x1b[0m`);
-                      println('');
-                      process.stdout.write('  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
-                  }
-                  _reasoningChars += chunk.length;
-                  _reasoningContent += chunk;
-                  const lines = chunk.split('\n');
-                  for (let i = 0; i < lines.length; i++) {
-                      if (i > 0) process.stdout.write('\n  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
-                      process.stdout.write(/** @type {string} */ (lines[i]));
-                  }
-                  broadcastSse('reasoning', { chunk, reasoningId: rId });
-              }
-            : undefined;
+        const onReasoning = showThinking ? createReasoningCallback(displayState) : undefined;
 
         // ── Streaming response (message deltas) ─────────────────────────────
-        let _streamingStarted = false;
-        let _streamingChars = 0;
-        let _firstChunkTime = 0;
-
-        /** @type {((chunk: string) => void) | undefined} */
-        const onDelta = (chunk) => {
-            if (!_streamingStarted) {
-                _streamingStarted = true;
-                _firstChunkTime = Date.now();
-                if (_reasoningStarted) {
-                    process.stdout.write('\x1b[0m\n');
-                    const thinkSecs = ((Date.now() - tThinkingStart) / 1000).toFixed(1);
-                    println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${_reasoningChars} chars)\x1b[0m`);
-                    println('');
-                    broadcastSse('reasoning.complete', {
-                        content: _reasoningContent,
-                        reasoningId: _reasoningId,
-                        durationMs: Date.now() - tThinkingStart,
-                        chars: _reasoningChars,
-                    });
-                } else {
-                    process.stdout.write('\r\x1b[K');
-                }
-                const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                });
-                const model = alwaysAliveAgent.model;
-                const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
-                println(SEPARATOR);
-                println(
-                    `  \x1b[90m[${tsNow}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m`,
-                );
-                println('');
-                process.stdout.write('  \x1b[32m│\x1b[0m  ');
-            }
-            _streamingChars += chunk.length;
-            const lines = chunk.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (i > 0) process.stdout.write('\n  \x1b[32m│\x1b[0m  ');
-                process.stdout.write(/** @type {string} */ (lines[i]));
-            }
-            broadcastSse('delta', { chunk });
-        };
+        /** @type {(chunk: string) => void} */
+        const onDelta = createDeltaCallback(displayState);
 
         const reply = await llmBridgeClient.dialogTurn(enrichedMessage, {
             timeout: TURN_TIMEOUT_MS,
@@ -363,43 +299,18 @@ async function _executeTurn(message, actor) {
         });
         const durationMs = Date.now() - t0;
 
-        if (_streamingStarted) {
-            const secs = (durationMs / 1000).toFixed(1);
-            const secsNum = durationMs / 1000;
-            const secsColor =
-                secsNum < 5
-                    ? `\x1b[32m${secs}s\x1b[0m`
-                    : secsNum < 15
-                      ? `\x1b[33m${secs}s\x1b[0m`
-                      : `\x1b[31m${secs}s\x1b[0m`;
-            const ttft = _firstChunkTime > 0 ? ((_firstChunkTime - t0) / 1000).toFixed(1) + 's TTFT' : '';
-            process.stdout.write('\n');
-            println(`  \x1b[90m└── ${secsColor}${ttft ? `  \x1b[90m·\x1b[0m  \x1b[90m${ttft}\x1b[0m` : ''}\x1b[0m`);
-            println('');
-        } else {
+        renderStreamingFooter(displayState, durationMs);
+        if (!displayState.streamingStarted) {
             printExchange(actor, message, reply, durationMs);
         }
 
-        if (_reasoningStarted && !_streamingStarted) {
-            process.stdout.write('\x1b[0m\n');
-            const thinkSecs = ((Date.now() - tThinkingStart) / 1000).toFixed(1);
-            println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${_reasoningChars} chars)\x1b[0m`);
-            println('');
-            broadcastSse('reasoning.complete', {
-                content: _reasoningContent,
-                reasoningId: _reasoningId,
-                durationMs: Date.now() - tThinkingStart,
-                chars: _reasoningChars,
-            });
-        }
-
-        if (_firstChunkTime > 0) {
-            const ttftMs = _firstChunkTime - t0;
+        if (displayState.firstChunkTime > 0) {
+            const ttftMs = displayState.firstChunkTime - t0;
             emitNerv('copilot:turn:streaming_metrics', {
                 timeToFirstTokenMs: ttftMs,
                 totalDurationMs: durationMs,
-                streamedChars: _streamingChars,
-                reasoningChars: _reasoningChars,
+                streamedChars: displayState.streamingChars,
+                reasoningChars: displayState.reasoningChars,
             });
         }
 
