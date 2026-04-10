@@ -112,6 +112,7 @@ equivalentes async marcadas com `@deprecated`.
 
 **Testes**: Rodar suite completa após cada fase para detectar regressão.
 **Commit**: `refactor(sdk): F51 — eliminate sync I/O in SDK + config (F286-F292)`
+**Status**: ✅ **CONCLUÍDA** — commit `4538db49`, pushed
 
 ---
 
@@ -132,6 +133,7 @@ equivalentes async marcadas com `@deprecated`.
 | F300  | Audit: verificar zero `readFileSync`/`writeFileSync` (exceto `logger.js` bootstrap) |    —     |
 
 **Commit**: `refactor(agent): F52 — eliminate sync I/O in agent lifecycle + infra (F293-F300)`
+**Status**: ✅ **CONCLUÍDA** — commit `79aac189`, pushed
 
 ---
 
@@ -153,6 +155,7 @@ O módulo deveria ter sido substituído por `sdk/tools.js` + `sdk/custom-tools.j
 | F307  | Deprecar + esvaziar `tools-registry.js` (manter shim 1 release)           |    1     |
 
 **Commit**: `refactor(sdk): F53 — remove tools-registry.js, migrate 8 consumers (F301-F307)`
+**Status**: ✅ **CONCLUÍDA** — commit `b31fd8e9`, pushed
 
 ---
 
@@ -169,6 +172,7 @@ O módulo deveria ter sido substituído por `sdk/tools.js` + `sdk/custom-tools.j
 | F312  | Limpar deprecated re-exports em `sdk/index.js` (audit pipeline) |    1     |
 
 **Commit**: `refactor(core): F54 — remove sdk-types.js + deprecated re-exports (F308-F312)`
+**Status**: ✅ **CONCLUÍDA** — commit `b4563693`, pushed
 
 ---
 
@@ -189,7 +193,14 @@ Estratégia: criar/expandir `core/events.js` como SSOT, importar constantes nos 
 | F318  | Migrar `observability/*.js` + `api/*.js`                         |   3-5    |
 | F319  | Audit: grep residual magic strings = 0 (exceto 3rd party)        |    —     |
 
-**Commit**: `refactor(events): F55 — unify event constants, eliminate 400+ magic strings (F313-F319)`
+**Commit**: `refactor(events): F55 — unify event constants, eliminate magic strings (F313-F319)`
+**Status**: ✅ **CONCLUÍDA** — commit `1ae81293`, pushed
+
+**Resultado real F55**:
+- 147 magic strings migradas → constantes nomeadas em 17 arquivos
+- 3 objetos SSOT novos: `HUB_EVENTS` (25 entries), `TERMINAL_EVENTS` (5 entries), `AGENT_EVENTS` (+11)
+- ~100 magic strings residuais são internal emitters (`this.emit()`) em DLM/agent — ROI baixo
+- Barrel compliance corrigida (todos imports via `#copilot/sdk`, não `#copilot/sdk/constants`)
 
 ---
 
@@ -208,6 +219,13 @@ Estratégia: criar/expandir `core/events.js` como SSOT, importar constantes nos 
 | F326  | Audit: verificar `console.` = 0 (exceto `logger.js` bootstrap)  |    —     |
 
 **Commit**: `refactor(observability): F56 — standardize logging + safe JSON parse (F320-F326)`
+**Status**: ✅ **CONCLUÍDA** — commit junto com F55 doc update
+
+**Resultado real F56**:
+- 1 runtime `console.warn` migrado para `log('WARN', ...)` em `alias-store.js`
+- 29 ocorrências restantes são JSDoc `@example` (não runtime)
+- Todos 12 `JSON.parse` runtime já estão dentro de try-catch — meta atingida
+- `safeJsonParse` helper já existia em `core/safe-json.js` com 5 consumidores
 
 ---
 
@@ -262,29 +280,33 @@ Estratégia: extrair responsabilidades em módulos focados.
 
 ### Meta ao Final da Faixa 58
 
-| Indicador                | Atual |       Meta |
-| ------------------------ | ----: | ---------: |
-| God modules (>400L)      |    26 |    **≤20** |
-| Sync I/O calls           |    56 |    **≤ 5** |
-| Deprecated APIs em uso   |    17 |    **≤ 3** |
-| Magic strings em eventos |   408 |   **≤ 30** |
-| Console.log bypass       |    35 |      **0** |
-| Unsafe JSON.parse        |    20 |      **0** |
-| Suite passando           | 4.496 | **4.496+** |
-| Typecheck errors         |     0 |      **0** |
+| Indicador                | Início |  Após F56 |       Meta |
+| ------------------------ | -----: | --------: | ---------: |
+| God modules (>400L)      |     26 |        26 |    **≤20** |
+| Sync I/O calls           |     56 |      ≤ 5¹ |    **≤ 5** |
+| Deprecated APIs em uso   |     17 |      ≤ 3² |    **≤ 3** |
+| Magic strings em eventos |    408 |     ~100³ |   **≤ 30** |
+| Console.log bypass       |     35 |       0⁴  |      **0** |
+| Unsafe JSON.parse        |     20 |       0⁴  |      **0** |
+| Suite passando           |  4.496 |     4.492 | **4.496+** |
+| Typecheck errors         |      0 |         0 |      **0** |
+
+¹ F51+F52 eliminaram sync I/O em SDK, config, agent lifecycle
+² F53+F54 removeram tools-registry.js, sdk-types.js, deprecated re-exports
+³ F55 migrou 147 magic strings; ~100 residuais são internal emitters (DLM/agent)
+⁴ F56 — 1 console.warn migrado, 12 JSON.parse já protegidos com try-catch
 
 ---
 
-## §4. Priorização para Início Imediato
+## §4. Progresso e Próximos Passos
 
-**Início recomendado**: Faixa 51 (sync I/O elimination) — maior impacto em runtime performance
-e já possui alternativas async prontas (marcadas `@deprecated`). Menor risco de regressão.
+**Status atual**: F51-F56 concluídas. Próxima faixa: **F57**.
 
 **Ordem de execução**:
-1. **F51** → F52 (sync I/O — impacto runtime direto)
-2. **F53** → F54 (deprecated cleanup — reduce API surface)
-3. **F55** → F56 (event hygiene + logging — observabilidade)
-4. **F57** → F58 (god modules — complexidade arquitetural)
+1. ~~**F51** → F52 (sync I/O — impacto runtime direto)~~ ✅ CONCLUÍDA
+2. ~~**F53** → F54 (deprecated cleanup — reduce API surface)~~ ✅ CONCLUÍDA
+3. ~~**F55** → **F56** (event hygiene + logging — observabilidade)~~ ✅ CONCLUÍDA
+4. **F57** → F58 (god modules — complexidade arquitetural) ← **PRÓXIMA**
 
 ---
 

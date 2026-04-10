@@ -130,9 +130,7 @@ export function resolve(input) {
         if (!alias) break;
         // F6.5 (BUG-LEVE-06): detectar loop de alias explicitamente antes de quebrar silencioso
         if (seen.has(cmd)) {
-            console.warn(
-                `[alias-store] Loop de alias detectado: "${cmd}" → ciclo em ${[...seen].join(' → ')} → "${cmd}"`,
-            );
+            log('WARN', `[alias-store] Loop de alias detectado: "${cmd}" → ciclo em ${[...seen].join(' → ')} → "${cmd}"`);
             break;
         }
         seen.add(cmd);
