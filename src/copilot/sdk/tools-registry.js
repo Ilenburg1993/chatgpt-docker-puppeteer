@@ -3,11 +3,10 @@ import { ConfigError } from '#copilot/core/errors';
 /**
  * src/copilot/sdk/tools-registry.js
  *
- * @module copilot/sdk/tools-registry
- * @deprecated Prefer sdk/tools.js + sdk/custom-tools.js. This module is retained for backward compatibility.
+ * Registry de ferramentas para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
+ * ferramentas por categoria, capacidade ou agente.
  *
- *   Registry de Custom Tools para o Copilot SDK. Permite registrar, filtrar, compor e inspecionar conjuntos de
- *   ferramentas por categoria, capacidade ou agente.
+ * @module copilot/sdk/tools-registry
  * @see module:copilot/sdk/tools
  * @see module:copilot/sdk/custom-tools
  */

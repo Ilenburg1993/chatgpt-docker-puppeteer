@@ -290,9 +290,7 @@ export {
 
 export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools-state.js';
 
-// ─── tools-registry.js — @deprecated prefer sdk/tools.js + sdk/custom-tools.js ─
-// Re-exports mantidos para backward compat; marcar para remoção futura.
-/** @deprecated Use sdk/tools.js + sdk/custom-tools.js */
+// ─── tools-registry.js — registry de ferramentas por sessão ─
 export {
     createRegistry,
     excludeByNames,

@@ -15,7 +15,6 @@
  *
  * @module copilot/sdk/tools
  * @see module:copilot/sdk/tools-registry
- * @see module:copilot/tools/tool-factory
  */
 
 import { log } from '#copilot/observability/logger';
