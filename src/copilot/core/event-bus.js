@@ -102,14 +102,23 @@ export class EventBus {
 
     /**
      * Emite um evento, passando por middleware e notificando handlers.
+     * Se `timestamp` não for fornecido, será preenchido automaticamente.
      *
-     * @param {BaseEvent} event
+     * @param {{type: string; timestamp?: number; [key: string]: unknown}} rawEvent
      */
-    emit(event) {
+    emit(rawEvent) {
         if (this.#disposed) return;
-        if (!event || typeof event.type !== 'string') {
+        if (!rawEvent || typeof rawEvent.type !== 'string') {
             throw new TypeError('[EventBus] event must have a string "type" property');
         }
+
+        // Auto-fill timestamp if not provided
+        if (!rawEvent.timestamp) {
+            rawEvent.timestamp = Date.now();
+        }
+
+        /** @type {BaseEvent} */
+        const event = /** @type {any} */ (rawEvent);
 
         // Increment counter
         this.#counters.set(event.type, (this.#counters.get(event.type) ?? 0) + 1);

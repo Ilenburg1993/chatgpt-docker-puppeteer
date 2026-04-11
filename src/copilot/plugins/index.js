@@ -7,7 +7,7 @@
  * Este módulo é **L3** — mesmo nível de hooks, tools e bridges. Plugins podem integrar-se com tools, hooks e bridges
  * via DI container.
  *
- * **Status**: fundação estrutural. Plugin registry será adicionado em N-2b.
+ * **Status**: fundação estrutural com PluginRegistry funcional.
  *
  * @module copilot/plugins
  */
@@ -22,5 +22,4 @@
  *   recebe o container DI.
  */
 
-// Placeholder — registry será adicionado em N-2b
-// export { PluginRegistry } from './plugin-registry.js';
+export { PluginRegistry, createPluginRegistry } from './plugin-registry.js';

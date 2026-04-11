@@ -541,7 +541,17 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **N-1a**: ✅ `src/copilot/services/index.js` — barrel L4 criado, layer registrado, subpath imports OK.
 
-**N-2a**: ✅ `src/copilot/plugins/index.js` — barrel L3 criado com `CopilotPlugin` typedef, layer registrado.
+**N-1b**: ✅ `SessionService` — fachada para sdk sessions (create, resume, disconnect, list, foreground) com logging + EventBus.
+
+**N-1c**: ✅ `ToolService` — fachada para tools (buildTool, listAll, getDisabled, isDisabled) com EventBus.
+
+**N-1d**: ✅ `AuditService` — fachada para audit + observability (getTail, isHighRisk, errorTracker, metrics) com EventBus.
+
+**N-1e**: ✅ `ConversationService` — fachada para conversation-hub (getHub, getStore, sendToLlmB, createHubSession).
+
+**N-2a**: ✅ `src/copilot/plugins/index.js` — barrel L3 com `CopilotPlugin` typedef.
+
+**N-2b**: ✅ `PluginRegistry` — register, install, installAll, list, has, get, size, clear. 11 testes.
 
 **N-4a**: ✅ `scripts/arch-health.mjs` — health dashboard completo.
 
@@ -549,14 +559,15 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **N-4c**: ✅ Health score A-F com fórmula ponderada.
 
+**EventBus melhoria**: `emit()` agora aceita `{type: string}` sem timestamp obrigatório — auto-preenche `Date.now()`.
+
 **Subfases deferidas** (alto risco / invasivas):
-- N-1b–N-1e: Fachadas SessionService, ToolService, AuditService, ConversationService — requerem refactoring incremental.
 - N-1f–N-1g: Migração api/ para services — alto risco, precisa de cobertura de testes nas routes.
-- N-2b–N-2e: Plugin registry real, discovery, config — requer design review.
-- N-3a–N-3d: API refactoring — alto risco, dependente de N-1.
+- N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — requer design review.
+- N-3a–N-3d: API refactoring — alto risco, dependente de N-1f.
 - N-4d: CI integration — requer configuração de pipeline.
 
-**Validação**: 113 testes ✅ | lint clean ✅ | layer violations 0 ✅ | typecheck 16 ≤ baseline ✅
+**Validação**: 132 testes ✅ | lint clean ✅ | layer violations 0 ✅ | typecheck 16 ≤ baseline ✅
 
 ---
 
