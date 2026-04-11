@@ -5,6 +5,7 @@
  * Testes unitários — core/di.js: createToken, createContainer, lifecycle, fork, dispose.
  */
 
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createContainer, createToken } from '../../../src/copilot/core/di.js';

@@ -42,6 +42,8 @@
     "#copilot/channel/*": "./src/copilot/channel/*.js",
     "#copilot/core": "./src/copilot/core/index.js",
     "#copilot/core/*": "./src/copilot/core/*.js",
+    "#copilot/types": "./src/copilot/types/index.js",
+    "#copilot/types/*": "./src/copilot/types/*.js",
     "#copilot/agent": "./src/copilot/agent/index.js",
     "#copilot/agent/*": "./src/copilot/agent/*.js",
     "#copilot/audit": "./src/copilot/audit/index.js",

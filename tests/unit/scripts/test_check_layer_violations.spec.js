@@ -65,8 +65,9 @@ describe('check-layer-violations — isInsideJsDoc', () => {
 });
 
 describe('check-layer-violations — LAYER_MAP', () => {
-    it('core e db são L0', () => {
+    it('core, types e db são L0', () => {
         assert.equal(LAYER_MAP['core'], 0);
+        assert.equal(LAYER_MAP['types'], 0);
         assert.equal(LAYER_MAP['db'], 0);
     });
 

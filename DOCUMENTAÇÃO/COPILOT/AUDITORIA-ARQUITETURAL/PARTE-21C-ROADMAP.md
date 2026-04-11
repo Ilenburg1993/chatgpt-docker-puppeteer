@@ -11,8 +11,8 @@
 | H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                        |
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp) |
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)       |
-| K     | ✅ CONCLUÍDA    | (pendente commit) — refactor(copilot): Faixa K (DI container) |
-| L     | ⬜ Pendente  | —                                                        |
+| K     | ✅ CONCLUÍDA    | `289d9d35` — refactor(copilot): Faixa K (DI container)     |
+| L     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa L (types module) |
 | M     | ⬜ Pendente  | —                                                        |
 | N     | ⬜ Pendente  | —                                                        |
 
@@ -396,6 +396,25 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | L-3c | Validar: nenhum módulo L1+ exporta typedefs que deveriam estar em types/ | Baixo |
 
 **Entregáveis Faixa L**: 12 subfases
+
+### Resultados da execução (Faixa L)
+
+- **L-1a** ✅ `types/index.js` — barrel canônico com re-exports de DI tokens, container, event schemas
+- **L-1b** ✅ `types/events.js` — catálogo de eventos cross-module: 8 namespaces (hook, session, tool,
+  sdk, agent, api, terminal, audit), 28 event names, typedefs BaseEvent/SessionEvent/ToolEvent/SdkEvent/AuditEvent
+- **L-1c** ✅ Re-export dos 12 DI tokens canônicos via barrel `#copilot/types`
+- **L-1d** ⏸ Deferido — tipos SDK (Tool&lt;T&gt;, CopilotClient) não podem ser movidos de `sdk/types.js`
+  sem quebrar TS resolution (mesmo problema do J-3a). Tipos permanecem em `sdk/types.js` como SSOT.
+- **L-1e** ✅ `types/README.md` — documentação do módulo
+- **L-2** ✅ Typedefs JSDoc declarados diretamente em `events.js` (BaseEvent, SessionEvent, ToolEvent, etc.)
+  — sem necessidade de .d.ts separados
+- **L-3a** ✅ `types/` registrado como L0 no LAYER_MAP (`scripts/check-layer-violations.mjs`)
+- **L-3b** ✅ `test_types_contracts.spec.js` — 6 contract tests (barrel DI re-exports, event exports,
+  namespace:action pattern, direct import resolution)
+- **L-3c** ✅ Layer check integration: 0 violações no codebase
+- **Validação**: TypeCheck 16 erros (baseline inalterada), Lint clean, 76 testes passando
+- **tsconfig.base.json** atualizado com paths `#copilot/types` e `#copilot/types/*`
+- **package.json** atualizado com subpath imports `#copilot/types` e `#copilot/types/*`
 
 ---
 

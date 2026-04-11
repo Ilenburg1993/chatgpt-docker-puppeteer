@@ -10,6 +10,7 @@
  * 3. Cada token tem nome e _id symbol
  */
 
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as core from '../../../../src/copilot/core/index.js';

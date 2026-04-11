@@ -30,6 +30,8 @@
       "#agent/*": ["src/agent/*"],
 
       "#copilot/observability": ["src/copilot/observability/index.js"],
+      "#copilot/types": ["src/copilot/types/index.js"],
+      "#copilot/types/*": ["src/copilot/types/*"],
       "#copilot/observability/logger": ["src/copilot/observability/logger.js"],
       "#copilot/observability/audit-log": ["src/copilot/observability/audit-log.js"],
       "#copilot/observability/telemetry-store": ["src/copilot/observability/telemetry-store.js"],

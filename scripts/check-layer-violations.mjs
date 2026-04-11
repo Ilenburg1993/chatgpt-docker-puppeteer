@@ -21,6 +21,7 @@ const COPILOT_ROOT = 'src/copilot';
 /** @type {Record<string, number>} */
 const LAYER_MAP = {
     core: 0,
+    types: 0,
     db: 0,
     sdk: 1,
     audit: 1,
