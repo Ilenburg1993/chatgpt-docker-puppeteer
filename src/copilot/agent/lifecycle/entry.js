@@ -15,6 +15,8 @@
 import { setAuditBus } from '#copilot/audit';
 import {
     TimeoutError,
+    container,
+    AUDIT_BUS,
     registerShutdownHandler,
     runShutdown,
     withRetry,
@@ -44,6 +46,7 @@ bootstrapObservability();
 // Injetar dependências tardias (tools, bus) em módulos de camada inferior (sdk/, audit/)
 bootstrapLateDeps({ buildTool });
 setAuditBus(defaultBus);
+container.register(AUDIT_BUS, () => defaultBus, 'singleton');
 
 /**
  * Inicializa o agente com retry centralizado (até {@link BOOT_MAX_RETRIES} tentativas).

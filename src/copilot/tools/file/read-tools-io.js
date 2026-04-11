@@ -12,14 +12,11 @@ import * as fs from 'node:fs';
 import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
-import { buildTool, withSkipPermission } from '../tool-factory.js';
+import { buildTool } from '../tool-factory.js';
 import {
     MAX_CONTENT_BYTES,
     MAX_LIST_ENTRIES,
-    MAX_SEARCH_OUTPUT,
     WORKSPACE_ROOT,
-    execFileAsync,
-    isRgAvailable,
     validatePath,
 } from './shared.js';
 

@@ -10,7 +10,7 @@
  * @see module:copilot/sdk/session-lifecycle
  */
 
-import { log as appLog } from './logger.js';
+import { log as _appLog } from './logger.js';
 import {
     modelGetCurrent,
     modelSwitchTo,

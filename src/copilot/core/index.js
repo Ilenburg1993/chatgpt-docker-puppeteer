@@ -47,6 +47,11 @@ export {
     registerTimer,
 } from './timer-registry.js';
 
+// ─── DI Container ─────────────────────────────────────────────────────────────
+export { createContainer, createToken } from './di.js';
+export { container } from './di-container.js';
+export * from './di-tokens.js';
+
 // ─── Security ─────────────────────────────────────────────────────────────────
 export {
     checkResolvedIp,

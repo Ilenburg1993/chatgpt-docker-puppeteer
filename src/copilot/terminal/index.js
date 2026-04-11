@@ -25,6 +25,14 @@ import { setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
+import { container } from '../core/di-container.js';
+import {
+    BRIDGE_AGENT,
+    FALLBACK_AGENT,
+    HUB,
+    NERV_BRIDGE_AGENT,
+    PERMISSION_AGENT,
+} from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';
@@ -118,6 +126,13 @@ export async function startTerminalServer() {
     setPermissionAgent(alwaysAliveAgent);
     setFallbackAgent(alwaysAliveAgent);
     setBridgeAgent(alwaysAliveAgent);
+
+    // DI container — registrar dependências de runtime (agent/tools stack)
+    container.register(HUB, () => conversationHub, 'singleton');
+    container.register(PERMISSION_AGENT, () => alwaysAliveAgent, 'singleton');
+    container.register(FALLBACK_AGENT, () => alwaysAliveAgent, 'singleton');
+    container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
+    container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files

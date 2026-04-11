@@ -14,6 +14,8 @@
  */
 
 import { setAuditLogger } from '../audit/logger.js';
+import { container } from '../core/di-container.js';
+import { AUDIT_LOGGER, DB_LOGGER, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
@@ -26,6 +28,8 @@ import { LOG_DIR, log } from './logger.js';
  * Conecta `core/error-handlers`, `core/shutdown`, `db/sqlite`, `sdk/` e `audit/` às implementações reais de log e
  * tracking. Idempotente — pode ser chamado mais de uma vez sem efeito adverso.
  *
+ * Também registra os tokens DI correspondentes no container global para consumo via DI.
+ *
  * @returns {void}
  */
 export function bootstrapObservability() {
@@ -33,10 +37,18 @@ export function bootstrapObservability() {
         log,
         tracker: defaultErrorTracker,
     });
+
+    // Setters legados (backward compat)
     setShutdownLogger(log);
     setDbLogger(log);
     setSdkLogger(log);
     setAuditLogger(log, LOG_DIR);
+
+    // DI container — registrar as mesmas dependências como tokens
+    container.register(SHUTDOWN_LOGGER, () => log, 'singleton');
+    container.register(DB_LOGGER, () => log, 'singleton');
+    container.register(SDK_LOGGER, () => log, 'singleton');
+    container.register(AUDIT_LOGGER, () => log, 'singleton');
 }
 
 /**
@@ -47,5 +59,8 @@ export function bootstrapObservability() {
  * @returns {void}
  */
 export function bootstrapLateDeps(deps) {
-    if (deps.buildTool) setCustomToolsBuilder(/** @type {any} */ (deps.buildTool));
+    if (deps.buildTool) {
+        setCustomToolsBuilder(/** @type {any} */ (deps.buildTool));
+        container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
+    }
 }

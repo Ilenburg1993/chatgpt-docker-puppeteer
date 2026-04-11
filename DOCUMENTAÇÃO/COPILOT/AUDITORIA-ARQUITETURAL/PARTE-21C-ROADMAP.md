@@ -10,8 +10,8 @@
 | ----- | ----------- | -------------------------------------------------------- |
 | H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                        |
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp) |
-| J     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa J           |
-| K     | ⬜ Pendente  | —                                                        |
+| J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)       |
+| K     | ✅ CONCLUÍDA    | (pendente commit) — refactor(copilot): Faixa K (DI container) |
 | L     | ⬜ Pendente  | —                                                        |
 | M     | ⬜ Pendente  | —                                                        |
 | N     | ⬜ Pendente  | —                                                        |
@@ -341,6 +341,24 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | K-7c | Full regression: typecheck + lint + unit + integration tests       | Baixo |
 
 **Entregáveis Faixa K**: 33 subfases
+
+### Resultados da execução (Faixa K)
+
+- **K-1** ✅ `core/di.js` (~240 LoC): `createToken`, `createContainer`, lifecycle (singleton/transient/scoped),
+  `fork()`, `dispose()` com ordered cleanup
+- **K-1f** ✅ 34 testes unitários passando (token, register/resolve, lifecycle, fork, dispose, dependency chain)
+- **K-2** ✅ `core/di-tokens.js` com 12 tokens canônicos: SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, TOOLS_BUILDER,
+  AUDIT_LOGGER, AUDIT_BUS, BRIDGE_AGENT, FALLBACK_AGENT, HUB, PERMISSION_AGENT, SESSION_RPC, NERV_BRIDGE_AGENT
+- **K-2c** ✅ `core/di-container.js` — container global singleton exportado via barrel `#copilot/core`
+- **K-3** ✅ `observability/bootstrap.js` registra SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, AUDIT_LOGGER no container
+  (dual: setters legados + DI)
+- **K-3f** ✅ `bootstrapLateDeps` registra TOOLS_BUILDER no container
+- **K-4** ✅ `terminal/index.js` registra HUB, PERMISSION_AGENT, FALLBACK_AGENT, BRIDGE_AGENT, NERV_BRIDGE_AGENT
+- **K-4 (entry)** ✅ `agent/lifecycle/entry.js` registra AUDIT_BUS no container
+- **K-7** ✅ 16 contract tests (DI barrel exports + 12 tokens canônicos + distinção)
+- **K-5, K-6** ⏸ Deferidos — eliminação de singletons residuais e terminal FSM requerem refactoring
+  mais invasivo (candidatos para fase futura)
+- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 50 testes passando (34 unit + 16 contract)
 
 ---
 
