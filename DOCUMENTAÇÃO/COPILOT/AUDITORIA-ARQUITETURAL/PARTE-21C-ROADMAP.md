@@ -11,7 +11,7 @@
 | H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                                                           |
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp)                                    |
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)                                          |
-| K     | ✅ CONCLUÍDA | `289d9d35` — refactor(copilot): Faixa K (DI container)                                      |
+| K     | ✅ CONCLUÍDA | `c7e016cd` — refactor(copilot): Faixa K (DI container + wireLegacySetters + Terminal SM)     |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)                                      |
 | M     | ✅ CONCLUÍDA | `ad45f050` — refactor(copilot): Faixa M (Event Bus)                                         |
 | N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |
@@ -356,8 +356,11 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 - **K-4** ✅ `terminal/index.js` registra HUB, PERMISSION_AGENT, FALLBACK_AGENT, BRIDGE_AGENT, NERV_BRIDGE_AGENT
 - **K-4 (entry)** ✅ `agent/lifecycle/entry.js` registra AUDIT_BUS no container
 - **K-7** ✅ 16 contract tests (DI barrel exports + 12 tokens canônicos + distinção)
-- **K-5, K-6** ⏸ Deferidos — eliminação de singletons residuais e terminal FSM requerem refactoring
-  mais invasivo (candidatos para fase futura)
+- **K-5, K-6** ✅ Parcialmente implementados (`c7e016cd`):
+  - K-5: `wireLegacySetters()` centraliza DI→setter wiring. bootstrap.js e terminal/index.js refatorados.
+    Singletons residuais (copilotDb, _client, copilotNamespace) permanecem — migração completa requer refactoring invasivo.
+  - K-6: `TerminalPhase` enum (init/idle/busy/shutting_down/stopped) e `transitionTerminalPhase()` com validação.
+    Migração completa de 8+ vars para FSM (K-6c) permanece deferida — requer alteração nos consumidores.
 - **Validação**: TypeCheck 16 erros (baseline), Lint clean, 50 testes passando (34 unit + 16 contract)
 
 ---
