@@ -111,7 +111,7 @@ export {
 
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
-export { validateUrl, validateUrlString } from './url-validator.js';
+export { validateUrl, validateUrlString } from '#copilot/core/security/url-validator';
 export { pickDefined } from './utils.js';
 
 // ─── Faixa 1: Types & Constants (rev.4) ──────────────────────────────────────
@@ -185,7 +185,7 @@ export {
     getSessionWorkspacePath,
     runSessionLifecycle,
     setSessionModel,
-} from './session-lifecycle.js';
+} from './sdk-session-wrapper.js';
 
 // ─── Faixa 7: RPC Core Subsystems (rev.4) ────────────────────────────────────
 export {

@@ -11,7 +11,7 @@ import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config.js';
-import { checkResolvedIp, validateWebhookUrl } from './url-validator.js';
+import { checkResolvedIp, validateWebhookUrl } from '#copilot/core/security/url-validator';
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry

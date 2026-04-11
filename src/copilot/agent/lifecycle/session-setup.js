@@ -18,7 +18,7 @@ import { buildMcpConfig } from '../../config/mcp-servers.js';
 
 import { attachBus } from '#copilot/hooks/bus';
 import { createHooks } from '#copilot/hooks/factory';
-import { createSessionHooks } from '#copilot/hooks/session-lifecycle';
+import { createSessionHooks } from '#copilot/hooks/session-hooks';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
 import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
 

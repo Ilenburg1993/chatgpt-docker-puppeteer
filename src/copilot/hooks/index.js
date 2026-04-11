@@ -40,7 +40,7 @@ export {
 } from './permission-handler.js';
 
 // ─── Session lifecycle (migrado de agent/session-hooks.js) ────────────────────
-export { createSessionHooks } from './session-lifecycle.js';
+export { createSessionHooks } from './session-hooks.js';
 
 // ─── Prompt transformer (Gap 1) ───────────────────────────────────────────────
 export {

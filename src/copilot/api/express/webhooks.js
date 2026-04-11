@@ -16,7 +16,7 @@
  */
 
 import { alwaysAliveAgent } from '#copilot/agent';
-import { validateUrlString } from '#copilot/sdk';
+import { validateUrlString } from '#copilot/core/security/url-validator';
 import { Router } from 'express';
 
 /**
