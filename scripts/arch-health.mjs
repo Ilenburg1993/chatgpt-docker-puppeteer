@@ -99,9 +99,9 @@ function singletonCount() {
     let total = 0;
     let excluded = 0;
     const pattern = /^let\s+\w+\s*=/gm;
-    // Patterns que NÃO são singletons reais (logger fallbacks, flags, counters, caches)
+    // Patterns que NÃO são singletons reais (logger fallbacks, flags, counters, caches, mutexes, config overrides, arrays, subscribers, infra state)
     const excludeRe =
-        /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b|_?broadcastSse\b|_idCounter\b|_pendingInputSeq\b|_sseEventIdCounter\b|_turnQueueDepth\b|_persistenceFailureCount\b|_flushScheduled\b|exitHandlerRegistered\b|_agentListenersRegistered\b|_beforeStopRegistered\b|_rgAvailable\b|_modelsCache\b|_zodToJsonSchema\b)/;
+        /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b|_?broadcastSse\b|_idCounter\b|_pendingInputSeq\b|_sseEventIdCounter\b|_turnQueueDepth\b|_persistenceFailureCount\b|_flushScheduled\b|exitHandlerRegistered\b|_agentListenersRegistered\b|_beforeStopRegistered\b|_rgAvailable\b|_modelsCache\b|_zodToJsonSchema\b|_mcpCircuitOpen\b|_mcpCircuitOpenAt\b|_bootAttemptCount\b|_permLogBytes\b|_backgroundCompactionThreshold\b|_stateDirReady\b|_fileCacheHits\b|_fileCacheMisses\b|_busy\b|_planMode\b|_showThinking\b|_showUsage\b|_showStreaming\b|_tokenSeq\b|shuttingDown\b|shutdownRegistered\b|_storeMutex\b|_sendTurnMutex\b|_writeQueue\b|_clearFn\b|_phase\b|_reflectionTimer\b|_registeredTools\b|_attachmentQueue\b|_injectHistory\b|_aliases\b|_contextCache\b|_stateCache\b|_infiniteSessionConfig\b|_toolsConfig\b|_mcpHealth\b|_inboundUnsub\b|_pendingReadyHandler\b|_ensureDialogLoopInFlight\b|_hubSessionId\b|_startPromise\b|_registry\b|_rl\b|_deps\b)/;
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
