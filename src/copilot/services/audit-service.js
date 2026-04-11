@@ -7,10 +7,9 @@
  * @module copilot/services/audit-service
  */
 
-import { defaultAuditLog, getAuditTail, globalAuditBuffer, isHighRiskTool } from '#copilot/audit';
+import { AUDIT_LOG, defaultAuditLog, getAuditTail, globalAuditBuffer, isHighRiskTool } from '#copilot/audit';
 import { container, EVENT_BUS } from '#copilot/core';
 import { defaultErrorTracker, defaultMetrics, log } from '#copilot/observability';
-import { AUDIT_LOG } from '#copilot/events';
 
 /**
  * Fachada de auditoria — consolida operações de audit + observability.

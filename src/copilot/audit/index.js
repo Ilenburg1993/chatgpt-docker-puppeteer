@@ -28,3 +28,6 @@ export {
 
 // Logger proxy (DI)
 export { setAuditLogger } from './logger.js';
+
+// Re-export de constantes de eventos de auditoria (SSOT vive em #copilot/events)
+export { AUDIT_LOG } from '#copilot/events';
