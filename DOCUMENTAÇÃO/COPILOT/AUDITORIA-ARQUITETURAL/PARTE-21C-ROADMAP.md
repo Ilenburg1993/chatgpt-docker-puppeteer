@@ -12,8 +12,8 @@
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp) |
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)       |
 | K     | ✅ CONCLUÍDA    | `289d9d35` — refactor(copilot): Faixa K (DI container)     |
-| L     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa L (types module) |
-| M     | ⬜ Pendente  | —                                                        |
+| L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)     |
+| M     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa M (Event Bus) |
 | N     | ⬜ Pendente  | —                                                        |
 
 ---
@@ -468,6 +468,24 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | M-5c | Testes de integração: EventBus ↔ NERV                                | Médio |
 
 **Entregáveis Faixa M**: 17 subfases
+
+### Resultados da execução (Faixa M)
+
+- **M-1a** ✅ `core/event-bus.js` (~230 LoC): EventBus com namespaces, wildcards (`session:*`, `*`),
+  middleware chain, error isolation, counters/stats, dispose
+- **M-1b** ✅ Wildcards implementados: `namespace:*` e `*` catch-all
+- **M-1c** ✅ Middleware chain: pipeline com `use(fn)`, suporta intercept/block/transform
+- **M-1d** ✅ Token `EVENT_BUS` criado em `core/di-tokens.js`, registrado como singleton no bootstrap
+  via `observability/bootstrap.js`
+- **M-1e** ✅ 29 testes unitários (on/emit, unsubscribe, once, wildcards, middleware, counters,
+  listenerCount, dispose, error isolation)
+- **M-2c** ✅ Catálogo de eventos publicado em `types/events.js` (28 event names, 8 namespaces,
+  5 typedefs: BaseEvent, SessionEvent, ToolEvent, SdkEvent, AuditEvent)
+- **M-2a, M-2b** ⏸ Catalogação exaustiva dos 70+ .emit() e schemas detalhados deferidos para
+  fase de migração incremental
+- **M-3, M-4, M-5** ⏸ Migrações incrementais (alto risco) deferidas — requerem refactoring invasivo
+  de agent↔hooks, agent↔observability, sdk→observability, terminal, conversation-hub, NERV bridge
+- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 108 testes passando
 
 ---
 

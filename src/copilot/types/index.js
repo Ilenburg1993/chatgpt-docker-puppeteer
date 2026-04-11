@@ -26,11 +26,15 @@ export {
     PERMISSION_AGENT,
     SESSION_RPC,
     NERV_BRIDGE_AGENT,
+    EVENT_BUS,
 } from '../core/di-tokens.js';
 
 // ─── DI Container utilities ──────────────────────────────────────────────────
 export { createContainer, createToken } from '../core/di.js';
 export { container } from '../core/di-container.js';
+
+// ─── Event Bus ───────────────────────────────────────────────────────────────
+export { EventBus, createEventBus } from '../core/event-bus.js';
 
 // ─── Event schemas ───────────────────────────────────────────────────────────
 export {

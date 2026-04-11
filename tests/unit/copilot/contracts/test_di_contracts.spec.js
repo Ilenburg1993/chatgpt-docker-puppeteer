@@ -35,6 +35,11 @@ describe('FK-7 — core barrel DI exports', () => {
         assert.equal(typeof core.container.dispose, 'function');
         assert.equal(typeof core.container.tokens, 'function');
     });
+
+    it('exporta EventBus e createEventBus', () => {
+        assert.equal(typeof core.EventBus, 'function');
+        assert.equal(typeof core.createEventBus, 'function');
+    });
 });
 
 // ─── K-7b: DI token exports ─────────────────────────────────────────────────
@@ -52,6 +57,7 @@ const EXPECTED_TOKENS = [
     'PERMISSION_AGENT',
     'SESSION_RPC',
     'NERV_BRIDGE_AGENT',
+    'EVENT_BUS',
 ];
 
 describe('FK-7 — DI tokens canônicos', () => {

@@ -17,6 +17,7 @@ import {
     PERMISSION_AGENT,
     SESSION_RPC,
     NERV_BRIDGE_AGENT,
+    EVENT_BUS,
     // DI utilities (re-exported from core/di)
     createContainer,
     createToken,
@@ -24,6 +25,9 @@ import {
     // Events
     EVENT_NAMES,
     EVENT_NAMESPACES,
+    // Event Bus
+    EventBus,
+    createEventBus,
 } from '#copilot/types';
 
 // ─── Direct imports ──────────────────────────────────────────────────────────
@@ -37,11 +41,12 @@ import {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe('types/ barrel — DI re-exports', () => {
-    it('re-exports all 12 DI tokens', () => {
+    it('re-exports all 13 DI tokens', () => {
         const tokens = [
             SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, TOOLS_BUILDER,
             AUDIT_LOGGER, AUDIT_BUS, BRIDGE_AGENT, FALLBACK_AGENT,
             HUB, PERMISSION_AGENT, SESSION_RPC, NERV_BRIDGE_AGENT,
+            EVENT_BUS,
         ];
         for (const token of tokens) {
             assert.ok(token, 'token should be defined');
@@ -59,6 +64,13 @@ describe('types/ barrel — DI re-exports', () => {
         assert.ok(container);
         assert.equal(typeof container.register, 'function');
         assert.equal(typeof container.resolve, 'function');
+    });
+
+    it('re-exports EventBus class and createEventBus factory', () => {
+        assert.equal(typeof EventBus, 'function');
+        assert.equal(typeof createEventBus, 'function');
+        const bus = createEventBus();
+        assert.ok(bus instanceof EventBus);
     });
 });
 

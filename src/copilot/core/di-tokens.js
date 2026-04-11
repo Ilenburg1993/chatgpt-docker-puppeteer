@@ -103,3 +103,13 @@ export const SESSION_RPC = createToken('SESSION_RPC');
  * @type {import('./di.js').Token<object>}
  */
 export const NERV_BRIDGE_AGENT = createToken('NERV_BRIDGE_AGENT');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L0 — Event Bus
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Event bus cross-module centralizado.
+ * @type {import('./di.js').Token<import('./event-bus.js').EventBus>}
+ */
+export const EVENT_BUS = createToken('EVENT_BUS');

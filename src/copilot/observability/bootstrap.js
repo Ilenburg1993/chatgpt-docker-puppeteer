@@ -15,8 +15,9 @@
 
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
-import { AUDIT_LOGGER, DB_LOGGER, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
+import { AUDIT_LOGGER, DB_LOGGER, EVENT_BUS, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
+import { createEventBus } from '../core/event-bus.js';
 import { setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
@@ -49,6 +50,9 @@ export function bootstrapObservability() {
     container.register(DB_LOGGER, () => log, 'singleton');
     container.register(SDK_LOGGER, () => log, 'singleton');
     container.register(AUDIT_LOGGER, () => log, 'singleton');
+
+    // Event Bus global — singleton cross-module
+    container.register(EVENT_BUS, () => createEventBus(), 'singleton');
 }
 
 /**
