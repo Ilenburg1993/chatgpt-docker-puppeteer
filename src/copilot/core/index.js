@@ -24,8 +24,8 @@
  * @example
  *     ```js
  *     import { CopilotError, AGENT_EVENTS } from '#copilot/core';
- *     import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
- *     import { buildStructuredRequest } from '#copilot/core/structured-message';
+ *     import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+ *     import { buildStructuredRequest } from '#copilot/core';
  *     ```;
  */
 
@@ -46,3 +46,15 @@ export {
     cancel as cancelTimer,
     registerTimer,
 } from './timer-registry.js';
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+export {
+    checkResolvedIp,
+    isPrivateIp,
+    validateUrl,
+    validateUrlString,
+    validateWebhookUrl,
+} from './security/url-validator.js';
+
+// ─── Shared State ─────────────────────────────────────────────────────────────
+export { getHubSessionId, setSharedHubSessionId } from './shared-state.js';

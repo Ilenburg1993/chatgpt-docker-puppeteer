@@ -14,8 +14,8 @@
  * @see module:copilot/always-alive
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { SessionError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import EventEmitter from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';

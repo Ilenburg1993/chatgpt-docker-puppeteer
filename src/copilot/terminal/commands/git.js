@@ -18,7 +18,7 @@ import {
     gitStash,
     gitStashList,
     gitStatus,
-} from '#copilot/bridges/git-bridge';
+} from '#copilot/bridges';
 
 /**
  * @typedef {object} SessionContext

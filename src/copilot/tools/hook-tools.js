@@ -20,8 +20,8 @@
  * @see module:copilot/hooks/audit
  */
 
-import { getAuditTail } from '#copilot/audit/pipeline';
-import { log } from '#copilot/observability/logger';
+import { getAuditTail } from '#copilot/audit';
+import { log } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

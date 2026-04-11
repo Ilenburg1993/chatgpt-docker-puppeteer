@@ -11,9 +11,8 @@
  * @internal
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { defaultMetrics } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
+import { SessionError } from '#copilot/core';
+import { defaultMetrics, log } from '#copilot/observability';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../config.js';
 import { wireDialogLoopEvents } from './loop-manager.js';
 

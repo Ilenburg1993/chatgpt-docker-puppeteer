@@ -1,5 +1,5 @@
 // @ts-check
-import { ConfigError } from '#copilot/core/errors';
+import { ConfigError } from '#copilot/core';
 /**
  * src/copilot/sdk/tools-registry.js
  *

@@ -8,8 +8,7 @@
  * @see module:copilot/tools/git-tools
  */
 
-import { defaultMetrics } from '#copilot/observability/metrics';
-import { startSpanImmediate } from '#copilot/observability/otel';
+import { defaultMetrics, startSpanImmediate } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

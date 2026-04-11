@@ -21,8 +21,11 @@ export { LOG_DIR, audit, getRecentLogs, log, logMetric, metric } from './logger.
 // ─── Event Collector ──────────────────────────────────────────────────────────
 export {
     MAX_EVENTS_BYTES,
+    attachSdkEventTyped,
     createEventCollector,
     defaultEventCollector,
+    getCompactionHistory,
+    getLastQuotaSnapshots,
     initEventCollector,
 } from './event-collector.js';
 
@@ -39,10 +42,13 @@ export { bootstrapLateDeps, bootstrapObservability } from './bootstrap.js';
 export { createAgentEventObserver } from './agent-event-observer.js';
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
-export { createAuditLog, defaultAuditLog } from '#copilot/audit/pipeline';
+export { createAuditLog, defaultAuditLog } from '#copilot/audit';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
-export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan } from './otel.js';
+export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan, startSpanImmediate } from './otel.js';
+
+// ─── Tool Stats ──────────────────────────────────────────────────────────────
+export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from './tool-stats.js';
 
 // ─── Event Catalog + Dead-Letter ──────────────────────────────────────────────
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';

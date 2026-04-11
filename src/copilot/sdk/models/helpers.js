@@ -12,7 +12,7 @@
  * @module copilot/lib/models
  */
 
-import { ConfigError } from '#copilot/core/errors';
+import { ConfigError } from '#copilot/core';
 import { getClient } from '#copilot/sdk/client';
 
 /**

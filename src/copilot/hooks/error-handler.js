@@ -13,7 +13,7 @@
  * @module copilot/hooks/error-handler
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('./types.js').ErrorOccurredHookInput} ErrorOccurredHookInput

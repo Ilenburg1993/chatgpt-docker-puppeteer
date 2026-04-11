@@ -25,9 +25,8 @@ import {
     TERMINAL_SHOW_STREAMING,
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
-} from '#copilot/config/env';
-import { CopilotError } from '#copilot/core/errors';
-import { getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core/shared-state';
+} from '#copilot/config';
+import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
 import EventEmitter from 'node:events';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 

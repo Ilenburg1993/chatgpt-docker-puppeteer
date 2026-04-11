@@ -13,8 +13,8 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { log } from '#copilot/observability/logger';
+import { logSwallowed } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';

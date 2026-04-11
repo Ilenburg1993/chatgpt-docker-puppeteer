@@ -14,9 +14,8 @@
  * @module copilot/routes/hooks
  */
 
-import { defaultBus } from '#copilot/hooks/bus';
-import { SDK_HOOKS } from '#copilot/hooks/registry';
-import { log } from '#copilot/observability/logger';
+import { SDK_HOOKS, defaultBus } from '#copilot/hooks';
+import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';

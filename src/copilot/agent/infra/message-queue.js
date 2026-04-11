@@ -11,9 +11,9 @@
  * @module copilot/agent/infra/message-queue
  */
 
-import { MAX_QUEUE_SIZE } from '#copilot/config/env';
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { MAX_QUEUE_SIZE } from '#copilot/config';
+import { SessionError } from '#copilot/core';
+import { log } from '#copilot/observability';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

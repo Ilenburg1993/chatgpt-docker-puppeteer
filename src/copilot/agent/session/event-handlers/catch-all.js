@@ -4,7 +4,7 @@
  * F62.9: Catch-all para eventos genuinamente não tratados por nenhum módulo do sistema.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação.

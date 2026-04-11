@@ -9,7 +9,7 @@
  * @module copilot/agent/dialog/user-input-handler
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**

@@ -10,7 +10,7 @@
  * @module copilot/agent/session/keepalive
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../config.js';
 
 /**

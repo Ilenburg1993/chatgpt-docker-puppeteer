@@ -19,8 +19,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { ConfigError } from '#copilot/core/errors';
-import { registerShutdownHandler } from '#copilot/core/shutdown';
+import { ConfigError, registerShutdownHandler } from '#copilot/core';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';

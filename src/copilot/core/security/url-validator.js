@@ -14,7 +14,7 @@
  * @module copilot/core/security/url-validator
  */
 
-import { ConfigError } from '#copilot/core/errors';
+import { ConfigError } from '#copilot/core';
 import dns from 'node:dns/promises';
 
 /**

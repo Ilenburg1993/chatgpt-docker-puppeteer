@@ -57,7 +57,7 @@
 // ─── Helpers e Histogramas (de metrics-histogram.js) ──────────────────────────
 
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
-import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config/env';
+import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';

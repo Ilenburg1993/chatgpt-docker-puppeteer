@@ -8,7 +8,7 @@
  * @see module:copilot/agent/dialog/loop-manager
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { WATCHDOG_THRESHOLDS } from '../config.js';
 
 /**

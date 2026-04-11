@@ -8,9 +8,8 @@
  */
 
 import { alwaysAliveAgent } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel/client';
-import { defaultErrorTracker } from '#copilot/observability/error-tracker';
-import { getToolStats } from '#copilot/observability/tool-stats';
+import { llmBridgeClient } from '#copilot/channel';
+import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 
 /**
  * @typedef {object} MetricsContext

@@ -9,7 +9,7 @@
  * @module copilot/api/bridge-stream
  */
 
-import { MAX_SSE_CLIENTS, MAX_SSE_LIFETIME_MS } from '#copilot/config/env';
+import { MAX_SSE_CLIENTS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
 import { AGENT_EVENTS } from '#copilot/core';
 import { eventFanout } from '../sse/fanout.js';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';

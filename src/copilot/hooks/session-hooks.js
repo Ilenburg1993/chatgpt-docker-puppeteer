@@ -15,10 +15,9 @@
  * @see module:copilot/hooks/types
  */
 
-import { defaultAuditLog } from '#copilot/audit/pipeline';
-import { getCopilotFallbackModel } from '#copilot/config/env';
-import { defaultMetrics } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
+import { defaultAuditLog } from '#copilot/audit';
+import { getCopilotFallbackModel } from '#copilot/config';
+import { defaultMetrics, log } from '#copilot/observability';
 import { modelSelector } from '#copilot/sdk';
 import { hostname } from 'node:os';
 

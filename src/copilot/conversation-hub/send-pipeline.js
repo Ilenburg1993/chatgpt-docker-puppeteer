@@ -7,8 +7,8 @@
  * @module copilot/conversation-hub/send-pipeline
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { SessionError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 import { HUB_EVENTS } from './events.js';
 

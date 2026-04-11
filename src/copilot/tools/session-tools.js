@@ -9,8 +9,8 @@
  * @see module:copilot/always-alive
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { log } from '#copilot/observability/logger';
+import { logSwallowed } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';

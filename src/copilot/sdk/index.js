@@ -118,7 +118,7 @@ export {
     supportsReasoning,
 } from './models/helpers.js';
 
-export { validateUrl, validateUrlString } from '#copilot/core/security/url-validator';
+export { validateUrl, validateUrlString } from '#copilot/core';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
 export { pickDefined } from './utils.js';

@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/tools
  */
 
-import { getToolStats } from '#copilot/observability/tool-stats';
+import { getToolStats } from '#copilot/observability';
 
 /**
  * @typedef {object} ToolsContext

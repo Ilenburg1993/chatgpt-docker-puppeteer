@@ -7,7 +7,7 @@
  * @module copilot/observability/collectors/tool-handlers
  */
 
-import { globalAuditBuffer } from '#copilot/audit/pipeline';
+import { globalAuditBuffer } from '#copilot/audit';
 import { SESSION_EVENTS as SE } from '#copilot/sdk';
 import { log } from '../logger.js';
 

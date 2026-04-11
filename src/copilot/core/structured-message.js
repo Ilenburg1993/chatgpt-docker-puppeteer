@@ -20,7 +20,7 @@
  *
  * @example
  *     ```js
- *     import { buildStructuredRequest, parseStructuredResponse } from '#copilot/core/structured-message';
+ *     import { buildStructuredRequest, parseStructuredResponse } from '#copilot/core';
  *
  *     // LLM-A cria mensagem tipada
  *     const msg = buildStructuredRequest({

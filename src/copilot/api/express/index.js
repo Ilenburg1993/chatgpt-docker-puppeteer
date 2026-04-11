@@ -19,7 +19,7 @@
 import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultMetrics } from '#copilot/observability';
 import { getClient, getClientState, stopClient } from '#copilot/sdk';
-import { allTools } from '#copilot/tools/index';
+import { allTools } from '#copilot/tools';
 import { Router } from 'express';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';

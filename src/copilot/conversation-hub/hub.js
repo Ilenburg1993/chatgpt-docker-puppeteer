@@ -12,9 +12,8 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { SessionError, logSwallowed } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { HUB_EVENTS } from './events.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';

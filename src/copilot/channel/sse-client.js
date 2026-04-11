@@ -8,7 +8,7 @@
  * @module copilot/channel/sse-client
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import http from 'node:http';
 import { logSwallowed } from '../core/error-handlers.js';
 

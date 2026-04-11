@@ -8,9 +8,9 @@
  * @module copilot/terminal/dialog/engine-persistence
  */
 
-import { emitNerv } from '#copilot/bridges/nerv-bridge';
-import { conversationHub } from '#copilot/conversation-hub/hub';
-import { log } from '#copilot/observability/logger';
+import { emitNerv } from '#copilot/bridges';
+import { conversationHub } from '#copilot/conversation-hub';
+import { log } from '#copilot/observability';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
 const _pendingNotifications = [];

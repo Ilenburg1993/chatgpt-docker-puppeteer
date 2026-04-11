@@ -14,7 +14,7 @@
  * @module copilot/agent/dialog/backpressure
  */
 
-import { SessionError } from '#copilot/core/errors';
+import { SessionError } from '#copilot/core';
 import { logSwallowed } from '../../core/error-handlers.js';
 
 /**

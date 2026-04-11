@@ -8,7 +8,7 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';

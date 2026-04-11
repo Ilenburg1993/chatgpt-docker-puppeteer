@@ -9,10 +9,8 @@
  * @see module:copilot/agent/status-snapshot
  */
 
-import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config/env';
-import { defaultMetrics } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
-import { getToolStats } from '#copilot/observability/tool-stats';
+import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
+import { defaultMetrics, getToolStats, log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';

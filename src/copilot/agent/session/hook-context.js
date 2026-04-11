@@ -13,10 +13,9 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { log } from '#copilot/observability/logger';
-import { defaultMetrics } from '#copilot/observability/metrics';
-import { readStore as _readTodoStore } from '#copilot/tools/todo/store';
+import { logSwallowed } from '#copilot/core';
+import { defaultMetrics, log } from '#copilot/observability';
+import { readStore as _readTodoStore } from '#copilot/tools';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';

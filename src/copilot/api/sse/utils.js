@@ -7,7 +7,7 @@
  *   contagem de clientes e cleanup em um módulo reutilizável.
  */
 
-import { MAX_SSE_CLIENTS } from '#copilot/config/env';
+import { MAX_SSE_CLIENTS } from '#copilot/config';
 import { createGzip } from 'node:zlib';
 
 /** @typedef {import('./replay-buffer.js').SseReplayBuffer} SseReplayBuffer */

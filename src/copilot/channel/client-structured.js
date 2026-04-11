@@ -11,8 +11,8 @@ import {
     buildStructuredRequest,
     parseStructuredResponse,
     serializeStructuredMessage,
-} from '#copilot/core/structured-message';
-import { log } from '#copilot/observability/logger';
+} from '#copilot/core';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('./client.js').ChatResult} ChatResult

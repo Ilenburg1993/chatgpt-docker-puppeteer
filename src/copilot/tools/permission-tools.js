@@ -20,8 +20,8 @@
  * @see module:copilot/agent/permission-controller
  */
 
-import { ConfigError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { ConfigError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { z } from 'zod';
 import { buildTool } from './tool-factory.js';
 

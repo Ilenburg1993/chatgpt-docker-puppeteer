@@ -8,7 +8,7 @@
  * @module copilot/tools/git
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';

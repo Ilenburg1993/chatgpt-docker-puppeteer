@@ -22,11 +22,9 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config/env';
-import { BridgeError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
-import { defaultMetrics } from '#copilot/observability/metrics';
-import { startSpanImmediate } from '#copilot/observability/otel';
+import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
+import { BridgeError } from '#copilot/core';
+import { defaultMetrics, log, startSpanImmediate } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import net from 'node:net';
 import { buildZodSchema } from './mcp-tool-schema.js';

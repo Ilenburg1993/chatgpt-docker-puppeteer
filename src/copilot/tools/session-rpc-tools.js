@@ -17,9 +17,9 @@
  * Em versões futuras do SDK, verificar se novos métodos públicos estão disponíveis como substitutos.
  */
 
-import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config/env';
-import { TimeoutError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
+import { TimeoutError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';

@@ -16,7 +16,7 @@
  * @see module:copilot/channel/client
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { z } from 'zod';
 import { buildTool } from './tool-factory.js';
 

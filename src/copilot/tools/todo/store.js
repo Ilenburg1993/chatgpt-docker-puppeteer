@@ -18,9 +18,9 @@
  * @see module:copilot/db/sqlite
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { getCopilotDb } from '#copilot/db/sqlite';
-import { log } from '#copilot/observability/logger';
+import { logSwallowed } from '#copilot/core';
+import { getCopilotDb } from '#copilot/db';
+import { log } from '#copilot/observability';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';

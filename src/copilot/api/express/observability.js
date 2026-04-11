@@ -19,16 +19,20 @@
  * @module copilot/routes/observability
  */
 
-import { defaultAuditLog, getAuditTail } from '#copilot/audit/pipeline';
-import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
-import { isMounted as isNervMounted } from '#copilot/bridges/nerv-bridge';
-import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config/env';
-import { defaultErrorTracker } from '#copilot/observability/error-tracker';
-import { getCatalog, getDeadLetters } from '#copilot/observability/event-catalog';
-import { getLastQuotaSnapshots } from '#copilot/observability/event-collector';
-import { getRecentLogs, log } from '#copilot/observability/logger';
-import { defaultMetrics } from '#copilot/observability/metrics';
-import { DEFAULT_OTEL_FILE, isOtelEnabled } from '#copilot/observability/otel';
+import { defaultAuditLog, getAuditTail } from '#copilot/audit';
+import { getMcpStatus, isMounted as isNervMounted } from '#copilot/bridges';
+import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config';
+import {
+    DEFAULT_OTEL_FILE,
+    defaultErrorTracker,
+    defaultMetrics,
+    getCatalog,
+    getDeadLetters,
+    getLastQuotaSnapshots,
+    getRecentLogs,
+    isOtelEnabled,
+    log,
+} from '#copilot/observability';
 import { Router } from 'express';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';

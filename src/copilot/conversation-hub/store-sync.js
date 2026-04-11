@@ -7,7 +7,7 @@
  * @module copilot/conversation-hub/store-sync
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * AI.4 — Sincroniza o histórico do SDK (`session.getHistory()`) para o schema `turns` do ConversationStore. Utiliza

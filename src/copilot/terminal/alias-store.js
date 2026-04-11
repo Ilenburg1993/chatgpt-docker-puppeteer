@@ -6,8 +6,8 @@
  *   Suporta aliases built-in e customizados pelo usuário. Aliases customizados são persistidos em arquivo JSON.
  */
 
-import { LLM_B_ALIASES_FILE } from '#copilot/config/env';
-import { log } from '#copilot/observability/logger';
+import { LLM_B_ALIASES_FILE } from '#copilot/config';
+import { log } from '#copilot/observability';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

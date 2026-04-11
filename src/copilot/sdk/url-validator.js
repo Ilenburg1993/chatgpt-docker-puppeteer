@@ -9,4 +9,4 @@
  * @module copilot/sdk/url-validator
  */
 
-export { validateUrl, validateUrlString } from '#copilot/core/security/url-validator';
+export { validateUrl, validateUrlString } from '#copilot/core';

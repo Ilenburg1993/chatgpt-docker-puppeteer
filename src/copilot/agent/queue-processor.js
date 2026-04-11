@@ -4,7 +4,7 @@
  * @file F57: Queue processor — extrai lógica de processamento de fila do AlwaysAliveAgent.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { executeTask } from './infra/task-executor.js';
 
 /**

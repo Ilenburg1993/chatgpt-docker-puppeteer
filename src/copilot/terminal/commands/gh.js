@@ -26,7 +26,7 @@ import {
     viewIssue,
     viewPr,
     viewRun,
-} from '#copilot/bridges/gh/index';
+} from '#copilot/bridges';
 
 /**
  * @typedef {object} SessionContext

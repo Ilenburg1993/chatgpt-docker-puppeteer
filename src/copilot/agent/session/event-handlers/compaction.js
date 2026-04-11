@@ -4,7 +4,7 @@
  * F62.2: Handler de eventos de compaction da sessão SDK.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**

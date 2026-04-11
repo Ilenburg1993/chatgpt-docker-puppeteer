@@ -25,10 +25,10 @@ import {
     defaultErrorTracker,
     defaultEventCollector,
     defaultMetrics,
+    log,
 } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
 import { SESSION_LIFECYCLE_EVENTS, isExperimentalEnabled } from '#copilot/sdk';
-import { createQuotaMonitor } from '#copilot/sdk/quota-monitor';
+import { createQuotaMonitor } from '#copilot/sdk';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
@@ -69,7 +69,9 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
- * @property {({ startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null) | undefined} mcpBridge — Ponte MCP injetável (F69)
+ * @property {({ startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null)
+ *     | undefined} mcpBridge
+ *   — Ponte MCP injetável (F69)
  */
 
 /**
@@ -170,7 +172,9 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
 
     // ── 8. Auto-reconnect MCP ──
     // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
-    const _ctxAny = /** @type {{ mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null }} */ (/** @type {unknown} */ (ctx));
+    const _ctxAny = /** @type {{
+    mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null;
+}} */ (/** @type {unknown} */ (ctx));
     const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
     const mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
         ctx.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });

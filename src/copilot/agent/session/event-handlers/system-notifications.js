@@ -4,7 +4,7 @@
  * F62.6: Handler de eventos system.notification da sessão SDK.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**

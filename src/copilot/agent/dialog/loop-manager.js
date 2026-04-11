@@ -19,10 +19,9 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { getCopilotFallbackModel } from '#copilot/config/env';
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
-import { startSpanImmediate } from '#copilot/observability/otel';
+import { getCopilotFallbackModel } from '#copilot/config';
+import { SessionError } from '#copilot/core';
+import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
 import EventEmitter from 'node:events';
 import { logSwallowed } from '../../core/error-handlers.js';

@@ -4,7 +4,7 @@
  * F62.8: Handler dedicado para billing (assistant.usage).
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
 import { writeStateAsync } from '../../lifecycle/state-io.js';
 

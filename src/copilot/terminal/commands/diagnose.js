@@ -18,10 +18,9 @@
  */
 
 import { alwaysAliveAgent } from '#copilot/agent';
-import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
-import { conversationHub } from '#copilot/conversation-hub/hub';
-import { conversationStore } from '#copilot/conversation-hub/store';
-import { getToolStats } from '#copilot/observability/tool-stats';
+import { getMcpStatus } from '#copilot/bridges';
+import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { getToolStats } from '#copilot/observability';
 
 /**
  * @typedef {object} DiagnoseContext

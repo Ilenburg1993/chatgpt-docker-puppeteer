@@ -25,10 +25,9 @@
  * @see module:copilot/conversation-hub/orchestrator
  */
 
-import { LLM_B_TERMINAL_PORT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config/env';
+import { LLM_B_TERMINAL_PORT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError } from '#copilot/core';
-import { log } from '#copilot/observability/logger';
-import { recordToolCall } from '#copilot/observability/tool-stats';
+import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
 import { subscribeSse } from './sse-client.js';

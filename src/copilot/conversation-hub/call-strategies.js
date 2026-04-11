@@ -8,8 +8,8 @@
  * @module copilot/conversation-hub/call-strategies
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { SessionError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { HUB_EVENTS } from './events.js';
 
 /**

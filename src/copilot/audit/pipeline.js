@@ -11,7 +11,7 @@
  * @module copilot/audit/pipeline
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
+import { logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { approveAll } from '#copilot/sdk';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
@@ -417,7 +417,6 @@ export function createAuditLog(opts = {}) {
 export const defaultAuditLog = createAuditLog();
 
 // F129: flush audit log via shutdown centralizado (priority 90 — low, runs late)
-import { registerShutdownHandler } from '#copilot/core/shutdown';
 registerShutdownHandler(
     'audit.flush',
     async () => {

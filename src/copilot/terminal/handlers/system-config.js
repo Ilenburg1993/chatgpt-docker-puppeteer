@@ -9,11 +9,10 @@
  */
 
 import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
-import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
-import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
-import { conversationHub } from '#copilot/conversation-hub/hub';
-import { conversationStore } from '#copilot/conversation-hub/store';
-import { defaultMetrics } from '#copilot/observability/metrics';
+import { getMcpStatus } from '#copilot/bridges';
+import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { defaultMetrics } from '#copilot/observability';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,

@@ -37,8 +37,8 @@
  * @see module:copilot/channel/inject
  */
 
-import { BridgeError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { BridgeError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { logSwallowed } from '../core/error-handlers.js';
 import {
     dialogTurn as _dialogTurn,

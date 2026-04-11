@@ -106,3 +106,6 @@ export {
     webTools,
     withSkipPermission,
 };
+
+// ─── Todo store (acesso direto ao estado persistido) ─────────────────────────
+export { readStore } from './todo/store.js';

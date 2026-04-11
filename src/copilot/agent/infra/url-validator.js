@@ -9,4 +9,4 @@
  * @module copilot/agent/infra/url-validator
  */
 
-export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core/security/url-validator';
+export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';

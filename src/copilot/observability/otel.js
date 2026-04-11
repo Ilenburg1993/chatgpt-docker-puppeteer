@@ -26,7 +26,7 @@ import {
     COPILOT_OTEL_ENDPOINT,
     COPILOT_OTEL_EXPORTER_TYPE,
     COPILOT_OTEL_SOURCE_NAME,
-} from '#copilot/config/env';
+} from '#copilot/config';
 import path from 'node:path';
 import { LOG_DIR } from './logger.js';
 

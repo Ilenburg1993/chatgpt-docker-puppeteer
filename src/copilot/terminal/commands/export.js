@@ -7,7 +7,7 @@
  * @module copilot/terminal/commands/export
  */
 
-import { llmBridgeClient } from '#copilot/channel/client';
+import { llmBridgeClient } from '#copilot/channel';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 

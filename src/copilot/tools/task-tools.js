@@ -9,8 +9,8 @@
  * @see module:copilot/agent/task-executor
  */
 
-import { SERVER_PORT } from '#copilot/config/env';
-import { log } from '#copilot/observability/logger';
+import { SERVER_PORT } from '#copilot/config';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

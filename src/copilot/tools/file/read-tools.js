@@ -8,7 +8,7 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import * as fs from 'node:fs';
 import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';

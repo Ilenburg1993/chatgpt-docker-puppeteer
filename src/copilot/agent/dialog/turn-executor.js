@@ -18,10 +18,8 @@
  * @module copilot/agent/dialog/turn-executor
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { defaultMetrics } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
-import { startSpan } from '#copilot/observability/otel';
+import { SessionError } from '#copilot/core';
+import { defaultMetrics, log, startSpan } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**

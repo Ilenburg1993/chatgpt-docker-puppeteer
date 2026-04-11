@@ -9,16 +9,23 @@ composível, testável e sem acoplamento com outras partes do workspace.
 
 ```js
 // API pública completa
-import { createHooks, createPermissionHandler, createHookBus } from '#copilot/hooks';
+import {
+    SDK_HOOKS,
+    attachBus,
+    createCircuitBreakerHandler,
+    createErrorHandler,
+    createHookBus,
+    createHooks,
+    createPermissionHandler,
+    createProductionHooks,
+    createPromptTransformer,
+    createSessionHooks,
+    fallback,
+    pipeline,
+    raceWithTimeout,
+} from '#copilot/hooks';
 
 // Módulos específicos (aliases granulares)
-import { createHooks } from '#copilot/hooks/factory';
-import { createPermissionHandler } from '#copilot/hooks/permission';
-import { createSessionHooks } from '#copilot/hooks/session';
-import { pipeline, fallback } from '#copilot/hooks/composer';
-import { createHookBus } from '#copilot/hooks/bus';
-import { SDK_HOOKS } from '#copilot/hooks/registry';
-import { createErrorHandler, createCircuitBreakerHandler } from '#copilot/hooks/error';
 ```
 
 ---
@@ -26,7 +33,6 @@ import { createErrorHandler, createCircuitBreakerHandler } from '#copilot/hooks/
 ## Quick Start — mínimo funcional
 
 ```js
-import { createHooks, createPermissionHandler } from '#copilot/hooks';
 import { CopilotClient } from '@github/copilot-sdk';
 
 const client = new CopilotClient({ token: process.env.GITHUB_TOKEN });
@@ -234,10 +240,6 @@ valor transformado.
 ### Pipeline com auditoria e timeout
 
 ```js
-import { createHooks } from '#copilot/hooks/factory';
-import { pipeline, raceWithTimeout } from '#copilot/hooks/composer';
-import { createPromptTransformer } from '#copilot/hooks/prompt-transformer';
-import { createCircuitBreakerHandler } from '#copilot/hooks/error';
 
 const hooks = createHooks({
   auditLog: true,
@@ -252,8 +254,6 @@ const hooks = createHooks({
 ### Observar eventos sem modificar handlers
 
 ```js
-import { createHooks } from '#copilot/hooks/factory';
-import { createHookBus, attachBus } from '#copilot/hooks/bus';
 
 const bus = createHookBus();
 bus.on('*', (event) => console.log('[audit]', event.hookName, event.sessionId));
@@ -265,7 +265,6 @@ const hooks = attachBus(baseHooks, bus); // transparente: retornos inalterados
 ### Preset de produção completo
 
 ```js
-import { createProductionHooks } from '#copilot/hooks/presets/production';
 
 const { hooks, onPermissionRequest } = createProductionHooks({
   toolAllowList: ['read_file', 'list_dir', 'grep_search', 'web_search'],
@@ -313,7 +312,7 @@ createSession(config)
 + import { createPermissionHandler } from '#copilot/hooks';
 
 - import { createSessionHooks } from '../agent/session-hooks.js';
-+ import { createSessionHooks } from '#copilot/hooks/session';
++ import { createSessionHooks } from '#copilot/hooks';
 ```
 
 > Os arquivos legados `lib/hooks.js`, `lib/permissions.js` e `agent/session-hooks.js` mantêm

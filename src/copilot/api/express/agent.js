@@ -18,7 +18,7 @@
  * @module copilot/routes/agent
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';

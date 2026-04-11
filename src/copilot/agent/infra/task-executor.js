@@ -10,7 +10,7 @@
  *   agente pai.
  */
 
-import { startSpanImmediate } from '#copilot/observability/otel';
+import { startSpanImmediate } from '#copilot/observability';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../config.js';
 
 /**

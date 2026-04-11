@@ -15,8 +15,8 @@
  * @see module:copilot/terminal/dialog
  */
 
-import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
-import { log } from '#copilot/observability/logger';
+import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { llmBridgeClient } from '../channel/client.js';

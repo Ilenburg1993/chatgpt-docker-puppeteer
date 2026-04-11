@@ -11,10 +11,8 @@
  * @internal
  */
 
-import { SessionError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
-import { startSpan } from '#copilot/observability';
-import { startSpanImmediate } from '#copilot/observability/otel';
+import { SessionError } from '#copilot/core';
+import { log, startSpan, startSpanImmediate } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**

@@ -16,9 +16,9 @@
  * @module copilot/terminal
  */
 
-import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config/env';
+import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
 import { AGENT_EVENTS } from '#copilot/core';
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';

@@ -4,7 +4,7 @@
  * F62.5: Handler de eventos de mudança de modo e ferramentas.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**

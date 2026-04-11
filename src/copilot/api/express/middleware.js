@@ -7,8 +7,8 @@
  * @module copilot/routes/middleware
  */
 
-import { CopilotError } from '#copilot/core/errors';
-import { log } from '#copilot/observability/logger';
+import { CopilotError } from '#copilot/core';
+import { log } from '#copilot/observability';
 
 /**
  * F245.3: Mapa de CopilotError subclasses → HTTP status codes.

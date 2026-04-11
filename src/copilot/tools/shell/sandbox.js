@@ -8,7 +8,7 @@
  * @module copilot/tools/shell/sandbox
  */
 
-import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config/env';
+import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 

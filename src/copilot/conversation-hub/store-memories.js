@@ -8,7 +8,7 @@
  * @module copilot/conversation-hub/store-memories
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { v4 as uuidv4 } from 'uuid';
 import { sanitizeFtsQuery } from './store-helpers.js';
 

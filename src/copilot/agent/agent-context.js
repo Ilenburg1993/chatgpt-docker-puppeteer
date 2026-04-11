@@ -14,7 +14,7 @@
  * @internal
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';

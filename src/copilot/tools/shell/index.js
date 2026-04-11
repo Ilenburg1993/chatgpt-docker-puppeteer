@@ -18,9 +18,8 @@
  * @module copilot/tools/shell-tools
  */
 
-import { defaultAuditLog } from '#copilot/audit/pipeline';
-import { log } from '#copilot/observability/logger';
-import { recordToolCall } from '#copilot/observability/tool-stats';
+import { defaultAuditLog } from '#copilot/audit';
+import { log, recordToolCall } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';

@@ -13,15 +13,21 @@
  */
 
 import { setAuditBus } from '#copilot/audit';
-import { TimeoutError } from '#copilot/core/errors';
-import { withRetry } from '#copilot/core/retry';
-import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
-import { defaultBus } from '#copilot/hooks/bus';
-import { defaultErrorTracker } from '#copilot/observability';
-import { bootstrapLateDeps, bootstrapObservability } from '#copilot/observability/bootstrap';
-import { log } from '#copilot/observability/logger';
+import {
+    TimeoutError,
+    registerShutdownHandler,
+    runShutdown,
+    withRetry,
+} from '#copilot/core';
+import { defaultBus } from '#copilot/hooks';
+import {
+    bootstrapLateDeps,
+    bootstrapObservability,
+    defaultErrorTracker,
+    log,
+} from '#copilot/observability';
 import { CopilotClient } from '#copilot/sdk';
-import { buildTool } from '#copilot/tools/tool-factory';
+import { buildTool } from '#copilot/tools';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {

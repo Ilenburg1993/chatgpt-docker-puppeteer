@@ -15,7 +15,7 @@
  * @module copilot/routes/webhooks
  */
 
-import { validateUrlString } from '#copilot/core/security/url-validator';
+import { validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 
 /**

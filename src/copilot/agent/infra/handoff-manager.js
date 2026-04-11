@@ -14,7 +14,7 @@
  * @module copilot/agent/infra/handoff-manager
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import EventEmitter from 'node:events';
 
 /**

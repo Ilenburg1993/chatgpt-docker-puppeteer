@@ -11,7 +11,7 @@
  * @module copilot/terminal/file-context
  */
 
-import { ToolError } from '#copilot/core/errors';
+import { ToolError } from '#copilot/core';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';

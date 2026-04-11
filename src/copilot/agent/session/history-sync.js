@@ -9,7 +9,7 @@
  * @module copilot/agent/session/history-sync
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession

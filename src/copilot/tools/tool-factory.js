@@ -27,7 +27,7 @@
  *
  * ```js
  * import { z } from 'zod/v3';
- * import { buildTool } from '#copilot/tools/tool-factory';
+ * import { buildTool } from '#copilot/tools';
  *
  * const readFileTool = buildTool({
  *     name: 'read_file',
@@ -64,7 +64,7 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 

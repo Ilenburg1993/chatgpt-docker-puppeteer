@@ -11,19 +11,20 @@
  * @internal
  */
 
-import { SessionError } from '#copilot/core/errors';
+import { SessionError } from '#copilot/core';
 import {
     buildTelemetryConfig,
     defaultErrorTracker,
     defaultMetrics,
     initEventCollector,
+    log,
     startSpan,
 } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
-import { CopilotClient } from '#copilot/sdk';
-import { raceEvents } from '#copilot/sdk';
+import { CopilotClient, raceEvents } from '#copilot/sdk';
 import { logSwallowed } from '../../core/error-handlers.js';
 
+import { conversationStore } from '../../conversation-hub/store.js';
+import { getHubSessionId } from '../../core/shared-state.js';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
 import { setSessionRpc } from '../infra/tools-bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
@@ -37,8 +38,6 @@ import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
 import { initOrResumeSession } from '../session/initializer.js';
-import { conversationStore } from '../../conversation-hub/store.js';
-import { getHubSessionId } from '../../core/shared-state.js';
 import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
 
 /**
@@ -149,7 +148,10 @@ export async function agentStart(ctx, host) {
         );
 
         if (isResumed) {
-            void syncSdkHistory(session, (event, payload) => host.emit(event, payload), { getHubSessionId, conversationStore });
+            void syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
+                getHubSessionId,
+                conversationStore,
+            });
         }
 
         host.emit('ready', { sessionId: session.sessionId, isResumed });
@@ -173,121 +175,124 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
     if (ctx.status === 'stopped') return;
 
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
-    log('INFO', '[AlwaysAlive] Parando agente...');
+        log('INFO', '[AlwaysAlive] Parando agente...');
 
-    host.emit('before-stop');
-    host.removeAllListeners('before-stop');
+        host.emit('before-stop');
+        host.removeAllListeners('before-stop');
 
-    if (ctx.status === 'starting') {
-        log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-        await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((/** @type {any} */ e) =>
-            logSwallowed(e, 'agent.lifecycle.stopBootWait'),
+        if (ctx.status === 'starting') {
+            log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
+            await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((/** @type {any} */ e) =>
+                logSwallowed(e, 'agent.lifecycle.stopBootWait'),
+            );
+        }
+
+        if (ctx.status === 'processing' || ctx.status === 'waiting_for_input') {
+            log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
+            await Promise.race([
+                new Promise((resolve) => {
+                    const onIdle = () => {
+                        if (ctx.status !== 'processing' && ctx.status !== 'waiting_for_input') {
+                            host.off('status', onIdle);
+                            resolve(undefined);
+                        }
+                    };
+                    host.on('status', onIdle);
+                }),
+                new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
+            ]);
+        }
+
+        if (ctx.dialogLoopAttached) {
+            ctx.dialogLoop.removeAllListeners();
+            ctx.dialogLoopAttached = false;
+        }
+        if (ctx.dialogLoop.active) {
+            ctx.dialogLoop.forceDeactivate();
+            host.emit('dialog.loop.changed', { active: false, ts: Date.now() });
+        }
+
+        try {
+            const snap = createSnapshot({
+                sessionId: host.sessionId ?? null,
+                model: ctx.model,
+                status: ctx.status,
+                sendCount: ctx.sendCount,
+                dialogLoopActive: false,
+                dialogPaused: ctx.dialogLoop.paused,
+                pendingQuestion: ctx.pendingQuestion?.question ?? null,
+                prMetrics: host.dialogPrMetrics,
+                reason: 'auto-shutdown',
+            });
+            await saveSnapshotAsync(snap);
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
+        }
+
+        await writeStateAsync({ sendCount: ctx.sendCount, gracefulShutdown: true }).catch((/** @type {any} */ e) =>
+            log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
         );
-    }
 
-    if (ctx.status === 'processing' || ctx.status === 'waiting_for_input') {
-        log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
-        await Promise.race([
-            new Promise((resolve) => {
-                const onIdle = () => {
-                    if (ctx.status !== 'processing' && ctx.status !== 'waiting_for_input') {
-                        host.off('status', onIdle);
-                        resolve(undefined);
-                    }
-                };
-                host.on('status', onIdle);
-            }),
-            new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
-        ]);
-    }
-
-    if (ctx.dialogLoopAttached) {
-        ctx.dialogLoop.removeAllListeners();
-        ctx.dialogLoopAttached = false;
-    }
-    if (ctx.dialogLoop.active) {
-        ctx.dialogLoop.forceDeactivate();
-        host.emit('dialog.loop.changed', { active: false, ts: Date.now() });
-    }
-
-    try {
-        const snap = createSnapshot({
-            sessionId: host.sessionId ?? null,
-            model: ctx.model,
-            status: ctx.status,
-            sendCount: ctx.sendCount,
-            dialogLoopActive: false,
-            dialogPaused: ctx.dialogLoop.paused,
-            pendingQuestion: ctx.pendingQuestion?.question ?? null,
-            prMetrics: host.dialogPrMetrics,
-            reason: 'auto-shutdown',
-        });
-        await saveSnapshotAsync(snap);
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
-    }
-
-    await writeStateAsync({ sendCount: ctx.sendCount, gracefulShutdown: true }).catch((/** @type {any} */ e) =>
-        log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
-    );
-
-    if (ctx.metricsTimer) {
-        clearInterval(ctx.metricsTimer);
-        ctx.metricsTimer = null;
-    }
-    if (ctx.mcpReconnectCancel) {
-        ctx.mcpReconnectCancel();
-        ctx.mcpReconnectCancel = null;
-    }
-    if (ctx.quotaMonitor) {
-        ctx.quotaMonitor.stop();
-        ctx.quotaMonitor = null;
-    }
-    ctx.keepalive.stop();
-    defaultMetrics.stopPeriodicSnapshot();
-
-    ctx.setStatus('stopped', host);
-
-    const remainingTasks = ctx.messageQueue.drain(
-        new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
-    );
-    ctx.statusSnapshotCache = null;
-    if (remainingTasks.length > 0) {
-        log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
-    }
-
-    if (ctx.agentObserver) {
-        ctx.agentObserver.detach();
-        ctx.agentObserver = null;
-    }
-
-    for (const unsub of ctx.sessionEventUnsubscribers) unsub();
-    ctx.sessionEventUnsubscribers = [];
-
-    if (ctx.session) {
-        try {
-            await ctx.session.disconnect();
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
+        if (ctx.metricsTimer) {
+            clearInterval(ctx.metricsTimer);
+            ctx.metricsTimer = null;
         }
-        ctx.session = null;
-        ctx.messagesCache.invalidate();
-        setSessionRpc(null);
-    }
+        if (ctx.mcpReconnectCancel) {
+            ctx.mcpReconnectCancel();
+            ctx.mcpReconnectCancel = null;
+        }
+        if (ctx.quotaMonitor) {
+            ctx.quotaMonitor.stop();
+            ctx.quotaMonitor = null;
+        }
+        ctx.keepalive.stop();
+        defaultMetrics.stopPeriodicSnapshot();
 
-    if (ctx.client) {
-        try {
-            const stopErrors = await ctx.client.stop();
-            if (stopErrors.length > 0) {
-                log('WARN', `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => e.message).join('; ')}`);
+        ctx.setStatus('stopped', host);
+
+        const remainingTasks = ctx.messageQueue.drain(
+            new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
+        );
+        ctx.statusSnapshotCache = null;
+        if (remainingTasks.length > 0) {
+            log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
+        }
+
+        if (ctx.agentObserver) {
+            ctx.agentObserver.detach();
+            ctx.agentObserver = null;
+        }
+
+        for (const unsub of ctx.sessionEventUnsubscribers) unsub();
+        ctx.sessionEventUnsubscribers = [];
+
+        if (ctx.session) {
+            try {
+                await ctx.session.disconnect();
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
             }
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${e.message}`);
+            ctx.session = null;
+            ctx.messagesCache.invalidate();
+            setSessionRpc(null);
         }
-        ctx.client = null;
-    }
 
-    host.emit('stopped');
+        if (ctx.client) {
+            try {
+                const stopErrors = await ctx.client.stop();
+                if (stopErrors.length > 0) {
+                    log(
+                        'WARN',
+                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => e.message).join('; ')}`,
+                    );
+                }
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${e.message}`);
+            }
+            ctx.client = null;
+        }
+
+        host.emit('stopped');
     }); // startSpan copilot.agent.stop
 }
 

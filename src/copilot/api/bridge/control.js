@@ -10,9 +10,9 @@
  */
 
 import { CHANNEL_VERSION } from '#copilot/channel';
-import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config/env';
+import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { conversationStore } from '#copilot/conversation-hub';
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health

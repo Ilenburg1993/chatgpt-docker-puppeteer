@@ -7,7 +7,7 @@
  * @module copilot/hooks/presets/deny-all
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createPermissionHandler } from '../permission-handler.js';
 
 /**

@@ -10,7 +10,7 @@
  * @see module:copilot/hooks/factory
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('./types.js').PreToolUseHandler} PreToolUseHandler

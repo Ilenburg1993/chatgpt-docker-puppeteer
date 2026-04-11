@@ -13,8 +13,8 @@ import {
     COPILOT_MCP_SERVERS,
     COPILOT_MCP_STDIO_TIMEOUT_MS,
     GITHUB_TOKEN,
-} from '#copilot/config/env';
-import { log } from '#copilot/observability/logger';
+} from '#copilot/config';
+import { log } from '#copilot/observability';
 import { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
 /**

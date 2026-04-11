@@ -28,7 +28,7 @@
  * @module copilot/api/express/sessions
  */
 
-import { SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config/env';
+import { SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config';
 import { Router } from 'express';
 import crudRouter from './session-crud.js';
 import messagingRouter from './session-messaging.js';

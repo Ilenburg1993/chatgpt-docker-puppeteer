@@ -7,7 +7,7 @@
  * @module copilot/api/express/session-middleware
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { z } from 'zod';
 
 /**

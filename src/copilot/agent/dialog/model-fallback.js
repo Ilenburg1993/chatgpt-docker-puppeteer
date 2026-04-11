@@ -13,7 +13,7 @@
  * @module copilot/agent/dialog/model-fallback
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {Object} AgentHostForFallback

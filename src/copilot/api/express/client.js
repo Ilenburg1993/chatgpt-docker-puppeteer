@@ -20,7 +20,7 @@
  * @module copilot/routes/client
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 

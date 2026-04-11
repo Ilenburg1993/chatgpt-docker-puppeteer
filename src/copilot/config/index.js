@@ -11,6 +11,9 @@
 // Cf. PARTE-21C Faixa H: eliminação de violações L2→L3.
 export { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
+// ─── Env (variáveis de ambiente e constantes de configuração) ─────────────────
+export * from './env.js';
+
 export { MCP_SERVERS, buildMcpConfig, listAvailableMcpServers } from './mcp-servers.js';
 
 export {

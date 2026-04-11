@@ -7,7 +7,7 @@
  * @module copilot/audit/jsonl-writer
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
+import { logSwallowed } from '#copilot/core';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 

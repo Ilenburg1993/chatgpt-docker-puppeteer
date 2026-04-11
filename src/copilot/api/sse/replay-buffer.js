@@ -7,7 +7,7 @@
  *   header Last-Event-ID permite replay dos eventos perdidos.
  */
 
-import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config/env';
+import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config';
 
 /** Tamanho padrão do buffer circular (configurável via SSE_REPLAY_BUFFER_SIZE). */
 const DEFAULT_BUFFER_SIZE = SSE_REPLAY_BUFFER_SIZE;

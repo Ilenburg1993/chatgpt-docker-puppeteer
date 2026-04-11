@@ -10,9 +10,8 @@
  * @module copilot/agent/session/snapshot
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { log } from '#copilot/observability/logger';
-import { startSpan } from '#copilot/observability';
+import { logSwallowed } from '#copilot/core';
+import { log, startSpan } from '#copilot/observability';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';

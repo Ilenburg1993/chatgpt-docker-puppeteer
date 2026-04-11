@@ -8,8 +8,7 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { conversationHub } from '#copilot/conversation-hub/hub';
-import { conversationStore } from '#copilot/conversation-hub/store';
+import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getHubSessionId } from '../state.js';
 
 /**

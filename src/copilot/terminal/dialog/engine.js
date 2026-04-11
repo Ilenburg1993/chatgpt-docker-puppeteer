@@ -8,9 +8,9 @@
  */
 
 import { alwaysAliveAgent } from '#copilot/agent';
-import { emitNerv } from '#copilot/bridges/nerv-bridge';
-import { llmBridgeClient } from '#copilot/channel/client';
-import { log } from '#copilot/observability/logger';
+import { emitNerv } from '#copilot/bridges';
+import { llmBridgeClient } from '#copilot/channel';
+import { log } from '#copilot/observability';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,

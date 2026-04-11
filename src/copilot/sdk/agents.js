@@ -1,5 +1,5 @@
 // @ts-check
-import { ConfigError } from '#copilot/core/errors';
+import { ConfigError } from '#copilot/core';
 import { log as appLog } from './logger.js';
 /**
  * src/copilot/sdk/agents.js

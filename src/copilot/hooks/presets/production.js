@@ -17,8 +17,8 @@
  * @module copilot/hooks/presets/production
  */
 
-import { log } from '#copilot/observability/logger';
-import { isToolDisabled } from '#copilot/tools/introspection-tools';
+import { log } from '#copilot/observability';
+import { isToolDisabled } from '#copilot/tools';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
@@ -67,7 +67,7 @@ import { createPromptTransformer } from '../prompt-transformer.js';
  * Preset de produção: combina segurança, auditoria e resiliência em uma configuração pronta para ambientes críticos.
  *
  * @example
- *     import { createProductionHooks } from '#copilot/hooks/presets/production';
+ *     import { createProductionHooks } from '#copilot/hooks';
  *
  *     const { hooks, onPermissionRequest } = createProductionHooks({
  *         toolAllowList: ['read_file', 'list_dir', 'web_search'],

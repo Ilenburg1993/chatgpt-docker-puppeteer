@@ -18,7 +18,7 @@
  * @module copilot/observability/event-collector
  */
 
-import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config/env';
+import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
 import { logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';

@@ -24,7 +24,7 @@
  * @see module:copilot/conversation-hub/hub
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { onSessionEvent } from '#copilot/sdk';
 
 /**

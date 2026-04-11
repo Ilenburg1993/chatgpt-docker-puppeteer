@@ -8,7 +8,7 @@
  * @module copilot/config/pinned-files-loader
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';

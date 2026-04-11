@@ -7,10 +7,9 @@
  *   reuso isolado.
  */
 
-import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
-import { ConfigError } from '#copilot/core/errors';
-import { checkResolvedIp, validateWebhookUrl } from '#copilot/core/security/url-validator';
-import { log } from '#copilot/observability/logger';
+import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config';
+import { ConfigError, checkResolvedIp, validateWebhookUrl } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config.js';
 
 /**

@@ -4,7 +4,7 @@
  * F62.4: Handler de eventos de token budget da sessão SDK.
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
 import { CONTEXT_UTIL_WARN_THRESHOLD } from '../../config.js';
 

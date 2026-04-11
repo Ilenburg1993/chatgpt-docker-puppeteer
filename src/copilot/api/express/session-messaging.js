@@ -7,7 +7,7 @@
  * @module copilot/api/express/session-messaging
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { getClientSession as getSdkSession, incrementSessionMessageCount as incrementMessageCount } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';

@@ -20,9 +20,8 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { logSwallowed } from '#copilot/core/error-handlers';
-import { defaultMetrics } from '#copilot/observability';
-import { log } from '#copilot/observability/logger';
+import { logSwallowed } from '#copilot/core';
+import { defaultMetrics, log } from '#copilot/observability';
 import EventEmitter from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)

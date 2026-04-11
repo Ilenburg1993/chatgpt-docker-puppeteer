@@ -13,7 +13,7 @@
  * @module copilot/terminal/workspace-context
  */
 
-import { COPILOT_WORKING_DIRECTORY } from '#copilot/config/env';
+import { COPILOT_WORKING_DIRECTORY } from '#copilot/config';
 import { execFile as execFileCb, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

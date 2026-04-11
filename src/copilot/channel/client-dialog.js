@@ -8,7 +8,7 @@
  * @module copilot/channel/client-dialog
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 
 /**
  * Interface mínima do AlwaysAliveAgent usada pelas funções de dialog.

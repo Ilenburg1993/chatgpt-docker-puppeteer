@@ -9,7 +9,7 @@
  * @see module:copilot/config/session-config
  */
 
-import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
+import { buildHookContextAppendMessage } from '#copilot/config';
 import { approveAll } from '#copilot/sdk';
 import { createHooks } from '../factory.js';
 import { createApproveAllPermission, createAuditOnlyPermission, createSafePermission } from '../permission-handler.js';

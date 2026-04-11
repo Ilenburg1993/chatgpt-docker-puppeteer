@@ -7,9 +7,8 @@
  * @module copilot/api/express/session-crud
  */
 
-import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config/env';
-import { getCompactionHistory } from '#copilot/observability/event-collector';
-import { log } from '#copilot/observability/logger';
+import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';
+import { getCompactionHistory, log } from '#copilot/observability';
 import {
     approveAll,
     createClientSession as createSdkSession,

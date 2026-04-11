@@ -10,9 +10,8 @@
  * @module copilot/agent/lifecycle/reconnect-policy
  */
 
-import { isFatalError } from '#copilot/core/error-handlers';
-import { log } from '#copilot/observability/logger';
-import { startSpan } from '#copilot/observability/otel';
+import { isFatalError } from '#copilot/core';
+import { log, startSpan } from '#copilot/observability';
 
 /**
  * @typedef {Object} ReconnectCallbacks

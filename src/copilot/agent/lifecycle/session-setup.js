@@ -11,14 +11,12 @@
  * @internal
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
 
-import { attachBus } from '#copilot/hooks/bus';
-import { createHooks } from '#copilot/hooks/factory';
-import { createSessionHooks } from '#copilot/hooks/session-hooks';
+import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
 import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
 

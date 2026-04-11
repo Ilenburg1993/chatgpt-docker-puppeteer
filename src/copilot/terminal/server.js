@@ -36,7 +36,7 @@
  * @see module:copilot/terminal/repl
  */
 
-import { defaultAuditLog } from '#copilot/audit/pipeline';
+import { defaultAuditLog } from '#copilot/audit';
 import {
     COPILOT_READY_WEBHOOK,
     LLM_B_INJECT_RATE_MAX,
@@ -46,8 +46,8 @@ import {
     LLM_B_TERMINAL_PORT,
     LLM_B_TERMINAL_TOKEN,
     MAX_SSE_CLIENTS,
-} from '#copilot/config/env';
-import { log } from '#copilot/observability/logger';
+} from '#copilot/config';
+import { log } from '#copilot/observability';
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
