@@ -272,6 +272,7 @@ export class ConversationHub {
         }
     }
 
+    /** @param {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} nerv */
     #bridgeToNerv(nerv) {
         if (!this.#orchestrator) return;
 

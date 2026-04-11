@@ -13,7 +13,7 @@
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)                                          |
 | K     | ✅ CONCLUÍDA | `c7e016cd` — refactor(copilot): Faixa K (DI container + wireLegacySetters + Terminal SM)    |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)                                      |
-| M     | ✅ CONCLUÍDA | `ad45f050` — refactor(copilot): Faixa M (Event Bus)                                         |
+| M     | ✅ CONCLUÍDA | `f348dde0` — refactor(copilot): Faixa M (Event Bus + bridgeEmitter + bridges Hub/Agent)         |
 | N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |
 
 ---
@@ -488,9 +488,16 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
   5 typedefs: BaseEvent, SessionEvent, ToolEvent, SdkEvent, AuditEvent)
 - **M-2a, M-2b** ⏸ Catalogação exaustiva dos 70+ .emit() e schemas detalhados deferidos para
   fase de migração incremental
-- **M-3, M-4, M-5** ⏸ Migrações incrementais (alto risco) deferidas — requerem refactoring invasivo
-  de agent↔hooks, agent↔observability, sdk→observability, terminal, conversation-hub, NERV bridge
-- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 108 testes passando
+- **M-3** ✅ `bridgeEmitter(emitter, bus, eventMap)` — utility em event-bus.js que conecta
+  EventEmitter convencional ao EventBus centralizado. Retorna função de unbind.
+- **M-4** ✅ ConversationHub bridge: 5 eventos do Orchestrator re-emitidos no EventBus
+  (hub:session:created, hub:session:closed, hub:turn:sent, hub:turn:complete, hub:user:injected)
+- **M-5** ✅ AlwaysAliveAgent bridge: 8 eventos lifecycle re-emitidos no EventBus
+  (agent:ready, agent:before-stop, agent:stopped, agent:error, agent:dialog:loop:changed,
+   agent:session:keepalive, agent:task:started, agent:task:delta)
+- **M-5 restante** ⏸ ~55 emitters deep agent-dialog são per-session e exigiriam refactoring invasivo.
+  31 são Socket.IO/SSE/hooks-bus (protocolo — não migráveis por design).
+- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 108 testes passando (91 node:test + 17 vitest)
 
 ---
 
