@@ -78,10 +78,15 @@ describe('check-layer-violations — LAYER_MAP', () => {
 
     it('hooks é L3', () => {
         assert.equal(LAYER_MAP['hooks'], 3);
+        assert.equal(LAYER_MAP['plugins'], 3);
     });
 
     it('terminal é L6', () => {
         assert.equal(LAYER_MAP['terminal'], 6);
+    });
+
+    it('services é L4', () => {
+        assert.equal(LAYER_MAP['services'], 4);
     });
 
     it('cada layer inferior tem valor menor', () => {

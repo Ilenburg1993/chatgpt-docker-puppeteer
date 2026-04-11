@@ -81,6 +81,10 @@
     "#copilot/observability/metrics": "./src/copilot/observability/metrics.js",
     "#copilot/observability/otel": "./src/copilot/observability/otel.js",
     "#copilot/observability/*": "./src/copilot/observability/*.js",
+    "#copilot/services": "./src/copilot/services/index.js",
+    "#copilot/services/*": "./src/copilot/services/*.js",
+    "#copilot/plugins": "./src/copilot/plugins/index.js",
+    "#copilot/plugins/*": "./src/copilot/plugins/*.js",
     "#copilot/*": "./src/copilot/*.js",
     "#core/constants": "./src/core/constants/index.ts",
     "#core/constants/browser": "./src/core/constants/browser.ts",
@@ -134,6 +138,7 @@
   ],
   "scripts": {
     "analyze:arch:filesize": "node scripts/check-file-size.mjs",
+    "analyze:arch:health": "node scripts/arch-health.mjs",
     "analyze:arch:layers": "node scripts/check-layer-violations.mjs",
     "analyze:circular": "node scripts/analysis/analyze-code-graph.js --circular",
     "analyze:constants": "node scripts/analysis/catalog-constants.mjs",

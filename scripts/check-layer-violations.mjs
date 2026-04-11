@@ -30,9 +30,11 @@ const LAYER_MAP = {
     hooks: 3,
     tools: 3,
     bridges: 3,
+    plugins: 3,
     agent: 4,
     'conversation-hub': 4,
     channel: 4,
+    services: 4,
     api: 5,
     terminal: 6,
 };

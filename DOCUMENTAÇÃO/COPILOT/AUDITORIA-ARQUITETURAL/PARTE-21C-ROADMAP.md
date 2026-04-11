@@ -13,8 +13,8 @@
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)       |
 | K     | ✅ CONCLUÍDA    | `289d9d35` — refactor(copilot): Faixa K (DI container)     |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)     |
-| M     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa M (Event Bus) |
-| N     | ⬜ Pendente  | —                                                        |
+| M     | ✅ CONCLUÍDA | `ad45f050` — refactor(copilot): Faixa M (Event Bus)       |
+| N     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa N (Services, Plugins, Health) |
 
 ---
 
@@ -536,6 +536,27 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | N-4d | Integrar ao CI como step informativo (não-bloqueante)                 | Baixo |
 
 **Entregáveis Faixa N**: 18 subfases
+
+### Resultados de Execução — Faixa N
+
+**N-1a**: ✅ `src/copilot/services/index.js` — barrel L4 criado, layer registrado, subpath imports OK.
+
+**N-2a**: ✅ `src/copilot/plugins/index.js` — barrel L3 criado com `CopilotPlugin` typedef, layer registrado.
+
+**N-4a**: ✅ `scripts/arch-health.mjs` — health dashboard completo.
+
+**N-4b**: ✅ Métricas: barrel ratio, singleton count, fan-out (max/avg/details), deep imports, DI tokens, test count.
+
+**N-4c**: ✅ Health score A-F com fórmula ponderada.
+
+**Subfases deferidas** (alto risco / invasivas):
+- N-1b–N-1e: Fachadas SessionService, ToolService, AuditService, ConversationService — requerem refactoring incremental.
+- N-1f–N-1g: Migração api/ para services — alto risco, precisa de cobertura de testes nas routes.
+- N-2b–N-2e: Plugin registry real, discovery, config — requer design review.
+- N-3a–N-3d: API refactoring — alto risco, dependente de N-1.
+- N-4d: CI integration — requer configuração de pipeline.
+
+**Validação**: 113 testes ✅ | lint clean ✅ | layer violations 0 ✅ | typecheck 16 ≤ baseline ✅
 
 ---
 
