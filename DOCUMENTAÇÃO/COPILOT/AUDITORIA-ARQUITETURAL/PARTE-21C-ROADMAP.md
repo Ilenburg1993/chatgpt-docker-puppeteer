@@ -356,11 +356,13 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 - **K-4** ✅ `terminal/index.js` registra HUB, PERMISSION_AGENT, FALLBACK_AGENT, BRIDGE_AGENT, NERV_BRIDGE_AGENT
 - **K-4 (entry)** ✅ `agent/lifecycle/entry.js` registra AUDIT_BUS no container
 - **K-7** ✅ 16 contract tests (DI barrel exports + 12 tokens canônicos + distinção)
-- **K-5, K-6** ✅ Parcialmente implementados (`c7e016cd`):
+- **K-5, K-6** ✅ Concluídos (`c7e016cd` + `26daddc9`):
   - K-5: `wireLegacySetters()` centraliza DI→setter wiring. bootstrap.js e terminal/index.js refatorados.
-    Singletons residuais (copilotDb, _client, copilotNamespace) permanecem — migração completa requer refactoring invasivo.
+    Singletons residuais (copilotDb, _client, copilotNamespace) analisados e mantidos — são lazy singletons
+    legítimos com side effects (I/O, SDK connect). DI migration seria over-engineering.
   - K-6: `TerminalPhase` enum (init/idle/busy/shutting_down/stopped) e `transitionTerminalPhase()` com validação.
-    Migração completa de 8+ vars para FSM (K-6c) permanece deferida — requer alteração nos consumidores.
+  - K-6c: `setBusy()` agora sincroniza com FSM em best-effort (idle↔busy). Demais vars não migradas —
+    planMode, rl, sseClients etc. são independentes da fase e não se beneficiam de FSM.
 - **Validação**: TypeCheck 16 erros (baseline), Lint clean, 50 testes passando (34 unit + 16 contract)
 
 ---
@@ -567,7 +569,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 **Subfases deferidas** (alto risco / invasivas):
 - N-1f–N-1g: Migração api/ para services — ✅ N-1f concluída (`e20fcc96`), fan-out 11→8.
 - N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — ✅ concluídas (`eb6f88a9`).
-- N-3a–N-3d: API refactoring — ✅ N-3a via N-1f, N-3b (middleware já extraído), N-3d (fan-out ≤8 atingido). N-3c (OpenAPI) adiada.
+- N-3a–N-3d: API refactoring — ✅ Todas concluídas. N-3a via N-1f, N-3b (middleware já extraído), N-3d (fan-out ≤8 atingido).
+  N-3c: ✅ `scripts/generate-openapi.mjs` gera spec OpenAPI 3.0 a partir dos route files Express (47 paths, 50 ops). `npm run generate:openapi`.
 - N-4d: CI integration — ✅ arch-health step no code-quality.yml (`eb6f88a9`).
 
 **N-1f**: ✅ Migração de api/ para services facades — fan-out reduzido de 11→8 modules. Rotas usam SessionService, ToolService, AuditService, ConversationService.
