@@ -66,3 +66,9 @@ export {
 
 // ─── Shared State ─────────────────────────────────────────────────────────────
 export { getHubSessionId, setSharedHubSessionId } from './shared-state.js';
+
+// ─── Cache ────────────────────────────────────────────────────────────────────
+export { createCache } from './cache.js';
+
+// ─── Mutex ────────────────────────────────────────────────────────────────────
+export { createMutex, createMutexPool, withMutex } from './mutex.js';

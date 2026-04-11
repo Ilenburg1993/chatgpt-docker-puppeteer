@@ -18,11 +18,24 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
+import { CircuitBreaker } from '../core/circuit-breaker.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { log } from './logger.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
 export { CopilotClient };
+
+/**
+ * Circuit breaker para operações de conexão ao SDK CLI.
+ * Protege contra retry storm em caso de CLI indisponível ou erro de rede.
+ *
+ * @type {CircuitBreaker}
+ */
+export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', {
+    failThreshold: 3,
+    resetTimeoutMs: 60_000,
+    halfOpenMax: 1,
+});
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
