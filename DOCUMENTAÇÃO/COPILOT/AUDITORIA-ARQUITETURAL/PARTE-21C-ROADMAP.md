@@ -605,16 +605,16 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 10. Resumo de Subfases por Faixa (H–N concluídas)
 
-| Faixa | Nome                       | Subfases | Wave | Deps    | Status       |
-| ----- | -------------------------- | -------- | ---- | ------- | ------------ |
-| **H** | CI Hardening + Violações   | 16       | 0    | —       | ✅ CONCLUÍDA  |
-| **I** | Barrel Enforcement         | 28       | 1    | H       | ✅ CONCLUÍDA  |
-| **J** | Decomposição de Arquivos   | 29       | 1    | H       | ✅ CONCLUÍDA  |
-| **K** | DI Container               | 33       | 2    | I, J    | ✅ CONCLUÍDA  |
-| **L** | Shared Types               | 12       | 2    | J, I    | ✅ CONCLUÍDA  |
-| **M** | Application Event Bus      | 17       | 3    | K, L    | ✅ CONCLUÍDA  |
-| **N** | Extensibilidade + Services | 18       | 3    | K, L, M | ✅ CONCLUÍDA  |
-| —     | **TOTAL H–N**              | **153**  | 0–3  | —       | ✅ DONE       |
+| Faixa | Nome                       | Subfases | Wave | Deps    | Status      |
+| ----- | -------------------------- | -------- | ---- | ------- | ----------- |
+| **H** | CI Hardening + Violações   | 16       | 0    | —       | ✅ CONCLUÍDA |
+| **I** | Barrel Enforcement         | 28       | 1    | H       | ✅ CONCLUÍDA |
+| **J** | Decomposição de Arquivos   | 29       | 1    | H       | ✅ CONCLUÍDA |
+| **K** | DI Container               | 33       | 2    | I, J    | ✅ CONCLUÍDA |
+| **L** | Shared Types               | 12       | 2    | J, I    | ✅ CONCLUÍDA |
+| **M** | Application Event Bus      | 17       | 3    | K, L    | ✅ CONCLUÍDA |
+| **N** | Extensibilidade + Services | 18       | 3    | K, L, M | ✅ CONCLUÍDA |
+| —     | **TOTAL H–N**              | **153**  | 0–3  | —       | ✅ DONE      |
 
 ---
 
@@ -627,18 +627,18 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **Objetivo**: Refinar métricas de qualidade. Foco: singletons, deep imports residuais, file splits.
 
-| Sub   | Tarefa                                       | Deps | Esforço | Impacto Score |
-| ----- | -------------------------------------------- | ---- | ------- | ------------- |
-| W4-1  | Refinar arch-health: excluir `let log=`      | —    | Baixo   | +10-15pts     |
-| W4-2  | ESLint allow-list para logger deep imports   | —    | Baixo   | Deep -134     |
-| W4-3  | Migrar 31 deep imports restantes (não-logger)| W4-2 | Alto    | Deep →≤50     |
-| W4-4  | Split `conversation-hub/store.js` (queries)  | —    | Médio   | -1 >400       |
-| W4-5  | Split `hooks/factory.js` (create vs compose) | —    | Médio   | -1 >400       |
-| W4-6  | Split `terminal/server.js` (http vs ws)      | —    | Médio   | -1 >400       |
-| W4-7  | Split `observability/dialog-task-handlers.js` | —   | Médio   | -1 >400       |
-| W4-8  | DI tokens para 14 setters residuais          | —    | Alto    | Setters →0    |
-| W4-9  | Expandir contract tests (+10 testes)         | —    | Médio   | Qualidade CI  |
-| W4-10 | Reduzir fan-out api/ (10→≤8)                 | W4-3 | Médio   | Fan-out -2    |
+| Sub   | Tarefa                                        | Deps | Esforço | Impacto Score |
+| ----- | --------------------------------------------- | ---- | ------- | ------------- |
+| W4-1  | Refinar arch-health: excluir `let log=`       | —    | Baixo   | +10-15pts     |
+| W4-2  | ESLint allow-list para logger deep imports    | —    | Baixo   | Deep -134     |
+| W4-3  | Migrar 31 deep imports restantes (não-logger) | W4-2 | Alto    | Deep →≤50     |
+| W4-4  | Split `conversation-hub/store.js` (queries)   | —    | Médio   | -1 >400       |
+| W4-5  | Split `hooks/factory.js` (create vs compose)  | —    | Médio   | -1 >400       |
+| W4-6  | Split `terminal/server.js` (http vs ws)       | —    | Médio   | -1 >400       |
+| W4-7  | Split `observability/dialog-task-handlers.js` | —    | Médio   | -1 >400       |
+| W4-8  | DI tokens para 14 setters residuais           | —    | Alto    | Setters →0    |
+| W4-9  | Expandir contract tests (+10 testes)          | —    | Médio   | Qualidade CI  |
+| W4-10 | Reduzir fan-out api/ (10→≤8)                  | W4-3 | Médio   | Fan-out -2    |
 
 **Health Score projetado pós-W4**: 78/100 (C+)
 
@@ -646,17 +646,17 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **Objetivo**: Eliminar fan-out excessivo, completar DI, domain buses.
 
-| Sub   | Tarefa                                        | Deps   | Esforço | Impacto       |
-| ----- | --------------------------------------------- | ------ | ------- | ------------- |
-| W5-1  | Extract terminal facades (fan-out 19→≤12)     | W4     | Alto    | Fan-out -7    |
-| W5-2  | Domain Event Bus por módulo (hooks, agent)    | W4     | Alto    | Desacoplamento|
-| W5-3  | Event sourcing para audit pipeline            | W5-2   | Alto    | Audit imutável|
-| W5-4  | Cache manager com TTL + invalidation          | W4     | Médio   | -5 singletons |
-| W5-5  | Mutex pool com timeout                        | W4     | Médio   | -3 singletons |
-| W5-6  | Timer manager com cleanup                     | W4     | Baixo   | -2 singletons |
-| W5-7  | Split `agent/always-alive.js` (lifecycle)     | W5-2   | Alto    | -1 >400       |
-| W5-8  | Split `agent/dialog/loop-manager.js`          | W5-2   | Alto    | -1 >400       |
-| W5-9  | DI.fork() para multi-agent prep               | W5-1   | Alto    | Multi-agent   |
+| Sub  | Tarefa                                     | Deps | Esforço | Impacto        |
+| ---- | ------------------------------------------ | ---- | ------- | -------------- |
+| W5-1 | Extract terminal facades (fan-out 19→≤12)  | W4   | Alto    | Fan-out -7     |
+| W5-2 | Domain Event Bus por módulo (hooks, agent) | W4   | Alto    | Desacoplamento |
+| W5-3 | Event sourcing para audit pipeline         | W5-2 | Alto    | Audit imutável |
+| W5-4 | Cache manager com TTL + invalidation       | W4   | Médio   | -5 singletons  |
+| W5-5 | Mutex pool com timeout                     | W4   | Médio   | -3 singletons  |
+| W5-6 | Timer manager com cleanup                  | W4   | Baixo   | -2 singletons  |
+| W5-7 | Split `agent/always-alive.js` (lifecycle)  | W5-2 | Alto    | -1 >400        |
+| W5-8 | Split `agent/dialog/loop-manager.js`       | W5-2 | Alto    | -1 >400        |
+| W5-9 | DI.fork() para multi-agent prep            | W5-1 | Alto    | Multi-agent    |
 
 **Health Score projetado pós-W5**: 85/100 (B+)
 
@@ -664,16 +664,16 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **Objetivo**: Fundação TypeScript, migração bottom-up, polish final.
 
-| Sub   | Tarefa                                        | Deps   | Esforço  | Impacto       |
-| ----- | --------------------------------------------- | ------ | -------- | ------------- |
-| W6-1  | Converter `types/` para .ts                   | W5     | Médio    | Primeiro .ts  |
-| W6-2  | Converter `core/` para .ts                    | W6-1   | Alto     | Foundation TS |
-| W6-3  | tsconfig paths para barrels                   | W6-1   | Médio    | TS module res |
-| W6-4  | Converter `db/` para .ts                      | W6-1   | Baixo    | Leaf .ts      |
-| W6-5  | Resolver 16 typecheck errors (rpc-*.js)       | W6-3   | Médio    | 0 errors      |
-| W6-6  | Observable-first metrics (OpenTelemetry)      | W5-3   | Alto     | Trace system  |
-| W6-7  | GraphQL gateway skeleton                      | W5     | Alto     | API evolution |
-| W6-8  | Horizontal scaling: worker pool draft         | W5-9   | Alto     | Scale out     |
+| Sub  | Tarefa                                   | Deps | Esforço | Impacto       |
+| ---- | ---------------------------------------- | ---- | ------- | ------------- |
+| W6-1 | Converter `types/` para .ts              | W5   | Médio   | Primeiro .ts  |
+| W6-2 | Converter `core/` para .ts               | W6-1 | Alto    | Foundation TS |
+| W6-3 | tsconfig paths para barrels              | W6-1 | Médio   | TS module res |
+| W6-4 | Converter `db/` para .ts                 | W6-1 | Baixo   | Leaf .ts      |
+| W6-5 | Resolver 16 typecheck errors (rpc-*.js)  | W6-3 | Médio   | 0 errors      |
+| W6-6 | Observable-first metrics (OpenTelemetry) | W5-3 | Alto    | Trace system  |
+| W6-7 | GraphQL gateway skeleton                 | W5   | Alto    | API evolution |
+| W6-8 | Horizontal scaling: worker pool draft    | W5-9 | Alto    | Scale out     |
 
 **Health Score projetado pós-W6**: 90/100 (A-)
 
@@ -681,19 +681,19 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 12. Métricas Projetadas Consolidadas (W0–W6)
 
-| Métrica             | Baseline | Pós W3 (atual) | Pós W4        | Pós W5       | Pós W6       |
-| ------------------- | -------- | -------------- | ------------- | ------------ | ------------ |
-| Layer violations    | 4        | **0** ✅        | 0             | 0            | 0            |
-| Barrel coverage     | 23%      | **100%** ✅     | 100%          | 100%         | 100%         |
-| Deep imports        | 233      | **165** ⚠️      | **≤50**       | ≤30          | allow-list   |
-| Files >400 LoC      | 25       | **18** ⚠️       | **≤14**       | ≤8           | ≤5           |
-| Singletons (reais)  | ~30      | **73** (15-20)  | **≤15**       | ≤5           | 0 (DI)       |
-| DI setters          | 22       | **23** ⚠️       | **0** (DI)    | 0            | 0            |
-| CI gates            | 2        | **5+**          | 7+            | 10+          | 12+          |
-| Contract tests      | 6        | **108** ✅      | 120+          | 130+         | 150+         |
-| EventEmitter ad-hoc | 70       | **72** ⚠️       | 72            | **≤40**      | ≤30          |
-| Fan-out max         | 11       | **19** (term)   | **≤15**       | ≤12          | ≤8           |
-| Health Score        | D (35)   | **D (65)**      | **C+ (78)**   | **B+ (85)**  | **A- (90)**  |
+| Métrica             | Baseline | Pós W3 (atual) | Pós W4      | Pós W5      | Pós W6      |
+| ------------------- | -------- | -------------- | ----------- | ----------- | ----------- |
+| Layer violations    | 4        | **0** ✅        | 0           | 0           | 0           |
+| Barrel coverage     | 23%      | **100%** ✅     | 100%        | 100%        | 100%        |
+| Deep imports        | 233      | **165** ⚠️      | **≤50**     | ≤30         | allow-list  |
+| Files >400 LoC      | 25       | **18** ⚠️       | **≤14**     | ≤8          | ≤5          |
+| Singletons (reais)  | ~30      | **73** (15-20) | **≤15**     | ≤5          | 0 (DI)      |
+| DI setters          | 22       | **23** ⚠️       | **0** (DI)  | 0           | 0           |
+| CI gates            | 2        | **5+**         | 7+          | 10+         | 12+         |
+| Contract tests      | 6        | **108** ✅      | 120+        | 130+        | 150+        |
+| EventEmitter ad-hoc | 70       | **72** ⚠️       | 72          | **≤40**     | ≤30         |
+| Fan-out max         | 11       | **19** (term)  | **≤15**     | ≤12         | ≤8          |
+| Health Score        | D (35)   | **D (65)**     | **C+ (78)** | **B+ (85)** | **A- (90)** |
 
 ---
 

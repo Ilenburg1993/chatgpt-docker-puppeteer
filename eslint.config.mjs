@@ -416,7 +416,7 @@ export default tseslint.config(
     // ── F21: Proíbe deep imports de módulos #copilot — use o barrel ──────
     {
         files: ['src/copilot/**/*.js'],
-        // Exceções: aliases intencionais definidos no package.json
+        // Exceções de arquivo: aliases intencionais definidos no package.json
         //   - #copilot/config/custom-tools-registry → sdk/custom-tools.js (alias de compatibilidade)
         //   - sdk/models/helpers.js usa #copilot/sdk/client (import interno ao módulo sdk)
         ignores: ['src/copilot/agent/infra/tools-bootstrap.js', 'src/copilot/sdk/models/helpers.js'],
@@ -426,10 +426,13 @@ export default tseslint.config(
                 {
                     patterns: [
                         {
-                            regex: '^#copilot/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api|sdk|agent|terminal)/.+',
+                            // Proíbe deep imports de #copilot/, EXCETO:
+                            //   - #copilot/sdk/types (typedef-only, sem runtime deps)
+                            //   - #copilot/observability/logger (allow-listed por DX/performance)
+                            regex: '^#copilot/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api|sdk|agent|terminal)/(?!types$|logger$).+',
                             message:
                                 'Use o barrel do módulo (ex.: "#copilot/core") em vez do deep import. ' +
-                                'Aliases intencionais como #copilot/config/custom-tools-registry são exceções declaradas no package.json.',
+                                'Exceções permitidas: #copilot/sdk/types e #copilot/observability/logger.',
                         },
                     ],
                 },

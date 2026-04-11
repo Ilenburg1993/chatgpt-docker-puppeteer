@@ -16,36 +16,36 @@ Score D (35/100) para **D (65/100)** — significativamente melhor, mas ainda di
 
 ### 1.1 O que foi feito (resumo)
 
-| Faixa | Tema                      | Resultado chave                                            |
-| ----- | ------------------------- | ---------------------------------------------------------- |
-| H     | CI Hardening              | 5 gates CI, regex expandida, export-from detection         |
-| I     | Barrel Enforcement        | Deep imports: 233→165, barrel ratio: 23%→100%              |
-| J     | File Decomposition        | 7 splits, sdk/rpc→3 arquivos, arquivos >400 LoC: 25→18    |
-| K     | DI Container              | 13 tokens, wireLegacySetters, TerminalPhase FSM            |
-| L     | Shared Types              | types/ module, 28 event names, 8 namespaces                |
-| M     | Application Event Bus     | EventBus + bridgeEmitter + 13 eventos bridged (Hub+Agent)  |
-| N     | Extensibilidade+Services  | 4 service facades, plugin registry, OpenAPI, arch-health CI|
+| Faixa | Tema                     | Resultado chave                                             |
+| ----- | ------------------------ | ----------------------------------------------------------- |
+| H     | CI Hardening             | 5 gates CI, regex expandida, export-from detection          |
+| I     | Barrel Enforcement       | Deep imports: 233→165, barrel ratio: 23%→100%               |
+| J     | File Decomposition       | 7 splits, sdk/rpc→3 arquivos, arquivos >400 LoC: 25→18      |
+| K     | DI Container             | 13 tokens, wireLegacySetters, TerminalPhase FSM             |
+| L     | Shared Types             | types/ module, 28 event names, 8 namespaces                 |
+| M     | Application Event Bus    | EventBus + bridgeEmitter + 13 eventos bridged (Hub+Agent)   |
+| N     | Extensibilidade+Services | 4 service facades, plugin registry, OpenAPI, arch-health CI |
 
 ### 1.2 Métricas atuais vs baseline vs target
 
-| Métrica                     | Baseline (21A) | Atual        | Target (21B) | Gap     |
-| --------------------------- | -------------- | ------------ | ------------ | ------- |
-| **Health Score**            | D (35/100)     | **D (65)**   | A (85+)      | +20pts  |
-| Layer violations (CI)       | 0              | **0** ✅      | 0            | —       |
-| Barrel coverage             | 23%            | **100%** ✅   | ≥90%         | Atingido|
-| Deep imports                | 233            | **165** ⚠️    | ≤50          | -115    |
-| Files >400 LoC (raw)        | 25             | **18** ⚠️     | ≤5           | -13     |
-| Singletons (`let`)          | ~30            | **73** 🔴     | ≤10          | -63     |
-| DI setters (`set*`)         | 22             | **23** ⚠️     | 0 (DI)       | -23     |
-| EventEmitter refs           | 70             | **72** ⚠️     | ≤30          | -42     |
-| DI tokens                   | 0              | **13** ✅     | —            | —       |
-| Fan-out max (módulo)        | 11 (api)       | **19** (term)| ≤8           | -11     |
-| Fan-out avg                 | —              | **5.7**      | ≤5           | -0.7    |
-| CI gates                    | 2              | **5+** ✅     | 10+          | -5      |
-| Contract tests              | 6              | **108** ✅    | 20+          | Atingido|
-| Módulos totais              | 14             | **17** ✅     | 17           | Atingido|
-| Arquivos totais             | 287            | **313**      | —            | +26     |
-| LoC total                   | 51.632         | **53.815**   | —            | +2.183  |
+| Métrica               | Baseline (21A) | Atual         | Target (21B) | Gap      |
+| --------------------- | -------------- | ------------- | ------------ | -------- |
+| **Health Score**      | D (35/100)     | **D (65)**    | A (85+)      | +20pts   |
+| Layer violations (CI) | 0              | **0** ✅       | 0            | —        |
+| Barrel coverage       | 23%            | **100%** ✅    | ≥90%         | Atingido |
+| Deep imports          | 233            | **165** ⚠️     | ≤50          | -115     |
+| Files >400 LoC (raw)  | 25             | **18** ⚠️      | ≤5           | -13      |
+| Singletons (`let`)    | ~30            | **73** 🔴      | ≤10          | -63      |
+| DI setters (`set*`)   | 22             | **23** ⚠️      | 0 (DI)       | -23      |
+| EventEmitter refs     | 70             | **72** ⚠️      | ≤30          | -42      |
+| DI tokens             | 0              | **13** ✅      | —            | —        |
+| Fan-out max (módulo)  | 11 (api)       | **19** (term) | ≤8           | -11      |
+| Fan-out avg           | —              | **5.7**       | ≤5           | -0.7     |
+| CI gates              | 2              | **5+** ✅      | 10+          | -5       |
+| Contract tests        | 6              | **108** ✅     | 20+          | Atingido |
+| Módulos totais        | 14             | **17** ✅      | 17           | Atingido |
+| Arquivos totais       | 287            | **313**       | —            | +26      |
+| LoC total             | 51.632         | **53.815**    | —            | +2.183   |
 
 ### 1.3 Análise do Health Score
 
@@ -66,34 +66,34 @@ O score 65/100 é calculado pelo `scripts/arch-health.mjs` com pesos:
 
 ## 2. Inventário de Módulos Atualizado
 
-| Módulo              | Layer | Arquivos | LoC        | Top file (LoC raw)          |
-| ------------------- | ----- | -------- | ---------- | --------------------------- |
-| `agent/`            | L4    | 54       | ~7.800     | always-alive.js (623)       |
-| `sdk/`              | L1    | 40       | ~7.700     | types.js (569)              |
-| `terminal/`         | L6    | 46       | ~7.700     | server.js (452)             |
-| `tools/`            | L3    | 24       | ~6.300     | introspection-tools.js (407)|
-| `observability/`    | L2    | 22       | ~4.600     | metrics.js (426)            |
-| `hooks/`            | L3    | 20       | ~3.600     | factory.js (416)            |
-| `api/`              | L5    | 21       | ~3.400     | session-crud.js (371)       |
-| `conversation-hub/` | L4    | 12       | ~2.600     | store.js (561)              |
-| `bridges/`          | L3    | 10       | ~2.300     | nerv-bridge.js (434)        |
-| `core/`             | L0    | 16       | ~2.100     | event-bus.js (~290)         |
-| `channel/`          | L4    | 7        | ~1.500     | client.js (557)             |
-| `config/`           | L2    | 7        | ~1.400     | custom-agents.js (325)      |
-| `services/`         | L4    | 5        | ~600       | session-service.js (~150)   |
-| `plugins/`          | L3    | 2        | ~300       | plugin-registry.js (~200)   |
-| `audit/`            | L1    | 5        | ~850       | pipeline.js (559)           |
-| `types/`            | L0    | 5        | ~550       | events.js (~200)            |
-| `db/`               | L0    | 3        | ~450       | sqlite.js (234)             |
-| **Total**           |       | **313**  | **53.815** |                             |
+| Módulo              | Layer | Arquivos | LoC        | Top file (LoC raw)           |
+| ------------------- | ----- | -------- | ---------- | ---------------------------- |
+| `agent/`            | L4    | 54       | ~7.800     | always-alive.js (623)        |
+| `sdk/`              | L1    | 40       | ~7.700     | types.js (569)               |
+| `terminal/`         | L6    | 46       | ~7.700     | server.js (452)              |
+| `tools/`            | L3    | 24       | ~6.300     | introspection-tools.js (407) |
+| `observability/`    | L2    | 22       | ~4.600     | metrics.js (426)             |
+| `hooks/`            | L3    | 20       | ~3.600     | factory.js (416)             |
+| `api/`              | L5    | 21       | ~3.400     | session-crud.js (371)        |
+| `conversation-hub/` | L4    | 12       | ~2.600     | store.js (561)               |
+| `bridges/`          | L3    | 10       | ~2.300     | nerv-bridge.js (434)         |
+| `core/`             | L0    | 16       | ~2.100     | event-bus.js (~290)          |
+| `channel/`          | L4    | 7        | ~1.500     | client.js (557)              |
+| `config/`           | L2    | 7        | ~1.400     | custom-agents.js (325)       |
+| `services/`         | L4    | 5        | ~600       | session-service.js (~150)    |
+| `plugins/`          | L3    | 2        | ~300       | plugin-registry.js (~200)    |
+| `audit/`            | L1    | 5        | ~850       | pipeline.js (559)            |
+| `types/`            | L0    | 5        | ~550       | events.js (~200)             |
+| `db/`               | L0    | 3        | ~450       | sqlite.js (234)              |
+| **Total**           |       | **313**  | **53.815** |                              |
 
 ### Módulos novos (criados pelas Faixas H–N)
 
-| Módulo      | Faixa | Propósito                                   |
-| ----------- | ----- | ------------------------------------------- |
-| `types/`    | L     | Type definitions compartilhados (L0)        |
-| `services/` | N     | Service facades (SessionService, etc.)      |
-| `plugins/`  | N     | Plugin registry + discovery + activation    |
+| Módulo      | Faixa | Propósito                                |
+| ----------- | ----- | ---------------------------------------- |
+| `types/`    | L     | Type definitions compartilhados (L0)     |
+| `services/` | N     | Service facades (SessionService, etc.)   |
+| `plugins/`  | N     | Plugin registry + discovery + activation |
 
 ---
 
@@ -154,17 +154,17 @@ O score 65/100 é calculado pelo `scripts/arch-health.mjs` com pesos:
 
 ## 4. Problemas Resolvidos (vs PARTE-21A)
 
-| # | Problema (21A)                   | Status    | Como resolvido                                    |
-|---|----------------------------------|-----------|---------------------------------------------------|
-| 1 | Gap de regex no CI               | ✅ Resolvido | Faixa H — regex expandida para export...from      |
-| 2 | 4 violações topológicas ocultas  | ✅ Resolvido | Faixa H — elevadas para detection pelo CI         |
-| 3 | 233 deep imports (72%)           | ⚠️ Parcial  | Faixa I — reduzido para 165. Bulk é logger (134)  |
-| 4 | 25 arquivos >400 LoC (raw)       | ⚠️ Parcial  | Faixa J — reduzido para 18. Remaining são coesos  |
-| 5 | ~30 singletons globais           | ⚠️ Parcial  | Faixa K — DI container criado, wireLegacySetters  |
-| 6 | 22 DI setters inconsistentes     | ⚠️ Parcial  | Faixa K — wireLegacySetters centraliza 9 setters  |
-| 7 | 70 EventEmitters sem bus         | ⚠️ Parcial  | Faixa M — EventBus + 13 bridges. 55 per-session   |
-| 8 | api/ mega-aggregator (11 deps)   | ✅ Resolvido | Faixa N — services/ + fan-out 11→8                |
-| 9 | 5+ CI gates ausentes             | ✅ Resolvido | Faixa H + N — 5+ gates + arch-health CI          |
+| #   | Problema (21A)                  | Status      | Como resolvido                                   |
+| --- | ------------------------------- | ----------- | ------------------------------------------------ |
+| 1   | Gap de regex no CI              | ✅ Resolvido | Faixa H — regex expandida para export...from     |
+| 2   | 4 violações topológicas ocultas | ✅ Resolvido | Faixa H — elevadas para detection pelo CI        |
+| 3   | 233 deep imports (72%)          | ⚠️ Parcial   | Faixa I — reduzido para 165. Bulk é logger (134) |
+| 4   | 25 arquivos >400 LoC (raw)      | ⚠️ Parcial   | Faixa J — reduzido para 18. Remaining são coesos |
+| 5   | ~30 singletons globais          | ⚠️ Parcial   | Faixa K — DI container criado, wireLegacySetters |
+| 6   | 22 DI setters inconsistentes    | ⚠️ Parcial   | Faixa K — wireLegacySetters centraliza 9 setters |
+| 7   | 70 EventEmitters sem bus        | ⚠️ Parcial   | Faixa M — EventBus + 13 bridges. 55 per-session  |
+| 8   | api/ mega-aggregator (11 deps)  | ✅ Resolvido | Faixa N — services/ + fan-out 11→8               |
+| 9   | 5+ CI gates ausentes            | ✅ Resolvido | Faixa H + N — 5+ gates + arch-health CI          |
 
 ---
 
@@ -183,41 +183,41 @@ os 31 restantes para barrels. Target: ≤50 deep imports (com allow-list).
 O `arch-health.mjs` conta **todos** os `let` em module scope (73). A contagem real de singletons
 problemáticos é ~15-20:
 
-| Tipo                      | Count | Problemático? | Ação                         |
-| ------------------------- | ----- | ------------- | ---------------------------- |
-| `let log = console.log`   | ~40   | Não           | Pattern de logger fallback   |
-| `let copilotDb = null`    | 1     | Parcial       | Lazy init legítimo (I/O)     |
-| `let _client = null`      | 1     | Parcial       | Lazy init legítimo (SDK)     |
-| `let _busy = false`       | 1     | Sim → FSM     | Migrado para TerminalPhase   |
-| Terminal state vars (8)   | 8     | Parcial       | Apenas _busy migrado         |
-| Audit/cache/mutex          | ~10   | Parcial       | DI candidato futuro          |
-| Regex match vars          | ~12   | Não           | Loop variables, not state    |
+| Tipo                    | Count | Problemático? | Ação                       |
+| ----------------------- | ----- | ------------- | -------------------------- |
+| `let log = console.log` | ~40   | Não           | Pattern de logger fallback |
+| `let copilotDb = null`  | 1     | Parcial       | Lazy init legítimo (I/O)   |
+| `let _client = null`    | 1     | Parcial       | Lazy init legítimo (SDK)   |
+| `let _busy = false`     | 1     | Sim → FSM     | Migrado para TerminalPhase |
+| Terminal state vars (8) | 8     | Parcial       | Apenas _busy migrado       |
+| Audit/cache/mutex       | ~10   | Parcial       | DI candidato futuro        |
+| Regex match vars        | ~12   | Não           | Loop variables, not state  |
 
 **Ação recomendada**: Refinar o script arch-health para distinguir `let log =` e `let match` de
 singletons reais. Reduzir contagem reportada.
 
 ### 5.3 MÉDIO — Files >400 LoC (18 restantes)
 
-| Arquivo                                | LoC | Split viável?                        |
-| -------------------------------------- | --- | ------------------------------------ |
-| `agent/always-alive.js`                | 623 | Parcial — classe monolítica coesa    |
-| `agent/dialog/loop-manager.js`         | 599 | Complexo — state machine + events    |
-| `sdk/types.js`                         | 569 | ❌ TS2314 — split quebra resolution   |
-| `conversation-hub/store.js`            | 561 | Possível — queries para helpers      |
-| `channel/client.js`                    | 557 | Parcial — connection vs ops          |
-| `conversation-hub/socket-ns.js`        | 482 | Possível — mount vs broadcast        |
-| `terminal/server.js`                   | 452 | Possível — http vs ws                |
-| `channel/inject.js`                    | 450 | Possível — subscribe vs handle       |
-| `conversation-hub/orchestrator.js`     | 438 | Limítrofe — single concern class     |
-| `terminal/repl.js`                     | 437 | Possível — repl vs handlers          |
-| `bridges/nerv-bridge.js`              | 434 | Possível — bridge vs events          |
-| `bridges/mcp-tool-bridge.js`          | 431 | Possível — bridge vs reconnect       |
-| `observability/metrics.js`            | 426 | Limítrofe — MetricsStore coeso       |
-| `observability/dialog-task-handlers`  | 424 | Possível — por event type            |
-| `sdk/client.js`                       | 416 | Parcial — client vs client-ops       |
-| `hooks/factory.js`                    | 416 | Possível — create vs compose         |
-| `tools/introspection-tools.js`        | 407 | Possível — session vs system         |
-| `observability/event-collector.js`    | 405 | Possível — collect vs dispatch       |
+| Arquivo                              | LoC | Split viável?                      |
+| ------------------------------------ | --- | ---------------------------------- |
+| `agent/always-alive.js`              | 623 | Parcial — classe monolítica coesa  |
+| `agent/dialog/loop-manager.js`       | 599 | Complexo — state machine + events  |
+| `sdk/types.js`                       | 569 | ❌ TS2314 — split quebra resolution |
+| `conversation-hub/store.js`          | 561 | Possível — queries para helpers    |
+| `channel/client.js`                  | 557 | Parcial — connection vs ops        |
+| `conversation-hub/socket-ns.js`      | 482 | Possível — mount vs broadcast      |
+| `terminal/server.js`                 | 452 | Possível — http vs ws              |
+| `channel/inject.js`                  | 450 | Possível — subscribe vs handle     |
+| `conversation-hub/orchestrator.js`   | 438 | Limítrofe — single concern class   |
+| `terminal/repl.js`                   | 437 | Possível — repl vs handlers        |
+| `bridges/nerv-bridge.js`             | 434 | Possível — bridge vs events        |
+| `bridges/mcp-tool-bridge.js`         | 431 | Possível — bridge vs reconnect     |
+| `observability/metrics.js`           | 426 | Limítrofe — MetricsStore coeso     |
+| `observability/dialog-task-handlers` | 424 | Possível — por event type          |
+| `sdk/client.js`                      | 416 | Parcial — client vs client-ops     |
+| `hooks/factory.js`                   | 416 | Possível — create vs compose       |
+| `tools/introspection-tools.js`       | 407 | Possível — session vs system       |
+| `observability/event-collector.js`   | 405 | Possível — collect vs dispatch     |
 
 **Candidatos prioritários de split** (multi-concern claros):
 1. `conversation-hub/store.js` (562) — queries extraíveis
@@ -226,14 +226,14 @@ singletons reais. Reduzir contagem reportada.
 
 ### 5.4 MÉDIO — Fan-out Alto
 
-| Módulo     | Fan-out | Aceitável? | Ação                              |
-| ---------- | ------- | ---------- | --------------------------------- |
-| terminal/  | 19      | Parcial    | Root node — alto esperado, mas 19 é excessivo |
-| agent/     | 14      | Parcial    | Orquestrador — alto esperado     |
-| api/       | 10      | ⚠️         | Reduzido de 11→10, target ≤8     |
-| hooks/     | 9       | ⚠️         | Limítrofe                         |
-| tools/     | 7       | ✅         | OK                                |
-| observ/    | 7       | ✅         | OK                                |
+| Módulo    | Fan-out | Aceitável? | Ação                                          |
+| --------- | ------- | ---------- | --------------------------------------------- |
+| terminal/ | 19      | Parcial    | Root node — alto esperado, mas 19 é excessivo |
+| agent/    | 14      | Parcial    | Orquestrador — alto esperado                  |
+| api/      | 10      | ⚠️          | Reduzido de 11→10, target ≤8                  |
+| hooks/    | 9       | ⚠️          | Limítrofe                                     |
+| tools/    | 7       | ✅          | OK                                            |
+| observ/   | 7       | ✅          | OK                                            |
 
 ### 5.5 MÉDIO — DI Setters Residuais
 
@@ -255,44 +255,44 @@ Migração completa requer:
 
 ### Wave 4: Deep Cleanup (prioridade alta)
 
-| Sub   | Tarefa                                  | Esforço | Impacto         |
-| ----- | --------------------------------------- | ------- | --------------- |
-| W4-1  | Refinar arch-health: excluir `let log`  | Baixo   | Score +10-15pts |
-| W4-2  | ESLint allow-list para logger deep      | Baixo   | Deep imp -134   |
-| W4-3  | Split store.js (hub queries)            | Médio   | -1 arquivo >400 |
-| W4-4  | Split hooks/factory.js                  | Médio   | -1 arquivo >400 |
-| W4-5  | Split terminal/server.js (http vs ws)   | Médio   | -1 arquivo >400 |
-| W4-6  | Migrar 31 deep imports restantes        | Alto    | Deep imp →≤50   |
-| W4-7  | Criar tokens DI para 14 setters restant | Alto    | Setters →0      |
+| Sub  | Tarefa                                  | Esforço | Impacto         |
+| ---- | --------------------------------------- | ------- | --------------- |
+| W4-1 | Refinar arch-health: excluir `let log`  | Baixo   | Score +10-15pts |
+| W4-2 | ESLint allow-list para logger deep      | Baixo   | Deep imp -134   |
+| W4-3 | Split store.js (hub queries)            | Médio   | -1 arquivo >400 |
+| W4-4 | Split hooks/factory.js                  | Médio   | -1 arquivo >400 |
+| W4-5 | Split terminal/server.js (http vs ws)   | Médio   | -1 arquivo >400 |
+| W4-6 | Migrar 31 deep imports restantes        | Alto    | Deep imp →≤50   |
+| W4-7 | Criar tokens DI para 14 setters restant | Alto    | Setters →0      |
 
 ### Wave 5: Arquitetura Avançada (prioridade média)
 
-| Sub   | Tarefa                                     | Esforço | Impacto            |
-| ----- | ------------------------------------------ | ------- | ------------------ |
-| W5-1  | Reduzir fan-out terminal/ (extract facades)| Alto    | Fan-out 19→≤12     |
-| W5-2  | Domain Event Bus por módulo                | Alto    | Desacopla internos |
-| W5-3  | Event sourcing para audit pipeline         | Alto    | Audit imutável     |
-| W5-4  | Cache manager com TTL+invalidation         | Médio   | Elimina singletons |
-| W5-5  | Mutex pool com timeout                     | Médio   | Elimina singletons |
-| W5-6  | Split agent/always-alive.js (lifecycle)    | Alto    | -1 arquivo >400    |
+| Sub  | Tarefa                                      | Esforço | Impacto            |
+| ---- | ------------------------------------------- | ------- | ------------------ |
+| W5-1 | Reduzir fan-out terminal/ (extract facades) | Alto    | Fan-out 19→≤12     |
+| W5-2 | Domain Event Bus por módulo                 | Alto    | Desacopla internos |
+| W5-3 | Event sourcing para audit pipeline          | Alto    | Audit imutável     |
+| W5-4 | Cache manager com TTL+invalidation          | Médio   | Elimina singletons |
+| W5-5 | Mutex pool com timeout                      | Médio   | Elimina singletons |
+| W5-6 | Split agent/always-alive.js (lifecycle)     | Alto    | -1 arquivo >400    |
 
 ### Wave 6: Preparação TypeScript (prioridade baixa)
 
-| Sub   | Tarefa                                     | Esforço  | Impacto            |
-| ----- | ------------------------------------------ | -------- | ------------------ |
-| W6-1  | Converter types/ para .ts                  | Médio    | Primeiro módulo TS |
-| W6-2  | Converter core/ para .ts                   | Alto     | Foundation TS      |
-| W6-3  | tsconfig paths para barrels                | Médio    | TS module res      |
-| W6-4  | Converter db/ para .ts                     | Baixo    | Leaf module TS     |
+| Sub  | Tarefa                      | Esforço | Impacto            |
+| ---- | --------------------------- | ------- | ------------------ |
+| W6-1 | Converter types/ para .ts   | Médio   | Primeiro módulo TS |
+| W6-2 | Converter core/ para .ts    | Alto    | Foundation TS      |
+| W6-3 | tsconfig paths para barrels | Médio   | TS module res      |
+| W6-4 | Converter db/ para .ts      | Baixo   | Leaf module TS     |
 
 ### Projeção de Health Score por Wave
 
-| Wave  | Score estimado | Grade | Mudanças chave                         |
-| ----- | -------------- | ----- | -------------------------------------- |
-| Atual | 65             | D     | —                                      |
-| W4    | 78             | C+    | Refine singletons, deep imports, splits|
-| W5    | 85             | B+    | Fan-out, DI complete, event sourcing   |
-| W6    | 90             | A-    | TypeScript, full DI, clean arch        |
+| Wave  | Score estimado | Grade | Mudanças chave                          |
+| ----- | -------------- | ----- | --------------------------------------- |
+| Atual | 65             | D     | —                                       |
+| W4    | 78             | C+    | Refine singletons, deep imports, splits |
+| W5    | 85             | B+    | Fan-out, DI complete, event sourcing    |
+| W6    | 90             | A-    | TypeScript, full DI, clean arch         |
 
 ---
 
@@ -334,14 +334,14 @@ plugins/ (L3) ← usado por: agent/lifecycle (potencial)
 
 ### 8.1 Suíte de Testes Copilot
 
-| Grupo                          | Runner     | Tests | Status        |
-| ------------------------------ | ---------- | ----- | ------------- |
-| Core DI                        | node:test  | 36    | ✅ Passing     |
-| Core EventBus                  | node:test  | 33    | ✅ Passing     |
-| Plugin Registry                | node:test  | 14    | ✅ Passing     |
-| Services Contracts             | node:test  | 8     | ✅ Passing     |
-| Barrel Contracts (vitest)      | vitest     | 17    | ✅ Passing     |
-| **Total copilot**              |            | **108**| ✅             |
+| Grupo                     | Runner    | Tests   | Status    |
+| ------------------------- | --------- | ------- | --------- |
+| Core DI                   | node:test | 36      | ✅ Passing |
+| Core EventBus             | node:test | 33      | ✅ Passing |
+| Plugin Registry           | node:test | 14      | ✅ Passing |
+| Services Contracts        | node:test | 8       | ✅ Passing |
+| Barrel Contracts (vitest) | vitest    | 17      | ✅ Passing |
+| **Total copilot**         |           | **108** | ✅         |
 
 ### 8.2 TypeCheck
 
@@ -357,23 +357,23 @@ plugins/ (L3) ← usado por: agent/lifecycle (potencial)
 
 ## 9. Commits da Execução (timeline completa)
 
-| # | Hash       | Mensagem                                                          |
-|---|------------|-------------------------------------------------------------------|
-| 1 | `3f4db045` | ci(copilot): Faixa H — CI hardening                              |
-| 2 | `8407a6d5` | refactor(copilot): Faixa I (315→2 deep imports)                  |
-| 3 | `3aacf20b` | refactor(copilot): Faixa J (7 splits)                            |
-| 4 | `289d9d35` | refactor(copilot): Faixa K (DI container)                        |
-| 5 | `8b02a3d2` | refactor(copilot): Faixa L (types module)                        |
-| 6 | `ad45f050` | refactor(copilot): Faixa M (Event Bus)                           |
-| 7 | `d0da823a` | refactor(copilot): Faixa N initial (Services, Plugins, Health)   |
-| 8 | `50a5f507` | style: Prettier auto-format                                      |
-| 9 | `740d39b1` | refactor(copilot): N-1b~e, N-2b facades+PluginRegistry           |
-| 10| `e20fcc96` | refactor(copilot): N-1f API migration to services                |
-| 11| `eb6f88a9` | refactor(copilot): N-2c~e, N-4d Plugin+CI arch-health            |
-| 12| `c7e016cd` | refactor(copilot): K-5+K-6 wireLegacySetters+Terminal SM         |
-| 13| `26daddc9` | refactor(copilot): K-6c+N-3c FSM sync+OpenAPI generator          |
-| 14| `f348dde0` | refactor(copilot): M-3~M-5 bridgeEmitter+EventBus bridges        |
-| 15| `6ebaa575` | docs: roadmap M-3~M-5 bridges concluídos                        |
+| #   | Hash       | Mensagem                                                       |
+| --- | ---------- | -------------------------------------------------------------- |
+| 1   | `3f4db045` | ci(copilot): Faixa H — CI hardening                            |
+| 2   | `8407a6d5` | refactor(copilot): Faixa I (315→2 deep imports)                |
+| 3   | `3aacf20b` | refactor(copilot): Faixa J (7 splits)                          |
+| 4   | `289d9d35` | refactor(copilot): Faixa K (DI container)                      |
+| 5   | `8b02a3d2` | refactor(copilot): Faixa L (types module)                      |
+| 6   | `ad45f050` | refactor(copilot): Faixa M (Event Bus)                         |
+| 7   | `d0da823a` | refactor(copilot): Faixa N initial (Services, Plugins, Health) |
+| 8   | `50a5f507` | style: Prettier auto-format                                    |
+| 9   | `740d39b1` | refactor(copilot): N-1b~e, N-2b facades+PluginRegistry         |
+| 10  | `e20fcc96` | refactor(copilot): N-1f API migration to services              |
+| 11  | `eb6f88a9` | refactor(copilot): N-2c~e, N-4d Plugin+CI arch-health          |
+| 12  | `c7e016cd` | refactor(copilot): K-5+K-6 wireLegacySetters+Terminal SM       |
+| 13  | `26daddc9` | refactor(copilot): K-6c+N-3c FSM sync+OpenAPI generator        |
+| 14  | `f348dde0` | refactor(copilot): M-3~M-5 bridgeEmitter+EventBus bridges      |
+| 15  | `6ebaa575` | docs: roadmap M-3~M-5 bridges concluídos                       |
 
 ---
 

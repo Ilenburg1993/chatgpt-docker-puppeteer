@@ -457,23 +457,23 @@ Wave 4  (futuro)      TS migration + multi-agent + horizontal scaling
 > **Nota pós-execução (2026-04-12)**: Faixas H–N executadas. "Baseline" = pré-Faixa H.
 > "Atual" = pós-Faixa N (`6ebaa575`). Detalhes em PARTE-21F.
 
-| Aspecto                     | Baseline (21A)    | Atual (pós-N)      | Ideal              | Gap restante |
-| --------------------------- | ----------------- | ------------------- | ------------------ | ------------ |
-| **Módulos**                 | 14                | **17** ✅            | 17                 | 0            |
-| **Layer violations (CI)**   | 4 ocultas         | **0** ✅             | 0                  | 0            |
-| **Barrel coverage**         | 23%               | **100%** ✅          | ≥90%               | Atingido     |
-| **Deep imports**            | 233               | **165** ⚠️           | ≤50                | -115         |
-| **Singletons (contados)**   | ~30               | **73** 🔴            | ≤10                | -63*         |
-| **EventEmitter refs**       | 70                | **72** ⚠️            | ≤30 + bus          | -42          |
-| **DI pattern**              | 22 ad-hoc setters | **13 tokens + 9 wired** ⚠️ | DI container | -14 setters  |
-| **CI gates**                | 2                 | **5+** ⚠️            | 10+                | -5           |
-| **Contract tests**          | 6                 | **108** ✅           | 20+                | Atingido     |
-| **Fan-out max**             | 11 (api/)         | **19** (terminal) 🔴 | ≤8                 | -11          |
-| **Files >400 LoC (raw)**    | 25                | **18** ⚠️            | ≤5                 | -13          |
-| **Plugin architecture**     | Inexiste          | **Plugin registry** ✅| Plugin registry    | 0            |
-| **TypeScript readiness**    | JSDoc only        | **types/ + JSDoc** ⚠️ | types/ .ts         | Conversão    |
-| **Multi-agent support**     | 1 agent only      | **1 + DI fork prep** | N agents via DI    | Futuro       |
-| **Health score**            | D (35/100)        | **D (65/100)** ⚠️    | A (90/100)         | +25pts       |
+| Aspecto                   | Baseline (21A)    | Atual (pós-N)             | Ideal           | Gap restante |
+| ------------------------- | ----------------- | ------------------------- | --------------- | ------------ |
+| **Módulos**               | 14                | **17** ✅                  | 17              | 0            |
+| **Layer violations (CI)** | 4 ocultas         | **0** ✅                   | 0               | 0            |
+| **Barrel coverage**       | 23%               | **100%** ✅                | ≥90%            | Atingido     |
+| **Deep imports**          | 233               | **165** ⚠️                 | ≤50             | -115         |
+| **Singletons (contados)** | ~30               | **73** 🔴                  | ≤10             | -63*         |
+| **EventEmitter refs**     | 70                | **72** ⚠️                  | ≤30 + bus       | -42          |
+| **DI pattern**            | 22 ad-hoc setters | **13 tokens + 9 wired** ⚠️ | DI container    | -14 setters  |
+| **CI gates**              | 2                 | **5+** ⚠️                  | 10+             | -5           |
+| **Contract tests**        | 6                 | **108** ✅                 | 20+             | Atingido     |
+| **Fan-out max**           | 11 (api/)         | **19** (terminal) 🔴       | ≤8              | -11          |
+| **Files >400 LoC (raw)**  | 25                | **18** ⚠️                  | ≤5              | -13          |
+| **Plugin architecture**   | Inexiste          | **Plugin registry** ✅     | Plugin registry | 0            |
+| **TypeScript readiness**  | JSDoc only        | **types/ + JSDoc** ⚠️      | types/ .ts      | Conversão    |
+| **Multi-agent support**   | 1 agent only      | **1 + DI fork prep**      | N agents via DI | Futuro       |
+| **Health score**          | D (35/100)        | **D (65/100)** ⚠️          | A (90/100)      | +25pts       |
 
 *\* 73 singletons contados inclui ~40 `let log =` e ~12 regex vars. Reais: ~15-20.*
 

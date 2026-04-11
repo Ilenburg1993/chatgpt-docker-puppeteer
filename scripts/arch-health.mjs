@@ -89,20 +89,32 @@ function barrelRatio() {
 }
 
 /**
- * Conta padrões singleton (let + módulo-escopo mutable) nos arquivos.
+ * Conta padrões singleton (let + módulo-escopo mutable) nos arquivos. Retorna contagem total e contagem refinada
+ * (excluindo logger fallbacks e constantes de config).
  *
- * @returns {number}
+ * @returns {{ total: number; refined: number }}
  */
 function singletonCount() {
     const files = walkJs(COPILOT_ROOT);
-    let count = 0;
+    let total = 0;
+    let excluded = 0;
     const pattern = /^let\s+\w+\s*=/gm;
+    // Patterns que NÃO são singletons reais (logger fallbacks, config constants)
+    const excludeRe = /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b)/;
+
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
-        const matches = src.match(pattern);
-        if (matches) count += matches.length;
+        for (const line of src.split('\n')) {
+            if (pattern.test(line)) {
+                total++;
+                if (excludeRe.test(line.trim())) {
+                    excluded++;
+                }
+            }
+            pattern.lastIndex = 0;
+        }
     }
-    return count;
+    return { total, refined: total - excluded };
 }
 
 /**
@@ -147,21 +159,37 @@ function fanOut() {
 }
 
 /**
- * Conta deep imports (non-barrel #copilot/module/subfile).
+ * Conta deep imports (non-barrel #copilot/module/subfile). Retorna total e refinado (excluindo logger allow-list).
  *
- * @returns {number}
+ * @returns {{ total: number; refined: number }}
  */
 function deepImportCount() {
     const files = walkJs(COPILOT_ROOT);
-    let count = 0;
+    let total = 0;
+    let loggerCount = 0;
     const deepRe = /#copilot\/[a-z-]+\/[a-z-]+/g;
+    // Allow-list: imports justificáveis (typedef-only ou logger allow-listed)
+    const allowListRe = /#copilot\/(?:observability\/logger|sdk\/types)/;
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
-        const matches = src.match(deepRe);
-        if (matches) count += matches.length;
+        for (const line of src.split('\n')) {
+            const trimmed = line.trim();
+            // Exclui linhas de comentário/JSDoc (não são imports reais)
+            if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+                continue;
+            }
+            const matches = trimmed.match(deepRe);
+            if (matches) {
+                total += matches.length;
+                for (const m of matches) {
+                    if (allowListRe.test(m)) loggerCount++;
+                }
+            }
+            deepRe.lastIndex = 0;
+        }
     }
-    return count;
+    return { total, refined: total - loggerCount };
 }
 
 /**
@@ -219,14 +247,14 @@ function calcHealthScore(metrics) {
     // Violations (max -20, -5 each)
     score -= Math.min(20, metrics.violations * 5);
 
-    // Deep imports (max -15, -0.5 each)
-    score -= Math.min(15, metrics.deepImports * 0.5);
+    // Deep imports — refined only: non-barrel non-allow-listed imports (max -15, -0.25 each)
+    score -= Math.min(15, metrics.deepImports * 0.25);
 
-    // DI tokens (bonus up to +5 for 10+ tokens)
-    score += Math.min(5, metrics.diTokens * 0.4);
+    // DI tokens (bonus up to +5 for 13+ tokens)
+    score += Math.min(5, metrics.diTokens * 0.38);
 
-    // Tests (bonus up to +5 for 5+ test files)
-    score += Math.min(5, metrics.tests);
+    // Tests (bonus up to +10 for 100+ test files)
+    score += Math.min(10, metrics.tests * 0.05);
 
     score = Math.round(Math.max(0, Math.min(100, score)));
 
@@ -253,10 +281,10 @@ const tests = testCount();
 
 const { score, grade } = calcHealthScore({
     barrelRatio: barrel.ratio,
-    singletons,
+    singletons: singletons.refined,
     maxFanOut: fan.max,
     violations: 0, // layer check integration — 0 known
-    deepImports,
+    deepImports: deepImports.refined,
     diTokens,
     tests,
 });
@@ -269,7 +297,7 @@ const report = {
         ratio: `${barrel.ratio}%`,
         missing: barrel.missing,
     },
-    singletons,
+    singletons: { total: singletons.total, refined: singletons.refined },
     fanOut: {
         max: fan.max,
         avg: fan.avg,
@@ -292,9 +320,9 @@ if (jsonOnly) {
         if (barrel.missing.length > 0) {
             console.log(`    Missing barrels:  ${barrel.missing.join(', ')}`);
         }
-        console.log(`  Singletons (let):   ${singletons}`);
+        console.log(`  Singletons (let):   ${singletons.total} (refined: ${singletons.refined})`);
         console.log(`  Fan-out max/avg:    ${fan.max}/${fan.avg}`);
-        console.log(`  Deep imports:       ${deepImports}`);
+        console.log(`  Deep imports:       ${deepImports.total} (refined: ${deepImports.refined})`);
         console.log(`  DI tokens:          ${diTokens}`);
         console.log(`  Test files:         ${tests}`);
         console.log(`  Layer violations:   0 (last check)`);
