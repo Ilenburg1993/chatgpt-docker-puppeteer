@@ -19,11 +19,15 @@ import { log as appLog } from './logger.js';
  * @returns {asserts session is CopilotSession}
  */
 function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || !("rpc" in session)) {
+    if (!session || typeof session !== 'object' || !('rpc' in session)) {
         throw new TypeError('[sdk/rpc/' + caller + '] Sessao invalida ou sem RPC disponivel.');
     }
 }
 
+/**
+ * @param {CopilotSession} session
+ * @returns {Promise<*>}
+ */
 export async function compactionCompact(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
@@ -40,7 +44,7 @@ export async function compactionCompact(session) {
  * @param {CopilotSession} session
  * @param {string} command - Comando shell a executar
  * @param {{ cwd?: string; timeout?: number }} [options]
- * @returns {Promise<ShellExecResult>}
+ * @returns {Promise<*>}
  */
 export async function shellExec(session, command, options) {
     assertSession(session, 'shell.exec');
@@ -61,7 +65,7 @@ export async function shellExec(session, command, options) {
  * @param {CopilotSession} session
  * @param {string} processId - ID do processo retornado por shellExec
  * @param {'SIGTERM' | 'SIGKILL' | 'SIGINT'} [signal='SIGTERM'] Default is `'SIGTERM'`
- * @returns {Promise<ShellKillResult>}
+ * @returns {Promise<*>}
  */
 export async function shellKill(session, processId, signal) {
     assertSession(session, 'shell.kill');
@@ -89,7 +93,7 @@ export async function shellKill(session, processId, signal) {
  * @param {CopilotSession} session
  * @param {string} message - Mensagem descrevendo a informação necessária
  * @param {object} requestedSchema - JSON Schema do formulário
- * @returns {Promise<ElicitationResult>}
+ * @returns {Promise<*>}
  */
 export async function uiElicitation(session, message, requestedSchema) {
     assertSession(session, 'ui.elicitation');
@@ -113,7 +117,7 @@ export async function uiElicitation(session, message, requestedSchema) {
  * @param {CopilotSession} session
  * @param {string} requestId - ID da requisição do comando
  * @param {{ error?: string }} [options]
- * @returns {Promise<HandleResult>}
+ * @returns {Promise<*>}
  */
 export async function commandsHandlePending(session, requestId, options) {
     assertSession(session, 'commands.handlePendingCommand');
@@ -140,7 +144,7 @@ export async function commandsHandlePending(session, requestId, options) {
  * @param {CopilotSession} session
  * @param {string} requestId
  * @param {{ kind: string } & Record<string, unknown>} result - Resultado da permissão (approved, denied-*)
- * @returns {Promise<HandleResult>}
+ * @returns {Promise<*>}
  */
 export async function permissionsHandlePending(session, requestId, result) {
     assertSession(session, 'permissions.handlePendingPermissionRequest');
@@ -166,7 +170,7 @@ export async function permissionsHandlePending(session, requestId, result) {
  * @param {CopilotSession} session
  * @param {string} requestId
  * @param {{ result?: string | { textResultForLlm: string; resultType?: string; error?: string }; error?: string }} [options]
- * @returns {Promise<HandleResult>}
+ * @returns {Promise<*>}
  */
 export async function toolsHandlePendingCall(session, requestId, options) {
     assertSession(session, 'tools.handlePendingToolCall');
