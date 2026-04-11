@@ -7,6 +7,7 @@
  * Exporta `registerStreamRoutes(bridge, agent)` para ser montado pelo http-bridge.js.
  *
  * @module copilot/api/bridge-stream
+ * @see EventBus
  */
 
 import { MAX_SSE_CLIENTS, MAX_SSE_LIFETIME_MS } from '#copilot/config';

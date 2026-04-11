@@ -14,6 +14,7 @@
  * Preparado para migração futura para `mode: "customize"` (=SDK v0.2.0) via constantes `SYSTEM_PROMPT_SECTIONS`.
  *
  * @module copilot/config/system-prompt
+ * @see EventBus
  */
 
 /**

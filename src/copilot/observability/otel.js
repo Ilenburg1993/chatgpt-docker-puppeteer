@@ -18,6 +18,7 @@
  * - `COPILOT_OTEL_CAPTURE_CONTENT` — capturar conteúdo de mensagens (padrão: false)
  *
  * @module copilot/observability/otel
+ * @see EventBus
  */
 
 import {

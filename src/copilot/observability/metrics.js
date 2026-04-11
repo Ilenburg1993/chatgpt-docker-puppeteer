@@ -13,6 +13,7 @@
  * - Taxa de erros global
  *
  * @module copilot/observability/metrics
+ * @see EventBus
  */
 
 // ─── Tipos (re-export de metrics-histogram.js) ───────────────────────────────

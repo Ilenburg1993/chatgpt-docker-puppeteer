@@ -5,6 +5,7 @@
  * F55/F314 — Constantes de eventos do Conversation Hub (socket namespaces).
  *
  * @module copilot/conversation-hub/events
+ * @see EventBus
  */
 
 /**

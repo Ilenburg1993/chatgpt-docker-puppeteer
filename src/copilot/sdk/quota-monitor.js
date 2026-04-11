@@ -8,6 +8,7 @@
  * `getQuotaStatus()`. Emite callbacks opcionais quando a quota é atualizada ou atinge limites críticos.
  *
  * @module copilot/sdk/quota-monitor
+ * @see EventBus
  * @see module:copilot/sdk/server-rpc
  * @see module:copilot/sdk/health
  */

@@ -6,6 +6,7 @@
  * `setTimeout` + listener cleanup em `always-alive.js`, `dialog.js` e outros componentes com EventEmitter.
  *
  * @module copilot/lib/event-helpers
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/dialog-loop-manager
  */

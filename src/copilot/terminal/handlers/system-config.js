@@ -5,6 +5,7 @@
  * Handlers de sistema: health, config, SSE clients, skills, tools, custom tools.
  *
  * @module copilot/terminal/handlers-system-config
+ * @see EventBus
  * @see module:copilot/terminal/route-table
  */
 

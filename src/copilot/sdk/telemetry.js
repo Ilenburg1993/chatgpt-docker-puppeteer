@@ -8,6 +8,7 @@
  * `onGetTraceContext?: TraceContextProvider` para propagacao de trace context W3C.
  *
  * @module copilot/sdk/telemetry
+ * @see EventBus
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────

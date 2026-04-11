@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/infra/webhook-manager
+ * @see EventBus
  * @file WebhookManager — gerencia webhooks de notificação de eventos do agente.
  *
  *   Encapsula o registro, remoção e disparo de webhooks HTTP(S), extraído de `always-alive.js` para facilitar testes e

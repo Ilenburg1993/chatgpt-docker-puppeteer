@@ -6,6 +6,7 @@
  * cascata.
  *
  * @module copilot/core/circuit-breaker
+ * @see EventBus
  */
 
 import { CopilotError } from './errors.js';

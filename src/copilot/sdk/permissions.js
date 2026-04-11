@@ -8,6 +8,7 @@
  * Consumers **não** devem importar `approveAll` diretamente do `@github/copilot-sdk`.
  *
  * @module copilot/sdk/permissions
+ * @see EventBus
  * @see module:copilot/hooks/permission-handler
  */
 

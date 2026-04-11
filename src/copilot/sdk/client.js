@@ -13,6 +13,7 @@
  * - Suporte a `COPILOT_CLI_URL` (env) para conectar a CLI já em execução (PM2 separado).
  *
  * @module copilot/lib/sdk-client
+ * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
  */
@@ -26,8 +27,8 @@ import { log } from './logger.js';
 export { CopilotClient };
 
 /**
- * Circuit breaker para operações de conexão ao SDK CLI.
- * Protege contra retry storm em caso de CLI indisponível ou erro de rede.
+ * Circuit breaker para operações de conexão ao SDK CLI. Protege contra retry storm em caso de CLI indisponível ou erro
+ * de rede.
  *
  * @type {CircuitBreaker}
  */

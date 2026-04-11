@@ -5,6 +5,7 @@
  * Comando `/export [path]` — exporta o histórico de conversa como Markdown.
  *
  * @module copilot/terminal/commands/export
+ * @see EventBus
  */
 
 import { llmBridgeClient } from '#copilot/services';

@@ -29,6 +29,7 @@
  * - `setCustomToolsBuilder(fn)` — injeta buildTool (late dep)
  *
  * @module copilot/sdk
+ * @see EventBus
  */
 
 export {

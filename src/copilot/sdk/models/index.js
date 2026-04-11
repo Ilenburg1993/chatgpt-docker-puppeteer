@@ -5,6 +5,7 @@
  * Barrel de re-exportação para os módulos de gerenciamento de modelos.
  *
  * @module copilot/sdk/models
+ * @see EventBus
  */
 
 // Funções puras de listagem, filtragem e seleção de modelos

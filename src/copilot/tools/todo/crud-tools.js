@@ -5,6 +5,7 @@
  * Tools CRUD do sistema de tarefas: get, update, add-subtask.
  *
  * @module copilot/tools/todo/crud-tools
+ * @see EventBus
  * @see module:copilot/tools/todo/store
  */
 

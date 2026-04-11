@@ -8,6 +8,7 @@
  * a API.
  *
  * @module copilot/hooks/types
+ * @see EventBus
  */
 
 // ─── Re-exports de tipos do SDK (via sdk/types.js como fonte canônica) ──────

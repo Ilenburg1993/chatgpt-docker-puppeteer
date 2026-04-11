@@ -5,6 +5,7 @@
  * Escrita assíncrona de JSONL com rotação automática e batch I/O via setImmediate.
  *
  * @module copilot/audit/jsonl-writer
+ * @see EventBus
  */
 
 import { logSwallowed } from '#copilot/core';

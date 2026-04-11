@@ -5,6 +5,7 @@
  * Barrel de re-exportação para src/copilot/config/. Fornece acesso centralizado aos builders de configuração do SDK.
  *
  * @module copilot/config
+ * @see EventBus
  */
 
 // Profile builders (buildAlwaysAliveConfig etc.) movidos para '#copilot/hooks/presets/profiles'.

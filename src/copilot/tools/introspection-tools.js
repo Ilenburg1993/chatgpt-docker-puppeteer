@@ -6,6 +6,7 @@
  * chamadas e obter informações sobre si mesmo.
  *
  * @module copilot/tools/introspection-tools
+ * @see EventBus
  * @see module:copilot/agent/status-snapshot
  */
 

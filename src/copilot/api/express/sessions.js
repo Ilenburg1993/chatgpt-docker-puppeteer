@@ -26,6 +26,7 @@
  * - GET /sessions/:id/messages — Lista histórico de mensagens
  *
  * @module copilot/api/express/sessions
+ * @see EventBus
  */
 
 import { SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config';

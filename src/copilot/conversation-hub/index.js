@@ -5,6 +5,7 @@
  * Barrel export do módulo conversation-hub.
  *
  * @module copilot/conversation-hub
+ * @see EventBus
  */
 
 export { ConversationHub, conversationHub } from './hub.js';

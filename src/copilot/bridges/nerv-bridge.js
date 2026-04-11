@@ -20,6 +20,7 @@
  * ```
  *
  * @module copilot/bridges/nerv-bridge
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/conversation-hub/hub
  */

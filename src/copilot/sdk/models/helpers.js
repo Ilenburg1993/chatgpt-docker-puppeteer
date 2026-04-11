@@ -10,6 +10,7 @@
  * buildReasoningConfig('claude-sonnet-4-5', 'high');
  *
  * @module copilot/lib/models
+ * @see EventBus
  */
 
 import { ConfigError } from '#copilot/core';

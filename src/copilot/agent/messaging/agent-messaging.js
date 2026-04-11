@@ -8,6 +8,7 @@
  * AgentContext e emite eventos via host.
  *
  * @module copilot/agent/messaging/agent-messaging
+ * @see EventBus
  * @internal
  */
 

@@ -8,6 +8,7 @@
  * ativo, fila pendente e configuração de permissões.
  *
  * @module copilot/agent/session/snapshot
+ * @see EventBus
  */
 
 import { logSwallowed } from '#copilot/core';

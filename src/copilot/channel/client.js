@@ -14,6 +14,7 @@
  * - Protocolo StructuredMessage (Sprint A): chatStructured() para comunicação tipada LLM-A ↔ LLM-B
  *
  * @module copilot/channel/client
+ * @see EventBus
  * @example
  *     ```js
  *     import { LlmBridgeClient } from '#copilot/channel';

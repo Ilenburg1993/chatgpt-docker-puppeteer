@@ -14,6 +14,7 @@
  * - Respostas pré-definidas (mock, para testes)
  *
  * @module copilot/hooks/user-input
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

@@ -12,6 +12,7 @@
  * L0 (core) — não importa camadas superiores. Lê WEBHOOK_ALLOW_PRIVATE_HOSTS de process.env.
  *
  * @module copilot/core/security/url-validator
+ * @see EventBus
  */
 
 import { ConfigError } from '#copilot/core';

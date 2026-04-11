@@ -12,6 +12,7 @@
  * - `/skills reload` — força reload do PinnedFilesLoader se ativo
  *
  * @module copilot/terminal/commands/skills
+ * @see EventBus
  */
 
 import { handleGetSkills, handleSetSkills } from '../handlers/system-config.js';

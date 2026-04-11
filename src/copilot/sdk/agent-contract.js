@@ -6,6 +6,7 @@
  * {@link AlwaysAliveAgent} satisfaz este contrato.
  *
  * @module copilot/sdk/agent-contract
+ * @see EventBus
  */
 
 /**

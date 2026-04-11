@@ -5,6 +5,7 @@
  * Comandos de memória semântica: /remember, /recall, /forget
  *
  * @module copilot/terminal/commands/memory
+ * @see EventBus
  */
 
 import { conversationStore } from '#copilot/services';

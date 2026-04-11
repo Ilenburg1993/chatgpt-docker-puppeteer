@@ -6,6 +6,7 @@
  * loop de sessão.
  *
  * @module copilot/tools/code-tools
+ * @see EventBus
  * @see module:copilot/tools/tool-factory
  */
 

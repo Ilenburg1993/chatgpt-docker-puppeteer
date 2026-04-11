@@ -9,6 +9,7 @@
  * logging básico.
  *
  * @module copilot/hooks/tool-interceptor
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

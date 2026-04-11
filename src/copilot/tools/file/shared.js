@@ -5,6 +5,7 @@
  * Constantes, padrões de segurança e helpers compartilhados pelas file-tools.
  *
  * @module copilot/tools/file/shared
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

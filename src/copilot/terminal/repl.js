@@ -11,6 +11,7 @@
  * - Fazer dispatch dos comandos `/xxx` para os módulos de commands/
  *
  * @module copilot/terminal/repl
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/terminal/dialog
  */

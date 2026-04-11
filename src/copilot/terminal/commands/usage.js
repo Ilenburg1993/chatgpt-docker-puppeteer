@@ -7,6 +7,7 @@
  * Controla a exibição de token usage e custo após cada turno.
  *
  * @module copilot/terminal/commands/usage
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

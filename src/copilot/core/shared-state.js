@@ -13,6 +13,7 @@
  * - O módulo de nível superior (`terminal/state.js`) DELEGA para este módulo como SSOT
  *
  * @module copilot/core/shared-state
+ * @see EventBus
  */
 
 // ─── Hub Session ID ───────────────────────────────────────────────────────────

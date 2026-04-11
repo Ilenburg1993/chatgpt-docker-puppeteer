@@ -16,6 +16,7 @@
  * - GET /agent/stream — SSE de eventos de ciclo de vida do cliente
  *
  * @module copilot/routes/agent
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

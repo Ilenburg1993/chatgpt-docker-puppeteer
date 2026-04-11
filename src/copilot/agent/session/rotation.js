@@ -8,6 +8,7 @@
  * sessão, e contagem de compactions.
  *
  * @module copilot/agent/session/rotation
+ * @see EventBus
  */
 
 import { log, startSpanImmediate } from '#copilot/observability';

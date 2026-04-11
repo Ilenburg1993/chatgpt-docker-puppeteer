@@ -14,6 +14,7 @@
  * - **customize**: overrides granulares por seção (recomendado para v0.2.0+)
  *
  * @module copilot/sdk/system-message
+ * @see EventBus
  * @see module:copilot/config/system-prompt
  */
 

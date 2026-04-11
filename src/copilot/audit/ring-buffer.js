@@ -5,6 +5,7 @@
  * Buffer circular genérico de tamanho fixo para entradas de auditoria. Operações O(1) para push, O(n) para snapshot.
  *
  * @module copilot/audit/ring-buffer
+ * @see EventBus
  */
 
 /**

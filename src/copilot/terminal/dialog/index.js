@@ -7,6 +7,7 @@
  * Re-exporta as APIs públicas de output, SSE e engine.
  *
  * @module copilot/terminal/dialog
+ * @see EventBus
  */
 
 export {

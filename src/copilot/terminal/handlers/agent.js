@@ -5,6 +5,7 @@
  * Handlers para endpoints do agente/dialog: /pipeline, /inject, /dialog/pause, /dialog/resume.
  *
  * @module copilot/terminal/handlers-agent
+ * @see EventBus
  * @see module:copilot/terminal/route-table
  */
 

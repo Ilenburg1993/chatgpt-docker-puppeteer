@@ -8,6 +8,7 @@
  * O SDK aceita um campo `provider?: ProviderConfig` em `CopilotClientOptions` para modo BYOK.
  *
  * @module copilot/sdk/provider
+ * @see EventBus
  */
 
 import { PROVIDER_TYPES } from './constants.js';

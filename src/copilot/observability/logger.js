@@ -11,6 +11,7 @@
  * - Rotação automática por tamanho (5 MB para log/metrics, 2 MB para audit)
  *
  * @module copilot/observability/logger
+ * @see EventBus
  */
 
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '#copilot/config';

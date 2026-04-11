@@ -5,6 +5,7 @@
  * Comando /git do REPL terminal LLM-B. Subcomandos: status, log, diff, branch, pull, stash
  *
  * @module copilot/terminal/commands/git
+ * @see EventBus
  */
 
 import {

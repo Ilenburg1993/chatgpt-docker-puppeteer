@@ -8,6 +8,7 @@
  * worker_threads), pode ser substituído por implementação Redis PubSub ou BroadcastChannel.
  *
  * @module copilot/api/event-fanout
+ * @see EventBus
  */
 
 import { createEmitter } from '#copilot/core';

@@ -7,6 +7,7 @@
  * Lista as tools registradas com statisticas de uso (invocações, erros, latência).
  *
  * @module copilot/terminal/commands/tools
+ * @see EventBus
  */
 
 import { getToolStats } from '#copilot/observability';

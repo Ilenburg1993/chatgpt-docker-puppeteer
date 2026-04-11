@@ -10,6 +10,7 @@
  * - `isTransientError(err)` — identifica erros retriáveis (rede, timeout, 502/503)
  *
  * @module copilot/core/error-handlers
+ * @see EventBus
  */
 
 import { CircuitOpenError } from './circuit-breaker.js';

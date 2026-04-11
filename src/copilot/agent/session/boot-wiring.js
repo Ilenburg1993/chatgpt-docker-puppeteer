@@ -18,6 +18,7 @@
  * Função pura sem estado próprio — recebe session, client e callbacks.
  *
  * @module copilot/agent/session/boot-wiring
+ * @see EventBus
  */
 
 import {

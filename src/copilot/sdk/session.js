@@ -10,6 +10,7 @@
  * - persistencia de estado (delegada ao session-manager.js)
  *
  * @module copilot/lib/session
+ * @see EventBus
  * @see module:copilot/session-initializer
  * @see module:copilot/lib/sdk-client
  * @see module:copilot/config/session-config

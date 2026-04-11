@@ -5,6 +5,7 @@
  * Handlers de eventos de assistant/user do EventCollector.
  *
  * @module copilot/observability/collectors/assistant-handlers
+ * @see EventBus
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/sdk';

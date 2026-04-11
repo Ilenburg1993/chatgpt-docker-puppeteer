@@ -6,6 +6,7 @@
  * um humano aprova cada ação.
  *
  * @module copilot/hooks/presets/interactive
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

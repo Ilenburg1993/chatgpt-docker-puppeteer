@@ -8,6 +8,7 @@
  * diferenciado por tipo.
  *
  * @module copilot/core/errors
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/dialog-loop-manager
  */

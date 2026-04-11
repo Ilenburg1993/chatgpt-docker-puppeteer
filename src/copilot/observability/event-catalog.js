@@ -5,6 +5,7 @@
  * Catálogo de eventos emitidos pelo AlwaysAliveAgent + rastreamento de dead-letters (eventos emitidos sem listener).
  *
  * @module copilot/observability/event-catalog
+ * @see EventBus
  */
 
 import { defaultMetrics } from './metrics.js';

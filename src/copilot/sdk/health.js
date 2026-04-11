@@ -6,6 +6,7 @@
  * unificada.
  *
  * @module copilot/sdk/health
+ * @see EventBus
  * @see module:copilot/sdk/server-rpc
  */
 

@@ -12,6 +12,7 @@
  * - Reset atômico do pipeline (forceDeactivate)
  *
  * @module copilot/agent/dialog/backpressure
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';

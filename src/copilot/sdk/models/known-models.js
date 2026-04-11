@@ -6,6 +6,7 @@
  * não fornece capabilities completas.
  *
  * @module copilot/sdk/models/known-models
+ * @see EventBus
  */
 
 /**

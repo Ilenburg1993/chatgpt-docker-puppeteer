@@ -16,6 +16,7 @@
  * `POST /api/copilot/answer` (ou equivalente na interface ativa).
  *
  * @module copilot/tools/hook-tools
+ * @see EventBus
  * @see module:copilot/lib/hooks
  * @see module:copilot/hooks/audit
  */

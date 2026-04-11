@@ -7,6 +7,7 @@
  * `#copilot/config` ou `#copilot/config/env`.
  *
  * @module copilot/core/constants
+ * @see EventBus
  */
 
 export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './events.js';

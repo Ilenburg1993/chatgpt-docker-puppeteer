@@ -6,6 +6,7 @@
  * (better-sqlite3 Database) como primeiro argumento.
  *
  * @module copilot/conversation-hub/store-memories
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

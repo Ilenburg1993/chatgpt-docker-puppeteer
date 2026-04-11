@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/usage
+ * @see EventBus
  * F62.8: Handler dedicado para billing (assistant.usage).
  */
 

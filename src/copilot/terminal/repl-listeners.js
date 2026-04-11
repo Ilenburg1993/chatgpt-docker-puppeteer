@@ -6,6 +6,7 @@
  * complexidade.
  *
  * @module copilot/terminal/repl-listeners
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '../agent/index.js';

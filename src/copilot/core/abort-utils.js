@@ -5,6 +5,7 @@
  * Utilitários para timeout com AbortController, substituindo padrões manuais de Promise.race([fn, setTimeout(reject)]).
  *
  * @module copilot/core/abort-utils
+ * @see EventBus
  */
 
 import { TimeoutError } from './errors.js';

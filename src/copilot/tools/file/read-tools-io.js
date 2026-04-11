@@ -5,6 +5,7 @@
  * Tools de IO: read_file_content, list_directory.
  *
  * @module copilot/tools/file/read-tools-io
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

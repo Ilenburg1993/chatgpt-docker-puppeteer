@@ -3,6 +3,7 @@
  * Barrel — SSE (Server-Sent Events) utilities.
  *
  * @module copilot/api/sse
+ * @see EventBus
  */
 
 export { EventFanout, eventFanout } from './fanout.js';

@@ -9,6 +9,7 @@
  * Padrão §15.8 — Dialog Loop: todas as iterações usam o mesmo PR (sem custo por turno).
  *
  * @module copilot/api/bridge-dialog
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

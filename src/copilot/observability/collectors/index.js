@@ -5,6 +5,7 @@
  * Barrel para os handler groups do EventCollector.
  *
  * @module copilot/observability/collectors
+ * @see EventBus
  */
 
 export { attachAssistantHandlers, quotaState } from './assistant-handlers.js';

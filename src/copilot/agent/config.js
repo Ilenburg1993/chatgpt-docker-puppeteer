@@ -8,6 +8,7 @@
  * Módulos internos do agent/ devem importar daqui em vez de ler `process.env` diretamente.
  *
  * @module copilot/agent/config
+ * @see EventBus
  */
 
 import {

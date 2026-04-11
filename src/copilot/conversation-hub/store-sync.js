@@ -5,6 +5,7 @@
  * Funções de sincronização SDK → ConversationStore extraídas para reduzir o God Module.
  *
  * @module copilot/conversation-hub/store-sync
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

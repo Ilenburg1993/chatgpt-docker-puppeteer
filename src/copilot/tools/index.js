@@ -35,6 +35,7 @@
  * - `setSessionRpc(rpc)` — injeta facade RPC de sessão
  *
  * @module copilot/tools
+ * @see EventBus
  */
 
 import { codeTools } from './code-tools.js';

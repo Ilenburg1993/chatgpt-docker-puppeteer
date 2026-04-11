@@ -5,6 +5,7 @@
  * Tools de leitura/consulta do sistema de tarefas: list, search, stats.
  *
  * @module copilot/tools/todo/query-tools
+ * @see EventBus
  * @see module:copilot/tools/todo/store
  */
 

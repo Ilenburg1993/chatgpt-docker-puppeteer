@@ -21,6 +21,7 @@
  * - bridge-dialog.js → POST /dialog/start, /dialog/turn, /dialog/stop
  *
  * @module copilot/api/http-bridge
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

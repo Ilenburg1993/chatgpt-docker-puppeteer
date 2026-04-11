@@ -5,6 +5,7 @@
  * Barrel — re-exporta todas as todo tools agrupadas e o store para acesso direto.
  *
  * @module copilot/tools/todo
+ * @see EventBus
  */
 
 export { todoBulkUpdateTool, todoClearCompletedTool, todoImportTool } from './bulk-tools.js';

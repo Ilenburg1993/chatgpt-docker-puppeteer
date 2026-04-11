@@ -5,6 +5,7 @@
  * Handlers para endpoints de sessão, memória e turnos do ConversationHub.
  *
  * @module copilot/terminal/handlers-dialog
+ * @see EventBus
  * @see module:copilot/terminal/route-table
  */
 

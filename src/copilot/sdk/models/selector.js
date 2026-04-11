@@ -6,6 +6,7 @@
  * automático. Extraído de registry.js (F104) para reduzir complexidade.
  *
  * @module copilot/sdk/models/selector
+ * @see EventBus
  */
 
 import { log } from '../logger.js';

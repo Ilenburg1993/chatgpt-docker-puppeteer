@@ -6,6 +6,7 @@
  * recebe as dependências necessárias (bridge, agent) como parâmetros.
  *
  * @module copilot/conversation-hub/call-strategies
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';

@@ -7,6 +7,7 @@
  * Recebem callbacks via `ctx` para evitar dependência de campos privados.
  *
  * @module copilot/agent/dialog/user-input-handler
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

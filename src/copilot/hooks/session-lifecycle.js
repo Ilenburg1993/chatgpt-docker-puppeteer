@@ -7,6 +7,7 @@
  *
  * @deprecated Importe diretamente de `#copilot/hooks/session-hooks`
  * @module copilot/hooks/session-lifecycle
+ * @see EventBus
  */
 
 export { createSessionHooks } from './session-hooks.js';

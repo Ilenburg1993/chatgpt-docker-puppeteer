@@ -14,6 +14,7 @@
  * - Fallback de modelo automático ao atingir quota/rate_limit
  *
  * @module copilot/agent/dialog/loop-manager
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/dialog/protocol
  * @see module:copilot/agent/dialog/watchdog

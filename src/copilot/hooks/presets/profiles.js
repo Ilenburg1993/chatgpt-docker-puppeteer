@@ -6,6 +6,7 @@
  * pré-configurado para um padrão de uso específico (always-alive, read-only, full-access, diagnostic).
  *
  * @module copilot/hooks/presets/profiles
+ * @see EventBus
  * @see module:copilot/config/session-config
  */
 

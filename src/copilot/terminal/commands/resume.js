@@ -7,6 +7,7 @@
  * Sem arg → lista últimas 5 hub_sessions. Com sessionId → carrega turnos e inicia nova sessão com contexto prefixed.
  *
  * @module copilot/terminal/commands/resume
+ * @see EventBus
  */
 
 import { conversationStore } from '#copilot/services';

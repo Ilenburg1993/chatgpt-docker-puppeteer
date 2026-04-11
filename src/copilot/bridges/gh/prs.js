@@ -5,6 +5,7 @@
  * GitHub CLI bridge — operações de Pull Requests.
  *
  * @module copilot/bridges/gh/prs
+ * @see EventBus
  */
 
 import { calcFetchLimit, fmtDate, repoArgs, runGh, runGhJson, slicePage } from './shared.js';

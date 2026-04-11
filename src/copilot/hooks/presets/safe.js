@@ -6,6 +6,7 @@
  * padrão do projeto: bloquear tools destrutivas opcionalmente.
  *
  * @module copilot/hooks/presets/safe
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

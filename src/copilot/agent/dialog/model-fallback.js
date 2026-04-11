@@ -11,6 +11,7 @@
  * - Aplicação do fallback ao host durante boot
  *
  * @module copilot/agent/dialog/model-fallback
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

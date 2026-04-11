@@ -11,6 +11,7 @@
  * AG.5 — workspace SessionContext
  *
  * @module copilot/terminal/workspace-context
+ * @see EventBus
  */
 
 import { COPILOT_WORKING_DIRECTORY } from '#copilot/config';

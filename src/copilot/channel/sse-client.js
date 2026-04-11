@@ -6,6 +6,7 @@
  * reduzir complexidade.
  *
  * @module copilot/channel/sse-client
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

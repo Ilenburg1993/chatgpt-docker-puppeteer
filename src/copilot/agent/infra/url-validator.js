@@ -7,6 +7,7 @@
  *
  * @deprecated Importe diretamente de `#copilot/core/security/url-validator`
  * @module copilot/agent/infra/url-validator
+ * @see EventBus
  */
 
 export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';

@@ -5,6 +5,7 @@
  * Handlers de eventos de sessão do EventCollector.
  *
  * @module copilot/observability/collectors/session-handlers
+ * @see EventBus
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/sdk';

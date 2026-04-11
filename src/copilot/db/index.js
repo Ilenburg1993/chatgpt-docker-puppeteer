@@ -3,6 +3,7 @@
  * Barrel — Database (SQLite).
  *
  * @module copilot/db
+ * @see EventBus
  */
 
 export { COPILOT_MIGRATIONS } from './migrations.js';

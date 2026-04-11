@@ -12,6 +12,7 @@
  * - API de consulta: `getErrors()`, `getErrorStats()`, `clearErrors()`
  *
  * @module copilot/observability/error-tracker
+ * @see EventBus
  */
 
 import { log } from './logger.js';

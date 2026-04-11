@@ -5,6 +5,7 @@
  * Output helpers e constantes de configuração do motor de diálogo LLM-B.
  *
  * @module copilot/terminal/dialog/output
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

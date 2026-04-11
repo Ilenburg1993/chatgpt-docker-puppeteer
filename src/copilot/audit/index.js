@@ -5,6 +5,7 @@
  * Barrel exports do módulo unificado de auditoria.
  *
  * @module copilot/audit
+ * @see EventBus
  */
 
 // Ring buffer genérico

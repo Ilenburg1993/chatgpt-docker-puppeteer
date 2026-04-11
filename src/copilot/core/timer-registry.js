@@ -6,6 +6,7 @@
  * leaks de timers órfãos.
  *
  * @module copilot/core/timer-registry
+ * @see EventBus
  */
 
 import { registerShutdownHandler } from './shutdown.js';

@@ -20,6 +20,7 @@
  * - Seguro a erros: qualquer exceção nos handlers é capturada e logada
  *
  * @module copilot/observability/agent-event-observer
+ * @see EventBus
  */
 
 import { createErrorAlerter } from './error-alerting.js';

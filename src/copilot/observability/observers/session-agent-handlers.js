@@ -6,11 +6,12 @@
  * external_tool.* do AgentEventObserver.
  *
  * @module copilot/observability/observers/session-agent-handlers
+ * @see EventBus
  */
 
+import { AGENT_EMITTER_ERROR, AGENT_SESSION_FATAL } from '#copilot/events';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
-import { AGENT_SESSION_FATAL, AGENT_EMITTER_ERROR } from '#copilot/events';
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 

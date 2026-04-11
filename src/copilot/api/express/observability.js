@@ -17,6 +17,7 @@
  * - POST /observability/log-level — ajustar nível de log dinamicamente
  *
  * @module copilot/routes/observability
+ * @see EventBus
  */
 
 import { getMcpStatus, isMounted as isNervMounted } from '#copilot/bridges';

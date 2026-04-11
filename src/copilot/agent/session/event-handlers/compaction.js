@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/compaction
+ * @see EventBus
  * F62.2: Handler de eventos de compaction da sessão SDK.
  */
 

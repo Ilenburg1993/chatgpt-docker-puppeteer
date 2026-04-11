@@ -15,6 +15,7 @@
  * - Uso de memória e uptime
  *
  * @module copilot/terminal/commands/diagnose
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

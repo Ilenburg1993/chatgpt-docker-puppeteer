@@ -6,6 +6,7 @@
  * para console antes do bootstrap.
  *
  * @module copilot/audit/logger
+ * @see EventBus
  */
 
 import path, { resolve } from 'node:path';

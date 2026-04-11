@@ -12,6 +12,7 @@
  * - GET /hooks/events — SSE stream de todos os eventos de hooks em tempo real
  *
  * @module copilot/routes/hooks
+ * @see EventBus
  */
 
 import { SDK_HOOKS, defaultBus } from '#copilot/hooks';

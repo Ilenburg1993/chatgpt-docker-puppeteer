@@ -32,6 +32,7 @@
  * | GET    | /config             | Configuração dinâmica da sessão LLM-B |
  *
  * @module copilot/terminal/server
+ * @see EventBus
  * @see module:copilot/terminal/route-table
  * @see module:copilot/terminal/repl
  */

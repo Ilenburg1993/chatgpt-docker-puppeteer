@@ -6,6 +6,7 @@
  * consolidado no pipeline de auditoria.
  *
  * @module copilot/audit/pipeline-audit-log
+ * @see EventBus
  */
 
 import { logSwallowed, registerShutdownHandler } from '#copilot/core';

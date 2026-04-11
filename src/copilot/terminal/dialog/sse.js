@@ -5,6 +5,7 @@
  * Transmissão SSE e Socket.io para o motor de diálogo do Terminal Permanente LLM-B.
  *
  * @module copilot/terminal/dialog/sse
+ * @see EventBus
  */
 
 import { eventFanout } from '#copilot/api';

@@ -5,6 +5,7 @@
  * Preset deny-all: bloqueia todas as tools. Útil para modo read-only ou análise estática.
  *
  * @module copilot/hooks/presets/deny-all
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

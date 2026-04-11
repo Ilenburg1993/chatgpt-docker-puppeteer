@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/api/sse-utils
+ * @see EventBus
  * @file Utilitários compartilhados para endpoints SSE (Server-Sent Events).
  *
  *   GAP-EVARCH-01 (STREAMING-EVENTS-AUDIT §12): extrai lógica comum de headers, heartbeat, sanitização de eventos,

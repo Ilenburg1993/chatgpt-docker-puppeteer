@@ -3,6 +3,7 @@
  * src/copilot/agent/infra/index.js — sub-barrel do subsistema Infra (queue, tools, webhooks, snapshots).
  *
  * @module copilot/agent/infra
+ * @see EventBus
  */
 
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#copilot/audit';

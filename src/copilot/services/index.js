@@ -8,6 +8,7 @@
  * e `terminal/` para reduzir fan-out.
  *
  * @module copilot/services
+ * @see EventBus
  */
 
 export { AuditService, createAuditService } from './audit-service.js';
@@ -21,11 +22,11 @@ export { ToolService, createToolService } from './tool-service.js';
 // De #copilot/agent
 export {
     alwaysAliveAgent,
-    setBackgroundCompactionThreshold,
     createSnapshot,
     listSnapshotsAsync,
     loadSnapshotAsync,
     saveSnapshotAsync,
+    setBackgroundCompactionThreshold,
 } from '#copilot/agent';
 
 // De #copilot/conversation-hub
@@ -33,4 +34,3 @@ export { broadcastGlobal, broadcastToSession, conversationHub, conversationStore
 
 // De #copilot/channel
 export { CHANNEL_VERSION, llmBridgeClient } from '#copilot/channel';
-

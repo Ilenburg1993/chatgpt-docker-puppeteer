@@ -8,6 +8,7 @@
  * Extrai responsabilidade de `always-alive.js` para isolar o ciclo de vida da permissão.
  *
  * @module copilot/agent/infra/permission-controller
+ * @see EventBus
  * @see module:copilot/hooks/permission
  * @see module:copilot/tools/permission-tools
  */

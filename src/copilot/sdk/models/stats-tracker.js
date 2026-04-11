@@ -6,6 +6,7 @@
  * para reduzir complexidade.
  *
  * @module copilot/sdk/models/stats-tracker
+ * @see EventBus
  */
 
 /** @typedef {import('./registry.js').ModelStats} ModelStats */

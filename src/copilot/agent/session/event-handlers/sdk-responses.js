@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/sdk-responses
+ * @see EventBus
  * F62.7: Handler de eventos de resposta do SDK (intent, reasoning, turns, lifecycle, subagents, etc.).
  */
 

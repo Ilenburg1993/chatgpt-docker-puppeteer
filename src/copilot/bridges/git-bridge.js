@@ -6,6 +6,7 @@
  * e git-bridge-write (createBranch, checkout, pull, push, add, commit, stash).
  *
  * @module copilot/bridges/git-bridge
+ * @see EventBus
  */
 
 export {

@@ -5,6 +5,7 @@
  * Registry de plugins copilot — registro, descoberta e ativação.
  *
  * @module copilot/plugins/plugin-registry
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

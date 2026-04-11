@@ -7,6 +7,7 @@
  * Permitem trocar o modelo e o nível de raciocínio sem reiniciar a sessão.
  *
  * @module copilot/terminal/commands/config
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

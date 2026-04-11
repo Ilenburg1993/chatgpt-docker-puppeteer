@@ -5,6 +5,7 @@
  * Motor de diálogo do Terminal Permanente LLM-B — dialog loop e execução de turnos.
  *
  * @module copilot/terminal/dialog/engine
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

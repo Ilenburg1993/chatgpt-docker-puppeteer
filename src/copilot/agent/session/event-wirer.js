@@ -7,6 +7,7 @@
  * F62: Refatorado de 591L monolítico para orquestrador fino (~90L) + 8 handler files.
  *
  * @module copilot/agent/session/event-wirer
+ * @see EventBus
  */
 
 import {

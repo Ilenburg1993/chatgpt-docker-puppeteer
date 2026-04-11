@@ -5,6 +5,7 @@
  * Comando /alias do REPL: list, set, remove, reset
  *
  * @module copilot/terminal/commands/alias
+ * @see EventBus
  */
 
 import { formatAliases, removeAlias, setAlias } from '../alias-store.js';

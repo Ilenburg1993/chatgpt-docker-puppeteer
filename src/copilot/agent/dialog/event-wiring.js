@@ -7,6 +7,7 @@
  * Extraído de loop-manager.js para separação de concerns.
  *
  * @module copilot/agent/dialog/event-wiring
+ * @see EventBus
  */
 
 /**

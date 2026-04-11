@@ -7,6 +7,7 @@
  * Busca em turnos anteriores via FTS5 (SQLite fulltext search) no ConversationHub store.
  *
  * @module copilot/terminal/commands/search
+ * @see EventBus
  */
 
 import { conversationHub } from '#copilot/services';

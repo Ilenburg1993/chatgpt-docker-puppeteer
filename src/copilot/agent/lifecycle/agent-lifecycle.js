@@ -8,6 +8,7 @@
  * always-alive.js em ~300L.
  *
  * @module copilot/agent/lifecycle/agent-lifecycle
+ * @see EventBus
  * @internal
  */
 

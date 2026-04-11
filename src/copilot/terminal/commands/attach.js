@@ -11,6 +11,7 @@
  * - `/attach clear` → limpa a fila
  *
  * @module copilot/terminal/commands/attach
+ * @see EventBus
  */
 
 import { access, stat } from 'node:fs/promises';

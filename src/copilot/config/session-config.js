@@ -6,6 +6,7 @@
  * (L3) pois dependem de hooks. Cf. PARTE-21C Faixa H.
  *
  * @module copilot/config/session-config
+ * @see EventBus
  * @see module:copilot/hooks/presets/profiles
  */
 

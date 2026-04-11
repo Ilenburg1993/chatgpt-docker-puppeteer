@@ -2,10 +2,11 @@
 /**
  * src/copilot/core/cache.js
  *
- * Cache LRU simples e determinístico em memória. Suporta TTL opcional por entrada e tamanho máximo
- * configurável. Substitui os múltiplos `new Map()` inline usados como caches ad-hoc no código.
+ * Cache LRU simples e determinístico em memória. Suporta TTL opcional por entrada e tamanho máximo configurável.
+ * Substitui os múltiplos `new Map()` inline usados como caches ad-hoc no código.
  *
  * Uso:
+ *
  * ```js
  * const cache = createCache({ maxSize: 500, defaultTtlMs: 60_000 });
  * cache.set('key', value);
@@ -15,6 +16,7 @@
  * ```
  *
  * @module copilot/core/cache
+ * @see EventBus
  */
 
 /**

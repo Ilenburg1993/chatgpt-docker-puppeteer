@@ -10,6 +10,7 @@
  * Tipos e helpers FTS5 vivem em `store-helpers.js` para manter este módulo focado na classe.
  *
  * @module copilot/conversation-hub/store
+ * @see EventBus
  * @see module:copilot/conversation-hub/store-helpers
  * @see module:copilot/conversation-hub/orchestrator
  * @see module:copilot/db/sqlite

@@ -6,6 +6,7 @@
  * com timeout e sandboxing.
  *
  * @module copilot/tools/shell/executor
+ * @see EventBus
  */
 
 import { execFile, spawn } from 'node:child_process';

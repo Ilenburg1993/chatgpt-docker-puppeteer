@@ -11,6 +11,7 @@
  * - `createContextualErrorHandler`: mapa de contexto → estratégia
  *
  * @module copilot/hooks/error-handler
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

@@ -6,6 +6,7 @@
  * elicitation, commands, permissions, tools). Expõe createSessionRpcFacade como API agregada principal.
  *
  * @module copilot/sdk/rpc
+ * @see EventBus
  * @see module:copilot/sdk/session-lifecycle
  */
 

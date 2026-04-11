@@ -52,6 +52,7 @@
  * ```
  *
  * @module copilot/tools/tool-factory
+ * @see EventBus
  * @see module:copilot/lib/tools-registry
  * @see module:copilot/agent/tools-bootstrap
  *

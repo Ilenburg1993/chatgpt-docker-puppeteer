@@ -8,6 +8,7 @@
  * Fallback: console.error (nenhum log é perdido antes do bootstrap).
  *
  * @module copilot/sdk/logger
+ * @see EventBus
  */
 
 /**

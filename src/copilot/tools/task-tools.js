@@ -6,6 +6,7 @@
  * infra SQLite existente.
  *
  * @module copilot/tools/task-tools
+ * @see EventBus
  * @see module:copilot/agent/task-executor
  */
 

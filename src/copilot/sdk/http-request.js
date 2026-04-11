@@ -6,6 +6,7 @@
  * limite de resposta e timeout.
  *
  * @module copilot/lib/http-request
+ * @see EventBus
  * @see module:copilot/tools/web-tools
  */
 

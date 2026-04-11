@@ -7,6 +7,7 @@
  * para desacoplar módulos do import concreto de `node:events`.
  *
  * @module copilot/core/create-emitter
+ * @see EventBus
  */
 
 import { EventEmitter as NodeEventEmitter } from 'node:events';

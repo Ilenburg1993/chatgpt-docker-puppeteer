@@ -5,6 +5,7 @@
  * Barrel exports do módulo de API HTTP.
  *
  * @module copilot/api
+ * @see EventBus
  */
 
 // Express routers (SDK API)

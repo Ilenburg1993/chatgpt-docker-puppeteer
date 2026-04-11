@@ -5,6 +5,7 @@
  * Barrel — re-exporta as 4 file read tools de read-tools-io e read-tools-search.
  *
  * @module copilot/tools/file/read-tools
+ * @see EventBus
  */
 
 import { withSkipPermission } from '../tool-factory.js';

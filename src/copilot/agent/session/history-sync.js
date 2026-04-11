@@ -7,6 +7,7 @@
  * Extraído do AlwaysAliveAgent (F32) como funções puras sem estado próprio.
  *
  * @module copilot/agent/session/history-sync
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

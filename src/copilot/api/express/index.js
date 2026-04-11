@@ -14,6 +14,7 @@
  * - `routes/webhooks.js` — /webhooks, /webhooks/:id
  *
  * @module copilot/api/sdk-api
+ * @see EventBus
  */
 
 import { defaultMetrics } from '#copilot/observability';

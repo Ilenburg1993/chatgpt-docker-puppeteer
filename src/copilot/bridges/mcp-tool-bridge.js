@@ -18,6 +18,7 @@
  * ```
  *
  * @module copilot/bridges/mcp-tool-bridge
+ * @see EventBus
  * @see module:copilot/agent/tools-bootstrap
  * @see module:copilot/lib/tools-registry
  */

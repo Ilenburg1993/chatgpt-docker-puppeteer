@@ -8,6 +8,7 @@
  * initSession, dialogLoop). Testável de forma independente.
  *
  * @module copilot/agent/lifecycle/reconnect-policy
+ * @see EventBus
  */
 
 import { isFatalError } from '#copilot/core';

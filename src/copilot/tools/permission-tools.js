@@ -16,6 +16,7 @@
  * DL-PERM: o dialog loop não é uma tool e não é controlado por este subsistema.
  *
  * @module copilot/tools/permission-tools
+ * @see EventBus
  * @see module:copilot/lib/permissions
  * @see module:copilot/agent/permission-controller
  */

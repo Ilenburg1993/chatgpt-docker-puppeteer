@@ -9,6 +9,7 @@
  * cada `patchToolsConfig()` para sobreviver a restarts.
  *
  * @module copilot/config/tools-state
+ * @see EventBus
  */
 
 import { readFile, writeFile } from 'node:fs/promises';

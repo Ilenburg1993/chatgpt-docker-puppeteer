@@ -3,6 +3,7 @@
  * src/copilot/agent/session/event-handlers/index.js — barrel para handlers de eventos SDK.
  *
  * @module copilot/agent/session/event-handlers
+ * @see EventBus
  */
 
 export { KNOWN_SDK_EVENTS, wireCatchAll } from './catch-all.js';

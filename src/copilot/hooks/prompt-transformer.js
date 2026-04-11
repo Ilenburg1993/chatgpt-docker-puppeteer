@@ -10,6 +10,7 @@
  * Este módulo expõe fábricas que efetivamente modificam o prompt via `modifiedPrompt`.
  *
  * @module copilot/hooks/prompt-transformer
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

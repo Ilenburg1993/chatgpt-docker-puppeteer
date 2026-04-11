@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/catch-all
+ * @see EventBus
  * F62.9: Catch-all para eventos genuinamente não tratados por nenhum módulo do sistema.
  */
 

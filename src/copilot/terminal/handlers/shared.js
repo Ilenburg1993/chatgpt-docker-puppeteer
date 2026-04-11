@@ -5,6 +5,7 @@
  * Tipos compartilhados entre os handlers HTTP do terminal LLM-B.
  *
  * @module copilot/terminal/handlers-shared
+ * @see EventBus
  */
 
 /**

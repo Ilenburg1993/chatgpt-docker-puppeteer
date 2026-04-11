@@ -6,6 +6,7 @@
  * servidores MCP disponíveis no ambiente DevContainer.
  *
  * @module copilot/config/mcp-servers
+ * @see EventBus
  */
 
 import {

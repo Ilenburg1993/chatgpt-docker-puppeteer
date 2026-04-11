@@ -6,6 +6,7 @@
  * allOf/oneOf/anyOf. Extraído de mcp-tool-bridge.js (F107) para reduzir complexidade.
  *
  * @module copilot/bridges/mcp-tool-schema
+ * @see EventBus
  */
 
 import { z } from 'zod';

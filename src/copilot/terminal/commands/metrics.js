@@ -5,6 +5,7 @@
  * Comando `/metrics` — exibe métricas consolidadas de performance e uso da sessão.
  *
  * @module copilot/terminal/commands/metrics
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

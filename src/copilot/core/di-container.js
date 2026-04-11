@@ -8,6 +8,7 @@
  * Alternativa moderna aos setters manuais (`setSdkLogger`, `setBridgeAgent`, etc.), mantendo backward compat total.
  *
  * @module copilot/core/di-container
+ * @see EventBus
  */
 
 import { createContainer } from './di.js';

@@ -2,10 +2,11 @@
 /**
  * src/copilot/agent/facades/agent-model-config.js
  *
- * Facade para configuração de modelo LLM em runtime: modelo, nível de raciocínio, modelos disponíveis.
- * Extraído de always-alive.js (O3 — PARTE-22).
+ * Facade para configuração de modelo LLM em runtime: modelo, nível de raciocínio, modelos disponíveis. Extraído de
+ * always-alive.js (O3 — PARTE-22).
  *
  * @module copilot/agent/facades/agent-model-config
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

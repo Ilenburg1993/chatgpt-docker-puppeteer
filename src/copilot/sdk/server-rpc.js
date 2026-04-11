@@ -13,6 +13,7 @@
  * conectado.
  *
  * @module copilot/sdk/server-rpc
+ * @see EventBus
  * @see module:copilot/sdk/rpc
  * @see module:copilot/sdk/health
  */

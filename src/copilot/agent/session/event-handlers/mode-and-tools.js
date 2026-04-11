@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/mode-and-tools
+ * @see EventBus
  * F62.5: Handler de eventos de mudança de modo e ferramentas.
  */
 

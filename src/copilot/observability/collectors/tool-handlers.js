@@ -5,6 +5,7 @@
  * Handlers de eventos de tool execution do EventCollector.
  *
  * @module copilot/observability/collectors/tool-handlers
+ * @see EventBus
  */
 
 import { globalAuditBuffer } from '#copilot/audit';

@@ -6,6 +6,7 @@
  * dialog/loop-manager, session/event-wirer ↔ always-alive).
  *
  * @module copilot/agent/types
+ * @see EventBus
  */
 
 // ─── SDK Re-exports ──────────────────────────────────────────────────────────

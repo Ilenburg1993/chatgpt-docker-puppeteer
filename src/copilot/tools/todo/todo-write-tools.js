@@ -5,6 +5,7 @@
  * Tools de escrita destrutiva: todo_create, todo_set_status, todo_delete.
  *
  * @module copilot/tools/todo/todo-write-tools
+ * @see EventBus
  */
 
 

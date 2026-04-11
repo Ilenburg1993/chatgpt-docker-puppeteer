@@ -6,6 +6,7 @@
  * com a API do SDK.
  *
  * @module copilot/sdk/constants
+ * @see EventBus
  */
 
 // ─── Session Modes ────────────────────────────────────────────────────────────

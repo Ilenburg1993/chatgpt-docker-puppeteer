@@ -14,6 +14,7 @@
  * ver `tools/tool-factory.js`.
  *
  * @module copilot/sdk/tools
+ * @see EventBus
  * @see module:copilot/sdk/tools-registry
  */
 

@@ -12,6 +12,7 @@
  * - Consultar histórico de conversas
  *
  * @module copilot/tools/hub-tools
+ * @see EventBus
  * @see module:copilot/conversation-hub/orchestrator
  * @see module:copilot/channel/client
  */

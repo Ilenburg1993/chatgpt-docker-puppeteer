@@ -14,6 +14,7 @@
  * 6. Inicia o REPL readline (via `repl.js`)
  *
  * @module copilot/terminal
+ * @see EventBus
  */
 
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';

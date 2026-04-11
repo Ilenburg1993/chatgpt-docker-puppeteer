@@ -3,6 +3,7 @@
  * src/copilot/agent/session/index.js — sub-barrel do subsistema Session.
  *
  * @module copilot/agent/session
+ * @see EventBus
  */
 
 export { performBootWiring } from './boot-wiring.js';

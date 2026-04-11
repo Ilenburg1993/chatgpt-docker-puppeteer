@@ -14,6 +14,7 @@
  * - Helpers puros: generateId, generateUniqueId, now, sanitize, isOverdue, createTask
  *
  * @module copilot/tools/todo/store
+ * @see EventBus
  * @see module:copilot/db/migrations
  * @see module:copilot/db/sqlite
  */

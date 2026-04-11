@@ -14,6 +14,7 @@
  * - `SessionEventHandler`: `(event: SessionEvent) => void`
  *
  * @module copilot/sdk/events
+ * @see EventBus
  */
 
 import { SESSION_EVENTS } from './constants.js';

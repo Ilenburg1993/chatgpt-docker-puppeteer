@@ -5,6 +5,7 @@
  * Git Bridge — operacoes de escrita: createBranch, checkout, pull, push, add, commit, stash.
  *
  * @module copilot/bridges/git-bridge-write
+ * @see EventBus
  */
 
 import { defaultMetrics, startSpanImmediate } from '#copilot/observability';

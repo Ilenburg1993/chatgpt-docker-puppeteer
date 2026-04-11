@@ -13,6 +13,7 @@
  * objetos `Tool` a partir dos registros, para uso por `tools-bootstrap.js`.
  *
  * @module copilot/config/custom-tools-registry
+ * @see EventBus
  */
 
 import { readFile, rename, writeFile } from 'node:fs/promises';

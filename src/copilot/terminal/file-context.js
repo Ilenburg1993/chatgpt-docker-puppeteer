@@ -9,6 +9,7 @@
  * `sendTurn()`.
  *
  * @module copilot/terminal/file-context
+ * @see EventBus
  */
 
 import { ToolError } from '#copilot/core';

@@ -3,6 +3,7 @@
  * src/copilot/agent/lifecycle/index.js — sub-barrel do subsistema Lifecycle.
  *
  * @module copilot/agent/lifecycle
+ * @see EventBus
  */
 
 export { tryReconnect } from './reconnect-policy.js';

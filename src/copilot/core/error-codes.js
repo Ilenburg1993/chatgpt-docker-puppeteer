@@ -8,6 +8,7 @@
  * constante é documentada com contexto de uso.
  *
  * @module copilot/core/error-codes
+ * @see EventBus
  */
 
 // ─── Erro base ───────────────────────────────────────────────────────────────

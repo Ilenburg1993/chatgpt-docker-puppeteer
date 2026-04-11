@@ -5,6 +5,7 @@
  * Comando /gh do REPL terminal LLM-B. Subcomandos: issue, pr, run/ci, release, search, status, api
  *
  * @module copilot/terminal/commands/gh
+ * @see EventBus
  */
 
 import {

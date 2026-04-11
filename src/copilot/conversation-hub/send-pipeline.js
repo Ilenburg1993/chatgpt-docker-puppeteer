@@ -5,6 +5,7 @@
  * Pipeline de envio de mensagens para LLM-B — extraído de HubOrchestrator.
  *
  * @module copilot/conversation-hub/send-pipeline
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';

@@ -9,6 +9,7 @@
  * `AlwaysAliveAgent`.
  *
  * @module copilot/agent/dialog/protocol
+ * @see EventBus
  * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/channel/client
  */

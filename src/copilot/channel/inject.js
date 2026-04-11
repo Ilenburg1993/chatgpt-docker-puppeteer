@@ -8,6 +8,7 @@
  * meio OFICIAL e recomendado para comunicação programática de LLM-A com LLM-B.
  *
  * @module copilot/channel/inject
+ * @see EventBus
  * @example
  *     ```js
  *     import { injectToLlmB, checkLlmBHealth } from '#copilot/channel';

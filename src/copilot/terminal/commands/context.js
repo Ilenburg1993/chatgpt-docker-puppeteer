@@ -8,6 +8,7 @@
  * chars/token) `/compact` → envia pedido de compactação à LLM-B e limpa o histórico local
  *
  * @module copilot/terminal/commands/context
+ * @see EventBus
  */
 
 import { alwaysAliveAgent } from '#copilot/services';

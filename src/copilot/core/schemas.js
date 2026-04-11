@@ -8,6 +8,7 @@
  * JSON.parse de arquivos ou payloads. Cada schema é exported como constante nomeada para uso com `z.safeParse()`.
  *
  * @module copilot/core/schemas
+ * @see EventBus
  */
 
 import { z } from 'zod';

@@ -6,6 +6,7 @@
  * reduzir complexidade do módulo principal.
  *
  * @module copilot/observability/metrics-histogram
+ * @see EventBus
  */
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@
  * Git Bridge — operacoes de leitura: status, log, diff, branch (query).
  *
  * @module copilot/bridges/git-bridge-read
+ * @see EventBus
  */
 
 import { defaultMetrics, startSpanImmediate } from '#copilot/observability';

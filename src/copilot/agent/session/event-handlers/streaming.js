@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/streaming
+ * @see EventBus
  * F62.3: Handler de eventos de streaming de tokens (reasoning + message delta).
  */
 

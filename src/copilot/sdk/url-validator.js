@@ -7,6 +7,7 @@
  *
  * @deprecated Importe diretamente de `#copilot/core/security/url-validator`
  * @module copilot/sdk/url-validator
+ * @see EventBus
  */
 
 export { validateUrl, validateUrlString } from '#copilot/core';

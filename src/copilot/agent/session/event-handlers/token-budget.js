@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/token-budget
+ * @see EventBus
  * F62.4: Handler de eventos de token budget da sessão SDK.
  */
 

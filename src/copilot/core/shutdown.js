@@ -8,6 +8,7 @@
  * L0 (core) — não importa camadas superiores. Logger é injetado via `setShutdownLogger`.
  *
  * @module copilot/core/shutdown
+ * @see EventBus
  */
 
 /**

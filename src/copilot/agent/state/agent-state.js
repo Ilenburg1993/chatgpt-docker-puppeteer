@@ -7,6 +7,7 @@
  * Centraliza a construção de snapshots e diagnósticos de listeners.
  *
  * @module copilot/agent/state/agent-state
+ * @see EventBus
  * @internal
  */
 

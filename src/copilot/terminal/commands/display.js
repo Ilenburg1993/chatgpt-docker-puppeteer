@@ -7,6 +7,7 @@
  * Consolida o controle de: thinking, streaming, usage, tools, intents num único comando.
  *
  * @module copilot/terminal/commands/display
+ * @see EventBus
  */
 
 import {

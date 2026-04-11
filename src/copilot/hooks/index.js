@@ -29,6 +29,7 @@
  * | **Presets**      | createAuditPreset, createProductionHooks, etc.               |
  *
  * @module copilot/hooks
+ * @see EventBus
  */
 
 // ─── Tipos (sem lógica executável) ────────────────────────────────────────────

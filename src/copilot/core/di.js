@@ -8,6 +8,7 @@
  * Zero dependências internas — opera exclusivamente com primitivas JS.
  *
  * @module copilot/core/di
+ * @see EventBus
  */
 
 // ─── Token ────────────────────────────────────────────────────────────────────

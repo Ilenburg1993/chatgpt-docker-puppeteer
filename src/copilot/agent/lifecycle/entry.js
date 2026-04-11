@@ -10,6 +10,7 @@
  * Este processo é opcional e controlado por COPILOT_SDK_ENABLED=true.
  *
  * @module copilot/agent/lifecycle/entry
+ * @see EventBus
  */
 
 import { setAuditBus } from '#copilot/audit';

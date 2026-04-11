@@ -13,6 +13,7 @@
  * - OTEL config builder (integração com CopilotClient)
  *
  * @module copilot/observability
+ * @see EventBus
  */
 
 // ─── Logger ───────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@
  * Extraído de store.js para reduzir o tamanho do módulo principal e manter responsabilidades claras.
  *
  * @module copilot/conversation-hub/store-helpers
+ * @see EventBus
  * @see module:copilot/conversation-hub/store
  */
 

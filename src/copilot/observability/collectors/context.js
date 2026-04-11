@@ -5,6 +5,7 @@
  * Tipo compartilhado de contexto para os handler groups do EventCollector.
  *
  * @module copilot/observability/collectors/context
+ * @see EventBus
  */
 
 /**

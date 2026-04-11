@@ -5,6 +5,7 @@
  * Protocolo chatStructured extraído de LlmBridgeClient.
  *
  * @module copilot/channel/client-structured
+ * @see EventBus
  */
 
 import {

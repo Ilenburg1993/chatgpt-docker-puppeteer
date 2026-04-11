@@ -5,6 +5,7 @@
  * Funções utilitárias de histórico extraídas de LlmBridgeClient.
  *
  * @module copilot/channel/client-history
+ * @see EventBus
  */
 
 /**

@@ -8,6 +8,7 @@
  * habilitada.
  *
  * @module copilot/conversation-hub/socket-ns
+ * @see EventBus
  */
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config';

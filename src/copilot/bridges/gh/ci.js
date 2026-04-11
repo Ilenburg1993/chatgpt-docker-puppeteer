@@ -5,6 +5,7 @@
  * GitHub CLI bridge — operações de CI/Actions runs.
  *
  * @module copilot/bridges/gh/ci
+ * @see EventBus
  */
 
 import { calcFetchLimit, fmtDate, repoArgs, runGh, runGhJson, runIcon, slicePage } from './shared.js';

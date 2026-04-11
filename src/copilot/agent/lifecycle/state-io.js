@@ -9,6 +9,7 @@
  * apenas serializa e desserializa o estado.
  *
  * @module copilot/agent/lifecycle/state-io
+ * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/session/initializer
  */

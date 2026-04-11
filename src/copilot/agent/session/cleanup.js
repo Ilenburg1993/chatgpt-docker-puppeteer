@@ -9,6 +9,7 @@
  * - Preserva a sessão ativa atual (se houver)
  *
  * @module copilot/agent/session/cleanup
+ * @see EventBus
  */
 
 import { log, startSpan } from '#copilot/observability';

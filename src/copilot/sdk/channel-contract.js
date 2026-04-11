@@ -6,6 +6,7 @@
  * e LLM-B (terminal interativo). O {@link LlmBridgeClient} satisfaz este contrato.
  *
  * @module copilot/sdk/channel-contract
+ * @see EventBus
  */
 
 /**

@@ -19,6 +19,7 @@
  * - `custom` — (opcional) true para rotas que requerem handling especial (SSE, metrics)
  *
  * @module copilot/terminal/route-table
+ * @see EventBus
  */
 
 import {

@@ -6,6 +6,7 @@
  * commits.
  *
  * @module copilot/tools/git
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

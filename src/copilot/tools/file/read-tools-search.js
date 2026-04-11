@@ -5,6 +5,7 @@
  * Tools de busca: search_in_files, diff_files.
  *
  * @module copilot/tools/file/read-tools-search
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

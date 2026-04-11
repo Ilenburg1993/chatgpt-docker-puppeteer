@@ -5,6 +5,7 @@
  * Helpers internos compartilhados pelos módulos do GitHub CLI bridge.
  *
  * @module copilot/bridges/gh/shared
+ * @see EventBus
  */
 
 import { LLM_B_GH_DEFAULT_REPO, LLM_B_GH_TIMEOUT_MS } from '#copilot/config';

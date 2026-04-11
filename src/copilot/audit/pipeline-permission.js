@@ -6,6 +6,7 @@
  * Ex-`agent/infra/tool-audit-logger.js`, consolidado no pipeline de auditoria.
  *
  * @module copilot/audit/pipeline-permission
+ * @see EventBus
  */
 
 import { logSwallowed } from '#copilot/core';

@@ -5,6 +5,7 @@
  * Comando /help do REPL terminal LLM-B.
  *
  * @module copilot/terminal/commands/help
+ * @see EventBus
  */
 
 /**

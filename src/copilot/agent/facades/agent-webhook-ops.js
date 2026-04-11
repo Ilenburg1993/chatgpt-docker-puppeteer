@@ -2,10 +2,10 @@
 /**
  * src/copilot/agent/facades/agent-webhook-ops.js
  *
- * Facade para operações de webhook do agent: register, unregister, list.
- * Extraído de always-alive.js (O3 — PARTE-22).
+ * Facade para operações de webhook do agent: register, unregister, list. Extraído de always-alive.js (O3 — PARTE-22).
  *
  * @module copilot/agent/facades/agent-webhook-ops
+ * @see EventBus
  */
 
 /**

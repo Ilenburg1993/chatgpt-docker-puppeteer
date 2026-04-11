@@ -14,6 +14,7 @@
  * - F39.5: Cooldown para evitar flooding de alertas
  *
  * @module copilot/observability/error-alerting
+ * @see EventBus
  */
 
 import { log } from './logger.js';

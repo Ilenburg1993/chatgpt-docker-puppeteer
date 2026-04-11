@@ -5,6 +5,7 @@
  * Preset minimal: hooks de observação com zero restrições. Logging e telemetria básicos sem bloquear nada.
  *
  * @module copilot/hooks/presets/minimal
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

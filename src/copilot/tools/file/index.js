@@ -5,6 +5,7 @@
  * Barrel re-export de todas as file-tools (leitura + escrita).
  *
  * @module copilot/tools/file
+ * @see EventBus
  */
 
 export {

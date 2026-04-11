@@ -2,10 +2,11 @@
 /**
  * src/copilot/agent/facades/agent-session-ops.js
  *
- * Facade para operações diretas na sessão SDK do agent: abort, log, watchdog, histórico.
- * Extraído de always-alive.js (O3 — PARTE-22).
+ * Facade para operações diretas na sessão SDK do agent: abort, log, watchdog, histórico. Extraído de always-alive.js
+ * (O3 — PARTE-22).
  *
  * @module copilot/agent/facades/agent-session-ops
+ * @see EventBus
  */
 
 import { logSwallowed } from '#copilot/core';

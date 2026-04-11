@@ -5,6 +5,7 @@
  * Tools de operações em lote do sistema de tarefas: bulk-update, clear-completed, import.
  *
  * @module copilot/tools/todo/bulk-tools
+ * @see EventBus
  * @see module:copilot/tools/todo/store
  */
 

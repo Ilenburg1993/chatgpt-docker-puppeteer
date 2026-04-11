@@ -7,6 +7,7 @@ import { ConfigError } from '#copilot/core';
  * por categoria, capacidade ou agente.
  *
  * @module copilot/sdk/tools-registry
+ * @see EventBus
  * @see module:copilot/sdk/tools
  * @see module:copilot/sdk/custom-tools
  */

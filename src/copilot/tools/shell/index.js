@@ -16,6 +16,7 @@
  * - Variáveis de ambiente sensíveis removidas do sub-processo
  *
  * @module copilot/tools/shell-tools
+ * @see EventBus
  */
 
 import { defaultAuditLog } from '#copilot/audit';

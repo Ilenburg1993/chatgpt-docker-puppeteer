@@ -5,6 +5,7 @@
  * F88: Helper para parse seguro de JSON com erro tipado.
  *
  * @module copilot/core/safe-json
+ * @see EventBus
  */
 
 import { ValidationError } from './errors.js';

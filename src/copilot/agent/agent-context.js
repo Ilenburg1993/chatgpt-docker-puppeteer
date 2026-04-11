@@ -11,6 +11,7 @@
  * externos acessam via API pública do AlwaysAliveAgent.
  *
  * @module copilot/agent/agent-context
+ * @see EventBus
  * @internal
  */
 

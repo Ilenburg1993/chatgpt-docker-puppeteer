@@ -12,6 +12,7 @@ import { log as appLog } from './logger.js';
  * listAgents(session);
  *
  * @module copilot/sdk/agents
+ * @see EventBus
  */
 
 /**

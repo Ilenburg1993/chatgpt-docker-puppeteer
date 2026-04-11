@@ -6,6 +6,7 @@
  * engine.js (F102) para reduzir complexidade.
  *
  * @module copilot/terminal/dialog/engine-persistence
+ * @see EventBus
  */
 
 import { emitNerv } from '#copilot/bridges';

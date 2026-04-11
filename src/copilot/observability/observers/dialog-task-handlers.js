@@ -5,13 +5,14 @@
  * Handlers de dialog._, task._, tool._, pr._, model.fallback e session.usage do AgentEventObserver.
  *
  * @module copilot/observability/observers/dialog-task-handlers
+ * @see EventBus
  */
 
 import { TimeoutError } from '#copilot/core';
+import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
 import { modelStatsTracker } from '#copilot/sdk';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
-import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 

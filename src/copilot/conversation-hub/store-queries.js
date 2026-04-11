@@ -6,6 +6,7 @@
  * ConversationStore para reduzir complexidade da classe principal.
  *
  * @module copilot/conversation-hub/store-queries
+ * @see EventBus
  */
 
 import { sanitizeFtsQuery } from './store-helpers.js';

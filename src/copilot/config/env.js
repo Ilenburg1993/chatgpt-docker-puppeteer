@@ -11,6 +11,7 @@
  * - `agent/config.js` que adiciona constantes derivadas sobre este módulo
  *
  * @module copilot/config/env
+ * @see EventBus
  */
 
 // ── Helpers ──────────────────────────────────────────────────

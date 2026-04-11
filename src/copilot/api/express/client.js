@@ -18,6 +18,7 @@
  * - POST /client/force-stop — Para CopilotClient forçadamente
  *
  * @module copilot/routes/client
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

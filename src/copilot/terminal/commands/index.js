@@ -5,6 +5,7 @@
  * Re-exports de todos os handlers de comando do REPL terminal LLM-B.
  *
  * @module copilot/terminal/commands
+ * @see EventBus
  */
 
 export { cmdAlias } from './alias.js';

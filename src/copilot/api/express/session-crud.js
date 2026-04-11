@@ -5,6 +5,7 @@
  * Rotas CRUD de sessões SDK: list, create, get, delete, disconnect, resume, foreground, compaction-history.
  *
  * @module copilot/api/express/session-crud
+ * @see EventBus
  */
 
 import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';

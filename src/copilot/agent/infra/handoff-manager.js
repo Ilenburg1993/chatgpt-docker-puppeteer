@@ -12,6 +12,7 @@
  * 4. Permite rejeitar/aceitar handoffs via API
  *
  * @module copilot/agent/infra/handoff-manager
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

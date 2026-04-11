@@ -7,6 +7,7 @@
  *
  * @deprecated Importe diretamente de `#copilot/sdk/sdk-session-wrapper`
  * @module copilot/sdk/session-lifecycle
+ * @see EventBus
  */
 
 export { abortSession, setSessionModel, getSessionMessages, getSessionWorkspacePath, disposeSession, runSessionLifecycle } from './sdk-session-wrapper.js';

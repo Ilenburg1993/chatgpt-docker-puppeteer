@@ -9,6 +9,7 @@
  * processar mensagens injetadas pelo usuário.
  *
  * @module copilot/conversation-hub/orchestrator
+ * @see EventBus
  * @see module:copilot/conversation-hub/store
  * @see module:copilot/conversation-hub/hub
  * @see module:copilot/always-alive

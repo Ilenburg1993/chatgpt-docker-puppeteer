@@ -13,6 +13,7 @@
  * - `/plan off` → desativa
  *
  * @module copilot/terminal/commands/plan
+ * @see EventBus
  */
 
 import { getPlanMode, setPlanMode } from '../state.js';

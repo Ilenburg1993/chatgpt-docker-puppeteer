@@ -15,6 +15,7 @@
  * - onPermissionRequest: modo restrito — toolAllowList com ask para o resto
  *
  * @module copilot/hooks/presets/production
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

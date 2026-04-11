@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/core/agent-events
+ * @see EventBus
  * @file Constantes de eventos emitidos pelo AlwaysAliveAgent.
  *
  *   Centraliza os nomes de evento para que testes, bridges e consumidores possam subscribir sem depender de strings

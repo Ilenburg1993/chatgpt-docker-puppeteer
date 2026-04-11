@@ -5,6 +5,7 @@
  * Middlewares e helpers compartilhados pelas rotas de sessão SDK.
  *
  * @module copilot/api/express/session-middleware
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

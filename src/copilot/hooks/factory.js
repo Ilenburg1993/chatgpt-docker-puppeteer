@@ -8,6 +8,7 @@
  * Migrado de src/copilot/lib/hooks.js — esse arquivo é mantido como re-export de compatibilidade.
  *
  * @module copilot/hooks/factory
+ * @see EventBus
  * @see module:copilot/hooks/types
  * @see module:copilot/hooks/composer
  */

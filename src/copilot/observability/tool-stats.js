@@ -6,6 +6,7 @@
  * nativo. Consumido por `get_tool_health` em introspection-tools.
  *
  * @module copilot/observability/tool-stats
+ * @see EventBus
  */
 
 /**

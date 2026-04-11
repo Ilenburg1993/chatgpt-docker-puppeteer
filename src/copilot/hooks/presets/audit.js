@@ -9,6 +9,7 @@
  * circular `observability → hooks/permission-handler → observability`.
  *
  * @module copilot/hooks/presets/audit
+ * @see EventBus
  */
 
 import { defaultAuditLog } from '#copilot/audit';

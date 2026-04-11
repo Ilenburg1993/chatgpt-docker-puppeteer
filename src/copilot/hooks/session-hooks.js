@@ -12,6 +12,7 @@
  * recebido via ctx (injeção de dependências).
  *
  * @module copilot/hooks/session-lifecycle
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

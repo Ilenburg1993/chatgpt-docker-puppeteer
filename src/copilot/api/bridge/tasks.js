@@ -7,6 +7,7 @@
  * Exporta `registerTaskRoutes(bridge, agent)` para ser montado pelo http-bridge.js.
  *
  * @module copilot/api/bridge-tasks
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

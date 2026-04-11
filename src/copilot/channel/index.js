@@ -13,6 +13,7 @@
  *   standalone que iniciam a sessão SDK diretamente.
  *
  * @module copilot/channel
+ * @see EventBus
  *
  * @example
  *     ```js

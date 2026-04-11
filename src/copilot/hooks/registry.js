@@ -8,6 +8,7 @@
  * customizados.
  *
  * @module copilot/hooks/registry
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

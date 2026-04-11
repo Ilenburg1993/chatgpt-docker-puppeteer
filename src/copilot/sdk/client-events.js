@@ -14,6 +14,7 @@
  * - `session.background` - sessão movida para background
  *
  * @module copilot/sdk/client-events
+ * @see EventBus
  */
 
 import { getClient } from './client.js';

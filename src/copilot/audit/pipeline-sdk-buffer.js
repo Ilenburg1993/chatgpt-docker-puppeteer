@@ -6,6 +6,7 @@
  * auditoria.
  *
  * @module copilot/audit/pipeline-sdk-buffer
+ * @see EventBus
  */
 
 import { log } from './logger.js';

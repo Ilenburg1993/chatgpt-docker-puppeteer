@@ -7,6 +7,7 @@
  * Mostra resumo do audit log (últimas entradas e sumário de categorias).
  *
  * @module copilot/terminal/commands/audit
+ * @see EventBus
  */
 
 import { defaultAuditLog } from '#copilot/audit';

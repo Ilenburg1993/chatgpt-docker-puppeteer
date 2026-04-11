@@ -5,6 +5,7 @@
  * Callbacks de renderização para streaming/reasoning durante turnos do dialog engine.
  *
  * @module copilot/terminal/dialog/turn-display
+ * @see EventBus
  */
 
 import { SEPARATOR, println } from './output.js';

@@ -16,6 +16,7 @@
  * campos privados do DLM.
  *
  * @module copilot/agent/dialog/turn-executor
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';

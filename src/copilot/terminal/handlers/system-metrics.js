@@ -5,6 +5,7 @@
  * Handlers de sistema: metrics, errors, audit, tool-stats, history, reset, git, gh, quota, pr-budget.
  *
  * @module copilot/terminal/handlers-system-metrics
+ * @see EventBus
  * @see module:copilot/terminal/route-table
  */
 

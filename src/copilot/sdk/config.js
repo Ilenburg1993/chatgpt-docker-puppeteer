@@ -6,6 +6,7 @@
  * re-exports dos builders de perfil.
  *
  * @module copilot/sdk/config
+ * @see EventBus
  */
 
 import { approveAll } from '@github/copilot-sdk';

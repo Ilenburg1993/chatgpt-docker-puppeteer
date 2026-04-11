@@ -4,16 +4,17 @@
  *
  * SSOT para strings de eventos cross-module do sistema Copilot.
  *
- * Todos os subsistemas devem importar eventos daqui via `#copilot/events`.
- * Usar strings de evento inline (`'agent:ready'`) fora deste módulo é considerado
- * uma violação arquitetural (critério C11 — PARTE-22).
+ * Todos os subsistemas devem importar eventos daqui via `#copilot/events`. Usar strings de evento inline
+ * (`'agent:ready'`) fora deste módulo é considerado uma violação arquitetural (critério C11 — PARTE-22).
  *
  * **Regras:**
+ *
  * - Sem lógica: apenas `export const` com strings literais
  * - Nomes de constante em UPPER_SNAKE_CASE, agrupados por namespace
  * - Strings de evento no formato `namespace:ação` (hifens para separar palavras em `ação`)
  *
  * @module copilot/events
+ * @see EventBus
  */
 
 // ─── Agent lifecycle ──────────────────────────────────────────────────────────

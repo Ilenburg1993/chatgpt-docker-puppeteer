@@ -5,6 +5,7 @@
  * RPC facade: model, mode, plan, workspace, sessionLog.
  *
  * @module copilot/sdk/rpc-session
+ * @see EventBus
  */
 
 import { log as appLog } from './logger.js';
@@ -26,7 +27,7 @@ function assertSession(session, caller) {
 
 /**
  * @param {CopilotSession} session
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function modelGetCurrent(session) {
     assertSession(session, 'model.getCurrent');
@@ -40,7 +41,7 @@ export async function modelGetCurrent(session) {
  * @param {CopilotSession} session
  * @param {string} modelId - ID do modelo destino
  * @param {{ reasoningEffort?: string }} [options]
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function modelSwitchTo(session, modelId, options) {
     assertSession(session, 'model.switchTo');
@@ -63,7 +64,7 @@ export async function modelSwitchTo(session, modelId, options) {
  * Retorna o modo atual da sessão (interactive, plan, autopilot).
  *
  * @param {CopilotSession} session
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function modeGet(session) {
     assertSession(session, 'mode.get');
@@ -75,8 +76,8 @@ export async function modeGet(session) {
  * Altera o modo da sessão.
  *
  * @param {CopilotSession} session
- * @param {"interactive" | "plan" | "autopilot"} mode
- * @returns {Promise<*>}
+ * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @returns {Promise<any>}
  */
 export async function modeSet(session, mode) {
     assertSession(session, 'mode.set');
@@ -96,7 +97,7 @@ export async function modeSet(session, mode) {
  * Lê o plano da sessão (plan.md do workspace infinito).
  *
  * @param {CopilotSession} session
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function planRead(session) {
     assertSession(session, 'plan.read');
@@ -140,7 +141,7 @@ export async function planDelete(session) {
  * Lista arquivos no diretório workspace da sessão infinita.
  *
  * @param {CopilotSession} session
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function workspaceListFiles(session) {
     assertSession(session, 'workspace.listFiles');
@@ -153,7 +154,7 @@ export async function workspaceListFiles(session) {
  *
  * @param {CopilotSession} session
  * @param {string} path - Caminho relativo dentro do diretório workspace
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function workspaceReadFile(session, path) {
     assertSession(session, 'workspace.readFile');
@@ -197,7 +198,7 @@ export async function workspaceCreateFile(session, path, content) {
  * @param {CopilotSession} session
  * @param {string} message - Texto legível
  * @param {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string }} [options]
- * @returns {Promise<*>}
+ * @returns {Promise<any>}
  */
 export async function sessionLog(session, message, options) {
     assertSession(session, 'log');
@@ -228,7 +229,7 @@ export async function sessionLog(session, message, options) {
  *         getCurrent: () => Promise<ModelCurrentResult>;
  *         switchTo: (modelId: string, options?: { reasoningEffort?: string }) => Promise<ModelSwitchResult>;
  *     };
- *     mode: { get: () => Promise<*>; set: (mode: 'interactive' | 'plan' | 'autopilot') => Promise<*> };
+ *     mode: { get: () => Promise<any>; set: (mode: 'interactive' | 'plan' | 'autopilot') => Promise<any> };
  *     plan: {
  *         read: () => Promise<PlanReadResult>;
  *         update: (content: string) => Promise<object>;

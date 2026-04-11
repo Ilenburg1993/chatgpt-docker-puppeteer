@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/alias-store
+ * @see EventBus
  * @file Alias Store — gerencia aliases de comandos do terminal REPL.
  *
  *   Suporta aliases built-in e customizados pelo usuário. Aliases customizados são persistidos em arquivo JSON.

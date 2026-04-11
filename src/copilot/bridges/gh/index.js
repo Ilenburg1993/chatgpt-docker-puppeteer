@@ -5,6 +5,7 @@
  * Barrel re-export do GitHub CLI bridge + funções utilitárias que não pertencem a domínio específico.
  *
  * @module copilot/bridges/gh
+ * @see EventBus
  */
 
 import { fmtDate, repoArgs, runGh, runGhJson } from './shared.js';

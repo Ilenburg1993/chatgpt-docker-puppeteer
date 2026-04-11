@@ -8,6 +8,7 @@
  * `assistant.reasoning_delta` são renderizados inline com prefixo 💭.
  *
  * @module copilot/terminal/commands/thinking
+ * @see EventBus
  */
 
 import { getShowThinking, setShowThinking } from '../state.js';

@@ -5,6 +5,7 @@
  * Tools de escrita do filesystem: write_file_content, create_file, delete_file, copy_file, move_file, patch_file.
  *
  * @module copilot/tools/file/write-tools
+ * @see EventBus
  * @see module:copilot/tools/file/shared
  */
 

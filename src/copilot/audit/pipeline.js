@@ -9,6 +9,7 @@
  * - `pipeline-permission.js` — permission logging + high risk classification + event bus
  *
  * @module copilot/audit/pipeline
+ * @see EventBus
  */
 
 /**

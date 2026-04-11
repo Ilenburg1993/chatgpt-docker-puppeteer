@@ -5,6 +5,7 @@
  * GitHub CLI bridge — operações de issues.
  *
  * @module copilot/bridges/gh/issues
+ * @see EventBus
  */
 
 import { calcFetchLimit, fmtDate, repoArgs, runGh, runGhJson, slicePage } from './shared.js';

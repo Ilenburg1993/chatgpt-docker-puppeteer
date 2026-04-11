@@ -5,6 +5,7 @@
  * Rotas de messaging e streaming de sessões SDK: send, stream, model, abort, messages.
  *
  * @module copilot/api/express/session-messaging
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

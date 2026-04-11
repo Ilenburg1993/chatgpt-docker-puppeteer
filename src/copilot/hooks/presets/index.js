@@ -3,6 +3,7 @@
  * Barrel — Hooks presets (configurações pré-definidas de hooks).
  *
  * @module copilot/hooks/presets
+ * @see EventBus
  */
 
 export { createHooksAuditPreset } from './audit.js';

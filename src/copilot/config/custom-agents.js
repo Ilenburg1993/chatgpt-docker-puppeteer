@@ -10,6 +10,7 @@ import { ConfigError } from '#copilot/core';
  * Regras de nomeação: agentes são referenciados pelo modo `@nome` no REPL/terminal.
  *
  * @module copilot/config/custom-agents
+ * @see EventBus
  * @see module:copilot/lib/agents
  * @see module:copilot/session-initializer
  */

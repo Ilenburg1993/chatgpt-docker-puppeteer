@@ -6,6 +6,7 @@
  * BridgeAgentLike e retorna dados puros.
  *
  * @module copilot/channel/client-dialog
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

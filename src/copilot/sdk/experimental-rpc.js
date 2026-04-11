@@ -17,6 +17,7 @@
  * - **extensions** (F123): `extensions.list()`, `extensions.enable()`, `extensions.disable()`
  *
  * @module copilot/sdk/experimental-rpc
+ * @see EventBus
  * @see module:copilot/sdk/feature-flags
  * @see module:copilot/sdk/rpc
  */

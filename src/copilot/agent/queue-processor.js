@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/queue-processor
+ * @see EventBus
  * @file F57: Queue processor — extrai lógica de processamento de fila do AlwaysAliveAgent.
  */
 

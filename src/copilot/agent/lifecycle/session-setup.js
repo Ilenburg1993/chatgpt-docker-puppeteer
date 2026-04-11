@@ -8,6 +8,7 @@
  * SDK.
  *
  * @module copilot/agent/lifecycle/session-setup
+ * @see EventBus
  * @internal
  */
 

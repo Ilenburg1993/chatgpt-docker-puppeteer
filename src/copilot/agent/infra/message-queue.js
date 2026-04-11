@@ -9,6 +9,7 @@
  * no host `AlwaysAliveAgent` que instancia esta classe e chama `scheduleNext()`.
  *
  * @module copilot/agent/infra/message-queue
+ * @see EventBus
  */
 
 import { MAX_QUEUE_SIZE } from '#copilot/config';

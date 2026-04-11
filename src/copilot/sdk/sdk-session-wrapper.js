@@ -6,6 +6,7 @@
  * asyncDispose com validação de sessão, logging e tratamento de erros padronizados.
  *
  * @module copilot/sdk/session-lifecycle
+ * @see EventBus
  * @see module:copilot/sdk/session
  */
 

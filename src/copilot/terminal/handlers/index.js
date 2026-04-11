@@ -5,6 +5,7 @@
  * Barrel — re-exporta todos os handlers HTTP do Terminal Permanente LLM-B.
  *
  * @module copilot/terminal/handlers
+ * @see EventBus
  */
 
 export {

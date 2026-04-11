@@ -16,6 +16,7 @@
  * - `{ kind: "denied-by-content-exclusion-policy"; path: string; message: string }`
  *
  * @module copilot/hooks/permission-handler
+ * @see EventBus
  * @see module:copilot/hooks/types
  */
 

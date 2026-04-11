@@ -7,6 +7,7 @@
  * Permite construir handlers complexos via composição sem duplicação de lógica.
  *
  * @module copilot/hooks/composer
+ * @see EventBus
  * @see module:copilot/hooks/factory
  */
 

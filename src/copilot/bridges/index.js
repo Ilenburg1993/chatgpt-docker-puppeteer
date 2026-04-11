@@ -3,6 +3,7 @@
  * Barrel — Bridges (integrações externas: git, MCP, Nerv).
  *
  * @module copilot/bridges
+ * @see EventBus
  */
 
 export {

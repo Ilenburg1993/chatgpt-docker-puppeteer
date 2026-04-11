@@ -9,6 +9,7 @@
  * Ativação: chamar setSessionRpc(session.rpc) após a sessão ser criada no always-alive.js.
  *
  * @module copilot/tools/session-rpc-tools
+ * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
  *

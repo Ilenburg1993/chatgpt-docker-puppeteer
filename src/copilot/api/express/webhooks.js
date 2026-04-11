@@ -13,6 +13,7 @@
  * - DELETE /webhooks/:id — Remove webhook registrado
  *
  * @module copilot/routes/webhooks
+ * @see EventBus
  */
 
 import { validateUrlString } from '#copilot/core';

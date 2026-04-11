@@ -7,6 +7,7 @@
  * Exporta `registerControlRoutes(bridge, agent)` para ser montado pelo http-bridge.js.
  *
  * @module copilot/api/bridge-control
+ * @see EventBus
  */
 
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';

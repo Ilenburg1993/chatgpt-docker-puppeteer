@@ -341,5 +341,3 @@ export const HEALTH_MANAGER = createToken('HEALTH_MANAGER');
  * @type {import('./di.js').Token<object>}
  */
 export const WORKER_POOL = createToken('WORKER_POOL');
-
-

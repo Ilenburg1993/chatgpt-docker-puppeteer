@@ -12,6 +12,7 @@
  * - **AutoDowngradeDetector**: detecção de modelo lento → sinaliza switch automático
  *
  * @module copilot/sdk/models/registry
+ * @see EventBus
  */
 
 import { KNOWN_MODELS } from './known-models.js';

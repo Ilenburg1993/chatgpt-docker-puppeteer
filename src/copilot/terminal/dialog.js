@@ -11,6 +11,7 @@
  * - `dialog/engine.js` — dialog loop e execução de turnos
  *
  * @module copilot/terminal/dialog
+ * @see EventBus
  */
 
 export {

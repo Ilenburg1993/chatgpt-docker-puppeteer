@@ -10,6 +10,7 @@
  * Extraído de `initializer.js` (F58) para reduzir responsabilidade daquele módulo.
  *
  * @module copilot/agent/session/hook-context
+ * @see EventBus
  * @see module:copilot/agent/session/initializer
  */
 

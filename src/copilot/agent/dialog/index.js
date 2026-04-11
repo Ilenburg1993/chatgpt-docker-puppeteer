@@ -3,6 +3,7 @@
  * src/copilot/agent/dialog/index.js — sub-barrel do subsistema Dialog Loop.
  *
  * @module copilot/agent/dialog
+ * @see EventBus
  */
 
 export { DialogLoopManager, wireDialogLoopEvents } from './loop-manager.js';

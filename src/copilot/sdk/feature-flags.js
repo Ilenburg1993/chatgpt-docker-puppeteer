@@ -8,6 +8,7 @@
  * `setExperimentalFlag(name, true)` ou configure via variáveis de ambiente `COPILOT_EXPERIMENTAL_<NAME>=1`.
  *
  * @module copilot/sdk/feature-flags
+ * @see EventBus
  */
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

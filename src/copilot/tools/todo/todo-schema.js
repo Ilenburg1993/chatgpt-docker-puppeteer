@@ -5,6 +5,7 @@
  * Schemas Zod, tipos JSDoc e constantes do sistema de tarefas.
  *
  * @module copilot/tools/todo/todo-schema
+ * @see EventBus
  */
 
 import { z } from 'zod';

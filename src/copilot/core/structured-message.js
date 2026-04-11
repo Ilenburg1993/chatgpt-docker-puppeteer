@@ -17,6 +17,7 @@
  * - Constantes de responseType e priority
  *
  * @module copilot/core/structured-message
+ * @see EventBus
  *
  * @example
  *     ```js

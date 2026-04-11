@@ -10,6 +10,7 @@
  * **Status**: fundação estrutural com PluginRegistry funcional.
  *
  * @module copilot/plugins
+ * @see EventBus
  */
 
 /**

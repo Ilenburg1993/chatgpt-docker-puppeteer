@@ -5,6 +5,7 @@
  * Middlewares Express compartilhados pelas rotas SDK.
  *
  * @module copilot/routes/middleware
+ * @see EventBus
  */
 
 import { CopilotError } from '#copilot/core';

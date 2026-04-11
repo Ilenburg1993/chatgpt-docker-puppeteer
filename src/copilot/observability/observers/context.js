@@ -5,6 +5,7 @@
  * Tipo compartilhado entre handler groups do AgentEventObserver.
  *
  * @module copilot/observability/observers/context
+ * @see EventBus
  */
 
 /**

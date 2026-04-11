@@ -8,6 +8,7 @@
  * métricas, SSE, alertas.
  *
  * @module copilot/hooks/bus
+ * @see EventBus
  * @see module:copilot/hooks/factory
  */
 

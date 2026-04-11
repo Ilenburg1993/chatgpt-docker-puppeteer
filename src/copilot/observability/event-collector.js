@@ -16,6 +16,7 @@
  * sessionId); // Ao encerrar a sessão: unsubs.forEach(u => u());
  *
  * @module copilot/observability/event-collector
+ * @see EventBus
  */
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';

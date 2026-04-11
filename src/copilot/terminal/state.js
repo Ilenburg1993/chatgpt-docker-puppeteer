@@ -16,6 +16,7 @@
  * - `'busy:changed'` `(busy: boolean)` — ao mudar o estado de ocupação do terminal
  *
  * @module copilot/terminal/state
+ * @see EventBus
  */
 
 import {

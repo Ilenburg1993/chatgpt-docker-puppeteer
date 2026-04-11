@@ -6,6 +6,7 @@
  * `registerAgentEventListeners` do `index.js` para separação de responsabilidades.
  *
  * @module copilot/terminal/terminal-agent-wiring
+ * @see EventBus
  */
 
 import { AGENT_EVENTS } from '#copilot/core';

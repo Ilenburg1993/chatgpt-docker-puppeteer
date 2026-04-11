@@ -7,6 +7,7 @@
  * Mostra os últimos N erros rastreados pelo error tracker.
  *
  * @module copilot/terminal/commands/errors
+ * @see EventBus
  */
 
 import { defaultErrorTracker } from '#copilot/observability';

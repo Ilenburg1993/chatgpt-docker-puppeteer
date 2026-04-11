@@ -5,6 +5,7 @@
  * Utilitários gerais de uso interno. Não possui dependências externas.
  *
  * @module copilot/lib/utils
+ * @see EventBus
  */
 
 /**

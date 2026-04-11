@@ -11,6 +11,7 @@
  * **Não contém runtime** — puro barrel de tipos para JSDoc.
  *
  * @module copilot/sdk/types
+ * @see EventBus
  */
 
 // ─── Core Client & Session ────────────────────────────────────────────────────
@@ -567,61 +568,73 @@
 
 /**
  * Resultado de shell.exec() — contém processId, stdout, stderr, exitCode.
+ *
  * @typedef {{ processId: string; stdout?: string; stderr?: string; exitCode?: number; [k: string]: unknown }} ShellExecResult
  */
 
 /**
  * Resultado de shell.kill() — confirmação de sinal enviado.
+ *
  * @typedef {{ killed: boolean; [k: string]: unknown }} ShellKillResult
  */
 
 /**
  * Resultado de ui.elicitation() — resposta do formulário pelo usuário.
+ *
  * @typedef {{ action: 'accept' | 'dismiss' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} ElicitationResult
  */
 
 /**
  * Resultado genérico de handlers RPC (commands, permissions, tools).
+ *
  * @typedef {{ success: boolean; [k: string]: unknown }} HandleResult
  */
 
 /**
  * Resultado de model.getCurrent() — modelo ativo da sessão.
+ *
  * @typedef {{ modelId: string; [k: string]: unknown }} ModelCurrentResult
  */
 
 /**
  * Resultado de model.switchTo() — confirmação de troca de modelo.
+ *
  * @typedef {{ modelId: string; [k: string]: unknown }} ModelSwitchResult
  */
 
 /**
  * Modo atual da sessão (interactive, plan, autopilot).
+ *
  * @typedef {'interactive' | 'plan' | 'autopilot'} SessionMode
  */
 
 /**
  * Resultado de mode.get() / mode.set() — modo atual após a operação.
+ *
  * @typedef {{ mode: SessionMode; [k: string]: unknown }} ModeResult
  */
 
 /**
  * Resultado de plan.read() — conteúdo do plan.md da sessão.
+ *
  * @typedef {{ content: string; [k: string]: unknown }} PlanReadResult
  */
 
 /**
  * Resultado de workspace.listFiles() — lista de arquivos no workspace.
+ *
  * @typedef {{ files: string[]; [k: string]: unknown }} WorkspaceListResult
  */
 
 /**
  * Resultado de workspace.readFile() — conteúdo de um arquivo do workspace.
+ *
  * @typedef {{ content: string; [k: string]: unknown }} WorkspaceReadResult
  */
 
 /**
  * Resultado de session.log() — confirmação de log emitido.
+ *
  * @typedef {{ logId?: string; [k: string]: unknown }} LogResult
  */
 

@@ -6,6 +6,7 @@
  * ambientes sanitizados.
  *
  * @module copilot/tools/shell/sandbox
+ * @see EventBus
  */
 
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';

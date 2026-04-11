@@ -6,6 +6,7 @@
  * /answer, /restart, /quit, /exit
  *
  * @module copilot/terminal/commands/session
+ * @see EventBus
  */
 
 import {

@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * @module copilot/agent/session/event-handlers/system-notifications
+ * @see EventBus
  * F62.6: Handler de eventos system.notification da sessão SDK.
  */
 

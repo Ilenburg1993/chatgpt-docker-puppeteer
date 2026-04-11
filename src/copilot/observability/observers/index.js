@@ -5,6 +5,7 @@
  * Barrel para os handler groups do AgentEventObserver.
  *
  * @module copilot/observability/observers
+ * @see EventBus
  */
 
 export { attachDialogTaskHandlers } from './dialog-task-handlers.js';

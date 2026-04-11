@@ -8,6 +8,7 @@
  * eventos.
  *
  * @module copilot/agent/dialog/agent-dialog-controller
+ * @see EventBus
  * @internal
  */
 

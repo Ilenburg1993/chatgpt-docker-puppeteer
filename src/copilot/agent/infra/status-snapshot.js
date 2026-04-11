@@ -8,6 +8,7 @@
  * unitário e desacopla a lógica de construção do snapshot do agente.
  *
  * @module copilot/agent/infra/status-snapshot
+ * @see EventBus
  */
 
 import { STARVATION_THRESHOLD_MS } from '../config.js';

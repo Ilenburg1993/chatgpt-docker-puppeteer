@@ -22,6 +22,7 @@
  * - `state/` — agent state management
  *
  * @module copilot/agent
+ * @see EventBus
  */
 
 // ── Raiz ─────────────────────────────────────────────────────

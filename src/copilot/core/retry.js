@@ -6,6 +6,7 @@
  * mcp-tool-bridge.js, reconnect-policy.js, etc.
  *
  * @module copilot/core/retry
+ * @see EventBus
  */
 
 /**

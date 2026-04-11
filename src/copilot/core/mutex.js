@@ -2,11 +2,11 @@
 /**
  * src/copilot/core/mutex.js
  *
- * Mutex baseado em promise-chain para serialização de operações assíncronas.
- * Substitui os padrões de mutex inline espalhados pelo código (tools/todo/store.js,
- * terminal/dialog/engine.js, agent/dialog/loop-manager.js, etc.).
+ * Mutex baseado em promise-chain para serialização de operações assíncronas. Substitui os padrões de mutex inline
+ * espalhados pelo código (tools/todo/store.js, terminal/dialog/engine.js, agent/dialog/loop-manager.js, etc.).
  *
  * Uso:
+ *
  * ```js
  * const m = createMutex();
  * const release = await m.acquire();
@@ -21,6 +21,7 @@
  * ```
  *
  * @module copilot/core/mutex
+ * @see EventBus
  */
 
 /**
@@ -48,9 +49,11 @@ export function createMutex() {
         acquire() {
             /** @type {() => void} */
             let release;
-            const token = new Promise(/** @param {(v: void) => void} resolve */ (resolve) => {
-                release = resolve;
-            });
+            const token = new Promise(
+                /** @param {(v: void) => void} resolve */ (resolve) => {
+                    release = resolve;
+                },
+            );
             const prev = _tail;
             _tail = prev.then(() => token);
             return prev.then(() => {
@@ -74,8 +77,8 @@ export function createMutex() {
 }
 
 /**
- * Pool de mutexes por chave string. Permite serialização por recurso nomeado
- * (ex: `mutexPool.for('session:abc').acquire()`).
+ * Pool de mutexes por chave string. Permite serialização por recurso nomeado (ex:
+ * `mutexPool.for('session:abc').acquire()`).
  *
  * @typedef {object} MutexPool
  * @property {(key: string) => Mutex} for - Retorna (ou cria) um mutex para a chave fornecida.

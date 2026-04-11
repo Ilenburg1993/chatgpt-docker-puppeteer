@@ -6,6 +6,7 @@
  * combinar getClient(), buildSessionConfig() e createSession() em um único fluxo.
  *
  * @module copilot/sdk/client-facade
+ * @see EventBus
  * @see module:copilot/sdk/client
  * @see module:copilot/sdk/session
  * @see module:copilot/sdk/config

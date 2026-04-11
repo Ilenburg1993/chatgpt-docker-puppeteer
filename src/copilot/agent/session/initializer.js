@@ -9,6 +9,7 @@
  * `infra/tool-audit-logger.js`.
  *
  * @module copilot/agent/session/initializer
+ * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/agent/lifecycle/state-io
  * @see module:copilot/config/session-config
@@ -23,7 +24,7 @@ import { readStateAsync as _readStateAsync, writeStateAsync as _writeStateAsync 
 import { buildHookSystemContextSafe } from './hook-context.js';
 
 // Re-exports para backward compatibility
-export { buildHookSystemContext, buildHookSystemContextSafe, SessionJsonSchema } from './hook-context.js';
+export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe } from './hook-context.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient

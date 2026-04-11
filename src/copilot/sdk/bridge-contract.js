@@ -7,6 +7,7 @@
  * deste contrato.
  *
  * @module copilot/sdk/bridge-contract
+ * @see EventBus
  */
 
 /**

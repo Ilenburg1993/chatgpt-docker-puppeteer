@@ -15,6 +15,7 @@
  * L0 (db) — não importa camadas superiores. Logger injetável via `setDbLogger`.
  *
  * @module copilot/db/sqlite
+ * @see EventBus
  * @see module:copilot/db/migrations
  * @see module:copilot/conversation-hub/store
  */

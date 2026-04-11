@@ -8,6 +8,7 @@
  * viva via `ask_user` pendente).
  *
  * @module copilot/agent/session/keepalive
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';

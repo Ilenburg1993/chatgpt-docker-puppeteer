@@ -5,6 +5,7 @@
  * Handlers de eventos de interação, permissões, sub-agentes, MCP, external tools, comandos e sistema do EventCollector.
  *
  * @module copilot/observability/collectors/interaction-handlers
+ * @see EventBus
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/sdk';

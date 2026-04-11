@@ -9,6 +9,7 @@
  * `clearRateLimiters()` sem conhecer `server.js`.
  *
  * @module copilot/terminal/rate-limiter-state
+ * @see EventBus
  */
 
 /** @type {() => void} */

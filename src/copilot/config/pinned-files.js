@@ -6,6 +6,7 @@
  * debounce para detectar mudanças em tempo real.
  *
  * @module copilot/config/pinned-files-loader
+ * @see EventBus
  */
 
 import { log } from '#copilot/observability';
