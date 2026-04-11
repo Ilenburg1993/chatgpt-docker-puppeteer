@@ -386,7 +386,10 @@ describe('core/di-container.js › wireLegacySetters', () => {
             { token: B, setter: (v) => called.push(['B', v]) },
         ]);
         assert.equal(count, 2);
-        assert.deepEqual(called, [['A', 'valueA'], ['B', 42]]);
+        assert.deepEqual(called, [
+            ['A', 'valueA'],
+            ['B', 42],
+        ]);
     });
 
     it('ignora tokens não registrados sem lançar erro', async () => {
@@ -394,7 +397,12 @@ describe('core/di-container.js › wireLegacySetters', () => {
         const c = createContainer();
         const MISSING = createToken('WL_MISSING');
         const count = wireLegacySetters(c, [
-            { token: MISSING, setter: () => { throw new Error('should not be called'); } },
+            {
+                token: MISSING,
+                setter: () => {
+                    throw new Error('should not be called');
+                },
+            },
         ]);
         assert.equal(count, 0);
     });

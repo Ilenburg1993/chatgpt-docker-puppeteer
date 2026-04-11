@@ -1,0 +1,1315 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Copilot SDK API",
+    "version": "1.0.0",
+    "description": "API REST do módulo copilot — endpoints para sessões, agent, observabilidade, hooks e webhooks."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Dev server"
+    }
+  ],
+  "paths": {
+    "/api/copilot/agent/info": {
+      "get": {
+        "summary": "GET /agent/info",
+        "operationId": "get_agent_info",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/agent/tools": {
+      "get": {
+        "summary": "GET /agent/tools",
+        "operationId": "get_agent_tools",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/agent/telemetry": {
+      "get": {
+        "summary": "GET /agent/telemetry",
+        "operationId": "get_agent_telemetry",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/telemetry": {
+      "get": {
+        "summary": "GET /telemetry",
+        "operationId": "get_telemetry",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/agent/telemetry/clear": {
+      "post": {
+        "summary": "POST /agent/telemetry/clear",
+        "operationId": "post_agent_telemetry_clear",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/agent/state": {
+      "get": {
+        "summary": "GET /agent/state",
+        "operationId": "get_agent_state",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/agent/stream": {
+      "get": {
+        "summary": "GET /agent/stream",
+        "operationId": "get_agent_stream",
+        "tags": [
+          "agent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/ping": {
+      "get": {
+        "summary": "GET /ping",
+        "operationId": "get_ping",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/status": {
+      "get": {
+        "summary": "GET /status",
+        "operationId": "get_status",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/auth": {
+      "get": {
+        "summary": "GET /auth",
+        "operationId": "get_auth",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/models": {
+      "get": {
+        "summary": "GET /models",
+        "operationId": "get_models",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/client/start": {
+      "post": {
+        "summary": "POST /client/start",
+        "operationId": "post_client_start",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/client/stop": {
+      "post": {
+        "summary": "POST /client/stop",
+        "operationId": "post_client_stop",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/client/force-stop": {
+      "post": {
+        "summary": "POST /client/force-stop",
+        "operationId": "post_client_force-stop",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/tools": {
+      "get": {
+        "summary": "GET /tools",
+        "operationId": "get_tools",
+        "tags": [
+          "client"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/hooks/registry": {
+      "get": {
+        "summary": "GET /hooks/registry",
+        "operationId": "get_hooks_registry",
+        "tags": [
+          "hooks"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/hooks/events": {
+      "get": {
+        "summary": "GET /hooks/events",
+        "operationId": "get_hooks_events",
+        "tags": [
+          "hooks"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/health": {
+      "get": {
+        "summary": "GET /observability/health",
+        "operationId": "get_observability_health",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/metrics": {
+      "get": {
+        "summary": "GET /observability/metrics",
+        "operationId": "get_observability_metrics",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/quota": {
+      "get": {
+        "summary": "GET /observability/quota",
+        "operationId": "get_observability_quota",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/errors": {
+      "get": {
+        "summary": "GET /observability/errors",
+        "operationId": "get_observability_errors",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/errors/stats": {
+      "get": {
+        "summary": "GET /observability/errors/stats",
+        "operationId": "get_observability_errors_stats",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/logs": {
+      "get": {
+        "summary": "GET /observability/logs",
+        "operationId": "get_observability_logs",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/errors/clear": {
+      "post": {
+        "summary": "POST /observability/errors/clear",
+        "operationId": "post_observability_errors_clear",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/log-level": {
+      "post": {
+        "summary": "POST /observability/log-level",
+        "operationId": "post_observability_log-level",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/audit": {
+      "get": {
+        "summary": "GET /observability/audit",
+        "operationId": "get_observability_audit",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/audit/flush": {
+      "post": {
+        "summary": "POST /observability/audit/flush",
+        "operationId": "post_observability_audit_flush",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/audit-tail": {
+      "get": {
+        "summary": "GET /observability/audit-tail",
+        "operationId": "get_observability_audit-tail",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/otel-status": {
+      "get": {
+        "summary": "GET /observability/otel-status",
+        "operationId": "get_observability_otel-status",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/events/catalog": {
+      "get": {
+        "summary": "GET /observability/events/catalog",
+        "operationId": "get_observability_events_catalog",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/observability/events/dead-letter": {
+      "get": {
+        "summary": "GET /observability/events/dead-letter",
+        "operationId": "get_observability_events_dead-letter",
+        "tags": [
+          "observability"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/active": {
+      "get": {
+        "summary": "GET /sessions/active",
+        "operationId": "get_sessions_active",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/last": {
+      "get": {
+        "summary": "GET /sessions/last",
+        "operationId": "get_sessions_last",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/foreground": {
+      "get": {
+        "summary": "GET /sessions/foreground",
+        "operationId": "get_sessions_foreground",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/foreground/{id}": {
+      "put": {
+        "summary": "PUT /sessions/foreground/:id",
+        "operationId": "put_sessions_foreground__id",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions": {
+      "get": {
+        "summary": "GET /sessions",
+        "operationId": "get_sessions",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /sessions",
+        "operationId": "post_sessions",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}": {
+      "get": {
+        "summary": "GET /sessions/:id",
+        "operationId": "get_sessions__id",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /sessions/:id",
+        "operationId": "delete_sessions__id",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/copilot/sessions/{id}/disconnect": {
+      "post": {
+        "summary": "POST /sessions/:id/disconnect",
+        "operationId": "post_sessions__id_disconnect",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}/resume": {
+      "post": {
+        "summary": "POST /sessions/:id/resume",
+        "operationId": "post_sessions__id_resume",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}/compaction-history": {
+      "get": {
+        "summary": "GET /sessions/:id/compaction-history",
+        "operationId": "get_sessions__id_compaction-history",
+        "tags": [
+          "session-crud"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/copilot/sessions/{id}/send": {
+      "post": {
+        "summary": "POST /sessions/:id/send",
+        "operationId": "post_sessions__id_send",
+        "tags": [
+          "session-messaging"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}/stream": {
+      "get": {
+        "summary": "GET /sessions/:id/stream",
+        "operationId": "get_sessions__id_stream",
+        "tags": [
+          "session-messaging"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/copilot/sessions/{id}/model": {
+      "post": {
+        "summary": "POST /sessions/:id/model",
+        "operationId": "post_sessions__id_model",
+        "tags": [
+          "session-messaging"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}/abort": {
+      "post": {
+        "summary": "POST /sessions/:id/abort",
+        "operationId": "post_sessions__id_abort",
+        "tags": [
+          "session-messaging"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/sessions/{id}/messages": {
+      "get": {
+        "summary": "GET /sessions/:id/messages",
+        "operationId": "get_sessions__id_messages",
+        "tags": [
+          "session-messaging"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/copilot/webhooks": {
+      "get": {
+        "summary": "GET /webhooks",
+        "operationId": "get_webhooks",
+        "tags": [
+          "webhooks"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /webhooks",
+        "operationId": "post_webhooks",
+        "tags": [
+          "webhooks"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/webhooks/{id}": {
+      "delete": {
+        "summary": "DELETE /webhooks/:id",
+        "operationId": "delete_webhooks__id",
+        "tags": [
+          "webhooks"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

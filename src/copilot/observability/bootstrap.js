@@ -14,8 +14,7 @@
  */
 
 import { setAuditLogger } from '../audit/logger.js';
-import { container } from '../core/di-container.js';
-import { wireLegacySetters } from '../core/di-container.js';
+import { container, wireLegacySetters } from '../core/di-container.js';
 import { AUDIT_LOGGER, DB_LOGGER, EVENT_BUS, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';

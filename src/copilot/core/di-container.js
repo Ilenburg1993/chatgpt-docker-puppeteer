@@ -23,11 +23,11 @@ export const container = createContainer();
 /**
  * K-5: Mapeamento centralizado de DI tokens → setters legados.
  *
- * Permite que o bootstrap chame `wireLegacySetters(container, mapping)` para resolver tokens e
- * invocar os setters correspondentes, eliminando scatter de setter calls pelo codebase.
+ * Permite que o bootstrap chame `wireLegacySetters(container, mapping)` para resolver tokens e invocar os setters
+ * correspondentes, eliminando scatter de setter calls pelo codebase.
  *
  * @param {import('./di.js').Container} c - Container com tokens já registrados.
- * @param {Array<{ token: import('./di.js').Token<any>; setter: (value: any) => void }>} mapping
+ * @param {{ token: import('./di.js').Token<any>; setter: (value: any) => void }[]} mapping
  * @returns {number} Quantidade de setters invocados.
  */
 export function wireLegacySetters(c, mapping) {

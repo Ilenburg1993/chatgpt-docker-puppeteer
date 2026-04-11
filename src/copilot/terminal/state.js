@@ -115,7 +115,19 @@ export function getBusy() {
 export function setBusy(value) {
     const prev = _busy;
     _busy = value;
-    if (prev !== value) stateEmitter.emit(TERMINAL_EVENTS.BUSY_CHANGED, value);
+    if (prev !== value) {
+        stateEmitter.emit(TERMINAL_EVENTS.BUSY_CHANGED, value);
+        // K-6c: sincronizar FSM com flag busy (best-effort — não lança)
+        try {
+            if (value && _phase === TerminalPhase.IDLE) {
+                transitionTerminalPhase(TerminalPhase.BUSY);
+            } else if (!value && _phase === TerminalPhase.BUSY) {
+                transitionTerminalPhase(TerminalPhase.IDLE);
+            }
+        } catch {
+            // Transição inválida — ignora (FSM pode estar em shutting_down)
+        }
+    }
 }
 
 /** @returns {import('node:readline').Interface | null} */
@@ -332,8 +344,8 @@ export function getTerminalPhase() {
  * Transiciona o terminal para uma nova fase. Valida a transição e emite evento.
  *
  * @param {string} next - Próxima fase (deve ser um valor de `TerminalPhase`).
- * @throws {CopilotError} Se a transição for inválida.
  * @returns {void}
+ * @throws {CopilotError} Se a transição for inválida.
  */
 export function transitionTerminalPhase(next) {
     const allowed = VALID_TRANSITIONS.get(_phase);

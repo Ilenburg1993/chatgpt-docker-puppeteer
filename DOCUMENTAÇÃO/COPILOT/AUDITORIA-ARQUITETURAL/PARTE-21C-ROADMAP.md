@@ -11,7 +11,7 @@
 | H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                                                           |
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp)                                    |
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)                                          |
-| K     | ✅ CONCLUÍDA | `c7e016cd` — refactor(copilot): Faixa K (DI container + wireLegacySetters + Terminal SM)     |
+| K     | ✅ CONCLUÍDA | `c7e016cd` — refactor(copilot): Faixa K (DI container + wireLegacySetters + Terminal SM)    |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)                                      |
 | M     | ✅ CONCLUÍDA | `ad45f050` — refactor(copilot): Faixa M (Event Bus)                                         |
 | N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |

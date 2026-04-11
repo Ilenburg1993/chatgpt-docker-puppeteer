@@ -139,6 +139,7 @@
   "scripts": {
     "analyze:arch:filesize": "node scripts/check-file-size.mjs",
     "analyze:arch:health": "node scripts/arch-health.mjs",
+    "generate:openapi": "node scripts/generate-openapi.mjs",
     "analyze:arch:layers": "node scripts/check-layer-violations.mjs",
     "analyze:circular": "node scripts/analysis/analyze-code-graph.js --circular",
     "analyze:constants": "node scripts/analysis/catalog-constants.mjs",
