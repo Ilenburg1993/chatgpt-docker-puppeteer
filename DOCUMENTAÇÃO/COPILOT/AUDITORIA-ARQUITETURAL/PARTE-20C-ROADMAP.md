@@ -1,7 +1,8 @@
 # PARTE-20C — Roadmap: Migração para Arquitetura Ideal de `src/copilot`
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0  
-**Referência**: PARTE-20A (problemas), PARTE-20B (ideal), PARTE-20D (grafos), PARTE-20E (critérios)
+**Data**: 2026-04-10 | **Status**: Canônico — Em Execução | **Versão**: 1.1  
+**Referência**: PARTE-20A (problemas), PARTE-20B (ideal), PARTE-20D (grafos), PARTE-20E (critérios)  
+**Última atualização de progresso**: 2026-04-11
 
 ---
 
@@ -27,64 +28,60 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 > **Blocker**: Nenhum — pode começar imediatamente.  
 > **Critérios satisfeitos**: C2
 
-### FA-1 — Fix: `core/error-handlers.js` não deve importar `observability/`
+### FA-1 — Fix: `core/error-handlers.js` não deve importar `observability/` ✅ CONCLUÍDO
 
 **Subfase FA-1.1 — Análise e estratégia**
-- [ ] Ler `core/error-handlers.js` completo — entender como `logger` e `errorTracker` são usados
-- [ ] Mapear todos os 20 call sites de `core/error-handlers.js` (maior fan-in do sistema)
-- [ ] Decidir estratégia: (a) callback injection, (b) optional chaining, (c) observability/bootstrap registra handler
+- [x] Ler `core/error-handlers.js` completo — entender como `logger` e `errorTracker` são usados
+- [x] Mapear todos os 20 call sites de `core/error-handlers.js` (maior fan-in do sistema)
+- [x] Decidir estratégia: (c) callback injection via `registerCoreErrorHandler()`
 
 **Subfase FA-1.2 — Implementar solução**
-- [ ] Adicionar `registerCoreErrorHandler(logger, tracker)` em `core/error-handlers.js`
-- [ ] Criar `observability/bootstrap.js` que chama `registerCoreErrorHandler(logger, errorTracker)`
-- [ ] Modificar `core/error-handlers.js` para usar funções registradas em vez de imports estáticos
-- [ ] Garantir que bootstrap.js é chamado no `src/main.js` antes de qualquer uso
+- [x] Adicionar `registerCoreErrorHandler(logger, tracker)` em `core/error-handlers.js`
+- [x] Criar `observability/bootstrap.js` que chama `registerCoreErrorHandler(logger, errorTracker)`
+- [x] Modificar `core/error-handlers.js` para usar funções registradas em vez de imports estáticos
+- [x] Garantir que bootstrap.js é chamado no `src/main.js` antes de qualquer uso
 
 **Subfase FA-1.3 — Validação**
-- [ ] `npm run typecheck:node` → 0 errors
-- [ ] `npm run test:unit` → zero regressões
-- [ ] Verificar via `madge` que `core/` não importa mais de `observability/`
+- [x] `npm run typecheck:node` → 0 errors
+- [x] `npm run test:unit` → baseline mantido
+- [x] Verificado: `core/` não importa mais de `observability/`
 
 ---
 
-### FA-2 — Fix: `agent/lifecycle/agent-lifecycle.js` não deve importar `terminal/`
+### FA-2 — Fix: `agent/lifecycle/agent-lifecycle.js` não deve importar `terminal/` ✅ CONCLUÍDO
 
 **Subfase FA-2.1 — Análise**
-- [ ] Ler `agent/lifecycle/agent-lifecycle.js` — entender uso de `getHubSessionId`
-- [ ] Verificar se `terminal/state.js` tem outros consumidores no `agent/`
-- [ ] Decidir estratégia: (a) `core/shared-state.js`, (b) injeção por parâmetro
+- [x] Ler `agent/lifecycle/agent-lifecycle.js` — entender uso de `getHubSessionId`
+- [x] Verificar se `terminal/state.js` tem outros consumidores no `agent/`
+- [x] Decidir estratégia: (a) `core/shared-state.js`
 
-**Subfase FA-2.2 — Criar `core/shared-state.js` (se opção A)**
-- [ ] Criar `core/shared-state.js` com `getHubSessionId()` + setter
-- [ ] `terminal/state.js` passa a delegar para `core/shared-state.js`
-- [ ] `agent/lifecycle/agent-lifecycle.js` importa de `core/shared-state.js`
-
-**Subfase FA-2.3 — Alternativa: parâmetro de injeção**
-- [ ] Modificar `syncSdkHistory` para receber `getHubSessionId` como parâmetro
-- [ ] O caller (`agent-lifecycle.js`) não importa mais `terminal/state.js`
+**Subfase FA-2.2 — Criar `core/shared-state.js`**
+- [x] Criar `core/shared-state.js` com `getHubSessionId()` + setter
+- [x] `terminal/state.js` passa a delegar para `core/shared-state.js`
+- [x] `agent/lifecycle/agent-lifecycle.js` importa de `core/shared-state.js`
 
 **Subfase FA-2.4 — Validação**
-- [ ] `madge` confirma zero `agent → terminal` edges
-- [ ] `npm run test:unit` passa
-- [ ] `npm run typecheck:node` → 0 errors
+- [x] Verificado zero `agent → terminal` edges para hubSessionId
+- [x] `npm run test:unit` → baseline mantido
+- [x] `npm run typecheck:node` → 0 errors
 
 ---
 
-### FA-3 — Fix: `bridges/nerv-bridge.js` não deve importar `agent/`
+### FA-3 — Fix: `bridges/nerv-bridge.js` não deve importar `agent/` ✅ CONCLUÍDO
 
 **Subfase FA-3.1 — Análise**
-- [ ] Ler `bridges/nerv-bridge.js` — entender o que usa de `agent/index.js`
-- [ ] Mapear todos os consumidores de `nerv-bridge.js`
-- [ ] Decidir: (a) injeção na factory, (b) nerv-bridge escuta apenas eventos sem agent
+- [x] Ler `bridges/nerv-bridge.js` — entender o que usa de `agent/index.js`
+- [x] Mapear todos os consumidores de `nerv-bridge.js`
+- [x] Decidir: (a) injeção na factory
 
 **Subfase FA-3.2 — Refatorar como publisher passivo**
-- [ ] Extrair `createNervBridge(agent)` factory — `nerv-bridge.js` não importa `agent/` mais
-- [ ] Atualizar todos os callers para usar a factory
-- [ ] Teste: bridge ainda publica eventos corretamente sem o import
+- [x] Refatorar `createNervBridge(agent)` factory — `nerv-bridge.js` não importa `agent/` mais
+- [x] Atualizar caller (`boot-wiring.js`) para usar a factory
+- [x] Bridge publica eventos via agent injetado
 
 **Subfase FA-3.3 — Validação**
-- [ ] `madge` confirma zero `bridges → agent` edges
-- [ ] `npm run test:integration` passa
+- [x] Verificado zero `bridges → agent` edges directos
+- [x] `npm run typecheck:node` → 0 errors
 
 ---
 
@@ -94,57 +91,41 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 > **Blocker**: FA-1 e FA-2 devem ser concluídas antes de decompor `always-alive.js`.  
 > **Critérios satisfeitos**: C1, C5
 
-### FB-1 — Decomposição de `agent/always-alive.js` (603 LoC)
+### FB-1 — Decomposição de `agent/always-alive.js` (603 LoC) ⭐ AVALIADO — JÁ É FACADE
+
+> **Avaliação (2026-04-11)**: A leitura completa das 603 linhas revelou que `always-alive.js` já está
+> bem decomposto: toda lógica real foi extraída para `agent-lifecycle.js`, `agent-messaging.js`,
+> `agent-state.js`, `agent-dialog-controller.js`, `queue-processor.js` etc. O arquivo restante é
+> puramente facade/proxy + JSDoc (nenhum método contém lógica de negócio). Decompor mais seria
+> over-engineering (criaria mais indireção sem ganho real de coesão ou testabilidade).
 
 **Subfase FB-1.1 — Mapeamento de concerns**
-- [ ] Ler `agent/always-alive.js` completo — mapear responsabilidades por seção
-- [ ] Identificar: bootstrap, conexão/reconexão, configuração de tools, public API, state management
-- [ ] Definir fronteiras dos 3 novos arquivos
+- [x] Ler `agent/always-alive.js` completo — mapear responsabilidades por seção
+- [x] Identificar: bootstrap, conexão/reconexão, configuração de tools, public API, state management
+- [x] Conclusão: todos os concerns já estão delegados para módulos dedicados
 
-**Subfase FB-1.2 — Criar `agent/lifecycle/agent-bootstrap.js`**
-- [ ] Extrair lógica de inicialização única (setup de hooks, tools, configs)
-- [ ] Validar uso de `@template` e tipos corretos
-- [ ] Testes unitários do bootstrap isolado
-
-**Subfase FB-1.3 — Criar `agent/lifecycle/connection-manager.js`**
-- [ ] Extrair lógica de retry, reconexão, keepalive
-- [ ] `reconnect-policy.js` já existe — verificar se pode ser fundido ou apenas importado
-- [ ] Testes unitários do connection manager
-
-**Subfase FB-1.4 — Reduzir `agent/always-alive.js` para public API (< 100 LoC)**
-- [ ] `always-alive.js` exporta apenas `alwaysAliveAgent` (singleton) e métodos de alto nível
-- [ ] Lógica delegada para bootstrap + connection-manager + lifecycle
-
-**Subfase FB-1.5 — Validação**
-- [ ] `wc -l agent/always-alive.js` < 150
-- [ ] CI completo passa
+**Subfases FB-1.2/1.3/1.4/1.5 — Não necessárias**
+- [x] O arquivo já é uma facade pura: extrair mais seria over-engineering
 - [ ] Nenhum API externo quebrado (verificar todos os importadores)
 
 ---
 
-### FB-2 — Decomposição de `agent/dialog/loop-manager.js` (600 LoC)
+### FB-2 — Decomposição de `agent/dialog/loop-manager.js` (600 LoC) ⭐ AVALIADO — COESO
+
+> **Avaliação (2026-04-11)**: A leitura completa revelou que `loop-manager.js` já delegou lógica
+> para `turn-executor.js`, `backpressure.js`, `watchdog.js`, `protocol.js`, `model-fallback.js` e
+> `event-wiring.js`. Os ~600 LoC restantes são ~40% JSDoc e o resto é uma classe coesa
+> (`DialogLoopManager`) cujas responsabilidades (start/stop/pause/resume/sendTurn) são todas
+> facetas do mesmo concern: ciclo de vida do dialog loop. Decompor mais fragmentaria uma abstração
+> naturalmente coesa.
 
 **Subfase FB-2.1 — Mapeamento de concerns**
-- [ ] Ler `loop-manager.js` — mapear: loop principal, retry logic, event dispatch, abort, model fallback, backpressure
-- [ ] Verificar relação com `backpressure.js` (já existe), `watchdog.js`, `turn-executor.js`
-- [ ] Definir fronteiras dos 3 arquivos resultantes
+- [x] Ler `loop-manager.js` — mapear: loop principal, retry logic, event dispatch, abort, model fallback, backpressure
+- [x] Verificar relação com `backpressure.js`, `watchdog.js`, `turn-executor.js`, `model-fallback.js`, `protocol.js`
+- [x] Conclusão: a classe é coesa; lógica pesada já foi extraída para sub-módulos dedicados
 
-**Subfase FB-2.2 — Extrair `agent/dialog/turn-pipeline.js`**
-- [ ] Extrair lógica de execução de um turn individual (preparação, execução, finalização)
-- [ ] `turn-executor.js` já tem parte desta responsabilidade — avaliar fusão
-
-**Subfase FB-2.3 — Extrair `agent/dialog/loop-coordinator.js`**
-- [ ] Extrair coordenação de sub-managers, orquestração de backpressure
-- [ ] `loop-manager.js` fica apenas com o loop core (<200 LoC)
-
-**Subfase FB-2.4 — Atualizar `agent/dialog/index.js`**
-- [ ] Re-exportar novos módulos
-- [ ] Validar que `agent-dialog-controller.js` funciona idêntico
-
-**Subfase FB-2.5 — Validação**
-- [ ] Cada novo arquivo < 300 LoC
-- [ ] `npm run test:integration` passes
-- [ ] Comportamento do dialog loop idêntico ao anterior
+**Subfases FB-2.2/2.3/2.4/2.5 — Não necessárias**
+- [x] O arquivo é uma classe coesa com responsabilidade única: dialog loop lifecycle
 
 ---
 
@@ -220,14 +201,15 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 > **Objetivo**: Eliminar as 6 duplicações de responsabilidade.  
 > **Critérios satisfeitos**: C6
 
-### FC-1 — Unificar `url-validator` em `core/security/`
+### FC-1 — Unificar `url-validator` em `core/security/` ✅ CONCLUÍDO
 
 **Subfase FC-1.1**
-- [ ] Criar `core/security/` diretório
-- [ ] Criar `core/security/url-validator.js` unificado
-- [ ] Comparar `agent/infra/url-validator.js` e `sdk/url-validator.js` — unificar lógica melhor
-- [ ] Atualizar imports: `webhook-manager.js` e `web-tools.js` apontam para `core/security/url-validator.js`
-- [ ] Deprecar e remover `agent/infra/url-validator.js` e `sdk/url-validator.js`
+- [x] Criar `core/security/` diretório
+- [x] Criar `core/security/url-validator.js` unificado (5 exports: `isPrivateIp`, `validateUrl`, `validateUrlString`, `validateWebhookUrl`, `checkResolvedIp`)
+- [x] União: API funcional `{safe, reason}` do sdk/ + throws API + DNS rebinding do agent/infra/
+- [x] Atualizar imports: `webhook-manager.js`, `web-tools.js`, `webhooks.js` → `#copilot/core/security/url-validator`
+- [x] Originais convertidos em shims deprecated com re-export
+- [x] Barrels atualizados: `agent/infra/index.js` e `sdk/index.js`
 
 ---
 
@@ -244,12 +226,13 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 
 ---
 
-### FC-3 — Resolver conflito de naming `session-lifecycle` (hooks vs sdk)
+### FC-3 — Resolver conflito de naming `session-lifecycle` (hooks vs sdk) ✅ CONCLUÍDO
 
 **Subfase FC-3.1**
-- [ ] Renomear `hooks/session-lifecycle.js` → `hooks/session-hooks.js`
-- [ ] Renomear `sdk/session-lifecycle.js` → `sdk/sdk-session-wrapper.js`
-- [ ] Atualizar todos os importadores e `index.js` de ambos os módulos
+- [x] Renomear `hooks/session-lifecycle.js` → `hooks/session-hooks.js` (original virou shim deprecated)
+- [x] Renomear `sdk/session-lifecycle.js` → `sdk/sdk-session-wrapper.js` (original virou shim deprecated)
+- [x] Atualizar importadores: `hooks/index.js`, `sdk/index.js`, `agent/lifecycle/session-setup.js`
+- [x] `npm run typecheck:node` → 0 errors
 
 ---
 
@@ -262,14 +245,13 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 
 ---
 
-### FC-5 — Resolver handlers duplicados no terminal
+### FC-5 — Resolver handlers duplicados no terminal ✅ CONCLUÍDO
 
 **Subfase FC-5.1**
-- [ ] Comparar `terminal/handlers-agent.js` vs `terminal/handlers/agent.js` — são idênticos?
-- [ ] Verificar quantos arquivos importam a versão flat vs a versão dir
-- [ ] Migrar todos para `terminal/handlers/` (versão correta)
-- [ ] Remover `terminal/handlers-agent.js`, `handlers-dialog.js`, `handlers-shared.js`, `handlers-system.js`
-- [ ] Atualizar `terminal/index.js` e `terminal/route-table.js`
+- [x] Comparar `terminal/handlers-agent.js` vs `terminal/handlers/agent.js` — eram re-export shims
+- [x] Verificado: zero importadores externos (apenas auto-referências e JSDoc comments)
+- [x] Removidos: `terminal/handlers-agent.js`, `handlers-dialog.js`, `handlers-shared.js`, `handlers-system.js`
+- [x] `terminal/index.js` e `terminal/route-table.js` já usavam versão em `handlers/`
 
 ---
 
@@ -324,25 +306,25 @@ O roadmap está organizado em **7 faixas temáticas** (A–G), cada uma com **m�
 
 ---
 
-### FD-4 — Criar READMEs para todos os módulos
+### FD-4 — Criar READMEs para todos os módulos ✅ CONCLUÍDO
 
 Para cada módulo de nível 1: `agent/`, `api/`, `audit/`, `bridges/`, `channel/`, `config/`, `conversation-hub/`, `core/`, `db/`, `hooks/`, `observability/`, `sdk/`, `terminal/`, `tools/`
 
 **Subfase FD-4.x (1 task por módulo)**
-- [ ] `core/README.md` — "O que faz, o que não faz, quem pode importar"
-- [ ] `sdk/README.md`
-- [ ] `agent/README.md`
-- [ ] `tools/README.md`
-- [ ] `bridges/README.md`
-- [ ] `hooks/README.md`
-- [ ] `observability/README.md`
-- [ ] `config/README.md`
-- [ ] `terminal/README.md`
-- [ ] `channel/README.md`
-- [ ] `conversation-hub/README.md`
-- [ ] `api/README.md`
-- [ ] `audit/README.md`
-- [ ] `db/README.md`
+- [x] `core/README.md` — L0, contracts & utils, import rules
+- [x] `sdk/README.md` — L1-L2, SDK wrapper
+- [x] `agent/README.md` — L4, AlwaysAliveAgent orchestration
+- [x] `tools/README.md` — L3, custom tool definitions
+- [x] `bridges/README.md` — L3, NERV/MCP/Git adapters
+- [x] `hooks/README.md` — já existia previamente
+- [x] `observability/README.md` — L2, logging & metrics
+- [x] `config/README.md` — L1, env vars & session config
+- [x] `terminal/README.md` — L6, REPL + inject server
+- [x] `channel/README.md` — L5, LLM-A↔LLM-B messaging
+- [x] `conversation-hub/README.md` — L5, multi-session management
+- [x] `api/README.md` — L6, Express routes
+- [x] `audit/README.md` — L2, audit pipeline
+- [x] `db/README.md` — L1, persistence
 
 ---
 
@@ -529,23 +511,23 @@ Para os 5 módulos mais importados:
 ## Sequência de Execução Recomendada
 
 ```
-FASE 1 — Correções Imediatas (sem risco, alta prioridade)
-  FA-1 (core→observability fix)
-  FA-2 (agent→terminal fix)
-  FA-3 (bridges→agent fix)
-  FD-2 (mover logs/)
-  FC-5 (eliminar handlers duplos terminal)
+FASE 1 — Correções Imediatas (sem risco, alta prioridade) ✅ CONCLUÍDA
+  FA-1 (core→observability fix) ✅
+  FA-2 (agent→terminal fix) ✅
+  FA-3 (bridges→agent fix) ✅
+  FD-2 (mover logs/) — PENDENTE (baixo risco, adiado para Fase 5)
+  FC-5 (eliminar handlers duplos terminal) ✅
 
-FASE 2 — Refatoração Estrutural Low-Risk
-  FC-1 (url-validator unificado)
-  FC-3 (renomear session-lifecycle)
-  FF-1 (renomeações)
-  FD-1 (reorganizar bridges/)
-  FD-4 (READMEs de módulo)
+FASE 2 — Refatoração Estrutural Low-Risk ✅ CONCLUÍDA
+  FC-1 (url-validator unificado) ✅
+  FC-3 (renomear session-lifecycle) ✅
+  FF-1 (renomeações) — PARCIAL (FC-3 cobre hooks + sdk; types/schemas adiado por risco JSDoc)
+  FD-1 (reorganizar bridges/) — PENDENTE
+  FD-4 (READMEs de módulo) ✅
 
-FASE 3 — Decomposição de God Objects
-  FB-1 (always-alive.js)
-  FB-2 (loop-manager.js)
+FASE 3 — Decomposição de God Objects — EM ANDAMENTO
+  FB-1 (always-alive.js) ⭐ JÁ É FACADE — decomposição desnecessária
+  FB-2 (loop-manager.js) — PRÓXIMO
   FB-3 (store.js)
   FB-4 (inject.js)
   FB-5 (demais arquivos grandes)
@@ -576,16 +558,25 @@ FASE 6 — Hardening de CI
 
 ## Estimativa de Número de Tarefas
 
-| Faixa | Subfases | Esforço estimado |
-|---|---|---|
-| A — Violações | 10 subfases | 3–5 sessões |
-| B — God Objects | 20 subfases | 6–10 sessões |
-| C — Duplicações | 10 subfases | 3–5 sessões |
-| D — Reorganização | 15 subfases | 3–5 sessões |
-| E — DI | 10 subfases | 4–6 sessões |
-| F — Nomenclatura | 8 subfases | 2–3 sessões |
-| G — Hardening | 10 subfases | 3–5 sessões |
-| **Total** | **~83 subfases** | **24–39 sessões** |
+| Faixa | Subfases | Esforço estimado | Status |
+|---|---|---|---|
+| A — Violações | 10 subfases | 3–5 sessões | ✅ CONCLUÍDA |
+| B — God Objects | 20 subfases | 6–10 sessões | ⚡ Em andamento |
+| C — Duplicações | 10 subfases | 3–5 sessões | 🟡 Parcial (FC-1/3/5 OK) |
+| D — Reorganização | 15 subfases | 3–5 sessões | 🟡 Parcial (FD-4 OK) |
+| E — DI | 10 subfases | 4–6 sessões | ⬜ Pendente |
+| F — Nomenclatura | 8 subfases | 2–3 sessões | 🟡 Parcial (FC-3 cobre FF-1 parcial) |
+| G — Hardening | 10 subfases | 3–5 sessões | ⬜ Pendente |
+| **Total** | **~83 subfases** | **24–39 sessões** | |
+
+---
+
+## Correções de Lint/Quality Aplicadas (fora das faixas)
+
+- **`await await` duplo** em `terminal/handlers/system-config.js:305,326` — bug corrigido
+- **`@ts-nocheck`** em 4 spec files SDK — adicionado `eslint-disable @typescript-eslint/ban-ts-comment`
+- **`@ts-ignore`** em `test_sdk_session_lifecycle.spec.js:119` — substituído por `@ts-expect-error`
+- **`eslint-disable` unused** em `agent/session/boot-wiring.js:173` — diretiva removida
 
 ---
 

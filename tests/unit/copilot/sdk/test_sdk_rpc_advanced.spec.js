@@ -1,4 +1,5 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 8: sdk/rpc.js (Advanced RPC Subsystems)
  *

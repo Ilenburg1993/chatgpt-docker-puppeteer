@@ -302,7 +302,7 @@ export async function handleRegisterCustomTool(rawBody) {
     if (typeof body['handlerId'] !== 'string' || !body['handlerId']) {
         return { status: 400, body: { ok: false, error: 'handlerId (string) é obrigatório' } };
     }
-    const result = await await registerCustomTool({
+    const result = await registerCustomTool({
         name: body['name'],
         description: body['description'],
         handlerId: body['handlerId'],
@@ -323,7 +323,7 @@ export async function handleRegisterCustomTool(rawBody) {
 export async function handleDeleteCustomTool(nameOrParams) {
     const name = typeof nameOrParams === 'string' ? nameOrParams : nameOrParams?.name;
     if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
-    const result = await await removeCustomTool(name);
+    const result = await removeCustomTool(name);
     if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };
     return { status: 200, cors: true, body: { ok: true } };
 }

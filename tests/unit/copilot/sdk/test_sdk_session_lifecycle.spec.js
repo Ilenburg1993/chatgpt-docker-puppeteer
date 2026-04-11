@@ -1,4 +1,5 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 6: sdk/session-lifecycle.js
  *
@@ -116,7 +117,7 @@ describe('sdk/session-lifecycle', () => {
 
         it('rejeita para model não-string', async () => {
             const s = fakeSession();
-            // @ts-ignore
+            // @ts-expect-error -- testing invalid argument type
             await expect(setSessionModel(s, 42)).rejects.toThrow(TypeError);
         });
 

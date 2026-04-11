@@ -170,7 +170,6 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
 
     // ── 8. Auto-reconnect MCP ──
     // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const _ctxAny = /** @type {{ mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null }} */ (/** @type {unknown} */ (ctx));
     const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
     const mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
