@@ -9,14 +9,9 @@
 
 export { todoBulkUpdateTool, todoClearCompletedTool, todoImportTool } from './bulk-tools.js';
 
-export {
-    todoAddSubtaskTool,
-    todoCreateTool,
-    todoDeleteTool,
-    todoGetTool,
-    todoSetStatusTool,
-    todoUpdateTool,
-} from './crud-tools.js';
+export { todoAddSubtaskTool, todoGetTool, todoUpdateTool } from './crud-tools.js';
+
+export { todoCreateTool, todoDeleteTool, todoSetStatusTool } from './todo-write-tools.js';
 
 export { todoListTool, todoSearchTool, todoStatsTool } from './query-tools.js';
 
@@ -26,15 +21,9 @@ export { todoListTool, todoSearchTool, todoStatsTool } from './query-tools.js';
 // ---------------------------------------------------------------------------
 
 import { todoBulkUpdateTool, todoClearCompletedTool, todoImportTool } from './bulk-tools.js';
-import {
-    todoAddSubtaskTool,
-    todoCreateTool,
-    todoDeleteTool,
-    todoGetTool,
-    todoSetStatusTool,
-    todoUpdateTool,
-} from './crud-tools.js';
+import { todoAddSubtaskTool, todoGetTool, todoUpdateTool } from './crud-tools.js';
 import { todoListTool, todoSearchTool, todoStatsTool } from './query-tools.js';
+import { todoCreateTool, todoDeleteTool, todoSetStatusTool } from './todo-write-tools.js';
 
 /**
  * Tools de leitura (skipPermission: true) — não modificam estado.

@@ -1,8 +1,20 @@
 # PARTE-21C — Roadmap v2: Faixas H–N para Upgrades de Larga Escala
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.0
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.1
 **Scope**: Roadmap evolutivo de `src/copilot` — da situação atual (21A) à ideal (21B)
 **Referência**: PARTE-21A (situação atual), PARTE-21B (ideal), PARTE-20C (roadmap anterior, CONCLUÍDO)
+
+**Progresso de execução** (atualizado 2026-04-11):
+
+| Faixa | Status      | Commit                                                   |
+| ----- | ----------- | -------------------------------------------------------- |
+| H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                        |
+| I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp) |
+| J     | ✅ CONCLUÍDA | (pendente commit) — refactor(copilot): Faixa J           |
+| K     | ⬜ Pendente  | —                                                        |
+| L     | ⬜ Pendente  | —                                                        |
+| M     | ⬜ Pendente  | —                                                        |
+| N     | ⬜ Pendente  | —                                                        |
 
 ---
 
@@ -237,6 +249,19 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | J-6d | Verificar deep import count não aumentou                                   | Baixo |
 
 **Entregáveis Faixa J**: 29 subfases, cada split é incremental e safe
+
+**Resultado da execução (Faixa J)**:
+
+- **J-1a** ✅ `audit/pipeline.js` 558→39 LoC (barrel) + 3 sub-files (sdk-buffer, audit-log, permission)
+- **J-1b** ✅ `terminal/index.js` 494→224 LoC + `terminal-agent-wiring.js` (289 LoC)
+- **J-1c** ✅ `tools/todo/crud-tools.js` 459→239 LoC + `todo-write-tools.js` (249 LoC)
+- **J-1d** ✅ `tools/todo/store.js` 423→355 LoC + `todo-schema.js` (99 LoC)
+- **J-2e** ✅ `sdk/rpc.js` 484→153 LoC + `rpc-session.js` (243 LoC) + `rpc-ops.js` (186 LoC)
+- **J-4c** ✅ `bridges/git-bridge.js` 427→30 LoC + `git-bridge-read.js` (292 LoC) + `git-bridge-write.js` (226 LoC)
+- **J-5h** ✅ `tools/file/read-tools.js` 405→26 LoC + `read-tools-io.js` (232 LoC) + `read-tools-search.js` (188 LoC)
+- **J-2a-d, J-3a** ⏸ Deferidos — classes monolíticas (AlwaysAlive, LoopManager, ConversationStore, Client)
+  requerem DI refactoring (Faixa K); types.js split causa erros TS2314 por chain de generics
+- **J-6** ✅ Validação: TypeCheck 258 erros (baseline inalterado), 0 novos erros introduzidos
 
 ---
 
