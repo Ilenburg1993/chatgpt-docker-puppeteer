@@ -15,7 +15,7 @@
  * @see module:copilot/lib/tools-registry
  */
 
-import { buildCustomTools } from '#copilot/config/custom-tools-registry';
+import { buildCustomTools } from '#copilot/sdk';
 import { log, wrapWithStats } from '#copilot/observability';
 import { registerTools } from '#copilot/sdk';
 import {

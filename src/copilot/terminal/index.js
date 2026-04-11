@@ -186,7 +186,7 @@ export async function startTerminalServer() {
     registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
     // T-21: graceful shutdown handlers via registerShutdownHandler
-    const { registerShutdownHandler } = await import('#copilot/core/shutdown');
+    const { registerShutdownHandler } = await import('#copilot/core');
 
     // F153: reflectionTimer agora é gerenciado via timer-registry (cancelAll no shutdown),
     // mas manter shutdown handler para log explícito + nullify da referência local

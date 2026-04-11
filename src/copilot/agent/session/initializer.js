@@ -161,7 +161,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         const decision = shouldRotateSession(rotationCtx);
         if (decision.shouldRotate) {
             log('INFO', `[PersistentSession] F43.2: Rotacionando sessão — ${decision.reason}`);
-            const { defaultMetrics } = await import('#copilot/observability/metrics');
+            const { defaultMetrics } = await import('#copilot/observability');
             defaultMetrics.recordSessionRotation();
             savedSessionId = null;
         }

@@ -13,7 +13,7 @@
  */
 
 import { ConfigError } from '#copilot/core';
-import { getClient } from '#copilot/sdk/client';
+import { getClient } from '../client.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo

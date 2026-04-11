@@ -128,3 +128,218 @@ export const NERV_BRIDGE_AGENT = createToken('NERV_BRIDGE_AGENT');
  * @type {import('./di.js').Token<import('./event-bus.js').EventBus>}
  */
 export const EVENT_BUS = createToken('EVENT_BUS');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L2 — Infra / Storage
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Repositório de conversas (SQLite store ou in-memory).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const CONVERSATION_STORE = createToken('CONVERSATION_STORE');
+
+/**
+ * Repositório de métricas de sessão.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const METRICS_STORE = createToken('METRICS_STORE');
+
+/**
+ * Pipeline de auditoria (ingesta, flush, drain).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const AUDIT_PIPELINE = createToken('AUDIT_PIPELINE');
+
+/**
+ * Tracker de erros (error collector/aggregator).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const ERROR_TRACKER = createToken('ERROR_TRACKER');
+
+/**
+ * Coletor de eventos de observabilidade.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const EVENT_COLLECTOR = createToken('EVENT_COLLECTOR');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L3 — Agent / Dialog
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Motor de diálogo (loop-manager de alto nível).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const DIALOG_ENGINE = createToken('DIALOG_ENGINE');
+
+/**
+ * Agente AlwaysAlive (singleton gerenciado por DI).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const ALWAYS_ALIVE_AGENT = createToken('ALWAYS_ALIVE_AGENT');
+
+/**
+ * Namespace Socket.IO para comunicação real-time.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const SOCKET_NAMESPACE = createToken('SOCKET_NAMESPACE');
+
+/**
+ * InjectServer — servidor de injeção de prompts.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const INJECT_SERVER = createToken('INJECT_SERVER');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L4 — Services
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Service de gerenciamento de sessões de agente.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const SESSION_SERVICE = createToken('SESSION_SERVICE');
+
+/**
+ * Service de conversas (orquestração de criação/busca/remoção).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const CONVERSATION_SERVICE = createToken('CONVERSATION_SERVICE');
+
+/**
+ * Service de agente (operações sobre AlwaysAliveAgent via services/).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const AGENT_SERVICE = createToken('AGENT_SERVICE');
+
+/**
+ * Service de diálogo (via services/).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const DIALOG_SERVICE = createToken('DIALOG_SERVICE');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L2 — Infra / Rate / Cache / Lock
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Gerenciador de rate-limit (throttle/debounce centralizado).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const RATE_LIMITER = createToken('RATE_LIMITER');
+
+/**
+ * Gerenciador de cache em memória.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const CACHE_MANAGER = createToken('CACHE_MANAGER');
+
+/**
+ * Pool de mutexes de exclusão mútua.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const MUTEX_POOL = createToken('MUTEX_POOL');
+
+/**
+ * Registro de timers ativos (para cancel-all no shutdown).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const TIMER_REGISTRY = createToken('TIMER_REGISTRY');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L5 — Infra / Plugins / Registry
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Registro de plugins dinâmicos.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const PLUGIN_REGISTRY = createToken('PLUGIN_REGISTRY');
+
+/**
+ * Registro de circuit breakers ativos.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const CIRCUIT_BREAKER_REGISTRY = createToken('CIRCUIT_BREAKER_REGISTRY');
+
+/**
+ * Tracer OpenTelemetry (noop se OTEL desabilitado).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const OTEL_TRACER = createToken('OTEL_TRACER');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// L3 — Observability / Alerting
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Gerenciador de alertas e notificações de saúde.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const ALERTS_MANAGER = createToken('ALERTS_MANAGER');
+
+/**
+ * Monitor de quota do SDK (Faixa 25).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const QUOTA_MONITOR = createToken('QUOTA_MONITOR');
+
+/**
+ * Logger raiz (root logger do sistema).
+ *
+ * @type {import('./di.js').Token<Function>}
+ */
+export const ROOT_LOGGER = createToken('ROOT_LOGGER');
+
+/**
+ * Configuração de runtime (config.json parseado + validado).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const APP_CONFIG = createToken('APP_CONFIG');
+
+/**
+ * Controle de fluxo de missões (controle.json).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const MISSION_CONTROL = createToken('MISSION_CONTROL');
+
+/**
+ * Gerenciador de saúde do sistema (health check aggregator).
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const HEALTH_MANAGER = createToken('HEALTH_MANAGER');
+
+/**
+ * Worker pool para tarefas paralelas.
+ *
+ * @type {import('./di.js').Token<object>}
+ */
+export const WORKER_POOL = createToken('WORKER_POOL');
+
+
