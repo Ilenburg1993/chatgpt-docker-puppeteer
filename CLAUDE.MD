@@ -1,473 +1,201 @@
-# CLAUDE.MD - AI Assistant Guide
+# AGENTS.md — Guia operacional enxuto para agentes
 
-> **Quick Reference for AI Assistants working on chatgpt-docker-puppeteer**
+**Status**: canônico para templates e operação prática no workspace. **Última atualização**:
+2026-03-15. Este arquivo é SEMPRE OBRIGATÓRIO para agentes de IA operando neste repositório,
+servindo como guia tático e fonte de templates de `vscode_askQuestions`. Para regras de lifecycle,
+governança e arquitetura, consulte as fontes canônicas listadas no final deste documento. Leia
+periodicamente este documento.
 
-## Project Overview
+> Este arquivo foi reduzido para evitar redundância. Regras duplicadas foram removidas e apontadas
+> para fontes únicas.
 
-**chatgpt-docker-puppeteer** is a production-grade, autonomous AI agent system that automates browser-based interactions with Large Language Models (ChatGPT, Gemini, Claude) using Puppeteer. It features an event-driven architecture, web dashboard, and 24/7 autonomous operation capabilities.
+## Hierarquia oficial de instruções (ordem de referência)
 
-### Key Statistics
-- **~21,732 lines** of JavaScript code
-- **135 JavaScript files** across 9+ core modules
-- **32 test spec files** with comprehensive coverage
-- **13+ architecture layers** with clear separation of concerns
+1. **Comportamento executável dos hooks** (`.github/hooks/scripts/*`, `.github/hooks/hooks-lib/*`)
+   - É o enforcement real (bloqueios, decisões, auditoria).
+2. **Protocolo de lifecycle** (`.github/instructions/hooks-protocol.instructions.md`)
+   - Fonte de verdade para SESSION/TURN/SUBTURN.
+3. **Baseline técnico do projeto** (`.github/instructions/project-canon.instructions.md`)
+   - Runtime, arquitetura, estilo, quality gates.
+4. **Este arquivo (`.github/AGENTS.md`)**
+   - Templates de `vscode_askQuestions` e playbooks operacionais.
+5. **Contexto complementar** (`.github/copilot-instructions.md`)
+   - Visão geral do repositório, sem re-declarar protocolo inteiro.
 
+## Regras rápidas de operação, OBRIGATÓRIAS.
+
+- Responder em **pt-BR**.
+- Você deve ser proativo, seguindo os protocolos, mas sempre sugerindo e implementando upgrades
+  arquiteturais e de processo quando identificar oportunidades (ex.: refactor, modularização,
+  automação de tarefas manuais etc), dentre outras coisas, sempre buscando otimizar para ciclos de
+  feedback rápidos e redução de trabalho manual.
+- Iniciar turno de trabalho com `manage_todo_list`. Tente ter sempre, no mínimo, 10 TODOS. O último
+  item do manage_todo_list deve ser SEMPRE chamar tool `vscode_askQuestions`.
+- Após cada `vscode_askQuestions`, executar **imediatamente** `manage_todo_list` para atualizar o
+  checklist de acordo com a resposta do usuário.
+- Preferir blocos contínuos de trabalho (meta operacional: ~10 minutos) antes de checkpoints
+  periódicos de continuidade (Template D), sem violar exigências de governança ativa.
+- Antes de commit/push: `vscode_askQuestions` **Template G**.
+- Evitar utilizar lint, format, ou typecheck como etapas intermediárias sem autorização explícita
+  (via Template A ou D) ou solicitação explícita do usuário.
+- Encerramento de sessão/turn: **somente Template F + key válida** (via fluxo automático dos hooks).
+- É OBRIGATÓRIO, SEMPRE, ATUALIZAR OS TODOS IMEDIATAMENTE, através da tool `manage_todo_list`, APÓS
+  O USUÁRIO DAR A RESPOSTA AO `vscode_askQuestions`, DE ACORDO COM A RESPOSTA FORNECIDA PELO
+  USUÁRIO.
+
+## É TERMINANTEMENTE PROIBIDO, SEMPRE.
+
+- CONCLUIR UMA SESSION/TURN SEM AUTORIZAÇÃO OU PEDIDO EXPRESSO DO USUÁRIO ATRAVÉS DE SELEÇÃO DE
+  OPÇÃO OU FREETEXT ATRAVÉS DA TOOL VSCODE_ASKQUESTIONS. POR DEFAULT, UMA SESSION/TURN NUNCA PODE
+  SER ENCERRADO POR DECISÃO AUTÔNOMA DO AGENTE.
+
+- CHAMAR `task_complete` SEM ANTES CHAMAR `vscode_askQuestions` NO MESMO TURNO. **O PreToolUse hook
+  bloqueia automaticamente `task_complete` quando `vscode_askQuestions` não foi chamado.** Isso
+  inclui turnos após git push, após commit, após último TODO concluído, após qualquer trabalho
+  finalizado.
+
+- INTERPRETAR A INSTRUÇÃO DO VS CODE COPILOT DE CHAMAR `task_complete` QUANDO A TAREFA ESTÁ PRONTA
+  COMO UMA AUTORIZAÇÃO PARA PULAR vscode_askQuestions. A sequência CORRETA É: concluir trabalho →
+  chamar vscode_askQuestions (Template A) → aguardar usuário → depois task_complete.
+
+## Checklist obrigatório no início/retomada
+
+Ler com `read_file`:
+
+1. `.github/hooks/state/session-briefing.md`
+2. `.github/hooks/state/pending-tasks.md`
+3. `.github/hooks/state/session-context.json`
+
+> Os hooks auditam essa leitura e podem bloquear fechamento de TURN se pendências existirem.
+
+## Templates `vscode_askQuestions`
+
+### Template A — Próximo passo (pós tarefa)
+
+```json
+[
+  {
+    "header": "Próxima ação",
+    "question": "✅ Concluí: [RESUMO_CURTO]. Qual próximo passo?",
+    "allowFreeformInput": true,
+    "options": [
+      { "label": "Seguir próxima tarefa do backlog", "recommended": true },
+      { "label": "Executar validações (lint/test/typecheck)" },
+      { "label": "Preparar commit/push (Template G)" },
+      { "label": "Mudar foco de módulo" }
+    ]
+  }
+]
+```
+
+### Template B — Descoberta de bugs (≥3 achados)
+
+```json
+[
+  {
+    "header": "Ação sobre bugs",
+    "question": "🔍 Encontrei [N] bugs em [MODULO]. Como proceder?",
+    "multiSelect": true,
+    "options": [
+      { "label": "Corrigir todos agora" },
+      { "label": "Corrigir apenas críticos/high" },
+      { "label": "Gerar relatório e backlog" },
+      { "label": "Adicionar testes de regressão" }
+    ]
+  }
+]
+```
+
+### Template C — Proposta de upgrade arquitetural
+
+```json
+[
+  {
+    "header": "Proposta de upgrade",
+    "question": "💡 Proposta: [RESUMO]. Executar agora?",
+    "options": [
+      { "label": "Executar agora em etapas", "recommended": true },
+      { "label": "Mostrar plano detalhado antes" },
+      { "label": "Adicionar ao backlog (alta)" },
+      { "label": "Não executar por enquanto" }
+    ]
+  }
+]
+```
+
+### Template D — Checkpoint periódico
+
+```json
+[
+  {
+    "header": "Checkpoint",
+    "question": "📍 Checkpoint [TURN]. [RESUMO]. Continuo em qual direção?",
+    "allowFreeformInput": true,
+    "options": [
+      { "label": "Continuar no plano atual", "recommended": true },
+      { "label": "Trocar foco de módulo" },
+      { "label": "Executar validações antes de continuar" },
+      { "label": "Preparar commit/push (Template G)" }
+    ]
+  }
+]
+```
+
+### Template E — Kickoff de sessão
+
+```json
+[
+  {
+    "header": "Kickoff da sessão",
+    "question": "Sessão iniciada. Priorizo backlog, auditoria ou correção de bugs?",
+    "options": [
+      { "label": "Backlog (alta → média → backlog)", "recommended": true },
+      { "label": "Auditoria profunda do módulo atual" },
+      { "label": "Correção imediata de bugs críticos" },
+      { "label": "Aguardar instrução explícita" }
+    ]
+  }
+]
+```
+
+### Template F — Encerramento de SESSION (uso restrito)
+
+```json
+[
+  {
+    "header": "🔐 Encerrar SESSION",
+    "question": "Close key: [CLOSE_KEY]. Digite a chave no campo livre para confirmar o encerramento.",
+    "allowFreeformInput": true,
+    "options": [
+      { "label": "Cancelar e continuar trabalhando", "recommended": true },
+      { "label": "Encerrar sessão agora" }
+    ]
+  }
+]
+```
+
+### Template G — Pré-autorização de commit/push
+
+```json
+[
+  {
+    "header": "Pré-autorização git",
+    "question": "Mudanças: [N_MOD] mod / [N_NEW] novos / [N_DEL] removidos. Lint=[L] Test=[T] Typecheck=[TC]. Prosseguir?",
+    "allowFreeformInput": true,
+    "options": [
+      { "label": "Commitar e pushar agora" },
+      { "label": "Apenas commitar agora" },
+      { "label": "Revisar mais antes de commit" },
+      { "label": "Rodar validações novamente" }
+    ]
+  }
+]
+```
 ---
 
-SEMPRE PROIBIDO: ENCERRAR/PAUSAR TURN E/OU SESSION SEM AUTORIZAÇÃO EXPRESSA DO USUÁRIO ATRAVÉS DA TOOL 'VSCODE_ASKQUESTION'.
-
-## Quick Start for AI Assistants
-
-### Essential Files to Read First
-1. `src/main.js` - Application entry point and boot sequence
-2. `config.json` - Global runtime configuration
-3. `package.json` - Dependencies and npm scripts
-4. `DOCUMENTAÇÃO/ARCHITECTURE.md` - System design overview
-
-### Key Directories
-```
-src/
-├── core/          # Config, logger, constants, identity, health
-├── nerv/          # Central event bus (IPC/telemetry)
-├── kernel/        # Task execution engine & orchestration
-├── driver/        # Browser automation (Puppeteer adapters)
-├── infra/         # Browser pool, queue, storage, locks
-├── server/        # Express API + Socket.io dashboard
-├── logic/         # Business logic & validation
-└── state/         # State management
-```
-
----
-
-## Architecture Overview
-
-### 6-Phase Boot Sequence
-```
-1. Config & Identity    → Load config.json, establish robot_id
-2. NERV Initialization  → Event bus (local + Socket.io hybrid)
-3. Browser Pool Setup   → Connect to 3x Chrome instances (port 9224)
-4. Kernel Startup       → 20Hz execution loop, policy engine
-5. Adapter Init         → Driver↔NERV & Server↔NERV bridges
-6. Web Server Startup   → Express + Socket.io on port 3008
-```
-
-### Core Execution Flow
-```
-Task Queue (fila/*.json)
-    ↓
-Kernel Loop (20Hz) → Observation Store → Policy Engine
-    ↓
-Driver Execution (Puppeteer) → Browser Automation
-    ↓
-Results Storage (respostas/*.txt, controle.json)
-```
-
-### Communication Architecture
-All components communicate via **NERV** (event bus):
-- **SERVER** ↔ NERV ↔ **KERNEL** ↔ NERV ↔ **DRIVER** ↔ NERV ↔ **INFRA**
-
----
-
-## Technology Stack
-
-### Core Technologies
-- **Runtime**: Node.js 24+ (ESM modules)
-- **Browser Automation**: Puppeteer 24.35+, puppeteer-extra with stealth
-- **Process Manager**: PM2 6.0+
-- **Web Framework**: Express 4.22+
-- **Real-time**: Socket.io 4.8+
-- **Validation**: Zod 4.3.5
-
-### Development Tools
-- **Testing**: Node.js native test runner, c8 (coverage), sinon (mocking)
-- **Linting**: ESLint 9.39+ with complexity plugins
-- **Formatting**: Prettier 3.8.0 (120-char lines, 4-space indent)
-- **Analysis**: madge (circular deps), jscodeshift (codemods)
-
-### Infrastructure
-- **Docker**: Multi-stage Dockerfile, docker-compose.yml
-- **CI/CD**: GitHub Actions
-- **DevContainer**: VS Code remote development
-
----
-
-## Common Development Tasks
-
-### Running the Application
-```bash
-npm start              # Start agent (development)
-npm run daemon:start   # Start with PM2 (production)
-npm run dev           # Development with nodemon
-```
-
-### Testing & Quality
-```bash
-npm test              # Run all tests
-npm run test:coverage # Run tests with coverage report
-npm run lint          # Check code quality
-npm run format        # Auto-format with Prettier
-```
-
-### Queue Management
-```bash
-npm run queue:status  # Monitor task queue
-npm run queue:add     # Create new task interactively
-npm run queue:clear   # Clear task queue
-```
-
-### Analysis & Diagnostics
-```bash
-npm run diagnose      # System diagnostics
-npm run analyze:deps  # Check circular dependencies
-npm run clean         # Clear logs and temp files
-```
-
-### Docker Operations
-```bash
-make build            # Build Docker image
-make up              # Start containers
-make down            # Stop containers
-make logs            # View logs
-```
-
----
-
-## Code Style & Patterns
-
-### Design Patterns Used
-1. **Event-Driven Architecture** - NERV event bus for zero-coupling
-2. **Factory Pattern** - DriverFactory, KernelFactory for object creation
-3. **Observer Pattern** - File watchers, health checks, telemetry
-4. **Domain-Driven Design** - Distinct domains with bounded contexts
-
-### File Organization
-- **Module Pattern**: Each directory has an `index.js` as public interface
-- **Private Modules**: Internal files prefixed with underscore (e.g., `_internal.js`)
-- **Constants**: Centralized in `src/core/constants/` (recently refactored)
-- **Tests**: Mirror source structure in `tests/` directory
-
-### Coding Conventions
-- **Indentation**: 4 spaces
-- **Line Length**: 120 characters
-- **Quotes**: Single quotes for strings
-- **Semicolons**: Required
-- **Naming**: camelCase for variables/functions, PascalCase for classes
-- **Comments**: JSDoc style for public APIs
-
-### Error Handling
-- Domain-specific error classes
-- Always log errors with context
-- Graceful degradation preferred over crashes
-- Use NERV for error event propagation
-
----
-
-## Important Configuration Files
-
-| File                  | Purpose                                                | Location |
-| --------------------- | ------------------------------------------------------ | -------- |
-| `config.json`         | Global runtime config (timeouts, concurrency, domains) | Root     |
-| `dynamic_rules.json`  | Runtime policy rules (priorities, limits)              | Root     |
-| `controle.json`       | Application state/control metadata                     | Root     |
-| `chrome-config.json`  | Chrome launch configuration                            | Root     |
-| `ecosystem.config.js` | PM2 process management                                 | Root     |
-| `.env`                | Environment variables (optional)                       | Root     |
-
-### Key Config Settings
-- **Browser Mode**: headless/headful (config.json → puppeteer.headless)
-- **Pool Size**: Chrome instance count (config.json → browser.poolSize, default: 3)
-- **Server Port**: API/dashboard port (config.json → server.port, default: 3008)
-- **Chrome Port**: Remote debugging port (default: 9224)
-- **Kernel Loop**: Execution frequency (20Hz = 50ms interval)
-
----
-
-## Testing Strategy
-
-### Test Structure
-```
-tests/
-├── unit/           # 60% - Fast, isolated component tests
-├── integration/    # 30% - Cross-component interactions
-└── e2e/           # 10% - Full workflow testing
-```
-
-### Coverage Goals
-- **Lines**: 80%+
-- **Branches/Functions**: 75%+
-- **Statements**: 80%+
-
-### Running Tests
-```bash
-npm test                    # All tests
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests only
-npm run test:coverage      # With coverage report
-```
-
----
-
-## Key Modules Deep Dive
-
-### NERV (src/nerv/)
-**Central event bus for inter-process communication**
-- `nerv.js` - Factory and composition
-- `buffers/` - Event buffering and ring buffers
-- `transport/` - Socket.io and hybrid transport adapters
-- `emission/` - Event publishing
-- `reception/` - Event subscription and handling
-- `correlation/` - Event correlation and tracing
-- `telemetry/` - IPC performance metrics
-
-**Usage Pattern**:
-```javascript
-const nerv = require('./nerv');
-nerv.emit('task:started', { taskId: '123' });
-nerv.on('task:completed', (data) => { /* handle */ });
-```
-
-### Kernel (src/kernel/)
-**Decision engine and task orchestration**
-- `kernel.js` - Main orchestrator
-- `execution_engine/` - Task execution logic
-- `kernel_loop/` - 20Hz control loop
-- `observation_store/` - Fact registry from events
-- `policy_engine/` - Policy enforcement
-- `task_runtime/` - Task lifecycle management
-
-**Execution Flow**: Queue → Policy Check → Execute → Emit Result
-
-### Driver (src/driver/)
-**Browser automation adapters**
-- `ChatGPTDriver.js` - ChatGPT target automation
-- `factory.js` - Driver factory pattern
-- `modules/` - Shared modules (analyzer, stabilizer, human simulation)
-- `targets/` - Target-specific implementations
-- `nerv_adapter/` - Bridge to NERV
-
-**Creating a New Driver**:
-1. Extend base driver class
-2. Implement required methods (connect, execute, disconnect)
-3. Register in factory.js
-
-### Infrastructure (src/infra/)
-**Resource management layer**
-- `browser_pool/` - Multi-instance Chrome management
-- `ConnectionOrchestrator.js` - Connection management
-- `queue/` - Task queue operations
-- `fs/` - File system utilities
-- `storage/` - Persistent storage
-- `ipc/` - IPC client and envelope handling
-- `locks/` - File-based locking
-
-### Server (src/server/)
-**Web API and real-time dashboard**
-- `main.js` - Server bootstrap
-- `api/` - REST API routes and controllers
-- `engine/` - Core server components
-- `realtime/` - Real-time features (PM2 bridge, log tailing, hardware telemetry)
-- `supervisor/` - Reconciler and supervision logic
-- `watchers/` - File system and log watchers
-
-**API Endpoints**: See `DOCUMENTAÇÃO/API.md` for full reference
-
----
-
-## Recent Changes & Active Development
-
-### Current Branch
-**`claude/update-claude-md-wvKC8`** - Creating/updating CLAUDE.MD
-
-### Recent Refactoring (v1.0.0 → v1.1.0)
-- ✅ Magic strings elimination via centralized constants
-- ✅ Automated code transformation (codemods)
-- ✅ Constants infrastructure (`src/core/constants/`)
-- ✅ Code formatting (697 files with Prettier)
-- ✅ Test cleanup (11 obsolete tests removed)
-
-**Statistics**:
-- 144 files modified
-- 73 magic strings replaced
-- 27 auto-injected imports
-
-### Known Issues
-- Some backup files in `backups/` have encoding issues (UTF-8 BOM)
-- Legacy scripts in `scripts/legacy/` need documentation
-
----
-
-## Git Workflow
-
-### Branch Strategy
-- **Main Branch**: Stable production code
-- **Feature Branches**: `claude/*`, `feature/*`, `fix/*`
-- **Current Branch**: `claude/update-claude-md-wvKC8`
-
-### Commit Conventions
-```
-feat: Add new feature
-fix: Bug fix
-refactor: Code refactoring
-chore: Maintenance tasks
-docs: Documentation updates
-test: Test updates
-```
-
-### Git Operations
-```bash
-# Always work on feature branches
-git checkout -b claude/feature-name
-
-# Commit with clear messages
-git commit -m "feat: add new driver for Gemini"
-
-# Push to remote
-git push -u origin claude/feature-name
-```
-
----
-
-## Documentation Resources
-
-### Primary Documentation (DOCUMENTAÇÃO/)
-- `QUICK_START.md` - Setup in 10 minutes
-- `ARCHITECTURE.md` - Detailed system design (150+ lines)
-- `ARCHITECTURE_DIAGRAMS.md` - 11 C4 model diagrams
-- `API.md` - REST API & WebSocket reference
-- `CONFIGURATION.md` - All config options
-- `DEPLOYMENT.md` - Production setup
-- `SECURITY.md` - Security best practices
-- `ROADMAP.md` - v1.0 planning
-
-### Other Resources
-- `README.md` - Project overview (if exists)
-- Inline JSDoc comments in source code
-- Test files as usage examples
-
----
-
-## Troubleshooting Common Issues
-
-### Browser Connection Issues
-- Check Chrome is running on port 9224: `curl http://localhost:9224/json/version`
-- Verify `chrome-config.json` settings
-- Check logs in `logs/` directory
-
-### Task Queue Not Processing
-- Check kernel loop status: `npm run diagnose`
-- Verify `fila/` directory permissions
-- Review `controle.json` for state issues
-
-### Server Won't Start
-- Check port 3008 is available: `lsof -i :3008`
-- Verify `config.json` syntax
-- Check PM2 logs: `pm2 logs`
-
-### Tests Failing
-- Clear cache: `npm run clean`
-- Reinstall dependencies: `rm -rf node_modules && npm install`
-- Check Node.js version: `node --version` (should be 20.19.2+)
-
----
-
-## Best Practices for AI Assistants
-
-### Before Making Changes
-1. ✅ Read relevant source files first
-2. ✅ Check existing tests for usage patterns
-3. ✅ Review DOCUMENTAÇÃO/ for context
-4. ✅ Understand the event-driven architecture (NERV)
-5. ✅ Check for similar implementations in the codebase
-
-### When Writing Code
-1. ✅ Follow existing code style (4 spaces, 120 char lines)
-2. ✅ Use centralized constants from `src/core/constants/`
-3. ✅ Add JSDoc comments for public APIs
-4. ✅ Emit appropriate NERV events for observability
-5. ✅ Handle errors gracefully with logging
-6. ✅ Write tests for new functionality
-
-### When Modifying Architecture
-1. ✅ Update DOCUMENTAÇÃO/ARCHITECTURE.md
-2. ✅ Consider impact on NERV event flow
-3. ✅ Update tests accordingly
-4. ✅ Check for circular dependencies: `npm run analyze:deps`
-5. ✅ Run full test suite: `npm test`
-
-### When Adding Dependencies
-1. ✅ Check if functionality exists in codebase
-2. ✅ Justify the addition (bundle size, maintenance)
-3. ✅ Use exact versions in package.json
-4. ✅ Update documentation
-
----
-
-## Project Goals & Philosophy
-
-### Design Principles
-- **Zero-coupling via events** - Components communicate only through NERV
-- **Fail gracefully** - Prefer degradation over crashes
-- **Observable by default** - Emit events for all significant actions
-- **Configuration over code** - Use config.json for behavior changes
-- **Test-driven** - 80%+ coverage target
-
-### Non-Goals
-- ❌ Not a web scraping framework (focused on LLM automation)
-- ❌ Not a general-purpose RPA tool (specialized for AI agents)
-- ❌ Not browser-agnostic (optimized for Chromium via Puppeteer)
-
----
-
-## Version Information
-
-- **Current Version**: 1.1.0 (In Development)
-- **Latest Stable**: 1.0.0 (2026-01-19)
-- **Node.js**: 24+ LTS
-- **npm**: 10.8.2+
-- **PM2**: 6.0+
-
----
-
-## Contact & Support
-
-- **Repository**: https://github.com/Ilenburg1993/chatgpt-docker-puppeteer
-- **Issues**: Report bugs and feature requests via GitHub Issues
-- **Documentation**: See DOCUMENTAÇÃO/ directory
-
----
-
-## Quick Command Reference
-
-```bash
-# Development
-npm start                  # Start agent
-npm run dev               # Development mode with auto-reload
-npm test                  # Run tests
-
-# Queue Operations
-npm run queue:status      # View queue
-npm run queue:add         # Add task
-
-# Production
-npm run daemon:start      # Start with PM2
-npm run daemon:stop       # Stop PM2 process
-npm run daemon:restart    # Restart PM2 process
-
-# Maintenance
-npm run clean             # Clear logs/temp
-npm run diagnose          # Run diagnostics
-npm run lint              # Check code quality
-npm run format            # Format code
-
-# Docker
-make build               # Build image
-make up                  # Start containers
-make down                # Stop containers
-make logs                # View logs
-```
-
----
-
-**Last Updated**: 2026-01-27
-**Generated for**: Claude AI Assistant
-**Project**: chatgpt-docker-puppeteer v1.1.0
+## Referências canônicas
+
+- Protocolo de hooks: `.github/instructions/hooks-protocol.instructions.md`
+- Baseline técnico: `.github/instructions/project-canon.instructions.md`
+- Instruções Copilot (contexto): `.github/copilot-instructions.md`
+- Arquitetura oficial: `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`

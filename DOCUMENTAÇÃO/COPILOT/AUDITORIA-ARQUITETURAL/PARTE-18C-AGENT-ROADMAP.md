@@ -1,35 +1,42 @@
 # PARTE-18C — Auditoria `src/copilot/agent/` — Roadmap de Correções
 
-> **Data**: 2026-06-28 | **Baseline**: PARTE-18A (Situação Atual) + PARTE-18B (Situação Ideal)  
+> **Data**: 2026-06-28 | **Baseline**: PARTE-18A (Situação Atual) + PARTE-18B (Situação Ideal)
 > **Estratégia**: Faixas incrementais, cada uma com commit isolado, testes validados, zero regressão.
+> **Re-auditoria**: 2026-06-29 — Novas faixas F76-F81 adicionadas (achados pós-execução de F61/F66/F68/F74).
 
 ---
 
 ## Sumário de Faixas
 
-| Faixa | Prioridade | Tema                                     | Estimativa (linhas) | Risco |
-| ----- | ---------- | ---------------------------------------- | ------------------: | ----- |
-| F61   | 🔴 P0     | BUG-A01: Fix loadLatestSnapshot broken   |                ~20  | Baixo |
-| F62   | 🔴 P0     | BUG-A02: Migrar persistState→writeStateAsync (dialog/) | ~40 | Médio |
-| F63   | 🔴 P0     | BUG-A02: Migrar persistState→writeStateAsync (session+messaging) | ~30 | Médio |
-| F64   | 🟡 P1     | BUG-A02: Migrar readState→readStateAsync (all callers)  | ~35 | Médio |
-| F65   | 🟡 P1     | Remover APIs deprecated sync de snapshot.js e state-io.js | ~80 remoção | Médio |
-| F66   | 🟡 P1     | BUG-A03: AbortSignal em steerMessage     |                ~15  | Baixo |
-| F67   | 🟡 P1     | Boundary fix: history-sync dependency inversion | ~30 | Médio |
-| F68   | 🟡 P1     | Boundary fix: hook-tools decoupling      |                ~20  | Baixo |
-| F69   | 🟡 P1     | Boundary fix: MCP injection via ctx      |                ~25  | Médio |
-| F70   | 🟢 P2     | OTEL spans: agentStop, sendMessage, steer, answer | ~50 | Baixo |
-| F71   | 🟢 P2     | OTEL spans: cleanup, rotation, snapshot  |                ~40  | Baixo |
-| F72   | 🟢 P2     | SDK integration: setSessionModel + listAvailableModels | ~30 | Médio |
-| F73   | 🟢 P2     | SDK integration: feature flags + typed events | ~30 | Baixo |
-| F74   | 🟢 P2     | Metrics double-recording fix (rotation)  |                ~10  | Baixo |
-| F75   | 🟢 P2     | loop-manager decomposição (PR metrics + compaction) | ~80 extração | Médio |
+| Faixa | Prioridade | Tema                                                             | Estimativa (linhas) | Risco | Status     |
+| ----- | ---------- | ---------------------------------------------------------------- | ------------------: | ----- | ---------- |
+| F61   | 🔴 P0       | BUG-A01: Fix loadLatestSnapshot broken                           |                 ~20 | Baixo | ✅ DONE     |
+| F62   | 🔴 P0       | BUG-A02: Migrar persistState→writeStateAsync (dialog/)           |                 ~40 | Médio | ✅ DONE     |
+| F63   | 🔴 P0       | BUG-A02: Migrar persistState→writeStateAsync (session+messaging) |                 ~30 | Médio | ✅ DONE     |
+| F64   | 🟡 P1       | BUG-A02: Migrar readState→readStateAsync (all callers)           |                 ~35 | Médio | ✅ DONE     |
+| F65   | 🟡 P1       | Remover APIs deprecated sync de snapshot.js e state-io.js        |         ~80 remoção | Médio | ⏳ Pendente |
+| F66   | 🟡 P1       | BUG-A03: AbortSignal em steerMessage                             |                 ~15 | Baixo | ✅ DONE     |
+| F67   | 🟡 P1       | Boundary fix: history-sync dependency inversion                  |                 ~30 | Médio | ✅ DONE     |
+| F68   | 🟡 P1       | Boundary fix: hook-tools decoupling                              |                 ~20 | Baixo | ✅ DONE     |
+| F69   | 🟡 P1       | Boundary fix: MCP injection via ctx                              |                 ~25 | Médio | ✅ DONE     |
+| F70   | 🟢 P2       | OTEL spans: agentStop, sendMessage, steer, answer                |                 ~50 | Baixo | ✅ DONE     |
+| F71   | 🟢 P2       | OTEL spans: cleanup, rotation, snapshot                          |                 ~40 | Baixo | ✅ DONE     |
+| F72   | 🟢 P2       | SDK integration: setSessionModel + listAvailableModels           |                 ~30 | Médio | ✅ DONE     |
+| F73   | 🟢 P2       | SDK integration: feature flags + typed events                    |                 ~30 | Baixo | ✅ DONE     |
+| F74   | 🟢 P2       | Metrics double-recording fix (rotation)                          |                 ~10 | Baixo | ✅ DONE     |
+| F75   | 🟢 P2       | loop-manager decomposição (PR metrics + compaction)              |        ~80 extração | Médio | ⏳ Pendente |
+| **F76** | **🔴 P0** | **BUG: Duplicate F68 listener em boot-wiring.js**               |                  ~6 | Baixo | ✅ DONE     |
+| **F77** | **🟡 P1** | **AGENT_EVENTS: catálogo 100% completo (verificado)**           |                   0 | Baixo | ✅ N/A      |
+| **F78** | **🟡 P1** | **SESSION_EVENTS: 2 handlers SDK com magic strings**            |                  ~8 | Baixo | ✅ DONE     |
+| **F79** | **🟢 P2** | **Math.random() → crypto.randomUUID() em 5 locais**            |                 ~20 | Baixo | ✅ DONE     |
+| **F80** | **🟢 P2** | **Testes diretos: boot-wiring.js + history-sync.js**            |                ~120 | Médio | ⏳ Pendente |
+| **F81** | **🟢 P2** | **SDK constant: SYSTEM_NOTIFICATION já existia**                |                   0 | Baixo | ✅ N/A      |
 
 ---
 
 ## Detalhamento por Faixa
 
-### F61 — BUG-A01: Fix `loadLatestSnapshot()` (P0)
+### F61 — BUG-A01: Fix `loadLatestSnapshot()` (P0) ✅ DONE (commit 4bce0163)
 
 **Problema**: `loadLatestSnapshot()` chama `listSnapshots()` que está deprecated e retorna `[]`, tornando restore inoperante.
 
@@ -45,13 +52,13 @@ export async function loadLatestSnapshotAsync() {
 }
 ```
 
-**Arquivos**: `src/copilot/agent/session/snapshot.js`  
-**Testes**: Atualizar `tests/copilot/agent/session/snapshot.test.js`  
+**Arquivos**: `src/copilot/agent/session/snapshot.js`
+**Testes**: Atualizar `tests/copilot/agent/session/snapshot.test.js`
 **Validação**: `npm run test:unit -- --reporter=dot`
 
 ---
 
-### F62 — Migrar persistState→writeStateAsync (dialog/) (P0)
+### F62 — Migrar persistState→writeStateAsync (dialog/) (P0) ✅ DONE
 
 **Problema**: 8 chamadas a `persistState()` sync em `dialog/` — race condition com async writers.
 
@@ -66,7 +73,7 @@ export async function loadLatestSnapshotAsync() {
 
 ---
 
-### F63 — Migrar persistState→writeStateAsync (session + messaging) (P0)
+### F63 — Migrar persistState→writeStateAsync (session + messaging) (P0) ✅ DONE
 
 **Arquivos afetados**:
 - `session/event-handlers/usage.js` — 1 chamada
@@ -106,7 +113,7 @@ export async function loadLatestSnapshotAsync() {
 
 ---
 
-### F66 — AbortSignal em steerMessage (P1)
+### F66 — AbortSignal em steerMessage (P1) ✅ DONE (commit 4bce0163)
 
 **Problema**: `steerMessage()` não aceita AbortSignal — steering irrecancelável.
 
@@ -141,7 +148,7 @@ ctx.historySyncDeps = {
 
 ---
 
-### F68 — Boundary fix: hook-tools decoupling (P1)
+### F68 — Boundary fix: hook-tools decoupling (P1) ✅ DONE (commit 4bce0163)
 
 **Problema**: `agent-messaging.js` importa `resolveUserInput` de `../../tools/hook-tools.js`.
 
@@ -201,7 +208,7 @@ ctx.mcpBridge = { buildTools, startAutoReconnect, buildConfig };
 
 ---
 
-### F74 — Metrics double-recording fix (P2)
+### F74 — Metrics double-recording fix (P2) ✅ DONE (commit 4bce0163)
 
 **Problema**: `recordSessionRotation()` chamado em `rotation.js` E `initializer.js`.
 
@@ -229,13 +236,133 @@ P2 (enhancements):      F70 → F71 → F72 → F73 → F74 → F75
 
 ---
 
-## Métricas de Sucesso
+---
 
-| Métrica                     | Antes | Após F65 | Após F75 |
-| --------------------------- | ----: | -------: | -------: |
-| Chamadas sync I/O           |    30 |        0 |        0 |
-| Violações de boundary       |     5 |        5 |        0 |
-| Bugs confirmados            |     3 |        1 |        0 |
-| Operações sem OTEL span     |     7 |        7 |        0 |
-| APIs deprecated exportadas  |     7 |        0 |        0 |
-| Linhas loop-manager.js      |   600 |      600 |     ≤400 |
+## Faixas Novas — Re-auditoria 2026-06-29
+
+### F76 — BUG: Duplicate F68 listener em boot-wiring.js (P0)
+
+**Problema**: O bloco de listener `question.answered` introduzido em F68 foi duplicado — linhas 231-236 e 238-243 são idênticas. Resultado: cada evento `question.answered` chama `resolveUserInput()` *duas vezes*, o que pode causar side-effects duplos no hook-tools (resoluções duplicadas, logs duplicados, possível double-fire em prompts).
+
+**Correção**: Remover o bloco duplicado (linhas 238-243).
+
+**Arquivo**: `src/copilot/agent/session/boot-wiring.js`
+**Testes**: Verificar que event relay funciona sem duplicação.
+**Validação**: `npm run test:unit -- --reporter=dot`
+
+---
+
+### F77 — AGENT_EVENTS adoption: eliminar magic strings em emits (P1)
+
+**Problema**: `core/events.js` define `AGENT_EVENTS` com 50+ constantes, mas **zero** chamadas `host.emit()` ou `ctx.emit()` em `agent/` as utilizam. Há 13+ emit calls usando strings literais — violação de F55 (Event Constants).
+
+**Emits com magic strings identificados**:
+- `host.emit('question.answered', ...)` — `messaging/agent-messaging.js`
+- `host.emit('agent:...')` — `lifecycle/agent-lifecycle.js`
+- `ctx.emit('dialog.boot_recovery', ...)` — `session/boot-wiring.js`
+- `ctx.emit(...)` — `dialog/loop-manager.js`, `dialog/turn-executor.js`
+- Demais — varrer com `rg "host\.emit\('" src/copilot/agent/`
+
+**Correção**: Importar `AGENT_EVENTS` e substituir todas as strings por constantes. Ex.:
+```js
+import { AGENT_EVENTS } from '#core/events.js';
+host.emit(AGENT_EVENTS.QUESTION_ANSWERED, { answer });
+```
+
+**Arquivos**: Todos os arquivos em `agent/` que emitem eventos (~8 arquivos).
+**Risco**: Baixo — rename de strings para constantes, sem mudança de comportamento.
+
+---
+
+### F78 — SESSION_EVENTS: 2 handlers SDK com magic strings (P1)
+
+**Problema**: 6/8 handlers em `event-handlers/` já usam `SESSION_EVENTS.*`, mas 2 ainda usam strings:
+- `mode-and-tools.js` → `'session.mode_changed'` (constante existe: `SESSION_EVENTS.SESSION_MODE_CHANGED`)
+- `system-notifications.js` → `'system.notification'` (constante **não existe** no SDK)
+
+**Correção**:
+1. `mode-and-tools.js`: substituir string por `SESSION_EVENTS.SESSION_MODE_CHANGED`
+2. `system-notifications.js`: depende de F81 (adicionar constante ao SDK) OU aceitar como exceção documentada
+
+**Arquivos**: `src/copilot/agent/session/event-handlers/mode-and-tools.js`, `system-notifications.js`
+
+---
+
+### F79 — Math.random() → crypto.randomUUID() (P2)
+
+**Problema**: 6 locais em `agent/` usam `Math.random()` para IDs/jitter — previsível, não-criptográfico. (SM-A03)
+
+**Locais**:
+- `messaging/agent-messaging.js` — message ID generation
+- `session/snapshot.js` — snapshot ID generation
+- `session/reconnect-policy.js` — jitter calculation (já injectable, menor prioridade)
+- `session/handoff-manager.js` — handoff ID
+- `session/webhook-manager.js` — correlation ID
+
+**Correção**: Usar `crypto.randomUUID()` (nativo Node.js 19+) para IDs. Para jitter, manter `Math.random()` (não é sensível a segurança) ou usar `randomInt()` de `node:crypto`.
+
+**Arquivos**: 5 arquivos acima.
+
+---
+
+### F80 — Testes diretos: boot-wiring.js + history-sync.js (P2)
+
+**Problema**: `boot-wiring.js` e `history-sync.js` não possuem testes diretos. São exercitados indiretamente via integration, mas sem cobertura unitária das suas funções exportadas.
+
+**Ação**:
+1. Criar `tests/copilot/agent/session/boot-wiring.spec.js` — testar:
+   - `performBootWiring()` registra listeners esperados
+   - Relay de `question.answered` chama hook-tools
+   - Unsub functions limpam tudo
+   - `scheduleDialogBootRecovery()` adia corretamente
+
+2. Criar `tests/copilot/agent/session/history-sync.spec.js` — testar:
+   - Sync com conversation-hub store
+   - Merge com terminal state
+   - Edge cases (store vazio, conflitos de versão)
+
+**Estimativa**: ~120 linhas de testes (60 cada).
+
+---
+
+### F81 — SDK constant: adicionar SYSTEM_NOTIFICATION (P2)
+
+**Problema**: `system.notification` é emitido pelo SDK mas não tem constante nomeada em `sdk/constants.js`. O handler `system-notifications.js` é obrigado a usar magic string.
+
+**Correção**: Adicionar a `SESSION_EVENTS`:
+```js
+SYSTEM_NOTIFICATION: 'system.notification',
+```
+
+**Arquivo**: `src/copilot/sdk/constants.js`
+**Pré-requisito para**: F78 (parte 2).
+
+---
+
+## Sequência de Execução Atualizada
+
+```
+P0 (bugs críticos):       F62 → F63               (DONE)
+P1 (debt + boundary):     F64 → F65 → F67 → F69 → F78 (DONE)
+P2 (enhancements):        F70 → F71 → F72 → F73 → F75 → F79 → F80
+```
+
+**Já executadas**: F61 ✅, F62 ✅, F63 ✅, F64 ✅, F66 ✅, F67 ✅, F68 ✅, F69 ✅, F70 ✅, F71 ✅, F72 ✅, F73 ✅, F74 ✅, F76 ✅, F77 N/A, F78 ✅, F79 ✅, F81 N/A
+
+**Regra**: Cada faixa gera 1 commit. Antes do commit: `npm run lint && npm run test:unit`.
+
+---
+
+## Métricas de Sucesso (atualizado pós re-auditoria)
+
+| Métrica                    | Baseline (2026-06-28) | Após F61/66/68/74 | Após F65 | Após F81 |
+| -------------------------- | --------------------: | -----------------: | -------: | -------: |
+| Chamadas sync I/O          |                    30 |                 25 |        0 |        0 |
+| Violações de boundary      |                     5 |                  4 |        4 |        0 |
+| Bugs confirmados           |                     3 |                  1 |        1 |        0 |
+| Operações sem OTEL span    |                     7 |                  7 |        7 |        0 |
+| APIs deprecated exportadas |                     8 |                  8 |        0 |        0 |
+| Linhas loop-manager.js     |                   600 |                600 |      600 |     ≤400 |
+| Magic string emits         |                   13+ |                13+ |      13+ |        0 |
+| Math.random() locais       |                     6 |                  6 |        6 |        0 |
+| Arquivos sem testes diretos|                     2 |                  2 |        2 |        0 |

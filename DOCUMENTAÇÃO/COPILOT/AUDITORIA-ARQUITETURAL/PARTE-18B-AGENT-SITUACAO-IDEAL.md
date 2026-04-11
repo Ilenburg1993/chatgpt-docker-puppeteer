@@ -1,6 +1,6 @@
 # PARTE-18B — Auditoria `src/copilot/agent/` — Situação Ideal
 
-> **Data**: 2026-06-28 | **Baseline**: PARTE-18A  
+> **Data**: 2026-06-28 | **Baseline**: PARTE-18A
 > **Objetivo**: Descrever o estado-alvo arquitetural do módulo agent após a resolução de todos os bugs, gaps e smells.
 
 ---
@@ -45,13 +45,13 @@
 
 ### 3.1 Imports Diretos a Eliminar
 
-| Import atual                          | Módulo de destino    | Solução                                  |
-| ------------------------------------- | -------------------- | ---------------------------------------- |
-| `../../conversation-hub/store.js`     | `history-sync.js`    | Inverter: hub → agent (observer pattern) |
-| `../../terminal/state.js`             | `history-sync.js`    | Receber `hubSessionId` via callback/ctx  |
-| `../../tools/hook-tools.js`           | `agent-messaging.js` | Abstrair como callback em AgentContext    |
-| `../../bridges/mcp-tool-bridge.js`    | 2 files              | Receber MCP bridge via injeção (ctx)     |
-| `../../config/mcp-servers.js`         | `session-setup.js`   | Usar `#copilot/config` barrel            |
+| Import atual                       | Módulo de destino    | Solução                                  |
+| ---------------------------------- | -------------------- | ---------------------------------------- |
+| `../../conversation-hub/store.js`  | `history-sync.js`    | Inverter: hub → agent (observer pattern) |
+| `../../terminal/state.js`          | `history-sync.js`    | Receber `hubSessionId` via callback/ctx  |
+| `../../tools/hook-tools.js`        | `agent-messaging.js` | Abstrair como callback em AgentContext   |
+| `../../bridges/mcp-tool-bridge.js` | 2 files              | Receber MCP bridge via injeção (ctx)     |
+| `../../config/mcp-servers.js`      | `session-setup.js`   | Usar `#copilot/config` barrel            |
 
 ### 3.2 Padrão-Alvo de Imports
 
@@ -90,15 +90,15 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 
 ### 4.1 Spans a Adicionar
 
-| Operação              | Nome do Span                    | Atributos                        |
-| --------------------- | ------------------------------- | -------------------------------- |
-| `agentStop()`         | `copilot.agent.stop`            | `reason`, `graceful`, `durationMs` |
-| `sendMessage()`       | `copilot.agent.sendMessage`     | `taskId`, `messageLength`        |
-| `steerMessage()`      | `copilot.agent.steer`           | `messageId`, `promptLength`      |
-| `answerPendingQuestion()` | `copilot.agent.answer`      | `answerLength`                   |
-| `cleanupStaleSessions()` | `copilot.session.cleanup`   | `total`, `deleted`, `errors`     |
-| `sessionRotation`     | `copilot.session.rotation`      | `reason`, `oldSessionId`         |
-| `snapshot save/load`  | `copilot.snapshot.{save,load}`  | `snapshotId`, `sizeBytes`        |
+| Operação                  | Nome do Span                   | Atributos                          |
+| ------------------------- | ------------------------------ | ---------------------------------- |
+| `agentStop()`             | `copilot.agent.stop`           | `reason`, `graceful`, `durationMs` |
+| `sendMessage()`           | `copilot.agent.sendMessage`    | `taskId`, `messageLength`          |
+| `steerMessage()`          | `copilot.agent.steer`          | `messageId`, `promptLength`        |
+| `answerPendingQuestion()` | `copilot.agent.answer`         | `answerLength`                     |
+| `cleanupStaleSessions()`  | `copilot.session.cleanup`      | `total`, `deleted`, `errors`       |
+| `sessionRotation`         | `copilot.session.rotation`     | `reason`, `oldSessionId`           |
+| `snapshot save/load`      | `copilot.snapshot.{save,load}` | `snapshotId`, `sizeBytes`          |
 
 ### 4.2 Dialog Loop Duration
 
