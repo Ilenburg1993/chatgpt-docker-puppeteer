@@ -23,7 +23,7 @@ import { getCopilotFallbackModel } from '#copilot/config';
 import { SessionError } from '#copilot/core';
 import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
-import { BaseEmitter } from '#copilot/core/create-emitter';
+import { BaseEmitter } from '#copilot/core';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
     BOOT_TIMEOUT_MS,

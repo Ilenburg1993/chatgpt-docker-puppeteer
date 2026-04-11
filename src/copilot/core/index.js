@@ -72,3 +72,6 @@ export { createCache } from './cache.js';
 
 // ─── Mutex ────────────────────────────────────────────────────────────────────
 export { createMutex, createMutexPool, withMutex } from './mutex.js';
+
+// ─── Emitter ──────────────────────────────────────────────────────────────────
+export { BaseEmitter, createEmitter } from './create-emitter.js';

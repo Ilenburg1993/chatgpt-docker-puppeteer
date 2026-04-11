@@ -9,7 +9,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { BaseEmitter } from '#copilot/core/create-emitter';
+import { BaseEmitter } from '#copilot/core';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';

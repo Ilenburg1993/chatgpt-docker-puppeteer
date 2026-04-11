@@ -27,7 +27,7 @@ import {
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
 import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
-import { createEmitter } from '#copilot/core/create-emitter';
+import { createEmitter } from '#copilot/core';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────

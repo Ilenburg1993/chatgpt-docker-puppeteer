@@ -22,7 +22,7 @@
 
 import { bridgeEmitter } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
-import { BaseEmitter } from '#copilot/core/create-emitter';
+import { BaseEmitter } from '#copilot/core';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 

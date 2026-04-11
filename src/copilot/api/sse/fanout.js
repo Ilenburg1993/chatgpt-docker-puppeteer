@@ -10,7 +10,7 @@
  * @module copilot/api/event-fanout
  */
 
-import { createEmitter } from '#copilot/core/create-emitter';
+import { createEmitter } from '#copilot/core';
 
 /**
  * @typedef {Object} FanoutEvent

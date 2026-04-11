@@ -15,7 +15,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { BaseEmitter } from '#copilot/core/create-emitter';
+import { BaseEmitter } from '#copilot/core';
 
 /**
  * @typedef {Object} HandoffRequest
