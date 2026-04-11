@@ -286,3 +286,64 @@ export function getInjectHistory(n = 50) {
     const limit = Math.min(Math.max(1, n), MAX_INJECT_HISTORY);
     return _injectHistory.slice(-limit);
 }
+
+// ─── K-6: Terminal State Machine ──────────────────────────────────────────────
+
+/**
+ * Fases do terminal (state machine formal).
+ *
+ * @readonly
+ * @enum {string}
+ */
+export const TerminalPhase = /** @type {const} */ ({
+    INIT: 'init',
+    IDLE: 'idle',
+    BUSY: 'busy',
+    SHUTTING_DOWN: 'shutting_down',
+    STOPPED: 'stopped',
+});
+
+/**
+ * Transições válidas do terminal state machine.
+ *
+ * @type {ReadonlyMap<string, readonly string[]>}
+ */
+const VALID_TRANSITIONS = new Map([
+    [TerminalPhase.INIT, [TerminalPhase.IDLE, TerminalPhase.STOPPED]],
+    [TerminalPhase.IDLE, [TerminalPhase.BUSY, TerminalPhase.SHUTTING_DOWN]],
+    [TerminalPhase.BUSY, [TerminalPhase.IDLE, TerminalPhase.SHUTTING_DOWN]],
+    [TerminalPhase.SHUTTING_DOWN, [TerminalPhase.STOPPED]],
+    [TerminalPhase.STOPPED, []],
+]);
+
+/** @type {string} */
+let _phase = TerminalPhase.INIT;
+
+/**
+ * Retorna a fase atual do terminal.
+ *
+ * @returns {string}
+ */
+export function getTerminalPhase() {
+    return _phase;
+}
+
+/**
+ * Transiciona o terminal para uma nova fase. Valida a transição e emite evento.
+ *
+ * @param {string} next - Próxima fase (deve ser um valor de `TerminalPhase`).
+ * @throws {CopilotError} Se a transição for inválida.
+ * @returns {void}
+ */
+export function transitionTerminalPhase(next) {
+    const allowed = VALID_TRANSITIONS.get(_phase);
+    if (!allowed?.includes(next)) {
+        throw new CopilotError(
+            `[TerminalSM] transição inválida: ${_phase} → ${next} (permitidas: ${allowed?.join(', ') ?? 'nenhuma'})`,
+            'STATE_TRANSITION_ERROR',
+        );
+    }
+    const prev = _phase;
+    _phase = next;
+    stateEmitter.emit('phase:changed', next, prev);
+}

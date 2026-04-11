@@ -10,8 +10,6 @@
 import { log } from '#copilot/observability';
 import { createSessionService } from '#copilot/services';
 import { Router } from 'express';
-
-const sessionService = createSessionService();
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 import {
@@ -22,6 +20,8 @@ import {
     validateModel,
     withErrorHandler,
 } from './session-middleware.js';
+
+const sessionService = createSessionService();
 
 /**
  * @typedef {import('express').Request} Req

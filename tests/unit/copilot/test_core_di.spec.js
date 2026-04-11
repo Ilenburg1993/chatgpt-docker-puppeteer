@@ -369,3 +369,33 @@ describe('core/di.js › dependency chain', () => {
         assert.equal(c.resolve(TOKEN), 'v2');
     });
 });
+
+// ─── wireLegacySetters ────────────────────────────────────────────────────────
+
+describe('core/di-container.js › wireLegacySetters', () => {
+    it('resolve tokens e invoca setters correspondentes', async () => {
+        const { wireLegacySetters } = await import('../../../src/copilot/core/di-container.js');
+        const c = createContainer();
+        const A = createToken('WL_A');
+        const B = createToken('WL_B');
+        c.register(A, () => 'valueA');
+        c.register(B, () => 42);
+        const called = [];
+        const count = wireLegacySetters(c, [
+            { token: A, setter: (v) => called.push(['A', v]) },
+            { token: B, setter: (v) => called.push(['B', v]) },
+        ]);
+        assert.equal(count, 2);
+        assert.deepEqual(called, [['A', 'valueA'], ['B', 42]]);
+    });
+
+    it('ignora tokens não registrados sem lançar erro', async () => {
+        const { wireLegacySetters } = await import('../../../src/copilot/core/di-container.js');
+        const c = createContainer();
+        const MISSING = createToken('WL_MISSING');
+        const count = wireLegacySetters(c, [
+            { token: MISSING, setter: () => { throw new Error('should not be called'); } },
+        ]);
+        assert.equal(count, 0);
+    });
+});

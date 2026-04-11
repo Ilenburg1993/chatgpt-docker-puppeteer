@@ -30,8 +30,7 @@ import createWebhooksRouter from './webhooks.js';
 /**
  * Cria o router principal da SDK API com injeção de dependências.
  *
- * Os sub-routers recebem dependências explícitas em vez de importar singletons,
- * facilitando testes e desacoplamento.
+ * Os sub-routers recebem dependências explícitas em vez de importar singletons, facilitando testes e desacoplamento.
  *
  * @returns {import('express').Router}
  */

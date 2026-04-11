@@ -25,7 +25,7 @@ import { setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
-import { container } from '../core/di-container.js';
+import { container, wireLegacySetters } from '../core/di-container.js';
 import { BRIDGE_AGENT, FALLBACK_AGENT, HUB, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
@@ -113,13 +113,8 @@ export async function startTerminalServer() {
     await loadAliasesAsync();
 
     // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
-    setHub(conversationHub);
     // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
     configureHookTools({ broadcastSse });
-    // ARCH-03 (fix): injetar agent nas permission-tools e orchestrator para quebrar circular deps
-    setPermissionAgent(alwaysAliveAgent);
-    setFallbackAgent(alwaysAliveAgent);
-    setBridgeAgent(alwaysAliveAgent);
 
     // DI container — registrar dependências de runtime (agent/tools stack)
     container.register(HUB, () => conversationHub, 'singleton');
@@ -127,6 +122,14 @@ export async function startTerminalServer() {
     container.register(FALLBACK_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
+
+    // K-5: wiring centralizado — resolve tokens e invoca setters legados
+    wireLegacySetters(container, [
+        { token: HUB, setter: setHub },
+        { token: PERMISSION_AGENT, setter: setPermissionAgent },
+        { token: FALLBACK_AGENT, setter: setFallbackAgent },
+        { token: BRIDGE_AGENT, setter: setBridgeAgent },
+    ]);
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files

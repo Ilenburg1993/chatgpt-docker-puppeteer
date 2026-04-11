@@ -15,6 +15,7 @@
 
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
+import { wireLegacySetters } from '../core/di-container.js';
 import { AUDIT_LOGGER, DB_LOGGER, EVENT_BUS, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
@@ -39,13 +40,7 @@ export function bootstrapObservability() {
         tracker: defaultErrorTracker,
     });
 
-    // Setters legados (backward compat)
-    setShutdownLogger(log);
-    setDbLogger(log);
-    setSdkLogger(log);
-    setAuditLogger(log, LOG_DIR);
-
-    // DI container — registrar as mesmas dependências como tokens
+    // DI container — registrar as dependências como tokens
     container.register(SHUTDOWN_LOGGER, () => log, 'singleton');
     container.register(DB_LOGGER, () => log, 'singleton');
     container.register(SDK_LOGGER, () => log, 'singleton');
@@ -53,6 +48,14 @@ export function bootstrapObservability() {
 
     // Event Bus global — singleton cross-module
     container.register(EVENT_BUS, () => createEventBus(), 'singleton');
+
+    // K-5: wiring centralizado — resolve tokens e invoca setters legados
+    wireLegacySetters(container, [
+        { token: SHUTDOWN_LOGGER, setter: setShutdownLogger },
+        { token: DB_LOGGER, setter: setDbLogger },
+        { token: SDK_LOGGER, setter: setSdkLogger },
+        { token: AUDIT_LOGGER, setter: (/** @type {any} */ fn) => setAuditLogger(fn, LOG_DIR) },
+    ]);
 }
 
 /**
@@ -64,7 +67,10 @@ export function bootstrapObservability() {
  */
 export function bootstrapLateDeps(deps) {
     if (deps.buildTool) {
-        setCustomToolsBuilder(/** @type {any} */ (deps.buildTool));
         container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
+        // K-5: wiring centralizado
+        wireLegacySetters(container, [
+            { token: TOOLS_BUILDER, setter: (/** @type {any} */ fn) => setCustomToolsBuilder(fn) },
+        ]);
     }
 }
