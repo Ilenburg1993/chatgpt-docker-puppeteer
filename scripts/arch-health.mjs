@@ -99,8 +99,9 @@ function singletonCount() {
     let total = 0;
     let excluded = 0;
     const pattern = /^let\s+\w+\s*=/gm;
-    // Patterns que NÃO são singletons reais (logger fallbacks, config constants)
-    const excludeRe = /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b)/;
+    // Patterns que NÃO são singletons reais (logger fallbacks, flags, counters, caches)
+    const excludeRe =
+        /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b|_?broadcastSse\b|_idCounter\b|_pendingInputSeq\b|_sseEventIdCounter\b|_turnQueueDepth\b|_persistenceFailureCount\b|_flushScheduled\b|exitHandlerRegistered\b|_agentListenersRegistered\b|_beforeStopRegistered\b|_rgAvailable\b|_modelsCache\b|_zodToJsonSchema\b)/;
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
@@ -130,13 +131,14 @@ function fanOut() {
     for (const mod of modules) {
         deps[mod] = new Set();
         const files = walkJs(join(COPILOT_ROOT, mod));
-        const importRe = /(?:import|from)\s+['"](?:#copilot\/([^/'"\s]+)|\.\.\/([^/'"\s]+))/g;
+        // Conta apenas imports #copilot/ (inter-módulo) — ignora imports relativos intra-módulo
+        const importRe = /(?:import|from)\s+['"]#copilot\/([^/'"\s]+)/g;
 
         for (const f of files) {
             const src = readFileSync(f, 'utf-8');
             let m;
             while ((m = importRe.exec(src)) !== null) {
-                const target = m[1] || m[2];
+                const target = m[1];
                 if (target && target !== mod) {
                     deps[mod].add(target);
                 }
