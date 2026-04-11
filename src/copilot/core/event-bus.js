@@ -259,9 +259,9 @@ export function createEventBus() {
  *
  * @example
  *     ```js
- *     // Re-emite 'SESSION_CREATED' do Orchestrator como 'hub:session:created' no EventBus
+ *     // Re-emite 'SESSION_CREATED' do Orchestrator como HUB_SESSION_CREATED no EventBus
  *     bridgeEmitter(orchestrator, eventBus, {
- *         [HUB_EVENTS.SESSION_CREATED]: 'hub:session:created',
+ *         [HUB_EVENTS.SESSION_CREATED]: HUB_SESSION_CREATED,
  *     });
  *     ```;
  *

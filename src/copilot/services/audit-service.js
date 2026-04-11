@@ -10,6 +10,7 @@
 import { defaultAuditLog, getAuditTail, globalAuditBuffer, isHighRiskTool } from '#copilot/audit';
 import { container, EVENT_BUS } from '#copilot/core';
 import { defaultErrorTracker, defaultMetrics, log } from '#copilot/observability';
+import { AUDIT_LOG, AUDIT_QUICK } from '#copilot/events';
 
 /**
  * Fachada de auditoria — consolida operações de audit + observability.
@@ -98,7 +99,7 @@ export class AuditService {
      */
     logAudit(level, message) {
         log(level, `[AuditService] ${message}`);
-        this.#bus()?.emit({ type: 'audit:log' });
+        this.#bus()?.emit({ type: AUDIT_LOG });
     }
 }
 

@@ -11,6 +11,7 @@ import { TimeoutError } from '#copilot/core';
 import { modelStatsTracker } from '#copilot/sdk';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
+import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 
@@ -122,7 +123,7 @@ export function attachDialogTaskHandlers(ctx) {
             if (errorTracker) {
                 const err = new TimeoutError(`Dialog turn timeout [phase=${evt?.phase ?? 'unknown'}]`);
                 errorTracker.trackError(err, {
-                    source: 'agent:dialog.turn_timeout',
+                    source: AGENT_DIALOG_TURN_TIMEOUT,
                     metadata: { phase: evt?.phase, timeoutMs: evt?.timeoutMs, turnId: evt?.turnId },
                 });
             }
@@ -237,7 +238,7 @@ export function attachDialogTaskHandlers(ctx) {
             }
             if (errorTracker) {
                 const err = evt?.error instanceof Error ? evt.error : new Error(String(evt?.error ?? 'task.error'));
-                errorTracker.trackError(err, { source: 'agent:task.error', metadata: { taskId } });
+                errorTracker.trackError(err, { source: AGENT_TASK_ERROR, metadata: { taskId } });
             }
             log('WARN', `[agent-event-observer] task.error taskId=${taskId}`);
         }, 'task.error'),

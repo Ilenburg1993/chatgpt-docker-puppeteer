@@ -10,6 +10,7 @@
 
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
+import { AGENT_SESSION_FATAL, AGENT_EMITTER_ERROR } from '#copilot/events';
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 
@@ -42,7 +43,7 @@ export function attachSessionAgentHandlers(ctx) {
             if (errorTracker && evt?.error) {
                 const err = evt.error instanceof Error ? evt.error : new Error(String(evt.error));
                 errorTracker.trackError(err, {
-                    source: 'agent:session.fatal',
+                    source: AGENT_SESSION_FATAL,
                     metadata: { sessionId: evt?.sessionId },
                 });
             }
@@ -250,7 +251,7 @@ export function attachSessionAgentHandlers(ctx) {
             metrics.recordCounter('agent.emitter.error');
             if (errorTracker) {
                 const e = err instanceof Error ? err : new Error(String(err));
-                errorTracker.trackError(e, { source: 'agent:emitter.error' });
+                errorTracker.trackError(e, { source: AGENT_EMITTER_ERROR });
             }
             log('WARN', `[agent-event-observer] agent error: ${err instanceof Error ? err.message : String(err)}`);
         }, 'error'),

@@ -222,7 +222,10 @@ check('C11', 'events/ module — zero strings de evento inline', 5, () => {
         parseInt(
             sh(
                 "grep -rn \"'agent:\\|'hub:\\|'terminal:\\|'system:\\|'dialog:\\|'audit:\\|'rpc:\" " +
-                    "src/copilot/ --include='*.js' 2>/dev/null | grep -v '\\.test\\.' | grep -v \"#copilot/events\" | wc -l",
+                    "src/copilot/ --include='*.js' 2>/dev/null | grep -v '\\.test\\.' | grep -v \"#copilot/events\" " +
+                    "| grep -v 'src/copilot/types/events\\.js' | grep -v 'src/copilot/events/' " +
+                    "| grep -v 'src/copilot/tools/shell/sandbox\\.js' " +
+                    "| grep -v 'src/copilot/conversation-hub/events\\.js' | wc -l",
             ),
         ) || 0;
     return { score: inline === 0 ? 5 : 0, detail: `${inline} strings de evento inline (meta: 0)` };

@@ -554,17 +554,27 @@ export const alwaysAliveAgent = new AlwaysAliveAgent();
 try {
     const { container } = await import('../core/di-container.js');
     const { EVENT_BUS } = await import('../core/di-tokens.js');
+    const {
+        AGENT_READY,
+        AGENT_BEFORE_STOP,
+        AGENT_STOPPED,
+        AGENT_ERROR,
+        AGENT_DIALOG_LOOP_CHANGED,
+        AGENT_SESSION_KEEPALIVE,
+        AGENT_TASK_STARTED,
+        AGENT_TASK_DELTA,
+    } = await import('../events/index.js');
     const bus = container.resolve(EVENT_BUS);
     if (bus) {
         bridgeEmitter(alwaysAliveAgent, bus, {
-            ready: 'agent:ready',
-            'before-stop': 'agent:before-stop',
-            stopped: 'agent:stopped',
-            error: 'agent:error',
-            'dialog.loop.changed': 'agent:dialog:loop:changed',
-            'session.keepalive': 'agent:session:keepalive',
-            'task.started': 'agent:task:started',
-            'task.delta': 'agent:task:delta',
+            ready: AGENT_READY,
+            'before-stop': AGENT_BEFORE_STOP,
+            stopped: AGENT_STOPPED,
+            error: AGENT_ERROR,
+            'dialog.loop.changed': AGENT_DIALOG_LOOP_CHANGED,
+            'session.keepalive': AGENT_SESSION_KEEPALIVE,
+            'task.started': AGENT_TASK_STARTED,
+            'task.delta': AGENT_TASK_DELTA,
         });
     }
 } catch {

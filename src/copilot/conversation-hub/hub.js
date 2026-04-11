@@ -17,6 +17,7 @@ import { log } from '#copilot/observability';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
 import { HUB_EVENTS } from './events.js';
+import { HUB_SESSION_CREATED, HUB_SESSION_CLOSED, HUB_TURN_SENT, HUB_TURN_COMPLETE, HUB_USER_INJECTED } from '#copilot/events';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
 import { conversationStore } from './store.js';
@@ -252,7 +253,7 @@ export class ConversationHub {
      */
     /**
      * M-3: Re-emite eventos significativos do Orchestrator no EventBus centralizado. Permite que qualquer módulo ouça
-     * eventos hub via `eventBus.on('hub:*', ...)`.
+     * eventos hub via EventBus (use constantes de `#copilot/events`).
      */
     #bridgeToEventBus() {
         if (!this.#orchestrator) return;
@@ -260,11 +261,11 @@ export class ConversationHub {
             const bus = container.resolve(EVENT_BUS);
             if (!bus) return;
             bridgeEmitter(this.#orchestrator, bus, {
-                [HUB_EVENTS.SESSION_CREATED]: 'hub:session:created',
-                [HUB_EVENTS.SESSION_CLOSED]: 'hub:session:closed',
-                [HUB_EVENTS.TURN_SENT]: 'hub:turn:sent',
-                [HUB_EVENTS.TURN_COMPLETE]: 'hub:turn:complete',
-                [HUB_EVENTS.USER_INJECTED]: 'hub:user:injected',
+                [HUB_EVENTS.SESSION_CREATED]: HUB_SESSION_CREATED,
+                [HUB_EVENTS.SESSION_CLOSED]: HUB_SESSION_CLOSED,
+                [HUB_EVENTS.TURN_SENT]: HUB_TURN_SENT,
+                [HUB_EVENTS.TURN_COMPLETE]: HUB_TURN_COMPLETE,
+                [HUB_EVENTS.USER_INJECTED]: HUB_USER_INJECTED,
             });
             log('DEBUG', '[ConversationHub] Bridge EventBus vinculado.');
         } catch {
