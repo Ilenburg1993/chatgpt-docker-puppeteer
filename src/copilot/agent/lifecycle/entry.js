@@ -16,8 +16,12 @@ import { TimeoutError } from '#copilot/core/errors';
 import { withRetry } from '#copilot/core/retry';
 import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
 import { defaultErrorTracker } from '#copilot/observability';
+import { bootstrapObservability } from '#copilot/observability/bootstrap';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '#copilot/sdk';
+
+// Registrar dependências de observabilidade em core/ antes de qualquer uso
+bootstrapObservability();
 import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {

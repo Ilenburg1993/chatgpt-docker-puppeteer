@@ -27,6 +27,7 @@ import {
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config/env';
 import { CopilotError } from '#copilot/core/errors';
+import { getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core/shared-state';
 import EventEmitter from 'node:events';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
@@ -56,8 +57,8 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
 
 // ─── Estado compartilhado ─────────────────────────────────────────────────────
 
-/** ID da hub_session permanente criada no boot. @type {string | null} */
-let _hubSessionId = null;
+// _hubSessionId é gerenciado em core/shared-state.js para permitir leitura por
+// módulos de camadas inferiores (ex: agent/) sem criar dependência de terminal/.
 
 /** Mutex simples: evita dois turnos simultâneos. @type {boolean} */
 let _busy = false;
@@ -98,12 +99,12 @@ const _terminalReplayBuffer = new SseReplayBuffer();
 
 /** @returns {string | null} */
 export function getHubSessionId() {
-    return _hubSessionId;
+    return _getCoreHubSessionId();
 }
 /** @param {string | null} id @returns {void} */
 export function setHubSessionId(id) {
-    const prev = _hubSessionId;
-    _hubSessionId = id;
+    const prev = _getCoreHubSessionId();
+    setSharedHubSessionId(id);
     if (prev !== id) stateEmitter.emit(TERMINAL_EVENTS.HUB_SESSION_CHANGED, id, prev);
 }
 

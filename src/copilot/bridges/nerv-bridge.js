@@ -26,7 +26,39 @@
 
 import { log } from '#copilot/observability/logger';
 import { onSessionEvent } from '#copilot/sdk';
-import { alwaysAliveAgent } from '../agent/index.js';
+
+/**
+ * @typedef {import('../agent/always-alive.js').AlwaysAliveAgent} AlwaysAliveAgentLike
+ */
+
+/**
+ * Referência ao agente injetada via `registerNervBridgeAgent()`.
+ * Não importamos `agent/` diretamente para evitar inversão de camada (bridges → agent).
+ *
+ * @type {AlwaysAliveAgentLike | null}
+ */
+let _agent = null;
+
+/**
+ * Registra a instância do AlwaysAliveAgent para uso pelo bridge.
+ * Deve ser chamado no bootstrap (main.js) antes de qualquer `mount()`.
+ *
+ * @param {AlwaysAliveAgentLike} agent
+ * @returns {void}
+ */
+export function registerNervBridgeAgent(agent) {
+    _agent = agent;
+}
+
+/**
+ * Retorna o agent registrado. Utilitário interno.
+ *
+ * @returns {AlwaysAliveAgentLike}
+ */
+function getAgent() {
+    if (!_agent) throw new Error('[nerv-bridge] Agent não registrado — chame registerNervBridgeAgent() no bootstrap.');
+    return _agent;
+}
 
 /**
  * Mapa de eventos do AlwaysAliveAgent → actionCode NERV.
@@ -148,24 +180,24 @@ const INBOUND_COMMANDS = Object.freeze({
             log('WARN', '[nerv-bridge:inbound] sendMessage ignorado — message inválido.');
             return;
         }
-        await alwaysAliveAgent.sendMessage(message, options ?? {});
+        await getAgent().sendMessage(message, options ?? {});
     },
     /** Pausa o dialog loop do agente. */
     async pause() {
-        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function') {
-            await alwaysAliveAgent.pauseDialogLoop();
+        if (typeof getAgent().pauseDialogLoop === 'function') {
+            await getAgent().pauseDialogLoop();
         }
     },
     /** Retoma o dialog loop após pause. */
     async resume() {
-        if (typeof alwaysAliveAgent.resumeDialogLoop === 'function') {
-            await alwaysAliveAgent.resumeDialogLoop();
+        if (typeof getAgent().resumeDialogLoop === 'function') {
+            await getAgent().resumeDialogLoop();
         }
     },
     /** Reinicia o agente (stop + start). */
     async restart() {
-        await alwaysAliveAgent.stop();
-        await alwaysAliveAgent.start();
+        await getAgent().stop();
+        await getAgent().start();
     },
 });
 
@@ -237,7 +269,7 @@ function _attachListeners() {
     for (const { event, actionCode } of EVENT_MAP) {
         const handler = (/** @type {Record<string, unknown>} */ payload) => safeEmit(actionCode, payload ?? {});
         _listeners.set(event, handler);
-        alwaysAliveAgent.on(event, handler);
+        getAgent().on(event, handler);
     }
     log('INFO', '[nerv-bridge] Listeners registrados nos eventos do AlwaysAliveAgent.');
 }
@@ -249,7 +281,7 @@ function _attachListeners() {
  */
 function _detachListeners() {
     for (const [event, handler] of _listeners.entries()) {
-        alwaysAliveAgent.off(event, handler);
+        getAgent().off(event, handler);
     }
     _listeners.clear();
     log('INFO', '[nerv-bridge] Listeners removidos do AlwaysAliveAgent.');
@@ -291,7 +323,7 @@ export function mount(nerv) {
     // e então re-registramos quando 'ready' disparar (novo ciclo de vida do agente).
     // F3.7 (BUG-MOD-12): verificar flag para evitar registro duplo em mounts consecutivos.
     if (!_beforeStopRegistered) {
-        alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+        getAgent().on('before-stop', _onAgentBeforeStop);
         _beforeStopRegistered = true;
     }
 
@@ -315,10 +347,10 @@ function _onAgentBeforeStop() {
         log('INFO', '[nerv-bridge] Agente pronto novamente — re-registrando listeners.');
         _attachListeners();
         // Reagendar o handler para o próximo ciclo de stop (flag já true, apenas re-registra)
-        alwaysAliveAgent.on('before-stop', _onAgentBeforeStop);
+        getAgent().on('before-stop', _onAgentBeforeStop);
     };
     // Ao reiniciar, o agente emite 'ready'; re-registramos UMA vez.
-    alwaysAliveAgent.once('ready', _pendingReadyHandler);
+    getAgent().once('ready', _pendingReadyHandler);
 }
 
 /**
@@ -333,10 +365,10 @@ export function unmount() {
         _inboundUnsub();
         _inboundUnsub = null;
     }
-    alwaysAliveAgent.off('before-stop', _onAgentBeforeStop);
+    getAgent().off('before-stop', _onAgentBeforeStop);
     // B10-03: cancelar handler 'ready' pendente para evitar re-anexação após desmontagem
     if (_pendingReadyHandler) {
-        alwaysAliveAgent.off('ready', _pendingReadyHandler);
+        getAgent().off('ready', _pendingReadyHandler);
         _pendingReadyHandler = null;
     }
     _beforeStopRegistered = false;
@@ -392,7 +424,7 @@ export function _resetNervBridgeState() {
  * ouvir eventos tipados do SDK diretamente (sessão copilot), em contraste com eventos do AlwaysAliveAgent
  * (EventEmitter).
  *
- * @param {import('@github/copilot-sdk').CopilotSession} session - Sessão SDK ativa.
+ * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
  * @param {string} eventType - Tipo de evento SDK (e.g., 'assistant.message').
  * @param {(event: any) => void} handler - Callback.
  * @returns {() => void} Função de unsubscribe.

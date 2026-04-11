@@ -32,6 +32,9 @@ export { createMetricsStore, defaultMetrics } from './metrics.js';
 // ─── Error Tracker ────────────────────────────────────────────────────────────
 export { createErrorTracker, defaultErrorTracker } from './error-tracker.js';
 
+// ─── Bootstrap (conecta core/ a observability/) ───────────────────────────────
+export { bootstrapObservability } from './bootstrap.js';
+
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';
 

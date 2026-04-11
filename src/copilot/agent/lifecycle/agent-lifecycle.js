@@ -33,16 +33,18 @@ import {
     buildSessionTools,
     finalizeSessionInit,
 } from '../lifecycle/session-setup.js';
-import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.js';
+import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
 import { initOrResumeSession } from '../session/initializer.js';
+import { conversationStore } from '../../conversation-hub/store.js';
+import { getHubSessionId } from '../../core/shared-state.js';
 import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('../types.js').AgentStatus} AgentStatus
  */
@@ -53,7 +55,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  * Inicializa (ou reinicializa) a sessão SDK.
  *
  * @param {AgentContext} ctx
- * @param {import('@github/copilot-sdk').CopilotClient} client
+ * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {LifecycleHost} host
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
  */
@@ -84,7 +86,7 @@ export async function agentStart(ctx, host) {
     ctx.setStatus('starting', host);
     log('INFO', '[AlwaysAlive] Iniciando agente...');
 
-    persistState({ gracefulShutdown: false }, '[AlwaysAlive] gracefulShutdown=false');
+    void writeStateAsync({ gracefulShutdown: false });
 
     initEventCollector({
         metrics: defaultMetrics,
@@ -130,6 +132,7 @@ export async function agentStart(ctx, host) {
             resumeDialogLoop: () => host.resumeDialogLoop(),
             startDialogLoop: () => host.startDialogLoop(),
             getDialogPrMetrics: () => host.dialogPrMetrics,
+            mcpBridge: ctx.mcpBridge ?? null,
         });
         ctx.sessionEventUnsubscribers = bootResult.unsubs;
         ctx.agentObserver = bootResult.agentObserver;
@@ -138,7 +141,7 @@ export async function agentStart(ctx, host) {
         ctx.quotaMonitor = bootResult.quotaMonitor ?? null;
 
         ctx.setStatus('idle', host);
-        ctx.sendCount = readState()?.sendCount ?? 0;
+        ctx.sendCount = (await readStateAsync())?.sendCount ?? 0;
 
         log(
             'INFO',
@@ -146,7 +149,7 @@ export async function agentStart(ctx, host) {
         );
 
         if (isResumed) {
-            void syncSdkHistory(session, (event, payload) => host.emit(event, payload));
+            void syncSdkHistory(session, (event, payload) => host.emit(event, payload), { getHubSessionId, conversationStore });
         }
 
         host.emit('ready', { sessionId: session.sessionId, isResumed });
@@ -169,6 +172,7 @@ export async function agentStart(ctx, host) {
 export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
     if (ctx.status === 'stopped') return;
 
+    return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
     log('INFO', '[AlwaysAlive] Parando agente...');
 
     host.emit('before-stop');
@@ -284,6 +288,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
     }
 
     host.emit('stopped');
+    }); // startSpan copilot.agent.stop
 }
 
 /**
@@ -300,7 +305,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
     try {
         return await tryReconnect(
             originalError,
-            /** @type {import('@github/copilot-sdk').CopilotClient} */ (ctx.client),
+            /** @type {import('#copilot/sdk/types').CopilotClient} */ (ctx.client),
             ctx.status,
             {
                 emit: (event, payload) => host.emit(event, payload),

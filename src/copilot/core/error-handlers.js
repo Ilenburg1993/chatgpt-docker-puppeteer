@@ -12,10 +12,42 @@
  * @module copilot/core/error-handlers
  */
 
-import { defaultErrorTracker } from '../observability/error-tracker.js';
-import { log } from '../observability/logger.js';
 import { CircuitOpenError } from './circuit-breaker.js';
 import { BridgeError, CopilotError } from './errors.js';
+
+// ─── Handlers injetáveis (bootstrap via observability/bootstrap.js) ───────────
+
+/**
+ * @typedef {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} CoreLogLevel
+ */
+
+/**
+ * @typedef {object} ErrorHandlerDeps
+ * @property {(level: CoreLogLevel, msg: string) => void} log - Função de log.
+ * @property {{ trackError: (err: unknown, opts?: Record<string, unknown>) => unknown }} tracker - ErrorTracker.
+ */
+
+/** @type {ErrorHandlerDeps} */
+let _deps = {
+    log: (_level, msg) => console.error('[core:error-handlers]', msg), // fallback mínimo
+    tracker: { trackError: () => undefined },
+};
+
+/**
+ * Registra as dependências de log e tracking para error-handlers.
+ * Deve ser chamado pelo observability bootstrap antes de qualquer uso em runtime.
+ *
+ * @param {ErrorHandlerDeps} deps
+ * @returns {void}
+ */
+export function registerErrorHandlerDeps(deps) {
+    _deps = deps;
+}
+
+/** @returns {ErrorHandlerDeps} */
+export function getErrorHandlerDeps() {
+    return _deps;
+}
 
 // ─── logSwallowed ─────────────────────────────────────────────────────────────
 
@@ -29,8 +61,8 @@ import { BridgeError, CopilotError } from './errors.js';
  */
 export function logSwallowed(err, context) {
     const message = err instanceof Error ? err.message : String(err);
-    log('DEBUG', `[swallowed:${context}] ${message}`);
-    defaultErrorTracker.trackError(err, { source: `swallowed:${context}` });
+    _deps.log('DEBUG', `[swallowed:${context}] ${message}`);
+    _deps.tracker.trackError(err, { source: `swallowed:${context}` });
 }
 
 // ─── wrapAsync ────────────────────────────────────────────────────────────────
