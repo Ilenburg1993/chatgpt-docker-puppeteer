@@ -14,7 +14,7 @@
 | K     | ✅ CONCLUÍDA | `289d9d35` — refactor(copilot): Faixa K (DI container)                             |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)                             |
 | M     | ✅ CONCLUÍDA | `ad45f050` — refactor(copilot): Faixa M (Event Bus)                                |
-| N     | ✅ CONCLUÍDA | `740d39b1` — refactor(copilot): Faixa N (Services facades, PluginRegistry, Health) |
+| N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |
 
 ---
 
@@ -562,12 +562,26 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 **EventBus melhoria**: `emit()` agora aceita `{type: string}` sem timestamp obrigatório — auto-preenche `Date.now()`.
 
 **Subfases deferidas** (alto risco / invasivas):
-- N-1f–N-1g: Migração api/ para services — alto risco, precisa de cobertura de testes nas routes.
-- N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — requer design review.
-- N-3a–N-3d: API refactoring — alto risco, dependente de N-1f.
-- N-4d: CI integration — requer configuração de pipeline.
+- N-1f–N-1g: Migração api/ para services — ✅ N-1f concluída (`e20fcc96`), fan-out 11→8.
+- N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — ✅ concluídas (`eb6f88a9`).
+- N-3a–N-3d: API refactoring — ✅ N-3a via N-1f, N-3b (middleware já extraído), N-3d (fan-out ≤8 atingido). N-3c (OpenAPI) adiada.
+- N-4d: CI integration — ✅ arch-health step no code-quality.yml (`eb6f88a9`).
 
-**Validação**: 132 testes ✅ | lint clean ✅ | layer violations 0 ✅ | typecheck 16 ≤ baseline ✅
+**N-1f**: ✅ Migração de api/ para services facades — fan-out reduzido de 11→8 modules. Rotas usam SessionService, ToolService, AuditService, ConversationService.
+
+**N-2c**: ✅ CopilotPlugin typedef estendido: `version`, `description`, `dependencies` opcionais. PluginRegistry valida dependências em install().
+
+**N-2d**: ✅ `discoverPlugins(baseDir, registry)` — escaneia tools/hooks/bridges/services/*.js, carrega via dynamic import, auto-infere tipo a partir do subdiretório.
+
+**N-2e**: ✅ `activatePlugins(registry, container, enabledNames?)` — whitelist-based activation; sem whitelist instala todos.
+
+**N-3b**: ✅ Middleware já extraído em middleware.js (error handler) e session-middleware.js (rate limiting, validation).
+
+**N-3d**: ✅ api/ fan-out ≤ 8 — meta atingida na N-1f (8 modules: agent, bridges, channel, config, core, hooks, observability, services).
+
+**N-4d**: ✅ Arch-health step integrado ao workflow code-quality.yml como step informativo (continue-on-error).
+
+**Validação final N completa**: 22 node:test + 17 vitest = 39 testes copilot ✅ | lint 0 errors ✅ | typecheck 16 (baseline) ✅
 
 ---
 
