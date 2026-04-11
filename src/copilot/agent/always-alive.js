@@ -20,8 +20,8 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { bridgeEmitter, logSwallowed } from '#copilot/core';
-import { defaultMetrics, log } from '#copilot/observability';
+import { bridgeEmitter } from '#copilot/core';
+import { defaultMetrics } from '#copilot/observability';
 import EventEmitter from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
@@ -48,6 +48,10 @@ import {
 } from './messaging/agent-messaging.js';
 // F39: State — getStatusSnapshot, listenerDiagnostics
 import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
+// O3: Facades extraídas para reduzir LoC desta classe
+import { abortCurrentMessage, pingDialogWatchdog, sessionLog, getSessionMessages } from './facades/agent-session-ops.js';
+import { getModel, setModel, listAvailableModels, getReasoningEffort, setReasoningEffort } from './facades/agent-model-config.js';
+import { registerWebhook, unregisterWebhook, listWebhooks } from './facades/agent-webhook-ops.js';
 
 /**
  * @typedef {import('./types.js').CopilotSession} CopilotSession
@@ -129,7 +133,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }} Identificador do webhook registrado
      */
     registerWebhook(url) {
-        return this.ctx.webhooks.register(url);
+        return registerWebhook(this.ctx, url);
     }
 
     /**
@@ -139,7 +143,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean} true se removido, false se não encontrado
      */
     unregisterWebhook(id) {
-        return this.ctx.webhooks.unregister(id);
+        return unregisterWebhook(this.ctx, id);
     }
 
     /**
@@ -148,7 +152,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }[]}
      */
     listWebhooks() {
-        return this.ctx.webhooks.list();
+        return listWebhooks(this.ctx);
     }
 
     /**
@@ -226,51 +230,28 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * M-04 (PARTE-8): Aborta a mensagem SDK em processamento na sessão atual.
      *
-     * Útil para cancelar operações travadas (stall) sem destruir o dialog loop inteiro. Se não houver sessão ativa ou o
-     * método `abort()` não estiver disponível, é um no-op.
-     *
      * @returns {Promise<void>}
      */
     async abortCurrentMessage() {
-        if (!this.ctx.session || typeof this.ctx.session.abort !== 'function') {
-            log('DEBUG', '[AlwaysAlive] abortCurrentMessage(): sem sessão ativa ou abort indisponível.');
-            return;
-        }
-        try {
-            await this.ctx.session.abort();
-            log('INFO', '[AlwaysAlive] Mensagem SDK abortada via session.abort().');
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] session.abort() falhou: ${e.message}`);
-        }
+        await abortCurrentMessage(this.ctx);
     }
 
     /**
      * F52 (PARTE-9): Pinga o watchdog do dialog loop para sinalizar atividade.
-     *
-     * Usado pelo handler de stall quando a recovery zero-PR é bem-sucedida, evitando que o watchdog dispare novamente
-     * imediatamente.
      */
     pingDialogWatchdog() {
-        this.ctx.dialogLoop.pingWatchdog();
+        pingDialogWatchdog(this.ctx);
     }
 
     /**
      * M-05 (PARTE-8): Registra mensagem no timeline da sessão SDK via session.log().
-     *
-     * Torna eventos significativos (reconexão, rotação, keepalive) visíveis em ferramentas de debug do SDK/CLI. No-op
-     * se a sessão não estiver ativa.
      *
      * @param {string} message - Mensagem para registrar no timeline
      * @param {{ level?: 'info' | 'warning' | 'error' }} [options]
      * @returns {Promise<void>}
      */
     async sessionLog(message, options) {
-        if (!this.ctx.session || typeof this.ctx.session.log !== 'function') return;
-        try {
-            await this.ctx.session.log(message, options);
-        } catch (/** @type {any} */ e) {
-            logSwallowed(e, 'agent.sessionLog');
-        }
+        await sessionLog(this.ctx, message, options);
     }
 
     /**
@@ -355,7 +336,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string}
      */
     get model() {
-        return this.ctx.model;
+        return getModel(this.ctx);
     }
 
     /**
@@ -365,35 +346,16 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setModel(modelId) {
-        this.ctx.model = modelId;
-        // G2-BUG-10: setModel() é uma API não documentada do SDK (não consta nos types oficiais).
-        // O cast `any` é deliberado e a chamada é protegida por typeof para evitar crash em versões
-        // do SDK que não suportem a troca de modelo em runtime.
-        const sdkSession = /** @type {{ setModel?: (id: string) => void }} */ (this.ctx.session);
-        if (sdkSession && typeof sdkSession.setModel === 'function') {
-            try {
-                sdkSession.setModel(modelId);
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${e.message}`);
-            }
-        }
+        setModel(this.ctx, modelId);
     }
 
     /**
      * Lista os modelos disponíveis via SDK. Retorna array vazio se cliente não estiver inicializado.
      *
-     * F72: expõe `client.listModels()` do SDK como API pública na facade.
-     *
      * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
      */
     async listAvailableModels() {
-        if (!this.ctx.client) return [];
-        try {
-            return await this.ctx.client.listModels();
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] listModels() falhou: ${e.message}`);
-            return [];
-        }
+        return listAvailableModels(this.ctx);
     }
 
     /**
@@ -402,7 +364,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
      */
     get reasoningEffort() {
-        return this.ctx.reasoningEffort;
+        return getReasoningEffort(this.ctx);
     }
 
     /**
@@ -412,7 +374,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setReasoningEffort(effort) {
-        this.ctx.reasoningEffort = effort;
+        setReasoningEffort(this.ctx, effort);
     }
 
     /**
@@ -557,7 +519,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<unknown[]>}
      */
     async getSessionMessages() {
-        return this.ctx.messagesCache.get(this.ctx.session);
+        return getSessionMessages(this.ctx);
     }
 
     /**
@@ -576,9 +538,8 @@ export class AlwaysAliveAgent extends EventEmitter {
      * fire-and-forget; útil em contextos onde `await using` não é possível.
      */
     [Symbol.dispose]() {
-        this.stop().catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] stop() em Symbol.dispose falhou: ${e.message}`),
-        );
+        // fire-and-forget: swallow errors — Symbol.dispose não suporta await
+        this.stop().catch(() => undefined);
     }
 }
 
