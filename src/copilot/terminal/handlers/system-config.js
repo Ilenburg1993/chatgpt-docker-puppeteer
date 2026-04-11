@@ -8,10 +8,10 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
+import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/services';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { conversationHub, conversationStore } from '#copilot/services';
 import { defaultMetrics } from '#copilot/observability';
 import {
     BUILTIN_HANDLER_MAP,

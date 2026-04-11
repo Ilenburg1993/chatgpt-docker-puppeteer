@@ -10,8 +10,8 @@
  * @module copilot/terminal/commands/context
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
+import { alwaysAliveAgent } from '#copilot/services';
+import { llmBridgeClient } from '#copilot/services';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────

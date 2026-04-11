@@ -9,7 +9,7 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { conversationHub } from '#copilot/conversation-hub';
+import { conversationHub } from '#copilot/services';
 import { log } from '#copilot/observability';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */

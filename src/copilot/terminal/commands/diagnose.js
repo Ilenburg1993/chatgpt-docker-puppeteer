@@ -17,9 +17,9 @@
  * @module copilot/terminal/commands/diagnose
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { getMcpStatus } from '#copilot/bridges';
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { conversationHub, conversationStore } from '#copilot/services';
 import { getToolStats } from '#copilot/observability';
 
 /**

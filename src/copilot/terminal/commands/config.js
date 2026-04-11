@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/config
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { listModels } from '#copilot/sdk';
 import { modelRegistry, modelStatsTracker } from '#copilot/sdk';
 

@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/resume
  */
 
-import { conversationStore } from '#copilot/conversation-hub';
+import { conversationStore } from '#copilot/services';
 
 /**
  * Handler do comando `/resume`.

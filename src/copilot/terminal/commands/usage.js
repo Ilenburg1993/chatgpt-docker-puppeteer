@@ -9,7 +9,7 @@
  * @module copilot/terminal/commands/usage
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { getShowUsage, setShowUsage } from '../state.js';
 
 /**

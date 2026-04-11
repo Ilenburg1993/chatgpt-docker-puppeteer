@@ -8,7 +8,7 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { defaultAuditLog } from '#copilot/audit';
 import {
     gitLog,

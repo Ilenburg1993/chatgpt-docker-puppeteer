@@ -9,10 +9,9 @@
  * @module copilot/api/bridge-control
  */
 
-import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { createConversationService } from '#copilot/services';
+import { CHANNEL_VERSION, createConversationService } from '#copilot/services';
 import { createRequire } from 'node:module';
 
 const conversationService = createConversationService();

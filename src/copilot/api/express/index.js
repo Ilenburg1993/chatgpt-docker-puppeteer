@@ -16,9 +16,8 @@
  * @module copilot/api/sdk-api
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultMetrics } from '#copilot/observability';
-import { createSessionService, createToolService } from '#copilot/services';
+import { alwaysAliveAgent, createSessionService, createToolService } from '#copilot/services';
 import { Router } from 'express';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';

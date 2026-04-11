@@ -7,7 +7,7 @@
  * @module copilot/terminal/dialog/output
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────

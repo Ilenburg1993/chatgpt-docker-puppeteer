@@ -14,9 +14,9 @@ import {
     listSnapshotsAsync,
     loadSnapshotAsync,
     saveSnapshotAsync,
-} from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
-import { conversationStore } from '#copilot/conversation-hub';
+} from '#copilot/services';
+import { llmBridgeClient } from '#copilot/services';
+import { conversationStore } from '#copilot/services';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**

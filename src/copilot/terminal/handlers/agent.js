@@ -8,7 +8,7 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { sendTurn } from '../dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../file-context.js';
 import { recordInjectHistory } from '../state.js';

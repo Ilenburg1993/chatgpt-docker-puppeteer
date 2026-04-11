@@ -23,7 +23,7 @@
  * @module copilot/api/http-bridge
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { Router } from 'express';
 import { registerControlRoutes } from './control.js';
 import { registerDialogRoutes } from './dialog.js';

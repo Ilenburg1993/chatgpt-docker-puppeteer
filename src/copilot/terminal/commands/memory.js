@@ -7,7 +7,7 @@
  * @module copilot/terminal/commands/memory
  */
 
-import { conversationStore } from '#copilot/conversation-hub';
+import { conversationStore } from '#copilot/services';
 
 /**
  * @typedef {object} SessionContext

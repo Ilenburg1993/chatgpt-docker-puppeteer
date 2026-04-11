@@ -7,9 +7,9 @@
  * @module copilot/terminal/dialog/engine
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/services';
 import { emitNerv } from '#copilot/bridges';
-import { llmBridgeClient } from '#copilot/channel';
+import { llmBridgeClient } from '#copilot/services';
 import { log } from '#copilot/observability';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {

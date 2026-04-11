@@ -7,8 +7,8 @@
  * @module copilot/terminal/commands/metrics
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
+import { alwaysAliveAgent } from '#copilot/services';
+import { llmBridgeClient } from '#copilot/services';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 
 /**
