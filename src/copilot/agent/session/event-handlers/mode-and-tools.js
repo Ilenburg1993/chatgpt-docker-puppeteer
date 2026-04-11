@@ -5,6 +5,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**
  * @param {import('../event-wirer.js').CopilotSessionLike} session
@@ -13,7 +14,7 @@ import { log } from '#copilot/observability/logger';
  */
 export function wireModeAndToolEvents(session, { emit }) {
     return [
-        session.on('session.mode_changed', (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_MODE_CHANGED, (/** @type {any} */ evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),

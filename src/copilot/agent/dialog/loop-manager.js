@@ -34,7 +34,7 @@ import {
     WATCHDOG_INTERVAL_MS,
     WATCHDOG_STALL_MS,
 } from '../config.js';
-import { persistState, readState, writeStateAsync } from '../lifecycle/state-io.js';
+import { readState, readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { TurnQueue } from './backpressure.js';
 import { ModelFallbackState } from './model-fallback.js';
 import { DialogProtocol } from './protocol.js';
@@ -243,7 +243,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = true;
         this.emit('changed', { active: true, ts: Date.now() });
-        persistState({ dialogLoopActive: true }, '[DialogLoopManager] writeState dialogLoopActive=true');
+        void writeStateAsync({ dialogLoopActive: true });
 
         // F68.2: Span OTEL para o ciclo completo do dialog loop (start → stop)
         this.#loopSpan = startSpanImmediate('copilot.dialog.loop', {
@@ -303,7 +303,7 @@ export class DialogLoopManager extends EventEmitter {
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
         // F42.4: persistir prMetrics após boot bem-sucedido
-        persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
+        void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -385,7 +385,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#active = false;
         this.#stopping = false;
         this.#endLoopSpan(true);
-        persistState({ dialogLoopActive: false }, '[DialogLoopManager] writeState dialogLoopActive=false');
+        void writeStateAsync({ dialogLoopActive: false });
         this.#watchdog?.stop();
         this.emit('stopped', { reason, authorized: true });
     }
@@ -421,7 +421,7 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', '[DialogLoopManager] resume() já em andamento — ignorado.');
             return;
         }
-        const state = readState();
+        const state = await readStateAsync();
         if (!state?.dialogPaused) {
             log('WARN', '[DialogLoopManager] resume() sem dialogPaused=true — ignorado.');
             return;
@@ -441,7 +441,7 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume
-                persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
+                void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
                 this.emit('resumed', { prConsumed: false });
                 return;
             }
@@ -464,7 +464,7 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume zero-PR
-                persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
+                void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
                 this.emit('resumed', { prConsumed: false });
                 return;
             }
@@ -482,7 +482,7 @@ export class DialogLoopManager extends EventEmitter {
             // F41B.8: contabilizar resume com PR
             this.#prMetrics.resumesWithPR++;
             // F42.4: persistir prMetrics após resume com PR
-            persistState({ prMetrics: { ...this.#prMetrics } }, '[DialogLoopManager] writeState prMetrics');
+            void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
             this.emit('resumed', { prConsumed: true });
         } finally {
             this.#resuming = false;

@@ -27,20 +27,20 @@ import {
     defaultMetrics,
 } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { SESSION_LIFECYCLE_EVENTS } from '#copilot/sdk';
+import { SESSION_LIFECYCLE_EVENTS, isExperimentalEnabled } from '#copilot/sdk';
 import { createQuotaMonitor } from '#copilot/sdk/quota-monitor';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
-import { readState, writeStateAsync } from '../lifecycle/state-io.js';
+import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
  *
@@ -69,6 +69,7 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
+ * @property {({ startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null) | undefined} mcpBridge — Ponte MCP injetável (F69)
  */
 
 /**
@@ -148,10 +149,11 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
 
     // ── 6. Dialog loop resume após boot recovery ──
     if (isResumed) {
-        const savedState = readState();
-        if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
-            scheduleDialogBootRecovery(ctx);
-        }
+        void readStateAsync().then((savedState) => {
+            if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
+                scheduleDialogBootRecovery(ctx);
+            }
+        });
     }
 
     // ── 7. Timer de métricas periódicas ──
@@ -167,7 +169,11 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
     }
 
     // ── 8. Auto-reconnect MCP ──
-    const mcpReconnectCancel = startMcpAutoReconnect((tools) => {
+    // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const _ctxAny = /** @type {{ mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null }} */ (/** @type {unknown} */ (ctx));
+    const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
+    const mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
         ctx.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });
     }, MCP_RECONNECT_MS);
 
@@ -209,37 +215,34 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
         logSwallowed(e, 'agent.bootWiring.quotaMonitor');
     }
 
-    // ── 11. Wiring de handoff ──
-    agentEmitter.on(
-        'session.handoff',
-        (
-            /**
-             * @type {{
-             *     fromAgent: string;
-             *     toAgent: string;
-             *     reason?: string;
-             *     context?: Record<string, unknown>;
-             * }}
-             */ data,
-        ) => {
-            ctx.handoff.receive(data);
-            defaultMetrics.recordHandoff();
-        },
-    );
+    // ── 11. Wiring de handoff ── (F73: guardado por feature flag 'fleet')
+    if (isExperimentalEnabled('fleet')) {
+        agentEmitter.on(
+            'session.handoff',
+            (
+                /**
+                 * @type {{
+                 *     fromAgent: string;
+                 *     toAgent: string;
+                 *     reason?: string;
+                 *     context?: Record<string, unknown>;
+                 * }}
+                 */ data,
+            ) => {
+                ctx.handoff.receive(data);
+                defaultMetrics.recordHandoff();
+            },
+        );
+    } else {
+        log('DEBUG', '[BootWiring] Handoff wiring desabilitado (experimental.fleet não habilitado).');
+    }
 
     // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
     agentEmitter.on('question.answered', (/** @type {{ answer?: string }} */ evt) => {
         if (typeof evt?.answer !== 'string') return;
+        const answer = evt.answer;
         import('../../tools/hook-tools.js')
-            .then(({ resolveUserInput }) => resolveUserInput(evt.answer))
-            .catch((/** @type {any} */ e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
-    });
-
-    // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
-    agentEmitter.on('question.answered', (/** @type {{ answer?: string }} */ evt) => {
-        if (typeof evt?.answer !== 'string') return;
-        import('../../tools/hook-tools.js')
-            .then(({ resolveUserInput }) => resolveUserInput(evt.answer))
+            .then(({ resolveUserInput }) => resolveUserInput(answer))
             .catch((/** @type {any} */ e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
     });
 

@@ -392,7 +392,7 @@ const webSearchTool = buildTool({
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 // WEB-01-FIX: web_search habilitado por padrão — desativar via WEB_SEARCH_DISABLED=true
 export const webTools = [webFetchTool, ...(WEB_SEARCH_DISABLED ? [] : [webSearchTool])];

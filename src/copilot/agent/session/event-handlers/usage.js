@@ -6,7 +6,7 @@
 
 import { log } from '#copilot/observability/logger';
 import { SESSION_EVENTS } from '#copilot/sdk';
-import { persistState } from '../../lifecycle/state-io.js';
+import { writeStateAsync } from '../../lifecycle/state-io.js';
 
 /**
  * @param {import('../event-wirer.js').CopilotSessionLike} session
@@ -28,7 +28,7 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
         log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
         onPrInfo(prInfo);
         emit('pr.consumed', prInfo);
-        persistState(
+        void writeStateAsync(
             {
                 pendingTurnConsumedPR: true,
                 lastPrConsumedAt: Date.now(),
@@ -36,7 +36,6 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
                 lastPrCost: cost ?? 0,
                 lastQuotaSnapshots: quotaSnapshots ?? null,
             },
-            '[AlwaysAlive] writeState pendingTurnConsumedPR',
         );
     });
 }

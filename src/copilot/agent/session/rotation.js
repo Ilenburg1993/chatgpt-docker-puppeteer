@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { startSpanImmediate } from '#copilot/observability/otel';
 import { ROTATION_MAX_AGE_MS, ROTATION_MAX_COMPACTIONS, ROTATION_MAX_TURNS, ROTATION_MAX_UTIL } from '../config.js';
 
 /**
@@ -53,30 +54,39 @@ const DEFAULT_POLICY = {
  */
 export function shouldRotateSession(ctx, policyOverride) {
     const policy = { ...DEFAULT_POLICY, ...policyOverride };
+    const span = startSpanImmediate('copilot.session.shouldRotate', {});
+
+    /** @param {RotationDecision} decision */
+    const finish = (decision) => {
+        span?.setAttribute('shouldRotate', decision.shouldRotate);
+        span?.setAttribute('reason', decision.reason);
+        span?.end();
+        return decision;
+    };
 
     if (ctx.contextUtilization !== undefined && ctx.contextUtilization >= policy.maxUtilization) {
         const reason = `Utilização de contexto alta: ${Math.round(ctx.contextUtilization * 100)}% ≥ ${Math.round(policy.maxUtilization * 100)}%`;
         log('INFO', `[SessionRotation] ${reason}`);
-        return { shouldRotate: true, reason };
+        return finish({ shouldRotate: true, reason });
     }
 
     if (ctx.sessionAgeMs !== undefined && ctx.sessionAgeMs >= policy.maxAgeMs) {
         const reason = `Sessão expirada por idade: ${Math.round(ctx.sessionAgeMs / 3600_000)}h ≥ ${Math.round(policy.maxAgeMs / 3600_000)}h`;
         log('INFO', `[SessionRotation] ${reason}`);
-        return { shouldRotate: true, reason };
+        return finish({ shouldRotate: true, reason });
     }
 
     if (ctx.compactionCount !== undefined && ctx.compactionCount >= policy.maxCompactions) {
         const reason = `Compactions excessivas: ${ctx.compactionCount} ≥ ${policy.maxCompactions}`;
         log('INFO', `[SessionRotation] ${reason}`);
-        return { shouldRotate: true, reason };
+        return finish({ shouldRotate: true, reason });
     }
 
     if (ctx.totalTurns !== undefined && ctx.totalTurns >= policy.maxTurns) {
         const reason = `Turnos excessivos: ${ctx.totalTurns} ≥ ${policy.maxTurns}`;
         log('INFO', `[SessionRotation] ${reason}`);
-        return { shouldRotate: true, reason };
+        return finish({ shouldRotate: true, reason });
     }
 
-    return { shouldRotate: false, reason: 'Dentro dos limites da política' };
+    return finish({ shouldRotate: false, reason: 'Dentro dos limites da política' });
 }

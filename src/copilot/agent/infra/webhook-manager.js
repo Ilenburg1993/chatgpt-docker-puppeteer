@@ -59,7 +59,7 @@ export class WebhookManager {
         if (this.#urls.size >= MAX_WEBHOOKS) {
             throw new ConfigError(`[WebhookManager] Limite de ${MAX_WEBHOOKS} webhooks atingido.`);
         }
-        const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const id = `wh_${Date.now()}_${globalThis.crypto.randomUUID().slice(-8)}`;
         this.#urls.set(id, url);
         log('INFO', `[WebhookManager] Registrado: ${id} → ${url}`);
         return { id, url };

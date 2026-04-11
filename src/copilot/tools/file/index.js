@@ -44,6 +44,6 @@ import { fileReadTools } from './read-tools.js';
 import { fileWriteTools } from './write-tools.js';
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool[]}
  */
 export const fileTools = [...fileReadTools, ...fileWriteTools];

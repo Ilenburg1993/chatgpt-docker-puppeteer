@@ -90,8 +90,8 @@ export function getToolStats() {
  * Envolve uma tool SDK para capturar automaticamente latência e status de cada chamada. Não altera parâmetros ou valor
  * de retorno — apenas registra métricas no `_stats` interno.
  *
- * @param {import('@github/copilot-sdk').Tool} tool - Tool original
- * @returns {import('@github/copilot-sdk').Tool} Mesma tool com handler instrumentado
+ * @param {import('#copilot/sdk/types').Tool<any>} tool - Tool original
+ * @returns {import('#copilot/sdk/types').Tool<any>} Mesma tool com handler instrumentado
  */
 export function wrapWithStats(tool) {
     const original = tool.handler;
@@ -101,7 +101,7 @@ export function wrapWithStats(tool) {
         ...tool,
         handler: async (
             /** @type {Record<string, unknown>} */ params,
-            /** @type {import('@github/copilot-sdk').ToolInvocation} */ invocation,
+            /** @type {import('#copilot/sdk/types').ToolInvocation} */ invocation,
         ) => {
             const t0 = Date.now();
             try {

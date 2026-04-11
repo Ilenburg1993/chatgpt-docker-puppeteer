@@ -36,7 +36,7 @@ import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
  */
 export async function buildSessionTools(ctx) {
     ctx.messagesCache.invalidate();
-    const mcpTools = await buildMcpTools();
+    const mcpTools = ctx.mcpBridge ? await ctx.mcpBridge.buildTools() : await buildMcpTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
@@ -96,7 +96,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             }),
         hooks: busHooks,
         tools,
-        mcpServers: buildMcpConfig(),
+        mcpServers: ctx.mcpBridge ? ctx.mcpBridge.buildConfig() : buildMcpConfig(),
         reasoningEffort: ctx.reasoningEffort,
         injectHookContext: true,
     };
@@ -106,7 +106,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
  * Finaliza a sessão após criação: atualiza ctx e RPC.
  *
  * @param {AgentContext} ctx
- * @param {import('@github/copilot-sdk').CopilotSession} session
+ * @param {import('#copilot/sdk/types').CopilotSession} session
  * @param {boolean} isResumed
  */
 export function finalizeSessionInit(ctx, session, isResumed) {

@@ -124,7 +124,7 @@ function requireAgent() {
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
  * @property {number} [timeoutMs] - Timeout em ms (default: 60000)
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
+ * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
  * @property {number} [retryDelayMs] - F11.4: delay base entre tentativas em ms (default: 1500; cresce 2× a cada retry)

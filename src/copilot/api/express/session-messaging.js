@@ -108,7 +108,7 @@ router.post(
 
             incrementMessageCount(id);
 
-            /** @type {import('@github/copilot-sdk').MessageOptions} */
+            /** @type {import('#copilot/sdk/types').MessageOptions} */
             const messageOptions = {
                 prompt,
                 ...(attachments ? { attachments } : {}),
@@ -122,7 +122,7 @@ router.post(
                         setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs + 5000),
                     ),
                 ]);
-                const assistantEvent = /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */ (
+                const assistantEvent = /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */ (
                     event
                 );
                 res.json({

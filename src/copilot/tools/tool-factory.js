@@ -77,7 +77,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
  * @property {string} description - Descrição legível para o modelo
  * @property {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown>} [parameters] - Schema Zod
  *   (v3 ou v4) ou JSON Schema manual dos parâmetros
- * @property {import('@github/copilot-sdk').ToolHandler<TArgs>} handler - Callback executor da ferramenta
+ * @property {import('#copilot/sdk/types').ToolHandler<TArgs>} handler - Callback executor da ferramenta
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
  */
@@ -122,7 +122,7 @@ function normalizeParameters(parameters) {
  *
  * @template TArgs
  * @param {BuildToolOptions<TArgs>} options
- * @returns {import('@github/copilot-sdk').Tool<TArgs>}
+ * @returns {import('#copilot/sdk/types').Tool<TArgs>}
  */
 export function buildTool({
     name,
@@ -134,7 +134,7 @@ export function buildTool({
 }) {
     const jsonSchemaParams = normalizeParameters(parameters);
 
-    const wrappedHandler = /** @type {import('@github/copilot-sdk').ToolHandler<TArgs>} */ (
+    const wrappedHandler = /** @type {import('#copilot/sdk/types').ToolHandler<TArgs>} */ (
         async (args, invocation) => {
             log('DEBUG', `[tool-factory] Invocando tool '${name}' (sessionId=${invocation?.sessionId ?? 'n/a'})`);
             return handler(args, invocation);
@@ -154,8 +154,9 @@ export function buildTool({
  * Marca uma tool existente como `skipPermission: true` (execução sem aprovação prévia do usuário). Aplicável a tools de
  * leitura, introspecção e operações sem efeito colateral.
  *
- * @param {import('@github/copilot-sdk').Tool} tool - Tool a ser marcada
- * @returns {import('@github/copilot-sdk').Tool} A mesma tool com `skipPermission: true`
+ * @template [TArgs=unknown]
+ * @param {import('#copilot/sdk/types').Tool<TArgs>} tool - Tool a ser marcada
+ * @returns {import('#copilot/sdk/types').Tool<TArgs>} A mesma tool com `skipPermission: true`
  */
 export const withSkipPermission = (tool) =>
     Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));

@@ -21,7 +21,7 @@ import { withSkipPermission } from './tool-factory.js';
 // ─── Estado compartilhado via module-level registry ─────────────────────────
 
 /**
- * @typedef {import('@github/copilot-sdk').Tool} Tool
+ * @typedef {import('#copilot/sdk/types').Tool} Tool
  */
 
 /**
@@ -96,7 +96,7 @@ const listToolsTool = createTool({ name: 'list_tools',
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
         'Retorna nome, descrição e parâmetros de cada ferramenta.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ category?: string; search?: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ category?: string; search?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
                 category: z
@@ -186,7 +186,7 @@ const getTelemetryTool = createTool({ name: 'get_telemetry',
     description:
         'Retorna o sumário de telemetria da sessão: total de chamadas, taxa de sucesso, tools mais usadas, ' +
         'chamadas recentes e sessões registradas.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ recent?: number; toolName?: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ recent?: number; toolName?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
                 recent: z
@@ -246,7 +246,7 @@ const reportIntentTool = createTool({ name: 'report_intent',
         'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
     overridesBuiltInTool: true,
     parameters:
-        /** @type {import('@github/copilot-sdk').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
+        /** @type {import('#copilot/sdk/types').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
             /** @type {unknown} */ (
                 z.object({
                     intent: z
@@ -282,7 +282,7 @@ const toggleToolTool = createTool({ name: 'toggle_tool',
         'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
         'Use para restringir temporariamente o acesso a tools durante operações sensíveis. ' +
         'As tools de introspecção não podem ser desabilitadas.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ toolName: string; enabled: boolean }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean }>} */ (
         /** @type {unknown} */ (
             z.object({
                 toolName: z.string().describe('Nome da tool a habilitar/desabilitar'),
@@ -397,7 +397,7 @@ const getToolHealthTool = createTool({ name: 'get_tool_health',
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const introspectionTools = [
     withSkipPermission(listToolsTool),

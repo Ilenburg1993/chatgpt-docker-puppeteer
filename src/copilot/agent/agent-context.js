@@ -26,9 +26,9 @@ import { SessionMessagesCache } from './session/history-sync.js';
 import { SessionKeepalive } from './session/keepalive.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('./types.js').PendingQuestion} PendingQuestion
  *
@@ -127,6 +127,13 @@ export class AgentContext {
      * @type {(() => void) | null}
      */
     mcpReconnectCancel = null;
+
+    /**
+     * F69: Injeção de dependências MCP — permite override em testes e desacoplamento de camadas.
+     *
+     * @type {{ buildTools: () => Promise<any[]>; buildConfig: () => Record<string, unknown>; startAutoReconnect: (onTools: (tools: any[]) => void) => () => void } | null}
+     */
+    mcpBridge = null;
 
     /**
      * Monitor de quota periódico — F118 (Faixa 25).

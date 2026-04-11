@@ -24,7 +24,7 @@ import { withSkipPermission } from './tool-factory.js';
  */
 const getTasksTool = createTool({ name: 'get_tasks',
     description: 'Lista as tarefas mais recentes do sistema. Use para verificar estado atual da fila.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 status: z.string().optional().describe('Filtrar por status (pending, running, done, failed)'),
@@ -62,7 +62,7 @@ const getTasksTool = createTool({ name: 'get_tasks',
  */
 const addTaskTool = createTool({ name: 'add_task',
     description: 'Cria e enfileira uma nova tarefa no sistema de missões. A tarefa será executada pelo kernel.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 target: z.string().describe('URL ou identificador do alvo da tarefa'),
@@ -150,7 +150,7 @@ const getSystemHealthTool = createTool({ name: 'get_system_health',
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const taskTools = [
     withSkipPermission(getTasksTool),

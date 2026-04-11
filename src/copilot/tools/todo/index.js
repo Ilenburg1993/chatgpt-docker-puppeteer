@@ -39,14 +39,14 @@ import { todoListTool, todoSearchTool, todoStatsTool } from './query-tools.js';
 /**
  * Tools de leitura (skipPermission: true) — não modificam estado.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const todoReadTools = [todoGetTool, todoListTool, todoSearchTool, todoStatsTool];
 
 /**
  * Tools de escrita (requerem aprovação) — modificam estado.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const todoWriteTools = [
     todoCreateTool,
@@ -62,6 +62,6 @@ export const todoWriteTools = [
 /**
  * Conjunto completo das 12 todo tools.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const todoTools = [...todoReadTools, ...todoWriteTools];

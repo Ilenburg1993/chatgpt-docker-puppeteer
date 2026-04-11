@@ -84,7 +84,7 @@ function _checkClientRateLimit() {
  * @property {string} [from] - ator remetente (default: 'llm-a')
  * @property {number} [timeoutMs] - timeout em ms (default: 130000)
  * @property {number} [port] - porta do terminal (default: LLM_B_TERMINAL_PORT ?? 3009)
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
+ * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - Tentativas automáticas em caso de 409 LLM_B_BUSY (default: 3; 0 = sem retry)
  * @property {number} [retryDelayMs] - Delay base entre tentativas em ms; duplicado por tentativa (backoff exponencial,

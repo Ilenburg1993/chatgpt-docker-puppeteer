@@ -29,7 +29,7 @@ import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '..
  * @property {string} id
  * @property {string} message
  * @property {number} [timeoutMs]
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments]
+ * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments]
  * @property {number} enqueuedAt
  * @property {number} [attempts] - Número de tentativas realizadas (para limitar reintentos após reconexão)
  * @property {(text: string) => void} resolve
@@ -45,7 +45,7 @@ import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '..
  * @example
  *     await executeTask(session, task, { onDelta, setStatus, emit, ... });
  *
- * @param {import('@github/copilot-sdk').CopilotSession} session Sessão SDK ativa — deve expor `on` e `sendAndWait`.
+ * @param {import('#copilot/sdk/types').CopilotSession} session Sessão SDK ativa — deve expor `on` e `sendAndWait`.
  * @param {QueuedTask} task - Tarefa a executar
  * @param {TaskExecutorCallbacks} callbacks - Callbacks de interação com o agente pai
  * @returns {Promise<void>}
@@ -119,7 +119,7 @@ export async function executeTask(session, task, callbacks) {
     });
 
     try {
-        const sendOpts = /** @type {import('@github/copilot-sdk').MessageOptions} */ ({
+        const sendOpts = /** @type {import('#copilot/sdk/types').MessageOptions} */ ({
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });

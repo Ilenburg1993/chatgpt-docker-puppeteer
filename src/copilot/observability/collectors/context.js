@@ -14,7 +14,7 @@
  *
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
 /**

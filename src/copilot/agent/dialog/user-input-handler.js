@@ -10,7 +10,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { persistState } from '../lifecycle/state-io.js';
+import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('../types.js').PendingQuestion} PendingQuestion
@@ -83,7 +83,7 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
 function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersist = false }, ctx) {
     ctx.setStatus('waiting_for_input');
     if (!skipPersist) {
-        persistState({ pendingQuestion: question }, '[AlwaysAlive] writeState pendingQuestion');
+        void writeStateAsync({ pendingQuestion: question });
     }
 
     return new Promise((resolve) => {
@@ -100,7 +100,7 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
         };
         ctx.setPendingQuestion(pq);
         // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
-        persistState({ pendingQuestion: question, lastAskUserAt: Date.now() }, '[AlwaysAlive] lastAskUserAt');
+        void writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() });
         ctx.emit('question.pending', { question, choices, allowFreeform });
     });
 }

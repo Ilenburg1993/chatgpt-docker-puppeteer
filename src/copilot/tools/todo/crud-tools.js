@@ -38,7 +38,7 @@ export const todoCreateTool = createTool({ name: 'todo_create',
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
         'tags, data de vencimento, notas livres, e subtarefas via parentId. ' +
         'Retorna o objeto completo da tarefa criada com seu ID gerado.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 title: z.string().min(1).max(500).describe('Título da tarefa (obrigatório)'),
@@ -165,7 +165,7 @@ export const todoUpdateTool = createTool({ name: 'todo_update',
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
         'alterados (patch parcial). Status segue máquina de estados validada. ' +
         'Use para modificar título, descrição, prioridade, tags, data, notas ou metadata.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 id: zId,
@@ -264,7 +264,7 @@ export const todoSetStatusTool = createTool({ name: 'todo_set_status',
         'in_progress → todo | done | cancelled | blocked; ' +
         'done | cancelled → todo (reabrir); blocked → todo | in_progress. ' +
         'Use force: true para forçar transição fora do grafo (casos excepcionais).',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 id: zId,
@@ -405,7 +405,7 @@ export const todoAddSubtaskTool = createTool({ name: 'todo_add_subtask',
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +
         'Equivale a todo_create com parent_id preenchido, mas com interface mais direta. ' +
         'A tarefa pai tem sua lista subtaskIds atualizada automaticamente.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 parent_id: z.string().min(1).describe('ID da tarefa pai'),

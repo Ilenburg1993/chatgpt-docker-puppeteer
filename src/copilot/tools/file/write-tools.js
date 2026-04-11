@@ -327,7 +327,7 @@ export { copyFileTool, createFileTool, deleteFileTool, moveFileTool, patchFileTo
 /**
  * Tools de escrita do filesystem (requirePermission — aprovação obrigatória).
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool[]}
  */
 export const fileWriteTools = [
     writeFileContentTool,

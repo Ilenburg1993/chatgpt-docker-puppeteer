@@ -134,7 +134,7 @@ const typecheckTool = buildTool({
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const codeTools = [
     withSkipPermission(lintCheckTool),

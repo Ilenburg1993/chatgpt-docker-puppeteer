@@ -26,11 +26,11 @@ export { KNOWN_SDK_EVENTS } from './event-handlers/catch-all.js';
 /**
  * Tipo mínimo de sessão SDK usado pelos handlers — compatível com CopilotSession.
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSessionLike
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSessionLike
  */
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
 /**

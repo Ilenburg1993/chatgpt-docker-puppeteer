@@ -20,11 +20,11 @@ import {
 import { approveAll } from '#copilot/sdk';
 
 /**
- * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
  *
- * @typedef {import('@github/copilot-sdk').Tool} Tool
+ * @typedef {import('#copilot/sdk/types').Tool} Tool
  *
- * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ * @typedef {import('#copilot/sdk/types').PermissionHandler} PermissionHandler
  */
 
 /**

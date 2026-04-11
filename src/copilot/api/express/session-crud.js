@@ -35,7 +35,7 @@ import {
  *
  * @typedef {import('express').Response} Res
  *
- * @typedef {import('@github/copilot-sdk').SessionListFilter} SessionListFilter
+ * @typedef {import('#copilot/sdk/types').SessionListFilter} SessionListFilter
  */
 
 const router = Router();

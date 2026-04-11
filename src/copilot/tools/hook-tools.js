@@ -335,7 +335,7 @@ const hookGetPendingTasksTool = buildTool({
 /**
  * Array de Custom Tools do hook system prontas para uso no SDK.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const hookTools = [withSkipPermission(hookGetAuditTailTool), requestUserInputTool, hookGetPendingTasksTool];
 

@@ -13,7 +13,9 @@
 
 import { SessionError } from '#copilot/core/errors';
 import { log } from '#copilot/observability/logger';
-import { persistState } from '../lifecycle/state-io.js';
+import { startSpan } from '#copilot/observability';
+import { startSpanImmediate } from '#copilot/observability/otel';
+import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -31,7 +33,7 @@ import { persistState } from '../lifecycle/state-io.js';
  * @param {string} message
  * @param {{
  *     timeoutMs?: number;
- *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+ *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *     signal?: AbortSignal;
  *     resolve: (v: string | PromiseLike<string>) => void;
  *     reject: (r: unknown) => void;
@@ -39,8 +41,7 @@ import { persistState } from '../lifecycle/state-io.js';
  */
 export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal, resolve, reject }) {
     const task = /** @type {AgentTask} */ ({
-        id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        message,
+        id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,        message,
         resolve,
         reject,
         enqueuedAt: Date.now(),
@@ -64,7 +65,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
  * @param {string} message
  * @param {{
  *     timeoutMs?: number;
- *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+ *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *     signal?: AbortSignal;
  * }} [opts]
  * @returns {Promise<string>}
@@ -123,10 +124,13 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     if (!ctx.session) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
-    const messageId = await ctx.session.send({ prompt, mode: 'immediate' });
-    log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
-    host.emit('steering.sent', { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
-    return messageId;
+    const session = ctx.session;
+    return startSpan('copilot.agent.steer', { model: ctx.model ?? '', actor: 'agent' }, async () => {
+        const messageId = await session.send({ prompt, mode: 'immediate' });
+        log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
+        host.emit('steering.sent', { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
+        return messageId;
+    });
 }
 
 /**
@@ -138,16 +142,19 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
  * @returns {boolean}
  */
 export function answerPendingQuestion(ctx, host, answer) {
+    const span = startSpanImmediate('copilot.agent.answer', { 'had_pending': String(ctx.pendingQuestion !== null) });
     if (!ctx.pendingQuestion) {
         // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
         host.emit('question.answered', { answer, hadPending: false });
         log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
+        span?.end();
         return false;
     }
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.pendingQuestion.resolve(answer);
     ctx.pendingQuestion = null;
-    persistState({ pendingQuestion: null }, '[AlwaysAlive] writeState pendingQuestion=null');
+    void writeStateAsync({ pendingQuestion: null });
     host.emit('question.answered', { answer, hadPending: true });
+    span?.end();
     return true;
 }

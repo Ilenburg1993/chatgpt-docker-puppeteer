@@ -65,7 +65,7 @@ export class HandoffManager extends EventEmitter {
      * @returns {HandoffRequest}
      */
     receive(data) {
-        const id = `handoff-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const id = `handoff-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`;
         /** @type {HandoffRequest} */
         const request = {
             id,

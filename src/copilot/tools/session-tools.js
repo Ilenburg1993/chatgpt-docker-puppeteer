@@ -44,7 +44,7 @@ const readBriefingTool = createTool({ name: 'read_briefing',
  */
 const writePendingTaskTool = createTool({ name: 'write_pending_task',
     description: 'Adiciona uma tarefa pendente ao arquivo pending-tasks.md do Hook System.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 title: z.string().describe('Título da tarefa pendente'),
@@ -135,7 +135,7 @@ const SESSION_CONTEXT_STORE = new Map();
 const setSessionContextTool = createTool({ name: 'set_session_context',
     description:
         'Armazena um valor de contexto em memória de sessão (chave/valor). Use para preservar informações entre turnos.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 key: z.string().describe('Chave de contexto (ex: "current_task", "user_goal")'),
@@ -159,7 +159,7 @@ const invokeSkillTool = createTool({ name: 'invoke_skill',
         'Carrega o conteúdo de uma skill pelo nome e retorna seu conteúdo completo como contexto. ' +
         'Use quando precisar de instruções especializadas de uma skill (ex: "code-audit", "jsdoc-authoring"). ' +
         'Lista skills disponíveis se chamado sem parâmetro `name`.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<{ name?: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
                 name: z.string().optional().describe('Nome da skill a carregar (slug do diretório em .github/skills/)'),
@@ -198,7 +198,7 @@ const invokeSkillTool = createTool({ name: 'invoke_skill',
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const sessionTools = [
     withSkipPermission(readBriefingTool),

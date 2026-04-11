@@ -12,6 +12,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { startSpan } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../config.js';
 
@@ -27,7 +28,7 @@ import { SESSION_MAX_AGE_MS } from '../config.js';
 /**
  * Limpa sessões expiradas do servidor SDK.
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - Cliente SDK
+ * @param {import('#copilot/sdk/types').CopilotClient} client - Cliente SDK
  * @param {{
  *     maxAgeMs?: number;
  *     currentSessionId?: string | null;
@@ -38,6 +39,7 @@ export async function cleanupStaleSessions(client, options = {}) {
     const maxAgeMs = options.maxAgeMs ?? SESSION_MAX_AGE_MS;
     const currentSessionId = options.currentSessionId ?? null;
 
+    return startSpan('copilot.session.cleanup', { extra: { maxAgeMs, currentSessionId: currentSessionId ?? '' } }, async () => {
     /** @type {SessionCleanupResult} */
     const result = { total: 0, deleted: 0, deletedIds: [], kept: 0, errors: [] };
 
@@ -115,4 +117,5 @@ export async function cleanupStaleSessions(client, options = {}) {
     }
 
     return result;
+    }); // startSpan copilot.session.cleanup
 }

@@ -147,7 +147,7 @@ export function removeCustomAgent(name) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {import('@github/copilot-sdk').CustomAgentConfig} SdkCustomAgentConfig
+ * @typedef {import('#copilot/sdk/types').CustomAgentConfig} SdkCustomAgentConfig
  */
 
 /**

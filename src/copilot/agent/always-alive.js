@@ -301,7 +301,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @param {string} message - Mensagem a enviar
      * @param {{
      *     timeoutMs?: number;
-     *     attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+     *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
      *     signal?: AbortSignal;
      * }} [opts]
      *   - `timeoutMs` sobrescreve o timeout padrão de 60 s do SDK para `sendAndWait`. Use um valor grande (ex.: `24 * 60 *
@@ -377,6 +377,23 @@ export class AlwaysAliveAgent extends EventEmitter {
             } catch (/** @type {any} */ e) {
                 log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${e.message}`);
             }
+        }
+    }
+
+    /**
+     * Lista os modelos disponíveis via SDK. Retorna array vazio se cliente não estiver inicializado.
+     *
+     * F72: expõe `client.listModels()` do SDK como API pública na facade.
+     *
+     * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
+     */
+    async listAvailableModels() {
+        if (!this.ctx.client) return [];
+        try {
+            return await this.ctx.client.listModels();
+        } catch (/** @type {any} */ e) {
+            log('WARN', `[AlwaysAlive] listModels() falhou: ${e.message}`);
+            return [];
         }
     }
 

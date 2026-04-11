@@ -395,7 +395,7 @@ export { diffFilesTool, listDirectoryTool, readFileContentTool, searchInFilesToo
 /**
  * Tools de leitura do filesystem (skipPermission: true — não modificam estado).
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool[]}
  */
 export const fileReadTools = [
     withSkipPermission(readFileContentTool),

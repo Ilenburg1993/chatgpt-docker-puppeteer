@@ -25,7 +25,7 @@ export const todoBulkUpdateTool = createTool({ name: 'todo_bulk_update',
         'Atualiza status, prioridade ou tags em múltiplas tarefas simultaneamente. ' +
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
         'Use para completar um sprint, repriorizar um conjunto ou etiquetar em lote.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 ids: z.array(zId).min(1).max(100).describe('Lista de IDs de tarefas a atualizar (máximo 100)'),
@@ -189,7 +189,7 @@ export const todoImportTool = createTool({ name: 'todo_import',
         'Cada objeto deve ter pelo menos "title". Campos opcionais: description, priority, status, ' +
         'tags, due_date, notes, metadata. IDs novos são gerados automaticamente. ' +
         'Use para migrar tarefas de outros sistemas ou criar um sprint inteiro de uma vez.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 tasks: z

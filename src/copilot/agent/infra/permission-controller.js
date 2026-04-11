@@ -55,7 +55,7 @@ import { PERMISSION_MODE } from '../config.js';
  * mudança até o próximo `initOrResumeSession`.
  */
 export class PermissionController {
-    /** @type {import('@github/copilot-sdk').PermissionHandler} */
+    /** @type {import('#copilot/sdk/types').PermissionHandler} */
     #handler = approveAll;
 
     /** @type {PermissionMode} */
@@ -91,7 +91,7 @@ export class PermissionController {
     /**
      * Retorna o `PermissionHandler` ativo para passar ao `initOrResumeSession`.
      *
-     * @returns {import('@github/copilot-sdk').PermissionHandler}
+     * @returns {import('#copilot/sdk/types').PermissionHandler}
      */
     get handler() {
         return this.#handler;

@@ -31,7 +31,7 @@ import { webTools } from './web-tools.js';
 /**
  * Conjunto completo de Custom Tools disponíveis para o SDK Agent.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool[]}
  */
 export const allTools = [
     ...taskTools,

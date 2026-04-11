@@ -59,7 +59,7 @@ const gitStatusTool = createTool({ name: 'git_status',
  */
 const gitDiffTool = createTool({ name: 'git_diff',
     description: 'Mostra o diff dos arquivos modificados. Use para revisar mudanças antes de commitar.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 staged: z
@@ -88,7 +88,7 @@ const gitDiffTool = createTool({ name: 'git_diff',
  */
 const gitCommitTool = createTool({ name: 'git_commit',
     description: 'Adiciona arquivos e realiza um commit Git. Por segurança, requer confirmação prévia via ask_user.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 message: z.string().describe('Mensagem do commit (formato: "tipo: descrição")'),
@@ -144,7 +144,7 @@ const gitChangedFilesTool = createTool({ name: 'git_changed_files',
  */
 const gitPushTool = createTool({ name: 'git_push',
     description: 'Faz push do branch atual para o origin. Não suporta force-push por segurança.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 remote: z.string().optional().default('origin').describe('Remote de destino (padrão: origin)'),
@@ -172,7 +172,7 @@ const gitPushTool = createTool({ name: 'git_push',
  */
 const gitCreateBranchTool = createTool({ name: 'git_create_branch',
     description: 'Cria um novo branch Git e faz checkout. Opcional: a partir de um commit/branch base.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 name: z.string().describe('Nome do branch (ex: "feat/nova-feature")'),
@@ -204,7 +204,7 @@ const gitCreateBranchTool = createTool({ name: 'git_create_branch',
  */
 const gitLogTool = createTool({ name: 'git_log',
     description: 'Retorna o log de commits recentes com hash, autor, data e mensagem.',
-    parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
                 n: z.number().int().min(1).max(50).optional().default(10).describe('Número de commits a retornar'),
@@ -257,7 +257,7 @@ const gitIsDirtyTool = createTool({ name: 'git_is_dirty',
 });
 
 /**
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const gitTools = [
     withSkipPermission(gitStatusTool),

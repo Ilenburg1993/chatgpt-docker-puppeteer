@@ -75,5 +75,5 @@ export { LlmBridgeClient, llmBridgeClient } from './client.js';
  *
  * Mapeia diretamente para `MessageOptions['attachments']` do SDK, suportando arquivos, diretórios e seleções de texto.
  *
- * @typedef {import('@github/copilot-sdk').MessageOptions['attachments']} ChannelAttachment
+ * @typedef {import('#copilot/sdk/types').MessageOptions['attachments']} ChannelAttachment
  */

@@ -27,7 +27,7 @@ export const todoListTool = withSkipPermission(
             'tag, parent_id (listar subtarefas de uma tarefa), texto de busca, e overdue. ' +
             'Retorna tarefas ordenadas por: overdue → priority → createdAt desc. ' +
             'Use para obter uma visão geral ou filtrar por critério.',
-        parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
             /** @type {unknown} */ (
                 z.object({
                     status: zStatus.optional().describe('Filtrar por status específico'),
@@ -137,7 +137,7 @@ export const todoSearchTool = withSkipPermission(
             'Busca full-text avançada em todas as tarefas. Pesquisa simultânea em título, ' +
             'descrição, notas e tags. Suporta múltiplos termos (todos devem corresponder). ' +
             'Retorna tarefas ordenadas por relevância (número de campos com match) + prioridade.',
-        parameters: /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (
+        parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
             /** @type {unknown} */ (
                 z.object({
                     query: z

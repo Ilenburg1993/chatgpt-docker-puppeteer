@@ -331,7 +331,7 @@ const hubListSessionsTool = buildTool({
 /**
  * Conjunto de tools do hub para registro no AlwaysAliveAgent.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const hubTools = [
     hubCreateSessionTool,

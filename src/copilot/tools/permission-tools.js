@@ -160,6 +160,6 @@ const permissionModeSetTool = buildTool({
 /**
  * Lista de tools de controle de permissão.
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const permissionTools = [permissionModeGetTool, permissionModeSetTool];

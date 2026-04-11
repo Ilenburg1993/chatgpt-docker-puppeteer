@@ -12,6 +12,7 @@
 
 import { logSwallowed } from '#copilot/core/error-handlers';
 import { log } from '#copilot/observability/logger';
+import { startSpan } from '#copilot/observability';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
@@ -57,7 +58,7 @@ const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
  * @returns {SessionSnapshotData}
  */
 export function createSnapshot(opts) {
-    const snapshotId = `snap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const snapshotId = `snap-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`;
     const state = readState();
 
     /** @type {SessionSnapshotData} */
@@ -100,17 +101,19 @@ export function saveSnapshot(snapshot) {
  * @returns {Promise<string>} Caminho do arquivo salvo
  */
 export async function saveSnapshotAsync(snapshot) {
-    await mkdir(SNAPSHOT_DIR, { recursive: true });
+    return startSpan('copilot.snapshot.save', { extra: { snapshotId: snapshot.snapshotId, reason: snapshot.reason ?? 'manual' } }, async () => {
+        await mkdir(SNAPSHOT_DIR, { recursive: true });
 
-    const filename = `${snapshot.snapshotId}.json`;
-    const filepath = join(SNAPSHOT_DIR, filename);
+        const filename = `${snapshot.snapshotId}.json`;
+        const filepath = join(SNAPSHOT_DIR, filename);
 
-    await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
-    log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
+        await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
+        log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
 
-    await pruneSnapshotsAsync();
+        await pruneSnapshotsAsync();
 
-    return filepath;
+        return filepath;
+    });
 }
 
 /**
@@ -227,6 +230,7 @@ export async function listSnapshotsAsync() {
  * @returns {Promise<SessionSnapshotData | null>}
  */
 export async function loadSnapshotAsync(snapshotId) {
+    return startSpan('copilot.snapshot.load', { extra: { snapshotId } }, async () => {
     try {
         await access(SNAPSHOT_DIR);
     } catch {
@@ -265,6 +269,7 @@ export async function loadSnapshotAsync(snapshotId) {
     } catch {
         return null;
     }
+    }); // startSpan copilot.snapshot.load
 }
 
 /**

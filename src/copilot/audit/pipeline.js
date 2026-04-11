@@ -489,11 +489,11 @@ export function logToolAudit(entry) {
 /**
  * Cria um `PermissionHandler` que envolve `baseHandler` com logging de auditoria automático.
  *
- * @param {import('@github/copilot-sdk').PermissionHandler | undefined} baseHandler
- * @returns {import('@github/copilot-sdk').PermissionHandler}
+ * @param {import('#copilot/sdk/types').PermissionHandler | undefined} baseHandler
+ * @returns {import('#copilot/sdk/types').PermissionHandler}
  */
 export function buildAuditingPermissionHandler(baseHandler) {
-    return /** @type {import('@github/copilot-sdk').PermissionHandler} */ (
+    return /** @type {import('#copilot/sdk/types').PermissionHandler} */ (
         async (request, invocation) => {
             const toolName =
                 /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??

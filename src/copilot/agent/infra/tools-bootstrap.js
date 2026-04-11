@@ -41,7 +41,7 @@ import {
 /**
  * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
  *
- * @typedef {import('@github/copilot-sdk').Tool} Tool
+ * @typedef {import('#copilot/sdk/types').Tool} Tool
  */
 
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc exportados diretamente de tools/index.js
@@ -62,7 +62,7 @@ export function bootstrapTools(registry, mcpTools) {
      * local à função para evitar TDZ com módulos que exportam via inicialização lazy. Adicionar um novo grupo aqui é
      * suficiente — não há necessidade de duplicar no spread de `allTools`.
      *
-     * @type {[import('@github/copilot-sdk').Tool[], Record<string, any>][]}
+     * @type {[import('#copilot/sdk/types').Tool[], Record<string, any>][]}}
      */
     const TOOL_GROUPS = [
         [taskTools, { category: 'task', tags: ['queue', 'state'] }],

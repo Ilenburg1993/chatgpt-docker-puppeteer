@@ -17,7 +17,7 @@
  */
 
 /**
- * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
+ * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
  */
 import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '#copilot/sdk';
 
@@ -29,7 +29,7 @@ import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '#copilot/sdk';
  * Metadados das seções do system prompt — re-exportados do SDK v0.2.0. Cada valor é `{ description: string }`; a chave
  * é o nome da seção (ex.: `'guidelines'`).
  *
- * @type {import('@github/copilot-sdk').SystemPromptSection extends infer K
+ * @type {import('#copilot/sdk/types').SystemPromptSection extends infer K
  *     ? K extends string
  *         ? Record<K, { description: string }>
  *         : never

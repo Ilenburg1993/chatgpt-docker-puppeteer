@@ -33,7 +33,7 @@ import { startSpan } from '#copilot/observability/otel';
  *     const ok = await tryReconnect(err, client, 'running', callbacks);
  *
  * @param {Error} originalError - Erro original que desencadeou a reconexão
- * @param {import('@github/copilot-sdk').CopilotClient} client - Cliente SDK ativo (`CopilotClient`)
+ * @param {import('#copilot/sdk/types').CopilotClient} client - Cliente SDK ativo (`CopilotClient`)
  * @param {string} currentStatus - Status atual do agente (retorna false se `'stopped'`)
  * @param {ReconnectCallbacks} callbacks - Callbacks de side-effect do host
  * @param {{

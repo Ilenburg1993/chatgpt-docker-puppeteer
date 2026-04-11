@@ -26,16 +26,16 @@ import {
     resumeOrCreate,
 } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
-import { readState as _readState, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
+import { readStateAsync as _readStateAsync, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
 
 // Re-exports para backward compatibility
 export { buildHookSystemContext, buildHookSystemContextSafe, SessionJsonSchema } from './hook-context.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  *
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
 // F51: Carrega configuração de tools persistida (async).
@@ -111,21 +111,21 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  * @param {object} sessionOptions - Opções para createSession/resumeSession
  * @param {string} [sessionOptions.model] - Modelo a usar (default: 'gpt-4.1')
  * @param {'low' | 'medium' | 'high' | 'xhigh'} [sessionOptions.reasoningEffort] - Esforço de raciocínio para o3/o4-mini
- * @param {import('@github/copilot-sdk').PermissionHandler} [sessionOptions.onPermissionRequest]
+ * @param {import('#copilot/sdk/types').PermissionHandler} [sessionOptions.onPermissionRequest]
  * @param {Function} [sessionOptions.onUserInputRequest]
  * @param {object} [sessionOptions.hooks]
- * @param {import('@github/copilot-sdk').Tool[]} [sessionOptions.tools] - Custom Tools a registrar na sessão
+ * @param {import('#copilot/sdk/types').Tool[]} [sessionOptions.tools] - Custom Tools a registrar na sessão
  * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do hook system (default: true)
  * @param {Record<string, unknown>} [sessionOptions.mcpServers] - Configurações de servidores MCP nativos
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
  * @throws {Error} Se a criação/retomada da sessão SDK falhar ou a escrita de estado falhar
  */
 export async function initOrResumeSession(client, sessionOptions) {
-    const state = _readState();
+    const state = await _readStateAsync();
     const model = sessionOptions.model ?? 'gpt-4.1';
     const injectContext = sessionOptions.injectHookContext !== false;
 
-    /** @type {import('@github/copilot-sdk').SystemMessageConfig | undefined} */
+    /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
     const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContextSafe()) : undefined;
 
     /** @type {Record<string, unknown>} */

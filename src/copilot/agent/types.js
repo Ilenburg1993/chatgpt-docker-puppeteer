@@ -11,9 +11,9 @@
 // ─── SDK Re-exports ──────────────────────────────────────────────────────────
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
+ * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  */
 
 // ─── Agent Status ─────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
  * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
+ * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
  *   seleções) a enviar junto com a mensagem.
  */
 

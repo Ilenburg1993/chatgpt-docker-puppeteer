@@ -219,7 +219,7 @@ export async function listMcpTools() {
  * Cria um Custom Tool SDK que delega a execução para a tool MCP correspondente via HTTP.
  *
  * @param {McpToolMeta} mcpTool - Metadados da tool MCP
- * @returns {import('@github/copilot-sdk').Tool} Custom Tool pronta para uso no SDK
+ * @returns {import('#copilot/sdk/types').Tool<Record<string, unknown>>} Custom Tool pronta para uso no SDK
  */
 function createSdkToolFromMcp(mcpTool) {
     const schema = buildZodSchema(mcpTool.inputSchema ?? {});
@@ -263,7 +263,7 @@ function createSdkToolFromMcp(mcpTool) {
  * Consulta dinamicamente o endpoint MCP para descobrir as tools disponíveis e gera uma Custom Tool SDK para cada uma,
  * prefixada com `mcp_`.
  *
- * @returns {Promise<import('@github/copilot-sdk').Tool[]>} Array de Custom Tools prontas para registro no SDK
+ * @returns {Promise<import('#copilot/sdk/types').Tool<any>[]>} Array de Custom Tools prontas para registro no SDK
  */
 export async function buildMcpTools() {
     // UPG-02: circuit breaker — não tentar se o circuito está aberto
@@ -367,7 +367,7 @@ export function _resetMcpState() {
  * Quando o circuit breaker está aberto ou não há tools disponíveis, o job tenta chamar `buildMcpTools()` e, em caso de
  * sucesso, invoca o callback `onReconnect` com a nova lista de tools para que o agente possa atualizar sua sessão.
  *
- * @param {(tools: import('@github/copilot-sdk').Tool[]) => void | Promise<void>} onReconnect - Callback chamado com as
+ * @param {(tools: import('#copilot/sdk/types').Tool[]) => void | Promise<void>} onReconnect - Callback chamado com as
  *   tools reconectadas quando o MCP volta a responder
  * @param {number} [baseIntervalMs=5 * 60_000] - Intervalo base em ms; multiplicado pelo backoff step (padrão: 5 min).
  *   Default is `5 * 60_000`

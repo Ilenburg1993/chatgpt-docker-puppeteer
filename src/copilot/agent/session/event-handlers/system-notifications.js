@@ -5,6 +5,7 @@
  */
 
 import { log } from '#copilot/observability/logger';
+import { SESSION_EVENTS } from '#copilot/sdk';
 
 /**
  * @param {import('../event-wirer.js').CopilotSessionLike} session
@@ -13,7 +14,7 @@ import { log } from '#copilot/observability/logger';
  */
 export function wireSystemNotificationEvents(session, { emit }) {
     return [
-        session.on('system.notification', (/** @type {any} */ event) => {
+        session.on(SESSION_EVENTS.SYSTEM_NOTIFICATION, (/** @type {any} */ event) => {
             const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.['kind']);
             if (!kind?.type) return;
 

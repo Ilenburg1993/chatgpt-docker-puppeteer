@@ -27,7 +27,7 @@ import { log } from '#copilot/observability/logger';
  * @property {function(Error): void} reject - Callback de rejeição da Promise
  * @property {number} enqueuedAt - Timestamp em ms do momento de enqueue
  * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). `undefined` = usa padrão do SDK (60 s).
- * @property {import('@github/copilot-sdk').MessageOptions['attachments']} [attachments] - Anexos adicionais
+ * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos adicionais
  */
 
 // ─── MessageQueue ─────────────────────────────────────────────────────────────

@@ -40,10 +40,10 @@ import {
  *
  * @template T
  * @param {import('zod').ZodType<T>} schema
- * @returns {import('@github/copilot-sdk').ZodSchema<any>}
+ * @returns {import('#copilot/sdk/types').ZodSchema<any>}
  */
 const sdkParam = (schema) =>
-    /** @type {import('@github/copilot-sdk').ZodSchema<any>} */ (/** @type {unknown} */ (schema));
+    /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (/** @type {unknown} */ (schema));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL: exec_command
@@ -363,7 +363,7 @@ const runNodeFileTool = createTool({
 /**
  * Todas as shell tools (3 tools de execução).
  *
- * @type {import('@github/copilot-sdk').Tool[]}
+ * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const shellTools = [execCommandTool, runNpmScriptTool, runNodeFileTool];
 

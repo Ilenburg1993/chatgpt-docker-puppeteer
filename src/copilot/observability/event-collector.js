@@ -201,7 +201,7 @@ function persistEvent(entry) {
 
 /**
  * @typedef {object} EventCollector
- * @property {(session: import('@github/copilot-sdk').CopilotSession, sessionId: string) => (() => void)[]} attach
+ * @property {(session: import('#copilot/sdk/types').CopilotSession, sessionId: string) => (() => void)[]} attach
  *
  *   - Registra handlers na sessão e retorna lista de unsubscribers.
  */
@@ -326,7 +326,7 @@ export function createEventCollector(opts = {}) {
     /**
      * Registra handlers nos eventos da sessão SDK e retorna lista de unsubscribers.
      *
-     * @param {import('@github/copilot-sdk').CopilotSession} session - Sessão SDK ativa.
+     * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
      * @param {string} sessionId - ID da sessão.
      * @returns {(() => void)[]} Lista de funções de unsubscribe para cleanup.
      */
@@ -397,7 +397,7 @@ export { MAX_EVENTS_BYTES };
  * Registra um handler tipado em um evento da sessão SDK usando o wrapper `onSessionEvent` do sdk/events.js. Utilitário
  * para collectors que preferem eventos tipados com validação integrada.
  *
- * @param {import('@github/copilot-sdk').CopilotSession} session - Sessão SDK ativa.
+ * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
  * @param {string} eventType - Tipo de evento (e.g., 'assistant.message').
  * @param {(event: any) => void} handler - Handler do evento.
  * @returns {() => void} Função de unsubscribe.

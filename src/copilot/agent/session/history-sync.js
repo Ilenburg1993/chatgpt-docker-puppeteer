@@ -10,11 +10,13 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { conversationStore } from '../../conversation-hub/store.js';
-import { getHubSessionId } from '../../terminal/state.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
+ */
+
+/**
+ * @typedef {{ syncFromSdkHistory: (hubSessionId: string, sessionId: string, messages: { id?: string; type: string; content: string; createdAt?: number }[]) => { synced: number; skipped: number } }} ConversationStoreLike
  */
 
 /**
@@ -25,11 +27,12 @@ import { getHubSessionId } from '../../terminal/state.js';
  *
  * @param {CopilotSession} session
  * @param {(event: string, payload?: unknown) => boolean} emit
+ * @param {{ getHubSessionId: () => string | null; conversationStore: ConversationStoreLike }} deps
  * @returns {Promise<void>}
  */
-export async function syncSdkHistory(session, emit) {
+export async function syncSdkHistory(session, emit, deps) {
     try {
-        const hubSessionId = getHubSessionId();
+        const hubSessionId = deps.getHubSessionId();
         if (!hubSessionId) return;
         const sdkSession = /** @type {{ getMessages?: () => Promise<unknown[]> }} */ (session);
         if (typeof sdkSession.getMessages !== 'function') {
@@ -41,7 +44,7 @@ export async function syncSdkHistory(session, emit) {
         }
         const messages = await sdkSession.getMessages();
         if (!Array.isArray(messages) || messages.length === 0) return;
-        const { synced, skipped } = conversationStore.syncFromSdkHistory(
+        const { synced, skipped } = deps.conversationStore.syncFromSdkHistory(
             hubSessionId,
             session.sessionId,
             /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
