@@ -18,8 +18,7 @@
 
 import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultMetrics } from '#copilot/observability';
-import { getClient, getClientState, stopClient } from '#copilot/sdk';
-import { allTools } from '#copilot/tools';
+import { createSessionService, createToolService } from '#copilot/services';
 import { Router } from 'express';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
@@ -39,8 +38,18 @@ import createWebhooksRouter from './webhooks.js';
 export default function createSdkApiRouter() {
     const router = Router();
 
+    const _sessionService = createSessionService();
+    const _toolService = createToolService();
+
     // Dependências compartilhadas — resolvidas uma vez na raiz
-    const sharedDeps = { agent: alwaysAliveAgent, metrics: defaultMetrics, getClient, getClientState, stopClient, allTools };
+    const sharedDeps = {
+        agent: alwaysAliveAgent,
+        metrics: defaultMetrics,
+        getClient: () => _sessionService.getClient(),
+        getClientState: () => _sessionService.getClientState(),
+        stopClient: () => _sessionService.stopClient(),
+        allTools: _toolService.listAll(),
+    };
 
     // Sub-routers modulares — cada arquivo é responsável por um domínio
     router.use('/', createClientRouter(sharedDeps));

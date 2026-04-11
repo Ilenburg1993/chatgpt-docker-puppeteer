@@ -19,7 +19,6 @@
  * @module copilot/routes/observability
  */
 
-import { defaultAuditLog, getAuditTail } from '#copilot/audit';
 import { getMcpStatus, isMounted as isNervMounted } from '#copilot/bridges';
 import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config';
 import {
@@ -33,9 +32,12 @@ import {
     isOtelEnabled,
     log,
 } from '#copilot/observability';
+import { createAuditService } from '#copilot/services';
 import { Router } from 'express';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
+
+const auditService = createAuditService();
 
 /**
  * @typedef {import('express').Request} Req
@@ -263,9 +265,9 @@ router.get('/observability/audit', (req, res) =>
     withErrorHandler(req, res, async () => {
         const n = Math.min(Number(req.query['n']) || 50, 200);
         const type = typeof req.query['type'] === 'string' ? req.query['type'] : undefined;
-        let entries = defaultAuditLog.getLast(n);
+        let entries = auditService.getDefaultLog().getLast(n);
         if (type) {
-            entries = entries.filter((e) => e.type === type);
+            entries = entries.filter((/** @type {any} */ e) => e.type === type);
         }
         res.json({ ok: true, entries, count: entries.length });
     }),
@@ -275,7 +277,7 @@ router.get('/observability/audit', (req, res) =>
 
 router.post('/observability/audit/flush', (req, res) =>
     withErrorHandler(req, res, async () => {
-        await defaultAuditLog.flush();
+        await auditService.getDefaultLog().flush();
         log('INFO', '[observability] Audit log flushed via API');
         res.json({ ok: true });
     }),
@@ -288,7 +290,7 @@ router.get('/observability/audit-tail', (req, res) =>
         const n = Math.min(Math.max(Number(req.query['n']) || 50, 1), 500);
         const sessionId = typeof req.query['sessionId'] === 'string' ? req.query['sessionId'] : undefined;
         const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
-        let entries = getAuditTail(n);
+        let entries = auditService.getTail(n);
         if (sessionId) {
             entries = entries.filter((e) => /** @type {any} */ (e).sessionId === sessionId);
         }

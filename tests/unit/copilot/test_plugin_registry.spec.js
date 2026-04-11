@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 describe('copilot/plugins/PluginRegistry', () => {
     /** @returns {Promise<import('#copilot/plugins').PluginRegistry>} */
@@ -54,7 +54,9 @@ describe('copilot/plugins/PluginRegistry', () => {
         reg.register({
             name: 'inst',
             type: /** @type {const} */ ('service'),
-            install: () => { called = true; },
+            install: () => {
+                called = true;
+            },
         });
         const { createContainer } = await import('../../../src/copilot/core/di.js');
         const container = createContainer();
@@ -75,7 +77,9 @@ describe('copilot/plugins/PluginRegistry', () => {
         reg.register({
             name: 'idem',
             type: /** @type {const} */ ('tool'),
-            install: () => { count++; },
+            install: () => {
+                count++;
+            },
         });
         const { createContainer } = await import('../../../src/copilot/core/di.js');
         const container = createContainer();
@@ -87,8 +91,20 @@ describe('copilot/plugins/PluginRegistry', () => {
     it('installAll() instala todos os registrados', async () => {
         const reg = await makeRegistry();
         const installed = [];
-        reg.register({ name: 'x', type: /** @type {const} */ ('tool'), install: () => { installed.push('x'); } });
-        reg.register({ name: 'y', type: /** @type {const} */ ('hook'), install: () => { installed.push('y'); } });
+        reg.register({
+            name: 'x',
+            type: /** @type {const} */ ('tool'),
+            install: () => {
+                installed.push('x');
+            },
+        });
+        reg.register({
+            name: 'y',
+            type: /** @type {const} */ ('hook'),
+            install: () => {
+                installed.push('y');
+            },
+        });
         const { createContainer } = await import('../../../src/copilot/core/di.js');
         await reg.installAll(createContainer());
         assert.deepEqual(installed, ['x', 'y']);

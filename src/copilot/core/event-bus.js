@@ -101,10 +101,10 @@ export class EventBus {
     }
 
     /**
-     * Emite um evento, passando por middleware e notificando handlers.
-     * Se `timestamp` não for fornecido, será preenchido automaticamente.
+     * Emite um evento, passando por middleware e notificando handlers. Se `timestamp` não for fornecido, será
+     * preenchido automaticamente.
      *
-     * @param {{type: string; timestamp?: number; [key: string]: unknown}} rawEvent
+     * @param {{ type: string; timestamp?: number; [key: string]: unknown }} rawEvent
      */
     emit(rawEvent) {
         if (this.#disposed) return;

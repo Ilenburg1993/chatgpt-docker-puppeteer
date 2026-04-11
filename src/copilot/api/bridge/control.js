@@ -11,9 +11,11 @@
 
 import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
-import { conversationStore } from '#copilot/conversation-hub';
 import { log } from '#copilot/observability';
+import { createConversationService } from '#copilot/services';
 import { createRequire } from 'node:module';
+
+const conversationService = createConversationService();
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
 const _sdkVersion = (() => {
@@ -122,9 +124,10 @@ function _handleHealth(res, agent) {
     // API-P4-01: verificar se db existe antes de usar ? para não gerar false positive
     /** @type {{ ok: boolean; error?: string }} */
     const hubStore = (() => {
-        if (!conversationStore.db) return { ok: false, error: 'db não inicializado' };
+        const store = conversationService.getStore();
+        if (!store.db) return { ok: false, error: 'db não inicializado' };
         try {
-            conversationStore.db.prepare('SELECT 1').get();
+            store.db.prepare('SELECT 1').get();
             return { ok: true };
         } catch (/** @type {any} */ e) {
             return { ok: false, error: String(e?.message ?? 'unknown') };

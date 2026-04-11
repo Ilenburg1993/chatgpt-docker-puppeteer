@@ -8,8 +8,10 @@
  */
 
 import { log } from '#copilot/observability';
-import { getClientSession as getSdkSession, incrementSessionMessageCount as incrementMessageCount } from '#copilot/sdk';
+import { createSessionService } from '#copilot/services';
 import { Router } from 'express';
+
+const sessionService = createSessionService();
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
 import {
@@ -97,7 +99,7 @@ router.post(
                 return;
             }
 
-            const entry = getSdkSession(id);
+            const entry = sessionService.getSession(id);
             if (!entry) {
                 res.status(404).json({
                     ok: false,
@@ -106,7 +108,7 @@ router.post(
                 return;
             }
 
-            incrementMessageCount(id);
+            sessionService.incrementMessageCount(id);
 
             /** @type {import('#copilot/sdk/types').MessageOptions} */
             const messageOptions = {
@@ -167,7 +169,7 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    const entry = getSdkSession(id);
+    const entry = sessionService.getSession(id);
     if (!entry) {
         res.status(404).json({
             ok: false,
@@ -197,7 +199,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
 
     // Registra handler no SDK para encaminhar eventos
-    const unsubscribe = entry.session.on((event) => {
+    const unsubscribe = entry.session.on((/** @type {any} */ event) => {
         const type = /** @type {string} */ (event?.type ?? '');
         if (!eventFilter || eventFilter(type)) sse.send('message', standardizeSsePayload(event));
     });
@@ -228,7 +230,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
             return;
         }
         const safeModel = modelValidation.model;
-        const entry = getSdkSession(id);
+        const entry = sessionService.getSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -252,7 +254,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
 router.post('/sessions/:id/abort', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const entry = getSdkSession(id);
+        const entry = sessionService.getSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -276,7 +278,7 @@ router.post('/sessions/:id/abort', (req, res) => {
 router.get('/sessions/:id/messages', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const entry = getSdkSession(id);
+        const entry = sessionService.getSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,

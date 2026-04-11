@@ -80,7 +80,7 @@ export class PluginRegistry {
     /**
      * Lista todos os plugins registrados.
      *
-     * @returns {Array<{name: string; type: string; installed: boolean}>}
+     * @returns {{ name: string; type: string; installed: boolean }[]}
      */
     list() {
         return [...this.#plugins.values()].map((p) => ({

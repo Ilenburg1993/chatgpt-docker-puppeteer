@@ -7,8 +7,8 @@
  * @module copilot/services/audit-service
  */
 
-import { container, EVENT_BUS } from '#copilot/core';
 import { defaultAuditLog, getAuditTail, globalAuditBuffer, isHighRiskTool } from '#copilot/audit';
+import { container, EVENT_BUS } from '#copilot/core';
 import { defaultErrorTracker, defaultMetrics, log } from '#copilot/observability';
 
 /**
@@ -37,7 +37,7 @@ export class AuditService {
     /**
      * Obtém as últimas N entradas do audit log.
      *
-     * @param {number} [count=50]
+     * @param {number} [count=50] Default is `50`
      * @returns {any[]}
      */
     getTail(count = 50) {

@@ -4,8 +4,8 @@
  *
  * Fachada de alto nível para operações de sessão, consolidando sdk + observability + core.
  *
- * Consumidores (api/, terminal/) podem usar esta fachada em vez de importar diretamente
- * os subsistemas, reduzindo fan-out e centralizando lógica transversal (logging, eventos).
+ * Consumidores (api/, terminal/) podem usar esta fachada em vez de importar diretamente os subsistemas, reduzindo
+ * fan-out e centralizando lógica transversal (logging, eventos).
  *
  * @module copilot/services/session-service
  */
@@ -13,13 +13,21 @@
 import { container, EVENT_BUS } from '#copilot/core';
 import { log } from '#copilot/observability';
 import {
+    approveAll,
     createClientSession,
     disconnectClientSession,
     getClient,
     getClientSession,
+    getClientState,
+    incrementSessionMessageCount,
     listActiveClientSessions,
+    pickDefined,
     resumeClientSession,
+    stopClient,
 } from '#copilot/sdk';
+
+// Re-exportar utilitários do SDK usados pelas routes (evita que api/ dependa diretamente de #copilot/sdk)
+export { approveAll, pickDefined };
 
 /**
  * Fachada de sessão — consolida operações do SDK com logging e eventos.
@@ -47,7 +55,7 @@ export class SessionService {
     /**
      * Lista sessões ativas em memória.
      *
-     * @returns {Array<{sessionId: string; model: string; createdAt: number; messagesCount: number; activeMs: number}>}
+     * @returns {{ sessionId: string; model: string; createdAt: number; messagesCount: number; activeMs: number }[]}
      */
     listActive() {
         return listActiveClientSessions().map(({ sessionId, model, createdAt, messagesCount }) => ({
@@ -121,7 +129,7 @@ export class SessionService {
      * Lista sessões no disco com filtro opcional.
      *
      * @param {any} [filter]
-     * @returns {Promise<Array<any>>}
+     * @returns {Promise<any[]>}
      */
     async listSessions(filter) {
         const client = await getClient();
@@ -158,6 +166,35 @@ export class SessionService {
         const client = await getClient();
         await client.setForegroundSessionId(sessionId);
         log('INFO', `[SessionService] foreground session: ${sessionId}`);
+    }
+
+    /**
+     * Obtém o estado atual do CopilotClient.
+     *
+     * @returns {any}
+     */
+    getClientState() {
+        return getClientState();
+    }
+
+    /**
+     * Para o CopilotClient.
+     *
+     * @returns {Promise<void>}
+     */
+    async stopClient() {
+        log('INFO', '[SessionService] stopping client');
+        await stopClient();
+    }
+
+    /**
+     * Incrementa contador de mensagens de uma sessão.
+     *
+     * @param {string} sessionId
+     * @returns {void}
+     */
+    incrementMessageCount(sessionId) {
+        incrementSessionMessageCount(sessionId);
     }
 }
 

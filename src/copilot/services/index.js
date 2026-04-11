@@ -10,7 +10,7 @@
  * @module copilot/services
  */
 
-export { SessionService, createSessionService } from './session-service.js';
-export { ToolService, createToolService } from './tool-service.js';
 export { AuditService, createAuditService } from './audit-service.js';
 export { ConversationService, createConversationService } from './conversation-service.js';
+export { approveAll, createSessionService, pickDefined, SessionService } from './session-service.js';
+export { createToolService, ToolService } from './tool-service.js';

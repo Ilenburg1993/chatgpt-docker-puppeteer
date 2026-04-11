@@ -9,16 +9,7 @@
 
 import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { getCompactionHistory, log } from '#copilot/observability';
-import {
-    approveAll,
-    createClientSession as createSdkSession,
-    disconnectClientSession as disconnectSdkSession,
-    getClient,
-    getClientSession as getSdkSession,
-    listActiveClientSessions as listActiveSessions,
-    pickDefined,
-    resumeClientSession as resumeSdkSession,
-} from '#copilot/sdk';
+import { approveAll, createSessionService, pickDefined } from '#copilot/services';
 import { Router } from 'express';
 import {
     CreateSessionBodySchema,
@@ -28,6 +19,8 @@ import {
     validateModel,
     withErrorHandler,
 } from './session-middleware.js';
+
+const sessionService = createSessionService();
 
 /**
  * @typedef {import('express').Request} Req
@@ -47,13 +40,7 @@ const router = Router();
  * Lista sessões ativas no registry em memória (sessões com conexão aberta neste processo).
  */
 router.get('/sessions/active', (_req, res) => {
-    const active = listActiveSessions().map(({ sessionId, model, createdAt, messagesCount }) => ({
-        sessionId,
-        model,
-        createdAt,
-        messagesCount,
-        activeMs: Date.now() - createdAt,
-    }));
+    const active = sessionService.listActive();
     res.json({ ok: true, count: active.length, sessions: active });
 });
 
@@ -62,8 +49,7 @@ router.get('/sessions/active', (_req, res) => {
  */
 router.get('/sessions/last', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const client = await getClient();
-        const sessionId = await client.getLastSessionId();
+        const sessionId = await sessionService.getLastSessionId();
         res.json({ ok: true, lastSessionId: sessionId ?? null });
     });
 });
@@ -77,8 +63,7 @@ router.get('/sessions/last', (req, res) => {
  */
 router.get('/sessions/foreground', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const client = await getClient();
-        const sessionId = await client.getForegroundSessionId();
+        const sessionId = await sessionService.getForegroundSessionId();
         res.json({ ok: true, foregroundSessionId: sessionId ?? null });
     });
 });
@@ -89,9 +74,7 @@ router.get('/sessions/foreground', (req, res) => {
 router.put('/sessions/foreground/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const client = await getClient();
-        await client.setForegroundSessionId(id);
-        log('INFO', `[sdk-api] foreground session definida: ${id}`);
+        await sessionService.setForegroundSessionId(id);
         res.json({ ok: true, foregroundSessionId: id });
     });
 });
@@ -114,9 +97,8 @@ router.get('/sessions', (req, res) => {
         if (req.query['branch']) filter.branch = String(req.query['branch']);
         if (req.query['cwd']) filter.cwd = String(req.query['cwd']);
 
-        const client = await getClient();
-        const sessions = await client.listSessions(Object.keys(filter).length ? filter : undefined);
-        const active = new Set(listActiveSessions().map((s) => s.sessionId));
+        const sessions = await sessionService.listSessions(Object.keys(filter).length ? filter : undefined);
+        const active = new Set(sessionService.listActive().map((s) => s.sessionId));
 
         const enriched = sessions.map((s) => ({
             ...s,
@@ -180,7 +162,7 @@ router.post(
             }
             const safeModel = modelResult.model;
 
-            const session = await createSdkSession({
+            const session = await sessionService.createSession({
                 onPermissionRequest: approveAll,
                 model: safeModel,
                 ...pickDefined({
@@ -218,13 +200,12 @@ router.post(
 router.get('/sessions/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const client = await getClient();
 
         // Busca todas as sessões no disco e filtra pela ID solicitada
-        const all = await client.listSessions();
-        const meta = all.find((s) => s.sessionId === id);
+        const all = await sessionService.listSessions();
+        const meta = all.find((/** @type {any} */ s) => s.sessionId === id);
 
-        const entry = getSdkSession(id);
+        const entry = sessionService.getSession(id);
 
         if (!meta && !entry) {
             res.status(404).json({ ok: false, error: `Sessão "${id}" não encontrada.` });
@@ -285,9 +266,9 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
         }
 
         // Desconectar do registry se ativo
-        await disconnectSdkSession(id);
+        await sessionService.disconnectSession(id);
 
-        const client = await getClient();
+        const client = await sessionService.getClient();
         await client.deleteSession(id);
         log('INFO', `[sdk-api] Sessão deletada: ${id}`);
         res.json({ ok: true, message: `Sessão "${id}" deletada permanentemente.` });
@@ -305,7 +286,7 @@ router.post('/sessions/:id/disconnect', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
 
-        const entry = getSdkSession(id);
+        const entry = sessionService.getSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -314,7 +295,7 @@ router.post('/sessions/:id/disconnect', (req, res) => {
             return;
         }
 
-        await disconnectSdkSession(id);
+        await sessionService.disconnectSession(id);
         log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
         res.json({ ok: true, message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.` });
     });
@@ -340,7 +321,7 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
         const id = /** @type {string} */ (req.params.id);
         const { model } = req.body ?? {};
 
-        const session = await resumeSdkSession(
+        const session = await sessionService.resumeSession(
             id,
             model ? { onPermissionRequest: approveAll, model } : { onPermissionRequest: approveAll },
         );

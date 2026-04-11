@@ -7,8 +7,8 @@
  * @module copilot/services/conversation-service
  */
 
-import { container, EVENT_BUS } from '#copilot/core';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { container, EVENT_BUS } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /**
