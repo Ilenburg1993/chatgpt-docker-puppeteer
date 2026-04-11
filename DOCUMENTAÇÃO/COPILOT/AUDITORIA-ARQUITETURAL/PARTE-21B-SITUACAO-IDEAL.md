@@ -452,33 +452,42 @@ Wave 4  (futuro)      TS migration + multi-agent + horizontal scaling
 
 ---
 
-## 8. Comparação: Atual vs Ideal
+## 8. Comparação: Baseline → Atual → Ideal
 
-| Aspecto                     | Atual             | Ideal                              | Gap    |
-| --------------------------- | ----------------- | ---------------------------------- | ------ |
-| **Módulos**                 | 14                | **17** (+types, services, plugins) | +3     |
-| **Layer violations (real)** | 4                 | **0**                              | -4     |
-| **Barrel usage**            | 23%               | **≥80%**                           | +57pp  |
-| **Deep imports**            | 233               | **≤50**                            | -183   |
-| **Singletons**              | ~30               | **0** (DI managed)                 | -30    |
-| **EventEmitter files**      | 70 (ad-hoc)       | **3 buses** + local emitters       | Reorg  |
-| **DI pattern**              | 22 ad-hoc setters | **DI container + tokens**          | Reorg  |
-| **CI gates**                | 2 (+ testes)      | **10+**                            | +8     |
-| **Contract tests**          | 6                 | **20+**                            | +14    |
-| **Fan-out max**             | 11 (api/)         | **≤8** (services/ absorve)         | -3     |
-| **Files >400 LoC raw**      | 25                | **≤5**                             | -20    |
-| **Plugin architecture**     | Inexiste          | **Plugin registry**                | Novo   |
-| **TypeScript readiness**    | JSDoc only        | **types/ + TS pilot modules**      | Novo   |
-| **Multi-agent support**     | 1 agent only      | **N agents via DI fork**           | Novo   |
-| **Health score**            | ~D (35/100)       | **A (90/100)**                     | +55pts |
+> **Nota pós-execução (2026-04-12)**: Faixas H–N executadas. "Baseline" = pré-Faixa H.
+> "Atual" = pós-Faixa N (`6ebaa575`). Detalhes em PARTE-21F.
+
+| Aspecto                     | Baseline (21A)    | Atual (pós-N)      | Ideal              | Gap restante |
+| --------------------------- | ----------------- | ------------------- | ------------------ | ------------ |
+| **Módulos**                 | 14                | **17** ✅            | 17                 | 0            |
+| **Layer violations (CI)**   | 4 ocultas         | **0** ✅             | 0                  | 0            |
+| **Barrel coverage**         | 23%               | **100%** ✅          | ≥90%               | Atingido     |
+| **Deep imports**            | 233               | **165** ⚠️           | ≤50                | -115         |
+| **Singletons (contados)**   | ~30               | **73** 🔴            | ≤10                | -63*         |
+| **EventEmitter refs**       | 70                | **72** ⚠️            | ≤30 + bus          | -42          |
+| **DI pattern**              | 22 ad-hoc setters | **13 tokens + 9 wired** ⚠️ | DI container | -14 setters  |
+| **CI gates**                | 2                 | **5+** ⚠️            | 10+                | -5           |
+| **Contract tests**          | 6                 | **108** ✅           | 20+                | Atingido     |
+| **Fan-out max**             | 11 (api/)         | **19** (terminal) 🔴 | ≤8                 | -11          |
+| **Files >400 LoC (raw)**    | 25                | **18** ⚠️            | ≤5                 | -13          |
+| **Plugin architecture**     | Inexiste          | **Plugin registry** ✅| Plugin registry    | 0            |
+| **TypeScript readiness**    | JSDoc only        | **types/ + JSDoc** ⚠️ | types/ .ts         | Conversão    |
+| **Multi-agent support**     | 1 agent only      | **1 + DI fork prep** | N agents via DI    | Futuro       |
+| **Health score**            | D (35/100)        | **D (65/100)** ⚠️    | A (90/100)         | +25pts       |
+
+*\* 73 singletons contados inclui ~40 `let log =` e ~12 regex vars. Reais: ~15-20.*
 
 ---
 
 ## 9. Conclusão
 
-A arquitetura ideal v2 transforma o `src/copilot` de um sistema monolítico com boa superfície
-documental em uma **plataforma extensível** pronta para upgrades de larga escala. As 4 dimensões
-(topologia, comunicação, estado, qualidade) são interdependentes — Wave 0 e 1 desbloqueiam Wave 2
-e 3.
+A arquitetura ideal v2 permanece como norte. As Faixas H–N resolveram **4 dos 9 problemas
+completamente** e avançaram parcialmente os outros 5. Os gaps principais são:
 
-O roadmap detalhado com faixas, subfases, esforço e dependências está na PARTE-21C.
+1. **Deep imports** — 134 são logger (aceitáveis com allow-list), 31 reais
+2. **Fan-out terminal/** — root node, parcialmente justificável (extract facades)
+3. **Singleton refinement** — script precisa distinguir `let log` de state global
+4. **DI setters** — 14 restantes para migrar
+
+Próximas Waves: W4 (Deep Cleanup), W5 (Arquitetura Avançada), W6 (TypeScript).
+Ver PARTE-21C (roadmap) e PARTE-21F (status pós-execução) para detalhes.

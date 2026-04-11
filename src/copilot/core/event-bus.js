@@ -254,24 +254,24 @@ export function createEventBus() {
 /**
  * Conecta um EventEmitter convencional ao EventBus centralizado, re-emitindo eventos selecionados.
  *
- * Para cada `eventName` no mapa, registra um listener no `emitter` que chama `bus.emit()` com o
- * `type` correspondente e o payload original como propriedades espalhadas.
+ * Para cada `eventName` no mapa, registra um listener no `emitter` que chama `bus.emit()` com o `type` correspondente e
+ * o payload original como propriedades espalhadas.
+ *
+ * @example
+ *     ```js
+ *     // Re-emite 'SESSION_CREATED' do Orchestrator como 'hub:session:created' no EventBus
+ *     bridgeEmitter(orchestrator, eventBus, {
+ *         [HUB_EVENTS.SESSION_CREATED]: 'hub:session:created',
+ *     });
+ *     ```;
  *
  * @param {import('node:events').EventEmitter} emitter - Fonte de eventos local.
  * @param {EventBus} bus - Destino centralizado.
  * @param {Record<string, string>} eventMap - Mapa `{ localEventName: 'bus:type' }`.
  * @returns {() => void} Função para remover todos os listeners registrados.
- *
- * @example
- * ```js
- * // Re-emite 'SESSION_CREATED' do Orchestrator como 'hub:session:created' no EventBus
- * bridgeEmitter(orchestrator, eventBus, {
- *     [HUB_EVENTS.SESSION_CREATED]: 'hub:session:created',
- * });
- * ```
  */
 export function bridgeEmitter(emitter, bus, eventMap) {
-    /** @type {Array<{ event: string; handler: (...args: unknown[]) => void }>} */
+    /** @type {{ event: string; handler: (...args: unknown[]) => void }[]} */
     const bindings = [];
 
     for (const [localEvent, busType] of Object.entries(eventMap)) {

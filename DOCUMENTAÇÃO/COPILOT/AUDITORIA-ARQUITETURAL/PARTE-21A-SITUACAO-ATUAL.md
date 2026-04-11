@@ -1,8 +1,12 @@
 # PARTE-21A — Situação Atual: Auditoria Arquitetural Profunda de `src/copilot`
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.0
+**Data**: 2026-04-12 | **Status**: BASELINE (congelado pré-Faixa H) | **Versão**: 2.0
 **Scope**: Todo o diretório `src/copilot` — 287 arquivos `.js`, ~51.600 LoC (inclui JSDoc robusto)
 **Precedente**: PARTE-20A (análise pré-roadmap), PARTE-20C (roadmap executado, v1.5 CONCLUÍDO)
+
+> **⚠️ ATENÇÃO**: Este documento é o **baseline pré-execução** das Faixas H–N.
+> Para o estado atual (pós-execução), ver **PARTE-21F-STATUS-POS-EXECUCAO.md**.
+> Métricas atuais: 313 arquivos, 53.815 LoC, 17 módulos, 108 testes, Health Score 65/100.
 
 ---
 

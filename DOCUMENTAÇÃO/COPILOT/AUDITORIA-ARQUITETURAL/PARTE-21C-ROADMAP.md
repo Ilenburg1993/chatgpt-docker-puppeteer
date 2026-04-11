@@ -1,10 +1,10 @@
-# PARTE-21C — Roadmap v2: Faixas H–N para Upgrades de Larga Escala
+# PARTE-21C — Roadmap v2: Faixas H–N + Waves 4–6 para Upgrades de Larga Escala
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.1
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 3.0
 **Scope**: Roadmap evolutivo de `src/copilot` — da situação atual (21A) à ideal (21B)
-**Referência**: PARTE-21A (situação atual), PARTE-21B (ideal), PARTE-20C (roadmap anterior, CONCLUÍDO)
+**Referência**: PARTE-21A (baseline), PARTE-21B (ideal), PARTE-21F (status pós-execução)
 
-**Progresso de execução** (atualizado 2026-04-11):
+**Progresso de execução** (atualizado 2026-04-12):
 
 | Faixa | Status      | Commit                                                                                      |
 | ----- | ----------- | ------------------------------------------------------------------------------------------- |
@@ -13,8 +13,13 @@
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)                                          |
 | K     | ✅ CONCLUÍDA | `c7e016cd` — refactor(copilot): Faixa K (DI container + wireLegacySetters + Terminal SM)    |
 | L     | ✅ CONCLUÍDA | `8b02a3d2` — refactor(copilot): Faixa L (types module)                                      |
-| M     | ✅ CONCLUÍDA | `f348dde0` — refactor(copilot): Faixa M (Event Bus + bridgeEmitter + bridges Hub/Agent)         |
+| M     | ✅ CONCLUÍDA | `f348dde0` — refactor(copilot): Faixa M (Event Bus + bridgeEmitter + bridges Hub/Agent)     |
 | N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |
+
+**Métricas resumidas pós-Faixa N** (commit `6ebaa575`):
+- Health Score: **65/100 (D)** — barrel: 100%, singletons: 73, fan-out max: 19, deep: 165
+- 108 testes (91 node:test + 17 vitest), 0 erros lint, 16 erros typecheck (baseline)
+- 313 arquivos JS, 53.815 LoC, 17 módulos, 13 DI tokens
 
 ---
 
@@ -598,40 +603,101 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ---
 
-## 10. Resumo de Subfases por Faixa
+## 10. Resumo de Subfases por Faixa (H–N concluídas)
 
-| Faixa | Nome                       | Subfases | Wave | Deps    |
-| ----- | -------------------------- | -------- | ---- | ------- |
-| **H** | CI Hardening + Violações   | 16       | 0    | —       |
-| **I** | Barrel Enforcement         | 28       | 1    | H       |
-| **J** | Decomposição de Arquivos   | 29       | 1    | H       |
-| **K** | DI Container               | 33       | 2    | I, J    |
-| **L** | Shared Types               | 12       | 2    | J, I    |
-| **M** | Application Event Bus      | 17       | 3    | K, L    |
-| **N** | Extensibilidade + Services | 18       | 3    | K, L, M |
-| —     | **TOTAL**                  | **153**  | —    | —       |
-
----
-
-## 11. Métricas Projetadas por Wave
-
-| Métrica             | Atual (W0-) | Pós W0 (H) | Pós W1 (I,J) | Pós W2 (K,L) | Pós W3 (M,N) |
-| ------------------- | ----------- | ---------- | ------------ | ------------ | ------------ |
-| Layer violations    | 4           | **0**      | 0            | 0            | 0            |
-| Barrel ratio        | 23%         | 23%        | **≥80%**     | ≥85%         | ≥90%         |
-| Deep imports        | 233         | 233        | **≤50**      | ≤40          | ≤20          |
-| Files >400 LoC      | 25          | 25         | **≤5**       | ≤5           | ≤5           |
-| Singletons          | ~30         | ~30        | ~30          | **≤10**      | ≤5           |
-| DI setters (ad-hoc) | 22          | 22         | 22           | **0** (DI)   | 0            |
-| CI gates            | 2           | **5+**     | 7+           | 10+          | 12+          |
-| Contract tests      | 6           | 8+         | **20+**      | 25+          | 30+          |
-| EventEmitter ad-hoc | 70          | 70         | 70           | 70           | **≤30**      |
-| api/ fan-out        | 11          | 11         | 11           | 11           | **≤4**       |
-| Health Score (est.) | D (35)      | D+ (45)    | C+ (60)      | B (75)       | A- (85)      |
+| Faixa | Nome                       | Subfases | Wave | Deps    | Status       |
+| ----- | -------------------------- | -------- | ---- | ------- | ------------ |
+| **H** | CI Hardening + Violações   | 16       | 0    | —       | ✅ CONCLUÍDA  |
+| **I** | Barrel Enforcement         | 28       | 1    | H       | ✅ CONCLUÍDA  |
+| **J** | Decomposição de Arquivos   | 29       | 1    | H       | ✅ CONCLUÍDA  |
+| **K** | DI Container               | 33       | 2    | I, J    | ✅ CONCLUÍDA  |
+| **L** | Shared Types               | 12       | 2    | J, I    | ✅ CONCLUÍDA  |
+| **M** | Application Event Bus      | 17       | 3    | K, L    | ✅ CONCLUÍDA  |
+| **N** | Extensibilidade + Services | 18       | 3    | K, L, M | ✅ CONCLUÍDA  |
+| —     | **TOTAL H–N**              | **153**  | 0–3  | —       | ✅ DONE       |
 
 ---
 
-## 12. Riscos e Mitigações
+## 11. Waves 4–6 — Roadmap Pós-Faixa N
+
+> As Faixas H–N levaram o Health Score de D(35) para D(65). As Waves 4–6 definem o caminho
+> de D(65) para A-(90+).
+
+### 11.1 Wave 4 — Deep Cleanup (health 65→78)
+
+**Objetivo**: Refinar métricas de qualidade. Foco: singletons, deep imports residuais, file splits.
+
+| Sub   | Tarefa                                       | Deps | Esforço | Impacto Score |
+| ----- | -------------------------------------------- | ---- | ------- | ------------- |
+| W4-1  | Refinar arch-health: excluir `let log=`      | —    | Baixo   | +10-15pts     |
+| W4-2  | ESLint allow-list para logger deep imports   | —    | Baixo   | Deep -134     |
+| W4-3  | Migrar 31 deep imports restantes (não-logger)| W4-2 | Alto    | Deep →≤50     |
+| W4-4  | Split `conversation-hub/store.js` (queries)  | —    | Médio   | -1 >400       |
+| W4-5  | Split `hooks/factory.js` (create vs compose) | —    | Médio   | -1 >400       |
+| W4-6  | Split `terminal/server.js` (http vs ws)      | —    | Médio   | -1 >400       |
+| W4-7  | Split `observability/dialog-task-handlers.js` | —   | Médio   | -1 >400       |
+| W4-8  | DI tokens para 14 setters residuais          | —    | Alto    | Setters →0    |
+| W4-9  | Expandir contract tests (+10 testes)         | —    | Médio   | Qualidade CI  |
+| W4-10 | Reduzir fan-out api/ (10→≤8)                 | W4-3 | Médio   | Fan-out -2    |
+
+**Health Score projetado pós-W4**: 78/100 (C+)
+
+### 11.2 Wave 5 — Arquitetura Avançada (health 78→85)
+
+**Objetivo**: Eliminar fan-out excessivo, completar DI, domain buses.
+
+| Sub   | Tarefa                                        | Deps   | Esforço | Impacto       |
+| ----- | --------------------------------------------- | ------ | ------- | ------------- |
+| W5-1  | Extract terminal facades (fan-out 19→≤12)     | W4     | Alto    | Fan-out -7    |
+| W5-2  | Domain Event Bus por módulo (hooks, agent)    | W4     | Alto    | Desacoplamento|
+| W5-3  | Event sourcing para audit pipeline            | W5-2   | Alto    | Audit imutável|
+| W5-4  | Cache manager com TTL + invalidation          | W4     | Médio   | -5 singletons |
+| W5-5  | Mutex pool com timeout                        | W4     | Médio   | -3 singletons |
+| W5-6  | Timer manager com cleanup                     | W4     | Baixo   | -2 singletons |
+| W5-7  | Split `agent/always-alive.js` (lifecycle)     | W5-2   | Alto    | -1 >400       |
+| W5-8  | Split `agent/dialog/loop-manager.js`          | W5-2   | Alto    | -1 >400       |
+| W5-9  | DI.fork() para multi-agent prep               | W5-1   | Alto    | Multi-agent   |
+
+**Health Score projetado pós-W5**: 85/100 (B+)
+
+### 11.3 Wave 6 — TypeScript & Polish (health 85→90)
+
+**Objetivo**: Fundação TypeScript, migração bottom-up, polish final.
+
+| Sub   | Tarefa                                        | Deps   | Esforço  | Impacto       |
+| ----- | --------------------------------------------- | ------ | -------- | ------------- |
+| W6-1  | Converter `types/` para .ts                   | W5     | Médio    | Primeiro .ts  |
+| W6-2  | Converter `core/` para .ts                    | W6-1   | Alto     | Foundation TS |
+| W6-3  | tsconfig paths para barrels                   | W6-1   | Médio    | TS module res |
+| W6-4  | Converter `db/` para .ts                      | W6-1   | Baixo    | Leaf .ts      |
+| W6-5  | Resolver 16 typecheck errors (rpc-*.js)       | W6-3   | Médio    | 0 errors      |
+| W6-6  | Observable-first metrics (OpenTelemetry)      | W5-3   | Alto     | Trace system  |
+| W6-7  | GraphQL gateway skeleton                      | W5     | Alto     | API evolution |
+| W6-8  | Horizontal scaling: worker pool draft         | W5-9   | Alto     | Scale out     |
+
+**Health Score projetado pós-W6**: 90/100 (A-)
+
+---
+
+## 12. Métricas Projetadas Consolidadas (W0–W6)
+
+| Métrica             | Baseline | Pós W3 (atual) | Pós W4        | Pós W5       | Pós W6       |
+| ------------------- | -------- | -------------- | ------------- | ------------ | ------------ |
+| Layer violations    | 4        | **0** ✅        | 0             | 0            | 0            |
+| Barrel coverage     | 23%      | **100%** ✅     | 100%          | 100%         | 100%         |
+| Deep imports        | 233      | **165** ⚠️      | **≤50**       | ≤30          | allow-list   |
+| Files >400 LoC      | 25       | **18** ⚠️       | **≤14**       | ≤8           | ≤5           |
+| Singletons (reais)  | ~30      | **73** (15-20)  | **≤15**       | ≤5           | 0 (DI)       |
+| DI setters          | 22       | **23** ⚠️       | **0** (DI)    | 0            | 0            |
+| CI gates            | 2        | **5+**          | 7+            | 10+          | 12+          |
+| Contract tests      | 6        | **108** ✅      | 120+          | 130+         | 150+         |
+| EventEmitter ad-hoc | 70       | **72** ⚠️       | 72            | **≤40**      | ≤30          |
+| Fan-out max         | 11       | **19** (term)   | **≤15**       | ≤12          | ≤8           |
+| Health Score        | D (35)   | **D (65)**      | **C+ (78)**   | **B+ (85)**  | **A- (90)**  |
+
+---
+
+## 13. Riscos e Mitigações
 
 | Risco                           | Probabilidade | Impacto | Mitigação                               |
 | ------------------------------- | ------------- | ------- | --------------------------------------- |
@@ -644,13 +710,17 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ---
 
-## 13. Conclusão
+## 14. Conclusão
 
-O roadmap de 153 subfases em 7 faixas e 4 ondas é desenhado para evolução **incremental e safe**:
-cada subfase pode ser feita em um commit, testada e revertida se necessário.
+### Faixas H–N (✅ concluídas — Waves 0–3)
 
-O caminho crítico é H→I→K→M — CI hardening desbloqueia barrel enforcement, que desbloqueia DI
-container, que desbloqueia EventBus. J e L são paralelos.
+153 subfases em 7 faixas executadas com sucesso. Health Score: D(35) → D(65).
+Principais conquistas: 17 módulos, DI container, EventBus, Plugin system, 108 testes, 0 violações.
 
-A execução disciplinada deste roadmap transforma o `src/copilot` de um monólito documentado em uma
-**plataforma extensível e pronta para upgrades de larga escala**.
+### Waves 4–6 (⬜ planejadas)
+
+27 subfases adicionais que levam o sistema de D(65) a A-(90).
+Caminho crítico: W4 (cleanup → score 78) → W5 (arquitetura → score 85) → W6 (TypeScript → score 90).
+
+A execução pode ser incremental — cada subfase é independente e commitável.
+Detalhes de status em PARTE-21F.

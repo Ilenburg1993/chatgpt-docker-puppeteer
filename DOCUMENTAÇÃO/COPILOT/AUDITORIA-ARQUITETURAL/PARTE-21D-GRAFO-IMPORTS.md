@@ -1,8 +1,12 @@
 # PARTE-21D — Grafos de Dependências: Atual e Ideal
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.0
+**Data**: 2026-04-12 | **Status**: BASELINE (grafos pré-Faixa H) | **Versão**: 2.0
 **Scope**: Grafos de dependência inter-módulo de `src/copilot` — ponderados por volume de imports
-**Referência**: PARTE-21A (situação atual), PARTE-21B (ideal), PARTE-21C (roadmap)
+**Referência**: PARTE-21A (baseline), PARTE-21B (ideal), PARTE-21C (roadmap), PARTE-21F (atual)
+
+> **⚠️ ATENÇÃO**: Os grafos neste documento refletem o estado **pré-execução** das Faixas H–N.
+> O grafo pós-execução inclui 3 módulos novos (types, services, plugins) e 165 deep imports
+> (vs 233 original). Ver PARTE-21F para fan-out atualizado por módulo.
 
 ---
 

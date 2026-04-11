@@ -12,10 +12,10 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
-import { SessionError, logSwallowed, bridgeEmitter } from '#copilot/core';
+import { SessionError, bridgeEmitter, logSwallowed } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
-import { log } from '#copilot/observability';
 import { HUB_EVENTS } from './events.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
@@ -251,8 +251,8 @@ export class ConversationHub {
      * @returns {void}
      */
     /**
-     * M-3: Re-emite eventos significativos do Orchestrator no EventBus centralizado.
-     * Permite que qualquer módulo ouça eventos hub via `eventBus.on('hub:*', ...)`.
+     * M-3: Re-emite eventos significativos do Orchestrator no EventBus centralizado. Permite que qualquer módulo ouça
+     * eventos hub via `eventBus.on('hub:*', ...)`.
      */
     #bridgeToEventBus() {
         if (!this.#orchestrator) return;

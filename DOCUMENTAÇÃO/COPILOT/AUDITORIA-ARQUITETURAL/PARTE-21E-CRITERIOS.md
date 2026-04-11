@@ -1,9 +1,12 @@
 # PARTE-21E — Critérios e Métricas: Avaliação Profunda Pós-Roadmap
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 2.0
-**Precedente**: PARTE-20E (critérios v1.0), PARTE-21A (situação atual v2.0)
+**Data**: 2026-04-12 | **Status**: BASELINE (scores pré-Faixa H) | **Versão**: 2.0
+**Precedente**: PARTE-20E (critérios v1.0), PARTE-21A (baseline v2.0), PARTE-21F (estado atual)
 **Scope**: Avaliação profunda contra 13 critérios canônicos, com evidências por arquivo,
 projeções por Wave do roadmap PARTE-21C, e novos sub-critérios para preparação de upgrades vastos.
+
+> **⚠️ ATENÇÃO**: Os scores neste documento refletem o estado **pré-execução** das Faixas H–N.
+> Scores atualizados pós-execução estão na PARTE-21F.
 
 ---
 

@@ -20,7 +20,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { logSwallowed, bridgeEmitter } from '#copilot/core';
+import { bridgeEmitter, logSwallowed } from '#copilot/core';
 import { defaultMetrics, log } from '#copilot/observability';
 import EventEmitter from 'node:events';
 
