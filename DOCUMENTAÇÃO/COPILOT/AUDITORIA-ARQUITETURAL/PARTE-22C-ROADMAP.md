@@ -620,18 +620,22 @@ O1 → O2 → O3 → O4 → P2 → Q1 → R2 → R3
 
 ## 9. Status de Execução
 
-| Faixa | Status     | Commit | Observação         |
-| ----- | ---------- | ------ | ------------------ |
-| O1    | ⏳ Pendente | —      | Próxima a executar |
-| O2    | ⏳ Pendente | —      | —                  |
-| O3    | ⏳ Pendente | —      | —                  |
-| O4    | ⏳ Pendente | —      | —                  |
-| O5    | ⏳ Pendente | —      | —                  |
-| O6    | ⏳ Pendente | —      | —                  |
-| O7    | ⏳ Pendente | —      | —                  |
-| P1    | ⏳ Pendente | —      | —                  |
-| P2    | ⏳ Pendente | —      | —                  |
-| P3    | ⏳ Pendente | —      | —                  |
+**Score atual**: 36/100 (36.0%) — Nota: F  
+**Último commit**: ver `git log --oneline -8`  
+**Critérios verdes**: C4 (DI tokens), C5 (deep imports), C6 (typecheck), C11 (events/), C12 (circuit breakers)
+
+| Faixa | Status        | Commit      | Observação                                         |
+| ----- | ------------- | ----------- | -------------------------------------------------- |
+| O1    | ✅ Concluída   | `e7ed35b8`  | 4 deep imports → 0; arch-health refined=0          |
+| O2    | ✅ Concluída   | `e7ed35b8`  | DI tokens 13→40; C4 verde                         |
+| O3    | ✅ Parcial     | `053604f7`  | facades extraídas; always-alive ainda >250 LoC     |
+| O4    | ⏳ Pendente   | —           | loop-manager.js 599 LoC — próxima                  |
+| O5    | ✅ Concluída   | `5c4255de`  | 16 typecheck errors → 0; C6 verde                 |
+| O6    | ✅ Concluída   | `41ee410e`  | core/cache.js + core/mutex.js criados              |
+| O7    | ✅ Concluída   | `41ee410e`  | sdkConnectionCircuitBreaker; 5→6 CBs; C12 verde   |
+| P1    | ✅ Concluída   | see C11     | src/copilot/events/ criado; 31 strings migradas    |
+| P2    | ⏳ Pendente   | —           | 8 arquivos EventEmitter → EventBus                 |
+| P3    | ⏳ Pendente   | —           | —                                                  |
 | P4    | ⏳ Pendente | —      | —                  |
 | P5    | ⏳ Pendente | —      | —                  |
 | P6    | ⏳ Pendente | —      | —                  |
