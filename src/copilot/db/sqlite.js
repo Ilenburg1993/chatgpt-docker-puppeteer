@@ -12,15 +12,15 @@
  *
  * Variável de ambiente: `COPILOT_DB_PATH` sobrescreve o caminho padrão. Padrão: `<cwd>/data/copilot.sqlite`
  *
+ * L0 (db) — não importa camadas superiores. Logger injetável via `setDbLogger`.
+ *
  * @module copilot/db/sqlite
  * @see module:copilot/db/migrations
  * @see module:copilot/conversation-hub/store
  */
 
-import { COPILOT_DB_PATH as ENV_DB_PATH } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
 import { registerShutdownHandler } from '#copilot/core/shutdown';
-import { log } from '#copilot/observability/logger';
 import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -28,6 +28,32 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
 import { COPILOT_MIGRATIONS } from './migrations.js';
+
+/**
+ * @typedef {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', msg: string) => void} DbLogFn
+ */
+
+/** @type {DbLogFn} */
+let log = (level, msg) => {
+    const fn = level === 'WARN' || level === 'ERROR' ? console.warn : console.log;
+    fn(`[db][${level}] ${msg}`);
+};
+
+/**
+ * Injeta logger externo (ex: observability/logger). Chamado no bootstrap.
+ *
+ * @param {DbLogFn} logFn
+ */
+export function setDbLogger(logFn) {
+    log = logFn;
+}
+
+/**
+ * Leitura direta de env para evitar import de config (L2) em db (L0).
+ *
+ * @type {string}
+ */
+const ENV_DB_PATH = process.env.COPILOT_DB_PATH || '';
 
 /** @type {import('better-sqlite3').Database | null} */
 let copilotDb = null;

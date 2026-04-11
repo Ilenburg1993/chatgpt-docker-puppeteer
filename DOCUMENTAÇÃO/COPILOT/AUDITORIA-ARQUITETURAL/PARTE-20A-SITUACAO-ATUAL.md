@@ -1,7 +1,95 @@
 # PARTE-20A — Situação Atual: Análise Arquitetural Profunda de `src/copilot`
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0  
-**Scope**: Todo o diretório `src/copilot` — 284 arquivos `.js`, ~33.700 LoC totais
+**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.1
+**Scope**: Todo o diretório `src/copilot` — 287 arquivos `.js`, ~51.800 LoC totais (inclui JSDoc robusto)
+**Última atualização**: 2026-04-12 — Pós-execução do PARTE-20C Roadmap (Faixas A-E concluídas, F-G parciais)
+
+---
+
+## 0. Situação Pós-Refatoração (Roadmap PARTE-20C)
+
+> Esta seção registra o estado **depois** da execução do roadmap. As seções abaixo (1-8) preservam
+> a análise original para referência histórica. Consulte `PARTE-20C-ROADMAP.md` v1.4 para o detalhamento.
+
+### Métricas Atualizadas
+
+| Métrica                                    | Valor Original        | Valor Atual                             | Meta Ideal |
+| ------------------------------------------ | --------------------- | --------------------------------------- | ---------- |
+| Total de arquivos JS                       | 284                   | 287                                     | ~200       |
+| LoC totais                                 | ~33.700               | ~51.800 (+JSDoc)                        | —          |
+| Arquivos > 400 LoC                         | 13                    | **0** ✅                                 | 0          |
+| Arquivos 300-400 LoC                       | —                     | 9 (warnings)                            | ≤5         |
+| Ciclos arquiteturais (módulo-nível)        | **3**                 | **0** ✅                                 | 0          |
+| Violações de camada                        | **3** → **27** (real) | **0** ✅                                 | 0          |
+| God objects (>450 LoC, múltiplos concerns) | **4**                 | **0** ✅ (todos avaliados como coesos)   | 0          |
+| Duplicações de responsabilidade            | **6**                 | **0** ✅ (todas corrigidas ou avaliadas) | 0          |
+| Módulos sem fronteiras claras              | **4**                 | **0** ✅ (READMEs + layer enforcement)   | 0          |
+| Módulos com handlers paralelos (flat+dir)  | **1** (terminal)      | **0** ✅ (shims removidos)               | 0          |
+| READMEs de módulo                          | 0                     | **14/14** ✅                             | 14/14      |
+| CI gates (layer/size)                      | 0                     | **2** ✅                                 | 2+         |
+
+### Violações Críticas — TODAS ELIMINADAS
+
+| # Original | Problema                                                    | Status                                                                |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| ARCH-V01   | `core` → `observability`                                    | ✅ DI via `registerErrorHandlerDeps()` em `observability/bootstrap.js` |
+| ARCH-V02   | `agent` → `terminal`                                        | ✅ `getHubSessionId` → `core/shared-state.js`                          |
+| ARCH-V03   | `bridges/nerv-bridge` → `agent`                             | ✅ Factory `createNervBridge(agent)` — bridge não importa agent        |
+| —          | sdk/ → observability/logger (×12)                           | ✅ Proxy `sdk/logger.js` + `setSdkLogger(log)`                         |
+| —          | sdk/ → config/env                                           | ✅ Leitura direta `process.env`                                        |
+| —          | sdk/ → tools/tool-factory                                   | ✅ DI via `setCustomToolsBuilder(fn)`                                  |
+| —          | audit/ → agent/config, config/env, hooks/bus, observability | ✅ Proxy `audit/logger.js` + `setAuditBus()` + `process.env`           |
+| —          | core/shutdown → observability                               | ✅ DI via `setShutdownLogger(log)`                                     |
+| —          | db/sqlite → config/env, observability                       | ✅ DI via `setDbLogger(log)`                                           |
+
+### Duplicações — TODAS RESOLVIDAS
+
+| # Original | Problema                     | Status                                                               |
+| ---------- | ---------------------------- | -------------------------------------------------------------------- |
+| ARCH-D01   | url-validator duplicado      | ✅ SSOT em `core/security/url-validator.js`                           |
+| ARCH-D02   | session-lifecycle nomes      | ✅ Renomeados: `hooks/session-hooks.js`, `sdk/sdk-session-wrapper.js` |
+| ARCH-D03   | config em 3 locais           | ✅ Avaliado: concerns distintos, `DEFAULT_EXCLUDED_TOOLS` deduplicado |
+| ARCH-D04   | audit em múltiplos locais    | ✅ Avaliado: sem duplicação real (concerns distintos)                 |
+| ARCH-D05   | dialog.js terminal vs agent  | ✅ Avaliado: concerns claramente distintos (REPL vs AI loop)          |
+| ARCH-D06   | handlers duplicados terminal | ✅ Shims flat removidos, apenas `handlers/` permanece                 |
+
+### Hierarquia de Camadas Consolidada (CI-enforced)
+
+```
+L0  core/            — utilitários puros, zero deps internas
+L0  db/              — SQLite, depende só de core
+L1  sdk/             — wrapper @github/copilot-sdk, depende de core
+L1  audit/           — pipeline auditoria, depende de core
+L2  config/          — configuração, depende de core
+L2  observability/   — logging/métricas, depende de core (injeta nos outros via bootstrap)
+L3  hooks/           — permissões/lifecycle, depende de core, config, sdk
+L3  tools/           — definição de Tools, depende de core, sdk
+L3  bridges/         — adaptadores externos, depende de core, db, sdk
+L4  agent/           — AlwaysAlive + session + dialog
+L4  conversation-hub/ — gestão multi-sessão
+L4  channel/         — transporte LLM-A ↔ LLM-B
+L5  api/             — HTTP/SSE/Express
+L6  terminal/        — REPL interativo, camada de apresentação
+```
+
+### Inventário de Módulos Atualizado
+
+| Módulo              | Arquivos | LoC    | Função                                                 |
+| ------------------- | -------- | ------ | ------------------------------------------------------ |
+| `agent/`            | 54       | ~7.800 | Core agent: lifecycle, session, dialog, infraestrutura |
+| `sdk/`              | 40       | ~7.700 | Wrapper @github/copilot-sdk — SSOT runtime + tipos     |
+| `terminal/`         | 46       | ~7.700 | Terminal interativo LLM-B: REPL, servidor, comandos    |
+| `tools/`            | 24       | ~6.200 | Definição de Tools disponíveis ao agente               |
+| `observability/`    | 22       | ~4.600 | Logging, métricas, alertas, traces                     |
+| `hooks/`            | 20       | ~3.500 | Sistema de hooks de permissão e lifecycle              |
+| `api/`              | 21       | ~3.300 | Camada HTTP (Express) + SSE + bridge de controle       |
+| `conversation-hub/` | 12       | ~2.600 | Hub de conversas entre LLMs                            |
+| `bridges/`          | 10       | ~2.200 | Pontes: MCP, NERV, Git, GitHub                         |
+| `core/`             | 16       | ~1.900 | Utilitários cross-cutting: erros, retry, schemas       |
+| `config/`           | 7        | ~1.400 | Configuração do SDK/agente                             |
+| `channel/`          | 7        | ~1.500 | Client LLM-A ↔ LLM-B                                   |
+| `audit/`            | 5        | ~800   | Pipeline de auditoria com ring buffer                  |
+| `db/`               | 3        | ~440   | Persistência SQLite                                    |
 
 ---
 
@@ -17,41 +105,41 @@ O sistema funciona, mas acumula dívida arquitetural relevante: limites de módu
 
 ### 2.1 Inventário Completo
 
-| Módulo | Arquivos | LoC estimado | Função Declarada |
-|---|---|---|---|
-| `sdk/` | 32 | ~4.800 | Wrapper do `@github/copilot-sdk` — SSOT runtime + tipos |
-| `terminal/` | 38 | ~4.600 | Terminal interativo LLM-B: REPL, servidor, roteamento, comandos |
-| `agent/` | 40 | ~4.400 | Core agent: lifecycle, session, dialog, infraestrutura |
-| `tools/` | 28 | ~3.200 | Definição de todas as ferramentas (Tools) disponíveis ao agente |
-| `core/` | 14 | ~2.200 | Utilitários cross-cutting: erros, retry, safe-json, schemas |
-| `conversation-hub/` | 12 | ~3.100 | Hub de conversas entre LLMs: store, orquestrador, socket |
-| `hooks/` | 19 | ~2.400 | Sistema de hooks de permissão e lifecycle |
-| `observability/` | 17 | ~2.800 | Logging, métricas, alertas, traces, observadores de eventos |
-| `api/` | 20 | ~2.000 | Camada HTTP (Express) + SSE + bridge de controle |
-| `bridges/` | 11 | ~1.800 | Pontes: MCP Tools, Nerv EventBus, Git, GitHub |
-| `channel/` | 7 | ~1.600 | Client de comunicação LLM-A ↔ LLM-B |
-| `config/` | 7 | ~900 | Configuração do SDK/agente: sessions, system-prompt, MCP |
-| `audit/` | 4 | ~750 | Pipeline de auditoria de eventos com ring buffer |
-| `db/` | 3 | ~400 | Persistência SQLite |
-| `logs/` | — | — | Outputs de log (arquivos gerados — não código) |
+| Módulo              | Arquivos | LoC estimado | Função Declarada                                                |
+| ------------------- | -------- | ------------ | --------------------------------------------------------------- |
+| `sdk/`              | 32       | ~4.800       | Wrapper do `@github/copilot-sdk` — SSOT runtime + tipos         |
+| `terminal/`         | 38       | ~4.600       | Terminal interativo LLM-B: REPL, servidor, roteamento, comandos |
+| `agent/`            | 40       | ~4.400       | Core agent: lifecycle, session, dialog, infraestrutura          |
+| `tools/`            | 28       | ~3.200       | Definição de todas as ferramentas (Tools) disponíveis ao agente |
+| `core/`             | 14       | ~2.200       | Utilitários cross-cutting: erros, retry, safe-json, schemas     |
+| `conversation-hub/` | 12       | ~3.100       | Hub de conversas entre LLMs: store, orquestrador, socket        |
+| `hooks/`            | 19       | ~2.400       | Sistema de hooks de permissão e lifecycle                       |
+| `observability/`    | 17       | ~2.800       | Logging, métricas, alertas, traces, observadores de eventos     |
+| `api/`              | 20       | ~2.000       | Camada HTTP (Express) + SSE + bridge de controle                |
+| `bridges/`          | 11       | ~1.800       | Pontes: MCP Tools, Nerv EventBus, Git, GitHub                   |
+| `channel/`          | 7        | ~1.600       | Client de comunicação LLM-A ↔ LLM-B                             |
+| `config/`           | 7        | ~900         | Configuração do SDK/agente: sessions, system-prompt, MCP        |
+| `audit/`            | 4        | ~750         | Pipeline de auditoria de eventos com ring buffer                |
+| `db/`               | 3        | ~400         | Persistência SQLite                                             |
+| `logs/`             | —        | —            | Outputs de log (arquivos gerados — não código)                  |
 
 ### 2.2 Arquivos de Maior Volume (> 450 LoC)
 
-| Arquivo | LoC | Responsabilidade |
-|---|---|---|
-| `agent/always-alive.js` | 603 | God object que orquestra todo o ciclo de vida do agente |
-| `agent/dialog/loop-manager.js` | 600 | Loop principal de diálogo — muito grande, múltiplas camadas misturadas |
-| `sdk/types.js` | 569 | SSOT de tipos — correto, necessário |
-| `conversation-hub/store.js` | 562 | Store global do hub — muito grande |
-| `channel/client.js` | 557 | Cliente high-level LLM-B — complexo demais para um único arquivo |
-| `audit/pipeline.js` | 537 | Pipeline de auditoria — vários concerns misturados |
-| `terminal/index.js` | 494 | Ponto de entrada terminal — reexporta + inicializa |
-| `sdk/rpc.js` | 484 | RPC SDK — wrapper pesado |
-| `conversation-hub/socket-ns.js` | 482 | Namespace Socket.io — infraestrutura misturada com lógica |
-| `tools/todo/crud-tools.js` | 459 | CRUD de tarefas — longo mas coeso |
-| `terminal/server.js` | 452 | Servidor terminal — config + routes + lifecycle misturados |
-| `channel/inject.js` | 451 | Injetor de mensagens no agente — muito longo |
-| `conversation-hub/orchestrator.js` | 438 | Orquestrador hub — vários padrões de call misturados |
+| Arquivo                            | LoC | Responsabilidade                                                       |
+| ---------------------------------- | --- | ---------------------------------------------------------------------- |
+| `agent/always-alive.js`            | 603 | God object que orquestra todo o ciclo de vida do agente                |
+| `agent/dialog/loop-manager.js`     | 600 | Loop principal de diálogo — muito grande, múltiplas camadas misturadas |
+| `sdk/types.js`                     | 569 | SSOT de tipos — correto, necessário                                    |
+| `conversation-hub/store.js`        | 562 | Store global do hub — muito grande                                     |
+| `channel/client.js`                | 557 | Cliente high-level LLM-B — complexo demais para um único arquivo       |
+| `audit/pipeline.js`                | 537 | Pipeline de auditoria — vários concerns misturados                     |
+| `terminal/index.js`                | 494 | Ponto de entrada terminal — reexporta + inicializa                     |
+| `sdk/rpc.js`                       | 484 | RPC SDK — wrapper pesado                                               |
+| `conversation-hub/socket-ns.js`    | 482 | Namespace Socket.io — infraestrutura misturada com lógica              |
+| `tools/todo/crud-tools.js`         | 459 | CRUD de tarefas — longo mas coeso                                      |
+| `terminal/server.js`               | 452 | Servidor terminal — config + routes + lifecycle misturados             |
+| `channel/inject.js`                | 451 | Injetor de mensagens no agente — muito longo                           |
+| `conversation-hub/orchestrator.js` | 438 | Orquestrador hub — vários padrões de call misturados                   |
 
 ---
 
@@ -59,25 +147,25 @@ O sistema funciona, mas acumula dívida arquitetural relevante: limites de módu
 
 ### 3.1 Fan-In — Módulos mais importados por outros
 
-| Arquivo | Importadores | Observação |
-|---|---|---|
-| `agent/config.js` | **21** | Mais importado de todo o sistema — quase god module |
-| `core/error-handlers.js` | **20** | Correto — utilitário central, mas importa observability |
-| `terminal/state.js` | **15** | State global do terminal importado até pelo agent (violação) |
-| `tools/tool-factory.js` | **15** | Correto — factory de tools, alta fan-in é esperada |
-| `agent/lifecycle/state-io.js` | **13** | Muitos módulos do agent lêem estado diretamente |
-| `observability/logger.js` | **12** | Correto — logging é infraestrutura transversal |
+| Arquivo                       | Importadores | Observação                                                   |
+| ----------------------------- | ------------ | ------------------------------------------------------------ |
+| `agent/config.js`             | **21**       | Mais importado de todo o sistema — quase god module          |
+| `core/error-handlers.js`      | **20**       | Correto — utilitário central, mas importa observability      |
+| `terminal/state.js`           | **15**       | State global do terminal importado até pelo agent (violação) |
+| `tools/tool-factory.js`       | **15**       | Correto — factory de tools, alta fan-in é esperada           |
+| `agent/lifecycle/state-io.js` | **13**       | Muitos módulos do agent lêem estado diretamente              |
+| `observability/logger.js`     | **12**       | Correto — logging é infraestrutura transversal               |
 
 ### 3.2 Fan-Out — Arquivos com mais dependências
 
-| Arquivo | Dependências diretas | Observação |
-|---|---|---|
-| `sdk/index.js` | 29 | Barrel com todas as re-exportações do SDK |
-| `terminal/commands/index.js` | 22 | Agrega todos os comandos do terminal |
-| `hooks/index.js` | 17 | Public API dos hooks |
-| `tools/index.js` + `terminal/index.js` | 14 | Barrels de re-exportação |
-| `agent/lifecycle/agent-lifecycle.js` | **12** | Excesso de dependências para lifecycle |
-| `core/index.js` | 12 | Correto — barrel central |
+| Arquivo                                | Dependências diretas | Observação                                |
+| -------------------------------------- | -------------------- | ----------------------------------------- |
+| `sdk/index.js`                         | 29                   | Barrel com todas as re-exportações do SDK |
+| `terminal/commands/index.js`           | 22                   | Agrega todos os comandos do terminal      |
+| `hooks/index.js`                       | 17                   | Public API dos hooks                      |
+| `tools/index.js` + `terminal/index.js` | 14                   | Barrels de re-exportação                  |
+| `agent/lifecycle/agent-lifecycle.js`   | **12**               | Excesso de dependências para lifecycle    |
+| `core/index.js`                        | 12                   | Correto — barrel central                  |
 
 ### 3.3 Acoplamentos Entre Módulos (Cross-Module Import Count)
 
@@ -102,11 +190,11 @@ agent       → tools          (1 edge)    ⚠️  Acoplável, mas cria implicit
 
 Nenhum ciclo de importação em nível de arquivo (madge não encontrou), mas existem **3 ciclos arquiteturais** em nível de módulo:
 
-| Par | Descrição | Severidade |
-|---|---|---|
-| `bridges ⟺ agent` | `bridges/nerv-bridge.js` importa `agent/index.js`; algo no agent importa bridges | 🔴 Alta |
-| `observability ⟺ core` | `core/error-handlers.js` importa logger + tracker de observability | 🔴 Alta |
-| `terminal ⟺ agent` | `agent/lifecycle/agent-lifecycle.js` importa `terminal/state.js`; terminal importa agent | 🔴 Alta |
+| Par                    | Descrição                                                                                | Severidade |
+| ---------------------- | ---------------------------------------------------------------------------------------- | ---------- |
+| `bridges ⟺ agent`      | `bridges/nerv-bridge.js` importa `agent/index.js`; algo no agent importa bridges         | 🔴 Alta     |
+| `observability ⟺ core` | `core/error-handlers.js` importa logger + tracker de observability                       | 🔴 Alta     |
+| `terminal ⟺ agent`     | `agent/lifecycle/agent-lifecycle.js` importa `terminal/state.js`; terminal importa agent | 🔴 Alta     |
 
 ---
 
@@ -157,7 +245,7 @@ Nenhum ciclo de importação em nível de arquivo (madge não encontrou), mas ex
 - Correto: único `core/security/url-validator.js` usado por ambos
 
 **ARCH-D02 — `session-lifecycle` duplicado**
-- `hooks/session-lifecycle.js` — factory de hooks de lifecycle  
+- `hooks/session-lifecycle.js` — factory de hooks de lifecycle
 - `sdk/session-lifecycle.js` — wrappers do SDK de lifecycle
 - Nomes análogos mas funções diferentes; causa confusão de naming
 - Correto: renomear para clareza — `hooks/session-hooks.js` e `sdk/session-wrapper.js`
@@ -212,15 +300,15 @@ Nenhum ciclo de importação em nível de arquivo (madge não encontrou), mas ex
 
 ### 4.5 Problemas de Nomenclatura
 
-| Problema | Arquivo(s) | Descrição |
-|---|---|---|
-| Nome genérico | `core/schemas.js` | Qual schema? Para que? |
-| Nome genérico | `core/events.js` | Quais eventos? Core eventos ou codec de eventos? |
-| Nome ambíguo | `agent/types.js` vs `sdk/types.js` | Dois arquivos de tipos com nomes idênticos |
-| Nome ambíguo | `hooks/types.js` vs `agent/types.js` | Mais um types.js — não fica claro o escopo |
-| Flat + dir paralelos | `terminal/handlers-*.js` e `terminal/handlers/*.js` | Dois conjuntos paralelos |
-| Nome impreciso | `sdk/utils.js` | Quais utils? Genérico demais |
-| Nome impreciso | `bridges/gh/shared.js` | "shared" não descreve o conteúdo |
+| Problema             | Arquivo(s)                                          | Descrição                                        |
+| -------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| Nome genérico        | `core/schemas.js`                                   | Qual schema? Para que?                           |
+| Nome genérico        | `core/events.js`                                    | Quais eventos? Core eventos ou codec de eventos? |
+| Nome ambíguo         | `agent/types.js` vs `sdk/types.js`                  | Dois arquivos de tipos com nomes idênticos       |
+| Nome ambíguo         | `hooks/types.js` vs `agent/types.js`                | Mais um types.js — não fica claro o escopo       |
+| Flat + dir paralelos | `terminal/handlers-*.js` e `terminal/handlers/*.js` | Dois conjuntos paralelos                         |
+| Nome impreciso       | `sdk/utils.js`                                      | Quais utils? Genérico demais                     |
+| Nome impreciso       | `bridges/gh/shared.js`                              | "shared" não descreve o conteúdo                 |
 
 ### 4.6 Problemas de Isolamento
 
@@ -243,55 +331,58 @@ Nenhum ciclo de importação em nível de arquivo (madge não encontrou), mas ex
 
 ## 5. Análise de Coesão por Módulo
 
-| Módulo | Coesão | Razão |
-|---|---|---|
-| `core/` | ✅ Alta | Utilitários independentes, sem dependências internas problemáticas (exceto `error-handlers`) |
-| `sdk/` | ✅ Alta | Bem delimitado ao wrapper do SDK — correto |
-| `audit/` | ✅ Alta | Ring buffer + pipeline + JSONL writer — coeso |
-| `db/` | ✅ Alta | SQLite + migrations — coeso |
-| `config/` | ⚠️ Média | Mistura configuração do SDK, system-prompt e agents — temas relacionados mas distintos |
-| `hooks/` | ⚠️ Média | Permissões, lifecycle, presets, tipos, registry — tudo hooks, mas escopo amplo |
-| `tools/` | ⚠️ Média | Definições de tools corretas mas factory ficou pesada |
-| `bridges/` | ⚠️ Baixa | 4 naturezas diferentes co-habitando (adaptador, publisher, client HTTP, client CLI) |
-| `agent/` | ⚠️ Baixa | Subsistemas grandes demais — agente monolítico com dialog, session, infra, lifecycle juntos |
-| `observability/` | ⚠️ Baixa | Logger + metrics + otel + audit-collector + alertas — muitos concerns |
-| `terminal/` | 🔴 Baixa | Monolítico: servidor, REPL, handlers duplos, state global, 23 comandos — muito grande |
-| `conversation-hub/` | 🔴 Baixa | Hub de convs + store + orquestrador + socket + sync — bounded context mal definido |
-| `channel/` | 🔴 Baixa | Fronteira com `conversation-hub` e `api/` não está clara |
+| Módulo              | Coesão  | Razão                                                                                        |
+| ------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `core/`             | ✅ Alta  | Utilitários independentes, sem dependências internas problemáticas (exceto `error-handlers`) |
+| `sdk/`              | ✅ Alta  | Bem delimitado ao wrapper do SDK — correto                                                   |
+| `audit/`            | ✅ Alta  | Ring buffer + pipeline + JSONL writer — coeso                                                |
+| `db/`               | ✅ Alta  | SQLite + migrations — coeso                                                                  |
+| `config/`           | ⚠️ Média | Mistura configuração do SDK, system-prompt e agents — temas relacionados mas distintos       |
+| `hooks/`            | ⚠️ Média | Permissões, lifecycle, presets, tipos, registry — tudo hooks, mas escopo amplo               |
+| `tools/`            | ⚠️ Média | Definições de tools corretas mas factory ficou pesada                                        |
+| `bridges/`          | ⚠️ Baixa | 4 naturezas diferentes co-habitando (adaptador, publisher, client HTTP, client CLI)          |
+| `agent/`            | ⚠️ Baixa | Subsistemas grandes demais — agente monolítico com dialog, session, infra, lifecycle juntos  |
+| `observability/`    | ⚠️ Baixa | Logger + metrics + otel + audit-collector + alertas — muitos concerns                        |
+| `terminal/`         | 🔴 Baixa | Monolítico: servidor, REPL, handlers duplos, state global, 23 comandos — muito grande        |
+| `conversation-hub/` | 🔴 Baixa | Hub de convs + store + orquestrador + socket + sync — bounded context mal definido           |
+| `channel/`          | 🔴 Baixa | Fronteira com `conversation-hub` e `api/` não está clara                                     |
 
 ---
 
 ## 6. Métricas de Saúde Arquitetural
 
-| Métrica | Valor Atual | Meta Ideal |
-|---|---|---|
-| Total de arquivos JS | 284 | ~200 (consolidações) |
-| LoC totais | ~33.700 | ~28.000 (-15%) |
-| Arquivos > 400 LoC | 13 | 0 (máximo 300) |
-| Ciclos arquiteturais (módulo-nível) | **3** | 0 |
-| Violações de camada | **3** | 0 |
-| God objects (>450 LoC, múltiplos concerns) | **4** | 0 |
-| Duplicações de responsabilidade | **6** | 0 |
-| Módulos sem fronteiras claras | **4** | 0 |
-| Cross-module dependency edges | **26** | **≤15** |
-| Módulos com handlers paralelos (flat+dir) | **1** (terminal) | 0 |
+> ⚠️ **Nota**: Valores "Atual" abaixo refletem o estado **pré-refatoração** (2026-04-10).
+> Para métricas atualizadas pós-roadmap, ver Seção 0.
+
+| Métrica                                    | Valor Atual (pré-refatoração) | Meta Ideal           |
+| ------------------------------------------ | ----------------------------- | -------------------- |
+| Total de arquivos JS                       | 284                           | ~200 (consolidações) |
+| LoC totais                                 | ~33.700                       | ~28.000 (-15%)       |
+| Arquivos > 400 LoC                         | 13                            | 0 (máximo 300)       |
+| Ciclos arquiteturais (módulo-nível)        | **3**                         | 0                    |
+| Violações de camada                        | **3**                         | 0                    |
+| God objects (>450 LoC, múltiplos concerns) | **4**                         | 0                    |
+| Duplicações de responsabilidade            | **6**                         | 0                    |
+| Módulos sem fronteiras claras              | **4**                         | 0                    |
+| Cross-module dependency edges              | **26**                        | **≤15**              |
+| Módulos com handlers paralelos (flat+dir)  | **1** (terminal)              | 0                    |
 
 ---
 
 ## 7. Resumo dos Problemas Críticos (Top 10)
 
-| # | Problema | Severidade | Módulo(s) |
-|---|---|---|---|
-| 1 | `core` importa `observability` — inversão de dependência | 🔴 Crítico | core, observability |
-| 2 | `agent` importa `terminal` — acoplamento proibido | 🔴 Crítico | agent, terminal |
-| 3 | `bridges/nerv-bridge` importa `agent` — bridge depende de concreto | 🔴 Crítico | bridges, agent |
-| 4 | `always-alive.js` e `loop-manager.js` — god objects >600 LoC | 🔴 Crítico | agent |
-| 5 | `terminal/` — monolito 38 arquivos com handlers duplos | 🔴 Crítico | terminal |
-| 6 | `agent/config.js` over-exposed — importado por 21 módulos | 🔴 Alto | agent, config |
-| 7 | `url-validator` duplicado em `agent/infra/` e `sdk/` | 🟠 Alto | agent/infra, sdk |
-| 8 | Config espalhada em 3 locais (`config/`, `agent/config.js`, `sdk/config.js`) | 🟠 Alto | config, agent, sdk |
-| 9 | `bridges/` sem coesão — 4 naturezas diferentes | 🟠 Médio | bridges |
-| 10 | `logs/` dentro de `src/copilot` — artefatos runtime no source | 🟡 Médio | logs |
+| #   | Problema                                                                     | Severidade | Módulo(s)           |
+| --- | ---------------------------------------------------------------------------- | ---------- | ------------------- |
+| 1   | `core` importa `observability` — inversão de dependência                     | 🔴 Crítico  | core, observability |
+| 2   | `agent` importa `terminal` — acoplamento proibido                            | 🔴 Crítico  | agent, terminal     |
+| 3   | `bridges/nerv-bridge` importa `agent` — bridge depende de concreto           | 🔴 Crítico  | bridges, agent      |
+| 4   | `always-alive.js` e `loop-manager.js` — god objects >600 LoC                 | 🔴 Crítico  | agent               |
+| 5   | `terminal/` — monolito 38 arquivos com handlers duplos                       | 🔴 Crítico  | terminal            |
+| 6   | `agent/config.js` over-exposed — importado por 21 módulos                    | 🔴 Alto     | agent, config       |
+| 7   | `url-validator` duplicado em `agent/infra/` e `sdk/`                         | 🟠 Alto     | agent/infra, sdk    |
+| 8   | Config espalhada em 3 locais (`config/`, `agent/config.js`, `sdk/config.js`) | 🟠 Alto     | config, agent, sdk  |
+| 9   | `bridges/` sem coesão — 4 naturezas diferentes                               | 🟠 Médio    | bridges             |
+| 10  | `logs/` dentro de `src/copilot` — artefatos runtime no source                | 🟡 Médio    | logs                |
 
 ---
 
@@ -303,8 +394,8 @@ As correções necessárias são majoritariamente de **reorganização estrutura
 
 ---
 
-**Próximos documentos**:  
-- `PARTE-20B-SITUACAO-IDEAL.md` — arquitetura target, critérios, layout ideal  
-- `PARTE-20C-ROADMAP.md` — plano de migração com faixas e fases  
-- `PARTE-20D-GRAFO-IMPORTS.md` — grafo visual textual atual e ideal  
+**Próximos documentos**:
+- `PARTE-20B-SITUACAO-IDEAL.md` — arquitetura target, critérios, layout ideal
+- `PARTE-20C-ROADMAP.md` — plano de migração com faixas e fases
+- `PARTE-20D-GRAFO-IMPORTS.md` — grafo visual textual atual e ideal
 - `PARTE-20E-CRITERIOS.md` — critérios de avaliação arquitetural

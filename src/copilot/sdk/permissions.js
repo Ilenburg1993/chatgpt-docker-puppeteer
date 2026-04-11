@@ -11,8 +11,8 @@
  * @see module:copilot/hooks/permission-handler
  */
 
-import { log } from '#copilot/observability/logger';
 import { approveAll } from '@github/copilot-sdk';
+import { log } from './logger.js';
 
 // Re-export canônico do SDK
 export { approveAll };

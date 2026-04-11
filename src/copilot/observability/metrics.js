@@ -279,14 +279,14 @@ export function createMetricsStore() {
      * Inicia snapshot periódico de métricas em arquivo.
      *
      * @param {number} [intervalMs] - Intervalo entre snapshots. Default: COPILOT_METRICS_SNAPSHOT_INTERVAL ou 5min.
-     * @param {string} [logDir] - Diretório de log. Default: src/copilot/logs/.
+     * @param {string} [logDir] - Diretório de log. Default: var/logs/copilot/.
      * @returns {void}
      */
     function startPeriodicSnapshot(intervalMs, logDir) {
         stopPeriodicSnapshot();
         const ms = intervalMs ?? COPILOT_METRICS_SNAPSHOT_INTERVAL;
         if (ms <= 0) return;
-        const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './src/copilot/logs');
+        const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './var/logs/copilot');
         _snapshotTimer = setInterval(() => {
             void (async () => {
                 try {

@@ -127,6 +127,8 @@
   ],
   "scripts": {
     "analyze:circular": "node scripts/analysis/analyze-code-graph.js --circular",
+    "analyze:arch:layers": "node scripts/check-layer-violations.mjs",
+    "analyze:arch:filesize": "node scripts/check-file-size.mjs",
     "analyze:constants": "node scripts/analysis/catalog-constants.mjs",
     "analyze:constants:unused": "node scripts/analysis/catalog-constants.mjs --unused-only",
     "analyze:depcruise": "npx depcruise --config .dependency-cruiser.mjs src --output-type err-html --output-to deps-cruise.html",

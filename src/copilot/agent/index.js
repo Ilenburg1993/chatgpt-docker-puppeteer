@@ -1,9 +1,25 @@
 // @ts-check
 /**
- * Barrel de exportação do módulo `src/copilot/agent/`.
+ * src/copilot/agent/index.js — [L4] Core agent: AlwaysAlive, session, dialog.
  *
- * Centraliza os pontos de acesso públicos do agente via sub-barrels, evitando importações com caminhos profundos em
- * outros módulos do sistema.
+ * Barrel de exportação do módulo `src/copilot/agent/`. Centraliza os pontos de acesso públicos do agente.
+ *
+ * ### API pública (para uso externo)
+ *
+ * | Export             | Tipo      | Descrição                                 |
+ * | ------------------ | --------- | ----------------------------------------- |
+ * | `alwaysAliveAgent` | Singleton | Instância principal do agente AlwaysAlive |
+ * | `getAgent()`       | Function  | Accessor para o agente (lazy)             |
+ * | `AlwaysAliveAgent` | Class     | Classe do agente (uso interno/testes)     |
+ *
+ * ### Subsistemas re-exportados
+ *
+ * - `dialog/` — DialogLoopManager, turn execution, backpressure, watchdog
+ * - `infra/` — tools bootstrap, webhook, permission, task executor, handoff
+ * - `lifecycle/` — bootstrap, connection, reconnect, state persistence
+ * - `messaging/` — agent messaging facade
+ * - `session/` — session initializer, event wiring, keepalive, rotation, cleanup
+ * - `state/` — agent state management
  *
  * @module copilot/agent
  */

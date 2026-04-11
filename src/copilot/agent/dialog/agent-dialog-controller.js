@@ -126,7 +126,11 @@ export function ensureDialogLoopAttached(ctx, host) {
             // F72: propagar ao SDK se sessão estiver ativa (mesma lógica do always-alive.setModel)
             const sdkSess = /** @type {{ setModel?: (id: string) => void }} */ (ctx.session);
             if (sdkSess && typeof sdkSess.setModel === 'function') {
-                try { sdkSess.setModel(modelId); } catch (_) { /* SDK opcional */ }
+                try {
+                    sdkSess.setModel(modelId);
+                } catch (_) {
+                    /* SDK opcional */
+                }
             }
         },
         getPendingQuestion: () => ctx.pendingQuestion,

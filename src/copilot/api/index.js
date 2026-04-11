@@ -8,7 +8,7 @@
  */
 
 // Express routers (SDK API)
-export { default as sdkApiRouter } from './express/index.js';
+export { default as createSdkApiRouter } from './express/index.js';
 
 // HTTP Bridge
 export { default as httpBridge } from './bridge/index.js';

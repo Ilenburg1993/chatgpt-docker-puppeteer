@@ -8,7 +8,7 @@
  * @module copilot/sdk/models/selector
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from '../logger.js';
 import { COST_ORDER, SPEED_ORDER } from './known-models.js';
 
 /** @typedef {import('./registry.js').ModelMeta} ModelMeta */

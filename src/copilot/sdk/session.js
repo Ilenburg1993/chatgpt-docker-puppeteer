@@ -15,8 +15,8 @@
  * @see module:copilot/config/session-config
  */
 
-import { log } from '#copilot/observability/logger';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import { log } from './logger.js';
 
 /**
  * @typedef {InstanceType<typeof CopilotClient>} CopilotClientInstance

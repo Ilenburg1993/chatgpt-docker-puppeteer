@@ -9,7 +9,7 @@
  * @see module:copilot/sdk/server-rpc
  */
 
-import { log as appLog } from '#copilot/observability/logger';
+import { log as appLog } from './logger.js';
 import { accountGetQuota, ping } from './server-rpc.js';
 
 /**

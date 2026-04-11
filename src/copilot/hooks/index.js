@@ -1,17 +1,32 @@
 // @ts-check
 /**
- * src/copilot/hooks/index.js
+ * src/copilot/hooks/index.js — [L3] Sistema de permissão e lifecycle.
  *
- * Barrel de exportação do módulo de hooks do Copilot.
+ * Barrel de exportação do módulo de hooks do Copilot. Ponto de entrada único para todo o sistema de hooks. Import via
+ * alias: `import { ... } from '#copilot/hooks'`.
  *
- * Ponto de entrada único para todo o sistema de hooks isolado sob src/copilot/hooks/. Importar via alias: `import { ...
- * } from '#copilot/hooks'`.
+ * ### Categorias de API pública
  *
- * Por quê um barrel centralizado?
- *
- * - Encapsulamento: consumidores importam de um path estável
- * - Introspection: todas as exports em um lugar
- * - Facilita substituições mockadas em testes
+ * | Categoria        | Exports principais                                           |
+ * | ---------------- | ------------------------------------------------------------ | ----------------------------------- |
+ * | **Factory**      | createHooks, createMinimalHooks, createSafeHooks, etc.       |
+ * | **Permission**   | createPermissionHandler, createApproveAllPermission, etc.    |
+ * | **Lifecycle**    | createSessionHooks                                           |
+ * | **Prompt**       | createPromptTransformer, createContextInjector, etc.         |
+ * | **Interceptors** | createAllowlistHook, createBlocklistHook, createArgSanitizer |
+ * | **User Input**   | createReadlineInputHandler, createQueuedInputHandler         |
+ * | **Bus**          | HookBus, defaultBus, attachBus                               |
+ * | **Registry**     | HookRegistry, SDK_HOOKS                                      |
+ * | **Composer**     | composeHandlers, pipeline, conditional, fallback, memoize    |
+ * | **Presets**      | createAuditPreset, createProductionHooks, etc.               | r, createApproveAllPermission, etc. |
+ * | **Lifecycle**    | createSessionHooks                                           |
+ * | **Prompt**       | createPromptTransformer, createContextInjector, etc.         |
+ * | **Interceptors** | createAllowlistHook, createBlocklistHook, createArgSanitizer |
+ * | **User Input**   | createReadlineInputHandler, createQueuedInputHandler         |
+ * | **Bus**          | HookBus, defaultBus, attachBus                               |
+ * | **Registry**     | HookRegistry, SDK_HOOKS                                      |
+ * | **Composer**     | composeHandlers, pipeline, conditional, fallback, memoize    |
+ * | **Presets**      | createAuditPreset, createProductionHooks, etc.               |
  *
  * @module copilot/hooks
  */

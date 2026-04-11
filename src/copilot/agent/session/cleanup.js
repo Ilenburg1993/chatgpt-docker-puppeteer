@@ -11,8 +11,8 @@
  * @module copilot/agent/session/cleanup
  */
 
-import { log } from '#copilot/observability/logger';
 import { startSpan } from '#copilot/observability';
+import { log } from '#copilot/observability/logger';
 import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../config.js';
 
@@ -39,83 +39,87 @@ export async function cleanupStaleSessions(client, options = {}) {
     const maxAgeMs = options.maxAgeMs ?? SESSION_MAX_AGE_MS;
     const currentSessionId = options.currentSessionId ?? null;
 
-    return startSpan('copilot.session.cleanup', { extra: { maxAgeMs, currentSessionId: currentSessionId ?? '' } }, async () => {
-    /** @type {SessionCleanupResult} */
-    const result = { total: 0, deleted: 0, deletedIds: [], kept: 0, errors: [] };
+    return startSpan(
+        'copilot.session.cleanup',
+        { extra: { maxAgeMs, currentSessionId: currentSessionId ?? '' } },
+        async () => {
+            /** @type {SessionCleanupResult} */
+            const result = { total: 0, deleted: 0, deletedIds: [], kept: 0, errors: [] };
 
-    try {
-        const sessions = await listSessions(client);
-        if (!Array.isArray(sessions)) {
-            log('WARN', '[SessionCleanup] listSessions não retornou array.');
-            return result;
-        }
-        result.total = sessions.length;
-
-        const now = Date.now();
-
-        /** @type {{ id: string; ageMs: number }[]} */
-        const toDelete = [];
-
-        for (const session of sessions) {
-            const id = session.sessionId;
-            if (!id) continue;
-
-            // Nunca deletar a sessão ativa
-            if (id === currentSessionId) {
-                result.kept++;
-                continue;
-            }
-
-            // Verificar idade — se `startTime` não estiver disponível, pular
-            const createdAt = session.startTime ? new Date(session.startTime).getTime() : null;
-            if (createdAt === null || isNaN(createdAt)) {
-                result.kept++;
-                continue;
-            }
-
-            const ageMs = now - createdAt;
-            if (ageMs > maxAgeMs) {
-                toDelete.push({ id, ageMs });
-            } else {
-                result.kept++;
-            }
-        }
-
-        // F70.2: Deletar em paralelo com Promise.allSettled (batched)
-        if (toDelete.length > 0) {
-            const outcomes = await Promise.allSettled(
-                toDelete.map(({ id, ageMs }) =>
-                    deleteSession(client, id).then(() => {
-                        log(
-                            'DEBUG',
-                            `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`,
-                        );
-                        return id;
-                    }),
-                ),
-            );
-
-            for (const outcome of outcomes) {
-                if (outcome.status === 'fulfilled') {
-                    result.deleted++;
-                    result.deletedIds.push(outcome.value);
-                } else {
-                    const msg = outcome.reason?.message ?? String(outcome.reason);
-                    result.errors.push(msg);
-                    log('WARN', `[SessionCleanup] Falha ao remover sessão: ${msg}`);
+            try {
+                const sessions = await listSessions(client);
+                if (!Array.isArray(sessions)) {
+                    log('WARN', '[SessionCleanup] listSessions não retornou array.');
+                    return result;
                 }
+                result.total = sessions.length;
+
+                const now = Date.now();
+
+                /** @type {{ id: string; ageMs: number }[]} */
+                const toDelete = [];
+
+                for (const session of sessions) {
+                    const id = session.sessionId;
+                    if (!id) continue;
+
+                    // Nunca deletar a sessão ativa
+                    if (id === currentSessionId) {
+                        result.kept++;
+                        continue;
+                    }
+
+                    // Verificar idade — se `startTime` não estiver disponível, pular
+                    const createdAt = session.startTime ? new Date(session.startTime).getTime() : null;
+                    if (createdAt === null || isNaN(createdAt)) {
+                        result.kept++;
+                        continue;
+                    }
+
+                    const ageMs = now - createdAt;
+                    if (ageMs > maxAgeMs) {
+                        toDelete.push({ id, ageMs });
+                    } else {
+                        result.kept++;
+                    }
+                }
+
+                // F70.2: Deletar em paralelo com Promise.allSettled (batched)
+                if (toDelete.length > 0) {
+                    const outcomes = await Promise.allSettled(
+                        toDelete.map(({ id, ageMs }) =>
+                            deleteSession(client, id).then(() => {
+                                log(
+                                    'DEBUG',
+                                    `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`,
+                                );
+                                return id;
+                            }),
+                        ),
+                    );
+
+                    for (const outcome of outcomes) {
+                        if (outcome.status === 'fulfilled') {
+                            result.deleted++;
+                            result.deletedIds.push(outcome.value);
+                        } else {
+                            const msg = outcome.reason?.message ?? String(outcome.reason);
+                            result.errors.push(msg);
+                            log('WARN', `[SessionCleanup] Falha ao remover sessão: ${msg}`);
+                        }
+                    }
+                }
+
+                log(
+                    'INFO',
+                    `[SessionCleanup] Concluído: ${result.deleted}/${result.total} sessões removidas, ${result.kept} mantidas.`,
+                );
+            } catch (/** @type {any} */ e) {
+                log('WARN', `[SessionCleanup] Erro ao listar sessões: ${e.message}`);
+                result.errors.push(e.message);
             }
-        }
 
-        log(
-            'INFO',
-            `[SessionCleanup] Concluído: ${result.deleted}/${result.total} sessões removidas, ${result.kept} mantidas.`,
-        );
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[SessionCleanup] Erro ao listar sessões: ${e.message}`);
-        result.errors.push(e.message);
-    }
-
-    return result;
-    }); // startSpan copilot.session.cleanup
+            return result;
+        },
+    ); // startSpan copilot.session.cleanup
 }

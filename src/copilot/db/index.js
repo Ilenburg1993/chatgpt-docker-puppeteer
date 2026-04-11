@@ -6,4 +6,4 @@
  */
 
 export { COPILOT_MIGRATIONS } from './migrations.js';
-export { closeCopilotDb, getCopilotDb, resolveCopilotDbPath } from './sqlite.js';
+export { closeCopilotDb, getCopilotDb, resolveCopilotDbPath, setDbLogger } from './sqlite.js';

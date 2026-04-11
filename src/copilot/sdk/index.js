@@ -1,8 +1,32 @@
 // @ts-check
 /**
- * src/copilot/sdk/index.js
+ * src/copilot/sdk/index.js — [L1] Wrapper @github/copilot-sdk. SSOT runtime + tipos.
  *
- * Barrel de re-exportação para os módulos da camada SDK do Copilot.
+ * Barrel de re-exportação para a camada SDK do Copilot. ~120 exports organizados em faixas temáticas.
+ *
+ * ### Faixas de API
+ *
+ * | Faixa | Tema                       | Sub-módulo fonte      |
+ * | ----- | -------------------------- | --------------------- |
+ * | 1     | Types & Constants          | constants.js          |
+ * | 2     | Tools & Permissions        | tools.js, permissions |
+ * | 3     | SystemMessage Builder      | system-message.js     |
+ * | 4     | Unified Config Builder     | config.js             |
+ * | 5     | Client & Session Facade    | client-facade.js      |
+ * | 6     | Session Lifecycle Wrappers | sdk-session-wrapper   |
+ * | 7-8   | RPC Core & Advanced        | rpc.js, server-rpc    |
+ * | 9     | Health & Auth              | health.js             |
+ * | 10    | Event System               | events.js             |
+ * | 11    | Lifecycle Events           | client-events.js      |
+ * | 12    | Provider / BYOK            | provider.js           |
+ * | 13    | Telemetry & Tracing        | telemetry.js          |
+ * | 16    | Custom Tools Registry      | custom-tools.js       |
+ * | 22    | Experimental Features      | feature-flags.js      |
+ *
+ * ### DI Setters (chamados por observability/bootstrap.js)
+ *
+ * - `setSdkLogger(logFn)` — injeta logger no módulo sdk
+ * - `setCustomToolsBuilder(fn)` — injeta buildTool (late dep)
  *
  * @module copilot/sdk
  */
@@ -109,9 +133,9 @@ export {
     supportsReasoning,
 } from './models/helpers.js';
 
+export { validateUrl, validateUrlString } from '#copilot/core/security/url-validator';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
-export { validateUrl, validateUrlString } from '#copilot/core/security/url-validator';
 export { pickDefined } from './utils.js';
 
 // ─── Faixa 1: Types & Constants (rev.4) ──────────────────────────────────────
@@ -339,3 +363,6 @@ export {
     skillsGetStatus,
     skillsList,
 } from './experimental-rpc.js';
+
+export { setCustomToolsBuilder } from './custom-tools.js';
+export { setSdkLogger } from './logger.js';

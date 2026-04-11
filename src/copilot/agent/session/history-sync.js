@@ -16,7 +16,13 @@ import { log } from '#copilot/observability/logger';
  */
 
 /**
- * @typedef {{ syncFromSdkHistory: (hubSessionId: string, sessionId: string, messages: { id?: string; type: string; content: string; createdAt?: number }[]) => { synced: number; skipped: number } }} ConversationStoreLike
+ * @typedef {{
+ *     syncFromSdkHistory: (
+ *         hubSessionId: string,
+ *         sessionId: string,
+ *         messages: { id?: string; type: string; content: string; createdAt?: number }[],
+ *     ) => { synced: number; skipped: number };
+ * }} ConversationStoreLike
  */
 
 /**

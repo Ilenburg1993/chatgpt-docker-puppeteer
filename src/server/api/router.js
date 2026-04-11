@@ -3,7 +3,7 @@ import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
 import copilotBridge from '../../copilot/api/bridge/index.js';
-import sdkApi from '../../copilot/api/express/index.js';
+import createSdkApiRouter from '../../copilot/api/express/index.js';
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { errorHandler, notFound } from '../middleware/error_handler.js';
 import artifactsController from './controllers/artifacts.js';
@@ -328,7 +328,7 @@ async function applyRoutes(app) {
     if (process.env.COPILOT_SDK_ENABLED !== 'false') {
         app.use('/api/copilot', apiLimiter, copilotBridge);
         log('INFO', '[COPILOT] SDK bridge registrado em /api/copilot');
-        app.use('/api/sdk', apiLimiter, sdkApi);
+        app.use('/api/sdk', apiLimiter, createSdkApiRouter());
         log('INFO', '[COPILOT] SDK API registrada em /api/sdk');
         app.use('/api/hub', apiLimiter, copilotHubRouter);
         log('INFO', '[COPILOT] ConversationHub REST API registrada em /api/hub');

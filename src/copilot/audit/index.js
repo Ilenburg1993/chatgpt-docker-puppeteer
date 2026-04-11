@@ -23,4 +23,8 @@ export {
     globalAuditBuffer,
     isHighRiskTool,
     logToolAudit,
+    setAuditBus,
 } from './pipeline.js';
+
+// Logger proxy (DI)
+export { setAuditLogger } from './logger.js';

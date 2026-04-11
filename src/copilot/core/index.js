@@ -1,14 +1,23 @@
 // @ts-check
 /**
- * src/copilot/core/index.js
+ * src/copilot/core/index.js — [L0] Utilitários puros, zero dependências internas.
  *
- * Barrel — ponto de entrada único para todos os contratos centrais do módulo copilot.
+ * Barrel — ponto de entrada único para contratos centrais do módulo copilot. Nenhum módulo externo deve importar
+ * sub-arquivos diretamente; use este barrel.
  *
- * Sub-módulos disponíveis:
+ * ### Categorias de exports
  *
- * - `constants` — portas, limites e nomes de eventos canônicos
- * - `errors` — CopilotError, SessionError, BridgeError, ConfigError, ToolError
- * - `structured-message` — StructuredMessage schema, builders, serializers, parser
+ * | Categoria          | Exports                                                        |
+ * | ------------------ | -------------------------------------------------------------- |
+ * | **Erros**          | CopilotError, SessionError, BridgeError, ToolError, ErrorCodes |
+ * | **Resiliência**    | withRetry, withTimeout, CircuitBreaker, CircuitOpenError       |
+ * | **Error handling** | isFatalError, isTransientError, logSwallowed, wrapAsync        |
+ * | **Shutdown**       | registerShutdownHandler, runShutdown, isShuttingDown           |
+ * | **JSON**           | safeJsonParse, safeJsonStringify, parseJsonOrThrow             |
+ * | **Schemas**        | Zod schemas canônicos (via schemas.js)                         |
+ * | **Constantes**     | LLM_B_TERMINAL_PORT, AGENT_EVENTS, etc. (via constants.js)     |
+ * | **Structured msg** | StructuredMessage schema, builders, serializers, parser        |
+ * | **Timers**         | registerTimer, cancelTimer, cancelAllTimers, activeTimerCount  |
  *
  * @module copilot/core
  *
@@ -28,7 +37,7 @@ export * from './errors.js';
 export { withRetry } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';
 export * from './schemas.js';
-export { isShuttingDown, registerShutdownHandler, runShutdown } from './shutdown.js';
+export { isShuttingDown, registerShutdownHandler, runShutdown, setShutdownLogger } from './shutdown.js';
 export * from './structured-message.js';
 export {
     activeCount as activeTimerCount,

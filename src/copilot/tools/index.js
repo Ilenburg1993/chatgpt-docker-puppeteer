@@ -1,9 +1,38 @@
 // @ts-check
 /**
- * src/copilot/tools/index.js
+ * src/copilot/tools/index.js — [L3] Definição de Custom Tools para o agente.
  *
- * Registry centralizado de Custom Tools para o Always-Alive Agent. Agrupa todas as ferramentas disponíveis e as expõe
- * como array pronto para uso no SDK.
+ * Registry centralizado de Custom Tools para o Always-Alive Agent. Agrupa todas as ferramentas e expõe como array
+ * pronto para uso no SDK.
+ *
+ * ### API pública
+ *
+ * | Export               | Tipo    | Descrição                                    |
+ * | -------------------- | ------- | -------------------------------------------- |
+ * | `allTools`           | Tool[]  | Array completo de todas as tools registradas |
+ * | `buildTool()`        | Factory | Factory canônica para criar novas tools      |
+ * | `withSkipPermission` | Wrapper | Wrapper para tools que pulam permissão       |
+ *
+ * ### Categorias de Tools
+ *
+ * - `taskTools` — gerenciamento de tarefas
+ * - `codeTools` — operações de código
+ * - `gitTools` — operações git
+ * - `sessionTools` / `sessionRpcTools` — controle de sessão SDK
+ * - `hookTools` — controle de hooks/permissões
+ * - `hubTools` — interação com conversation hub
+ * - `fileTools` (read + write) — operações de arquivo
+ * - `shellTools` — execução de comandos shell
+ * - `webTools` — operações web (HTTP, scrape)
+ * - `todoTools` (read + write) — CRUD de todos
+ * - `permissionTools` — controle de permissões
+ * - `introspectionTools` — autodiagnóstico e introspecção
+ *
+ * ### Setters de DI
+ *
+ * - `setHub(hub)` — injeta ConversationHub para hub-tools
+ * - `setPermissionAgent(agent)` — injeta agente de permissão
+ * - `setSessionRpc(rpc)` — injeta facade RPC de sessão
  *
  * @module copilot/tools
  */

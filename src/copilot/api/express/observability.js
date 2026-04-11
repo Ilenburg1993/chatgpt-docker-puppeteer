@@ -19,7 +19,6 @@
  * @module copilot/routes/observability
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
 import { defaultAuditLog, getAuditTail } from '#copilot/audit/pipeline';
 import { getMcpStatus } from '#copilot/bridges/mcp-tool-bridge';
 import { isMounted as isNervMounted } from '#copilot/bridges/nerv-bridge';
@@ -34,13 +33,28 @@ import { Router } from 'express';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
-const router = Router();
-
 /**
  * @typedef {import('express').Request} Req
  *
  * @typedef {import('express').Response} Res
  */
+
+/**
+ * Dependências injetáveis do router de observabilidade.
+ *
+ * @typedef {object} ObservabilityRouterDeps
+ * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
+ */
+
+/**
+ * Factory que cria o router de rotas `/observability/*` com dependências injetadas.
+ *
+ * @param {ObservabilityRouterDeps} deps
+ * @returns {import('express').Router}
+ */
+export default function createObservabilityRouter(deps) {
+    const { agent } = deps;
+    const router = Router();
 
 /**
  * @param {Req} req
@@ -74,7 +88,7 @@ router.get('/observability/health', (req, res) =>
         let agentSnapshot = null;
         let agentAvailable = false;
         try {
-            agentSnapshot = alwaysAliveAgent.getStatusSnapshot();
+            agentSnapshot = agent.getStatusSnapshot();
             agentAvailable = true;
         } catch (/** @type {any} */ e) {
             logSwallowed(e, 'api.observability.getAgent');
@@ -307,4 +321,5 @@ router.get('/observability/events/dead-letter', (req, res) => {
     res.json({ ok: true, entries, count: entries.length });
 });
 
-export default router;
+    return router;
+}

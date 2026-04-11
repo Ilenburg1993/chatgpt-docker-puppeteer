@@ -1,8 +1,8 @@
 # PARTE-19A — Auditoria: Imports Diretos do SDK `@github/copilot-sdk`
 
-**Data**: 2026-07-21  
-**Escopo**: `src/copilot/**/*.js` (exceto `src/copilot/sdk/`)  
-**Política violada**: Todo acesso ao SDK deve passar pelo wrapper `src/copilot/sdk/` (alias `#copilot/sdk`)  
+**Data**: 2026-07-21
+**Escopo**: `src/copilot/**/*.js` (exceto `src/copilot/sdk/`)
+**Política violada**: Todo acesso ao SDK deve passar pelo wrapper `src/copilot/sdk/` (alias `#copilot/sdk`)
 
 ---
 

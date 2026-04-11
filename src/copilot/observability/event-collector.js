@@ -9,7 +9,7 @@
  * - Registra handlers para os eventos de maior valor (tool calls, tokens, erros, sessão)
  * - Alimenta o TelemetryStore com dados de execução
  * - Re-emite eventos no HookBus para SSE em tempo real
- * - Persiste eventos de alto valor em `src/copilot/logs/events.jsonl` (assíncrono)
+ * - Persiste eventos de alto valor em `var/logs/copilot/events.jsonl` (assíncrono)
  * - Rastreia pendings de tool calls para calcular latência
  *
  * Uso: const collector = createEventCollector({ telemetry, hookBus }); const unsubs = collector.attach(session,
@@ -23,7 +23,6 @@ import { logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
     attachAssistantHandlers,
     attachInteractionHandlers,
@@ -32,12 +31,11 @@ import {
     injectRecordCompaction,
     quotaState,
 } from './collectors/index.js';
-import { log } from './logger.js';
+import { LOG_DIR, log } from './logger.js';
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
+const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : LOG_DIR;
 const EVENTS_FILE = path.join(LOGS_DIR, 'events.jsonl');
 const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
 

@@ -17,8 +17,8 @@
  * @see module:copilot/sdk/tools-registry
  */
 
-import { log } from '#copilot/observability/logger';
 import { defineTool } from '@github/copilot-sdk';
+import { log } from './logger.js';
 
 /** @type {typeof import('zod-to-json-schema').zodToJsonSchema | null} */
 let _zodToJsonSchema = null;

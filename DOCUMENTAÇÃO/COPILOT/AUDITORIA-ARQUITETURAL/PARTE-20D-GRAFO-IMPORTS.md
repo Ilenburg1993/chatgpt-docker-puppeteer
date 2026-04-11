@@ -1,6 +1,7 @@
 # PARTE-20D — Grafo de Imports: Situação Atual e Ideal
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0
+**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.1
+**Última atualização**: 2026-04-12 — Pós-execução do roadmap PARTE-20C (violations 27→0)
 
 ---
 
@@ -98,34 +99,34 @@ Cada nó representa um **módulo de nível 1** de `src/copilot`. Arestas com nú
 
 ### 2.2 Tabela Resumo de Arestas Cross-Module
 
-| De | Para | Edges | Status |
-|---|---|---|---|
-| agent | core | 12 | ✅ |
-| terminal | core | 9 | ✅ |
-| sdk | core | 7 | ✅ |
-| channel | core | 3 | ✅ |
-| observability | core | 3 | ✅ |
-| terminal | agent | 3 | ⚠️ Bidirecional com violação |
-| agent | bridges | 2 | ⚠️ |
-| core | observability | 2 | 🔴 VIOLAÇÃO |
-| terminal | tools | 2 | ⚠️ |
-| terminal | channel | 2 | ⚠️ |
-| terminal | conversation-hub | 2 | ⚠️ |
-| tools | sdk | 2 | ✅ |
-| agent | conversation-hub | 1 | ⚠️ |
-| agent | terminal | 1 | 🔴 VIOLAÇÃO |
-| agent | sdk | 1 | ✅ |
-| agent | config | 1 | ✅ |
-| agent | tools | 1 | ⚠️ |
-| api | core | 1 | ✅ |
-| bridges | agent | 1 | 🔴 VIOLAÇÃO |
-| config | core | 1 | ✅ |
-| conversation-hub | channel | 1 | ⚠️ |
-| conversation-hub | core | 1 | ✅ |
-| db | core | 1 | ✅ |
-| terminal | bridges | 1 | ⚠️ |
-| terminal | config | 1 | ✅ |
-| terminal | api | 1 | ⚠️ |
+| De               | Para             | Edges | Status                      |
+| ---------------- | ---------------- | ----- | --------------------------- |
+| agent            | core             | 12    | ✅                           |
+| terminal         | core             | 9     | ✅                           |
+| sdk              | core             | 7     | ✅                           |
+| channel          | core             | 3     | ✅                           |
+| observability    | core             | 3     | ✅                           |
+| terminal         | agent            | 3     | ⚠️ Bidirecional com violação |
+| agent            | bridges          | 2     | ⚠️                           |
+| core             | observability    | 2     | 🔴 VIOLAÇÃO                  |
+| terminal         | tools            | 2     | ⚠️                           |
+| terminal         | channel          | 2     | ⚠️                           |
+| terminal         | conversation-hub | 2     | ⚠️                           |
+| tools            | sdk              | 2     | ✅                           |
+| agent            | conversation-hub | 1     | ⚠️                           |
+| agent            | terminal         | 1     | 🔴 VIOLAÇÃO                  |
+| agent            | sdk              | 1     | ✅                           |
+| agent            | config           | 1     | ✅                           |
+| agent            | tools            | 1     | ⚠️                           |
+| api              | core             | 1     | ✅                           |
+| bridges          | agent            | 1     | 🔴 VIOLAÇÃO                  |
+| config           | core             | 1     | ✅                           |
+| conversation-hub | channel          | 1     | ⚠️                           |
+| conversation-hub | core             | 1     | ✅                           |
+| db               | core             | 1     | ✅                           |
+| terminal         | bridges          | 1     | ⚠️                           |
+| terminal         | config           | 1     | ✅                           |
+| terminal         | api              | 1     | ⚠️                           |
 
 ---
 
@@ -229,38 +230,59 @@ L6  terminal/      ← depende de tudo —  camada de apresentação
 
 ### 4.1 Dependências a Remover (Violações)
 
-| Aresta a remover | Arquivo concreto | Alternativa |
-|---|---|---|
+| Aresta a remover         | Arquivo concreto                                                                              | Alternativa                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `core` → `observability` | `core/error-handlers.js` importa `observability/error-tracker.js` e `observability/logger.js` | `error-handlers.js` recebe `logger` por parâmetro; observability registra handler via `core.onError()` callback |
-| `agent` → `terminal` | `agent/lifecycle/agent-lifecycle.js` importa `terminal/state.js` | `getHubSessionId` injetada via parâmetro ou `core/shared-state.js` |
-| `bridges` → `agent` | `bridges/nerv-bridge.js` importa `agent/index.js` | nerv-bridge escuta eventos do NERV — o agent publica; remover import do agent |
+| `agent` → `terminal`     | `agent/lifecycle/agent-lifecycle.js` importa `terminal/state.js`                              | `getHubSessionId` injetada via parâmetro ou `core/shared-state.js`                                              |
+| `bridges` → `agent`      | `bridges/nerv-bridge.js` importa `agent/index.js`                                             | nerv-bridge escuta eventos do NERV — o agent publica; remover import do agent                                   |
 
 ### 4.2 Dependências a Ajustar (Acoplamentos)
 
-| Aresta | Situação | Correção |
-|---|---|---|
-| `api` → `agent` | Express routes importam `alwaysAliveAgent` singleton | Injetar `agent` no router via factory: `createRouter(agent)` |
-| `channel` → `agent` | `channel/client.js` importa singleton | `new LlmBridgeClient(agent)` — DI explícita |
-| `terminal` → `agent` | 3 pontos importam `alwaysAliveAgent` diretamente | Terminal recebe `agent` no bootstrap — sem import direto |
-| `observability` → `agent` | `agent-event-observer.js` importa agent internals | Observer recebe agent como parâmetro |
-| `conversation-hub` → `channel` | Hub importa channel diretamente | Comunicação via eventos — sem import direto |
-| `agent` → `bridges` | Agent importa nerv e git bridges | Bridges registradas via hooks/tools registry |
+| Aresta                         | Situação                                             | Correção                                                     |
+| ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------ |
+| `api` → `agent`                | Express routes importam `alwaysAliveAgent` singleton | Injetar `agent` no router via factory: `createRouter(agent)` |
+| `channel` → `agent`            | `channel/client.js` importa singleton                | `new LlmBridgeClient(agent)` — DI explícita                  |
+| `terminal` → `agent`           | 3 pontos importam `alwaysAliveAgent` diretamente     | Terminal recebe `agent` no bootstrap — sem import direto     |
+| `observability` → `agent`      | `agent-event-observer.js` importa agent internals    | Observer recebe agent como parâmetro                         |
+| `conversation-hub` → `channel` | Hub importa channel diretamente                      | Comunicação via eventos — sem import direto                  |
+| `agent` → `bridges`            | Agent importa nerv e git bridges                     | Bridges registradas via hooks/tools registry                 |
 
 ### 4.3 Novas Arestas Necessárias (Adições)
 
-| Nova aresta | Justificativa |
-|---|---|
-| `core/shared-state.js` | Módulo L0 para shared state mínimo (ex.: hubSessionId) acessível sem violar layers |
-| `core` ← bootstrapper injects logger | `observability/bootstrap.js` chama `core.registerErrorHandler(fn)` |
+| Nova aresta                          | Justificativa                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `core/shared-state.js`               | Módulo L0 para shared state mínimo (ex.: hubSessionId) acessível sem violar layers |
+| `core` ← bootstrapper injects logger | `observability/bootstrap.js` chama `core.registerErrorHandler(fn)`                 |
 
 ---
 
 ## 5. Métricas Comparativas
 
-| Métrica | Atual | Ideal |
-|---|---|---|
-| Violações de camada | 3 | **0** |
-| Ciclos arquiteturais (nível módulo) | 3 | **0** |
-| Cross-module dependency edges | 26 | **≤ 16** |
-| Módulos com dependência bidirecional | 3 | **0** |
-| Módulos com import de singleton mutable | 8+ | 0 (DI explícita) |
+| Métrica                                 | Pré-Refatoração | Pós-Roadmap        | Ideal |
+| --------------------------------------- | --------------- | ------------------ | ----- |
+| Violações de camada                     | 3 (real: 27)    | **0** ✅            | 0     |
+| Ciclos arquiteturais (nível módulo)     | 3               | **0** ✅            | 0     |
+| Cross-module dependency edges           | 26              | ~20                | ≤ 16  |
+| Módulos com dependência bidirecional    | 3               | **0** ✅            | 0     |
+| Módulos com import de singleton mutable | 8+              | ~4 (api factories) | 0     |
+
+---
+
+## 6. Nota Pós-Refatoração (2026-04-12)
+
+> O grafo "Atual" na seção 2 reflete o estado **pré-refatoração** (2026-04-10).
+> As seguintes mudanças foram aplicadas pelo roadmap PARTE-20C:
+
+### Violações Eliminadas
+- **`core` → `observability`**: Resolvido via DI — `observability/bootstrap.js` injeta logger/tracker em core
+- **`agent` → `terminal`**: Resolvido — `getHubSessionId` movido para `core/shared-state.js`
+- **`bridges` → `agent`**: Resolvido — `createNervBridge(agent)` factory, bridge não importa agent
+- **`sdk/` → `observability/logger`** (×12): Proxy `sdk/logger.js` + `setSdkLogger(log)`
+- **`sdk/` → `config/env`**: Leitura direta de `process.env`
+- **`sdk/` → `tools/tool-factory`**: DI via `setCustomToolsBuilder(fn)`
+- **`audit/` → agent/config, hooks/bus, config/env, observability**: Proxy `audit/logger.js` + DI
+
+### Hierarquia Atualizada
+- `channel/` reclassificado de L5 para L4 (mesmo nível de `conversation-hub` e `agent`)
+- Enforcement via CI: `npm run check:layers` (script `scripts/check-layer-violations.mjs`)
+- JSDoc type-only imports (`@typedef`) filtrados automaticamente (não são runtime violations)

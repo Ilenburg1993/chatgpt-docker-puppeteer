@@ -16,24 +16,41 @@
  * @module copilot/api/sdk-api
  */
 
+import { alwaysAliveAgent } from '#copilot/agent';
+import { defaultMetrics } from '#copilot/observability';
+import { getClient, getClientState, stopClient } from '#copilot/sdk';
+import { allTools } from '#copilot/tools/index';
 import { Router } from 'express';
-import agentRouter from './agent.js';
-import clientRouter from './client.js';
+import createAgentRouter from './agent.js';
+import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
-import observabilityRouter from './observability.js';
+import createObservabilityRouter from './observability.js';
 import sessionsRouter from './sessions.js';
-import webhooksRouter from './webhooks.js';
+import createWebhooksRouter from './webhooks.js';
 
-const router = Router();
+/**
+ * Cria o router principal da SDK API com injeção de dependências.
+ *
+ * Os sub-routers recebem dependências explícitas em vez de importar singletons,
+ * facilitando testes e desacoplamento.
+ *
+ * @returns {import('express').Router}
+ */
+export default function createSdkApiRouter() {
+    const router = Router();
 
-// Sub-routers modulares — cada arquivo é responsável por um domínio
-router.use('/', clientRouter);
-router.use('/', sessionsRouter);
-router.use('/', agentRouter);
-router.use('/', webhooksRouter);
-// P.2: rotas de introspecção de hooks (registry + SSE events)
-router.use('/', hooksRouter);
-// Rotas de observabilidade (metrics, errors, logs, health, log-level)
-router.use('/', observabilityRouter);
+    // Dependências compartilhadas — resolvidas uma vez na raiz
+    const sharedDeps = { agent: alwaysAliveAgent, metrics: defaultMetrics, getClient, getClientState, stopClient, allTools };
 
-export default router;
+    // Sub-routers modulares — cada arquivo é responsável por um domínio
+    router.use('/', createClientRouter(sharedDeps));
+    router.use('/', sessionsRouter);
+    router.use('/', createAgentRouter(sharedDeps));
+    router.use('/', createWebhooksRouter(sharedDeps));
+    // P.2: rotas de introspecção de hooks (registry + SSE events)
+    router.use('/', hooksRouter);
+    // Rotas de observabilidade (metrics, errors, logs, health, log-level)
+    router.use('/', createObservabilityRouter(sharedDeps));
+
+    return router;
+}

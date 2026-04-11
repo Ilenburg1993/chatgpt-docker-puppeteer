@@ -9,7 +9,7 @@
  * - Emite spans automáticos para sessões, mensagens, tool calls no CLI interno
  * - Suporte a exportação OTLP HTTP ou arquivo JSONL local
  *
- * Por padrão, exporta para `src/copilot/logs/otel-traces.jsonl`. Configurável via variáveis de ambiente:
+ * Por padrão, exporta para `var/logs/copilot/otel-traces.jsonl`. Configurável via variáveis de ambiente:
  *
  * - `COPILOT_OTEL_DISABLED` — desabilitar completamente
  * - `COPILOT_OTEL_ENDPOINT` — OTLP HTTP endpoint (ex: http://localhost:4318)
@@ -21,7 +21,6 @@
  */
 
 import {
-    COPILOT_LOG_DIR,
     COPILOT_OTEL_CAPTURE_CONTENT,
     COPILOT_OTEL_DISABLED,
     COPILOT_OTEL_ENDPOINT,
@@ -29,11 +28,9 @@ import {
     COPILOT_OTEL_SOURCE_NAME,
 } from '#copilot/config/env';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { LOG_DIR } from './logger.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
+const LOGS_DIR = LOG_DIR;
 
 const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');
 

@@ -46,8 +46,9 @@ export const DEFAULT_DIAGNOSTIC_MODEL = 'gpt-4.1-mini';
  * Ferramentas excluídas por padrão em sessões do projeto.
  *
  * @type {readonly string[]}
+ * @deprecated Importar diretamente de `#copilot/config/session-config`. Re-export mantido para compatibilidade.
  */
-export const DEFAULT_EXCLUDED_TOOLS = Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory']);
+export { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
 
 /**
  * Configuração default de infinite sessions.

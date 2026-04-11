@@ -12,16 +12,16 @@
  * @module copilot/agent/lifecycle/entry
  */
 
+import { setAuditBus } from '#copilot/audit';
 import { TimeoutError } from '#copilot/core/errors';
 import { withRetry } from '#copilot/core/retry';
 import { registerShutdownHandler, runShutdown } from '#copilot/core/shutdown';
+import { defaultBus } from '#copilot/hooks/bus';
 import { defaultErrorTracker } from '#copilot/observability';
-import { bootstrapObservability } from '#copilot/observability/bootstrap';
+import { bootstrapLateDeps, bootstrapObservability } from '#copilot/observability/bootstrap';
 import { log } from '#copilot/observability/logger';
 import { CopilotClient } from '#copilot/sdk';
-
-// Registrar dependências de observabilidade em core/ antes de qualquer uso
-bootstrapObservability();
+import { buildTool } from '#copilot/tools/tool-factory';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
@@ -32,6 +32,12 @@ import {
     RESTART_DELAY_MS,
 } from '../config.js';
 import { drainStateWrites } from './state-io.js';
+
+// Registrar dependências de observabilidade (log, error-tracker) em core/ e db/ antes de qualquer uso
+bootstrapObservability();
+// Injetar dependências tardias (tools, bus) em módulos de camada inferior (sdk/, audit/)
+bootstrapLateDeps({ buildTool });
+setAuditBus(defaultBus);
 
 /**
  * Inicializa o agente com retry centralizado (até {@link BOOT_MAX_RETRIES} tentativas).

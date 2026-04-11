@@ -11,22 +11,44 @@
  * @module copilot/audit/pipeline
  */
 
-import { TOOL_AUDIT_MAX_LOG_BYTES } from '#copilot/agent/config';
-import {
-    COPILOT_AUDIT_BUFFER_SIZE,
-    COPILOT_AUDIT_LOG_PATH,
-    COPILOT_AUDIT_RING_SIZE,
-    COPILOT_HIGH_RISK_TOOLS,
-    COPILOT_TOOL_PERMISSIONS_LOG,
-} from '#copilot/config/env';
 import { logSwallowed } from '#copilot/core/error-handlers';
-import { defaultBus } from '#copilot/hooks/bus';
-import { LOG_DIR, log } from '#copilot/observability/logger';
 import { approveAll } from '#copilot/sdk';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { getLogDir, log } from './logger.js';
 import { AuditRingBuffer } from './ring-buffer.js';
+
+// ─── Env vars lidas diretamente (evita L1 → L2/L4) ──────────────────────────
+
+/** @param {string} key @param {number} def @returns {number} */
+const envInt = (key, def) => {
+    const v = parseInt(process.env[key] ?? '', 10);
+    return Number.isFinite(v) ? v : def;
+};
+/** @param {string} key @returns {string} */
+const envOpt = (key) => process.env[key] ?? '';
+
+const COPILOT_AUDIT_BUFFER_SIZE = envInt('COPILOT_AUDIT_BUFFER_SIZE', 500);
+const COPILOT_AUDIT_LOG_PATH = envOpt('COPILOT_AUDIT_LOG_PATH');
+const COPILOT_AUDIT_RING_SIZE = envInt('COPILOT_AUDIT_RING_SIZE', 200);
+const COPILOT_HIGH_RISK_TOOLS = envOpt('COPILOT_HIGH_RISK_TOOLS');
+const COPILOT_TOOL_PERMISSIONS_LOG = envOpt('COPILOT_TOOL_PERMISSIONS_LOG');
+const TOOL_AUDIT_MAX_LOG_BYTES = envInt('AGENT_TOOL_AUDIT_MAX_LOG_BYTES', 10 * 1024 * 1024);
+
+// ─── Event bus (injetado em runtime via setAuditBus) ─────────────────────────
+
+/** @type {{ emitHook: (name: string, sessionId: string, input: unknown, output?: unknown) => void } | null} */
+let _bus = null;
+
+/**
+ * Injeta o event bus (hooks/bus). Chamado no bootstrap.
+ *
+ * @param {{ emitHook: (name: string, sessionId: string, input: unknown, output?: unknown) => void }} bus
+ */
+export function setAuditBus(bus) {
+    if (bus && typeof bus.emitHook === 'function') _bus = bus;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Part 1: SDK Audit Buffer (ex-hooks/audit.js)
@@ -100,10 +122,10 @@ export function createAuditPostToolHandler(logger, buffer = globalAuditBuffer) {
 const MAX_AUDIT_ENTRIES = COPILOT_AUDIT_RING_SIZE;
 
 /** Default path do arquivo de audit geral em disco. */
-const AUDIT_FILE = join(LOG_DIR, 'audit.jsonl');
+const AUDIT_FILE = join(getLogDir(), 'audit.jsonl');
 
 /** Path do arquivo JSONL de tool calls (execuções). */
-const TOOL_AUDIT_FILE = join(LOG_DIR, 'tool-execution-audit.jsonl');
+const TOOL_AUDIT_FILE = join(getLogDir(), 'tool-execution-audit.jsonl');
 const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
@@ -412,7 +434,7 @@ const TOOL_PERMISSIONS_LOG = COPILOT_TOOL_PERMISSIONS_LOG
     ? resolve(COPILOT_TOOL_PERMISSIONS_LOG)
     : COPILOT_AUDIT_LOG_PATH
       ? resolve(COPILOT_AUDIT_LOG_PATH)
-      : join(resolve(LOG_DIR), 'tool-permissions-audit.jsonl');
+      : join(resolve(getLogDir()), 'tool-permissions-audit.jsonl');
 const PERMISSIONS_ROTATE_LOG = TOOL_PERMISSIONS_LOG + '.1';
 const MAX_LOG_BYTES = TOOL_AUDIT_MAX_LOG_BYTES;
 
@@ -525,7 +547,7 @@ export function buildAuditingPermissionHandler(baseHandler) {
                 typeof (/** @type {any} */ (invocation)?.sessionId) === 'string'
                     ? /** @type {any} */ (invocation).sessionId
                     : '';
-            defaultBus.emitHook('permission_request', sessionId, { toolName, highRisk }, { decision });
+            _bus?.emitHook('permission_request', sessionId, { toolName, highRisk }, { decision });
 
             if (highRisk && decision === 'approved') {
                 log('INFO', `[ToolAudit] Ferramenta alto risco APROVADA: '${toolName}'`);

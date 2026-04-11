@@ -1,6 +1,6 @@
 // @ts-check
 import { ConfigError } from '#copilot/core/errors';
-import { log as appLog } from '#copilot/observability/logger';
+import { log as appLog } from './logger.js';
 /**
  * src/copilot/sdk/agents.js
  *

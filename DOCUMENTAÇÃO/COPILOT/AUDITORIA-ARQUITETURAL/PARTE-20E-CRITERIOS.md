@@ -2,7 +2,7 @@
 
 **Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0
 
-> Este documento define os critérios que toda decisão arquitetural em `src/copilot` deve satisfazer.  
+> Este documento define os critérios que toda decisão arquitetural em `src/copilot` deve satisfazer.
 > Usado como checklist de avaliação para novas features, refatorações e revisões de código.
 
 ---
@@ -169,7 +169,7 @@
 
 **Critérios:**
 - C12.1 — Logs vivem em `var/logs/` ou path configurável via env — nunca em `src/`
-- C12.2 — Snapshots vivem em `var/snapshots/` — nunca em `src/`  
+- C12.2 — Snapshots vivem em `var/snapshots/` — nunca em `src/`
 - C12.3 — Arquivos `.bak` não vivem em `src/`
 - C12.4 — `.gitignore` exclui explicitamente todos os paths de artefatos runtime
 

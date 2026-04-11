@@ -9,7 +9,7 @@
  * @see module:copilot/sdk/session
  */
 
-import { log } from '#copilot/observability/logger';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession

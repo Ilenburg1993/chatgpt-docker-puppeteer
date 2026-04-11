@@ -6,7 +6,7 @@
  *
  * Exporta todos os instrumentos de observabilidade isolados do workspace pai:
  *
- * - Logger interno (escreve em logs/copilot/ — não polui workspace)
+ * - Logger interno (escreve em var/logs/copilot/ — não polui workspace)
  * - EventCollector (captura 50+ tipos de eventos SDK)
  * - MetricsStore (histogramas de latência + token usage)
  * - ErrorTracker (ring buffer de erros + global handlers)
@@ -33,7 +33,7 @@ export { createMetricsStore, defaultMetrics } from './metrics.js';
 export { createErrorTracker, defaultErrorTracker } from './error-tracker.js';
 
 // ─── Bootstrap (conecta core/ a observability/) ───────────────────────────────
-export { bootstrapObservability } from './bootstrap.js';
+export { bootstrapLateDeps, bootstrapObservability } from './bootstrap.js';
 
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';

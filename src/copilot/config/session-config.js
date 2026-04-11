@@ -12,12 +12,12 @@
 
 import { buildHookContextAppendMessage } from '#copilot/config/system-prompt';
 import {
+    approveAll,
     createApproveAllPermission,
     createAuditOnlyPermission,
     createHooks,
     createSafePermission,
 } from '#copilot/sdk';
-import { approveAll } from '#copilot/sdk';
 
 /**
  * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
@@ -47,9 +47,11 @@ const BASE_CONFIG = {
  * - `web_search`: buscas não controladas em produção
  * - `memory`: manipulação de memória persistente via ferramenta lateral
  *
- * @type {string[]}
+ * @type {readonly string[]}
  */
-export const DEFAULT_EXCLUDED_TOOLS = ['powershell', 'web_fetch', 'web_search', 'memory'];
+export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
+    Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory'])
+);
 
 /**
  * Cria uma configuração de sessão para o Always-Alive Agent.

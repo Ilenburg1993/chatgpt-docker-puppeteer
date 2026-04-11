@@ -18,10 +18,7 @@
  * @module copilot/routes/agent
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
-import { defaultMetrics } from '#copilot/observability';
 import { log } from '#copilot/observability/logger';
-import { getClient } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../sse/replay-buffer.js';
 import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
@@ -39,7 +36,24 @@ const _agentReplayBuffer = new SseReplayBuffer();
  * @typedef {import('express').Response} Res
  */
 
-const router = Router();
+/**
+ * Dependências injetáveis do router de agente.
+ *
+ * @typedef {object} AgentRouterDeps
+ * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
+ * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
+ * @property {() => Promise<any>} getClient - Factory do SDK client.
+ */
+
+/**
+ * Factory que cria o router de rotas `/agent/*` com dependências injetadas.
+ *
+ * @param {AgentRouterDeps} deps
+ * @returns {import('express').Router}
+ */
+export default function createAgentRouter(deps) {
+    const { agent, metrics, getClient } = deps;
+    const router = Router();
 
 /**
  * Wrapper com prefixo de log para as rotas de agente.
@@ -61,8 +75,8 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/agent');
 router.get('/agent/info', (_req, res) => {
     res.json({
         ok: true,
-        running: alwaysAliveAgent.status !== 'stopped',
-        sessionId: alwaysAliveAgent.sessionId ?? null,
+        running: agent.status !== 'stopped',
+        sessionId: agent.sessionId ?? null,
         uptime: Math.floor(process.uptime()),
         pid: process.pid,
         nodeVersion: process.version,
@@ -79,7 +93,7 @@ router.get('/agent/info', (_req, res) => {
  * ?category=hook&page=1&limit=20 para filtragem e paginação.
  */
 router.get('/agent/tools', (req, res) => {
-    const registry = alwaysAliveAgent.toolsRegistry;
+    const registry = agent.toolsRegistry;
     if (!registry) {
         res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
         return;
@@ -123,7 +137,7 @@ router.get('/agent/tools', (req, res) => {
  * @param {import('express').Response} res
  */
 function handleGetTelemetry(_req, res) {
-    res.json({ ok: true, summary: defaultMetrics.getSummary() });
+    res.json({ ok: true, summary: metrics.getSummary() });
 }
 
 router.get('/agent/telemetry', handleGetTelemetry);
@@ -133,7 +147,7 @@ router.get('/telemetry', handleGetTelemetry);
  * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
  */
 router.post('/agent/telemetry/clear', (_req, res) => {
-    defaultMetrics.reset();
+    metrics.reset();
     log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
     res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
 });
@@ -199,7 +213,7 @@ router.get('/agent/stream', (req, res) => {
         );
 
         // Inscreve nos eventos de ciclo de vida do client
-        const unsubscribe = client.on((event) => {
+        const unsubscribe = client.on((/** @type {any} */ event) => {
             const type = /** @type {string} */ (event?.type ?? 'lifecycle');
             if (!eventFilter || eventFilter(type)) sse.send('lifecycle', standardizeSsePayload(event));
         });
@@ -211,4 +225,5 @@ router.get('/agent/stream', (req, res) => {
     });
 });
 
-export default router;
+    return router;
+}

@@ -20,10 +20,7 @@
  * @module copilot/routes/client
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
 import { log } from '#copilot/observability/logger';
-import { getClient, getClientState, stopClient } from '#copilot/sdk';
-import { allTools } from '#copilot/tools/index';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -33,7 +30,26 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @typedef {import('express').Response} Res
  */
 
-const router = Router();
+/**
+ * Dependências injetáveis do router de client.
+ *
+ * @typedef {object} ClientRouterDeps
+ * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
+ * @property {() => Promise<any>} getClient - Factory do SDK client.
+ * @property {() => string} getClientState - Estado de conexão.
+ * @property {() => Promise<void | Error[]>} stopClient - Para o client.
+ * @property {any[]} allTools - Ferramentas estáticas.
+ */
+
+/**
+ * Factory que cria o router de rotas `/client/*` com dependências injetadas.
+ *
+ * @param {ClientRouterDeps} deps
+ * @returns {import('express').Router}
+ */
+export default function createClientRouter(deps) {
+    const { agent, getClient, getClientState, stopClient, allTools } = deps;
+    const router = Router();
 
 /**
  * Wrapper com prefixo de log para as rotas de cliente.
@@ -166,7 +182,7 @@ router.post('/client/force-stop', (req, res) => {
  */
 router.get('/tools', (_req, res) => {
     const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (
-        alwaysAliveAgent
+        agent
     ).toolsRegistry;
 
     if (registry?.entries instanceof Map && registry.entries.size > 0) {
@@ -202,4 +218,5 @@ router.get('/tools', (_req, res) => {
     res.json({ ok: true, source: 'static', count: list.length, tools: list });
 });
 
-export default router;
+    return router;
+}

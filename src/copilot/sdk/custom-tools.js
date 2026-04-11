@@ -15,13 +15,33 @@
  * @module copilot/config/custom-tools-registry
  */
 
-import { log } from '#copilot/observability/logger';
-import { buildTool } from '#copilot/tools/tool-factory';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
 import { safeJsonParse } from '../core/safe-json.js';
 import { CustomToolsFileSchema } from '../core/schemas.js';
+import { log } from './logger.js';
+
+/**
+ * @typedef {(opts: {
+ *     name: string;
+ *     description: string;
+ *     parameters?: unknown;
+ *     handler: Function;
+ * }) => import('@github/copilot-sdk').Tool} BuildToolFn
+ */
+
+/** @type {BuildToolFn | null} */
+let _buildTool = null;
+
+/**
+ * Injeta a factory `buildTool` de `tools/tool-factory`. Chamado uma vez durante o bootstrap.
+ *
+ * @param {BuildToolFn} fn
+ */
+export function setCustomToolsBuilder(fn) {
+    if (typeof fn === 'function') _buildTool = fn;
+}
 
 /** Caminho do arquivo de persistência. @type {string} */
 const CUSTOM_TOOLS_PATH = join(resolve(import.meta.dirname, '../..'), 'custom-tools.json');
@@ -239,6 +259,10 @@ export async function removeCustomTool(name) {
  * @returns {import('@github/copilot-sdk').Tool[]}
  */
 export function buildCustomTools() {
+    if (!_buildTool) {
+        log('WARN', '[custom-tools-registry] buildTool não injetado — retornando lista vazia.');
+        return [];
+    }
     /** @type {import('@github/copilot-sdk').Tool[]} */
     const tools = [];
     for (const def of _registry.values()) {
@@ -251,11 +275,11 @@ export function buildCustomTools() {
             continue;
         }
         tools.push(
-            buildTool({
+            _buildTool({
                 name: def.name,
                 description: def.description,
                 ...(def.parameters ? { parameters: def.parameters } : {}),
-                handler: async (args) => {
+                handler: async (/** @type {unknown} */ args) => {
                     const result = await handler(/** @type {Record<string, unknown>} */ (args));
                     return typeof result === 'string' ? result : JSON.stringify(result);
                 },

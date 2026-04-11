@@ -9,12 +9,20 @@
  *
  * Prevenção de SSRF alinhada com OWASP A10 (Server-Side Request Forgery).
  *
+ * L0 (core) — não importa camadas superiores. Lê WEBHOOK_ALLOW_PRIVATE_HOSTS de process.env.
+ *
  * @module copilot/core/security/url-validator
  */
 
-import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config/env';
 import { ConfigError } from '#copilot/core/errors';
 import dns from 'node:dns/promises';
+
+/**
+ * Leitura direta de env para evitar import de config (L2) em core (L0).
+ *
+ * @type {boolean}
+ */
+const WEBHOOK_ALLOW_PRIVATE_HOSTS = process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true';
 
 // ─── Patterns de IP privado/loopback ────────────────────────────────────────
 

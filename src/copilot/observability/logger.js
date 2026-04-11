@@ -4,7 +4,7 @@
  *
  * Logger interno isolado para src/copilot. Drop-in replacement de `#core/logger`, sem dependência do workspace pai.
  *
- * - Escreve em `src/copilot/logs/agent.log` (não mais em `ROOT/logs/agente_current.log`)
+ * - Escreve em `var/logs/copilot/agent.log` (fora de `src/`)
  * - Nível de log controlado por `COPILOT_LOG_LEVEL` (independente de `LOG_LEVEL` global)
  * - Mesma API pública de `#core/logger`: `log`, `log.debug/info/warn/error/fatal`, `audit`, `metric`, `logMetric`
  * - Prefixo `[copilot]` nas linhas de console para distinguir de logs do workspace pai
@@ -22,8 +22,15 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Diretório de logs isolado dentro do módulo copilot. */
-export const LOG_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.resolve(__dirname, '../logs');
+/**
+ * Raiz do projeto (2 níveis acima de src/copilot/observability/).
+ *
+ * @type {string}
+ */
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+
+/** Diretório de logs. Default: `var/logs/copilot/` na raiz do projeto (fora de `src/`). */
+export const LOG_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot');
 
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');

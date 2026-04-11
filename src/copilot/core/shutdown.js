@@ -5,10 +5,20 @@
  * Gerenciador de graceful shutdown centralizado. Registra handlers nomeados com prioridade e os executa em ordem
  * durante o shutdown.
  *
+ * L0 (core) — não importa camadas superiores. Logger é injetado via `setShutdownLogger`.
+ *
  * @module copilot/core/shutdown
  */
 
-import { log } from '#copilot/observability/logger';
+/**
+ * @typedef {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', msg: string) => void} ShutdownLogFn
+ */
+
+/** @type {ShutdownLogFn} */
+let _log = (level, msg) => {
+    const fn = level === 'WARN' || level === 'ERROR' ? console.warn : console.log;
+    fn(`[shutdown][${level}] ${msg}`);
+};
 
 /**
  * @typedef {object} ShutdownHandler
@@ -22,6 +32,15 @@ const handlers = [];
 
 /** @type {boolean} */
 let shuttingDown = false;
+
+/**
+ * Injeta logger externo (ex: observability/logger). Chamado no bootstrap.
+ *
+ * @param {ShutdownLogFn} logFn
+ */
+export function setShutdownLogger(logFn) {
+    _log = logFn;
+}
 
 /**
  * Registra um handler de shutdown com nome e prioridade. Prioridades recomendadas:
@@ -52,7 +71,7 @@ export async function runShutdown(reason = 'unknown') {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    log('INFO', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
+    _log('INFO', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
 
     for (const handler of handlers) {
         try {
@@ -62,13 +81,13 @@ export async function runShutdown(reason = 'unknown') {
                     setTimeout(() => reject(new Error(`Shutdown handler "${handler.name}" timeout`)), 5_000),
                 ),
             ]);
-            log('INFO', `  ✓ ${handler.name}`);
+            _log('INFO', `  ✓ ${handler.name}`);
         } catch (/** @type {any} */ err) {
-            log('WARN', `  ✗ ${handler.name}: ${err?.message ?? err}`);
+            _log('WARN', `  ✗ ${handler.name}: ${err?.message ?? err}`);
         }
     }
 
-    log('INFO', 'Graceful shutdown concluído');
+    _log('INFO', 'Graceful shutdown concluído');
 }
 
 /**

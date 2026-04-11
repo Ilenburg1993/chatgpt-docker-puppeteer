@@ -225,7 +225,8 @@ function createSdkToolFromMcp(mcpTool) {
     const schema = buildZodSchema(mcpTool.inputSchema ?? {});
     const toolName = `mcp_${mcpTool.name}`;
 
-    return createTool({ name: toolName,
+    return createTool({
+        name: toolName,
         description: `[MCP] ${mcpTool.description ?? mcpTool.name}`,
         parameters: schema,
         // GAP-SDK-07 (fix): MCP tools devem override built-ins com o mesmo nome

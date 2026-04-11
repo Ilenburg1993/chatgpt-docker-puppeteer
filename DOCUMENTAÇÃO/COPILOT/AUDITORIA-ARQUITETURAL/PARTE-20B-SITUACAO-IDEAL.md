@@ -1,6 +1,6 @@
 # PARTE-20B — Situação Ideal: Arquitetura Target de `src/copilot`
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0  
+**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0
 **Referência cruzada**: PARTE-20A (problemas), PARTE-20D (grafos), PARTE-20E (critérios)
 
 ---
@@ -421,12 +421,12 @@ import { alwaysAliveAgent } from '../agent/index.js';
 
 ### 4.4 `terminal/` — Eliminar Handlers Duplicados
 
-Remover: `terminal/handlers-agent.js`, `terminal/handlers-dialog.js`, `terminal/handlers-shared.js`, `terminal/handlers-system.js`  
+Remover: `terminal/handlers-agent.js`, `terminal/handlers-dialog.js`, `terminal/handlers-shared.js`, `terminal/handlers-system.js`
 Manter: `terminal/handlers/` (versão subdiretório — organização correta)
 
 ### 4.5 `always-alive.js` — Decomposição
 
-**Atual:** 1 arquivo 603 LoC com bootstrap + conexão + lifecycle + public API  
+**Atual:** 1 arquivo 603 LoC com bootstrap + conexão + lifecycle + public API
 **Ideal:**
 ```
 agent/lifecycle/agent-bootstrap.js   — inicialização única (criar agent, configurar)
@@ -436,7 +436,7 @@ agent/always-alive.js                — public API minimalista (< 100 LoC)
 
 ### 4.6 `loop-manager.js` — Decomposição
 
-**Atual:** 1 arquivo 600 LoC com loop principal + retry + model fallback + event dispatch  
+**Atual:** 1 arquivo 600 LoC com loop principal + retry + model fallback + event dispatch
 **Ideal:**
 ```
 agent/dialog/loop-manager.js        — loop principal puro (< 200 LoC)

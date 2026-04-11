@@ -11,7 +11,7 @@
  * @see module:copilot/sdk/session-lifecycle
  */
 
-import { log as appLog } from '#copilot/observability/logger';
+import { log as appLog } from './logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession

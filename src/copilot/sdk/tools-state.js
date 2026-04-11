@@ -11,12 +11,12 @@
  * @module copilot/config/tools-state
  */
 
-import { log } from '#copilot/observability/logger';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
 import { safeJsonParse } from '../core/safe-json.js';
 import { ToolsConfigSchema } from '../core/schemas.js';
+import { log } from './logger.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-config.json');

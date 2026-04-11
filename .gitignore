@@ -40,6 +40,12 @@ __pycache__/
 
 # Logs
 logs/
+var/*
+!var/logs/
+var/logs/*
+!var/logs/copilot/
+var/logs/copilot/*
+!var/logs/copilot/.gitkeep
 *.log
 logs/**/*.log
 
