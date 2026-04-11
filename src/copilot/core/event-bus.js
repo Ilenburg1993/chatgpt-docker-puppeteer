@@ -5,6 +5,7 @@
  * Event Bus cross-module com suporte a namespaces, wildcards e middleware.
  *
  * Características:
+ *
  * - Typed events via JSDoc + catálogo em `types/events.js`
  * - Namespaces: `session:start`, `tool:pre_invoke`, etc.
  * - Wildcards: `session:*`, `*` (catch-all)
@@ -35,8 +36,8 @@
 // ─── EventBus ────────────────────────────────────────────────────────────────
 
 /**
- * Bus de eventos cross-module. Substitui EventEmitter ad-hoc por um bus
- * centralizado com namespaces, wildcards e middleware.
+ * Bus de eventos cross-module. Substitui EventEmitter ad-hoc por um bus centralizado com namespaces, wildcards e
+ * middleware.
  */
 export class EventBus {
     /** @type {Map<string, Set<EventHandler>>} */
@@ -52,8 +53,7 @@ export class EventBus {
     #disposed = false;
 
     /**
-     * Registra um handler para um event type.
-     * Suporta wildcards: `session:*` captura todos os eventos `session:*`.
+     * Registra um handler para um event type. Suporta wildcards: `session:*` captura todos os eventos `session:*`.
      *
      * @param {string} eventType - Nome do evento ou padrão com wildcard.
      * @param {EventHandler} handler
@@ -129,8 +129,7 @@ export class EventBus {
     }
 
     /**
-     * Adiciona um middleware ao pipeline.
-     * Middlewares são executados na ordem de adição, antes da entrega aos handlers.
+     * Adiciona um middleware ao pipeline. Middlewares são executados na ordem de adição, antes da entrega aos handlers.
      *
      * @param {Middleware} fn
      */
@@ -196,7 +195,9 @@ export class EventBus {
             for (const handler of exact) {
                 try {
                     void handler(event);
-                } catch (_) { /* handler errors are swallowed */ }
+                } catch (_) {
+                    /* handler errors are swallowed */
+                }
             }
         }
 
@@ -209,7 +210,9 @@ export class EventBus {
                 for (const handler of wildcard) {
                     try {
                         void handler(event);
-                    } catch (_) { /* handler errors are swallowed */ }
+                    } catch (_) {
+                        /* handler errors are swallowed */
+                    }
                 }
             }
         }
@@ -220,7 +223,9 @@ export class EventBus {
             for (const handler of catchAll) {
                 try {
                     void handler(event);
-                } catch (_) { /* handler errors are swallowed */ }
+                } catch (_) {
+                    /* handler errors are swallowed */
+                }
             }
         }
     }

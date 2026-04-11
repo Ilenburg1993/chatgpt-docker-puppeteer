@@ -4,8 +4,8 @@
  *
  * Barrel canônico do módulo `services/` — fachadas de alto nível para subsistemas.
  *
- * Este módulo é **L4** — consolida agent, sdk, config, tools, hooks, bridges em interfaces
- * coesas. Consumido por `api/` e `terminal/` para reduzir fan-out.
+ * Este módulo é **L4** — consolida agent, sdk, config, tools, hooks, bridges em interfaces coesas. Consumido por `api/`
+ * e `terminal/` para reduzir fan-out.
  *
  * **Status**: fundação estrutural. Fachadas individuais serão adicionadas incrementalmente.
  *

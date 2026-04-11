@@ -2,51 +2,49 @@
 /**
  * src/copilot/sdk/rpc.js
  *
- * Barrel de RPC — re-exporta rpc-session.js (model, mode, plan, workspace, log)
- * e rpc-ops.js (compaction, shell, elicitation, commands, permissions, tools).
- * Expõe createSessionRpcFacade como API agregada principal.
+ * Barrel de RPC — re-exporta rpc-session.js (model, mode, plan, workspace, log) e rpc-ops.js (compaction, shell,
+ * elicitation, commands, permissions, tools). Expõe createSessionRpcFacade como API agregada principal.
  *
  * @module copilot/sdk/rpc
  * @see module:copilot/sdk/session-lifecycle
  */
 
-import { log as _appLog } from './logger.js';
 import {
+    modeGet,
     modelGetCurrent,
     modelSwitchTo,
-    modeGet,
     modeSet,
+    planDelete,
     planRead,
     planUpdate,
-    planDelete,
+    sessionLog,
+    workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-    workspaceCreateFile,
-    sessionLog,
 } from './rpc-session.js';
 
 export {
+    modeGet,
     modelGetCurrent,
     modelSwitchTo,
-    modeGet,
     modeSet,
+    planDelete,
     planRead,
     planUpdate,
-    planDelete,
+    sessionLog,
+    workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-    workspaceCreateFile,
-    sessionLog,
 } from './rpc-session.js';
 
 export {
+    commandsHandlePending,
     compactionCompact,
+    permissionsHandlePending,
     shellExec,
     shellKill,
-    uiElicitation,
-    commandsHandlePending,
-    permissionsHandlePending,
     toolsHandlePendingCall,
+    uiElicitation,
 } from './rpc-ops.js';
 
 /**

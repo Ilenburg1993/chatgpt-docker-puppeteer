@@ -8,16 +8,9 @@
  */
 
 import { log } from '#copilot/observability';
-import * as path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';
-import {
-    MAX_SEARCH_OUTPUT,
-    WORKSPACE_ROOT,
-    execFileAsync,
-    isRgAvailable,
-    validatePath,
-} from './shared.js';
+import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Tool: search_in_files
@@ -180,5 +173,4 @@ const diffFilesTool = buildTool({
 // Exports
 // ---------------------------------------------------------------------------
 
-
-export { searchInFilesTool, diffFilesTool };
+export { diffFilesTool, searchInFilesTool };

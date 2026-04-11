@@ -6,6 +6,7 @@
  * Gera relatório JSON de métricas de saúde arquitetural do sistema copilot.
  *
  * Métricas:
+ *
  * - barrel_ratio: % de módulos com barrel index.js
  * - singleton_count: contagem de padrões singleton (global mutable)
  * - fan_out: fan-out máximo e médio por módulo
@@ -20,7 +21,7 @@
  * @module scripts/arch-health
  */
 
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const COPILOT_ROOT = 'src/copilot';
@@ -61,12 +62,11 @@ function walkJs(dir) {
 function listModules(dir) {
     if (!existsSync(dir)) return [];
     const EXCLUDE = new Set(['.github', 'logs', 'node_modules']);
-    return readdirSync(dir)
-        .filter((e) => {
-            if (EXCLUDE.has(e)) return false;
-            const full = join(dir, e);
-            return statSync(full).isDirectory();
-        });
+    return readdirSync(dir).filter((e) => {
+        if (EXCLUDE.has(e)) return false;
+        const full = join(dir, e);
+        return statSync(full).isDirectory();
+    });
 }
 
 // ─── Métricas ────────────────────────────────────────────────────────────────
@@ -155,7 +155,6 @@ function deepImportCount() {
     const files = walkJs(COPILOT_ROOT);
     let count = 0;
     const deepRe = /#copilot\/[a-z-]+\/[a-z-]+/g;
-
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');

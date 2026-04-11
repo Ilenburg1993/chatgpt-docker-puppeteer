@@ -26,13 +26,7 @@ import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { container } from '../core/di-container.js';
-import {
-    BRIDGE_AGENT,
-    FALLBACK_AGENT,
-    HUB,
-    NERV_BRIDGE_AGENT,
-    PERMISSION_AGENT,
-} from '../core/di-tokens.js';
+import { BRIDGE_AGENT, FALLBACK_AGENT, HUB, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';

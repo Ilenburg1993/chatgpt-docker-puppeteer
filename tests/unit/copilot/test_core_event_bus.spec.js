@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { EventBus, createEventBus } from '../../../src/copilot/core/event-bus.js';
 
@@ -173,7 +173,10 @@ describe('core/event-bus.js › middleware', () => {
         const bus = createEventBus();
         /** @type {string[]} */
         const order = [];
-        bus.use((_event, next) => { order.push('mw'); next(); });
+        bus.use((_event, next) => {
+            order.push('mw');
+            next();
+        });
         bus.on('a:b', () => order.push('handler'));
         bus.emit(evt('a:b'));
         assert.deepStrictEqual(order, ['mw', 'handler']);
@@ -182,8 +185,12 @@ describe('core/event-bus.js › middleware', () => {
     it('middleware pode bloquear entrega não chamando next()', () => {
         const bus = createEventBus();
         let delivered = false;
-        bus.use((_event, _next) => { /* não chama next */ });
-        bus.on('a:b', () => { delivered = true; });
+        bus.use((_event, _next) => {
+            /* não chama next */
+        });
+        bus.on('a:b', () => {
+            delivered = true;
+        });
         bus.emit(evt('a:b'));
         assert.equal(delivered, false);
     });
@@ -192,9 +199,18 @@ describe('core/event-bus.js › middleware', () => {
         const bus = createEventBus();
         /** @type {number[]} */
         const order = [];
-        bus.use((_e, next) => { order.push(1); next(); });
-        bus.use((_e, next) => { order.push(2); next(); });
-        bus.use((_e, next) => { order.push(3); next(); });
+        bus.use((_e, next) => {
+            order.push(1);
+            next();
+        });
+        bus.use((_e, next) => {
+            order.push(2);
+            next();
+        });
+        bus.use((_e, next) => {
+            order.push(3);
+            next();
+        });
         bus.on('x:y', () => order.push(4));
         bus.emit(evt('x:y'));
         assert.deepStrictEqual(order, [1, 2, 3, 4]);
@@ -306,8 +322,12 @@ describe('core/event-bus.js › error isolation', () => {
     it('erro em handler não impede entrega a outros handlers', () => {
         const bus = createEventBus();
         let reached = false;
-        bus.on('a:b', () => { throw new Error('boom'); });
-        bus.on('a:b', () => { reached = true; });
+        bus.on('a:b', () => {
+            throw new Error('boom');
+        });
+        bus.on('a:b', () => {
+            reached = true;
+        });
         bus.emit(evt('a:b'));
         assert.ok(reached);
     });

@@ -48,9 +48,9 @@ export {
 } from './timer-registry.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
-export { createContainer, createToken } from './di.js';
 export { container } from './di-container.js';
 export * from './di-tokens.js';
+export { createContainer, createToken } from './di.js';
 
 // ─── Event Bus ────────────────────────────────────────────────────────────────
 export { EventBus, createEventBus } from './event-bus.js';

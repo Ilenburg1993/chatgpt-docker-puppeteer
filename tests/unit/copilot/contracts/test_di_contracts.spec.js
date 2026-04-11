@@ -5,13 +5,14 @@
  * FK-7 — Contract tests — DI container exports e tokens.
  *
  * Garante que:
+ *
  * 1. O barrel core/index.js exporta createContainer, createToken, container
  * 2. Todos os tokens DI canônicos estão exportados
  * 3. Cada token tem nome e _id symbol
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import * as core from '../../../../src/copilot/core/index.js';
 

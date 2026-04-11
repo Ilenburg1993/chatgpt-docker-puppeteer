@@ -10,10 +10,10 @@ hierarquia.
 
 ## Estrutura
 
-| Arquivo     | Conteúdo                                      |
-| ----------- | --------------------------------------------- |
+| Arquivo     | Conteúdo                                         |
+| ----------- | ------------------------------------------------ |
 | `index.js`  | Barrel — re-exports de tokens, container, events |
-| `events.js` | Catálogo de nomes de eventos cross-module      |
+| `events.js` | Catálogo de nomes de eventos cross-module        |
 
 ## Uso
 

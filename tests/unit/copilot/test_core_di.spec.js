@@ -5,8 +5,8 @@
  * Testes unitários — core/di.js: createToken, createContainer, lifecycle, fork, dispose.
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { createContainer, createToken } from '../../../src/copilot/core/di.js';
 
@@ -228,7 +228,15 @@ describe('core/di.js › dispose', () => {
         let disposed = false;
         const TOKEN = createToken('DS');
         const c = createContainer();
-        c.register(TOKEN, () => ({ dispose: () => { disposed = true; } }), 'singleton');
+        c.register(
+            TOKEN,
+            () => ({
+                dispose: () => {
+                    disposed = true;
+                },
+            }),
+            'singleton',
+        );
         c.resolve(TOKEN); // cria instância
         c.dispose();
         assert.equal(disposed, true);
@@ -238,7 +246,15 @@ describe('core/di.js › dispose', () => {
         let closed = false;
         const TOKEN = createToken('CL');
         const c = createContainer();
-        c.register(TOKEN, () => ({ close: () => { closed = true; } }), 'singleton');
+        c.register(
+            TOKEN,
+            () => ({
+                close: () => {
+                    closed = true;
+                },
+            }),
+            'singleton',
+        );
         c.resolve(TOKEN);
         c.dispose();
         assert.equal(closed, true);
@@ -248,7 +264,15 @@ describe('core/di.js › dispose', () => {
         let destroyed = false;
         const TOKEN = createToken('DE');
         const c = createContainer();
-        c.register(TOKEN, () => ({ destroy: () => { destroyed = true; } }), 'singleton');
+        c.register(
+            TOKEN,
+            () => ({
+                destroy: () => {
+                    destroyed = true;
+                },
+            }),
+            'singleton',
+        );
         c.resolve(TOKEN);
         c.dispose();
         assert.equal(destroyed, true);

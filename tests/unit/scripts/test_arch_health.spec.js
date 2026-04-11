@@ -1,7 +1,7 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { describe, it } from 'node:test';
 
 describe('scripts/arch-health.mjs', () => {
     it('gera JSON válido com --json --quiet', () => {

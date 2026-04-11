@@ -13,21 +13,9 @@
  */
 
 import { setAuditBus } from '#copilot/audit';
-import {
-    TimeoutError,
-    container,
-    AUDIT_BUS,
-    registerShutdownHandler,
-    runShutdown,
-    withRetry,
-} from '#copilot/core';
+import { AUDIT_BUS, TimeoutError, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
 import { defaultBus } from '#copilot/hooks';
-import {
-    bootstrapLateDeps,
-    bootstrapObservability,
-    defaultErrorTracker,
-    log,
-} from '#copilot/observability';
+import { bootstrapLateDeps, bootstrapObservability, defaultErrorTracker, log } from '#copilot/observability';
 import { CopilotClient } from '#copilot/sdk';
 import { buildTool } from '#copilot/tools';
 import { logSwallowed } from '../../core/error-handlers.js';

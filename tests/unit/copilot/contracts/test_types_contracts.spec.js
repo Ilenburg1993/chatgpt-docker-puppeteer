@@ -1,40 +1,37 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 // ─── Barrel imports ──────────────────────────────────────────────────────────
 import {
-    // DI tokens (re-exported from core/di-tokens)
-    SHUTDOWN_LOGGER,
-    DB_LOGGER,
-    SDK_LOGGER,
-    TOOLS_BUILDER,
-    AUDIT_LOGGER,
     AUDIT_BUS,
+    AUDIT_LOGGER,
     BRIDGE_AGENT,
-    FALLBACK_AGENT,
-    HUB,
-    PERMISSION_AGENT,
-    SESSION_RPC,
-    NERV_BRIDGE_AGENT,
+    DB_LOGGER,
     EVENT_BUS,
-    // DI utilities (re-exported from core/di)
-    createContainer,
-    createToken,
-    container,
     // Events
     EVENT_NAMES,
     EVENT_NAMESPACES,
     // Event Bus
     EventBus,
+    FALLBACK_AGENT,
+    HUB,
+    NERV_BRIDGE_AGENT,
+    PERMISSION_AGENT,
+    SDK_LOGGER,
+    SESSION_RPC,
+    // DI tokens (re-exported from core/di-tokens)
+    SHUTDOWN_LOGGER,
+    TOOLS_BUILDER,
+    container,
+    // DI utilities (re-exported from core/di)
+    createContainer,
     createEventBus,
+    createToken,
 } from '#copilot/types';
 
 // ─── Direct imports ──────────────────────────────────────────────────────────
-import {
-    EVENT_NAMES as DirectEventNames,
-    EVENT_NAMESPACES as DirectNamespaces,
-} from '#copilot/types/events';
+import { EVENT_NAMES as DirectEventNames, EVENT_NAMESPACES as DirectNamespaces } from '#copilot/types/events';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Tests
@@ -43,9 +40,18 @@ import {
 describe('types/ barrel — DI re-exports', () => {
     it('re-exports all 13 DI tokens', () => {
         const tokens = [
-            SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, TOOLS_BUILDER,
-            AUDIT_LOGGER, AUDIT_BUS, BRIDGE_AGENT, FALLBACK_AGENT,
-            HUB, PERMISSION_AGENT, SESSION_RPC, NERV_BRIDGE_AGENT,
+            SHUTDOWN_LOGGER,
+            DB_LOGGER,
+            SDK_LOGGER,
+            TOOLS_BUILDER,
+            AUDIT_LOGGER,
+            AUDIT_BUS,
+            BRIDGE_AGENT,
+            FALLBACK_AGENT,
+            HUB,
+            PERMISSION_AGENT,
+            SESSION_RPC,
+            NERV_BRIDGE_AGENT,
             EVENT_BUS,
         ];
         for (const token of tokens) {
@@ -92,8 +98,11 @@ describe('types/ barrel — event exports', () => {
     it('all event names follow namespace:action pattern', () => {
         for (const [group, events] of Object.entries(EVENT_NAMES)) {
             for (const [, value] of Object.entries(events)) {
-                assert.match(String(value), /^[a-z]+:[a-z_]+$/,
-                    `event "${value}" in group "${group}" does not match pattern`);
+                assert.match(
+                    String(value),
+                    /^[a-z]+:[a-z_]+$/,
+                    `event "${value}" in group "${group}" does not match pattern`,
+                );
             }
         }
     });
