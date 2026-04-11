@@ -10,7 +10,7 @@
  * @module copilot/api/event-fanout
  */
 
-import { EventEmitter } from 'node:events';
+import { createEmitter } from '#copilot/core/create-emitter';
 
 /**
  * @typedef {Object} FanoutEvent
@@ -32,7 +32,7 @@ import { EventEmitter } from 'node:events';
  * customizado.
  */
 export class EventFanout {
-    /** @type {EventEmitter} */
+    /** @type {import('node:events').EventEmitter} */
     #emitter;
     /** @type {string} */
     #processId;
@@ -41,7 +41,7 @@ export class EventFanout {
      * @param {{ processId?: string }} [opts]
      */
     constructor(opts = {}) {
-        this.#emitter = new EventEmitter();
+        this.#emitter = createEmitter();
         this.#emitter.setMaxListeners(100);
         this.#processId = opts.processId ?? `pid-${process.pid}`;
     }

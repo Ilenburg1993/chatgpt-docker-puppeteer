@@ -15,7 +15,7 @@
  */
 
 import { log } from '#copilot/observability';
-import EventEmitter from 'node:events';
+import { BaseEmitter } from '#copilot/core/create-emitter';
 
 /**
  * @typedef {Object} HandoffRequest
@@ -38,9 +38,9 @@ import EventEmitter from 'node:events';
 /**
  * Gerencia handoffs de sessão entre agentes.
  *
- * @extends EventEmitter
+ * @extends BaseEmitter
  */
-export class HandoffManager extends EventEmitter {
+export class HandoffManager extends BaseEmitter {
     /** @type {Map<string, HandoffRequest>} */
     #pending = new Map();
 

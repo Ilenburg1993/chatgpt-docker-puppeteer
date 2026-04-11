@@ -12,7 +12,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { EventEmitter } from 'node:events';
+import { BaseEmitter } from '#copilot/core/create-emitter';
 
 /**
  * @typedef {import('./types.js').HookBusEvent} HookBusEvent
@@ -48,9 +48,9 @@ import { EventEmitter } from 'node:events';
  * - `'session_end'` — ao encerrar uma sessão
  * - `'error_occurred'` — ao ocorrer um erro
  *
- * @extends {EventEmitter}
+ * @extends {BaseEmitter}
  */
-export class HookBus extends EventEmitter {
+export class HookBus extends BaseEmitter {
     constructor() {
         super();
         this.setMaxListeners(50);

@@ -16,7 +16,7 @@
 
 import { SessionError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import EventEmitter from 'node:events';
+import { BaseEmitter } from '#copilot/core/create-emitter';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { HUB_EVENTS } from './events.js';
@@ -86,9 +86,9 @@ export function setFallbackAgent(agent) {
  * - `session:closed` { hubSessionId }
  * - `error` { hubSessionId, message, error }
  *
- * @extends {EventEmitter}
+ * @extends {BaseEmitter}
  */
-export class HubOrchestrator extends EventEmitter {
+export class HubOrchestrator extends BaseEmitter {
     /** @type {import('./store.js').ConversationStore} */
     #store;
 

@@ -22,7 +22,7 @@
 
 import { bridgeEmitter } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
-import EventEmitter from 'node:events';
+import { BaseEmitter } from '#copilot/core/create-emitter';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 
@@ -49,9 +49,20 @@ import {
 // F39: State — getStatusSnapshot, listenerDiagnostics
 import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
 // O3: Facades extraídas para reduzir LoC desta classe
-import { abortCurrentMessage, pingDialogWatchdog, sessionLog, getSessionMessages } from './facades/agent-session-ops.js';
-import { getModel, setModel, listAvailableModels, getReasoningEffort, setReasoningEffort } from './facades/agent-model-config.js';
-import { registerWebhook, unregisterWebhook, listWebhooks } from './facades/agent-webhook-ops.js';
+import {
+    getModel,
+    getReasoningEffort,
+    listAvailableModels,
+    setModel,
+    setReasoningEffort,
+} from './facades/agent-model-config.js';
+import {
+    abortCurrentMessage,
+    getSessionMessages,
+    pingDialogWatchdog,
+    sessionLog,
+} from './facades/agent-session-ops.js';
+import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agent-webhook-ops.js';
 
 /**
  * @typedef {import('./types.js').CopilotSession} CopilotSession
@@ -68,9 +79,9 @@ import { registerWebhook, unregisterWebhook, listWebhooks } from './facades/agen
 /**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
- * @extends EventEmitter
+ * @extends BaseEmitter
  */
-export class AlwaysAliveAgent extends EventEmitter {
+export class AlwaysAliveAgent extends BaseEmitter {
     /**
      * F35: AgentContext — contexto compartilhado com todos os módulos internos.
      *

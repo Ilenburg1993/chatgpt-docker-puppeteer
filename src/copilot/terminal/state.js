@@ -27,7 +27,7 @@ import {
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
 import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
-import EventEmitter from 'node:events';
+import { createEmitter } from '#copilot/core/create-emitter';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
 // ─── Emitter reativo ──────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
  *     import { stateEmitter } from './state.js';
  *     stateEmitter.on('busy:changed', (busy) => console.log('terminal busy:', busy));
  */
-export const stateEmitter = new EventEmitter();
+export const stateEmitter = createEmitter();
 // T-23: setMaxListeners calculado em vez de hardcoded (base 10 + margem p/ hot patches)
 stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
 
