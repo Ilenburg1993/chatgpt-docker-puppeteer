@@ -20,7 +20,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, bridgeEmitter } from '#copilot/core';
 import { defaultMetrics, log } from '#copilot/observability';
 import EventEmitter from 'node:events';
 
@@ -588,6 +588,27 @@ export class AlwaysAliveAgent extends EventEmitter {
  * @type {AlwaysAliveAgent}
  */
 export const alwaysAliveAgent = new AlwaysAliveAgent();
+
+// M-3: Bridge agent lifecycle events → EventBus centralizado
+try {
+    const { container } = await import('../core/di-container.js');
+    const { EVENT_BUS } = await import('../core/di-tokens.js');
+    const bus = container.resolve(EVENT_BUS);
+    if (bus) {
+        bridgeEmitter(alwaysAliveAgent, bus, {
+            ready: 'agent:ready',
+            'before-stop': 'agent:before-stop',
+            stopped: 'agent:stopped',
+            error: 'agent:error',
+            'dialog.loop.changed': 'agent:dialog:loop:changed',
+            'session.keepalive': 'agent:session:keepalive',
+            'task.started': 'agent:task:started',
+            'task.delta': 'agent:task:delta',
+        });
+    }
+} catch {
+    // EventBus not available yet — ignore
+}
 
 /**
  * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.

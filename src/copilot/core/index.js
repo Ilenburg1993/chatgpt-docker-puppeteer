@@ -53,7 +53,7 @@ export * from './di-tokens.js';
 export { createContainer, createToken } from './di.js';
 
 // ─── Event Bus ────────────────────────────────────────────────────────────────
-export { EventBus, createEventBus } from './event-bus.js';
+export { EventBus, createEventBus, bridgeEmitter } from './event-bus.js';
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 export {

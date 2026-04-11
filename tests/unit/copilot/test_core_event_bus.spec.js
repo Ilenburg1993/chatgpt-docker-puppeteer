@@ -332,3 +332,68 @@ describe('core/event-bus.js › error isolation', () => {
         assert.ok(reached);
     });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// bridgeEmitter (M-3)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('core/event-bus.js › bridgeEmitter', () => {
+    // Dynamic import to get bridgeEmitter
+    /** @type {typeof import('../../../src/copilot/core/event-bus.js').bridgeEmitter} */
+    let bridgeEmitter;
+    /** @type {typeof import('node:events').default} */
+    let EventEmitter;
+
+    it('carrega bridgeEmitter', async () => {
+        const mod = await import('../../../src/copilot/core/event-bus.js');
+        bridgeEmitter = mod.bridgeEmitter;
+        const events = await import('node:events');
+        EventEmitter = events.default;
+        assert.ok(typeof bridgeEmitter === 'function');
+    });
+
+    it('M-3: re-emite eventos locais no EventBus', async () => {
+        const emitter = new EventEmitter();
+        const bus = createEventBus();
+        /** @type {unknown[]} */
+        const received = [];
+        bus.on('hub:session:created', (ev) => received.push(ev));
+
+        bridgeEmitter(emitter, bus, { 'session:created': 'hub:session:created' });
+        emitter.emit('session:created', { hubSessionId: 'abc' });
+
+        assert.strictEqual(received.length, 1);
+        assert.ok(received[0] && typeof received[0] === 'object');
+        assert.strictEqual(/** @type {any} */ (received[0]).hubSessionId, 'abc');
+        assert.strictEqual(/** @type {any} */ (received[0]).type, 'hub:session:created');
+    });
+
+    it('M-3: unbind remove listeners do emitter original', async () => {
+        const emitter = new EventEmitter();
+        const bus = createEventBus();
+        let count = 0;
+        bus.on('x:y', () => count++);
+
+        const unbind = bridgeEmitter(emitter, bus, { ev1: 'x:y' });
+        emitter.emit('ev1', {});
+        assert.strictEqual(count, 1);
+
+        unbind();
+        emitter.emit('ev1', {});
+        assert.strictEqual(count, 1, 'não deve incrementar após unbind');
+    });
+
+    it('M-3: payload primitivo é tratado como objeto vazio', async () => {
+        const emitter = new EventEmitter();
+        const bus = createEventBus();
+        /** @type {unknown[]} */
+        const received = [];
+        bus.on('test:event', (ev) => received.push(ev));
+
+        bridgeEmitter(emitter, bus, { raw: 'test:event' });
+        emitter.emit('raw', 'string-payload');
+
+        assert.strictEqual(received.length, 1);
+        assert.strictEqual(/** @type {any} */ (received[0]).type, 'test:event');
+    });
+});

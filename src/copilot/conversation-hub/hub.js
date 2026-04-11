@@ -12,7 +12,9 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
-import { SessionError, logSwallowed } from '#copilot/core';
+import { SessionError, logSwallowed, bridgeEmitter } from '#copilot/core';
+import { container } from '../core/di-container.js';
+import { EVENT_BUS } from '../core/di-tokens.js';
 import { log } from '#copilot/observability';
 import { HUB_EVENTS } from './events.js';
 import { HubOrchestrator } from './orchestrator.js';
@@ -72,6 +74,9 @@ export class ConversationHub {
         if (opts.nerv) {
             this.#bridgeToNerv(opts.nerv);
         }
+
+        // 5. M-3: Bridge Orchestrator → EventBus centralizado
+        this.#bridgeToEventBus();
 
         this.#initialized = true;
         log('INFO', '[ConversationHub] Ambiente permanente LLM-A ↔ LLM-B ↔ Usuário inicializado.');
@@ -245,6 +250,28 @@ export class ConversationHub {
      * @param {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} nerv
      * @returns {void}
      */
+    /**
+     * M-3: Re-emite eventos significativos do Orchestrator no EventBus centralizado.
+     * Permite que qualquer módulo ouça eventos hub via `eventBus.on('hub:*', ...)`.
+     */
+    #bridgeToEventBus() {
+        if (!this.#orchestrator) return;
+        try {
+            const bus = container.resolve(EVENT_BUS);
+            if (!bus) return;
+            bridgeEmitter(this.#orchestrator, bus, {
+                [HUB_EVENTS.SESSION_CREATED]: 'hub:session:created',
+                [HUB_EVENTS.SESSION_CLOSED]: 'hub:session:closed',
+                [HUB_EVENTS.TURN_SENT]: 'hub:turn:sent',
+                [HUB_EVENTS.TURN_COMPLETE]: 'hub:turn:complete',
+                [HUB_EVENTS.USER_INJECTED]: 'hub:user:injected',
+            });
+            log('DEBUG', '[ConversationHub] Bridge EventBus vinculado.');
+        } catch {
+            // EventBus não registrado no DI — ignorar
+        }
+    }
+
     #bridgeToNerv(nerv) {
         if (!this.#orchestrator) return;
 

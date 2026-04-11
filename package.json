@@ -139,7 +139,6 @@
   "scripts": {
     "analyze:arch:filesize": "node scripts/check-file-size.mjs",
     "analyze:arch:health": "node scripts/arch-health.mjs",
-    "generate:openapi": "node scripts/generate-openapi.mjs",
     "analyze:arch:layers": "node scripts/check-layer-violations.mjs",
     "analyze:circular": "node scripts/analysis/analyze-code-graph.js --circular",
     "analyze:constants": "node scripts/analysis/catalog-constants.mjs",
@@ -237,6 +236,7 @@
     "format": "prettier --write --cache --cache-location /home/node/.cache/prettier/.prettier-cache --cache-strategy content \"**/*.{js,mjs,cjs,ts,tsx,jsx,vue,json,jsonc,md,yml,yaml,css,html}\"",
     "format:check": "prettier --check --cache --cache-location /home/node/.cache/prettier/.prettier-cache --cache-strategy content \"**/*.{js,mjs,cjs,ts,tsx,jsx,vue,json,jsonc,md,yml,yaml,css,html}\"",
     "format:fix": "prettier --write --cache --cache-location /home/node/.cache/prettier/.prettier-cache --cache-strategy content \"**/*.{js,mjs,cjs,ts,tsx,jsx,vue,json,jsonc,md,yml,yaml,css,html}\"",
+    "generate:openapi": "node scripts/generate-openapi.mjs",
     "hooks:continue-section": "bash .github/hooks/scripts/continue-section.sh",
     "hooks:daily": "bash scripts/hooks-status.sh -- --quiet",
     "hooks:install-git": "bash .github/hooks/scripts/install-git-hooks.sh",

@@ -5,8 +5,8 @@
  *
  * N-3c: Gera spec OpenAPI 3.0 a partir dos route files Express do copilot.
  *
- * Escaneia os arquivos em `src/copilot/api/express/` usando regex para capturar
- * `router.<method>('<path>', ...)` e gerar um skeleton OpenAPI básico.
+ * Escaneia os arquivos em `src/copilot/api/express/` usando regex para capturar `router.<method>('<path>', ...)` e
+ * gerar um skeleton OpenAPI básico.
  *
  * Uso: node scripts/generate-openapi.mjs [--output <path>]
  *
@@ -35,7 +35,7 @@ function toOpenApiPath(path) {
  * Extrai parâmetros de path.
  *
  * @param {string} path
- * @returns {Array<{name: string; in: string; required: boolean; schema: {type: string}}>}
+ * @returns {{ name: string; in: string; required: boolean; schema: { type: string } }[]}
  */
 function extractParams(path) {
     const params = [];
@@ -100,7 +100,8 @@ async function main() {
         info: {
             title: 'Copilot SDK API',
             version: '1.0.0',
-            description: 'API REST do módulo copilot — endpoints para sessões, agent, observabilidade, hooks e webhooks.',
+            description:
+                'API REST do módulo copilot — endpoints para sessões, agent, observabilidade, hooks e webhooks.',
         },
         servers: [{ url: 'http://localhost:3001', description: 'Dev server' }],
         paths,
