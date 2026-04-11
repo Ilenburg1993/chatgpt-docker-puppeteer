@@ -42,13 +42,8 @@ export const DEFAULT_MODEL = 'gpt-4.1';
  */
 export const DEFAULT_DIAGNOSTIC_MODEL = 'gpt-4.1-mini';
 
-/**
- * Ferramentas excluídas por padrão em sessões do projeto.
- *
- * @type {readonly string[]}
- * @deprecated Importar diretamente de `#copilot/config/session-config`. Re-export mantido para compatibilidade.
- */
-export { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config';
+// DEFAULT_EXCLUDED_TOOLS removido — importar diretamente de '#copilot/config/session-config'.
+// Cf. PARTE-21C Faixa H: eliminação de violação L1→L2.
 
 /**
  * Configuração default de infinite sessions.
@@ -150,9 +145,5 @@ export function mergeExcludedTools(base, extra) {
 
 // ─── Re-exports dos builders de perfil ────────────────────────────────────────
 
-export {
-    buildAlwaysAliveConfig,
-    buildDiagnosticConfig,
-    buildFullAccessConfig,
-    buildReadOnlyConfig,
-} from '#copilot/config/session-config';
+// Profile builders removidos — importar diretamente de '#copilot/config/session-config'.
+// Cf. PARTE-21C Faixa H: eliminação de violação L1→L2.

@@ -7,12 +7,9 @@
  * @module copilot/config
  */
 
-export {
-    buildAlwaysAliveConfig,
-    buildDiagnosticConfig,
-    buildFullAccessConfig,
-    buildReadOnlyConfig,
-} from './session-config.js';
+// Profile builders (buildAlwaysAliveConfig etc.) movidos para '#copilot/hooks/presets/profiles'.
+// Cf. PARTE-21C Faixa H: eliminação de violações L2→L3.
+export { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
 
 export { MCP_SERVERS, buildMcpConfig, listAvailableMcpServers } from './mcp-servers.js';
 

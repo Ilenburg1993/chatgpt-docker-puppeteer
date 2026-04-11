@@ -45,12 +45,12 @@ import {
     LLM_B_SSE_RATE_WINDOW_MS,
     LLM_B_TERMINAL_PORT,
     LLM_B_TERMINAL_TOKEN,
+    MAX_SSE_CLIENTS,
 } from '#copilot/config/env';
 import { log } from '#copilot/observability/logger';
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
-import { MAX_SSE_CLIENTS } from '../core/constants.js';
 import { println } from './dialog.js';
 import { handleMetrics } from './handlers/system-metrics.js';
 import { registerClearRateLimiters } from './rate-limiter-state.js';

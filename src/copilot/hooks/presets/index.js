@@ -10,4 +10,10 @@ export { createDenyAllPreset } from './deny-all.js';
 export { createInteractivePreset } from './interactive.js';
 export { createMinimalPreset } from './minimal.js';
 export { createProductionHooks } from './production.js';
+export {
+    buildAlwaysAliveConfig,
+    buildDiagnosticConfig,
+    buildFullAccessConfig,
+    buildReadOnlyConfig,
+} from './profiles.js';
 export { createSafePreset } from './safe.js';

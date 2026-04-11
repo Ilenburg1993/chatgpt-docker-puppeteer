@@ -15,7 +15,7 @@
  * | **Shutdown**       | registerShutdownHandler, runShutdown, isShuttingDown           |
  * | **JSON**           | safeJsonParse, safeJsonStringify, parseJsonOrThrow             |
  * | **Schemas**        | Zod schemas canônicos (via schemas.js)                         |
- * | **Constantes**     | LLM_B_TERMINAL_PORT, AGENT_EVENTS, etc. (via constants.js)     |
+ * | **Constantes**     | AGENT_EVENTS, DIALOG_LOOP_EVENTS, etc. (via constants.js)      |
  * | **Structured msg** | StructuredMessage schema, builders, serializers, parser        |
  * | **Timers**         | registerTimer, cancelTimer, cancelAllTimers, activeTimerCount  |
  *
@@ -23,7 +23,8 @@
  *
  * @example
  *     ```js
- *     import { LLM_B_TERMINAL_PORT, CopilotError, AGENT_EVENTS } from '#copilot/core';
+ *     import { CopilotError, AGENT_EVENTS } from '#copilot/core';
+ *     import { LLM_B_TERMINAL_PORT } from '#copilot/config/env';
  *     import { buildStructuredRequest } from '#copilot/core/structured-message';
  *     ```;
  */

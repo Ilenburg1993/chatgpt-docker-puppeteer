@@ -93,6 +93,12 @@ export { createDenyAllPreset } from './presets/deny-all.js';
 export { createInteractivePreset } from './presets/interactive.js';
 export { createMinimalPreset } from './presets/minimal.js';
 export { createProductionHooks } from './presets/production.js';
+export {
+    buildAlwaysAliveConfig,
+    buildDiagnosticConfig,
+    buildFullAccessConfig,
+    buildReadOnlyConfig,
+} from './presets/profiles.js';
 export { createSafePreset } from './presets/safe.js';
 
 // ─── Error handler com circuit-breaker (Fase I) ───────────────────────────────

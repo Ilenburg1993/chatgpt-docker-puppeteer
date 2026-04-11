@@ -55,23 +55,8 @@ export {
     stopClient,
 } from './client.js';
 
-export {
-    composePreToolUseHandlers,
-    createAuditHooks,
-    createDenyAllHooks,
-    createErrorNotifierHook,
-    createHooks,
-    createMinimalHooks,
-    createSafeHooks,
-} from '#copilot/hooks/factory';
-
-export {
-    createApproveAllPermission,
-    createAuditOnlyPermission,
-    createPermissionHandler,
-    createRestrictedPermission,
-    createSafePermission,
-} from '#copilot/hooks/permission';
+// Hook factory e permission removidos — consumidores devem importar de '#copilot/hooks' (L3), não via sdk (L1).
+// Cf. PARTE-21C Faixa H: eliminação de violações L1→L3.
 
 export {
     createClientFromCliUrl,
@@ -174,15 +159,13 @@ export {
 } from './system-message.js';
 
 // ─── Faixa 4: Unified Config Builder (rev.4) ─────────────────────────────────
+// Nota: DEFAULT_EXCLUDED_TOOLS, buildAlwaysAliveConfig, buildDiagnosticConfig,
+// buildFullAccessConfig, buildReadOnlyConfig removidos — importar de '#copilot/config/session-config'.
+// Cf. PARTE-21C Faixa H: eliminação de violações L1→L2.
 export {
     DEFAULT_DIAGNOSTIC_MODEL,
-    DEFAULT_EXCLUDED_TOOLS,
     DEFAULT_INFINITE_SESSION,
     DEFAULT_MODEL,
-    buildAlwaysAliveConfig,
-    buildDiagnosticConfig,
-    buildFullAccessConfig,
-    buildReadOnlyConfig,
     buildSessionConfig,
     getProjectDefaults,
     mergeExcludedTools,

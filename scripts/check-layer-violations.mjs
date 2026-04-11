@@ -97,10 +97,18 @@ function resolveTarget(spec, fileModule) {
     return null;
 }
 
+// ─── Exports para testes ──────────────────────────────────────────────────────
+
+export { LAYER_MAP, extractModule, isInsideJsDoc, resolveTarget };
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
-const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
+/** @type {RegExp} */
+export const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
+/** @type {RegExp} */
+export const exportFromRegex = /^\s*export\s+(?:\{[^}]*\}|\*)\s+from\s+['"]([^'"]+)['"]/gm;
+/** @type {RegExp} */
+export const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
 /**
  * Verifica se um match de import está dentro de um bloco JSDoc (type-only import). Imports via `@typedef {import(...)}`
@@ -118,76 +126,102 @@ function isInsideJsDoc(src, matchIndex) {
     return /^\s*\*/.test(line) || /^\s*\/\*\*/.test(line);
 }
 
-/** @type {{
-    file: string;
-    line: number;
-    from: string;
-    to: string;
-    fromLayer: number;
-    toLayer: number;
-    spec: string;
-}[]} */
-const violations = [];
+/**
+ * Executa a verificação completa de violações de layer e retorna os resultados.
+ *
+ * @returns {{
+ *     file: string;
+ *     line: number;
+ *     from: string;
+ *     to: string;
+ *     fromLayer: number;
+ *     toLayer: number;
+ *     spec: string;
+ * }[]}
+ */
+export function checkViolations() {
+    /**
+     * @type {{
+     *     file: string;
+     *     line: number;
+     *     from: string;
+     *     to: string;
+     *     fromLayer: number;
+     *     toLayer: number;
+     *     spec: string;
+     * }[]}
+     */
+    const violations = [];
 
-const allFiles = walkJs(COPILOT_ROOT);
+    const allFiles = walkJs(COPILOT_ROOT);
 
-for (const file of allFiles) {
-    const relFile = relative(COPILOT_ROOT, file);
-    const fileModule = extractModule(relFile);
-    if (!fileModule || LAYER_MAP[fileModule] === undefined) continue;
+    for (const file of allFiles) {
+        const relFile = relative(COPILOT_ROOT, file);
+        const fileModule = extractModule(relFile);
+        if (!fileModule || LAYER_MAP[fileModule] === undefined) continue;
 
-    const content = readFileSync(file, 'utf-8');
-    const fromLayer = LAYER_MAP[fileModule];
+        const content = readFileSync(file, 'utf-8');
+        const fromLayer = LAYER_MAP[fileModule];
 
-    // Combina static e dynamic imports
-    /** @type {[RegExp, string][]} */
-    const regexes = [
-        [importRegex, content],
-        [dynamicImportRegex, content],
-    ];
+        // Combina static imports, re-exports e dynamic imports
+        /** @type {[RegExp, string][]} */
+        const regexes = [
+            [importRegex, content],
+            [exportFromRegex, content],
+            [dynamicImportRegex, content],
+        ];
 
-    for (const [regex, src] of regexes) {
-        regex.lastIndex = 0;
-        let match;
-        while ((match = regex.exec(src)) !== null) {
-            // Ignorar type-only imports dentro de JSDoc
-            if (isInsideJsDoc(src, match.index)) continue;
+        for (const [regex, src] of regexes) {
+            regex.lastIndex = 0;
+            let match;
+            while ((match = regex.exec(src)) !== null) {
+                // Ignorar type-only imports dentro de JSDoc
+                if (isInsideJsDoc(src, match.index)) continue;
 
-            const spec = match[1];
-            const targetModule = resolveTarget(spec, fileModule);
-            if (!targetModule || LAYER_MAP[targetModule] === undefined) continue;
+                const spec = match[1];
+                if (!spec) continue;
+                const targetModule = resolveTarget(spec, fileModule);
+                if (!targetModule || LAYER_MAP[targetModule] === undefined) continue;
 
-            const toLayer = LAYER_MAP[targetModule];
-            if (toLayer > fromLayer) {
-                // Encontrar número da linha
-                const beforeMatch = src.substring(0, match.index);
-                const lineNum = (beforeMatch.match(/\n/g) || []).length + 1;
+                const toLayer = LAYER_MAP[targetModule];
+                if (toLayer > fromLayer) {
+                    // Encontrar número da linha
+                    const beforeMatch = src.substring(0, match.index);
+                    const lineNum = (beforeMatch.match(/\n/g) || []).length + 1;
 
-                violations.push({
-                    file: relFile,
-                    line: lineNum,
-                    from: fileModule,
-                    to: targetModule,
-                    fromLayer,
-                    toLayer,
-                    spec,
-                });
+                    violations.push({
+                        file: relFile,
+                        line: lineNum,
+                        from: fileModule,
+                        to: targetModule,
+                        fromLayer,
+                        toLayer,
+                        spec,
+                    });
+                }
             }
         }
     }
+
+    return violations;
 }
 
-// ─── Output ───────────────────────────────────────────────────────────────────
+// ─── CLI entry point ──────────────────────────────────────────────────────────
 
-if (violations.length === 0) {
-    console.log('✅ Nenhuma violação de camada encontrada.');
-    process.exit(0);
-} else {
-    console.error(`❌ ${violations.length} violação(ões) de camada encontrada(s):\n`);
-    for (const v of violations) {
-        console.error(`  ${COPILOT_ROOT}/${v.file}:${v.line}`);
-        console.error(`    L${v.fromLayer} (${v.from}) → L${v.toLayer} (${v.to})  import '${v.spec}'`);
-        console.error('');
+const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+if (isDirectRun) {
+    const violations = checkViolations();
+
+    if (violations.length === 0) {
+        console.log('✅ Nenhuma violação de camada encontrada.');
+        process.exit(0);
+    } else {
+        console.error(`❌ ${violations.length} violação(ões) de camada encontrada(s):\n`);
+        for (const v of violations) {
+            console.error(`  ${COPILOT_ROOT}/${v.file}:${v.line}`);
+            console.error(`    L${v.fromLayer} (${v.from}) → L${v.toLayer} (${v.to})  import '${v.spec}'`);
+            console.error('');
+        }
+        process.exit(1);
     }
-    process.exit(1);
 }
