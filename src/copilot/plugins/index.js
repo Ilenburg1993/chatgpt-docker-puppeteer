@@ -20,6 +20,9 @@
  * @property {'tool' | 'hook' | 'bridge' | 'service'} type - Tipo do plugin.
  * @property {(container: import('../core/di.js').Container) => void | Promise<void>} install - Função de instalação que
  *   recebe o container DI.
+ * @property {string} [version] - Versão semântica do plugin (ex: '1.0.0').
+ * @property {string} [description] - Descrição curta do propósito do plugin.
+ * @property {string[]} [dependencies] - Nomes de plugins dos quais este depende.
  */
 
-export { PluginRegistry, createPluginRegistry } from './plugin-registry.js';
+export { activatePlugins, createPluginRegistry, discoverPlugins, PluginRegistry } from './plugin-registry.js';

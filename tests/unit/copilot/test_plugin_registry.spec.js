@@ -132,4 +132,68 @@ describe('copilot/plugins/PluginRegistry', () => {
         assert.equal(reg.size, 0);
         assert.ok(!reg.has('c1'));
     });
+
+    it('N-2c: install() rejeita se dependência não instalada', async () => {
+        const reg = await makeRegistry();
+        reg.register(fakePlugin('base'));
+        reg.register({
+            name: 'dep-child',
+            type: /** @type {const} */ ('tool'),
+            install: () => {},
+            dependencies: ['base'],
+        });
+        const { createContainer } = await import('../../../src/copilot/core/di.js');
+        const container = createContainer();
+        // base não instalado → deve rejeitar
+        await assert.rejects(() => reg.install('dep-child', container), /requires "base"/);
+        // instalar base primeiro → funciona
+        await reg.install('base', container);
+        await reg.install('dep-child', container);
+        assert.equal(reg.list().find((p) => p.name === 'dep-child')?.installed, true);
+    });
+
+    it('N-2e: activatePlugins() instala apenas os nomes fornecidos', async () => {
+        const { activatePlugins } = await import('../../../src/copilot/plugins/plugin-registry.js');
+        const reg = await makeRegistry();
+        const installed = [];
+        reg.register({
+            name: 'alpha',
+            type: /** @type {const} */ ('tool'),
+            install: () => { installed.push('alpha'); },
+        });
+        reg.register({
+            name: 'beta',
+            type: /** @type {const} */ ('hook'),
+            install: () => { installed.push('beta'); },
+        });
+        reg.register({
+            name: 'gamma',
+            type: /** @type {const} */ ('service'),
+            install: () => { installed.push('gamma'); },
+        });
+        const { createContainer } = await import('../../../src/copilot/core/di.js');
+        const result = await activatePlugins(reg, createContainer(), ['alpha', 'gamma']);
+        assert.deepEqual(result, ['alpha', 'gamma']);
+        assert.deepEqual(installed, ['alpha', 'gamma']);
+    });
+
+    it('N-2e: activatePlugins() sem whitelist instala todos', async () => {
+        const { activatePlugins } = await import('../../../src/copilot/plugins/plugin-registry.js');
+        const reg = await makeRegistry();
+        reg.register({
+            name: 'all1',
+            type: /** @type {const} */ ('tool'),
+            install: () => {},
+        });
+        reg.register({
+            name: 'all2',
+            type: /** @type {const} */ ('hook'),
+            install: () => {},
+        });
+        const { createContainer } = await import('../../../src/copilot/core/di.js');
+        const result = await activatePlugins(reg, createContainer());
+        assert.equal(result.length, 2);
+        assert.ok(result.includes('all1'));
+        assert.ok(result.includes('all2'));
+    });
 });

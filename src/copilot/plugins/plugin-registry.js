@@ -58,6 +58,14 @@ export class PluginRegistry {
             log('WARN', `[PluginRegistry] plugin "${name}" already installed, skipping`);
             return;
         }
+        // N-2c: validar dependências antes de instalar
+        if (plugin.dependencies?.length) {
+            for (const dep of plugin.dependencies) {
+                if (!this.#installed.has(dep)) {
+                    throw new Error(`[PluginRegistry] plugin "${name}" requires "${dep}" to be installed first`);
+                }
+            }
+        }
         await plugin.install(container);
         this.#installed.add(name);
         log('INFO', `[PluginRegistry] instalado: ${name}`);
@@ -135,4 +143,83 @@ export class PluginRegistry {
  */
 export function createPluginRegistry() {
     return new PluginRegistry();
+}
+
+/**
+ * Descobre e carrega plugins a partir de diretórios convencionais no filesystem.
+ *
+ * Escaneia por arquivos `*.js` nos subdiretórios `tools/`, `hooks/`, `bridges/`, `services/` dentro de `baseDir`.
+ * Cada arquivo deve exportar um default que satisfaça o contrato CopilotPlugin.
+ *
+ * @param {string} baseDir - Diretório raiz de plugins (ex: `src/copilot/plugins`).
+ * @param {PluginRegistry} registry - Registry onde registrar os plugins encontrados.
+ * @returns {Promise<string[]>} Nomes dos plugins registrados.
+ */
+export async function discoverPlugins(baseDir, registry) {
+    const { readdir } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+    const { pathToFileURL } = await import('node:url');
+
+    const subdirs = ['tools', 'hooks', 'bridges', 'services'];
+    /** @type {string[]} */
+    const registered = [];
+
+    for (const sub of subdirs) {
+        const dir = join(baseDir, sub);
+        /** @type {import('node:fs').Dirent[]} */
+        let entries;
+        try {
+            entries = await readdir(dir, { withFileTypes: true });
+        } catch {
+            // Diretório não existe — ok, pular
+            continue;
+        }
+        for (const entry of entries) {
+            if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+            const filePath = join(dir, entry.name);
+            try {
+                const mod = await import(pathToFileURL(filePath).href);
+                const plugin = mod.default ?? mod;
+                if (plugin && typeof plugin.name === 'string' && typeof plugin.install === 'function') {
+                    if (!plugin.type) plugin.type = sub.replace(/s$/, ''); // tools→tool, hooks→hook
+                    registry.register(plugin);
+                    registered.push(plugin.name);
+                } else {
+                    log('WARN', `[discoverPlugins] ${filePath}: módulo não exporta plugin válido, ignorando`);
+                }
+            } catch (/** @type {any} */ err) {
+                log('ERROR', `[discoverPlugins] falha ao carregar ${filePath}: ${err?.message ?? err}`);
+            }
+        }
+    }
+    return registered;
+}
+
+/**
+ * Ativa plugins com base em configuração.
+ *
+ * Recebe um array de nomes (whitelist) e instala apenas os plugins correspondentes no registry.
+ * Se `enabledNames` for `undefined` ou `null`, instala todos (comportamento padrão).
+ *
+ * @param {PluginRegistry} registry - Registry com plugins já registrados.
+ * @param {import('../core/di.js').Container} container - Container DI.
+ * @param {string[] | null | undefined} [enabledNames] - Nomes dos plugins a ativar. Se omitido, ativa todos.
+ * @returns {Promise<string[]>} Nomes dos plugins efetivamente instalados.
+ */
+export async function activatePlugins(registry, container, enabledNames) {
+    if (!enabledNames) {
+        await registry.installAll(container);
+        return registry.list().filter((p) => p.installed).map((p) => p.name);
+    }
+    /** @type {string[]} */
+    const activated = [];
+    for (const name of enabledNames) {
+        if (registry.has(name)) {
+            await registry.install(name, container);
+            activated.push(name);
+        } else {
+            log('WARN', `[activatePlugins] plugin "${name}" configurado mas não encontrado no registry`);
+        }
+    }
+    return activated;
 }

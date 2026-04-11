@@ -99,6 +99,13 @@ jobs:
           set -o pipefail
           npm run analyze:graph:full 2>&1 | tee artifacts/code-quality/code-graph.txt
 
+      - name: Architecture health score
+        id: arch_health
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run analyze:arch:health 2>&1 | tee artifacts/code-quality/arch-health.json
+
       - name: Build code quality summary
         if: always()
         run: |
@@ -113,6 +120,7 @@ jobs:
             echo "| orphan_modules | ${{ steps.orphans.outcome }} (${orphan_lines} linhas) |"
             echo "| forbidden_patterns | ${{ steps.forbidden.outcome }} |"
             echo "| code_graph | ${{ steps.code_graph.outcome }} |"
+            echo "| arch_health | ${{ steps.arch_health.outcome }} |"
             echo ""
             echo "> Falhas acima são informativas e não bloqueiam o merge."
           } | tee -a "$GITHUB_STEP_SUMMARY"
