@@ -31,6 +31,9 @@ import { buildTool } from '#copilot/tools';
 import { EVENT_BUS } from '../../core/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
+    EMITTER_ERROR,
+    EMITTER_SESSION_FATAL,
+    EMITTER_STATUS,
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
     HOOK_PRE_TOOL_USE,
@@ -167,16 +170,16 @@ if (process.send) {
 }
 
 // Logar status periódico (evita PM2 matar o processo por inatividade)
-alwaysAliveAgent.on('status', (status) => {
+alwaysAliveAgent.on(EMITTER_STATUS, (status) => {
     log('INFO', `[copilot/agent] Status: ${status}`);
 });
 
-alwaysAliveAgent.on('error', (err) => {
+alwaysAliveAgent.on(EMITTER_ERROR, (err) => {
     log('ERROR', `[copilot/agent] Erro do agente: ${err.message}`);
 });
 
 // `session.fatal` indica que a sessão está irrecuperável. Encerrar o processo permite ao PM2 reiniciar imediatamente.
-alwaysAliveAgent.on('session.fatal', (/** @type {Record<string, unknown>} */ evt) => {
+alwaysAliveAgent.on(EMITTER_SESSION_FATAL, (/** @type {Record<string, unknown>} */ evt) => {
     const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
     log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
     void runShutdown('session.fatal').finally(() => {

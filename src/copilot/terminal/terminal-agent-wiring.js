@@ -10,6 +10,19 @@
  */
 
 import { AGENT_EVENTS } from '#copilot/core';
+import {
+    EMITTER_DIALOG_LOOP_CHANGED,
+    EMITTER_DIALOG_READY,
+    EMITTER_DIALOG_REPLY,
+    EMITTER_DIALOG_STALLED,
+    EMITTER_DIALOG_STOPPED,
+    EMITTER_SESSION_FATAL,
+    EMITTER_SESSION_USAGE,
+    EMITTER_TASK_COMPLETED,
+    EMITTER_TASK_DELTA,
+    EMITTER_TASK_ERROR,
+    EMITTER_TASK_REASONING,
+} from '#copilot/events';
 import { log } from '#copilot/observability';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { llmBridgeClient } from '../channel/client.js';
@@ -31,7 +44,7 @@ export function registerAgentEventListeners(printBanner) {
     // T-14: guard contra registros duplicados (ex: hot-reload, tests)
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
-    alwaysAliveAgent.on('dialog.stalled', async (/** @type {{ stalledMs: number }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo).`);
 
@@ -95,7 +108,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
-    alwaysAliveAgent.on('dialog.reply', (/** @type {{ reply: string }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         broadcastSse('dialog.reply', {
             content: evt.reply,
             timestamp: Date.now(),
@@ -104,10 +117,10 @@ export function registerAgentEventListeners(printBanner) {
         });
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    alwaysAliveAgent.on('dialog.loop.changed', (/** @type {{ active: boolean; ts: number }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
         broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
     });
-    alwaysAliveAgent.on('dialog.ready', () => {
+    alwaysAliveAgent.on(EMITTER_DIALOG_READY, () => {
         broadcastSse('dialog.ready', {
             timestamp: Date.now(),
             model: alwaysAliveAgent.model,
@@ -116,7 +129,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
-    alwaysAliveAgent.on('dialog.stopped', (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
@@ -145,7 +158,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AA.4: SSE 'context' event
-    alwaysAliveAgent.on('session.usage', (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
+    alwaysAliveAgent.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
             broadcastSse('session.usage', {
@@ -188,18 +201,21 @@ export function registerAgentEventListeners(printBanner) {
             }
         },
     );
-    alwaysAliveAgent.on('session.fatal', async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
-        const _hubSessionId = getHubSessionId();
-        if (!_hubSessionId) return;
-        try {
-            await conversationHub.store.writeTurn(_hubSessionId, {
-                role: 'user',
-                content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
-            });
-        } catch (/** @type {any} */ e) {
-            logSwallowed(e, 'terminal.index.fatalWriteTurn');
-        }
-    });
+    alwaysAliveAgent.on(
+        EMITTER_SESSION_FATAL,
+        async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+            const _hubSessionId = getHubSessionId();
+            if (!_hubSessionId) return;
+            try {
+                await conversationHub.store.writeTurn(_hubSessionId, {
+                    role: 'user',
+                    content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
+                });
+            } catch (/** @type {any} */ e) {
+                logSwallowed(e, 'terminal.index.fatalWriteTurn');
+            }
+        },
+    );
 
     // ── F36.3: Terminal buffer para task streaming ─────────────────────────
     // Quando task.delta/task.reasoning são emitidos fora do dialog loop, renderiza no terminal.
@@ -234,26 +250,26 @@ export function registerAgentEventListeners(printBanner) {
         }
     };
 
-    alwaysAliveAgent.on('task.delta', (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(chunk);
     });
-    alwaysAliveAgent.on('task.reasoning', (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
+    alwaysAliveAgent.on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
         const text = evt?.text ?? '';
         if (!text) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(`\x1b[2m${text}\x1b[22m`); // dim text para reasoning
     });
-    alwaysAliveAgent.on('task.completed', () => {
+    alwaysAliveAgent.on(EMITTER_TASK_COMPLETED, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[90m└── task complete ───┘\x1b[0m');
             _activeTaskId = null;
         }
     });
-    alwaysAliveAgent.on('task.error', () => {
+    alwaysAliveAgent.on(EMITTER_TASK_ERROR, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[31m└── task error ──────┘\x1b[0m');

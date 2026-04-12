@@ -16,6 +16,7 @@
  */
 
 import { BaseEmitter } from '#copilot/core';
+import { EMITTER_HANDOFF_ACCEPTED, EMITTER_HANDOFF_RECEIVED, EMITTER_HANDOFF_REJECTED } from '#copilot/events';
 import { log } from '#copilot/observability';
 
 /**
@@ -79,7 +80,7 @@ export class HandoffManager extends BaseEmitter {
         };
 
         this.#pending.set(id, request);
-        this.emit('handoff.received', request);
+        this.emit(EMITTER_HANDOFF_RECEIVED, request);
         log('INFO', `[HandoffManager] Handoff recebido: ${id} (${request.fromAgent} → ${request.toAgent})`);
 
         return request;
@@ -100,7 +101,7 @@ export class HandoffManager extends BaseEmitter {
         request.status = 'accepted';
         this.#pending.delete(handoffId);
         this.#addToHistory(request);
-        this.emit('handoff.accepted', request);
+        this.emit(EMITTER_HANDOFF_ACCEPTED, request);
         log('INFO', `[HandoffManager] Handoff aceito: ${handoffId}`);
 
         return { accepted: true, completedAt: Date.now() };
@@ -122,7 +123,7 @@ export class HandoffManager extends BaseEmitter {
         request.status = 'rejected';
         this.#pending.delete(handoffId);
         this.#addToHistory(request);
-        this.emit('handoff.rejected', { ...request, rejectReason: reason });
+        this.emit(EMITTER_HANDOFF_REJECTED, { ...request, rejectReason: reason });
         log('INFO', `[HandoffManager] Handoff rejeitado: ${handoffId} (${reason ?? 'sem motivo'})`);
 
         return { accepted: false, error: reason ?? 'rejected', completedAt: Date.now() };

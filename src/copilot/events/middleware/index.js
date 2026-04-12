@@ -22,16 +22,16 @@ export { createRateLimiter } from './rate-limiter.js';
 export { schemaValidator } from './schema-validator.js';
 export { timestampEnricher } from './timestamp-enricher.js';
 
+import { BUILTIN_SCHEMAS } from '../schemas/builtin-schemas.js';
+import { registerEventSchemas } from '../schemas/registry.js';
 import { correlationEnricher } from './correlation-enricher.js';
 import { createRateLimiter } from './rate-limiter.js';
 import { schemaValidator } from './schema-validator.js';
 import { timestampEnricher } from './timestamp-enricher.js';
-import { registerEventSchemas } from '../schemas/registry.js';
-import { BUILTIN_SCHEMAS } from '../schemas/builtin-schemas.js';
 
 /**
- * Registra os middleware built-in no EventBus fornecido. Deve ser chamado uma vez durante o bootstrap.
- * Também registra os schemas built-in (FAIXA-L18).
+ * Registra os middleware built-in no EventBus fornecido. Deve ser chamado uma vez durante o bootstrap. Também registra
+ * os schemas built-in (FAIXA-L18).
  *
  * @param {import('../../core/event-bus.js').EventBus} bus
  * @param {{ rateLimiterWindowMs?: number; rateLimiterMax?: number }} [options]

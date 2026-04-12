@@ -11,10 +11,11 @@
  * externos acessam via API pública do AlwaysAliveAgent.
  *
  * @module copilot/agent/agent-context
- * @see EventBus
  * @internal
+ * @see EventBus
  */
 
+import { EMITTER_PERMISSION_MODE_CHANGED, EMITTER_PROCESS_QUEUE, EMITTER_STATUS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
@@ -132,7 +133,11 @@ export class AgentContext {
     /**
      * F69: Injeção de dependências MCP — permite override em testes e desacoplamento de camadas.
      *
-     * @type {{ buildTools: () => Promise<any[]>; buildConfig: () => Record<string, unknown>; startAutoReconnect: (onTools: (tools: any[]) => void) => () => void } | null}
+     * @type {{
+     *     buildTools: () => Promise<any[]>;
+     *     buildConfig: () => Record<string, unknown>;
+     *     startAutoReconnect: (onTools: (tools: any[]) => void) => () => void;
+     * } | null}
      */
     mcpBridge = null;
 
@@ -195,7 +200,7 @@ export class AgentContext {
 
         // Instanciar managers com callbacks para o emitter
         this.messageQueue = new MessageQueue({
-            onEnqueue: () => emitter.emit('__processQueue'),
+            onEnqueue: () => emitter.emit(EMITTER_PROCESS_QUEUE),
             onChanged: () => {
                 this.statusSnapshotCache = null;
             },
@@ -204,7 +209,7 @@ export class AgentContext {
         this.dialogLoop = new DialogLoopManager();
         this.webhooks = new WebhookManager();
         this.permissions = new PermissionController({
-            onModeChanged: (mode) => emitter.emit('permission.mode_changed', { mode }),
+            onModeChanged: (mode) => emitter.emit(EMITTER_PERMISSION_MODE_CHANGED, { mode }),
         });
         this.toolsRegistry = createRegistry();
         this.keepalive = new SessionKeepalive();
@@ -244,6 +249,6 @@ export class AgentContext {
         }
         this.status = status;
         this.statusSnapshotCache = null;
-        emitter.emit('status', status);
+        emitter.emit(EMITTER_STATUS, status);
     }
 }

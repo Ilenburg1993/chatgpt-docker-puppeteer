@@ -22,14 +22,23 @@
  */
 
 import {
+    EMITTER_AGENT_METRICS,
+    EMITTER_DIALOG_BOOT_RECOVERY,
+    EMITTER_MCP_RECONNECTED,
+    EMITTER_QUESTION_ANSWERED,
+    EMITTER_QUOTA_WARNING,
+    EMITTER_SDK_LIFECYCLE,
+    EMITTER_SESSION_CLEANUP,
+    EMITTER_SESSION_KEEPALIVE,
+} from '#copilot/events';
+import {
     createAgentEventObserver,
     defaultErrorTracker,
     defaultEventCollector,
     defaultMetrics,
     log,
 } from '#copilot/observability';
-import { SESSION_LIFECYCLE_EVENTS, isExperimentalEnabled } from '#copilot/sdk';
-import { createQuotaMonitor } from '#copilot/sdk';
+import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled } from '#copilot/sdk';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
@@ -80,7 +89,11 @@ import { wireSessionEvents } from './event-wirer.js';
  *
  * @typedef {Object} BootWiringResult
  * @property {(() => void)[]} unsubs — Funções de unsubscribe de eventos
- * @property {{ attach: (agent: import('node:events').EventEmitter) => void; attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void; detach: () => void } | null} agentObserver
+ * @property {{
+ *     attach: (agent: import('node:events').EventEmitter) => void;
+ *     attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void;
+ *     detach: () => void;
+ * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
@@ -121,15 +134,15 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     if (typeof client.on === 'function') {
         const unsubCreated = client.on(SESSION_LIFECYCLE_EVENTS.CREATED, (/** @type {any} */ evt) => {
             log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
-            ctx.emit('sdk.lifecycle', { type: SESSION_LIFECYCLE_EVENTS.CREATED, sessionId: evt?.sessionId });
+            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.CREATED, sessionId: evt?.sessionId });
         });
         const unsubDeleted = client.on(SESSION_LIFECYCLE_EVENTS.DELETED, (/** @type {any} */ evt) => {
             log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
-            ctx.emit('sdk.lifecycle', { type: SESSION_LIFECYCLE_EVENTS.DELETED, sessionId: evt?.sessionId });
+            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.DELETED, sessionId: evt?.sessionId });
         });
         const unsubUpdated = client.on(SESSION_LIFECYCLE_EVENTS.UPDATED, (/** @type {any} */ evt) => {
             log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
-            ctx.emit('sdk.lifecycle', { type: SESSION_LIFECYCLE_EVENTS.UPDATED, sessionId: evt?.sessionId });
+            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.UPDATED, sessionId: evt?.sessionId });
         });
         unsubs.push(unsubCreated, unsubDeleted, unsubUpdated);
     }
@@ -151,7 +164,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
         .then((result) => {
             if (result.deleted > 0) {
                 for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
-                ctx.emit('session.cleanup', result);
+                ctx.emit(EMITTER_SESSION_CLEANUP, result);
             }
         })
         .catch((/** @type {any} */ e) => logSwallowed(e, 'agent.bootWiring.cleanup'));
@@ -170,7 +183,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     let metricsTimer = null;
     if (METRICS_INTERVAL_MS > 0) {
         metricsTimer = setInterval(() => {
-            ctx.emit('agent.metrics', ctx.getStatusSnapshot());
+            ctx.emit(EMITTER_AGENT_METRICS, ctx.getStatusSnapshot());
         }, METRICS_INTERVAL_MS);
         metricsTimer.unref();
         // F154: registrar no timer-registry para cleanup automático via shutdown
@@ -179,12 +192,14 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
 
     // ── 8. Auto-reconnect MCP ──
     // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
-    const _ctxAny = /** @type {{
-    mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null;
-}} */ (/** @type {unknown} */ (ctx));
+    const _ctxAny = /**
+     * @type {{
+     *     mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null;
+     * }}
+     */ (/** @type {unknown} */ (ctx));
     const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
     const mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
-        ctx.emit('mcp.reconnected', { toolCount: tools.length, ts: Date.now() });
+        ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
     }, MCP_RECONNECT_MS);
 
     // ── 9. Keepalive de sessão ──
@@ -195,7 +210,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
         isDialogLoopActive: ctx.dialogLoopActive,
         onKeepalive: (/** @type {number} */ ts) => {
             defaultMetrics.recordKeepalivePing();
-            ctx.emit('session.keepalive', { ts });
+            ctx.emit(EMITTER_SESSION_KEEPALIVE, { ts });
         },
     });
 
@@ -213,7 +228,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
                     'WARN',
                     `[boot-wiring] Quota baixa — id=${quotaId}, restante=${snapshot.remainingPercentage?.toFixed(1)}%`,
                 );
-                ctx.emit('quota.warning', { quotaId, snapshot, ts: Date.now() });
+                ctx.emit(EMITTER_QUOTA_WARNING, { quotaId, snapshot, ts: Date.now() });
             },
             onUpdate: (snapshots) => {
                 defaultMetrics.recordQuotaPoll?.();
@@ -248,7 +263,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     }
 
     // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
-    agentEmitter.on('question.answered', (/** @type {{ answer?: string }} */ evt) => {
+    agentEmitter.on(EMITTER_QUESTION_ANSWERED, (/** @type {{ answer?: string }} */ evt) => {
         if (typeof evt?.answer !== 'string') return;
         const answer = evt.answer;
         import('../../tools/hook-tools.js')
@@ -274,7 +289,7 @@ function scheduleDialogBootRecovery(ctx) {
             await writeStateAsync({ dialogPaused: true });
             await ctx.resumeDialogLoop();
             log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
-            ctx.emit('dialog.boot_recovery', { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
+            ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
         } catch (/** @type {any} */ e) {
             log('WARN', `[AlwaysAlive] F53: Boot recovery falhou (${e.message}) — fallback para startDialogLoop.`);
             try {

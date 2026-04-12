@@ -9,6 +9,13 @@
  * @see EventBus
  */
 
+import {
+    EMITTER_DIALOG_READY,
+    EMITTER_DIALOG_REPLY,
+    EMITTER_DIALOG_STOPPED,
+    EMITTER_TASK_DELTA,
+    EMITTER_TASK_REASONING,
+} from '#copilot/events';
 import { log } from '#copilot/observability';
 
 /**
@@ -28,9 +35,9 @@ export function registerDialogListeners(agent, opts) {
     const { onReady, onReply, onStopped } = opts;
     const replyHandler = onReply ? (/** @type {{ reply?: string }} */ evt) => onReply(evt.reply ?? '') : null;
 
-    if (onReady) agent.once('dialog.ready', onReady);
-    if (replyHandler) agent.on('dialog.reply', replyHandler);
-    if (onStopped) agent.once('dialog.stopped', onStopped);
+    if (onReady) agent.once(EMITTER_DIALOG_READY, onReady);
+    if (replyHandler) agent.on(EMITTER_DIALOG_REPLY, replyHandler);
+    if (onStopped) agent.once(EMITTER_DIALOG_STOPPED, onStopped);
 
     const cleanup = () => {
         if (onReady) agent.off('dialog.ready', onReady);
@@ -85,14 +92,14 @@ export async function dialogTurn(agent, message, opts = {}) {
               if (evt.chunk) onDelta(evt.chunk);
           }
         : null;
-    if (onDeltaTemp) agent.on('task.delta', onDeltaTemp);
+    if (onDeltaTemp) agent.on(EMITTER_TASK_DELTA, onDeltaTemp);
 
     const onReasoningTemp = onReasoning
         ? (/** @type {{ chunk?: string; reasoningId?: string | null }} */ evt) => {
               if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
           }
         : null;
-    if (onReasoningTemp) agent.on('task.reasoning', onReasoningTemp);
+    if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
 
     try {
         return await agent.sendDialogTurn(message, { timeout });

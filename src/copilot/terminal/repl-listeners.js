@@ -9,6 +9,19 @@
  * @see EventBus
  */
 
+import {
+    EMITTER_ASSISTANT_INTENT,
+    EMITTER_QUESTION_PENDING,
+    EMITTER_SESSION_COMPACTION_COMPLETE,
+    EMITTER_SESSION_COMPACTION_START,
+    EMITTER_SESSION_ERROR,
+    EMITTER_STOPPED,
+    EMITTER_SUBAGENT_COMPLETED,
+    EMITTER_SUBAGENT_FAILED,
+    EMITTER_SUBAGENT_STARTED,
+    EMITTER_TOOL_EXECUTION_COMPLETE,
+    EMITTER_TOOL_EXECUTION_START,
+} from '#copilot/events';
 import { alwaysAliveAgent } from '../agent/index.js';
 import { broadcastSse, println } from './dialog.js';
 
@@ -119,17 +132,17 @@ export function setupAgentListeners(rl) {
         println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
     };
 
-    alwaysAliveAgent.on('question.pending', onQuestion);
-    alwaysAliveAgent.once('stopped', onStopped);
-    alwaysAliveAgent.on('tool.execution_start', onToolStart);
-    alwaysAliveAgent.on('tool.execution_complete', onToolComplete);
-    alwaysAliveAgent.on('session.error', onSessionError);
-    alwaysAliveAgent.on('session.compaction_start', onCompactionStart);
-    alwaysAliveAgent.on('session.compaction_complete', onCompactionComplete);
-    alwaysAliveAgent.on('assistant.intent', onIntent);
-    alwaysAliveAgent.on('subagent.started', onSubagentStarted);
-    alwaysAliveAgent.on('subagent.completed', onSubagentCompleted);
-    alwaysAliveAgent.on('subagent.failed', onSubagentFailed);
+    alwaysAliveAgent.on(EMITTER_QUESTION_PENDING, onQuestion);
+    alwaysAliveAgent.once(EMITTER_STOPPED, onStopped);
+    alwaysAliveAgent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
+    alwaysAliveAgent.on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
+    alwaysAliveAgent.on(EMITTER_SESSION_ERROR, onSessionError);
+    alwaysAliveAgent.on(EMITTER_SESSION_COMPACTION_START, onCompactionStart);
+    alwaysAliveAgent.on(EMITTER_SESSION_COMPACTION_COMPLETE, onCompactionComplete);
+    alwaysAliveAgent.on(EMITTER_ASSISTANT_INTENT, onIntent);
+    alwaysAliveAgent.on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
+    alwaysAliveAgent.on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
+    alwaysAliveAgent.on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
 
     return () => {
         alwaysAliveAgent.off('question.pending', onQuestion);

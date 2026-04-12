@@ -10,6 +10,7 @@
  * @see EventBus
  */
 
+import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
@@ -102,6 +103,6 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
         ctx.setPendingQuestion(pq);
         // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
         void writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() });
-        ctx.emit('question.pending', { question, choices, allowFreeform });
+        ctx.emit(EMITTER_QUESTION_PENDING, { question, choices, allowFreeform });
     });
 }

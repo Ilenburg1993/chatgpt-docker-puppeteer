@@ -19,7 +19,9 @@ describe('middleware/correlation-enricher (FAIXA-L16)', () => {
     it('gera correlationId UUID v4 quando ausente', () => {
         const event = evt('test:foo');
         let called = false;
-        correlationEnricher(event, () => { called = true; });
+        correlationEnricher(event, () => {
+            called = true;
+        });
         assert.ok(called, 'next() deve ser chamado');
         assert.ok(typeof event.correlationId === 'string', 'correlationId deve ser string');
         assert.ok(UUID_RE.test(event.correlationId), `correlationId deve ser UUID: ${event.correlationId}`);
@@ -41,8 +43,12 @@ describe('middleware/correlation-enricher (FAIXA-L16)', () => {
 
     it('chama next() incondicionalmente', () => {
         let nextCalled = 0;
-        correlationEnricher(evt('test:c'), () => { nextCalled++; });
-        correlationEnricher(evt('test:d', { correlationId: 'x' }), () => { nextCalled++; });
+        correlationEnricher(evt('test:c'), () => {
+            nextCalled++;
+        });
+        correlationEnricher(evt('test:d', { correlationId: 'x' }), () => {
+            nextCalled++;
+        });
         assert.equal(nextCalled, 2);
     });
 });

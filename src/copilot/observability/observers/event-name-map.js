@@ -68,8 +68,8 @@ import {
 /**
  * Mapa de nomes de eventos do agent EventEmitter → constantes SSOT do EventBus.
  *
- * As chaves são os event names usados em `agent.emit('nome', payload)` e `agent.on('nome', handler)`. Os valores são
- * as strings canônicas emitidas no EventBus via `bridgeEmitter`.
+ * As chaves são os event names usados em `agent.emit('nome', payload)` e `agent.on('nome', handler)`. Os valores são as
+ * strings canônicas emitidas no EventBus via `bridgeEmitter`.
  *
  * @type {Record<string, string>}
  */

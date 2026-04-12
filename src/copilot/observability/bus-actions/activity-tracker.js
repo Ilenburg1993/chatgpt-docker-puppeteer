@@ -2,8 +2,8 @@
 /**
  * src/copilot/observability/bus-actions/activity-tracker.js — FAIXA-L15
  *
- * EventBus subscriber que rastreia timestamp da última atividade por tipo,
- * permitindo detecção de deadlock/inatividade pelo watchdog.
+ * EventBus subscriber que rastreia timestamp da última atividade por tipo, permitindo detecção de deadlock/inatividade
+ * pelo watchdog.
  *
  * @module copilot/observability/bus-actions/activity-tracker
  */
@@ -30,7 +30,7 @@ export function createActivityTracker({ bus, trackTypes }) {
     let lastActivity = Date.now();
     let lastEventType = 'init';
     let eventCount = 0;
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     const unsubs = [];
 
     const types = trackTypes ?? [
@@ -46,11 +46,13 @@ export function createActivityTracker({ bus, trackTypes }) {
     ];
 
     for (const type of types) {
-        unsubs.push(bus.on(type, (/** @type {any} */ evt) => {
-            lastActivity = evt?.timestamp ?? Date.now();
-            lastEventType = type;
-            eventCount++;
-        }));
+        unsubs.push(
+            bus.on(type, (/** @type {any} */ evt) => {
+                lastActivity = evt?.timestamp ?? Date.now();
+                lastEventType = type;
+                eventCount++;
+            }),
+        );
     }
 
     log('INFO', `[activity-tracker] ${unsubs.length} tipos de atividade rastreados`);

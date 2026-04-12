@@ -3,17 +3,16 @@
 /**
  * scripts/event-flow-graph.mjs — FAIXA-L17
  *
- * Gera diagramas Mermaid automaticamente a partir do código,
- * mostrando o fluxo de eventos entre módulos.
+ * Gera diagramas Mermaid automaticamente a partir do código, mostrando o fluxo de eventos entre módulos.
  *
  * Analisa:
- *   - emit() calls → produtores
- *   - on()/once() calls → consumidores
- *   - bridgeEmitter map → ponte agent→EventBus
- *   - bus.on() → subscribers do EventBus
  *
- * Uso:
- *   node scripts/event-flow-graph.mjs [--output FILE] [--json]
+ * - emit() calls → produtores
+ * - on()/once() calls → consumidores
+ * - bridgeEmitter map → ponte agent→EventBus
+ * - bus.on() → subscribers do EventBus
+ *
+ * Uso: node scripts/event-flow-graph.mjs [--output FILE] [--json]
  */
 
 import { readdir, readFile, writeFile } from 'node:fs/promises';
@@ -31,6 +30,7 @@ const outputFile = outputIdx >= 0 ? args[outputIdx + 1] : null;
 
 /**
  * @typedef {{ module: string; event: string; line: number }} EmitSite
+ *
  * @typedef {{ module: string; event: string; line: number }} ListenerSite
  */
 
@@ -188,14 +188,14 @@ async function main() {
         const summary = {
             totalEmits: allEmits.length,
             totalListeners: allListeners.length,
-            uniqueEmitEvents: [...new Set(allEmits.map(e => e.event))].length,
-            uniqueListenEvents: [...new Set(allListeners.map(l => l.event))].length,
-            modules: [...new Set([...allEmits.map(e => e.module), ...allListeners.map(l => l.module)])],
+            uniqueEmitEvents: [...new Set(allEmits.map((e) => e.event))].length,
+            uniqueListenEvents: [...new Set(allListeners.map((l) => l.event))].length,
+            modules: [...new Set([...allEmits.map((e) => e.module), ...allListeners.map((l) => l.module)])],
         };
         console.log(JSON.stringify(summary, null, 2));
     } else {
         const mermaid = generateMermaid(data);
-        const md = `# Event Flow Graph\n\n> Auto-gerado por \`scripts/event-flow-graph.mjs\` (FAIXA-L17)\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`\n\n## Estatísticas\n\n- **Emits encontrados**: ${allEmits.length}\n- **Listeners encontrados**: ${allListeners.length}\n- **Eventos únicos (emit)**: ${[...new Set(allEmits.map(e => e.event))].length}\n- **Eventos únicos (listen)**: ${[...new Set(allListeners.map(l => l.event))].length}\n`;
+        const md = `# Event Flow Graph\n\n> Auto-gerado por \`scripts/event-flow-graph.mjs\` (FAIXA-L17)\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`\n\n## Estatísticas\n\n- **Emits encontrados**: ${allEmits.length}\n- **Listeners encontrados**: ${allListeners.length}\n- **Eventos únicos (emit)**: ${[...new Set(allEmits.map((e) => e.event))].length}\n- **Eventos únicos (listen)**: ${[...new Set(allListeners.map((l) => l.event))].length}\n`;
 
         if (outputFile) {
             await writeFile(path.resolve(outputFile), md, 'utf-8');
@@ -206,7 +206,7 @@ async function main() {
     }
 }
 
-main().catch(err => {
+main().catch((err) => {
     console.error('Erro fatal:', err);
     process.exit(2);
 });

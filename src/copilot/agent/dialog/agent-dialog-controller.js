@@ -8,11 +8,12 @@
  * eventos.
  *
  * @module copilot/agent/dialog/agent-dialog-controller
- * @see EventBus
  * @internal
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';
+import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { defaultMetrics, log } from '#copilot/observability';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../config.js';
 import { wireDialogLoopEvents } from './loop-manager.js';
@@ -58,7 +59,7 @@ export async function dialogStart(ctx, host, bootPrompt) {
     // F42.2: pausar keepalive enquanto dialog loop está ativo
     ctx.keepalive.stop();
     await ctx.dialogLoop.start(bootPrompt);
-    host.emit('dialog.loop.changed', { active: true, ts: Date.now() });
+    host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: true, ts: Date.now() });
 }
 
 /**
@@ -84,7 +85,7 @@ export async function dialogStop(ctx, host, opts) {
             isDialogLoopActive: () => ctx.dialogLoop.active,
             onKeepalive: (/** @type {number} */ ts) => {
                 defaultMetrics.recordKeepalivePing();
-                host.emit('session.keepalive', { ts });
+                host.emit(EMITTER_SESSION_KEEPALIVE, { ts });
             },
         });
     }

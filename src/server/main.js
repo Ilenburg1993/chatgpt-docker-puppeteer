@@ -750,7 +750,8 @@ async function bootstrap(options = {}) {
                         }
                     });
                     eventBus.on(NERV_COMMAND_PAUSE, () => {
-                        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function') void alwaysAliveAgent.pauseDialogLoop();
+                        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function')
+                            void alwaysAliveAgent.pauseDialogLoop();
                     });
                     eventBus.on(NERV_COMMAND_RESUME, () => {
                         if (typeof alwaysAliveAgent.resumeDialogLoop === 'function')

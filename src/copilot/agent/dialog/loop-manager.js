@@ -11,6 +11,18 @@
 
 import { getCopilotFallbackModel } from '#copilot/config';
 import { BaseEmitter, SessionError } from '#copilot/core';
+import {
+    EMITTER_LOOP_CHANGED,
+    EMITTER_LOOP_COMPACTION_REQUESTED,
+    EMITTER_LOOP_PAUSED,
+    EMITTER_LOOP_PRE_STALL_WARNING,
+    EMITTER_LOOP_READY,
+    EMITTER_LOOP_REPLY,
+    EMITTER_LOOP_RESUMED,
+    EMITTER_LOOP_STALLED,
+    EMITTER_LOOP_STOPPED,
+    EMITTER_LOOP_TURN_TIMEOUT,
+} from '#copilot/events';
 import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
 import { logSwallowed } from '../../core/error-handlers.js';
@@ -189,7 +201,7 @@ export class DialogLoopManager extends BaseEmitter {
             this.#active = false;
             // F41B.4: parar watchdog ao reconectar — sem loop ativo, watchdog não deve rodar
             this.#watchdog?.stop();
-            this.emit('changed', { active: false, ts: Date.now(), reason: 'reconnect' });
+            this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'reconnect' });
         }
     }
 
@@ -226,7 +238,7 @@ export class DialogLoopManager extends BaseEmitter {
         }
 
         this.#active = true;
-        this.emit('changed', { active: true, ts: Date.now() });
+        this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
         void writeStateAsync({ dialogLoopActive: true });
 
         // F68.2: Span OTEL para o ciclo completo do dialog loop (start → stop)
@@ -248,9 +260,9 @@ export class DialogLoopManager extends BaseEmitter {
         this.#watchdog = new DialogWatchdog({
             intervalMs: this.#watchdogIntervalMs,
             stallThresholdMs: this.#watchdogStallMs,
-            onStall: (stalledMs) => this.emit('stalled', { stalledMs }),
+            onStall: (stalledMs) => this.emit(EMITTER_LOOP_STALLED, { stalledMs }),
             // F41B.7: aviso pré-stall a 80% do threshold
-            onPreStallWarning: (stalledMs) => this.emit('pre_stall_warning', { stalledMs }),
+            onPreStallWarning: (stalledMs) => this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs }),
         });
         this.#watchdog.start();
 
@@ -267,15 +279,15 @@ export class DialogLoopManager extends BaseEmitter {
             if (this.#active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
-                this.emit('changed', { active: false, ts: Date.now() });
-                this.emit('stopped', { reason: e.message });
+                this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
+                this.emit(EMITTER_LOOP_STOPPED, { reason: e.message });
             }
         });
 
         // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
         bootPromise.catch((/** @type {any} */ e) => {
             if (e?.message?.includes('Boot timeout') || e?.code === 'DIALOG_TIMEOUT') {
-                this.emit('turn_timeout', { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
+                this.emit(EMITTER_LOOP_TURN_TIMEOUT, { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
                 log(
                     'WARN',
                     `[DialogLoopManager] Boot timeout (${this.#bootTimeoutMs}ms) — evento turn_timeout emitido.`,
@@ -371,7 +383,7 @@ export class DialogLoopManager extends BaseEmitter {
         this.#endLoopSpan(true);
         void writeStateAsync({ dialogLoopActive: false });
         this.#watchdog?.stop();
-        this.emit('stopped', { reason, authorized: true });
+        this.emit(EMITTER_LOOP_STOPPED, { reason, authorized: true });
     }
 
     /**
@@ -391,7 +403,7 @@ export class DialogLoopManager extends BaseEmitter {
         // F31: pausar watchdog durante pause para evitar falsos-positivos de stall
         this.#watchdog?.stop();
         log('INFO', `[DialogLoopManager] Dialog loop pausado. SessionId: ${sessionId}.`);
-        this.emit('paused', { sessionId, pausedAt: Date.now() });
+        this.emit(EMITTER_LOOP_PAUSED, { sessionId, pausedAt: Date.now() });
     }
 
     /**
@@ -426,7 +438,7 @@ export class DialogLoopManager extends BaseEmitter {
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume
                 void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
-                this.emit('resumed', { prConsumed: false });
+                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
 
@@ -449,7 +461,7 @@ export class DialogLoopManager extends BaseEmitter {
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume zero-PR
                 void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
-                this.emit('resumed', { prConsumed: false });
+                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
 
@@ -467,7 +479,7 @@ export class DialogLoopManager extends BaseEmitter {
             this.#prMetrics.resumesWithPR++;
             // F42.4: persistir prMetrics após resume com PR
             void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
-            this.emit('resumed', { prConsumed: true });
+            this.emit(EMITTER_LOOP_RESUMED, { prConsumed: true });
         } finally {
             this.#resuming = false;
         }
@@ -483,14 +495,14 @@ export class DialogLoopManager extends BaseEmitter {
 
         if (kind === 'ready') {
             this.#watchdog?.ping();
-            this.emit('ready', {});
+            this.emit(EMITTER_LOOP_READY, {});
         } else if (kind === 'reply') {
             this.#watchdog?.ping();
             const reply = DialogProtocol.extractReply(question);
-            this.emit('reply', { reply });
+            this.emit(EMITTER_LOOP_REPLY, { reply });
         } else if (kind === 'stopped') {
             log('WARN', '[DialogLoopManager] Modelo emitiu STOPPED — emitindo stopped para restart automático.');
-            this.emit('stopped', { reason: 'model_stopped', authorized: false });
+            this.emit(EMITTER_LOOP_STOPPED, { reason: 'model_stopped', authorized: false });
         }
     }
 
@@ -522,8 +534,8 @@ export class DialogLoopManager extends BaseEmitter {
         this.#watchdog?.stop();
         this.#watchdog = null;
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
-        this.emit('stopped', { reason: 'force_deactivate', authorized: false });
-        this.emit('changed', { active: false, ts: Date.now(), reason: 'force_deactivate' });
+        this.emit(EMITTER_LOOP_STOPPED, { reason: 'force_deactivate', authorized: false });
+        this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'force_deactivate' });
     }
 
     /**
@@ -539,7 +551,7 @@ export class DialogLoopManager extends BaseEmitter {
         if (ratio >= 95) {
             log('WARN', `[DialogLoopManager] F31.4: Token budget CRÍTICO em ${ratio}% — compaction urgente.`);
             this.#compactionRequested = false; // Permite re-emissão
-            this.emit('compaction.requested', { ratio, currentTokens, tokenLimit, urgency: 'critical' });
+            this.emit(EMITTER_LOOP_COMPACTION_REQUESTED, { ratio, currentTokens, tokenLimit, urgency: 'critical' });
             return;
         }
 
@@ -547,7 +559,7 @@ export class DialogLoopManager extends BaseEmitter {
         if (ratio >= 90 && !this.#compactionRequested) {
             log('WARN', `[DialogLoopManager] F31.3: Token budget em ${ratio}% — compaction proativa solicitada.`);
             this.#compactionRequested = true;
-            this.emit('compaction.requested', { ratio, currentTokens, tokenLimit, urgency: 'proactive' });
+            this.emit(EMITTER_LOOP_COMPACTION_REQUESTED, { ratio, currentTokens, tokenLimit, urgency: 'proactive' });
         }
     }
 

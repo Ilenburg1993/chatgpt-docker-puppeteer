@@ -2,8 +2,7 @@
 /**
  * src/copilot/observability/bus-actions/error-alerter.js — FAIXA-L15
  *
- * EventBus subscriber que detecta eventos `*:error` e `*:fatal` e aciona o
- * sistema de alertas (ErrorAlerting).
+ * EventBus subscriber que detecta eventos `*:error` e `*:fatal` e aciona o sistema de alertas (ErrorAlerting).
  *
  * @module copilot/observability/bus-actions/error-alerter
  */
@@ -19,11 +18,13 @@ import { log } from '../logger.js';
  * @returns {{ unsub: () => void; hasAction: true; name: string }}
  */
 export function createErrorAlerterAction({ bus, onAlert }) {
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     const unsubs = [];
-    const alertFn = onAlert ?? ((/** @type {{ type: string }} */ evt) => {
-        log('ERROR', `[error-alerter] ALERTA: evento ${evt.type} detectado`);
-    });
+    const alertFn =
+        onAlert ??
+        ((/** @type {{ type: string }} */ evt) => {
+            log('ERROR', `[error-alerter] ALERTA: evento ${evt.type} detectado`);
+        });
 
     // Match error/fatal events via wildcard patterns
     const errorPatterns = [
@@ -35,13 +36,15 @@ export function createErrorAlerterAction({ bus, onAlert }) {
     ];
 
     for (const pattern of errorPatterns) {
-        unsubs.push(bus.on(pattern, (/** @type {any} */ evt) => {
-            try {
-                alertFn(evt);
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[error-alerter] erro ao processar alerta: ${e?.message}`);
-            }
-        }));
+        unsubs.push(
+            bus.on(pattern, (/** @type {any} */ evt) => {
+                try {
+                    alertFn(evt);
+                } catch (/** @type {any} */ e) {
+                    log('WARN', `[error-alerter] erro ao processar alerta: ${e?.message}`);
+                }
+            }),
+        );
     }
 
     log('INFO', `[error-alerter] ${unsubs.length} patterns de erro monitorados`);

@@ -1,17 +1,17 @@
 # PARTE-23L-D — Events System: Roadmap v3.0 (Expandido)
 
-**Data**: 2026-04-12 | **Status**: Roadmap | **Versão**: 3.0 (pós-FAIXA-L1 a L8)
+**Data**: 2026-04-12 | **Status**: ✅ TODAS AS FAIXAS CONCLUÍDAS | **Versão**: 4.0
 **Precedente**: PARTE-23L-A/B/C v2.0 (re-auditoria completa)
 
 ---
 
 ## Sumário Executivo
 
-O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
+O roadmap v3-4 organizou **18 faixas** (L1–L18) em 4 ondas — **todas concluídas**:
 - **Onda 1 (L1–L8)**: ✅ CONCLUÍDA — implementação base
-- **Onda 2 (L9–L12)**: Eliminação de duplicação e cobertura completa
-- **Onda 3 (L13–L15)**: Remoção de legado e migração de observers
-- **Onda 4 (L16–L18)**: Inteligência operacional e observabilidade avançada
+- **Onda 2 (L9–L12)**: ✅ CONCLUÍDA — eliminação de duplicação e cobertura completa
+- **Onda 3 (L13–L15)**: ✅ CONCLUÍDA — remoção de legado e migração de observers
+- **Onda 4 (L16–L18)**: ✅ CONCLUÍDA — inteligência operacional e observabilidade avançada
 
 ---
 
@@ -73,6 +73,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 ### FAIXA-L9 — Bridge dos 28 Events Perdidos ✅ CONCLUÍDO
 
 **Objetivo**: Bridgear todos os 28 events que o Agent emite mas NÃO chegam ao EventBus.
+**Commit**: `96502f4b`
 
 **Arquivos a modificar**:
 1. `events/agent-events.js` — adicionar 26 constantes SSOT (`AGENT_ASSISTANT_TURN_START`, etc.)
@@ -92,6 +93,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 ### FAIXA-L10 — Remoção do SdkSessionBridge ✅ CONCLUÍDO
 
 **Objetivo**: Eliminar o caminho duplicado SDK→EventBus direto.
+**Commit**: `96502f4b`
 
 **Justificativa**:
 - O SdkSessionBridge (L5) nunca teve `attach()` chamado em produção
@@ -109,7 +111,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 **Critério**: Zero imports de `sdk-events` ou `sdk-session-bridge` no codebase
 
-### FAIXA-L11 — Namespace Normalization 🟡 MÉDIO
+### FAIXA-L11 — Namespace Normalization ✅ CONCLUÍDO
 
 **Objetivo**: Padronizar todos os event names para formato `namespace:domain:action`.
 
@@ -127,7 +129,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 **Critério**: `grep -r "emit(" src/copilot | grep -v "events/" | wc -l` → 0
 
-### FAIXA-L12 — SSOT Hardcoded Audit Tool 🟢 BAIXO
+### FAIXA-L12 — SSOT Hardcoded Audit Tool ✅ CONCLUÍDO
 
 **Objetivo**: Script automatizado para detectar event strings fora do SSOT.
 
@@ -141,7 +143,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 ## Onda 3 — Remoção de Legado e Migração
 
-### FAIXA-L13 — Remoção do nerv-bridge.js Legado 🔴 CRÍTICO
+### FAIXA-L13 — Remoção do nerv-bridge.js Legado ✅ CONCLUÍDO
 
 **Objetivo**: Eliminar duplicação Agent→NERV (nerv-bridge + NervEventBusAdapter).
 
@@ -161,7 +163,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 **Critério**: Zero imports de `nerv-bridge` no codebase
 **Ganho**: Eliminação de ~452 linhas de código legado
 
-### FAIXA-L14 — Observer Migration (direto → EventBus) 🟡 MÉDIO
+### FAIXA-L14 — Observer Migration (direto → EventBus) ✅ CONCLUÍDO
 
 **Objetivo**: Migrar observers de `agent.on()` direto para `bus.on()`.
 
@@ -185,7 +187,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 **Critério**: Zero `agent.on()` em observers/, somente `bus.on()`
 
-### FAIXA-L15 — Event-Bus-Observers Upgrade 🟡 MÉDIO
+### FAIXA-L15 — Event-Bus-Observers Upgrade ✅ CONCLUÍDO
 
 **Objetivo**: Transformar bus-observers de log-only para ações reais.
 
@@ -203,7 +205,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 ## Onda 4 — Inteligência Operacional
 
-### FAIXA-L16 — Correlation ID End-to-End 🟡 MÉDIO
+### FAIXA-L16 — Correlation ID End-to-End ✅ CONCLUÍDO
 
 **Objetivo**: Cada evento carrega um `_correlationId` rastreável do SDK até o NERV.
 
@@ -215,7 +217,7 @@ O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
 
 **Benefício**: Debug: "de onde veio este event NERV?" → rastreio completo
 
-### FAIXA-L17 — Event Flow Visualizer 🟢 BAIXO
+### FAIXA-L17 — Event Flow Visualizer ✅ CONCLUÍDO
 
 **Objetivo**: Gerar grafos Mermaid automaticamente a partir do código.
 
@@ -235,7 +237,7 @@ graph TD
     EB -->|15 subs| OBS[Observers]
 ```
 
-### FAIXA-L18 — Event Schema Registry 🟢 BAIXO
+### FAIXA-L18 — Event Schema Registry ✅ CONCLUÍDO
 
 **Objetivo**: Definir schemas JSON para cada event type, validação em dev.
 
@@ -279,10 +281,10 @@ START ──→ L9 (Bridge 28) ──→ L11 (Namespace) ──→ L12 (Audit To
 
 ## Ordem de Execução Recomendada
 
-| Sequência | Faixa | Risco    | Complexidade | Dependência |
-|-----------|-------|----------|--------------|-------------|
+| Sequência | Faixa | Risco   | Complexidade | Dependência |
+| --------- | ----- | ------- | ------------ | ----------- |
 | 1         | L9    | 🔴 ALTO  | Média        | Nenhuma     |
-| 2         | L10   | ⚠️ ALTO   | Baixa        | Nenhuma     |
+| 2         | L10   | ⚠️ ALTO  | Baixa        | Nenhuma     |
 | 3         | L11   | 🟡 MÉDIO | Média        | L9          |
 | 4         | L13   | 🔴 ALTO  | Média        | L9          |
 | 5         | L14   | 🟡 MÉDIO | Alta         | L9 + L13    |
@@ -296,12 +298,12 @@ START ──→ L9 (Bridge 28) ──→ L11 (Namespace) ──→ L12 (Audit To
 
 ## Score Estimado (arch-health)
 
-| Onda     | Score Atual | Score Estimado | Delta |
-|----------|-------------|----------------|-------|
-| Pós-L8   | 78/100 (C)  | —              | —     |
-| Pós-Onda2| —           | 80/100 (B-)    | +2    |
-| Pós-Onda3| —           | 85/100 (B)     | +5    |
-| Pós-Onda4| —           | 88/100 (B+)    | +3    |
+| Onda      | Score Atual | Score Estimado | Delta |
+| --------- | ----------- | -------------- | ----- |
+| Pós-L8    | 78/100 (C)  | —              | —     |
+| Pós-Onda2 | —           | 80/100 (B-)    | +2    |
+| Pós-Onda3 | —           | 85/100 (B)     | +5    |
+| Pós-Onda4 | —           | 88/100 (B+)    | +3    |
 
 > Nota: Os maiores ganhos de score virão da remoção de singletons (que NÃO é escopo
 > deste roadmap de events). Para atingir 90+, é preciso PARTE-24 (DI Refactoring).
@@ -310,8 +312,9 @@ START ──→ L9 (Bridge 28) ──→ L11 (Namespace) ──→ L12 (Audit To
 
 ## Changelog
 
-| Versão | Data       | Mudanças                                           |
-|--------|------------|----------------------------------------------------|
-| 1.0    | 2026-03-XX | 10 gaps, faixas L1–L8 originais                    |
-| 2.0    | 2026-04-XX | FAIXA L1–L8 marcadas ✅, status atualizado          |
+| Versão | Data       | Mudanças                                          |
+| ------ | ---------- | ------------------------------------------------- |
+| 1.0    | 2026-03-XX | 10 gaps, faixas L1–L8 originais                   |
+| 2.0    | 2026-04-XX | FAIXA L1–L8 marcadas ✅, status atualizado         |
 | 3.0    | 2026-04-12 | Re-auditoria v2, ondas 2–4 (L9–L18), 8 gaps novos |
+| 4.0    | 2026-04-12 | Todas 18 faixas marcadas ✅ CONCLUÍDO              |

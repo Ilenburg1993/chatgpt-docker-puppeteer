@@ -2,9 +2,8 @@
 /**
  * src/copilot/observability/bus-actions/metrics-collector.js — FAIXA-L15
  *
- * EventBus subscriber que incrementa contadores/histogramas do MetricsStore
- * para cada tipo de evento recebido, eliminando a necessidade de metrificar
- * manualmente em cada módulo.
+ * EventBus subscriber que incrementa contadores/histogramas do MetricsStore para cada tipo de evento recebido,
+ * eliminando a necessidade de metrificar manualmente em cada módulo.
  *
  * @module copilot/observability/bus-actions/metrics-collector
  */
@@ -13,6 +12,7 @@ import { log } from '../logger.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ *
  * @typedef {import('../metrics.js').MetricsStore} MetricsStore
  */
 
@@ -21,16 +21,20 @@ import { log } from '../logger.js';
  * @returns {{ unsub: () => void; hasAction: true; name: string }}
  */
 export function createMetricsCollector({ bus, metrics }) {
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     const unsubs = [];
 
     /** @param {string} type @param {(evt: any) => void} fn */
     function on(type, fn) {
-        unsubs.push(bus.on(type, (/** @type {any} */ evt) => {
-            try { fn(evt); } catch (/** @type {any} */ e) {
-                log('WARN', `[metrics-collector] erro em ${type}: ${e?.message}`);
-            }
-        }));
+        unsubs.push(
+            bus.on(type, (/** @type {any} */ evt) => {
+                try {
+                    fn(evt);
+                } catch (/** @type {any} */ e) {
+                    log('WARN', `[metrics-collector] erro em ${type}: ${e?.message}`);
+                }
+            }),
+        );
     }
 
     // Dialog turn metrics
@@ -63,11 +67,7 @@ export function createMetricsCollector({ bus, metrics }) {
     // Tool calls
     on('hook:post_tool_use', (evt) => {
         const input = evt?.input ?? {};
-        metrics.recordToolCall(
-            input.toolName ?? 'unknown',
-            input.durationMs ?? 0,
-            input.result !== 'error',
-        );
+        metrics.recordToolCall(input.toolName ?? 'unknown', input.durationMs ?? 0, input.result !== 'error');
     });
 
     // Streaming chunks
@@ -76,11 +76,21 @@ export function createMetricsCollector({ bus, metrics }) {
     });
 
     // Counters via recordCounter
-    on('agent:session:compaction_start', () => { metrics.recordCounter('session.compaction', 1); });
-    on('agent:session:compaction_complete', () => { metrics.recordCounter('session.compaction_complete', 1); });
-    on('agent:handoff:received', () => { metrics.recordHandoff(); });
-    on('agent:session:keepalive', () => { metrics.recordKeepalivePing(); });
-    on('agent:session:usage', () => { metrics.recordCounter('session.usage_report', 1); });
+    on('agent:session:compaction_start', () => {
+        metrics.recordCounter('session.compaction', 1);
+    });
+    on('agent:session:compaction_complete', () => {
+        metrics.recordCounter('session.compaction_complete', 1);
+    });
+    on('agent:handoff:received', () => {
+        metrics.recordHandoff();
+    });
+    on('agent:session:keepalive', () => {
+        metrics.recordKeepalivePing();
+    });
+    on('agent:session:usage', () => {
+        metrics.recordCounter('session.usage_report', 1);
+    });
 
     log('INFO', `[metrics-collector] ${unsubs.length} subscribers registrados`);
 

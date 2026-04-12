@@ -5,6 +5,7 @@
  * @file F57: Queue processor — extrai lógica de processamento de fila do AlwaysAliveAgent.
  */
 
+import { EMITTER_TASK_DELTA, EMITTER_TASK_STARTED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { executeTask } from './infra/task-executor.js';
 
@@ -25,7 +26,7 @@ export function processQueue(ctx, host, callbacks) {
     if (!task) return;
 
     ctx.setStatus('processing', host);
-    host.emit('task.started', { taskId: task.id });
+    host.emit(EMITTER_TASK_STARTED, { taskId: task.id });
 
     log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
     ctx.sendCount++;
@@ -33,7 +34,7 @@ export function processQueue(ctx, host, callbacks) {
     ctx.keepalive.ping();
 
     void executeTask(session, task, {
-        onDelta: (chunk, taskId) => host.emit('task.delta', { taskId, chunk }),
+        onDelta: (chunk, taskId) => host.emit(EMITTER_TASK_DELTA, { taskId, chunk }),
         setStatus: (s) => ctx.setStatus(s, host),
         emit: (event, payload) => host.emit(event, payload),
         tryReconnect: (e) => callbacks.tryReconnect(e),

@@ -8,13 +8,13 @@
  */
 
 export {
+    clearSchemas,
+    getAllSchemas,
+    getEventSchema,
     registerEventSchema,
     registerEventSchemas,
-    validateEvent,
-    getEventSchema,
-    getAllSchemas,
-    clearSchemas,
     schemaCount,
+    validateEvent,
 } from './registry.js';
 
 export { BUILTIN_SCHEMAS } from './builtin-schemas.js';

@@ -2,9 +2,8 @@
 /**
  * src/copilot/observability/bus-actions/health-updater.js — FAIXA-L15
  *
- * EventBus subscriber que mantém health score do sistema baseado em eventos.
- * O score é um valor 0-100 que degrada com erros/timeouts e recupera com
- * eventos de sucesso.
+ * EventBus subscriber que mantém health score do sistema baseado em eventos. O score é um valor 0-100 que degrada com
+ * erros/timeouts e recupera com eventos de sucesso.
  *
  * @module copilot/observability/bus-actions/health-updater
  */
@@ -23,7 +22,9 @@ import { log } from '../logger.js';
  */
 
 /** @param {number} val @param {number} min @param {number} max @returns {number} */
-function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+function clamp(val, min, max) {
+    return Math.max(min, Math.min(max, val));
+}
 
 /**
  * @param {{ bus: EventBus }} deps
@@ -32,7 +33,7 @@ function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
 export function createHealthUpdater({ bus }) {
     /** @type {HealthState} */
     const state = { score: 100, status: 'healthy', lastUpdate: Date.now() };
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     const unsubs = [];
 
     function update() {
@@ -55,24 +56,62 @@ export function createHealthUpdater({ bus }) {
     }
 
     // Degradation events
-    unsubs.push(bus.on('agent:session:fatal', () => { degrade(30); }));
-    unsubs.push(bus.on('agent:task:error', () => { degrade(10); }));
-    unsubs.push(bus.on('agent:dialog:turn_timeout', () => { degrade(15); }));
-    unsubs.push(bus.on('agent:dialog:stalled', () => { degrade(5); }));
-    unsubs.push(bus.on('hook:error_occurred', () => { degrade(10); }));
+    unsubs.push(
+        bus.on('agent:session:fatal', () => {
+            degrade(30);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:task:error', () => {
+            degrade(10);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:dialog:turn_timeout', () => {
+            degrade(15);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:dialog:stalled', () => {
+            degrade(5);
+        }),
+    );
+    unsubs.push(
+        bus.on('hook:error_occurred', () => {
+            degrade(10);
+        }),
+    );
 
     // Recovery events
-    unsubs.push(bus.on('agent:dialog:turn_end', () => { recover(2); }));
-    unsubs.push(bus.on('agent:task:completed', () => { recover(5); }));
-    unsubs.push(bus.on('agent:ready', () => { recover(10); }));
-    unsubs.push(bus.on('agent:session:compaction_complete', () => { recover(3); }));
+    unsubs.push(
+        bus.on('agent:dialog:turn_end', () => {
+            recover(2);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:task:completed', () => {
+            recover(5);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:ready', () => {
+            recover(10);
+        }),
+    );
+    unsubs.push(
+        bus.on('agent:session:compaction_complete', () => {
+            recover(3);
+        }),
+    );
 
     log('INFO', `[health-updater] ${unsubs.length} eventos de health monitorados`);
 
     return {
         name: 'HealthUpdater',
         hasAction: true,
-        getHealth() { return { ...state }; },
+        getHealth() {
+            return { ...state };
+        },
         unsub() {
             for (const u of unsubs) u();
             unsubs.length = 0;

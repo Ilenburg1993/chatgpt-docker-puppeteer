@@ -13,6 +13,7 @@
  */
 
 import { SessionError } from '#copilot/core';
+import { EMITTER_QUESTION_ANSWERED, EMITTER_STEERING_SENT, EMITTER_TASK_QUEUED } from '#copilot/events';
 import { log, startSpan, startSpanImmediate } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
@@ -53,7 +54,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
         reject(err instanceof Error ? err : new Error(String(err)));
         return;
     }
-    host.emit('task.queued', { taskId: task.id, message });
+    host.emit(EMITTER_TASK_QUEUED, { taskId: task.id, message });
 }
 
 /**
@@ -127,7 +128,7 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     return startSpan('copilot.agent.steer', { model: ctx.model ?? '', actor: 'agent' }, async () => {
         const messageId = await session.send({ prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
-        host.emit('steering.sent', { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
+        host.emit(EMITTER_STEERING_SENT, { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
         return messageId;
     });
 }
@@ -144,7 +145,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     const span = startSpanImmediate('copilot.agent.answer', { 'had_pending': String(ctx.pendingQuestion !== null) });
     if (!ctx.pendingQuestion) {
         // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
-        host.emit('question.answered', { answer, hadPending: false });
+        host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false });
         log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
         span?.end();
         return false;
@@ -153,7 +154,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     ctx.pendingQuestion.resolve(answer);
     ctx.pendingQuestion = null;
     void writeStateAsync({ pendingQuestion: null });
-    host.emit('question.answered', { answer, hadPending: true });
+    host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: true });
     span?.end();
     return true;
 }

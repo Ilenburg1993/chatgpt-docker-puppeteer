@@ -1,12 +1,12 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 import { createEventBus } from '../../../../src/copilot/core/event-bus.js';
-import { createHealthUpdater } from '../../../../src/copilot/observability/bus-actions/health-updater.js';
 import { createActivityTracker } from '../../../../src/copilot/observability/bus-actions/activity-tracker.js';
 import { createCorrelationTracer } from '../../../../src/copilot/observability/bus-actions/correlation-tracer.js';
 import { createErrorAlerterAction } from '../../../../src/copilot/observability/bus-actions/error-alerter.js';
+import { createHealthUpdater } from '../../../../src/copilot/observability/bus-actions/health-updater.js';
 
 describe('bus-actions (FAIXA-L15)', () => {
     /** @type {ReturnType<typeof createEventBus>} */
@@ -122,7 +122,10 @@ describe('bus-actions (FAIXA-L15)', () => {
             assert.equal(ct.hasAction, true);
             assert.equal(ea.hasAction, true);
 
-            hu.unsub(); at.unsub(); ct.unsub(); ea.unsub();
+            hu.unsub();
+            at.unsub();
+            ct.unsub();
+            ea.unsub();
         });
     });
 });

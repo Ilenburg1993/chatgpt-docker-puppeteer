@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/observability/event-collector.js
+ *
  * @module copilot/observability/event-collector
  * @see EventBus
  */
@@ -10,6 +11,7 @@ import { logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
     attachAssistantHandlers,
     attachInteractionHandlers,
@@ -19,10 +21,10 @@ import {
     quotaState,
 } from './collectors/index.js';
 import { log } from './logger.js';
-import { fileURLToPath } from 'node:url';
 
 /**
  * Resolve LOGS_DIR sem depender de LOG_DIR (evita TDZ em import cíclico).
+ *
  * @see logger.js - mesma logica de resolucao.
  */
 const _ecProjectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -41,6 +43,7 @@ const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
 
 /**
  * Retorna o último quotaSnapshot recebido.
+ *
  * @returns {{ snapshots: Record<string, QuotaSnapshot>; ts: number }}
  */
 export function getLastQuotaSnapshots() {
@@ -57,6 +60,7 @@ const MAX_COMPACTION_ENTRIES = 50;
 
 /**
  * Registra um evento de compaction para a sessão.
+ *
  * @param {string} sessionId
  * @param {CompactionEntry} entry
  */
@@ -71,6 +75,7 @@ function _recordCompaction(sessionId, entry) {
 }
 /**
  * Retorna o histórico de compaction para uma sessão.
+ *
  * @param {string} sessionId
  * @returns {CompactionEntry[]}
  */
@@ -107,6 +112,7 @@ registerShutdownHandler(
 
 /**
  * Agenda flush assíncrono de eventos para disco.
+ *
  * @returns {void}
  */
 function scheduleFlush() {
@@ -135,6 +141,7 @@ function scheduleFlush() {
 }
 /**
  * Persiste um evento em events.jsonl (filtragem por max bytes é simplificada — sem rotação aqui).
+ *
  * @param {Record<string, unknown>} entry
  * @returns {void}
  */
@@ -144,8 +151,11 @@ function persistEvent(entry) {
 }
 /**
  * @typedef {import('./metrics.js').MetricsStore} TelemetryStore
+ *
  * @typedef {import('#copilot/hooks/bus').HookBus} HookBus
+ *
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
+ *
  * @typedef {import('./error-tracker.js').ErrorTracker} ErrorTracker
  */
 
@@ -163,6 +173,7 @@ function persistEvent(entry) {
 
 /**
  * @typedef {{ toolName: string; mcpServerName: string | null; startTs: number; toolArgs: Record<string, unknown> }} PendingToolEntry
+ *
  *
  * @typedef {{ turnId: string; startTs: number }} PendingTurnEntry
  */
@@ -246,9 +257,11 @@ const DEFAULT_PERSIST_TYPES = /** @type {ReadonlySet<string>} */ (
 
 /**
  * Cria um EventCollector configurado.
+ *
  * @example
  *     const collector = createEventCollector({ telemetry, hookBus: defaultBus });
  *     const unsubs = collector.attach(session, sessionId);
+ *
  * @param {EventCollectorOptions} [opts={}] Default is `{}`
  * @returns {EventCollector}
  */
@@ -277,6 +290,7 @@ export function createEventCollector(opts = {}) {
 
     /**
      * Registra handlers nos eventos da sessão SDK e retorna lista de unsubscribers.
+     *
      * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
      * @param {string} sessionId - ID da sessão.
      * @returns {(() => void)[]} Lista de funções de unsubscribe para cleanup.
@@ -320,6 +334,7 @@ let _defaultCollector = createEventCollector({ persist: true });
  * Inicializa o singleton defaultCollector com métricas, errorTracker e hookBus.
  *
  * Deve ser chamado uma vez no boot do agente, antes do primeiro `.attach()`.
+ *
  * @param {EventCollectorOptions} opts
  * @returns {void}
  */
@@ -328,6 +343,7 @@ export function initEventCollector(opts) {
 }
 /**
  * Collector singleton — usar após `initEventCollector()`.
+ *
  * @type {EventCollector}
  */
 export const defaultEventCollector = {
@@ -340,6 +356,7 @@ export { MAX_EVENTS_BYTES };
 /**
  * Registra um handler tipado em um evento da sessão SDK usando o wrapper `onSessionEvent` do sdk/events.js. Utilitário
  * para collectors que preferem eventos tipados com validação integrada.
+ *
  * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
  * @param {string} eventType - Tipo de evento (e.g., 'assistant.message').
  * @param {(event: any) => void} handler - Handler do evento.

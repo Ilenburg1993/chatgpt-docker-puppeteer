@@ -2,12 +2,11 @@
 /**
  * src/copilot/events/middleware/schema-validator.js
  *
- * FAIXA-L6 + L18 — Middleware que valida estrutura mínima de eventos
- * e, opcionalmente, schema do registry (FAIXA-L18).
+ * FAIXA-L6 + L18 — Middleware que valida estrutura mínima de eventos e, opcionalmente, schema do registry (FAIXA-L18).
  *
  * - Validação base: `type` (string) e `timestamp` (number) sao obrigatórios.
- * - Validação estendida (L18): se houver schema registrado, valida campos required e tipos.
- *   Em dev: log WARN. Em prod: log WARN (nao bloqueia).
+ * - Validação estendida (L18): se houver schema registrado, valida campos required e tipos. Em dev: log WARN. Em prod:
+ *   log WARN (nao bloqueia).
  *
  * @module copilot/events/middleware/schema-validator
  */

@@ -7,8 +7,8 @@ import { EMITTER_TO_BUS_TYPE } from '../../../../src/copilot/observability/obser
 /**
  * Testa o mapeamento EMITTER_TO_BUS_TYPE — pilar da migração FAIXA-L14.
  *
- * O teste do observer completo (attachToBus) falha por bug preexistente
- * de dependência circular em otel.js. Quando resolvido, expandir este arquivo.
+ * O teste do observer completo (attachToBus) falha por bug preexistente de dependência circular em otel.js. Quando
+ * resolvido, expandir este arquivo.
  */
 describe('event-name-map › EMITTER_TO_BUS_TYPE (FAIXA-L14)', () => {
     it('mapeia pelo menos 40 eventos do agente', () => {
@@ -18,10 +18,7 @@ describe('event-name-map › EMITTER_TO_BUS_TYPE (FAIXA-L14)', () => {
 
     it('todos os valores seguem namespace :-separated', () => {
         for (const [key, busType] of Object.entries(EMITTER_TO_BUS_TYPE)) {
-            assert.ok(
-                busType.includes(':'),
-                `event '${key}' maps to '${busType}' which has no ':' separator`,
-            );
+            assert.ok(busType.includes(':'), `event '${key}' maps to '${busType}' which has no ':' separator`);
         }
     });
 

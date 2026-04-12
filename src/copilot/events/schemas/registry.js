@@ -2,11 +2,9 @@
 /**
  * src/copilot/events/schemas/registry.js — FAIXA-L18
  *
- * Schema Registry para tipos de evento do EventBus.
- * Permite registrar schemas por tipo de evento e validar payloads.
+ * Schema Registry para tipos de evento do EventBus. Permite registrar schemas por tipo de evento e validar payloads.
  *
- * Em modo dev: strict validation (logs + pode bloquear).
- * Em modo prod: log warning, nao bloqueia.
+ * Em modo dev: strict validation (logs + pode bloquear). Em modo prod: log warning, nao bloqueia.
  *
  * @module copilot/events/schemas/registry
  */

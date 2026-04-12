@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/terminal/repl.js
+ *
  * @module copilot/terminal/repl
  * @see EventBus
  * @see module:copilot/always-alive
@@ -8,6 +9,7 @@
  */
 
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { alwaysAliveAgent } from '../agent/index.js';
@@ -87,6 +89,7 @@ const BANNER = `
 /**
  * Tabela de roteamento de comandos REPL. `println` é resolvida via closure sobre o módulo. Cada entry: `[nomes[],
  * handler(ctx, arg, rest, rl, injectServer, cleanup)]`
+ *
  * @type {[
  *     string[],
  *     (
@@ -181,6 +184,7 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
 }
 /**
  * F41.5: Dispatcher para subcomandos de `/session save|list|restore`.
+ *
  * @param {string} subCmd
  * @param {string[]} rest
  */
@@ -225,7 +229,7 @@ async function _cmdRestart() {
             clearTimeout(timeout);
             resolveReady();
         };
-        alwaysAliveAgent.once('dialog.ready', onReady);
+        alwaysAliveAgent.once(EMITTER_DIALOG_READY, onReady);
         await llmBridgeClient.stopDialogMode();
         if (!alwaysAliveAgent.dialogLoopActive) {
             await readyPromise;
@@ -303,6 +307,7 @@ export { setupAgentListeners } from './repl-listeners.js';
  *
  * Em modo headless (stdin não-TTY), apenas garante o dialog loop e retorna, deixando o inject server HTTP manter o
  * event loop ativo.
+ *
  * @param {import('node:http').Server} injectServer - Servidor HTTP de injeção (para fechar no /quit)
  * @returns {Promise<void>}
  */
@@ -318,6 +323,7 @@ export async function startRepl(injectServer) {
 
     /**
      * Readline completer para comandos REPL (F37.1).
+     *
      * @param {string} line
      * @returns {[string[], string]}
      */

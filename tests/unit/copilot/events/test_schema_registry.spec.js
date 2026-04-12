@@ -1,17 +1,17 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { beforeEach, describe, it } from 'node:test';
 
+import { BUILTIN_SCHEMAS } from '../../../../src/copilot/events/schemas/builtin-schemas.js';
 import {
+    clearSchemas,
+    getAllSchemas,
+    getEventSchema,
     registerEventSchema,
     registerEventSchemas,
-    validateEvent,
-    getEventSchema,
-    getAllSchemas,
-    clearSchemas,
     schemaCount,
+    validateEvent,
 } from '../../../../src/copilot/events/schemas/registry.js';
-import { BUILTIN_SCHEMAS } from '../../../../src/copilot/events/schemas/builtin-schemas.js';
 
 describe('Schema Registry (FAIXA-L18)', () => {
     beforeEach(() => {
@@ -95,7 +95,7 @@ describe('Schema Registry (FAIXA-L18)', () => {
     describe('BUILTIN_SCHEMAS', () => {
         it('tem schemas definidos para tipos-chave', () => {
             assert.ok(BUILTIN_SCHEMAS.length >= 20);
-            const types = BUILTIN_SCHEMAS.map(s => s.type);
+            const types = BUILTIN_SCHEMAS.map((s) => s.type);
             assert.ok(types.includes('agent:ready'));
             assert.ok(types.includes('agent:task:completed'));
             assert.ok(types.includes('agent:dialog:turn_end'));

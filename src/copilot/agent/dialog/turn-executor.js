@@ -1,11 +1,21 @@
 // @ts-check
 /**
  * src/copilot/agent/dialog/turn-executor.js
+ *
  * @module copilot/agent/dialog/turn-executor
  * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';
+import {
+    EMITTER_LOOP_READY,
+    EMITTER_LOOP_REPLY,
+    EMITTER_LOOP_STOPPED,
+    EMITTER_QUESTION_PENDING,
+    EMITTER_READY,
+    EMITTER_TURN_END,
+    EMITTER_TURN_START,
+} from '#copilot/events';
 import { defaultMetrics, log, startSpan } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
@@ -31,14 +41,12 @@ import { writeStateAsync } from '../lifecycle/state-io.js';
 export function emitTurnStart(emitter, message, counter) {
     const turnStart = Date.now();
     counter.sendCount++;
-    emitter.emit('turn_start', { message: message.slice(0, 120), ts: turnStart });
-    void writeStateAsync(
-        {
-            pendingTurnMessage: message,
-            pendingTurnTs: turnStart,
-            pendingTurnConsumedPR: false,
-        },
-    );
+    emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
+    void writeStateAsync({
+        pendingTurnMessage: message,
+        pendingTurnTs: turnStart,
+        pendingTurnConsumedPR: false,
+    });
     return { turnStart };
 }
 
@@ -78,7 +86,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
 
     const timeoutHandle = setTimeout(() => {
         if (pendingListenerRef.current) {
-            emitter.off('question.pending', pendingListenerRef.current);
+            emitter.off(EMITTER_QUESTION_PENDING, pendingListenerRef.current);
             pendingListenerRef.current = null;
         }
         reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
@@ -86,16 +94,16 @@ export function buildTurnResolutionListeners(emitter, opts) {
 
     handlers.reply = (/** @type {{ reply: string }} */ evt) => {
         clearTimeout(timeoutHandle);
-        emitter.off('stopped', handlers.stop);
+        emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
         const durationMs = Date.now() - turnStart;
-        emitter.emit('turn_end', { reply: evt.reply.slice(0, 120), durationMs });
+        emitter.emit(EMITTER_TURN_END, { reply: evt.reply.slice(0, 120), durationMs });
         defaultMetrics.recordDialogTurn(durationMs, true);
         resolve(evt.reply);
     };
 
     handlers.stop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
         clearTimeout(timeoutHandle);
-        emitter.off('reply', handlers.reply);
+        emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
         if (stopEvt?.authorized) {
             reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
         } else {
@@ -149,35 +157,35 @@ export function dispatchTurnToHost(emitter, opts) {
             clearTimeout(timeoutHandle);
             // F41B.3: remover os outer listeners registrados por buildTurnResolutionListeners
             // para evitar listener leak / double-fire quando novos listeners são registrados abaixo
-            emitter.off('reply', onReplyOuter);
-            emitter.off('stopped', onStopOuter);
+            emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
+            emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
             const newTimeout = setTimeout(() => {
-                emitter.off('reply', onReply);
-                emitter.off('stopped', onStop);
+                emitter.off(EMITTER_LOOP_REPLY, onReply);
+                emitter.off(EMITTER_LOOP_STOPPED, onStop);
                 reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
             }, timeout);
             const onReply = (/** @type {{ reply: string }} */ evt) => {
                 clearTimeout(newTimeout);
-                emitter.off('stopped', onStop);
+                emitter.off(EMITTER_LOOP_STOPPED, onStop);
                 resolve(evt.reply);
             };
             const onStop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt2) => {
                 clearTimeout(newTimeout);
-                emitter.off('reply', onReply);
+                emitter.off(EMITTER_LOOP_REPLY, onReply);
                 if (stopEvt2?.authorized) {
                     reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
                 } else {
                     waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
                 }
             };
-            emitter.once('reply', onReply);
-            emitter.once('stopped', onStop);
+            emitter.once(EMITTER_LOOP_REPLY, onReply);
+            emitter.once(EMITTER_LOOP_STOPPED, onStop);
             host.answerPendingQuestion(message);
         };
         pendingListenerRef.current = onPending;
-        emitter.once('question.pending', onPending);
+        emitter.once(EMITTER_QUESTION_PENDING, onPending);
         if (host.getPendingQuestion()) {
-            emitter.off('question.pending', onPending);
+            emitter.off(EMITTER_QUESTION_PENDING, onPending);
             pendingListenerRef.current = null;
             onPending(undefined);
         }
@@ -211,8 +219,8 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
             if (settled) return;
             settled = true;
             clearTimeout(retryTimeout);
-            emitter.off('ready', onRetryReady);
-            if (onRetryPending) emitter.off('question.pending', onRetryPending);
+            emitter.off(EMITTER_LOOP_READY, onRetryReady);
+            if (onRetryPending) emitter.off(EMITTER_QUESTION_PENDING, onRetryPending);
             reject(new DOMException('[DialogLoopManager] restart abortado.', 'AbortError'));
         };
         if (signal) signal.addEventListener('abort', onAbort, { once: true });
@@ -220,8 +228,8 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
         const retryTimeout = setTimeout(() => {
             if (settled) return;
             settled = true;
-            emitter.off('ready', onRetryReady);
-            if (onRetryPending) emitter.off('question.pending', onRetryPending);
+            emitter.off(EMITTER_LOOP_READY, onRetryReady);
+            if (onRetryPending) emitter.off(EMITTER_QUESTION_PENDING, onRetryPending);
             reject(
                 new SessionError(
                     `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
@@ -235,7 +243,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
             onRetryPending = () => {
                 host.answerPendingQuestion(message);
                 const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
-                    emitter.off('reply', onRetryReply);
+                    emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
                     reject(
                         new SessionError(
                             `[DialogLoopManager] stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
@@ -245,19 +253,19 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                 };
                 /** @type {(evt: { reply: string }) => void} */
                 const onRetryReply = (retryEvt) => {
-                    emitter.off('stopped', onRetryStopped);
+                    emitter.off(EMITTER_LOOP_STOPPED, onRetryStopped);
                     resolve(retryEvt.reply);
                 };
-                emitter.once('reply', onRetryReply);
-                emitter.once('stopped', onRetryStopped);
+                emitter.once(EMITTER_LOOP_REPLY, onRetryReply);
+                emitter.once(EMITTER_LOOP_STOPPED, onRetryStopped);
             };
             if (host.getPendingQuestion()) {
                 onRetryPending();
             } else {
-                emitter.once('question.pending', onRetryPending);
+                emitter.once(EMITTER_QUESTION_PENDING, onRetryPending);
             }
         };
-        emitter.once('ready', onRetryReady);
+        emitter.once(EMITTER_READY, onRetryReady);
     });
 }
 
@@ -317,16 +325,16 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
                         'abort',
                         () => {
                             clearTimeout(timeoutHandle);
-                            emitter.off('reply', onReplyOuter);
-                            emitter.off('stopped', onStopOuter);
+                            emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
+                            emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
                             reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
                         },
                         { once: true },
                     );
                 }
 
-                emitter.once('reply', onReplyOuter);
-                emitter.once('stopped', onStopOuter);
+                emitter.once(EMITTER_LOOP_REPLY, onReplyOuter);
+                emitter.once(EMITTER_LOOP_STOPPED, onStopOuter);
 
                 dispatchTurnToHost(emitter, {
                     host,

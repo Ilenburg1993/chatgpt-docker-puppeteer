@@ -49,8 +49,8 @@ import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observer
  * @typedef {object} AgentEventObserver
  * @property {(agent: import('node:events').EventEmitter) => void} attach Registra todos os listeners no EventEmitter do
  *   agente (legado).
- * @property {(bus: import('../core/event-bus.js').EventBus) => void} attachToBus Registra todos os listeners no EventBus
- *   centralizado (FAIXA-L14).
+ * @property {(bus: import('../core/event-bus.js').EventBus) => void} attachToBus Registra todos os listeners no
+ *   EventBus centralizado (FAIXA-L14).
  * @property {() => void} detach Remove todos os listeners previamente registrados e reseta estado.
  */
 
@@ -64,7 +64,7 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
     /** @type {{ emitter: import('node:events').EventEmitter; event: string; listener: (...args: any[]) => void }[]} */
     const _emitterRegistrations = [];
 
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     const _busUnsubscribers = [];
 
     /** @type {import('./error-alerting.js').ErrorAlerter | null} */
@@ -83,17 +83,24 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
     }
 
     /**
-     * Cria função _on para modo EventBus. O primeiro arg (emitter) é ignorado — o listener é registrado no bus usando
-     * a constante SSOT mapeada.
+     * Cria função _on para modo EventBus. O primeiro arg (emitter) é ignorado — o listener é registrado no bus usando a
+     * constante SSOT mapeada.
      *
      * @param {import('../core/event-bus.js').EventBus} bus
-     * @returns {(emitter: import('node:events').EventEmitter, event: string, listener: (...args: any[]) => void) => void}
+     * @returns {(
+     *     emitter: import('node:events').EventEmitter,
+     *     event: string,
+     *     listener: (...args: any[]) => void,
+     * ) => void}
      */
     function _createBusOn(bus) {
         return (_emitter, event, listener) => {
             const busType = EMITTER_TO_BUS_TYPE[event];
             if (!busType) {
-                log('WARN', `[agent-event-observer] no SSOT mapping for agent event '${event}' — skipping bus registration`);
+                log(
+                    'WARN',
+                    `[agent-event-observer] no SSOT mapping for agent event '${event}' — skipping bus registration`,
+                );
                 return;
             }
             const unsub = bus.on(busType, (/** @type {any} */ evt) => listener(evt));

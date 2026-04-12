@@ -6,16 +6,14 @@
  * Detecta event strings hardcoded (fora do SSOT) no codebase.
  *
  * Fluxo:
- *   1. Importa todas as constantes de `src/copilot/events/*.js`
- *   2. Percorre `src/copilot/` buscando `.emit(`, `bus.emit(`, `.on(` com string literal
- *   3. Reporta strings que NÃO estão no SSOT
  *
- * Uso:
- *   node scripts/audit-event-strings.mjs [--json] [--strict]
+ * 1. Importa todas as constantes de `src/copilot/events/*.js`
+ * 2. Percorre `src/copilot/` buscando `.emit(`, `bus.emit(`, `.on(` com string literal
+ * 3. Reporta strings que NÃO estão no SSOT
  *
- * Flags:
- *   --json    → saída JSON (para CI)
- *   --strict  → exit code 1 se encontrar violações
+ * Uso: node scripts/audit-event-strings.mjs [--json] [--strict]
+ *
+ * Flags: --json → saída JSON (para CI) --strict → exit code 1 se encontrar violações
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -86,10 +84,7 @@ async function walkJS(dir, results = []) {
 /**
  * Regex patterns para capturar event strings hardcoded em chamadas de emit/on.
  *
- * Captura padrões como:
- *   .emit('string', ...)
- *   .on('string', ...)
- *   bus.emit({ type: 'string' })
+ * Captura padrões como: .emit('string', ...) .on('string', ...) bus.emit({ type: 'string' })
  */
 const EMIT_ON_REGEX = /\.(?:emit|on|once|addListener)\(\s*['"]([^'"]+)['"]/g;
 const BUS_EMIT_TYPE_REGEX = /\.emit\(\s*\{\s*type:\s*['"]([^'"]+)['"]/g;
@@ -121,7 +116,26 @@ async function scanFile(filePath, ssot) {
                 // Skip wildcards e event names que são variáveis (não strings literais de event)
                 if (eventStr === '*' || eventStr === 'error' || eventStr === 'close' || eventStr === 'data') continue;
                 // Skip Node.js built-in events
-                if (['message', 'exit', 'disconnect', 'end', 'drain', 'finish', 'pipe', 'unpipe', 'readable', 'open', 'listening', 'connection', 'request', 'response', 'upgrade'].includes(eventStr)) continue;
+                if (
+                    [
+                        'message',
+                        'exit',
+                        'disconnect',
+                        'end',
+                        'drain',
+                        'finish',
+                        'pipe',
+                        'unpipe',
+                        'readable',
+                        'open',
+                        'listening',
+                        'connection',
+                        'request',
+                        'response',
+                        'upgrade',
+                    ].includes(eventStr)
+                )
+                    continue;
 
                 if (!ssot.has(eventStr)) {
                     violations.push({
@@ -159,12 +173,18 @@ async function main() {
     }
 
     if (jsonMode) {
-        console.log(JSON.stringify({
-            ssotCount: ssot.size,
-            filesScanned: files.length,
-            violations: allViolations,
-            violationCount: allViolations.length,
-        }, null, 2));
+        console.log(
+            JSON.stringify(
+                {
+                    ssotCount: ssot.size,
+                    filesScanned: files.length,
+                    violations: allViolations,
+                    violationCount: allViolations.length,
+                },
+                null,
+                2,
+            ),
+        );
     } else {
         if (allViolations.length === 0) {
             console.log('✅ Nenhuma string hardcoded de evento encontrada fora do SSOT.\n');
@@ -192,7 +212,7 @@ async function main() {
     }
 }
 
-main().catch(err => {
+main().catch((err) => {
     console.error('Erro fatal:', err);
     process.exit(2);
 });

@@ -8,11 +8,19 @@
  * always-alive.js em ~300L.
  *
  * @module copilot/agent/lifecycle/agent-lifecycle
- * @see EventBus
  * @internal
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';
+import {
+    EMITTER_BEFORE_STOP,
+    EMITTER_DIALOG_LOOP_CHANGED,
+    EMITTER_ERROR,
+    EMITTER_READY,
+    EMITTER_STATUS,
+    EMITTER_STOPPED,
+} from '#copilot/events';
 import {
     buildTelemetryConfig,
     defaultErrorTracker,
@@ -112,31 +120,38 @@ export async function agentStart(ctx, host) {
 
         if (ctx.agentObserver) ctx.agentObserver.detach();
         const eventBus = container.resolve(EVENT_BUS) ?? undefined;
-        const bootResult = performBootWiring(client, session, isResumed, host, {
-            emit: (event, payload) => host.emit(event, payload),
-            getStatusSnapshot: () => host.getStatusSnapshot(),
-            onCheckpointPath: (path) => {
-                ctx.lastCheckpointPath = path;
+        const bootResult = performBootWiring(
+            client,
+            session,
+            isResumed,
+            host,
+            {
+                emit: (event, payload) => host.emit(event, payload),
+                getStatusSnapshot: () => host.getStatusSnapshot(),
+                onCheckpointPath: (path) => {
+                    ctx.lastCheckpointPath = path;
+                },
+                onContextState: (state) => {
+                    ctx.contextState = state;
+                },
+                onPrInfo: (info) => {
+                    ctx.lastPrInfo = info;
+                },
+                isProcessing: () => ctx.status === 'processing',
+                dialogLoopActive: () => ctx.dialogLoop?.active ?? false,
+                getSessionId: () => host.sessionId,
+                getStatus: () => ctx.status,
+                dialogLoop: ctx.dialogLoop,
+                keepalive: ctx.keepalive,
+                handoff: ctx.handoff,
+                ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
+                resumeDialogLoop: () => host.resumeDialogLoop(),
+                startDialogLoop: () => host.startDialogLoop(),
+                getDialogPrMetrics: () => host.dialogPrMetrics,
+                mcpBridge: ctx.mcpBridge ?? null,
             },
-            onContextState: (state) => {
-                ctx.contextState = state;
-            },
-            onPrInfo: (info) => {
-                ctx.lastPrInfo = info;
-            },
-            isProcessing: () => ctx.status === 'processing',
-            dialogLoopActive: () => ctx.dialogLoop?.active ?? false,
-            getSessionId: () => host.sessionId,
-            getStatus: () => ctx.status,
-            dialogLoop: ctx.dialogLoop,
-            keepalive: ctx.keepalive,
-            handoff: ctx.handoff,
-            ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
-            resumeDialogLoop: () => host.resumeDialogLoop(),
-            startDialogLoop: () => host.startDialogLoop(),
-            getDialogPrMetrics: () => host.dialogPrMetrics,
-            mcpBridge: ctx.mcpBridge ?? null,
-        }, { eventBus });
+            { eventBus },
+        );
         ctx.sessionEventUnsubscribers = bootResult.unsubs;
         ctx.agentObserver = bootResult.agentObserver;
         ctx.metricsTimer = bootResult.metricsTimer;
@@ -158,11 +173,11 @@ export async function agentStart(ctx, host) {
             });
         }
 
-        host.emit('ready', { sessionId: session.sessionId, isResumed });
+        host.emit(EMITTER_READY, { sessionId: session.sessionId, isResumed });
     } catch (/** @type {any} */ e) {
         ctx.setStatus('stopped', host);
         log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
-        host.emit('error', e);
+        host.emit(EMITTER_ERROR, e);
         throw e;
     }
 }
@@ -181,7 +196,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
         log('INFO', '[AlwaysAlive] Parando agente...');
 
-        host.emit('before-stop');
+        host.emit(EMITTER_BEFORE_STOP);
         host.removeAllListeners('before-stop');
 
         if (ctx.status === 'starting') {
@@ -197,11 +212,11 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 new Promise((resolve) => {
                     const onIdle = () => {
                         if (ctx.status !== 'processing' && ctx.status !== 'waiting_for_input') {
-                            host.off('status', onIdle);
+                            host.off(EMITTER_STATUS, onIdle);
                             resolve(undefined);
                         }
                     };
-                    host.on('status', onIdle);
+                    host.on(EMITTER_STATUS, onIdle);
                 }),
                 new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
             ]);
@@ -213,7 +228,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
         if (ctx.dialogLoop.active) {
             ctx.dialogLoop.forceDeactivate();
-            host.emit('dialog.loop.changed', { active: false, ts: Date.now() });
+            host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: false, ts: Date.now() });
         }
 
         try {
@@ -296,7 +311,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             ctx.client = null;
         }
 
-        host.emit('stopped');
+        host.emit(EMITTER_STOPPED);
     }); // startSpan copilot.agent.stop
 }
 
