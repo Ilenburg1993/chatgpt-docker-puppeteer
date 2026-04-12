@@ -23,8 +23,7 @@ logFn.error = vi.fn();
 
 vi.mock('#copilot/observability/logger', () => ({
     log: logFn,
-    appLog: logFn,
-}));
+    appLog: logFn, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('@github/copilot-sdk', () => {
     const SYSTEM_PROMPT_SECTIONS = Object.freeze({

@@ -14,8 +14,7 @@ vi.mock('#copilot/audit/pipeline', () => ({
     globalAuditBuffer: { push: vi.fn() },
 }));
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 /**
  * Cria um context mock mínimo para os collectors.

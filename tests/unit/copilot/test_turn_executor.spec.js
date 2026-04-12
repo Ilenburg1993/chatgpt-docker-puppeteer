@@ -11,15 +11,27 @@ vi.mock('#copilot/core/errors', () => {
             this.name = 'SessionError';
         }
     }
-    return { SessionError };
+    class CopilotError extends Error {
+        /** @param {string} msg @param {string} code */
+        constructor(msg, code) {
+            super(msg);
+            this.code = code;
+            this.name = 'CopilotError';
+        }
+    }
+    return { SessionError, CopilotError };
 });
 
 vi.mock('#copilot/observability', () => ({
     defaultMetrics: { recordDialogTurn: vi.fn() },
+    log: vi.fn(),
+    startSpan: vi.fn((_name, _attrs, fn) => fn()),
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 vi.mock('#copilot/observability/otel', () => ({
@@ -28,6 +40,7 @@ vi.mock('#copilot/observability/otel', () => ({
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
+    writeStateAsync: vi.fn(),
 }));
 
 /* ── SUT ── */

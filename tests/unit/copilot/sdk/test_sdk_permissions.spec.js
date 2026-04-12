@@ -8,8 +8,20 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock logger
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+const { mockLog } = vi.hoisted(() => ({ mockLog: vi.fn() }));
+
+// Mock logger — observability barrel (para imports indiretos)
+vi.mock('#copilot/observability/logger', () => ({
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
+
+// sdk/permissions.js importa log de ./logger.js (DI local)
+vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
+    log: mockLog,
+    setSdkLogger: vi.fn(),
+}));
 
 // Mock approveAll + SYSTEM_PROMPT_SECTIONS (necessário para barrel import)
 vi.mock('@github/copilot-sdk', () => ({
@@ -188,8 +200,7 @@ describe('sdk/permissions.js', () => {
             const barrel = await import('../../../../src/copilot/sdk/index.js');
             expect(typeof barrel.approveAll).toBe('function');
             expect(typeof barrel.createAllowlistPermissionHandler).toBe('function');
-            // createPermissionHandler já exportada via #copilot/hooks/permission no barrel
-            expect(typeof barrel.createPermissionHandler).toBe('function');
+            // createPermissionHandler movido para #copilot/hooks/permission — não no barrel sdk
         });
     });
 });

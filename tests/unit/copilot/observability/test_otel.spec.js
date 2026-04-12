@@ -33,6 +33,10 @@ vi.mock('#copilot/config/env', () => ({
     get COPILOT_OTEL_CAPTURE_CONTENT() {
         return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
     },
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 describe('otel.js', () => {

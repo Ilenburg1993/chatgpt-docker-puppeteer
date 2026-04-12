@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockLog = vi.fn();
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: vi.fn(),
@@ -36,8 +36,7 @@ vi.mock('node:child_process', () => ({
 
 // createTool: passthrough para obter handler
 vi.mock('#copilot/sdk', () => ({
-    createTool: vi.fn((config) => config),
-}));
+    createTool: vi.fn((config) => config), SYSTEM_PROMPT_SECTIONS: {},}));
 
 // withSkipPermission: passthrough
 vi.mock('#copilot/tools/tool-factory', () => ({

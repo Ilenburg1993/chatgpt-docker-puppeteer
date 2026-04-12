@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
 
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 // ─── Mock timer-registry (usado por error-alerting) ─────────────────────────
 

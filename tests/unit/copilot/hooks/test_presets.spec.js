@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 // Mock dependencies before imports
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 vi.mock('#copilot/audit/pipeline', () => ({
@@ -22,6 +24,7 @@ vi.mock('#copilot/audit/pipeline', () => ({
 
 vi.mock('#copilot/tools/introspection-tools', () => ({
     isToolDisabled: vi.fn(() => false),
+    introspectionTools: [],
 }));
 
 vi.mock('../../../src/copilot/hooks/permission-handler.js', () => ({
@@ -46,7 +49,7 @@ import { createSafePreset } from '../../../../src/copilot/hooks/presets/safe.js'
 /** @param {string} toolName */
 const makeInput = (toolName) => /** @type {any} */ ({ toolName, toolArgs: {} });
 
-/** @param {string} [sid='sess-1'] Default is `'sess-1'` */
+/** @param {string} [sid='sess-1'] . Default is `'sess-1'` */
 const makeInvocation = (sid = 'sess-1') => /** @type {any} */ ({ sessionId: sid });
 
 const makePromptInput = (prompt = 'hello') => /** @type {any} */ ({ prompt });

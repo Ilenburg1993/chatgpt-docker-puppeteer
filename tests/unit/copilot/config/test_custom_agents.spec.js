@@ -17,6 +17,12 @@ vi.mock(
         ),
 );
 
+vi.mock('#copilot/config/mcp-servers', () => ({
+    MCP_SERVERS: {},
+    buildMcpConfig: vi.fn(() => ({})),
+    listAvailableMcpServers: vi.fn(() => []),
+}));
+
 const mod = await import('#copilot/config/custom-agents');
 
 // ═══════════════════════════════════════════════════════════════════════════════

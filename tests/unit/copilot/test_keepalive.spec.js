@@ -3,8 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('../../../src/copilot/agent/config.js', () => ({
     KEEPALIVE_INTERVAL_MS: 100,

@@ -22,7 +22,7 @@ const { mockLog, mockBuildTool, mockLogSwallowed } = vi.hoisted(() => ({
     mockLogSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 vi.mock('#copilot/tools/tool-factory', () => ({ buildTool: mockBuildTool }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 vi.mock('#copilot/core/safe-json', () => ({
@@ -67,6 +67,7 @@ const {
     getCustomToolDefinitions,
     buildCustomTools,
     loadCustomToolsAsync,
+    setCustomToolsBuilder,
     _resetRegistry,
 } = await import('#copilot/sdk/custom-tools');
 
@@ -77,6 +78,7 @@ const { readFile } = await import('node:fs/promises');
 beforeEach(() => {
     vi.clearAllMocks();
     _resetRegistry();
+    setCustomToolsBuilder(mockBuildTool);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

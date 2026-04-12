@@ -89,11 +89,14 @@ vi.mock('#copilot/config/session-config', () => ({
 vi.mock('#copilot/config/env', () => ({
     COPILOT_CLI_URL: undefined,
     OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 import {
     buildConfig,

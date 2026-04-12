@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. session-middleware.js

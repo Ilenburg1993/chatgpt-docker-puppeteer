@@ -19,7 +19,7 @@ const { mockLog, mockLogSwallowed } = vi.hoisted(() => ({
     mockLogSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 
 // ─── Imports ─────────────────────────────────────────────────────────────────

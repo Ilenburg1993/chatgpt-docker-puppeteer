@@ -46,7 +46,20 @@ const {
     mockGetCompactionHistory: vi.fn(() => []),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
+
+vi.mock('#copilot/agent', () => ({
+    alwaysAliveAgent: { on: vi.fn(), emit: vi.fn(), ctx: {} },
+    createSnapshot: vi.fn(),
+    listSnapshotsAsync: vi.fn(async () => []),
+    loadSnapshotAsync: vi.fn(),
+    saveSnapshotAsync: vi.fn(),
+    setBackgroundCompactionThreshold: vi.fn(),
+}));
 
 vi.mock('#copilot/observability/event-collector', () => ({
     getCompactionHistory: mockGetCompactionHistory,
@@ -56,6 +69,17 @@ vi.mock('#copilot/config/env', () => ({
     BRIDGE_ADMIN_TOKEN: undefined,
     SSE_REPLAY_BUFFER_SIZE: 100,
     SSE_MAX_CONCURRENT: 10,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
+    AGENT_MAX_LISTENERS: 100,
+}));
+
+vi.mock('#copilot/config/mcp-servers', () => ({
+    MCP_SERVERS: {},
+    buildMcpConfig: vi.fn(() => ({})),
+    listAvailableMcpServers: vi.fn(() => []),
 }));
 
 vi.mock('#copilot/sdk', () => ({
@@ -64,6 +88,7 @@ vi.mock('#copilot/sdk', () => ({
     disconnectClientSession: mockDisconnectSdkSession,
     getClient: mockGetClient,
     getClientSession: mockGetSdkSession,
+    getClientState: vi.fn(),
     listActiveClientSessions: mockListActiveSessions,
     pickDefined: vi.fn((obj) => {
         /** @type {Record<string, unknown>} */
@@ -75,6 +100,17 @@ vi.mock('#copilot/sdk', () => ({
     }),
     resumeClientSession: mockResumeSdkSession,
     incrementSessionMessageCount: mockIncrementMessageCount,
+    stopClient: vi.fn(),
+    SYSTEM_PROMPT_SECTIONS: {},
+    createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
+    createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
+    defineTool: vi.fn(() => ({ name: 'mock-defined', execute: vi.fn() })),
+    loadToolsConfigAsync: vi.fn(async () => ({})),
+    loadToolsConfig: vi.fn(() => ({})),
+    getToolsConfig: vi.fn(() => ({})),
+    patchToolsConfig: vi.fn(),
+    setCustomToolsBuilder: vi.fn(),
+    createRegistry: vi.fn(() => new Map()),
 }));
 
 // ─── Import routers após mocks ──────────────────────────────────────────────

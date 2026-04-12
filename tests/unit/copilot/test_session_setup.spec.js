@@ -2,8 +2,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock de dependências externas
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
-vi.mock('#copilot/sdk/index', () => ({ createRegistry: vi.fn(() => new Map()) }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
+vi.mock('#copilot/sdk/index', () => ({
+    createRegistry: vi.fn(() => new Map()),
+    SYSTEM_PROMPT_SECTIONS: {},
+    createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
+    createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
+    defineTool: vi.fn(() => ({ name: 'mock-defined', execute: vi.fn() })),
+}));
 vi.mock('../../../src/copilot/bridges/mcp-tool-bridge.js', () => ({ buildMcpTools: vi.fn(async () => []) }));
 vi.mock('../../../src/copilot/config/mcp-servers.js', () => ({ buildMcpConfig: vi.fn(() => ({})) }));
 vi.mock('#copilot/hooks/bus', () => ({ attachBus: vi.fn((h) => h) }));

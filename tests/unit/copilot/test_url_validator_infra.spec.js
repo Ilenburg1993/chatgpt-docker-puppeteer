@@ -18,6 +18,10 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_SHUTDOWN_TIMEOUT_MS: 5000,
     LLM_RETRY_MAX: 3,
     LLM_RETRY_BASE_MS: 1000,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('node:dns/promises', () => ({

@@ -16,6 +16,14 @@ const { mockLog } = vi.hoisted(() => ({
 // ─── Mock: logger ──────────────────────────────────────────────────────────
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
+
+// sdk-session-wrapper.js importa log de ./logger.js (DI local), não de #copilot/observability
+vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
+    log: mockLog,
+    setSdkLogger: vi.fn(),
 }));
 
 // ─── Mock: SDK (necessário pelo barrel) ────────────────────────────────────

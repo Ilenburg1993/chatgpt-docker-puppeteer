@@ -24,9 +24,17 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: 'test-server',
     COPILOT_MODEL: 'gpt-4.1-test',
     COPILOT_SDK_ENABLED: true,
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('#copilot/observability', () => ({
+    log: vi.fn(),
+    getToolStats: vi.fn(() => ({
+        web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
+        git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
+        shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
+    })),
     defaultMetrics: {
         getSummary: vi.fn(() => ({
             tools: {
@@ -42,6 +50,8 @@ vi.mock('#copilot/observability', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 vi.mock('#copilot/observability/tool-stats', () => ({
@@ -65,6 +75,7 @@ vi.mock('#copilot/sdk', () => ({
         handler: config.handler,
         parameters: config.parameters,
     })),
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({

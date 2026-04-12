@@ -52,11 +52,8 @@ function findSdkBypasses(content) {
 // ─── F166: Auditoria completa de bypasses ─────────────────────────────────
 
 describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
-    // Mapeamento dos bypasses INTENCIONAIS conhecidos
-    const KNOWN_INTENTIONAL_BYPASSES = new Map([
-        ['src/copilot/agent/session/boot-wiring.js', ['#copilot/sdk/quota-monitor']],
-        ['src/copilot/config/index.js', ['#copilot/sdk/tools-state']],
-    ]);
+    // Zero bypasses intencionais restam (boot-wiring e config/index já migrados para barrel)
+    const KNOWN_INTENTIONAL_BYPASSES = new Map([]);
 
     /**
      * Varre todos os .js em src/copilot/ (exceto o próprio sdk/) e coleta bypasses.
@@ -64,10 +61,16 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
      * @returns {{ file: string; bypasses: string[] }[]}
      */
     function collectAllBypasses() {
-        const output = execSync(
-            `grep -rn "from '#copilot/sdk/[^']*'" ${join(ROOT, 'src/copilot')} --include="*.js" | grep -v "src/copilot/sdk/"`,
-            { encoding: 'utf-8', cwd: ROOT },
-        ).trim();
+        let output;
+        try {
+            output = execSync(
+                `grep -rn "from '#copilot/sdk/[^']*'" ${join(ROOT, 'src/copilot')} --include="*.js" | grep -v "src/copilot/sdk/"`,
+                { encoding: 'utf-8', cwd: ROOT },
+            ).trim();
+        } catch {
+            // grep exit code 1 = no matches
+            return [];
+        }
 
         if (!output) return [];
 
@@ -105,9 +108,9 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
         expect(unexpected).toHaveLength(0);
     });
 
-    it('boot-wiring.js mantém bypass intencional de quota-monitor', () => {
+    it('boot-wiring.js importa createQuotaMonitor do barrel (não bypass)', () => {
         const src = read('src/copilot/agent/session/boot-wiring.js');
-        expect(src).toContain("from '#copilot/sdk/quota-monitor'");
+        expect(src).toContain("from '#copilot/sdk'");
     });
 
     // F54: re-export de tools-state removido de config/index.js (zero consumers)

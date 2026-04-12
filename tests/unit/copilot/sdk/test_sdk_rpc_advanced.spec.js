@@ -13,7 +13,7 @@ const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('@github/copilot-sdk', () => ({
     CopilotClient: vi.fn(),

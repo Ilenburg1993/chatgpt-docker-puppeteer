@@ -55,64 +55,49 @@ describe('F139 — api/express não importa #copilot/sdk/client diretamente', ()
     }
 });
 
-// ─── F140: session-crud.js usa barrel ──────────────────────────────────────
+// ─── F140: session-crud.js usa #copilot/services ─────────────────────────────
 
-describe('F140 — session-crud.js usa barrel para funções de client', () => {
-    it('importa createClientSession do barrel', () => {
+describe('F140 — session-crud.js usa #copilot/services para funções de client', () => {
+    it('importa createSessionService do barrel services', () => {
         const content = src('src/copilot/api/express/session-crud.js');
-        expect(content).toContain('createClientSession');
-        expect(content).toContain("from '#copilot/sdk'");
+        expect(content).toContain('createSessionService');
+        expect(content).toContain("from '#copilot/services'");
     });
 
-    it('importa listActiveClientSessions do barrel', () => {
+    it('importa approveAll do barrel services', () => {
         const content = src('src/copilot/api/express/session-crud.js');
-        expect(content).toContain('listActiveClientSessions');
-        expect(content).toContain("from '#copilot/sdk'");
-    });
-
-    it('importa getClient do barrel', () => {
-        const content = src('src/copilot/api/express/session-crud.js');
-        expect(content).toContain('getClient');
-        expect(content).toContain("from '#copilot/sdk'");
+        expect(content).toContain('approveAll');
+        expect(content).toContain("from '#copilot/services'");
     });
 });
 
-// ─── F141: session-messaging.js usa barrel ─────────────────────────────────
+// ─── F141: session-messaging.js usa #copilot/services ────────────────────────
 
-describe('F141 — session-messaging.js usa barrel para funções de client', () => {
-    it('importa getClientSession do barrel', () => {
+describe('F141 — session-messaging.js usa #copilot/services para funções de client', () => {
+    it('importa createSessionService do barrel services', () => {
         const content = src('src/copilot/api/express/session-messaging.js');
-        expect(content).toContain('getClientSession');
-        expect(content).toContain("from '#copilot/sdk'");
-    });
-
-    it('importa incrementSessionMessageCount do barrel', () => {
-        const content = src('src/copilot/api/express/session-messaging.js');
-        expect(content).toContain('incrementSessionMessageCount');
-        expect(content).toContain("from '#copilot/sdk'");
+        expect(content).toContain('createSessionService');
+        expect(content).toContain("from '#copilot/services'");
     });
 });
 
-// ─── F142: agent.js usa barrel ─────────────────────────────────────────────
+// ─── F142/F143: agent.js e client.js usam DI ──────────────────────────────
 
-describe('F142 — agent.js usa barrel para getClient', () => {
-    it('importa getClient de #copilot/sdk (não de submodule)', () => {
+describe('F142 — agent.js recebe getClient via DI (não import)', () => {
+    it('não importa getClient diretamente — recebe via deps', () => {
         const content = src('src/copilot/api/express/agent.js');
-        expect(content).toContain("import { getClient } from '#copilot/sdk'");
-        expect(content).not.toContain("from '#copilot/sdk/client'");
+        expect(content).toContain('getClient');
+        expect(content).not.toContain('import { getClient }');
     });
 });
 
-// ─── F143: client.js usa barrel ────────────────────────────────────────────
-
-describe('F143 — client.js usa barrel para getClient/getClientState/stopClient', () => {
-    it('importa getClient, getClientState, stopClient de #copilot/sdk', () => {
+describe('F143 — client.js recebe getClient/getClientState/stopClient via DI', () => {
+    it('não importa de #copilot/sdk — recebe via deps', () => {
         const content = src('src/copilot/api/express/client.js');
         expect(content).toContain('getClient');
         expect(content).toContain('getClientState');
         expect(content).toContain('stopClient');
-        expect(content).toContain("from '#copilot/sdk'");
-        expect(content).not.toContain("from '#copilot/sdk/client'");
+        expect(content).not.toContain('import { getClient }');
     });
 });
 

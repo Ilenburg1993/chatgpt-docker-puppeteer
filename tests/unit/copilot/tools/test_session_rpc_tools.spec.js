@@ -26,6 +26,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/config/env', () => ({
     COPILOT_RPC_TIMEOUT_MS: 5000,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('#copilot/core/errors', () => ({
@@ -46,6 +50,8 @@ vi.mock('#copilot/core/errors', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 vi.mock('#copilot/sdk', () => ({
@@ -59,6 +65,7 @@ vi.mock('#copilot/sdk', () => ({
         description: config.description,
         handler: config.handler,
     })),
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({

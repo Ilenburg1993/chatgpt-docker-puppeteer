@@ -9,11 +9,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('#copilot/config/env', () => ({
     COPILOT_CLI_URL: '',
     OTEL_EXPORTER_OTLP_ENDPOINT: '',
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('../../../src/copilot/core/error-handlers.js', () => ({

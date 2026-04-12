@@ -44,12 +44,16 @@ vi.mock('#copilot/config/env', () => ({
     MAX_WEBHOOKS: 10,
     WEBHOOK_MAX_RETRIES: 3,
     WEBHOOK_TIMEOUT_MS: 5000,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 vi.mock('#copilot/core/errors', async () => {
     const actual = await vi.importActual('#copilot/core/errors');
     return actual;
 });
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 // Mock waitForEvent — resolve imediatamente por padrão
 const mockWaitForEvent = vi.fn(() => Promise.resolve({}));
@@ -59,6 +63,7 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
     readState: vi.fn(() => null),
     writeStateAsync: vi.fn(async () => {}),
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 vi.mock('../../../src/copilot/agent/dialog/turn-executor.js', () => ({

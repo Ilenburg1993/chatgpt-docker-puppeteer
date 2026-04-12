@@ -44,11 +44,14 @@ vi.mock('#copilot/config/env', () => ({
     MAX_WEBHOOKS: 10,
     WEBHOOK_MAX_RETRIES: 3,
     WEBHOOK_TIMEOUT_MS: 5000,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 /** Span mock */
 const mockSpan = {
@@ -67,6 +70,7 @@ vi.mock('#copilot/observability/otel', () => ({
 
 vi.mock('#copilot/sdk/event-helpers', () => ({
     waitForEvent: vi.fn(),
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 vi.mock('#copilot/sdk/session', () => ({

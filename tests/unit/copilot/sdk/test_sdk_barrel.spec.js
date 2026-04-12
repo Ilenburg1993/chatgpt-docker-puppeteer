@@ -43,6 +43,8 @@ vi.mock('#copilot/core/errors', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -150,13 +152,10 @@ describe('F86 - Barrel complete export coverage', () => {
         barrel = barrel ?? (await import('#copilot/sdk/index.js'));
         const names = [
             'DEFAULT_DIAGNOSTIC_MODEL',
-            'DEFAULT_EXCLUDED_TOOLS',
+            // DEFAULT_EXCLUDED_TOOLS removido — importar de '#copilot/config/session-config'
             'DEFAULT_INFINITE_SESSION',
             'DEFAULT_MODEL',
-            'buildAlwaysAliveConfig',
-            'buildDiagnosticConfig',
-            'buildFullAccessConfig',
-            'buildReadOnlyConfig',
+            // build*Config removidos — importar de '#copilot/hooks/presets/profiles'
             'buildSessionConfig',
             'getProjectDefaults',
             'mergeExcludedTools',
@@ -452,29 +451,5 @@ describe('F89 - Utility and helper exports', () => {
         expect(typeof barrel.pickDefined).toBe('function');
     });
 
-    it('exports hooks/factory.js', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
-        const names = [
-            'composePreToolUseHandlers',
-            'createAuditHooks',
-            'createDenyAllHooks',
-            'createErrorNotifierHook',
-            'createHooks',
-            'createMinimalHooks',
-            'createSafeHooks',
-        ];
-        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
-    });
-
-    it('exports hooks/permission.js', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
-        const names = [
-            'createApproveAllPermission',
-            'createAuditOnlyPermission',
-            'createPermissionHandler',
-            'createRestrictedPermission',
-            'createSafePermission',
-        ];
-        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
-    });
+    // hooks/factory.js e hooks/permission.js movidos para #copilot/hooks — não re-exportados pelo barrel sdk
 });

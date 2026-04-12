@@ -36,7 +36,11 @@ const mocks = vi.hoisted(() => ({
     fsReaddir: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mocks.log }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mocks.log,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
 vi.mock(
     '#copilot/config/env',
@@ -49,12 +53,19 @@ vi.mock(
                 WEBHOOK_MAX_RETRIES: 2,
                 WEBHOOK_TIMEOUT_MS: 5000,
                 AGENT_HOOK_CONTEXT_MAX_BYTES: 8192,
+                COPILOT_MCP_SERVERS: '',
+                COPILOT_CUSTOM_AGENTS: '',
+                COPILOT_DISABLED_AGENTS: '',
+                AGENT_MAX_LISTENERS: 100,
             },
-            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? 0 : undefined), has: () => true },
+            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? '' : undefined), has: () => true },
         ),
 );
 vi.mock('#copilot/observability/metrics', () => ({ defaultMetrics: mocks.defaultMetrics }));
-vi.mock('#copilot/tools/todo/store', () => ({ readStore: mocks.readTodoStore }));
+vi.mock('#copilot/tools/todo/store', async (importOriginal) => ({
+    ...(await importOriginal()),
+    readStore: mocks.readTodoStore,
+}));
 
 vi.mock('node:fs/promises', () => ({
     access: mocks.fsAccess,
@@ -67,6 +78,15 @@ vi.mock('node:fs/promises', () => ({
 vi.mock('#copilot/agent/infra/url-validator', () => ({
     validateWebhookUrl: mocks.validateWebhookUrl,
     checkResolvedIp: mocks.checkResolvedIp,
+}));
+
+// webhook-manager.js importa de #copilot/core (barrel) — mockar o sub-módulo real
+vi.mock('#copilot/core/security/url-validator', () => ({
+    validateWebhookUrl: mocks.validateWebhookUrl,
+    checkResolvedIp: mocks.checkResolvedIp,
+    validateUrl: vi.fn(),
+    validateUrlString: vi.fn(),
+    isPrivateIp: vi.fn(() => false),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════

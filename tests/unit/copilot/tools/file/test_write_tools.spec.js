@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockLog = vi.fn();
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog }));
+vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 /** @type {Record<string, import('vitest').Mock>} */
 const fsMock = {

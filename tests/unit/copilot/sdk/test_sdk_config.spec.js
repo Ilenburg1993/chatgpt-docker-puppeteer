@@ -25,22 +25,11 @@ vi.mock('@github/copilot-sdk', () => ({
     defineTool: vi.fn(),
 }));
 
-// Mock dos builders de perfil (dependem de módulos internos pesados)
-vi.mock('#copilot/config/session-config', () => ({
-    buildAlwaysAliveConfig: vi.fn((opts) => ({ _profile: 'always-alive', ...opts })),
-    buildReadOnlyConfig: vi.fn((opts) => ({ _profile: 'read-only', ...opts })),
-    buildFullAccessConfig: vi.fn((opts) => ({ _profile: 'full-access', ...opts })),
-    buildDiagnosticConfig: vi.fn((opts) => ({ _profile: 'diagnostic', ...opts })),
-}));
+// builders de perfil movidos para hooks/presets/profiles.js — mock não necessário aqui
 
 import {
-    buildAlwaysAliveConfig,
-    buildDiagnosticConfig,
-    buildFullAccessConfig,
-    buildReadOnlyConfig,
     buildSessionConfig,
     DEFAULT_DIAGNOSTIC_MODEL,
-    DEFAULT_EXCLUDED_TOOLS,
     DEFAULT_INFINITE_SESSION,
     DEFAULT_MODEL,
     getProjectDefaults,
@@ -59,14 +48,7 @@ describe('Config constants', () => {
         expect(DEFAULT_DIAGNOSTIC_MODEL).toBe('gpt-4.1-mini');
     });
 
-    it('DEFAULT_EXCLUDED_TOOLS contém 4 itens frozen', () => {
-        expect(DEFAULT_EXCLUDED_TOOLS).toHaveLength(4);
-        expect(DEFAULT_EXCLUDED_TOOLS).toContain('powershell');
-        expect(DEFAULT_EXCLUDED_TOOLS).toContain('web_fetch');
-        expect(DEFAULT_EXCLUDED_TOOLS).toContain('web_search');
-        expect(DEFAULT_EXCLUDED_TOOLS).toContain('memory');
-        expect(Object.isFrozen(DEFAULT_EXCLUDED_TOOLS)).toBe(true);
-    });
+    // DEFAULT_EXCLUDED_TOOLS removido de sdk/config.js — importar de '#copilot/config/session-config'
 
     it('DEFAULT_INFINITE_SESSION tem enabled e threshold', () => {
         expect(DEFAULT_INFINITE_SESSION.enabled).toBe(true);
@@ -197,44 +179,20 @@ describe('mergeExcludedTools()', () => {
     });
 });
 
-// ─── Re-exports dos builders de perfil ────────────────────────────────────────
-
-describe('Profile builder re-exports', () => {
-    it('buildAlwaysAliveConfig é função re-exportada', () => {
-        expect(typeof buildAlwaysAliveConfig).toBe('function');
-        const result = buildAlwaysAliveConfig({ model: 'test' });
-        expect(result._profile).toBe('always-alive');
-    });
-
-    it('buildReadOnlyConfig é função re-exportada', () => {
-        expect(typeof buildReadOnlyConfig).toBe('function');
-    });
-
-    it('buildFullAccessConfig é função re-exportada', () => {
-        expect(typeof buildFullAccessConfig).toBe('function');
-    });
-
-    it('buildDiagnosticConfig é função re-exportada', () => {
-        expect(typeof buildDiagnosticConfig).toBe('function');
-    });
-});
+// Profile builders movidos para src/copilot/hooks/presets/profiles.js — testes lá.
 
 // ─── Barrel re-export ─────────────────────────────────────────────────────────
 
 describe('sdk/index.js barrel re-exports config', () => {
-    it('re-exporta todas as funções e constantes', async () => {
+    it('re-exporta funções e constantes que permanecem no barrel', async () => {
         const barrel = await import('../../../../src/copilot/sdk/index.js');
         expect(barrel.DEFAULT_MODEL).toBe('gpt-4.1');
         expect(barrel.DEFAULT_DIAGNOSTIC_MODEL).toBe('gpt-4.1-mini');
-        expect(barrel.DEFAULT_EXCLUDED_TOOLS).toBeDefined();
         expect(barrel.DEFAULT_INFINITE_SESSION).toBeDefined();
         expect(typeof barrel.getProjectDefaults).toBe('function');
         expect(typeof barrel.buildSessionConfig).toBe('function');
         expect(typeof barrel.mergeTools).toBe('function');
         expect(typeof barrel.mergeExcludedTools).toBe('function');
-        expect(typeof barrel.buildAlwaysAliveConfig).toBe('function');
-        expect(typeof barrel.buildReadOnlyConfig).toBe('function');
-        expect(typeof barrel.buildFullAccessConfig).toBe('function');
-        expect(typeof barrel.buildDiagnosticConfig).toBe('function');
+        // DEFAULT_EXCLUDED_TOOLS e build*Config movidos — não re-exportados no barrel
     });
 });

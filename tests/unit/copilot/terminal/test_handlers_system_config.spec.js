@@ -31,6 +31,10 @@ vi.mock('#copilot/config/env', async (importOriginal) => {
 });
 vi.mock('#copilot/conversation-hub/hub', () => ({
     conversationHub: { isReady: false },
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 vi.mock('#copilot/conversation-hub/store', () => ({
     conversationStore: { countHubSessions: () => 0 },
@@ -52,6 +56,7 @@ vi.mock('#copilot/sdk/tools-state', () => ({
     patchToolsConfig: async (/** @type {Record<string, unknown>} */ patch) => {
         Object.assign(_toolsState.current, patch);
     },
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 const {

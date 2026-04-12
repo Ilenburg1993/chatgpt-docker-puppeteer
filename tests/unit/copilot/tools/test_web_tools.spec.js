@@ -30,12 +30,15 @@ vi.mock('../../../../src/copilot/sdk/url-validator.js', () => ({
 // Mock config/env
 vi.mock('#copilot/config/env', () => ({
     WEB_SEARCH_DISABLED: false,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 // Mock logger
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 // Mock error-handlers
 vi.mock('#copilot/core/error-handlers', () => ({

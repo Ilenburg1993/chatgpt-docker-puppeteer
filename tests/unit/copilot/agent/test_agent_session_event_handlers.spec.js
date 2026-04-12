@@ -37,7 +37,11 @@ const mocks = vi.hoisted(() => ({
     }),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mocks.log }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mocks.log,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
 // Mock env com Proxy que retorna defaults para qualquer export não explicitamente definido
 vi.mock(
@@ -61,9 +65,13 @@ vi.mock(
                 COPILOT_REASONING_EFFORT: '',
                 COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
                 DASHBOARD_SOCKET_AUTH_REQUIRED: false,
+                COPILOT_MCP_SERVERS: '',
+                COPILOT_CUSTOM_AGENTS: '',
+                COPILOT_DISABLED_AGENTS: '',
+                AGENT_MAX_LISTENERS: 100,
             },
             {
-                get: (target, prop) => (prop in target ? target[prop] : typeof prop === 'string' ? 0 : undefined),
+                get: (target, prop) => (prop in target ? target[prop] : typeof prop === 'string' ? '' : undefined),
                 has: () => true,
             },
         ),

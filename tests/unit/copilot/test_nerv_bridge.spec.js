@@ -16,10 +16,17 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before, afterEach } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
-import { copilotNervBridge, emitNerv, isMounted, mount, registerNervBridgeAgent, unmount } from '../../../src/copilot/bridges/nerv-bridge.js';
+import {
+    copilotNervBridge,
+    emitNerv,
+    isMounted,
+    mount,
+    registerNervBridgeAgent,
+    unmount,
+} from '../../../src/copilot/bridges/nerv-bridge.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

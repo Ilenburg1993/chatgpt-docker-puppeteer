@@ -14,6 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('#copilot/config/env', () => ({
     COPILOT_LOG_DIR: '/tmp/test-metrics',
     COPILOT_METRICS_SNAPSHOT_INTERVAL: 0, // desabilita snapshot automático
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('node:fs/promises', () => ({

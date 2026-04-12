@@ -30,6 +30,7 @@ vi.mock('#copilot/core/errors', () => ({
 
 vi.mock('#copilot/sdk/models/registry', () => ({
     modelStatsTracker: { record: vi.fn() },
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 vi.mock('../../../../src/copilot/observability/logger.js', () => ({

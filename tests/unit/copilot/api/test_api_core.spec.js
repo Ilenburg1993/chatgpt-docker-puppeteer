@@ -12,6 +12,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/config/env', () => ({
     SSE_REPLAY_BUFFER_SIZE: 100,
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 import { SseReplayBuffer } from '../../../../src/copilot/api/sse/replay-buffer.js';
@@ -77,7 +81,7 @@ describe('api/sse/SseReplayBuffer', () => {
 
 // ─── Middleware (withErrorHandler) ──────────────────────────────────────────
 
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn() }));
+vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 import { withErrorHandler } from '../../../../src/copilot/api/express/middleware.js';
 

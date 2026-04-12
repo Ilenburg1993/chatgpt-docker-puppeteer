@@ -25,6 +25,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
 }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
@@ -62,6 +64,7 @@ vi.mock('#copilot/sdk', () => ({
         handler: config.handler,
         parameters: config.parameters,
     })),
+    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

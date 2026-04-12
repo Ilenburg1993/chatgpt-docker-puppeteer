@@ -20,8 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-}));
+    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
     buildTool: vi.fn((opts) => ({

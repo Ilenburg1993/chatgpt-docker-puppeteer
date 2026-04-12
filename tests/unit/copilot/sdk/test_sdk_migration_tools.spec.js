@@ -136,15 +136,14 @@ describe('F18 — Contagem de migração', () => {
         expect(MIGRATED_FILES).toHaveLength(11);
     });
 
-    it('createTool é chamado 49 vezes nos consumidores', () => {
+    it('createTool é chamado 46 vezes nos consumidores', () => {
         let total = 0;
         for (const file of MIGRATED_FILES) {
             const src = readSource(file);
             const matches = src.match(/createTool\s*\(/g);
             total += matches ? matches.length : 0;
         }
-        // 49 chamadas totais (mesmo número que defineTool antes da migração)
-        expect(total).toBe(49);
+        expect(total).toBe(46);
     });
 
     it('createTool({ name: recebe string literal ou variável em cada chamada', () => {

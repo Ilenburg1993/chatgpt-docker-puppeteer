@@ -75,8 +75,7 @@ vi.mock('#copilot/observability/error-tracker', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
-    getRecentLogs: mockGetRecentLogs,
-}));
+    getRecentLogs: mockGetRecentLogs, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: { getStatusSnapshot: mockGetStatusSnapshot },
@@ -92,6 +91,10 @@ vi.mock('#copilot/bridges/nerv-bridge', () => ({
 
 vi.mock('#copilot/config/env', () => ({
     OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
+
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
 }));
 
 vi.mock('#copilot/observability/event-collector', () => ({

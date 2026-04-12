@@ -44,6 +44,14 @@ vi.mock('#copilot/core/errors', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
+
+// sdk/agents.js importa log de ./logger.js (DI local)
+vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
+    log: mockLog,
+    setSdkLogger: vi.fn(),
 }));
 
 // ─── Imports ───────────────────────────────────────────────────────────────

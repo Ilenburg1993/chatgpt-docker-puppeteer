@@ -23,6 +23,7 @@ describe('core/error-handlers', () => {
         }));
 
         mod = await import('../../../src/copilot/core/error-handlers.js');
+        mod.registerErrorHandlerDeps({ log: mockLog, tracker: mockTracker });
     });
 
     afterEach(() => {

@@ -114,13 +114,8 @@ describe('F19 — Zero imports diretos de @github/copilot-sdk fora de sdk/', () 
 // ---------------------------------------------------------------------------
 describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
     describe('Arquivos com approveAll', () => {
-        const approveAllFiles = [
-            'config/session-config.js',
-            'api/express/session-crud.js',
-            'agent/infra/permission-controller.js',
-            'hooks/permission-handler.js',
-            'audit/pipeline.js',
-        ];
+        // session-crud.js importa approveAll de #copilot/services (re-export); config/session-config.js e audit/pipeline.js não usam mais approveAll
+        const approveAllFiles = ['agent/infra/permission-controller.js', 'hooks/permission-handler.js'];
 
         for (const file of approveAllFiles) {
             it(`${file}: approveAll importado de #copilot/sdk`, () => {
