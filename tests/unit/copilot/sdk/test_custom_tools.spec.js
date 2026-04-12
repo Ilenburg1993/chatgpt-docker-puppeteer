@@ -22,7 +22,11 @@ const { mockLog, mockBuildTool, mockLogSwallowed } = vi.hoisted(() => ({
     mockLogSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 vi.mock('#copilot/tools/tool-factory', () => ({ buildTool: mockBuildTool }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 vi.mock('#copilot/core/safe-json', () => ({

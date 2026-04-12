@@ -31,7 +31,6 @@ vi.mock('node:dns/promises', () => ({
 }));
 
 import dns from 'node:dns/promises';
-import { describe, it, beforeEach } from 'node:test';
 import { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '../../../src/copilot/agent/infra/url-validator.js';
 
 describe('url-validator (infra)', () => {

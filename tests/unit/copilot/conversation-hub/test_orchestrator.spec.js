@@ -6,9 +6,7 @@
  * event emission, error paths.
  */
 
-import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
@@ -73,7 +71,7 @@ let testDb;
 /** @type {ConversationStore} */
 let store;
 
-before(() => {
+beforeAll(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
@@ -81,7 +79,7 @@ before(() => {
     store.init(testDb);
 });
 
-after(() => {
+afterAll(() => {
     testDb?.close();
 });
 
@@ -111,7 +109,7 @@ describe('HubOrchestrator lifecycle', () => {
 
         // Após destroy, listeners foram removidos
         orch.emit('session:created', {});
-        assert.ok(!eventFired, 'Listener deve ser removido após destroy');
+        expect(eventFired).toBeFalsy() // Listener deve ser removido após destroy;
     });
 });
 
@@ -135,10 +133,10 @@ describe('HubOrchestrator session management', () => {
         orch.on('session:created', (d) => events.push(d));
 
         const id = orch.createSession({ title: 'Test Session' });
-        assert.ok(typeof id === 'string');
-        assert.ok(id.length > 0);
-        assert.strictEqual(events.length, 1);
-        assert.strictEqual(events[0].hubSessionId, id);
+        expect(typeof id === 'string').toBeTruthy();
+        expect(id.length > 0).toBeTruthy();
+        expect(events.length).toBe(1);
+        expect(events[0].hubSessionId).toBe(id);
     });
 
     it('closeSession emite session:closed', () => {
@@ -147,24 +145,23 @@ describe('HubOrchestrator session management', () => {
 
         const id = orch.createSession();
         orch.closeSession(id);
-        assert.strictEqual(events.length, 1);
-        assert.strictEqual(events[0].hubSessionId, id);
+        expect(events.length).toBe(1);
+        expect(events[0].hubSessionId).toBe(id);
     });
 
     it('closeSession impede novos sendToLlmB', async () => {
         const id = orch.createSession();
         orch.closeSession(id);
 
-        await assert.rejects(
+        await expect(
             () => orch.sendToLlmB(id, 'hello'),
-            (err) => /** @type {Error} */ (err).message.includes('encerrada'),
-        );
+        ).rejects.toThrow('encerrada');
     });
 
     it('listSessions retorna sessões do store', () => {
         orch.createSession({ title: 'list-test' });
         const sessions = orch.listSessions();
-        assert.ok(sessions.length >= 1);
+        expect(sessions.length >= 1).toBeTruthy();
     });
 });
 
@@ -184,15 +181,15 @@ describe('HubOrchestrator sendToLlmB', () => {
         const id = orch.createSession();
         const result = await orch.sendToLlmB(id, 'hello');
 
-        assert.ok(result.turnId > 0);
-        assert.strictEqual(result.content, 'mock response');
-        assert.strictEqual(result.hubSessionId, id);
-        assert.ok(result.durationMs >= 0);
+        expect(result.turnId > 0).toBeTruthy();
+        expect(result.content).toBe('mock response');
+        expect(result.hubSessionId).toBe(id);
+        expect(result.durationMs >= 0).toBeTruthy();
 
-        assert.strictEqual(sentEvents.length, 1);
-        assert.strictEqual(sentEvents[0].role, 'llm_a');
-        assert.strictEqual(completeEvents.length, 1);
-        assert.strictEqual(completeEvents[0].role, 'llm_b');
+        expect(sentEvents.length).toBe(1);
+        expect(sentEvents[0].role).toBe('llm_a');
+        expect(completeEvents.length).toBe(1);
+        expect(completeEvents[0].role).toBe('llm_b');
 
         orch.destroy();
     });
@@ -205,9 +202,9 @@ describe('HubOrchestrator sendToLlmB', () => {
         const id = orch.createSession();
         const result = await orch.sendToLlmB(id, { text: 'structured' }, { useStructured: true });
 
-        assert.strictEqual(result.content, 'structured response');
-        assert.deepStrictEqual(result.structured, { action: 'test' });
-        assert.ok(bridge.chatStructured.mock.calls.length >= 1);
+        expect(result.content).toBe('structured response');
+        expect(result.structured).toEqual({ action: 'test' });
+        expect(bridge.chatStructured.mock.calls.length >= 1).toBeTruthy();
 
         orch.destroy();
     });
@@ -224,7 +221,7 @@ describe('HubOrchestrator sendToLlmB', () => {
 
         const id = orch.createSession();
         const result = await orch.sendToLlmB(id, 'hello');
-        assert.strictEqual(result.content, 'dialog response');
+        expect(result.content).toBe('dialog response');
 
         orch.destroy();
     });
@@ -242,17 +239,16 @@ describe('HubOrchestrator sendToLlmB', () => {
         orch.on('error', (d) => errorEvents.push(d));
 
         const id = orch.createSession();
-        await assert.rejects(
+        await expect(
             () => orch.sendToLlmB(id, 'will fail'),
-            (err) => /** @type {Error} */ (err).message.includes('bridge failure'),
-        );
+        ).rejects.toThrow('bridge failure');
 
-        assert.strictEqual(errorEvents.length, 1);
+        expect(errorEvents.length).toBe(1);
 
         // Verificar que o erro está persistido como turn
         const turns = orch.readHistory(id);
         const errorTurn = turns.find((t) => t.content.includes('[ERRO]'));
-        assert.ok(errorTurn, 'Turn de erro deve existir no histórico');
+        expect(errorTurn).toBeTruthy(); // Turn de erro deve existir no histórico
 
         orch.destroy();
     });
@@ -261,10 +257,9 @@ describe('HubOrchestrator sendToLlmB', () => {
         const orch = new HubOrchestrator(store, createMockAgent());
         // Não chama init()
         const id = store.createHubSession({ title: 'no-init' });
-        await assert.rejects(
+        await expect(
             () => orch.sendToLlmB(id, 'hello'),
-            (err) => /** @type {Error} */ (err).message.includes('inicializado'),
-        );
+        ).rejects.toThrow('inicializado');
         orch.destroy();
     });
 
@@ -274,10 +269,9 @@ describe('HubOrchestrator sendToLlmB', () => {
         orch.init(/** @type {any} */ (createMockBridge()));
 
         const id = orch.createSession();
-        await assert.rejects(
+        await expect(
             () => orch.sendToLlmB(id, 'hello'),
-            (err) => /** @type {Error} */ (err).message.includes('ativo'),
-        );
+        ).rejects.toThrow('ativo');
 
         orch.destroy();
     });
@@ -305,9 +299,9 @@ describe('HubOrchestrator user messages', () => {
         const sessionId = orch.createSession();
         const turnId = await orch.injectUserMessage(sessionId, 'Olá do usuário');
 
-        assert.ok(turnId > 0);
-        assert.strictEqual(events.length, 1);
-        assert.strictEqual(events[0].content, 'Olá do usuário');
+        expect(turnId > 0).toBeTruthy();
+        expect(events.length).toBe(1);
+        expect(events[0].content).toBe('Olá do usuário');
     });
 
     it('pollUserMessages retorna pendentes e marca como lidas', async () => {
@@ -316,11 +310,11 @@ describe('HubOrchestrator user messages', () => {
         await orch.injectUserMessage(sessionId, 'Mensagem 2');
 
         const msgs = orch.pollUserMessages(sessionId);
-        assert.strictEqual(msgs.length, 2);
+        expect(msgs.length).toBe(2);
 
         // Após poll, não deve ter mais pendentes
         const again = orch.pollUserMessages(sessionId);
-        assert.strictEqual(again.length, 0);
+        expect(again.length).toBe(0);
     });
 });
 
@@ -342,10 +336,10 @@ describe('HubOrchestrator notifyTerminalTurn', () => {
             { turnId: 2, content: 'llm response', turnNumber: 2, durationMs: 100 },
         );
 
-        assert.strictEqual(sentEvents.length, 1);
-        assert.strictEqual(sentEvents[0].source, 'terminal');
-        assert.strictEqual(completeEvents.length, 1);
-        assert.strictEqual(completeEvents[0].source, 'terminal');
+        expect(sentEvents.length).toBe(1);
+        expect(sentEvents[0].source).toBe('terminal');
+        expect(completeEvents.length).toBe(1);
+        expect(completeEvents[0].source).toBe('terminal');
 
         orch.destroy();
     });
@@ -362,7 +356,7 @@ describe('HubOrchestrator history', () => {
         await orch.sendToLlmB(id, 'msg for history');
 
         const history = orch.readHistory(id);
-        assert.ok(history.length >= 2, 'Deve ter turn de LLM-A e LLM-B');
+        expect(history.length >= 2).toBeTruthy() // Deve ter turn de LLM-A e LLM-B;
 
         orch.destroy();
     });

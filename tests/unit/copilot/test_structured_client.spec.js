@@ -16,8 +16,6 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
-import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
@@ -63,7 +61,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     /** @type {import('../../../src/copilot/channel/client.js').LlmBridgeClient} */
     let bridge;
 
-    before(async () => {
+    beforeAll(async () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
         const mod = await import('../../../src/copilot/channel/client.js');
         // Injeta mock como bridge agent para que requireAgent() não lance
@@ -74,7 +72,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     it('exporta chatStructured como método de LlmBridgeClient', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const instance = new mod.LlmBridgeClient();
-        assert.ok(typeof instance.chatStructured === 'function', 'chatStructured deve ser método');
+        expect(typeof instance.chatStructured === 'function').toBeTruthy() // chatStructured deve ser método;
     });
 
     it('chatStructured() retorna shape StructuredChatResult', async () => {
@@ -99,12 +97,12 @@ describe('LlmBridgeClient › chatStructured()', () => {
         });
 
         // Deve ter todos os campos de StructuredChatResult
-        assert.ok('structured' in result, 'deve ter campo structured');
-        assert.ok('raw' in result, 'deve ter campo raw');
-        assert.ok('taskId' in result, 'deve ter campo taskId');
-        assert.ok('durationMs' in result, 'deve ter campo durationMs');
-        assert.ok('chunks' in result, 'deve ter campo chunks');
-        assert.ok('responseLen' in result, 'deve ter campo responseLen');
+        expect('structured' in result).toBeTruthy() // deve ter campo structured;
+        expect('raw' in result).toBeTruthy() // deve ter campo raw;
+        expect('taskId' in result).toBeTruthy() // deve ter campo taskId;
+        expect('durationMs' in result).toBeTruthy() // deve ter campo durationMs;
+        expect('chunks' in result).toBeTruthy() // deve ter campo chunks;
+        expect('responseLen' in result).toBeTruthy() // deve ter campo responseLen;
     });
 
     it('parseia resposta JSON de LLM-B → structured ≠ null', async () => {
@@ -126,9 +124,9 @@ describe('LlmBridgeClient › chatStructured()', () => {
             responseType: 'plan',
         });
 
-        assert.notEqual(result.structured, null, 'structured deve ser parseado');
-        assert.equal(result.structured?.responseType, 'plan');
-        assert.equal(result.structured?.output, 'Plano A concluído.');
+        expect(result.structured).not.toBe(null); // structured deve ser parseado
+        expect(result.structured?.responseType).toBe('plan');
+        expect(result.structured?.output).toBe('Plano A concluído.');
     });
 
     it('retorna structured=null quando LLM-B responde texto puro', async () => {
@@ -150,8 +148,8 @@ describe('LlmBridgeClient › chatStructured()', () => {
             responseType: 'question',
         });
 
-        assert.equal(result.structured, null, 'structured deve ser null para texto puro');
-        assert.ok(result.raw.length > 0, 'raw deve ter conteúdo mesmo sem parse');
+        expect(result.structured).toBe(null); // structured deve ser null para texto puro
+        expect(result.raw.length > 0).toBeTruthy() // raw deve ter conteúdo mesmo sem parse;
     });
 
     it('propaga raw sempre (JSON e texto puro)', async () => {
@@ -169,7 +167,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         b.chat = mockChat;
 
         const result = await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' });
-        assert.equal(result.raw, responseText, 'raw deve ser a resposta original');
+        expect(result.raw).toBe(responseText); // raw deve ser a resposta original
     });
 
     it('inclui taskId, durationMs, chunks, responseLen no resultado', async () => {
@@ -186,10 +184,10 @@ describe('LlmBridgeClient › chatStructured()', () => {
         b.chat = mockChat;
 
         const result = await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' });
-        assert.equal(result.taskId, 'specific-task-id');
-        assert.equal(result.durationMs, 1234);
-        assert.equal(result.responseLen, 999);
-        assert.deepEqual(result.chunks, ['chunk1', 'chunk2']);
+        expect(result.taskId).toBe('specific-task-id');
+        expect(result.durationMs).toBe(1234);
+        expect(result.responseLen).toBe(999);
+        expect(result.chunks).toEqual(['chunk1', 'chunk2']);
     });
 
     it('passa onDelta para chat() como opção', async () => {
@@ -207,8 +205,8 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const onDelta = (/** @type {any} */ _chunk) => {};
         await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' }, { onDelta });
 
-        assert.ok(capturedOpts !== null, 'opts deve ter sido passado para chat()');
-        assert.equal(capturedOpts.onDelta, onDelta, 'onDelta deve ser passado adiante');
+        expect(capturedOpts !== null).toBeTruthy() // opts deve ter sido passado para chat();
+        expect(capturedOpts.onDelta).toBe(onDelta); // onDelta deve ser passado adiante
     });
 
     it('serializa input como JSON com instrução de protocolo antes de enviar', async () => {
@@ -229,29 +227,27 @@ describe('LlmBridgeClient › chatStructured()', () => {
             responseType: 'diagnostic',
         });
 
-        assert.ok(capturedMsg.includes('STRUCTURED_PROTOCOL_V1:'), 'deve incluir instrução de protocolo');
-        assert.ok(capturedMsg.includes('"context"'), 'deve incluir campo context serializado');
-        assert.ok(capturedMsg.includes('"intent"'), 'deve incluir campo intent serializado');
+        expect(capturedMsg.includes('STRUCTURED_PROTOCOL_V1:')).toBeTruthy() // deve incluir instrução de protocolo;
+        expect(capturedMsg.includes('"context"')).toBeTruthy() // deve incluir campo context serializado;
+        expect(capturedMsg.includes('"intent"')).toBeTruthy() // deve incluir campo intent serializado;
     });
 
     it('lança ZodError para input inválido (context vazio)', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        await assert.rejects(
+        await expect(
             () => b.chatStructured({ context: '', intent: 'i', responseType: 'diagnostic' }),
-            (/** @type {any} */ err) => err.constructor.name === 'ZodError',
-        );
+        ).rejects.toThrow();
     });
 
     it('lança ZodError para responseType inválido', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        await assert.rejects(
+        await expect(
             // @ts-expect-error — teste deliberado de tipo inválido
             () => b.chatStructured({ context: 'c', intent: 'i', responseType: 'invalid_type' }),
-            (/** @type {any} */ err) => err.constructor.name === 'ZodError',
-        );
+        ).rejects.toThrow();
     });
 });

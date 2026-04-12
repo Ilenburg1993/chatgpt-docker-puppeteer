@@ -1,4 +1,3 @@
-import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/test_observability_f68_f70.spec.js
  *
@@ -51,7 +50,10 @@ vi.mock('#copilot/config/env', () => ({
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 /** Span mock */
 const mockSpan = {
@@ -79,6 +81,16 @@ vi.mock('#copilot/sdk/session', () => ({
 }));
 
 vi.mock('#copilot/observability', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+    startSpan: vi.fn(async (_name, _attrs, fn) => fn()),
+    startSpanImmediate: vi.fn(() => ({
+        setAttribute: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+        end: vi.fn(),
+    })),
     defaultMetrics: {
         recordSessionRotation: vi.fn(),
         recordSessionStart: vi.fn(),
@@ -103,8 +115,7 @@ vi.mock('#copilot/observability', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { defaultMetrics } from '#copilot/observability';
-import { startSpan, startSpanImmediate } from '#copilot/observability/otel';
+import { defaultMetrics, startSpan, startSpanImmediate } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
 import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';

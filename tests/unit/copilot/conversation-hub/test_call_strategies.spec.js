@@ -5,8 +5,6 @@
  * F158: Testes para call-strategies.js (estratégias de chamada LLM-B).
  */
 
-import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 import {
     callViaDialogLoop,
     callViaSimpleChat,
@@ -36,17 +34,16 @@ describe('callViaDialogLoop', () => {
         };
         const ctx = makeCtx();
         const result = await callViaDialogLoop(/** @type {any} */ (agent), 'hello', 'hello', ctx);
-        assert.strictEqual(result, 'resposta do dialog');
-        assert.ok(agent.sendDialogTurn.mock.calls.length === 1);
+        expect(result).toBe('resposta do dialog');
+        expect(agent.sendDialogTurn.mock.calls.length === 1).toBeTruthy();
     });
 
     it('lança SessionError quando agent não suporta sendDialogTurn', async () => {
         const agent = { on: vi.fn(), off: vi.fn() };
         const ctx = makeCtx();
-        await assert.rejects(
+        await expect(
             () => callViaDialogLoop(/** @type {any} */ (agent), 'hello', 'hello', ctx),
-            (err) => /** @type {Error} */ (err).message.includes('sendDialogTurn'),
-        );
+        ).rejects.toThrow('sendDialogTurn');
     });
 
     it('registra e remove listener de task.delta', async () => {
@@ -58,8 +55,8 @@ describe('callViaDialogLoop', () => {
         };
         const ctx = makeCtx();
         await callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx);
-        assert.ok(agent.on.mock.calls.some((c) => c[0] === 'task.delta'));
-        assert.ok(agent.off.mock.calls.some((c) => c[0] === 'task.delta'));
+        expect(agent.on.mock.calls.some((c) => c[0] === 'task.delta')).toBeTruthy();
+        expect(agent.off.mock.calls.some((c) => c[0] === 'task.delta')).toBeTruthy();
     });
 
     it('emite turn:delta quando agent envia task.delta', async () => {
@@ -78,11 +75,11 @@ describe('callViaDialogLoop', () => {
         };
         const ctx = makeCtx();
         await callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx);
-        assert.ok(
+        expect(
             /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
                 (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'chunk1',
             ),
-        );
+        ).toBeTruthy();
     });
 
     it('remove listener mesmo quando sendDialogTurn lança', async () => {
@@ -94,11 +91,12 @@ describe('callViaDialogLoop', () => {
             off: vi.fn(),
         };
         const ctx = makeCtx();
-        await assert.rejects(() => callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx));
-        assert.ok(
+        await expect(
+            () => callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx),
+        ).rejects.toThrow();
+        expect(
             agent.off.mock.calls.some((c) => c[0] === 'task.delta'),
-            'off deve ser chamado no finally',
-        );
+        ).toBeTruthy(); // off deve ser chamado no finally
     });
 });
 
@@ -115,9 +113,9 @@ describe('callViaStructured', () => {
         };
         const ctx = makeCtx();
         const result = await callViaStructured(/** @type {any} */ (bridge), { text: 'hello' }, ctx);
-        assert.strictEqual(result.llmBResponse, 'resposta raw');
-        assert.deepStrictEqual(result.llmBStructured, { action: 'test' });
-        assert.strictEqual(result.parseError, null);
+        expect(result.llmBResponse).toBe('resposta raw');
+        expect(result.llmBStructured).toEqual({ action: 'test' });
+        expect(result.parseError).toBe(null);
     });
 
     it('usa accumulated quando raw é undefined', async () => {
@@ -132,7 +130,7 @@ describe('callViaStructured', () => {
         };
         const ctx = makeCtx();
         const result = await callViaStructured(/** @type {any} */ (bridge), {}, ctx);
-        assert.strictEqual(result.llmBResponse, 'chunk1chunk2');
+        expect(result.llmBResponse).toBe('chunk1chunk2');
     });
 });
 
@@ -145,7 +143,7 @@ describe('callViaSimpleChat', () => {
         };
         const ctx = makeCtx();
         const result = await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);
-        assert.strictEqual(result, 'simple response');
+        expect(result).toBe('simple response');
     });
 
     it('emite turn:delta via onDelta callback', async () => {
@@ -157,10 +155,10 @@ describe('callViaSimpleChat', () => {
         };
         const ctx = makeCtx();
         await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);
-        assert.ok(
+        expect(
             /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
                 (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'delta1',
             ),
-        );
+        ).toBeTruthy();
     });
 });

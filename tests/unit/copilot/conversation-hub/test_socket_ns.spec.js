@@ -6,10 +6,8 @@
  * para evitar dependência de servidor real.
  */
 
-import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { createRequire } from 'node:module';
-import { describe, it, before, after } from 'node:test';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
@@ -101,7 +99,7 @@ let testDb;
 /** @type {ConversationStore} */
 let store;
 
-before(() => {
+beforeAll(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
@@ -109,7 +107,7 @@ before(() => {
     store.init(testDb);
 });
 
-after(() => {
+afterAll(() => {
     testDb?.close();
 });
 
@@ -137,8 +135,8 @@ describe('socket-ns mountCopilotNamespace', () => {
         orch.init(/** @type {any} */ (bridge));
 
         const result = mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
-        assert.ok(result, 'deve retornar o namespace');
-        assert.ok(mockIo.of.mock.calls[0][0] === '/copilot');
+        expect(result).toBeTruthy() // deve retornar o namespace;
+        expect(mockIo.of.mock.calls[0][0] === '/copilot').toBeTruthy();
 
         // Cleanup
         mod.unmountCopilotNamespace();
@@ -167,7 +165,7 @@ describe('socket-ns mountCopilotNamespace', () => {
         mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
         const count2 = mockIo.of.mock.calls.length;
 
-        assert.strictEqual(count1, count2, 'of() não deve ser chamado novamente no re-mount');
+        expect(count1).toBe(count2) // of() não deve ser chamado novamente no re-mount;
 
         mod.unmountCopilotNamespace();
         orch.destroy();
@@ -191,10 +189,10 @@ describe('socket-ns unmountCopilotNamespace', () => {
         orch.init(/** @type {any} */ ({ chat: vi.fn(), chatStructured: vi.fn() }));
 
         mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
-        assert.ok(mod.getCopilotNamespace() !== null);
+        expect(mod.getCopilotNamespace()).not.toBe(null);
 
         mod.unmountCopilotNamespace();
-        assert.strictEqual(mod.getCopilotNamespace(), null);
+        expect(mod.getCopilotNamespace()).toBe(null);
 
         orch.destroy();
     });
@@ -206,9 +204,9 @@ describe('socket-ns broadcastToSession', () => {
         mod.unmountCopilotNamespace();
 
         // Não deve lançar
-        assert.doesNotThrow(() => {
+        expect(() => {
             mod.broadcastToSession('hub-001', 'test-event', { data: 1 });
-        });
+        }).not.toThrow();
     });
 });
 
@@ -217,8 +215,8 @@ describe('socket-ns broadcastGlobal', () => {
         const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
         mod.unmountCopilotNamespace();
 
-        assert.doesNotThrow(() => {
+        expect(() => {
             mod.broadcastGlobal('test-event', { data: 1 });
-        });
+        }).not.toThrow();
     });
 });
