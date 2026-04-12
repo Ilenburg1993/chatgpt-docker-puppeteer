@@ -80,7 +80,7 @@ import { wireSessionEvents } from './event-wirer.js';
  *
  * @typedef {Object} BootWiringResult
  * @property {(() => void)[]} unsubs — Funções de unsubscribe de eventos
- * @property {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} agentObserver
+ * @property {{ attach: (agent: import('node:events').EventEmitter) => void; attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void; detach: () => void } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
@@ -94,9 +94,10 @@ import { wireSessionEvents } from './event-wirer.js';
  * @param {boolean} isResumed — Se a sessão foi retomada
  * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
  * @param {BootWiringContext} ctx — Callbacks e referências
+ * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
  * @returns {BootWiringResult}
  */
-export function performBootWiring(client, session, isResumed, agentEmitter, ctx) {
+export function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
     /** @type {(() => void)[]} */
     const unsubs = [];
 
@@ -138,7 +139,12 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx)
         metrics: defaultMetrics,
         errorTracker: defaultErrorTracker,
     });
-    agentObserver.attach(agentEmitter);
+    // FAIXA-L14: prefer EventBus over direct agent emitter
+    if (options?.eventBus) {
+        agentObserver.attachToBus(options.eventBus);
+    } else {
+        agentObserver.attach(agentEmitter);
+    }
 
     // ── 5. Limpeza assíncrona de sessões stale ──
     void cleanupStaleSessions(client, { currentSessionId: session.sessionId })

@@ -22,6 +22,8 @@ import {
     startSpan,
 } from '#copilot/observability';
 import { CopilotClient, raceEvents } from '#copilot/sdk';
+import { container } from '../../core/di-container.js';
+import { EVENT_BUS } from '../../core/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 
 import { conversationStore } from '../../conversation-hub/store.js';
@@ -109,6 +111,7 @@ export async function agentStart(ctx, host) {
         );
 
         if (ctx.agentObserver) ctx.agentObserver.detach();
+        const eventBus = container.resolve(EVENT_BUS) ?? undefined;
         const bootResult = performBootWiring(client, session, isResumed, host, {
             emit: (event, payload) => host.emit(event, payload),
             getStatusSnapshot: () => host.getStatusSnapshot(),
@@ -133,7 +136,7 @@ export async function agentStart(ctx, host) {
             startDialogLoop: () => host.startDialogLoop(),
             getDialogPrMetrics: () => host.dialogPrMetrics,
             mcpBridge: ctx.mcpBridge ?? null,
-        });
+        }, { eventBus });
         ctx.sessionEventUnsubscribers = bootResult.unsubs;
         ctx.agentObserver = bootResult.agentObserver;
         ctx.metricsTimer = bootResult.metricsTimer;

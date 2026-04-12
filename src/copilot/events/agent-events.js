@@ -21,6 +21,8 @@ export const AGENT_STOPPED = 'agent:stopped';
 /** @readonly */
 export const AGENT_SHUTDOWN = 'agent:shutdown';
 /** @readonly */
+export const AGENT_STATUS = 'agent:status';
+/** @readonly */
 export const AGENT_ERROR = 'agent:error';
 /** @readonly */
 export const AGENT_EMITTER_ERROR = 'agent:emitter:error';
@@ -204,6 +206,12 @@ export const AGENT_MCP_RECONNECTED = 'agent:mcp:reconnected';
 export const AGENT_QUOTA_WARNING = 'agent:quota:warning';
 /** @readonly */
 export const AGENT_STEERING_SENT = 'agent:steering:sent';
+/** @readonly */
+export const AGENT_PENDING_MESSAGES_MODIFIED = 'agent:pending_messages:modified';
+/** @readonly */
+export const AGENT_EXIT_PLAN_MODE_COMPLETED = 'agent:exit_plan_mode:completed';
+/** @readonly */
+export const AGENT_EXTERNAL_TOOL_COMPLETED = 'agent:external_tool:completed';
 
 // ─── Grupos consolidados ──────────────────────────────────────────────────────
 

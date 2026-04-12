@@ -573,11 +573,14 @@ try {
         AGENT_DIALOG_TURN_END,
         AGENT_DIALOG_TURN_TIMEOUT,
         AGENT_ELICITATION_PENDING,
+        AGENT_EXIT_PLAN_MODE_COMPLETED,
+        AGENT_EXTERNAL_TOOL_COMPLETED,
         AGENT_HANDOFF_RECEIVED,
         AGENT_HANDOFF_ACCEPTED,
         AGENT_HANDOFF_REJECTED,
         AGENT_MCP_RECONNECTED,
         AGENT_METRICS,
+        AGENT_PENDING_MESSAGES_MODIFIED,
         AGENT_PERMISSION_MODE_CHANGED,
         AGENT_PR_CONSUMED,
         AGENT_PR_FALLBACK_MODEL,
@@ -606,6 +609,7 @@ try {
         AGENT_SESSION_WORKSPACE_FILE_CHANGED,
         AGENT_SHELL_COMPLETED,
         AGENT_SHELL_DETACHED_COMPLETED,
+        AGENT_STATUS,
         AGENT_STEERING_SENT,
         AGENT_SUBAGENT_COMPLETED,
         AGENT_SUBAGENT_FAILED,
@@ -695,6 +699,11 @@ try {
             'mcp.reconnected': AGENT_MCP_RECONNECTED,
             'quota.warning': AGENT_QUOTA_WARNING,
             'steering.sent': AGENT_STEERING_SENT,
+            // ── FAIXA-L14: 4 previously unbridged observer events ────────
+            status: AGENT_STATUS,
+            'pending_messages.modified': AGENT_PENDING_MESSAGES_MODIFIED,
+            'exit_plan_mode.completed': AGENT_EXIT_PLAN_MODE_COMPLETED,
+            'external_tool.completed': AGENT_EXTERNAL_TOOL_COMPLETED,
         });
         // FAIXA-2A: bridge DialogLoopManager → EventBus
         bridgeEmitter(alwaysAliveAgent.ctx.dialogLoop, bus, {

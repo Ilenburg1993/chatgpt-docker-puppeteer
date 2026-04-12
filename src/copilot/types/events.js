@@ -120,6 +120,7 @@ export const EVENT_NAMES = /** @type {const} */ ({
  * @typedef {object} BaseEvent
  * @property {string} type - Nome canônico do evento (ex: `session:start`).
  * @property {number} timestamp - Unix epoch ms.
+ * @property {string} [correlationId] - UUID de correlação para rastreamento ponta-a-ponta (FAIXA-L16).
  * @property {string} [source] - Módulo/subsistema de origem.
  * @property {Record<string, unknown>} [meta] - Metadata adicional.
  */
