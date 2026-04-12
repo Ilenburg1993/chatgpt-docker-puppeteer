@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -108,7 +108,7 @@ test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)'
         DELETE FROM missions;
     `);
 
-    afterAll(() => {
+    after(() => {
         delete process.env.MISSION_STEP_DISPATCH_MODE;
         try {
             closeDb();
@@ -160,7 +160,7 @@ test('wave15: MissionManager mantém fallback legacy_direct por env', async (t) 
     process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
     process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = 'true';
 
-    afterAll(() => {
+    after(() => {
         delete process.env.MISSION_STEP_DISPATCH_MODE;
         delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
     });

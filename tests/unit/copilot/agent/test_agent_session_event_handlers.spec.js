@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it } from 'node:test';
 /**
  * @file Faixa 43 — Agent: session event-wirer + event-handlers + history-sync + webhook-manager
  *

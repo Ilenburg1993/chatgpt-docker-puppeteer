@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
 const TEST_STATE_DIR = join(import.meta.dirname, '.tmp-state-io-test');
@@ -28,11 +28,11 @@ const { readState, readStateAsync, writeState, writeStateAsync, clearState, clea
     await import('#copilot/agent/lifecycle/state-io');
 
 describe('state-io', () => {
-    beforeAll(() => {
+    before(() => {
         mkdirSync(TEST_STATE_DIR, { recursive: true });
     });
 
-    afterAll(() => {
+    after(() => {
         delete process.env.AGENT_STATE_FILE;
         if (existsSync(TEST_STATE_DIR)) {
             rmSync(TEST_STATE_DIR, { recursive: true, force: true });

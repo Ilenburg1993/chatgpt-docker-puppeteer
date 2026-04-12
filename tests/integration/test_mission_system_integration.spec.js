@@ -5,7 +5,7 @@ import { createNERV } from '#nerv/nerv';
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 /**
  * Suite de testes de integração do sistema de missões.
@@ -24,12 +24,12 @@ describe('Mission System Integration (E2E)', () => {
     /** @type {any} */ let missionManager;
     const testMissionsDir = path.join(import.meta.dirname, '../../missions-test');
 
-    beforeAll(async () => {
+    before(async () => {
         // Setup: Cria diretório temporário para missões de teste
         await fs.mkdir(testMissionsDir, { recursive: true });
     });
 
-    afterAll(async () => {
+    after(async () => {
         // Cleanup: Remove diretório de teste
         try {
             await fs.rm(testMissionsDir, { recursive: true, force: true });
@@ -150,7 +150,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('3. Mission Execution Integration', () => {
         /** @type {any} */ let testMissionId;
 
-        beforeAll(async () => {
+        before(async () => {
             // Cria mission para teste de execução
             const mission = await missionManager.createMission({
                 title: 'Execution Test',
@@ -200,7 +200,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('4. Feedback Integration', () => {
         /** @type {any} */ let feedbackMissionId;
 
-        beforeAll(async () => {
+        before(async () => {
             const mission = await missionManager.createMission({
                 title: 'Feedback Test',
                 description: 'Testing feedback injection',
@@ -336,7 +336,7 @@ describe('Mission System Integration (E2E)', () => {
     describe('6. Progress Tracking Integration', () => {
         /** @type {any} */ let progressMissionId;
 
-        beforeAll(async () => {
+        before(async () => {
             const mission = await missionManager.createMission({
                 title: 'Progress Test',
                 description: 'Test',

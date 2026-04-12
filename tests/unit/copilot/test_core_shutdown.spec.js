@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, after, beforeEach } from 'node:test';
 
 import {
     _resetForTesting,
@@ -20,7 +20,7 @@ describe('core/shutdown.js', () => {
         _resetForTesting();
     });
 
-    afterAll(() => {
+    after(() => {
         _resetForTesting();
     });
 

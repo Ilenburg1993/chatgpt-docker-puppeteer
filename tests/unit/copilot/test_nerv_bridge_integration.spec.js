@@ -13,13 +13,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 describe('F34.6 — NERV ↔ Agent bridge integration', async () => {
     /** @type {string} */
     let bridgeSource = '';
 
-    beforeAll(async () => {
+    before(async () => {
         const { readFile } = await import('node:fs/promises');
         bridgeSource = await readFile(new URL('../../../src/copilot/bridges/nerv-bridge.js', import.meta.url), 'utf-8');
     });

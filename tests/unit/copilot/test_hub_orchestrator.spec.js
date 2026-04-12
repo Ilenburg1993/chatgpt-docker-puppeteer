@@ -16,7 +16,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
@@ -81,7 +81,7 @@ const mockAgent = { getStatusSnapshot: () => ({ sessionId: 'mock-sdk-session-id'
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-beforeAll(() => {
+before(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
@@ -94,7 +94,7 @@ beforeAll(() => {
     orchestrator.init(/** @type {any} */ (mockBridge));
 });
 
-afterAll(() => {
+after(() => {
     orchestrator?.destroy();
     testDb?.close();
 });

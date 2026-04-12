@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
     /** @type {string} */
@@ -19,7 +19,7 @@ describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
     /** @type {string} */
     let collectorSource = '';
 
-    beforeAll(async () => {
+    before(async () => {
         const { readFile } = await import('node:fs/promises');
         const base = new URL('../../../src/copilot/observability/', import.meta.url);
         const observerFiles = [

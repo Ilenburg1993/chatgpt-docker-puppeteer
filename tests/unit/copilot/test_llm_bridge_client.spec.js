@@ -19,7 +19,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
@@ -29,7 +29,7 @@ describe('llm-bridge-client › estrutura do módulo', () => {
     /** @type {any} */
     let mod;
 
-    beforeAll(async () => {
+    before(async () => {
         mod = await import('../../../src/copilot/channel/client.js');
     });
 
@@ -71,7 +71,7 @@ describe('LlmBridgeClient › histórico de conversa', () => {
     /** @type {any} */
     let LlmBridgeClient;
 
-    beforeAll(async () => {
+    before(async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         LlmBridgeClient = mod.LlmBridgeClient;
         // Injeta o agente real via DI para que requireAgent() não lance

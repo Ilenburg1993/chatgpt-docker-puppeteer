@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 
 describe('agent-lifecycle › exports', () => {
@@ -55,7 +55,7 @@ describe('agent-lifecycle › source contracts', () => {
     /** @type {string} */
     let src;
 
-    beforeAll(async () => {
+    before(async () => {
         src = await readFile(
             new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url),
             'utf-8',

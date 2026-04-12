@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 
 import { shutdown as shutdownDriverFactory } from '#driver/factory';
 import { __mainTestHooks, shutdown } from '#main';
@@ -13,7 +13,7 @@ async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(ROOT, relPath), 'utf8');
 }
 
-afterAll(async () => {
+after(async () => {
     __mainTestHooks.cleanupSignalHandlers();
     __mainTestHooks.resetShutdownState();
     await shutdownDriverFactory().catch(() => {});

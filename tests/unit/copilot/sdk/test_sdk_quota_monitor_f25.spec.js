@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/sdk/test_sdk_quota_monitor_f25.spec.js
  *

@@ -6,13 +6,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 describe('cleanupStaleSessions', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/cleanup.js').cleanupStaleSessions} */
     let cleanupStaleSessions;
 
-    beforeAll(async () => {
+    before(async () => {
         ({ cleanupStaleSessions } = await import('../../../src/copilot/agent/session/cleanup.js'));
     });
 

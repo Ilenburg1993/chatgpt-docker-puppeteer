@@ -16,10 +16,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, before, afterEach } from 'node:test';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
-import { copilotNervBridge, emitNerv, isMounted, mount, unmount } from '../../../src/copilot/bridges/nerv-bridge.js';
+import { copilotNervBridge, emitNerv, isMounted, mount, registerNervBridgeAgent, unmount } from '../../../src/copilot/bridges/nerv-bridge.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,10 @@ function makeMockNerv() {
 // ─── Suite principal ──────────────────────────────────────────────────────────
 
 describe('copilotNervBridge', () => {
+    before(() => {
+        registerNervBridgeAgent(alwaysAliveAgent);
+    });
+
     afterEach(() => {
         // Garante que o bridge é desmontado após cada teste
         if (isMounted()) unmount();

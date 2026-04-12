@@ -6,9 +6,7 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
 import { describe, it } from 'node:test';
-
 describe("terminal/rate-limiter-state.js — contrato", () => {
     it("importa sem erros", async () => {
         const mod = await import("../../../src/copilot/terminal/rate-limiter-state.js");

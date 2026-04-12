@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 import { syncFromSdkHistory } from '../../../../src/copilot/conversation-hub/store-sync.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
@@ -41,7 +41,7 @@ let db;
 const HUB_SESSION = 'sync-test-session';
 const SDK_SESSION = 'sdk-session-001';
 
-beforeAll(() => {
+before(() => {
     const Database = require('better-sqlite3');
     db = new Database(':memory:');
     applyCopilotMigrations(db);
@@ -51,7 +51,7 @@ beforeAll(() => {
     ).run(HUB_SESSION, 'Sync Test', 'active', Date.now(), Date.now());
 });
 
-afterAll(() => {
+after(() => {
     db?.close();
 });
 

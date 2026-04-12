@@ -4,7 +4,7 @@ import { __mainTestHooks } from '#main';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 
 const ROOT = process.cwd();
 
@@ -43,7 +43,7 @@ test('wave3: concurrent signals reuse the same shutdown promise and exit once', 
     __mainTestHooks.cleanupSignalHandlers();
     __mainTestHooks.resetShutdownState();
 
-    afterAll(async () => {
+    after(async () => {
         __mainTestHooks.cleanupSignalHandlers();
         __mainTestHooks.resetShutdownState();
         process.exit = originalExit;

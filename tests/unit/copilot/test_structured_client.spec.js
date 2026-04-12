@@ -17,7 +17,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
@@ -63,7 +63,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     /** @type {import('../../../src/copilot/channel/client.js').LlmBridgeClient} */
     let bridge;
 
-    beforeAll(async () => {
+    before(async () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
         const mod = await import('../../../src/copilot/channel/client.js');
         // Injeta mock como bridge agent para que requireAgent() não lance

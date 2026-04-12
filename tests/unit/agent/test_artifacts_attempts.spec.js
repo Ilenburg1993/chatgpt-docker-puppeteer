@@ -2,7 +2,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
@@ -57,13 +57,13 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
     const dbPath = makeDbPath();
     const artifactsDir = makeArtifactsDir();
 
-    beforeAll(() => {
+    before(() => {
         process.env.MAESTRO_DB_PATH = dbPath;
         process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
         getDb(); // migrations
     });
 
-    afterAll(() => {
+    after(() => {
         try {
             closeDb();
         } catch (_) {}

@@ -10,7 +10,7 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, before, afterEach } from 'node:test';
 
 const require = createRequire(import.meta.url);
 const { readFileSync } = require('node:fs');
@@ -79,7 +79,7 @@ describe('F22 — F124 runtime: feature-flags API', () => {
     /** @type {import('../../../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
 
-    beforeAll(async () => {
+    before(async () => {
         featureFlags = await import('#copilot/sdk/feature-flags.js');
     });
 
@@ -189,7 +189,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     /** @type {typeof import('../../../../../../src/copilot/sdk/experimental-rpc.js')} */
     let expRpc;
 
-    beforeAll(async () => {
+    before(async () => {
         featureFlags = await import('#copilot/sdk/feature-flags.js');
         expRpc = await import('#copilot/sdk/experimental-rpc.js');
     });

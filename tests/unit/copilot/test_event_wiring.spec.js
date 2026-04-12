@@ -5,7 +5,6 @@
  * F61.4: Testes unitários para wireDialogLoopEvents (event-wiring.js)
  */
 import EventEmitter from 'node:events';
-import { describe, it } from 'node:test';
 import { describe, expect, it, vi } from 'vitest';
 import { DLM_EVENTS, EVENT_MAP, wireDialogLoopEvents } from '../../../src/copilot/agent/dialog/event-wiring.js';
 

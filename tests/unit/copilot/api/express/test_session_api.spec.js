@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 37 — API Session CRUD + Messaging Test Suite (F197-F204)
  *

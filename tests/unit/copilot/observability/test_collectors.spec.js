@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 48 — observability/collectors: tool-handlers, assistant-handlers, interaction-handlers
  *

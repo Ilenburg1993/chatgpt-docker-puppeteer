@@ -15,7 +15,6 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, it } from 'node:test';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = '/workspaces/chatgpt-docker-puppeteer';

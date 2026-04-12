@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 import { io as ioClient } from 'socket.io-client';
 
@@ -41,7 +41,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
     /** @type {string | null} */
     let dbPath = null;
 
-    beforeAll(async () => {
+    before(async () => {
         process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_dashboard_realtime_contract_jwt_secret_123456789';
         process.env.DASHBOARD_SOCKET_AUTH_REQUIRED = 'true';
 
@@ -111,7 +111,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         await waitForEvent(client, 'task:updates_batch', 8000);
     });
 
-    afterAll(async () => {
+    after(async () => {
         try {
             telemetryAggregator.stop();
         } catch {}

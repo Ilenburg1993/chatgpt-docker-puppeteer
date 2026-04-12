@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 35 — Write Tools Test Suite (F181-F188)
  *

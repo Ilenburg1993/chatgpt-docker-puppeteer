@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 import {
     initTurnsFts,
@@ -48,7 +48,7 @@ let db;
 
 const HUB_SESSION = 'test-hub-session-001';
 
-beforeAll(() => {
+before(() => {
     const Database = require('better-sqlite3');
     db = new Database(':memory:');
     applyCopilotMigrations(db);
@@ -59,7 +59,7 @@ beforeAll(() => {
     ).run(HUB_SESSION, 'Test Session', 'active', Date.now(), Date.now());
 });
 
-afterAll(() => {
+after(() => {
     db?.close();
 });
 
@@ -138,7 +138,7 @@ describe('migrateFts5Tokenizer', () => {
 describe('store-queries', () => {
     const SESSION = 'queries-session-001';
 
-    beforeAll(() => {
+    before(() => {
         db.prepare(
             `INSERT INTO copilot_hub_sessions (id, title, status, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?)`,

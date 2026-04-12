@@ -1,4 +1,4 @@
-import { it } from 'node:test';
+import { describe, it } from 'node:test';
 // ORPHAN: source module deleted (sdk-client.js deleted) — skip until reimplemented
 describe.skip('test_sdk_client.spec.js — source module deleted', () => {
     it('pending reimplementation', () => {});

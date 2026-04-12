@@ -8,13 +8,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, before, afterEach } from 'node:test';
 
 describe.skip('SessionKeepalive', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session-keepalive.js').SessionKeepalive} */
     let SessionKeepalive;
 
-    beforeAll(async () => {
+    before(async () => {
         ({ SessionKeepalive } = await import('../../../src/copilot/agent/session-keepalive.js'));
     });
 

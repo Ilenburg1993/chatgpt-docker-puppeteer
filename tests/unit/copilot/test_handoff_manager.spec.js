@@ -6,13 +6,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 describe('HandoffManager', async () => {
     /** @type {typeof import('#copilot/agent/infra/handoff-manager').HandoffManager} */
     let HandoffManager;
 
-    beforeAll(async () => {
+    before(async () => {
         ({ HandoffManager } = await import('#copilot/agent/infra/handoff-manager'));
     });
 

@@ -5,7 +5,7 @@ import { ContextManager } from '#orchestrator/context_manager';
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 
 describe('Feedback Flow Integration Tests', () => {
     /** @type {any} */ let missionManager;
@@ -27,7 +27,7 @@ describe('Feedback Flow Integration Tests', () => {
         emitEvent: () => {},
     };
 
-    beforeAll(async () => {
+    before(async () => {
         testMissionsDir = path.join(import.meta.dirname, '../../missions-test-feedback');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
@@ -44,7 +44,7 @@ describe('Feedback Flow Integration Tests', () => {
         await missionManager.initialize();
     });
 
-    afterAll(async () => {
+    after(async () => {
         await fs.rm(testMissionsDir, { recursive: true, force: true });
         contextManager.cleanup();
         missionManager.cleanup();

@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 import { ConversationHub } from '../../../src/copilot/conversation-hub/hub.js';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
@@ -59,7 +59,7 @@ let store;
 /** @type {ConversationHub} */
 let hub;
 
-beforeAll(() => {
+before(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
@@ -73,7 +73,7 @@ beforeAll(() => {
     // para controlar o DB in-memory
 });
 
-afterAll(() => {
+after(() => {
     testDb?.close();
 });
 
@@ -212,7 +212,7 @@ describe('F35.5 — HubOrchestrator standalone flow', () => {
     /** @type {import('better-sqlite3').Database} */
     let orchDb;
 
-    beforeAll(() => {
+    before(() => {
         const Database = require('better-sqlite3');
         orchDb = new Database(':memory:');
         applyCopilotMigrations(orchDb);
@@ -241,7 +241,7 @@ describe('F35.5 — HubOrchestrator standalone flow', () => {
         orch.init(/** @type {any} */ (mockBridge));
     });
 
-    afterAll(() => {
+    after(() => {
         orch?.destroy();
         orchDb?.close();
     });

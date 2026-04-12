@@ -8,11 +8,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 
 const execFileAsync = promisify(execFile);
 
-afterAll(async () => {
+after(async () => {
     await shutdownDriverFactory();
 });
 
@@ -56,7 +56,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
 
 test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async (t) => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wave2-env-bootstrap-'));
-    afterAll(async () => {
+    after(async () => {
         await rm(tmpDir, { recursive: true, force: true });
     });
 

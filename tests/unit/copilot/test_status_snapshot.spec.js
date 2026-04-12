@@ -7,12 +7,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 /** @type {typeof import('#copilot/agent/infra/status-snapshot').buildStatusSnapshot} */
 let buildStatusSnapshot;
 
-beforeAll(async () => {
+before(async () => {
     ({ buildStatusSnapshot } = await import('#copilot/agent/infra/status-snapshot'));
 });
 
@@ -182,7 +182,7 @@ describe('AlwaysAliveAgent.getStatusSnapshot() › integração', async () => {
     /** @type {import('../../../src/copilot/agent/always-alive.js').AlwaysAliveAgent} */
     let agent;
 
-    beforeAll(async () => {
+    before(async () => {
         const { AlwaysAliveAgent } = await import('../../../src/copilot/agent/always-alive.js');
         agent = new AlwaysAliveAgent();
     });

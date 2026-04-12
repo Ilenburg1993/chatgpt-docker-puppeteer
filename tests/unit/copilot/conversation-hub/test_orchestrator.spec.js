@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
@@ -73,7 +73,7 @@ let testDb;
 /** @type {ConversationStore} */
 let store;
 
-beforeAll(() => {
+before(() => {
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
@@ -81,7 +81,7 @@ beforeAll(() => {
     store.init(testDb);
 });
 
-afterAll(() => {
+after(() => {
     testDb?.close();
 });
 

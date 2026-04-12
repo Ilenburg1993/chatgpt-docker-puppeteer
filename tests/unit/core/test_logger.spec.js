@@ -2,7 +2,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 
 import sinon from 'sinon';
 
@@ -13,14 +13,14 @@ describe('Logger - Sistema de Logging Unificado', () => {
     const TEST_LOG_DIR = path.join(import.meta.dirname, '../../tmp/logs');
     const TEST_LOG_FILE = path.join(TEST_LOG_DIR, 'test_agente.log');
 
-    beforeAll(() => {
+    before(() => {
         // Criar diretório de teste
         if (!fs.existsSync(TEST_LOG_DIR)) {
             fs.mkdirSync(TEST_LOG_DIR, { recursive: true });
         }
     });
 
-    afterAll(() => {
+    after(() => {
         // Limpar arquivos de teste
         if (fs.existsSync(TEST_LOG_DIR)) {
             fs.rmSync(TEST_LOG_DIR, { recursive: true, force: true });

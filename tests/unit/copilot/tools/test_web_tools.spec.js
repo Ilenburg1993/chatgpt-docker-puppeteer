@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/tools/test_web_tools.spec.js
  *

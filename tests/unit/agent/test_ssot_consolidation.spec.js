@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
@@ -51,12 +51,12 @@ class MockNERV {
 describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { concurrency: 1 }, () => {
     const dbPath = makeDbPath();
 
-    beforeAll(() => {
+    before(() => {
         process.env.MAESTRO_DB_PATH = dbPath;
         getDb(); // migrations
     });
 
-    afterAll(() => {
+    after(() => {
         try {
             closeDb();
         } catch (_) {}

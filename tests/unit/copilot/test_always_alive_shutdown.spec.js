@@ -14,10 +14,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
-import { MAX_QUEUE_SIZE } from '../../../src/copilot/core/constants.js';
+import { MAX_QUEUE_SIZE } from '../../../src/copilot/config/env.js';
 
 // ─── Suite: análise estrutural ───────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    beforeAll(async () => {
+    before(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle, agentConfig] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
@@ -111,7 +111,7 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    beforeAll(async () => {
+    before(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
@@ -153,7 +153,8 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
         );
         assert.ok(
             mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/core/constants'") ||
-                mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config/env'"),
+                mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config/env'") ||
+                mq.includes("import { MAX_QUEUE_SIZE } from '#copilot/config'"),
             'MAX_QUEUE_SIZE deve ser importado em message-queue.js (onde a verificação de capacidade está)',
         );
         assert.ok(
@@ -206,7 +207,7 @@ describe('always-alive › stop() idempotência', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    beforeAll(async () => {
+    before(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),

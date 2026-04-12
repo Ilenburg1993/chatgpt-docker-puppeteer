@@ -11,7 +11,6 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { test, describe, it } from 'node:test';
 import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------

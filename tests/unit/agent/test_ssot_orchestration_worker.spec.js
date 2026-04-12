@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 
 import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
 import { insertArtifact } from '#infra/db/artifact_repo';
@@ -63,13 +63,13 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
     const dbPath = makeDbPath();
     const artifactsDir = makeArtifactsDir();
 
-    beforeAll(() => {
+    before(() => {
         process.env.MAESTRO_DB_PATH = dbPath;
         process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
         getDb(); // migrations
     });
 
-    afterAll(() => {
+    after(() => {
         try {
             closeDb();
         } catch (_) {}

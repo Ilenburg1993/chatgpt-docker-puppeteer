@@ -6,7 +6,6 @@
  */
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { test, describe, it } from 'node:test';
 import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 39 — SDK Custom Tools Registry Test Suite (F213-F220)
  *

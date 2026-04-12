@@ -20,7 +20,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { it } from 'node:test';
+import { it, before, after } from 'node:test';
 
 // AlwaysAliveAgent é um singleton exportado do módulo — importamos diretamente
 // para garantir o mesmo objeto monitorado pelos listeners do sistema.
@@ -141,7 +141,7 @@ async function runLifecycleCycle(cycleNum, agent) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.skip('AlwaysAliveAgent › ciclo stop/start › F4.7 (UPG-12)', { timeout: BOOT_TIMEOUT_MS * 7 }, () => {
-    beforeAll(async () => {
+    before(async () => {
         // Garantir que o agente está parado antes dos testes
         if (alwaysAliveAgent.status !== 'stopped') {
             if (alwaysAliveAgent.dialogLoopActive) {
@@ -151,7 +151,7 @@ describe.skip('AlwaysAliveAgent › ciclo stop/start › F4.7 (UPG-12)', { timeo
         }
     });
 
-    afterAll(async () => {
+    after(async () => {
         // Limpeza final
         if (alwaysAliveAgent.status !== 'stopped') {
             if (alwaysAliveAgent.dialogLoopActive) {

@@ -5,7 +5,7 @@ import { CHUNKING_STRATEGY, ContextManager } from '#orchestrator/context_manager
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 describe('Context Flow Integration Tests', () => {
     /** @type {any} */ let contextManager;
@@ -27,7 +27,7 @@ describe('Context Flow Integration Tests', () => {
         emitEvent: () => {},
     };
 
-    beforeAll(async () => {
+    before(async () => {
         testMissionsDir = path.join(import.meta.dirname, '../../missions-test-context');
         await fs.mkdir(testMissionsDir, { recursive: true });
 
@@ -49,7 +49,7 @@ describe('Context Flow Integration Tests', () => {
         await missionManager.initialize();
     });
 
-    afterAll(async () => {
+    after(async () => {
         await fs.rm(testMissionsDir, { recursive: true, force: true });
         contextManager.cleanup();
         missionManager.cleanup();
@@ -79,7 +79,7 @@ describe('Context Flow Integration Tests', () => {
     describe('2. Context Accumulation During Execution', () => {
         /** @type {any} */ let testMissionId;
 
-        beforeAll(async () => {
+        before(async () => {
             const mission = await missionManager.createMission({
                 title: 'Accumulation Test',
                 description: 'Test context accumulation',
@@ -138,7 +138,7 @@ describe('Context Flow Integration Tests', () => {
     describe('3. Context in Task Generation', () => {
         /** @type {any} */ let testMissionId;
 
-        beforeAll(async () => {
+        before(async () => {
             const mission = await missionManager.createMission({
                 title: 'Task Generation Test',
                 description: 'Test context in task prompts',

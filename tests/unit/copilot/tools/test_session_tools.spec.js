@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 36 — Session Tools Test Suite (F189-F196)
  *

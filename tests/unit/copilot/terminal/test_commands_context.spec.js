@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/terminal/test_commands_context.spec.js
  *

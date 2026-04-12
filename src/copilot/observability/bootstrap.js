@@ -18,8 +18,7 @@ import { container, wireLegacySetters } from '../core/di-container.js';
 import { AUDIT_LOGGER, DB_LOGGER, EVENT_BUS, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
-import { registerShutdownHandler } from '../core/shutdown.js';
-import { setShutdownLogger } from '../core/shutdown.js';
+import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
 import { setSdkLogger } from '../sdk/logger.js';
@@ -61,7 +60,9 @@ export function bootstrapObservability() {
 
     registerShutdownHandler(
         'error-tracker.destroy',
-        async () => { defaultErrorTracker.destroy(); },
+        async () => {
+            defaultErrorTracker.destroy();
+        },
         45,
     );
 

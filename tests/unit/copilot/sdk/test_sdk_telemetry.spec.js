@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import { describe, expect, it, vi } from 'vitest';
 
 // ─── SDK mock ──────────────────────────────────────────────────────────────

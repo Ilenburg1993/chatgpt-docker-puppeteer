@@ -7,7 +7,6 @@
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { test, describe, it } from 'node:test';
 import { describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks genéricos para dependências pesadas ──────────────────────────

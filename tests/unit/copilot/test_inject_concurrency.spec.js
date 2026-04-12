@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 
 // ─── Test infra: mock HTTP server ────────────────────────────────────────────
 
@@ -105,14 +105,14 @@ describe('F32.3 — injectToLlmB concurrência com múltiplos inject', () => {
     /** @type {typeof import('../../../src/copilot/channel/inject.js').injectToLlmB} */
     let injectToLlmB;
 
-    beforeAll(async () => {
+    before(async () => {
         mock = createMockLlmBServer({ concurrentDelay: 30, maxConcurrent: 1 });
         port = await mock.start();
         const mod = await import('../../../src/copilot/channel/inject.js');
         injectToLlmB = mod.injectToLlmB;
     });
 
-    afterAll(() => {
+    after(() => {
         mock.server.close();
     });
 

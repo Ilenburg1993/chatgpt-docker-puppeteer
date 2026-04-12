@@ -7,13 +7,13 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 
 describe('always-alive.js › delegação para módulos extraídos', () => {
     /** @type {string} */
     let src;
 
-    beforeAll(async () => {
+    before(async () => {
         src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
     });
 

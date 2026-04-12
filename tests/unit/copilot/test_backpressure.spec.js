@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/test_backpressure.spec.js
  *

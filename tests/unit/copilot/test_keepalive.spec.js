@@ -1,5 +1,4 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */

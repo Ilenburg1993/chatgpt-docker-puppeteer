@@ -320,6 +320,8 @@ export const conversationHub = new ConversationHub();
 // FAIXA-0: graceful shutdown — fechar sessions e orchestrator
 registerShutdownHandler(
     'hub.close',
-    async () => { await conversationHub.close(); },
+    async () => {
+        await conversationHub.close();
+    },
     10,
 );

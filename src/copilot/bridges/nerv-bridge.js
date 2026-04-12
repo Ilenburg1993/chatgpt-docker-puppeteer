@@ -34,16 +34,16 @@ import { onSessionEvent } from '#copilot/sdk';
  */
 
 /**
- * Referência ao agente injetada via `registerNervBridgeAgent()`.
- * Não importamos `agent/` diretamente para evitar inversão de camada (bridges → agent).
+ * Referência ao agente injetada via `registerNervBridgeAgent()`. Não importamos `agent/` diretamente para evitar
+ * inversão de camada (bridges → agent).
  *
  * @type {AlwaysAliveAgentLike | null}
  */
 let _agent = null;
 
 /**
- * Registra a instância do AlwaysAliveAgent para uso pelo bridge.
- * Deve ser chamado no bootstrap (main.js) antes de qualquer `mount()`.
+ * Registra a instância do AlwaysAliveAgent para uso pelo bridge. Deve ser chamado no bootstrap (main.js) antes de
+ * qualquer `mount()`.
  *
  * @param {AlwaysAliveAgentLike} agent
  * @returns {void}
@@ -338,7 +338,9 @@ export function mount(nerv) {
     if (!_shutdownRegistered) {
         registerShutdownHandler(
             'nerv-bridge.unmount',
-            async () => { unmount(); },
+            async () => {
+                unmount();
+            },
             20,
         );
         _shutdownRegistered = true;
