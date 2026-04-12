@@ -18,6 +18,8 @@
  */
 
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
+import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
+import { bridgeEmitter } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
@@ -27,7 +29,7 @@ import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
-import { BRIDGE_AGENT, FALLBACK_AGENT, HUB, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../core/di-tokens.js';
+import { BRIDGE_AGENT, EVENT_BUS, FALLBACK_AGENT, HUB, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';
@@ -142,6 +144,13 @@ export async function startTerminalServer() {
     await pinnedLoader.start().catch((/** @type {any} */ e) => {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
+
+    // FAIXA-2C: bridge PinnedFilesLoader → EventBus (6/6 emitters bridged)
+    const _pinnedBus = container.resolve(EVENT_BUS);
+    if (_pinnedBus) {
+        bridgeEmitter(pinnedLoader, _pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED });
+    }
+
     pinnedLoader.on('changed', (/** @type {{ file: string; type: string }} */ evt) => {
         // F13.5: hot-reload de skills/instruções sem reiniciar o agente.
         // buildHookSystemContext() já lê do disco a cada chamada (sem cache), então a próxima

@@ -4,139 +4,141 @@
  *
  * SSOT para strings de eventos cross-module do sistema Copilot.
  *
+ * Este arquivo é o barrel central — re-exporta todos os eventos dos submodules:
+ *   - `events/agent-events.js` — lifecycle, session, task, dialog, handoff
+ *   - `events/hook-events.js`  — HookBus events
+ *   - `events/hub-events.js`   — ConversationHub / Socket.IO events
+ *   - `events/terminal-events.js` — terminal + audit
+ *   - `events/system-events.js`   — shutdown, config, health, bridges
+ *
  * Todos os subsistemas devem importar eventos daqui via `#copilot/events`. Usar strings de evento inline
  * (`'agent:ready'`) fora deste módulo é considerado uma violação arquitetural (critério C11 — PARTE-22).
- *
- * **Regras:**
- *
- * - Sem lógica: apenas `export const` com strings literais
- * - Nomes de constante em UPPER_SNAKE_CASE, agrupados por namespace
- * - Strings de evento no formato `namespace:ação` (hifens para separar palavras em `ação`)
  *
  * @module copilot/events
  * @see EventBus
  */
 
-// ─── Agent lifecycle ──────────────────────────────────────────────────────────
+// ─── Re-exports dos submodules (FAIXA-2A) ────────────────────────────────────
 
-/** @readonly */
-export const AGENT_READY = 'agent:ready';
-/** @readonly */
-export const AGENT_BEFORE_STOP = 'agent:before-stop';
-/** @readonly */
-export const AGENT_STOPPED = 'agent:stopped';
-/** @readonly */
-export const AGENT_SHUTDOWN = 'agent:shutdown';
-/** @readonly */
-export const AGENT_ERROR = 'agent:error';
-/** @readonly */
-export const AGENT_EMITTER_ERROR = 'agent:emitter.error';
+export {
+    // lifecycle
+    AGENT_READY,
+    AGENT_BEFORE_STOP,
+    AGENT_STOPPED,
+    AGENT_SHUTDOWN,
+    AGENT_ERROR,
+    AGENT_EMITTER_ERROR,
+    // session
+    AGENT_SESSION_KEEPALIVE,
+    AGENT_SESSION_FATAL,
+    // task
+    AGENT_TASK_STARTED,
+    AGENT_TASK_DELTA,
+    AGENT_TASK_ERROR,
+    // dialog
+    AGENT_DIALOG_LOOP_CHANGED,
+    AGENT_DIALOG_TURN_TIMEOUT,
+    AGENT_DIALOG_STALLED,
+    AGENT_DIALOG_PAUSED,
+    AGENT_DIALOG_RESUMED,
+    AGENT_DIALOG_STOPPED,
+    AGENT_DIALOG_REPLY,
+    AGENT_DIALOG_COMPACTION_REQUESTED,
+    // handoff
+    AGENT_HANDOFF_RECEIVED,
+    AGENT_HANDOFF_ACCEPTED,
+    AGENT_HANDOFF_REJECTED,
+    // grupos/arrays de classificação (array, para loop dinâmico)
+    AGENT_EVENTS,
+    PR_CONSUMING_EVENTS,
+    DIALOG_LOOP_EVENTS,
+    HIGH_FREQUENCY_EVENTS,
+} from './agent-events.js';
 
-// ─── Agent session ────────────────────────────────────────────────────────────
+export {
+    HOOK_PRE_TOOL_USE,
+    HOOK_POST_TOOL_USE,
+    HOOK_PROMPT_SUBMITTED,
+    HOOK_SESSION_START,
+    HOOK_SESSION_END,
+    HOOK_ERROR_OCCURRED,
+} from './hook-events.js';
 
-/** @readonly */
-export const AGENT_SESSION_KEEPALIVE = 'agent:session:keepalive';
-/** @readonly */
-export const AGENT_SESSION_FATAL = 'agent:session.fatal';
+export {
+    HUB_EVENTS,
+    HUB_ERROR,
+    HUB_SESSION_CREATED,
+    HUB_SESSION_CLOSED,
+    HUB_TURN_SENT,
+    HUB_TURN_COMPLETE,
+    HUB_USER_INJECTED,
+    HUB_TURN_DELTA,
+    HUB_TURN_USER_PENDING,
+} from './hub-events.js';
 
-// ─── Agent task ───────────────────────────────────────────────────────────────
+export {
+    TERMINAL_STARTED,
+    TERMINAL_STOPPED,
+    TERMINAL_COMMAND,
+    AUDIT_ENTRY,
+    AUDIT_FLUSH,
+    AUDIT_LOG,
+    AUDIT_QUICK,
+} from './terminal-events.js';
 
-/** @readonly */
-export const AGENT_TASK_STARTED = 'agent:task:started';
-/** @readonly */
-export const AGENT_TASK_DELTA = 'agent:task:delta';
-/** @readonly */
-export const AGENT_TASK_ERROR = 'agent:task.error';
-
-// ─── Agent dialog ─────────────────────────────────────────────────────────────
-
-/** @readonly */
-export const AGENT_DIALOG_LOOP_CHANGED = 'agent:dialog:loop:changed';
-/** @readonly */
-export const AGENT_DIALOG_TURN_TIMEOUT = 'agent:dialog.turn_timeout';
-/** @readonly */
-export const AGENT_DIALOG_STALLED = 'agent:dialog:stalled';
-/** @readonly */
-export const AGENT_DIALOG_PAUSED = 'agent:dialog:paused';
-/** @readonly */
-export const AGENT_DIALOG_RESUMED = 'agent:dialog:resumed';
-/** @readonly */
-export const AGENT_DIALOG_STOPPED = 'agent:dialog:stopped';
-/** @readonly */
-export const AGENT_DIALOG_REPLY = 'agent:dialog:reply';
-/** @readonly */
-export const AGENT_DIALOG_COMPACTION_REQUESTED = 'agent:dialog:compaction:requested';
-
-// ─── Hook events (bridgeable via HookBus → EventBus) ─────────────────────────
-
-/** @readonly */
-export const HOOK_PRE_TOOL_USE = 'hook:pre_tool_use';
-/** @readonly */
-export const HOOK_POST_TOOL_USE = 'hook:post_tool_use';
-/** @readonly */
-export const HOOK_PROMPT_SUBMITTED = 'hook:prompt_submitted';
-/** @readonly */
-export const HOOK_SESSION_START = 'hook:session_start';
-/** @readonly */
-export const HOOK_SESSION_END = 'hook:session_end';
-/** @readonly */
-export const HOOK_ERROR_OCCURRED = 'hook:error_occurred';
-
-// ─── Handoff events ───────────────────────────────────────────────────────────
-
-/** @readonly */
-export const AGENT_HANDOFF_RECEIVED = 'agent:handoff:received';
-/** @readonly */
-export const AGENT_HANDOFF_ACCEPTED = 'agent:handoff:accepted';
-/** @readonly */
-export const AGENT_HANDOFF_REJECTED = 'agent:handoff:rejected';
-
-// ─── Hub (Conversation Hub) ───────────────────────────────────────────────────
-
-/** @readonly */
-export const HUB_ERROR = 'hub:error';
-/** @readonly */
-export const HUB_SESSION_CREATED = 'hub:session:created';
-/** @readonly */
-export const HUB_SESSION_CLOSED = 'hub:session:closed';
-/** @readonly */
-export const HUB_TURN_SENT = 'hub:turn:sent';
-/** @readonly */
-export const HUB_TURN_COMPLETE = 'hub:turn:complete';
-/** @readonly */
-export const HUB_USER_INJECTED = 'hub:user:injected';
-
-// ─── Terminal ─────────────────────────────────────────────────────────────────
-
-/** @readonly */
-export const TERMINAL_STARTED = 'terminal:started';
-/** @readonly */
-export const TERMINAL_STOPPED = 'terminal:stopped';
-/** @readonly */
-export const TERMINAL_COMMAND = 'terminal:command';
-
-// ─── Audit ────────────────────────────────────────────────────────────────────
-
-/** @readonly */
-export const AUDIT_ENTRY = 'audit:entry';
-/** @readonly */
-export const AUDIT_FLUSH = 'audit:flush';
-/** @readonly */
-export const AUDIT_LOG = 'audit:log';
-/** @readonly */
-export const AUDIT_QUICK = 'audit:quick';
+export {
+    SYSTEM_SHUTDOWN_STARTED,
+    SYSTEM_SHUTDOWN_COMPLETE,
+    CONFIG_PINNED_FILES_CHANGED,
+    CONFIG_CHANGED,
+    HEALTH_CHECK,
+    HEALTH_DEGRADED,
+    HEALTH_RECOVERED,
+    BRIDGE_MCP_RECONNECTED,
+    BRIDGE_NERV_CONNECTED,
+    BRIDGE_NERV_DISCONNECTED,
+} from './system-events.js';
 
 // ─── Re-exports de types/events.js para compatibilidade ──────────────────────
 export { EVENT_NAMES, EVENT_NAMESPACES } from '../types/events.js';
 
 // ─── Grupos consolidados (para uso em switch/Map) ─────────────────────────────
 
+import {
+    AGENT_READY,
+    AGENT_BEFORE_STOP,
+    AGENT_STOPPED,
+    AGENT_SHUTDOWN,
+    AGENT_ERROR,
+    AGENT_EMITTER_ERROR,
+    AGENT_SESSION_KEEPALIVE,
+    AGENT_SESSION_FATAL,
+    AGENT_TASK_STARTED,
+    AGENT_TASK_DELTA,
+    AGENT_TASK_ERROR,
+    AGENT_DIALOG_LOOP_CHANGED,
+    AGENT_DIALOG_TURN_TIMEOUT,
+} from './agent-events.js';
+
+import {
+    HUB_ERROR,
+    HUB_SESSION_CREATED,
+    HUB_SESSION_CLOSED,
+    HUB_TURN_SENT,
+    HUB_TURN_COMPLETE,
+    HUB_USER_INJECTED,
+} from './hub-events.js';
+
+import { TERMINAL_STARTED, TERMINAL_STOPPED, TERMINAL_COMMAND } from './terminal-events.js';
+import { AUDIT_ENTRY, AUDIT_FLUSH, AUDIT_LOG, AUDIT_QUICK } from './terminal-events.js';
+
 /**
- * Todos os eventos de agente agrupados.
+ * Mapa de eventos de agente agrupados (para uso em switch/Map).
+ * Para o array de eventos do SDK (loop dinâmico de listeners), use `AGENT_EVENTS`.
  *
  * @readonly
  */
-export const AGENT_EVENTS = /** @type {const} */ ({
+export const AGENT_EVENTS_MAP = /** @type {const} */ ({
     READY: AGENT_READY,
     BEFORE_STOP: AGENT_BEFORE_STOP,
     STOPPED: AGENT_STOPPED,

@@ -23,6 +23,7 @@ import { setDbLogger } from '../db/sqlite.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { defaultErrorTracker } from './error-tracker.js';
+import { attachEventBusObservers } from './event-bus-observers.js';
 import { LOG_DIR, log } from './logger.js';
 
 /**
@@ -47,6 +48,9 @@ export function bootstrapObservability() {
 
     // Event Bus global — singleton cross-module
     container.register(EVENT_BUS, () => createEventBus(), 'singleton');
+
+    // FAIXA-2D: registrar subscribers cross-module no EventBus (best-effort após registro do bus)
+    attachEventBusObservers();
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
     registerShutdownHandler(

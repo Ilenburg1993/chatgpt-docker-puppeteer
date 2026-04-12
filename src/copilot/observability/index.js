@@ -42,6 +42,9 @@ export { bootstrapLateDeps, bootstrapObservability } from './bootstrap.js';
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';
 
+// ─── EventBus Observers (FAIXA-2D) ───────────────────────────────────────────
+export { attachEventBusObservers, detachEventBusObservers } from './event-bus-observers.js';
+
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 export { createAuditLog, defaultAuditLog } from '#copilot/audit';
 

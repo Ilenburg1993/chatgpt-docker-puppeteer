@@ -4,9 +4,9 @@
  * @see EventBus
  * @file Constantes de eventos emitidos pelo AlwaysAliveAgent.
  *
- *   Centraliza os nomes de evento para que testes, bridges e consumidores possam subscribir sem depender de strings
- *   literais espalhadas. Manter esta lista sincronizada com os `emit()` em `always-alive.js`, `dialog/loop-manager.js`
- *   e `infra/task-executor.js`.
+ * @deprecated FAIXA-2B: Importar de `#copilot/events` (via `events/agent-events.js`) em vez deste módulo.
+ *   Este arquivo é mantido para compatibilidade retroativa e será removido em versão futura.
+ *   Consumidores atuais: `agent/state/agent-state.js`, `api/bridge/stream.js`, `terminal/terminal-agent-wiring.js`.
  *
  *   Originalmente em `agent/events.js` — movido para `core/` (R9) para eliminar a dependência invertida `core/ → agent/`.
  */
@@ -187,3 +187,18 @@ export const DIALOG_LOOP_EVENTS = /** @type {ReadonlySet<string>} */ (
 export const HIGH_FREQUENCY_EVENTS = /** @type {ReadonlySet<AgentEventName>} */ (
     new Set(['task.delta', 'task.reasoning', 'session.usage', 'dialog.turn_start', 'dialog.turn_end'])
 );
+
+// ─── FAIXA-2B: Re-exports individuais via SSOT (forward-compat) ──────────────
+// Os consumers que já importam de `#copilot/events` recebem as mesmas constantes.
+// Futuramente, quando AGENT_EVENTS migrar para importar de `#copilot/events`, este arquivo pode ser
+// substituído por um simples thin re-export.
+export {
+    AGENT_READY,
+    AGENT_BEFORE_STOP,
+    AGENT_STOPPED,
+    AGENT_SHUTDOWN,
+    AGENT_ERROR,
+    AGENT_HANDOFF_RECEIVED,
+    AGENT_HANDOFF_ACCEPTED,
+    AGENT_HANDOFF_REJECTED,
+} from '../events/agent-events.js';

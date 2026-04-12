@@ -1,18 +1,19 @@
 // @ts-check
 /**
- * src/copilot/conversation-hub/events.js
+ * src/copilot/events/hub-events.js
  *
- * F55/F314 — Constantes de eventos do Conversation Hub (socket namespaces).
+ * Constantes de eventos do ConversationHub (socket namespaces, sessions, turns, user inject).
  *
- * @deprecated FAIXA-2B: Importar de `#copilot/events` em vez deste módulo.
- *   Maintained para compatibilidade retroativa. Será removido em versão futura.
+ * Migrado de `conversation-hub/events.js` (FAIXA-2A). Consumidores devem importar de `#copilot/events`.
  *
- * @module copilot/conversation-hub/events
+ * @module copilot/events/hub-events
  * @see EventBus
  */
 
 /**
  * Eventos emitidos/consumidos pelo ConversationHub e seus socket namespaces.
+ *
+ * @readonly
  */
 export const HUB_EVENTS = /** @type {const} */ ({
     // ── socket lifecycle ──
@@ -48,3 +49,22 @@ export const HUB_EVENTS = /** @type {const} */ ({
     ERROR_HISTORY: 'error:history',
     ERROR_INJECT: 'error:inject',
 });
+
+// ─── Constantes individuais (para bridge e subscribers) ──────────────────────
+
+/** @readonly */
+export const HUB_ERROR = 'hub:error';
+/** @readonly */
+export const HUB_SESSION_CREATED = 'session:created';
+/** @readonly */
+export const HUB_SESSION_CLOSED = 'session:closed';
+/** @readonly */
+export const HUB_TURN_SENT = 'turn:sent';
+/** @readonly */
+export const HUB_TURN_COMPLETE = 'turn:complete';
+/** @readonly */
+export const HUB_USER_INJECTED = 'user:injected';
+/** @readonly */
+export const HUB_TURN_DELTA = 'turn:delta';
+/** @readonly */
+export const HUB_TURN_USER_PENDING = 'turn:user_pending';
