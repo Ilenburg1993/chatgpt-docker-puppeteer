@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave16r: server main enforces single realtime source by DASHBOARD_TASK_SYNC_MODE', async () => {
     const filePath = path.join(process.cwd(), 'src/server/main.js');

@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * @file Faixa 50 — API: session-middleware + event-fanout
  *

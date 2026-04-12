@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import { OllamaEmbeddingsProvider } from '../../../tools/rag/lib/embeddings/ollama.mjs';
 

@@ -3,6 +3,7 @@ import { createKernel } from '#kernel/kernel';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 // Mock NERV simple (compatível com nerv.onReceive + nerv.emitCommand/emitEvent)
 class MockNERV extends EventEmitter {

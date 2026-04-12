@@ -2,6 +2,7 @@
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('NERV Envelope - Protocolo Universal', () => {
     describe('1. Criação Básica de Envelope', () => {

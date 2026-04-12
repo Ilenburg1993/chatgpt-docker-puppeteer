@@ -8,6 +8,7 @@
  * CopilotClient REAL nao e instanciado — todos os testes usam mocks.
  */
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 // ─── mock de CopilotClient ───────────────────────────────────────────────────
 

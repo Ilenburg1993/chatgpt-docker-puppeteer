@@ -1,3 +1,4 @@
+import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/test_observability_f68_f70.spec.js
  *

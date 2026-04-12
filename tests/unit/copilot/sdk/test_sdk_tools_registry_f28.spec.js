@@ -31,6 +31,7 @@ import {
 } from '#copilot/sdk';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it, beforeEach } from 'node:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 // ─── helpers ───────────────────────────────────────────────────────────────

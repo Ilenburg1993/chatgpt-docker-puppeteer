@@ -2,6 +2,7 @@
 import { shutdown as shutdownDriverFactory } from '#driver/factory';
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 class MockNerv {
     constructor() {

@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { describe, it } from 'node:test';
 
 describe('F30.4 — Usage dedup: sem contagem dupla', async () => {
     /** @type {string} */

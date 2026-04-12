@@ -7,6 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 /** @type {typeof import('#copilot/agent/infra/status-snapshot').buildStatusSnapshot} */
 let buildStatusSnapshot;

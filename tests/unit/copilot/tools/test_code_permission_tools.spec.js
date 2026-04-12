@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * @file Faixa 46 — Business logic: code-tools, permission-tools, rate-limiter-state
  *

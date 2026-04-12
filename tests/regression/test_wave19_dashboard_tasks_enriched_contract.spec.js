@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave19: dashboard tasks/missions mantém contrato enriquecido de contexto', async () => {
     const dashboardTasks = await fs.readFile(

@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { AUDIT_PHASES } from '../../../scripts/audit/lib/event_types.mjs';
 import { buildPhasePlan } from '../../../scripts/audit/lib/phase_plan.mjs';

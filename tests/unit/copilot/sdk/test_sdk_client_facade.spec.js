@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/sdk/test_sdk_client_facade.spec.js
  *

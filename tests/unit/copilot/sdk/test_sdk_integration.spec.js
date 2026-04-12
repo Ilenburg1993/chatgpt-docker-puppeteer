@@ -1,3 +1,4 @@
+import { describe, it, beforeEach } from 'node:test';
 /**
  * Faixa 17 - Integration Tests: New Features (F90-F94)
  *

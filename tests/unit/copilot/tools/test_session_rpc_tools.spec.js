@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/tools/test_session_rpc_tools.spec.js
  *

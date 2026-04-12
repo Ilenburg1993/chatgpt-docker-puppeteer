@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it, beforeEach } from 'node:test';
 
 import sinon from 'sinon';
 

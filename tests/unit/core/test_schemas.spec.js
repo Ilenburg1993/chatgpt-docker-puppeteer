@@ -2,6 +2,7 @@
 import { STATUS_VALUES } from '#core/constants/tasks';
 import * as schemas from '#core/schemas';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Task Schema Validation', () => {
     describe('Validação de tarefas válidas', () => {

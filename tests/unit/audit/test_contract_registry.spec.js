@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { loadContractRegistry } from '../../../scripts/audit/contracts/load_registry.mjs';
 

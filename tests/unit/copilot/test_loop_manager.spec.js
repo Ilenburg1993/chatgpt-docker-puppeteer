@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/test_loop_manager.spec.js
  *

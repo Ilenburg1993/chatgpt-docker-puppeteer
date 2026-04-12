@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 
 const SRC = fs.readFileSync(path.resolve('src/copilot/channel/inject.js'), 'utf8');
 const SSE_SRC = fs.readFileSync(path.resolve('src/copilot/channel/sse-client.js'), 'utf8');

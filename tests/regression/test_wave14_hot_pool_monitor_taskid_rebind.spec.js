@@ -1,6 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
+import { test } from 'node:test';
 
 import { PageLifecycleMonitor } from '#infra/browser_pool/PageLifecycleMonitor';
 import BrowserPoolManager from '#infra/browser_pool/pool_manager';

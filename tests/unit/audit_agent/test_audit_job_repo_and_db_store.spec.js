@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { createAuditAgentDbStore } from '../../../src/audit_agent/db_store.js';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';

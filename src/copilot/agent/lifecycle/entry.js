@@ -103,15 +103,9 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // ─── Handlers de erros não tratados ──────────────────────────────────────────
-process.on('uncaughtException', (err) => {
-    log('FATAL', `[entry] uncaughtException: ${err.message}`);
-    defaultErrorTracker.trackError(err, { source: 'uncaughtException' });
-});
-process.on('unhandledRejection', (reason) => {
-    const msg = reason instanceof Error ? reason.message : String(reason);
-    log('ERROR', `[entry] unhandledRejection: ${msg}`);
-    defaultErrorTracker.trackError(reason, { source: 'unhandledRejection' });
-});
+// Delegado ao error-tracker singleton que já implementa trackError + log.
+// Evita duplicação de handlers (FAIXA-0 Quick Win #2).
+defaultErrorTracker.registerGlobalHandlers();
 
 // ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
 // Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.

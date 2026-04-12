@@ -5,6 +5,7 @@
  * Testes unitários para src/copilot/lib/agents.js
  */
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
     READ_ONLY_TOOLS,

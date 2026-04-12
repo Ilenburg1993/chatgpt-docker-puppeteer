@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * @file Faixa 41 — RPC Facade Edge Cases + Integration Contracts (F229-F235)
  *

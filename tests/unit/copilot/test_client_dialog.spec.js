@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/test_client_dialog.spec.js
  *

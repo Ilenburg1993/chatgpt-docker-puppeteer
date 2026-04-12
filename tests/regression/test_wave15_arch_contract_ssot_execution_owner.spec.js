@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave15: contrato de ownership SSOT de dispatch está registrado em architecture.json', async () => {
     const filePath = path.join(process.cwd(), 'contracts/domains/architecture.json');

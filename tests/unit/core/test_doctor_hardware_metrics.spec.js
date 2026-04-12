@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { test } from 'node:test';
 
 import { getHardwareMetrics } from '../../../src/core/doctor.js';
 

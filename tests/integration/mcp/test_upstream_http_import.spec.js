@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import http from 'node:http';
+import { test } from 'node:test';
 
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
 import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';

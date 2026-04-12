@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 44 — Agent: hook-context + WebhookManager + mode-and-tools
  *

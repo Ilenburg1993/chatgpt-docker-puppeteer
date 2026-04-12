@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
 import { closeDb, getDb } from '#infra/db/sqlite';

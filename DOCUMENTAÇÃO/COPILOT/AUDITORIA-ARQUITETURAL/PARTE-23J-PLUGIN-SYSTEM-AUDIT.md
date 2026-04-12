@@ -10,11 +10,11 @@
 
 ### 1.1 Arquivos
 
-| Arquivo | LoC | Função |
-|---------|-----|--------|
-| `plugins/plugin-registry.js` | 225 | PluginRegistry class + discoverPlugins() |
-| `plugins/index.js` | 30 | Re-exports + CopilotPlugin typedef |
-| **Total** | **255** | |
+| Arquivo                      | LoC     | Função                                   |
+| ---------------------------- | ------- | ---------------------------------------- |
+| `plugins/plugin-registry.js` | 225     | PluginRegistry class + discoverPlugins() |
+| `plugins/index.js`           | 30      | Re-exports + CopilotPlugin typedef       |
+| **Total**                    | **255** |                                          |
 
 ### 1.2 Status
 
@@ -35,15 +35,15 @@ new PluginRegistry()
 
 ### 2.2 Métodos Públicos
 
-| Método | Signature | Comportamento |
-|--------|-----------|--------------|
-| `register(plugin)` | `(CopilotPlugin) → void` | Valida + armazena. Throw se nome duplicado. |
+| Método                     | Signature                    | Comportamento                                                           |
+| -------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| `register(plugin)`         | `(CopilotPlugin) → void`     | Valida + armazena. Throw se nome duplicado.                             |
 | `install(name, container)` | `(string, Container) → void` | Resolve deps → chama `plugin.install(container)`. Throw se dep missing. |
-| `installAll(container)` | `(Container) → void` | Itera registry, instala todos por ordem de dependência. |
-| `list()` | `() → CopilotPlugin[]` | Retorna cópia do array de plugins. |
-| `has(name)` | `(string) → boolean` | Verifica existência. |
-| `get(name)` | `(string) → CopilotPlugin` | Retorna plugin. Throw se missing. |
-| `clear()` | `() → void` | Limpa registry. |
+| `installAll(container)`    | `(Container) → void`         | Itera registry, instala todos por ordem de dependência.                 |
+| `list()`                   | `() → CopilotPlugin[]`       | Retorna cópia do array de plugins.                                      |
+| `has(name)`                | `(string) → boolean`         | Verifica existência.                                                    |
+| `get(name)`                | `(string) → CopilotPlugin`   | Retorna plugin. Throw se missing.                                       |
+| `clear()`                  | `() → void`                  | Limpa registry.                                                         |
 
 ### 2.3 discoverPlugins()
 ```js
@@ -96,14 +96,14 @@ discoverPlugins(baseDir, registry)
 
 ### 4.1 Checklist de Ativação
 
-| # | Item | Status | Esforço |
-|---|------|--------|---------|
-| 1 | PluginRegistry precisa ser importado em algum lugar | ❌ Não importado | 1 linha |
-| 2 | `discoverPlugins()` precisa ser chamado no boot | ❌ Nunca chamado | 3 linhas |
-| 3 | `registry.installAll(container)` precisa ser chamado | ❌ Nunca chamado | 1 linha |
-| 4 | Feature flag `plugins` em sdk/feature-flags.js | ✅ Já existe! | 0 |
-| 5 | Pelo menos 1 plugin real para descobrir | ❌ Nenhum | ~50 LoC |
-| 6 | Testes para PluginRegistry | ❌ Nenhum | ~80 LoC |
+| #   | Item                                                 | Status          | Esforço  |
+| --- | ---------------------------------------------------- | --------------- | -------- |
+| 1   | PluginRegistry precisa ser importado em algum lugar  | ❌ Não importado | 1 linha  |
+| 2   | `discoverPlugins()` precisa ser chamado no boot      | ❌ Nunca chamado | 3 linhas |
+| 3   | `registry.installAll(container)` precisa ser chamado | ❌ Nunca chamado | 1 linha  |
+| 4   | Feature flag `plugins` em sdk/feature-flags.js       | ✅ Já existe!    | 0        |
+| 5   | Pelo menos 1 plugin real para descobrir              | ❌ Nenhum        | ~50 LoC  |
+| 6   | Testes para PluginRegistry                           | ❌ Nenhum        | ~80 LoC  |
 
 ### 4.2 Minimal Viable Integration (~10 linhas)
 
@@ -239,11 +239,11 @@ DI tokens ──→ EVENT_BUS, loggers, services, bridges
 
 ## 8. Métricas Pré/Pós Ativação
 
-| Métrica | Antes | Após V1 | Após V2 |
-|---------|-------|---------|---------|
-| Plugins loaded | 0 | 3 builtin | 5+ |
-| Plugin system órfão | ✅ | ❌ | ❌ |
-| Feature-flagged | Não | Sim | Sim |
-| Specs para plugins | 0 | 3+ | 10+ |
-| Wiring espalhado | 3 arquivos | 3 + plugins | Plugins only |
-| Install error isolation | N/A | Não | Sim (try/catch) |
+| Métrica                 | Antes      | Após V1     | Após V2         |
+| ----------------------- | ---------- | ----------- | --------------- |
+| Plugins loaded          | 0          | 3 builtin   | 5+              |
+| Plugin system órfão     | ✅          | ❌           | ❌               |
+| Feature-flagged         | Não        | Sim         | Sim             |
+| Specs para plugins      | 0          | 3+          | 10+             |
+| Wiring espalhado        | 3 arquivos | 3 + plugins | Plugins only    |
+| Install error isolation | N/A        | Não         | Sim (try/catch) |

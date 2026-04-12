@@ -6,6 +6,7 @@ test('wave16r: dashboard socket rejects clients without JWT when auth is require
     const script = `
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { test } from 'node:test';
 import express from 'express';
 import { io as ioClient } from 'socket.io-client';
 import * as socketHub from '#server/engine/socket';

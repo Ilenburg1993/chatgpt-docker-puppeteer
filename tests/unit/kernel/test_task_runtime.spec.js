@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Kernel Task Runtime - Ambiente de Execução', () => {
     describe('1. Contexto de Execução', () => {

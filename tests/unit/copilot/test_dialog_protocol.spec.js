@@ -1,3 +1,4 @@
+import { describe, it } from 'node:test';
 import {
     DIALOG_PROTO_DONE,
     DIALOG_PROTO_READY,

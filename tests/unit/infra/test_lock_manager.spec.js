@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Infra Lock Manager - Gerenciador de Locks', () => {
     describe('1. Aquisição de Locks', () => {

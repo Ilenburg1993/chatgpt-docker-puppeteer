@@ -15,6 +15,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { ROUTE_TABLE, matchRoute } from '../../../src/copilot/terminal/route-table.js';
 

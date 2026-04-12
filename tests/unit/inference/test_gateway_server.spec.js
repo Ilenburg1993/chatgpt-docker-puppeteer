@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { createInferenceGatewayServer } from '../../../src/inference_gateway/server.js';
 

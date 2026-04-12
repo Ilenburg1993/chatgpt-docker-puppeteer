@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { readFile } from 'node:fs/promises';
+import { describe, it } from 'node:test';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 
 describe('agent-lifecycle › exports', () => {

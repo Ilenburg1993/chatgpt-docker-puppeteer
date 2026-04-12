@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import * as promClient from 'prom-client';
 

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 

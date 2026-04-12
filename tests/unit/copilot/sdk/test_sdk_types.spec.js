@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/sdk/test_sdk_types.spec.js
  *

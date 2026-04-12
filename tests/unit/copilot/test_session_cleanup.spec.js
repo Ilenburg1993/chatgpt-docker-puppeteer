@@ -6,6 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 describe('cleanupStaleSessions', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/cleanup.js').cleanupStaleSessions} */

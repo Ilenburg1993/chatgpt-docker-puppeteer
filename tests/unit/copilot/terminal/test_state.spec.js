@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach, afterEach } from 'node:test';
 /**
  * tests/unit/copilot/terminal/test_state.spec.js
  *

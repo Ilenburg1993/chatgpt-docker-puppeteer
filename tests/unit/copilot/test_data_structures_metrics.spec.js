@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * @file Faixa 45 — Data structures & metrics: histogram, ring-buffer, known-models, stats-tracker
  *

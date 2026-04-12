@@ -7,6 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { describe, it } from 'node:test';
 
 describe('always-alive.js › delegação para módulos extraídos', () => {
     /** @type {string} */

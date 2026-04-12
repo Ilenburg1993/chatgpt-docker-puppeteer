@@ -12,6 +12,7 @@
  *   caso contrário via smoke tests do comportamento público.
  */
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { buildMcpTools, listMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 

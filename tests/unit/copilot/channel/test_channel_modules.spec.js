@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 40 — Channel Module Test Suite (F221-F228)
  *

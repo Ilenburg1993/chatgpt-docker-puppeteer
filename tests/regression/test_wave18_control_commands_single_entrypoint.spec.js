@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave18: control plane expõe endpoint único e controllers delegam para executeCommand', async () => {
     const routerContent = await fs.readFile(path.join(process.cwd(), 'src/server/api/router.js'), 'utf8');

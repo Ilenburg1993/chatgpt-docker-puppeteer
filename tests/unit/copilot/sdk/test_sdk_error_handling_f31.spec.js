@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * @file Faixa 31 — Error Handling Consolidation
  *

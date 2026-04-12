@@ -252,10 +252,10 @@ A Fase 2D do roadmap expandido (PARTE-23I) endereça isso: migrar observers para
 
 ### 7.3 Tabela de Métricas Corrigida
 
-| Critério | Atual (corrigido) | Pós E1 | Pós E2 | Pós E3 |
-|----------|-------------------|--------|--------|---------|
-| Fontes de evento | 4 | 1 (events/) | 1 | 1 |
-| Constantes em events/ | 31 | ~60 | ~60 | ~60 |
-| bridgeEmitter coverage | 2/8 (25%) | 2/8 | 2/8 | 8/8 (100%) |
-| EventBus subscribers cross-module | 0 | 0 | 5+ | 10+ |
-| Inline event strings em prod | ~30 | ~15 | ~5 | 0 |
+| Critério                          | Atual (corrigido) | Pós E1      | Pós E2 | Pós E3     |
+| --------------------------------- | ----------------- | ----------- | ------ | ---------- |
+| Fontes de evento                  | 4                 | 1 (events/) | 1      | 1          |
+| Constantes em events/             | 31                | ~60         | ~60    | ~60        |
+| bridgeEmitter coverage            | 2/8 (25%)         | 2/8         | 2/8    | 8/8 (100%) |
+| EventBus subscribers cross-module | 0                 | 0           | 5+     | 10+        |
+| Inline event strings em prod      | ~30               | ~15         | ~5     | 0          |

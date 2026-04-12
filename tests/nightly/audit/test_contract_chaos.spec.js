@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 test('chaos harness baseline: invariants stay stable under synthetic fault input', async () => {
     const syntheticFaults = [

@@ -13,6 +13,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 describe('F34.6 — NERV ↔ Agent bridge integration', async () => {
     /** @type {string} */

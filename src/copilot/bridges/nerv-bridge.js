@@ -25,6 +25,7 @@
  * @see module:copilot/conversation-hub/hub
  */
 
+import { registerShutdownHandler } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { onSessionEvent } from '#copilot/sdk';
 
@@ -217,6 +218,9 @@ let _inboundUnsub = null;
  */
 let _beforeStopRegistered = false;
 
+/** @type {boolean} Flag para evitar registro duplicado de shutdown handler. */
+let _shutdownRegistered = false;
+
 /**
  * B10-03: rastrear o handler once('ready') pendente para poder removê-lo em unmount() antes do disparo. Evita
  * re-anexação de listeners após bridge ter sido desmontado.
@@ -329,6 +333,16 @@ export function mount(nerv) {
     }
 
     log('INFO', '[nerv-bridge] Bridge NERV↔AlwaysAlive montado.');
+
+    // FAIXA-0: graceful shutdown — desmontar bridge ao encerrar processo (registro idempotente)
+    if (!_shutdownRegistered) {
+        registerShutdownHandler(
+            'nerv-bridge.unmount',
+            async () => { unmount(); },
+            20,
+        );
+        _shutdownRegistered = true;
+    }
 }
 
 /**
@@ -414,6 +428,7 @@ export const copilotNervBridge = { mount, unmount, isMounted, emitNerv };
 export function _resetNervBridgeState() {
     _nerv = null;
     _beforeStopRegistered = false;
+    _shutdownRegistered = false;
     _pendingReadyHandler = null;
     _listeners.clear();
 }

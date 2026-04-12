@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave18: caminhos legados permanecem em contingência explícita', async () => {
     const serverMain = await fs.readFile(path.join(process.cwd(), 'src/server/main.js'), 'utf8');

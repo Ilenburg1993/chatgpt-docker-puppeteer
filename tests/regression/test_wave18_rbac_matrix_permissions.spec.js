@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
 import { hasPermission } from '#server/domain/rbac_policy';

@@ -66,7 +66,7 @@
 ```js
 const cb = new CircuitBreaker({ threshold: 3, timeout: 30000 });
 const result = await withRetry(
-    () => cb.execute(() => mcpCall()), 
+    () => cb.execute(() => mcpCall()),
     { maxAttempts: 3, shouldRetry: (err) => !(err instanceof CircuitOpenError) }
 );
 ```

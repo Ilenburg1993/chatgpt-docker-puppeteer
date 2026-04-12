@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock de dependências externas

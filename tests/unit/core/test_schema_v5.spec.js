@@ -1,6 +1,7 @@
 // @ts-check
 import { TaskSchemaV5 } from '#core/schemas/task_schema_v5';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import {
     autoMigrateTask,

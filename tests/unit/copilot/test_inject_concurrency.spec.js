@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { describe, it } from 'node:test';
 
 // ─── Test infra: mock HTTP server ────────────────────────────────────────────
 

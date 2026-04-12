@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 describe('stabilizer.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;

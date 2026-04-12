@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { ResilientLockManager } from '../../src/infra/locks/resilient_lock.js';
 import { registerUpstreams, shutdownUpstreams } from '../../src/integration/mcp/upstream-manager.mjs';

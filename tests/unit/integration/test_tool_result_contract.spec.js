@@ -1,6 +1,7 @@
 // @ts-check
 import express from 'express';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import { ToolRegistry, normalizeToolResultPayload } from '../../../src/integration/tool-registry.mjs';
 import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';

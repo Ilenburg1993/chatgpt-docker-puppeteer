@@ -1,3 +1,4 @@
+import { describe, it, beforeEach } from 'node:test';
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck -- test file uses untyped mocks extensively
 /**

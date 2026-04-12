@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/terminal/test_handlers_system_config.spec.js
  *

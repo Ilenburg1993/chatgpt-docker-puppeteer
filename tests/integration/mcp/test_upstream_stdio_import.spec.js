@@ -1,6 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
 import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';

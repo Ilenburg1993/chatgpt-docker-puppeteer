@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 
 describe('Infra IO Operations - Operações de Entrada/Saída', () => {
     /** @type {any} */ let testDir;

@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach, afterEach } from 'node:test';
 /**
  * @file Faixa 49 — error-alerting, jsonl-writer, engine-persistence
  *

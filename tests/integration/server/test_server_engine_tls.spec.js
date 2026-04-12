@@ -3,6 +3,7 @@ import * as serverEngine from '#server/engine/server';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import path from 'node:path';
+import { test } from 'node:test';
 
 async function getFreePort() {
     const server = net.createServer();

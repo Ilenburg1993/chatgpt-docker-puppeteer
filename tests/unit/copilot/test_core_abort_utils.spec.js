@@ -6,6 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { withTimeout } from '../../../src/copilot/core/abort-utils.js';
 import { TimeoutError } from '../../../src/copilot/core/errors.js';

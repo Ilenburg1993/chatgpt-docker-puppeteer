@@ -264,16 +264,16 @@ A tabela da Seção 5 afirma que todos os BaseEmitter emitem localmente "❌ loc
 
 **Tabela corrigida**:
 
-| Arquivo | Classe | EventBus? | Via |
-|---------|--------|-----------|-----|
-| always-alive.js | AlwaysAliveAgent | ✅ 7 events bridged | bridgeEmitter |
-| hub.js/orchestrator | HubOrchestrator | ✅ 5 events bridged | bridgeEmitter |
-| hooks/bus.js | HookBus | ❌ local | — |
-| loop-manager.js | DialogLoopManager | ❌ local | — |
-| handoff-manager.js | HandoffManager | ❌ local | — |
-| pinned-files.js | PinnedFilesLoader | ❌ local | — |
-| fanout.js | (createEmitter) | ❌ local | — |
-| state.js | (createEmitter) | ❌ local | — |
+| Arquivo             | Classe            | EventBus?          | Via           |
+| ------------------- | ----------------- | ------------------ | ------------- |
+| always-alive.js     | AlwaysAliveAgent  | ✅ 7 events bridged | bridgeEmitter |
+| hub.js/orchestrator | HubOrchestrator   | ✅ 5 events bridged | bridgeEmitter |
+| hooks/bus.js        | HookBus           | ❌ local            | —             |
+| loop-manager.js     | DialogLoopManager | ❌ local            | —             |
+| handoff-manager.js  | HandoffManager    | ❌ local            | —             |
+| pinned-files.js     | PinnedFilesLoader | ❌ local            | —             |
+| fanout.js           | (createEmitter)   | ❌ local            | —             |
+| state.js            | (createEmitter)   | ❌ local            | —             |
 
 **Coverage**: 2/8 bridged (25%), não 0/8 como indicado anteriormente.
 

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave18: mission/task control services aplicam guard pause-to-edit', async () => {
     const missionControl = await fs.readFile(

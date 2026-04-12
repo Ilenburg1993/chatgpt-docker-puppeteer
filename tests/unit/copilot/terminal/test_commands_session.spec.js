@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/terminal/test_commands_session.spec.js
  *

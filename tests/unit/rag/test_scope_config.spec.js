@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import { resolveRagScopeConfig } from '../../../tools/rag/lib/scope_config.mjs';
 

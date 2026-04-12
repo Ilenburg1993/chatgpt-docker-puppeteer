@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 import { createAuditAgentServer } from '../../../src/audit_agent/server.js';

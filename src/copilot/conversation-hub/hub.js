@@ -12,7 +12,7 @@
  * @see module:copilot/bridges/nerv-bridge
  */
 
-import { SessionError, bridgeEmitter, logSwallowed } from '#copilot/core';
+import { SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';
 import {
     HUB_SESSION_CLOSED,
     HUB_SESSION_CREATED,
@@ -316,3 +316,10 @@ export class ConversationHub {
  * @type {ConversationHub}
  */
 export const conversationHub = new ConversationHub();
+
+// FAIXA-0: graceful shutdown — fechar sessions e orchestrator
+registerShutdownHandler(
+    'hub.close',
+    async () => { await conversationHub.close(); },
+    10,
+);

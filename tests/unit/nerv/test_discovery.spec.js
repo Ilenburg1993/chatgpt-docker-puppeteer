@@ -4,6 +4,7 @@ import * as Discovery from '#nerv/discovery';
 import { ActionCode } from '#shared/nerv/constants';
 import assert from 'node:assert';
 import fs from 'node:fs';
+import { test } from 'node:test';
 
 function makeMockNerv() {
     /** @type {any[]} */ let listeners = [];

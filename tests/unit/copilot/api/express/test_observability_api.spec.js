@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * @file Faixa 38 — API Observability Routes Test Suite (F205-F212)
  *

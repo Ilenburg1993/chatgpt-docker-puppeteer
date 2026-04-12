@@ -2,6 +2,7 @@
 import { TaskSyncBridge, UnifiedStatus } from '#server/dashboard-api/task_sync_bridge';
 import { ActionCode } from '#shared/nerv/constants';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 class MockNerv {
     constructor() {

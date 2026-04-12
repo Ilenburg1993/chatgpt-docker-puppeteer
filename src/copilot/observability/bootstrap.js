@@ -18,6 +18,7 @@ import { container, wireLegacySetters } from '../core/di-container.js';
 import { AUDIT_LOGGER, DB_LOGGER, EVENT_BUS, SDK_LOGGER, SHUTDOWN_LOGGER, TOOLS_BUILDER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
+import { registerShutdownHandler } from '../core/shutdown.js';
 import { setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
@@ -47,6 +48,22 @@ export function bootstrapObservability() {
 
     // Event Bus global — singleton cross-module
     container.register(EVENT_BUS, () => createEventBus(), 'singleton');
+
+    // FAIXA-0: Shutdown handlers para singletons de observabilidade
+    registerShutdownHandler(
+        'eventbus.dispose',
+        async () => {
+            const bus = container.resolve(EVENT_BUS);
+            if (bus?.dispose) bus.dispose();
+        },
+        40,
+    );
+
+    registerShutdownHandler(
+        'error-tracker.destroy',
+        async () => { defaultErrorTracker.destroy(); },
+        45,
+    );
 
     // K-5: wiring centralizado — resolve tokens e invoca setters legados
     wireLegacySetters(container, [

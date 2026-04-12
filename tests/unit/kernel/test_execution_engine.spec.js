@@ -1,6 +1,7 @@
 // @ts-check
 import { STATUS_VALUES } from '#core/constants/tasks';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Kernel Execution Engine - Motor de Execução', () => {
     describe('1. Ciclo de Vida de Tarefas', () => {

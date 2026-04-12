@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave18: realtime de comando usa canal control:command_status (server + UI)', async () => {
     const controlService = await fs.readFile(

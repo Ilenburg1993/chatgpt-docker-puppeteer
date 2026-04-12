@@ -6,6 +6,7 @@ test('wave16r: dashboard command channel is disabled by default', () => {
     const script = `
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { test } from 'node:test';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { io as ioClient } from 'socket.io-client';

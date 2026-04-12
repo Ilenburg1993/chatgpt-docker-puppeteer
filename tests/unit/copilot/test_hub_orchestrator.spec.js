@@ -16,6 +16,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { describe, it } from 'node:test';
 
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';

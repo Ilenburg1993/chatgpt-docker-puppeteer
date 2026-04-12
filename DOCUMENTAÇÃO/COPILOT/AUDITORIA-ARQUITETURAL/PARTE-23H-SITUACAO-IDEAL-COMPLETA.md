@@ -20,14 +20,14 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| BaseEmitter | Alias puro para EventEmitter | Facade com typed events ou remoção (usar EventBus diretamente) |
-| events.js no core/ | Legacy AGENT_EVENTS (189 LoC) | Removido — migrado para events/index.js |
-| constants.js | Re-export de events.js legado | Removido |
-| shared-state.js | Estado global compartilhado | Migrado para DI container como singleton scoped |
-| create-emitter.js | BaseEmitter = NodeEventEmitter | Se mantido: adicionar typed emit/on. Se não: remover |
-| di-container.js | wireLegacySetters helper | Removido após migração DI completa |
+| Aspecto            | Atual                          | Ideal                                                          |
+| ------------------ | ------------------------------ | -------------------------------------------------------------- |
+| BaseEmitter        | Alias puro para EventEmitter   | Facade com typed events ou remoção (usar EventBus diretamente) |
+| events.js no core/ | Legacy AGENT_EVENTS (189 LoC)  | Removido — migrado para events/index.js                        |
+| constants.js       | Re-export de events.js legado  | Removido                                                       |
+| shared-state.js    | Estado global compartilhado    | Migrado para DI container como singleton scoped                |
+| create-emitter.js  | BaseEmitter = NodeEventEmitter | Se mantido: adicionar typed emit/on. Se não: remover           |
+| di-container.js    | wireLegacySetters helper       | Removido após migração DI completa                             |
 
 ### Ações Concretas
 1. Mover `core/events.js` → `events/legacy-agent.js` (re-export temporário em core/)
@@ -40,12 +40,12 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Fontes de event strings | 4 paralelas (events/, types/, core/events.js, modules locais) | **1 SSOT**: events/index.js |
-| Coverage | 31 constantes exportadas | ~80+ constantes (todos os eventos do sistema) |
-| Tipagem | Strings plain | Objetos com payload type: `{ name: string, payload: T }` |
-| Documentação | Nenhuma | Catálogo com source, payload shape, consumers |
+| Aspecto                 | Atual                                                         | Ideal                                                    |
+| ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------- |
+| Fontes de event strings | 4 paralelas (events/, types/, core/events.js, modules locais) | **1 SSOT**: events/index.js                              |
+| Coverage                | 31 constantes exportadas                                      | ~80+ constantes (todos os eventos do sistema)            |
+| Tipagem                 | Strings plain                                                 | Objetos com payload type: `{ name: string, payload: T }` |
+| Documentação            | Nenhuma                                                       | Catálogo com source, payload shape, consumers            |
 
 ### Ações Concretas
 1. Consolidar TODAS as constantes de evento em events/ (incluindo HUB_EVENTS, HOOK_EVENTS, etc.)
@@ -59,13 +59,13 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Tokens definidos | 41 | 41 (sem novos — limpar os 12 não usados) |
-| Tokens registrados | 12 (29%) | 25+ (60%+) |
-| Tokens resolvidos | 1 em 6 sites | 15+ em 30+ sites |
-| CompositionRoot | Inexistente (3 arquivos ad-hoc) | 1 arquivo: `core/composition-root.js` |
-| Singletons `let=null` | 25 | <10 (migrados para DI singleton) |
+| Aspecto               | Atual                           | Ideal                                    |
+| --------------------- | ------------------------------- | ---------------------------------------- |
+| Tokens definidos      | 41                              | 41 (sem novos — limpar os 12 não usados) |
+| Tokens registrados    | 12 (29%)                        | 25+ (60%+)                               |
+| Tokens resolvidos     | 1 em 6 sites                    | 15+ em 30+ sites                         |
+| CompositionRoot       | Inexistente (3 arquivos ad-hoc) | 1 arquivo: `core/composition-root.js`    |
+| Singletons `let=null` | 25                              | <10 (migrados para DI singleton)         |
 
 ### Ações Concretas
 1. Criar `core/composition-root.js` que centraliza TODOS os `container.register()` calls
@@ -80,11 +80,11 @@
 
 ### Actual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| bridgeEmitter active | 2/8 (25%) | 8/8 (100%) |
-| Events bridged | 12/35+ | 35+/35+ |
-| Subscribers cross-module | 0 | 10+ (observability, audit, metrics) |
+| Aspecto                    | Atual                          | Ideal                                  |
+| -------------------------- | ------------------------------ | -------------------------------------- |
+| bridgeEmitter active       | 2/8 (25%)                      | 8/8 (100%)                             |
+| Events bridged             | 12/35+                         | 35+/35+                                |
+| Subscribers cross-module   | 0                              | 10+ (observability, audit, metrics)    |
 | Observability via EventBus | Não (escuta direto no emitter) | Sim (observers migrados para EventBus) |
 
 ### Ações Concretas (por prioridade)
@@ -104,12 +104,12 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| PluginRegistry | Completo (225 LoC) mas órfão | Integrado no bootstrap |
-| Plugins existentes | 0 | 3-5 (hooks-preset, audit-preset, mcp-preset) |
-| discoverPlugins() | Nunca chamado | Chamado no boot |
-| Feature flag | Não há | `sdk/feature-flags.js` → `plugins: true` |
+| Aspecto            | Atual                        | Ideal                                        |
+| ------------------ | ---------------------------- | -------------------------------------------- |
+| PluginRegistry     | Completo (225 LoC) mas órfão | Integrado no bootstrap                       |
+| Plugins existentes | 0                            | 3-5 (hooks-preset, audit-preset, mcp-preset) |
+| discoverPlugins()  | Nunca chamado                | Chamado no boot                              |
+| Feature flag       | Não há                       | `sdk/feature-flags.js` → `plugins: true`     |
 
 ### Ações Concretas
 1. Wiring: `entry.js` ou `composition-root.js` chama `discoverPlugins()` + `registry.installAll(container)`
@@ -126,17 +126,17 @@
 
 ### Atual → Ideal
 
-| Service | Atual (LoC) | Métodos Atuais | Métodos Ideais |
-|---------|------------|----------------|----------------|
-| session-service | 208 | start, close, compact | + resume, getStatus, listActive, getMetrics |
-| audit-service | 112 | logEvent, getStats | + flush, query, cleanup, rotate |
-| conversation-service | 87 | sendMessage | + getHistory, listSessions, getSessionStatus, search |
-| tool-service | 86 | buildToolSet, validate | + invoke, register, list, getSchema |
-| **Novos** | | | |
-| health-service | 0 | — | checkAll, checkComponent, getMetrics, getUptime |
-| bridge-service | 0 | — | status, reconnect, getMetrics (NERV + MCP) |
-| config-service | 0 | — | get, set, validate, watch |
-| plugin-service | 0 | — | list, install, uninstall, getStatus |
+| Service              | Atual (LoC) | Métodos Atuais         | Métodos Ideais                                       |
+| -------------------- | ----------- | ---------------------- | ---------------------------------------------------- |
+| session-service      | 208         | start, close, compact  | + resume, getStatus, listActive, getMetrics          |
+| audit-service        | 112         | logEvent, getStats     | + flush, query, cleanup, rotate                      |
+| conversation-service | 87          | sendMessage            | + getHistory, listSessions, getSessionStatus, search |
+| tool-service         | 86          | buildToolSet, validate | + invoke, register, list, getSchema                  |
+| **Novos**            |             |                        |                                                      |
+| health-service       | 0           | —                      | checkAll, checkComponent, getMetrics, getUptime      |
+| bridge-service       | 0           | —                      | status, reconnect, getMetrics (NERV + MCP)           |
+| config-service       | 0           | —                      | get, set, validate, watch                            |
+| plugin-service       | 0           | —                      | list, install, uninstall, getStatus                  |
 
 ### Ações Concretas
 1. Expandir 4 services existentes com métodos essenciais
@@ -151,13 +151,13 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Retry | mcp-bridge tem custom (ignora core/retry.js) | Todos usam `withRetry()` de core/retry.js |
-| Circuit breaker | mcp-bridge ad-hoc | Todos usam `CircuitBreaker` de core/circuit-breaker.js |
-| Singletons | nerv-bridge tem 5 `let` vars | Migrados para DI singleton |
-| Shutdown | Ad-hoc cleanup | registerShutdownHandler() com priority |
-| Health | Sem health endpoint | health-service.checkBridge('nerv') / .checkBridge('mcp') |
+| Aspecto         | Atual                                        | Ideal                                                    |
+| --------------- | -------------------------------------------- | -------------------------------------------------------- |
+| Retry           | mcp-bridge tem custom (ignora core/retry.js) | Todos usam `withRetry()` de core/retry.js                |
+| Circuit breaker | mcp-bridge ad-hoc                            | Todos usam `CircuitBreaker` de core/circuit-breaker.js   |
+| Singletons      | nerv-bridge tem 5 `let` vars                 | Migrados para DI singleton                               |
+| Shutdown        | Ad-hoc cleanup                               | registerShutdownHandler() com priority                   |
+| Health          | Sem health endpoint                          | health-service.checkBridge('nerv') / .checkBridge('mcp') |
 
 ### Ações Concretas
 1. `mcp-tool-bridge.js`: Substituir retry ad-hoc por `withRetry()` de core/retry.js
@@ -171,13 +171,13 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Specs passando | ~21 (5%) | 224+ (70%) |
-| Root cause fix | Não aplicado | `import { test } from 'node:test'` em 299 files |
-| Secondary fixes | — | Mocks atualizados, imports corrigidos |
-| Coverage tool | Inexistente | `c8` ou `node --test --experimental-test-coverage` |
-| CI pipeline | Inexistente | GitHub Actions com lint + typecheck + test |
+| Aspecto         | Atual        | Ideal                                              |
+| --------------- | ------------ | -------------------------------------------------- |
+| Specs passando  | ~21 (5%)     | 224+ (70%)                                         |
+| Root cause fix  | Não aplicado | `import { test } from 'node:test'` em 299 files    |
+| Secondary fixes | —            | Mocks atualizados, imports corrigidos              |
+| Coverage tool   | Inexistente  | `c8` ou `node --test --experimental-test-coverage` |
+| CI pipeline     | Inexistente  | GitHub Actions com lint + typecheck + test         |
 
 ### Fases de Fix
 1. **T1** (1 script): Injetar `import { test, describe, it } from 'node:test'` em 299 files
@@ -192,12 +192,12 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Global handlers | Duplicados (entry.js + error-tracker.js) | 1 ponto: error-tracker.js |
-| process.exit calls | 6 em entry.js | 1 (após shutdown completo) |
-| Error hierarchy | Existe (CopilotError) mas pouco usada | Adotada em todos os throw sites |
-| Swallowed errors | catch vazio em bridges | Sempre `logSwallowed()` |
+| Aspecto            | Atual                                    | Ideal                           |
+| ------------------ | ---------------------------------------- | ------------------------------- |
+| Global handlers    | Duplicados (entry.js + error-tracker.js) | 1 ponto: error-tracker.js       |
+| process.exit calls | 6 em entry.js                            | 1 (após shutdown completo)      |
+| Error hierarchy    | Existe (CopilotError) mas pouco usada    | Adotada em todos os throw sites |
+| Swallowed errors   | catch vazio em bridges                   | Sempre `logSwallowed()`         |
 
 ### Ações Concretas
 1. Remover process.on('uncaughtException') de entry.js — manter só em error-tracker
@@ -211,16 +211,16 @@
 
 ### Atual → Ideal
 
-| Handler | Atual | Ideal |
-|---------|-------|-------|
-| agent-session-stop (P10) | ✅ | ✅ |
-| sdk-client-close (P20) | ✅ | ✅ |
-| nerv-disconnect (P20) | ❌ | ✅ |
-| mcp-disconnect (P20) | ❌ | ✅ |
-| db-close (P30) | ❌ | ✅ |
-| eventbus-dispose (P30) | ❌ | ✅ |
-| terminal-server (P40) | ❌ | ✅ |
-| timer-cleanup (P50) | ✅ | ✅ |
+| Handler                  | Atual | Ideal |
+| ------------------------ | ----- | ----- |
+| agent-session-stop (P10) | ✅     | ✅     |
+| sdk-client-close (P20)   | ✅     | ✅     |
+| nerv-disconnect (P20)    | ❌     | ✅     |
+| mcp-disconnect (P20)     | ❌     | ✅     |
+| db-close (P30)           | ❌     | ✅     |
+| eventbus-dispose (P30)   | ❌     | ✅     |
+| terminal-server (P40)    | ❌     | ✅     |
+| timer-cleanup (P50)      | ✅     | ✅     |
 
 ### Ações Concretas
 1. nerv-bridge: `registerShutdownHandler('nerv-disconnect', disconnectNerv, 20)`
@@ -235,13 +235,13 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Listeners | Via `.on()` direto no emitter | Via EventBus (cross-module) |
-| Ciclo config↔observ | Existe | Quebrado (config não importa observ) |
-| Health endpoint | Inexistente | `/health` com JSON status |
-| Metrics endpoint | Inexistente | `/metrics` com Prometheus format |
-| Request context | Não há | AsyncLocalStorage com request-id |
+| Aspecto             | Atual                         | Ideal                                |
+| ------------------- | ----------------------------- | ------------------------------------ |
+| Listeners           | Via `.on()` direto no emitter | Via EventBus (cross-module)          |
+| Ciclo config↔observ | Existe                        | Quebrado (config não importa observ) |
+| Health endpoint     | Inexistente                   | `/health` com JSON status            |
+| Metrics endpoint    | Inexistente                   | `/metrics` com Prometheus format     |
+| Request context     | Não há                        | AsyncLocalStorage com request-id     |
 
 ### Ações Concretas
 1. Observers: migrar de `emitter.on()` para `eventBus.on()`
@@ -256,12 +256,12 @@
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Registration points | 3 (bootstrap.js, entry.js, terminal/) | 1 (composition-root.js) |
-| Boot order | Implícita | Declarativa (phases array) |
-| Plugin load | Não existe | discoverPlugins() → installAll() |
-| Validation | Nenhuma | Container.validate() — verifica tokens não resolvidos |
+| Aspecto             | Atual                                 | Ideal                                                 |
+| ------------------- | ------------------------------------- | ----------------------------------------------------- |
+| Registration points | 3 (bootstrap.js, entry.js, terminal/) | 1 (composition-root.js)                               |
+| Boot order          | Implícita                             | Declarativa (phases array)                            |
+| Plugin load         | Não existe                            | discoverPlugins() → installAll()                      |
+| Validation          | Nenhuma                               | Container.validate() — verifica tokens não resolvidos |
 
 ### Ações Concretas
 1. Criar `core/composition-root.js`:
@@ -288,12 +288,12 @@ export function composeContainer(container) {
 
 ### Atual → Ideal
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| `/health` | Não existe | JSON: status, uptime, bridges, db, eventbus |
-| `/metrics` | Não existe | MetricsStore.snapshot() |
-| Error middleware | Básico | CopilotError-aware com error codes |
-| Rate limiting | Inexistente | Token bucket middleware (core/ class) |
+| Aspecto          | Atual       | Ideal                                       |
+| ---------------- | ----------- | ------------------------------------------- |
+| `/health`        | Não existe  | JSON: status, uptime, bridges, db, eventbus |
+| `/metrics`       | Não existe  | MetricsStore.snapshot()                     |
+| Error middleware | Básico      | CopilotError-aware com error codes          |
+| Rate limiting    | Inexistente | Token bucket middleware (core/ class)       |
 
 ---
 
@@ -343,18 +343,18 @@ main.js ──→ composition-root.js ──→ DI container (ALL tokens)
 
 ## 15. Gap Score — Atual vs Ideal
 
-| Dimensão | Atual | Ideal | Gap |
-|----------|-------|-------|-----|
-| DI adoption | 29% | 60%+ | Médio |
-| Event unification | 25% | 100% | Alto |
-| Test pass rate | 5% | 70%+ | Crítico |
-| Shutdown coverage | 3/8 | 8/8 | Médio |
-| Service completeness | 4 anêmicos | 8 feature-complete | Alto |
-| Plugin integration | 0% | 100% | Alto |
-| Bridge standardization | 0% | 100% | Alto |
-| Health endpoints | 0% | 100% | Médio |
-| Error convergence | 50% | 95% | Médio |
-| Bootstrap centralization | 33% | 100% | Médio |
+| Dimensão                 | Atual      | Ideal              | Gap     |
+| ------------------------ | ---------- | ------------------ | ------- |
+| DI adoption              | 29%        | 60%+               | Médio   |
+| Event unification        | 25%        | 100%               | Alto    |
+| Test pass rate           | 5%         | 70%+               | Crítico |
+| Shutdown coverage        | 3/8        | 8/8                | Médio   |
+| Service completeness     | 4 anêmicos | 8 feature-complete | Alto    |
+| Plugin integration       | 0%         | 100%               | Alto    |
+| Bridge standardization   | 0%         | 100%               | Alto    |
+| Health endpoints         | 0%         | 100%               | Médio   |
+| Error convergence        | 50%        | 95%                | Médio   |
+| Bootstrap centralization | 33%        | 100%               | Médio   |
 
 **Score composto**: Atual ~35/100 → Ideal ~80/100 (gap de 45 pontos)
 
@@ -362,15 +362,15 @@ main.js ──→ composition-root.js ──→ DI container (ALL tokens)
 
 ## 16. Prioridades de Fechamento de Gap (Impacto × Esforço)
 
-| # | Gap | Impacto | Esforço | ROI |
-|---|-----|---------|---------|-----|
-| 1 | Test fix (import) | Muito Alto | Baixo (1 script) | ★★★★★ |
-| 2 | bridgeEmitter 6 restantes | Alto | Baixo (6 edits) | ★★★★★ |
-| 3 | Bridge retry → core/retry.js | Alto | Baixo (1 edit) | ★★★★☆ |
-| 4 | CompositionRoot | Alto | Médio | ★★★★☆ |
-| 5 | Shutdown handlers +5 | Médio | Baixo (5 linhas each) | ★★★★☆ |
-| 6 | Plugin wiring | Médio | Baixo (10 linhas) | ★★★☆☆ |
-| 7 | Health endpoint | Médio | Médio | ★★★☆☆ |
-| 8 | Services expansion | Médio | Alto | ★★☆☆☆ |
-| 9 | Event SSOT consolidation | Alto | Alto | ★★☆☆☆ |
-| 10 | Error handler dedup | Baixo | Baixo | ★★★☆☆ |
+| #   | Gap                          | Impacto    | Esforço               | ROI   |
+| --- | ---------------------------- | ---------- | --------------------- | ----- |
+| 1   | Test fix (import)            | Muito Alto | Baixo (1 script)      | ★★★★★ |
+| 2   | bridgeEmitter 6 restantes    | Alto       | Baixo (6 edits)       | ★★★★★ |
+| 3   | Bridge retry → core/retry.js | Alto       | Baixo (1 edit)        | ★★★★☆ |
+| 4   | CompositionRoot              | Alto       | Médio                 | ★★★★☆ |
+| 5   | Shutdown handlers +5         | Médio      | Baixo (5 linhas each) | ★★★★☆ |
+| 6   | Plugin wiring                | Médio      | Baixo (10 linhas)     | ★★★☆☆ |
+| 7   | Health endpoint              | Médio      | Médio                 | ★★★☆☆ |
+| 8   | Services expansion           | Médio      | Alto                  | ★★☆☆☆ |
+| 9   | Event SSOT consolidation     | Alto       | Alto                  | ★★☆☆☆ |
+| 10  | Error handler dedup          | Baixo      | Baixo                 | ★★★☆☆ |

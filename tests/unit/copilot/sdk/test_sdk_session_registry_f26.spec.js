@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach, afterEach } from 'node:test';
 /**
  * tests/unit/copilot/sdk/test_sdk_session_registry_f26.spec.js
  *

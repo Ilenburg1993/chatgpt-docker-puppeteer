@@ -1,6 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { test } from 'node:test';
 
 test('wave20b: import de src/server/main.js com env PM2 simulada não dispara bootstrap', () => {
     const result = spawnSync(

@@ -1,4 +1,5 @@
 // @ts-check
+import { test, describe, it } from 'node:test';
 /**
  * FG-3 — Testes de contrato entre módulos copilot.
  *

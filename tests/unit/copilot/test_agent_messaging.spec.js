@@ -7,6 +7,7 @@
 
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
+import { describe, it } from 'node:test';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
     answerPendingQuestion,

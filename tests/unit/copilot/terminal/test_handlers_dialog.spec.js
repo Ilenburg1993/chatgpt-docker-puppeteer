@@ -7,6 +7,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 

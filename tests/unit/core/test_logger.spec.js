@@ -2,6 +2,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it, beforeEach } from 'node:test';
 
 import sinon from 'sinon';
 

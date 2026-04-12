@@ -6,6 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import {
     _resetForTesting,

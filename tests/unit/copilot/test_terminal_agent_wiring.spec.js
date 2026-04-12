@@ -7,6 +7,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { describe, it } from 'node:test';
 
 describe("terminal/terminal-agent-wiring.js — contrato", () => {
     it("importa sem erros", async () => {

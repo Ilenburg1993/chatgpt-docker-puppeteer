@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave18t: TASK_REASSIGN_MISSION exige estado PAUSED ou READY não iniciada', async () => {
     const taskControl = await fs.readFile(

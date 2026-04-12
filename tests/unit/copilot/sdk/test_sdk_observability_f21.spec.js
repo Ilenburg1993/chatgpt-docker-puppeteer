@@ -11,6 +11,7 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { test, describe, it, beforeEach, afterEach } from 'node:test';
 
 const require = createRequire(import.meta.url);
 const { readFileSync } = require('node:fs');

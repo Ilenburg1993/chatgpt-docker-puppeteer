@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, afterEach } from 'node:test';
 /**
  * @file Faixa 47 — config/custom-agents.js (325L)
  *

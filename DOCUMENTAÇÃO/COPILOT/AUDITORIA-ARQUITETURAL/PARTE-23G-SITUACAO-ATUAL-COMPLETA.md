@@ -8,19 +8,19 @@
 
 ## 1. Visão Geral Absoluta
 
-| Dimensão | Valor |
-|----------|-------|
-| Total de módulos | 20 |
-| Total de arquivos .js (prod) | 320 |
-| Total de LoC (prod) | ~52.557 |
-| Total de spec files | 320 unit + 50 regression + 26 integration |
-| Testes passando | ~21 spec files (com `import node:test`), ~299 falham (`test not defined`) |
-| Health-check calibrado | 97/100 (A+) |
-| Health-check honesto estimado | ~42/100 |
-| TypeCheck errors | 0 ✅ |
-| ESLint errors | 0 ✅ |
-| Commit HEAD | `b27204d8` em `main` |
-| Node.js | v24.14.0, ESM, `@ts-check` |
+| Dimensão                      | Valor                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| Total de módulos              | 20                                                                        |
+| Total de arquivos .js (prod)  | 320                                                                       |
+| Total de LoC (prod)           | ~52.557                                                                   |
+| Total de spec files           | 320 unit + 50 regression + 26 integration                                 |
+| Testes passando               | ~21 spec files (com `import node:test`), ~299 falham (`test not defined`) |
+| Health-check calibrado        | 97/100 (A+)                                                               |
+| Health-check honesto estimado | ~42/100                                                                   |
+| TypeCheck errors              | 0 ✅                                                                       |
+| ESLint errors                 | 0 ✅                                                                       |
+| Commit HEAD                   | `b27204d8` em `main`                                                      |
+| Node.js                       | v24.14.0, ESM, `@ts-check`                                                |
 
 ---
 
@@ -282,16 +282,16 @@
 
 ### 3.1 bridgeEmitter — Cobertura Real
 
-| Emitter | Bridge? | Events Bridged | Events Locais |
-|---------|---------|---------------|---------------|
-| always-alive.js | ✅ | 7 (ready, before-stop, stopped, error, dialog.loop.changed, session.keepalive, task.started, task.delta) | 0 locais-only |
-| hub/orchestrator.js | ✅ via hub.js | 5 (SESSION_CREATED, SESSION_CLOSED, TURN_SENT, TURN_COMPLETE, USER_INJECTED) | ~18 locais-only |
-| loop-manager.js | ❌ | 0 | 6+ (turn_start, turn_end, stalled, timeout, tool_use, phase:changed) |
-| hooks/bus.js | ❌ | 0 | 5+ (pre_tool_use, post_tool_use, session_start, session_end, error_occurred, prompt_submitted) |
-| handoff-manager.js | ❌ | 0 | 2+ |
-| pinned-files.js | ❌ | 0 | 1 (changed) |
-| fanout.js | ❌ | 0 | 1 (data) |
-| state.js | ❌ | 0 | 2+ (stateChanged) |
+| Emitter             | Bridge?      | Events Bridged                                                                                           | Events Locais                                                                                  |
+| ------------------- | ------------ | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| always-alive.js     | ✅            | 7 (ready, before-stop, stopped, error, dialog.loop.changed, session.keepalive, task.started, task.delta) | 0 locais-only                                                                                  |
+| hub/orchestrator.js | ✅ via hub.js | 5 (SESSION_CREATED, SESSION_CLOSED, TURN_SENT, TURN_COMPLETE, USER_INJECTED)                             | ~18 locais-only                                                                                |
+| loop-manager.js     | ❌            | 0                                                                                                        | 6+ (turn_start, turn_end, stalled, timeout, tool_use, phase:changed)                           |
+| hooks/bus.js        | ❌            | 0                                                                                                        | 5+ (pre_tool_use, post_tool_use, session_start, session_end, error_occurred, prompt_submitted) |
+| handoff-manager.js  | ❌            | 0                                                                                                        | 2+                                                                                             |
+| pinned-files.js     | ❌            | 0                                                                                                        | 1 (changed)                                                                                    |
+| fanout.js           | ❌            | 0                                                                                                        | 1 (data)                                                                                       |
+| state.js            | ❌            | 0                                                                                                        | 2+ (stateChanged)                                                                              |
 
 **Resumo**: 2/8 emitters bridged (25%), 12/35+ events bridged (~34%)
 
@@ -309,19 +309,19 @@ Observability ** não escuta** via EventBus — escuta via `.on()` direto no emi
 
 ### 4.1 Tokens Registrados no Runtime
 
-| Token | Registrado em | Factory |
-|-------|--------------|---------|
-| SHUTDOWN_LOGGER | bootstrap.js | `() => log` |
-| DB_LOGGER | bootstrap.js | `() => log` |
-| SDK_LOGGER | bootstrap.js | `() => log` |
-| AUDIT_LOGGER | bootstrap.js | `() => log` |
-| EVENT_BUS | bootstrap.js | `() => createEventBus()` |
-| TOOLS_BUILDER | bootstrap.js | `() => deps.buildTool` |
-| AUDIT_BUS | entry.js | `() => defaultBus` |
-| HUB | terminal/index.js | `() => conversationHub` |
-| PERMISSION_AGENT | terminal/index.js | `() => alwaysAliveAgent` |
-| FALLBACK_AGENT | terminal/index.js | `() => alwaysAliveAgent` |
-| BRIDGE_AGENT | terminal/index.js | `() => alwaysAliveAgent` |
+| Token             | Registrado em     | Factory                  |
+| ----------------- | ----------------- | ------------------------ |
+| SHUTDOWN_LOGGER   | bootstrap.js      | `() => log`              |
+| DB_LOGGER         | bootstrap.js      | `() => log`              |
+| SDK_LOGGER        | bootstrap.js      | `() => log`              |
+| AUDIT_LOGGER      | bootstrap.js      | `() => log`              |
+| EVENT_BUS         | bootstrap.js      | `() => createEventBus()` |
+| TOOLS_BUILDER     | bootstrap.js      | `() => deps.buildTool`   |
+| AUDIT_BUS         | entry.js          | `() => defaultBus`       |
+| HUB               | terminal/index.js | `() => conversationHub`  |
+| PERMISSION_AGENT  | terminal/index.js | `() => alwaysAliveAgent` |
+| FALLBACK_AGENT    | terminal/index.js | `() => alwaysAliveAgent` |
+| BRIDGE_AGENT      | terminal/index.js | `() => alwaysAliveAgent` |
 | NERV_BRIDGE_AGENT | terminal/index.js | `() => alwaysAliveAgent` |
 
 **Registrados**: 12/41 tokens (29%)
@@ -329,8 +329,8 @@ Observability ** não escuta** via EventBus — escuta via `.on()` direto no emi
 
 ### 4.2 Resolves no Runtime
 
-| Token | Resolved em | Resultado |
-|-------|------------|-----------|
+| Token     | Resolved em                            | Resultado          |
+| --------- | -------------------------------------- | ------------------ |
 | EVENT_BUS | services/*.js, always-alive.js, hub.js | EventBus singleton |
 
 **Resolved**: 1 token (EVENT_BUS) em 6 call sites
@@ -357,16 +357,16 @@ test('meu teste', () => { ... });  // ← 299 arquivos fazem isso
 
 ### 5.2 Distribuição
 
-| Grupo | Specs | Com `import node:test` | Sem import | Passing |
-|-------|-------|----------------------|-----------|---------|
-| tests/unit/copilot/ | 220 | ~15 | ~205 | ~15 |
-| tests/unit/audit/ | 19 | ~2 | ~17 | ~2 |
-| tests/unit/rag/ | 14 | 0 | 14 | 0 |
-| tests/unit/server/ | 10 | 0 | 10 | 0 |
-| tests/unit/core/ | 7 | 0 | 7 | 0 |
-| tests/unit/* (outros) | 50 | ~4 | ~46 | ~4 |
-| tests/regression/ | ~50 | ? | ~50 | ? |
-| **Total** | **~370** | **~21** | **~299+** | **~21** |
+| Grupo                 | Specs    | Com `import node:test` | Sem import | Passing |
+| --------------------- | -------- | ---------------------- | ---------- | ------- |
+| tests/unit/copilot/   | 220      | ~15                    | ~205       | ~15     |
+| tests/unit/audit/     | 19       | ~2                     | ~17        | ~2      |
+| tests/unit/rag/       | 14       | 0                      | 14         | 0       |
+| tests/unit/server/    | 10       | 0                      | 10         | 0       |
+| tests/unit/core/      | 7        | 0                      | 7          | 0       |
+| tests/unit/* (outros) | 50       | ~4                     | ~46        | ~4      |
+| tests/regression/     | ~50      | ?                      | ~50        | ?       |
+| **Total**             | **~370** | **~21**                | **~299+**  | **~21** |
 
 ### 5.3 Fix Pattern
 
@@ -487,28 +487,28 @@ core/shutdown.js registerShutdownHandler():
 
 ## 10. Resumo de Métricas Cross-Cutting
 
-| Métrica | Valor |
-|---------|-------|
-| Módulos prod | 20 |
-| Arquivos prod | 320 |
-| LoC prod | ~52.557 |
-| Spec files (total) | ~396 |
-| Testes passando | ~21 (~5%) |
-| DI tokens definidos | 41 |
-| DI tokens registrados | 12 (29%) |
-| DI tokens resolvidos | 1 (2.4%) |
-| Singletons `let=null` | 25 |
-| EventBus subscribers cross-module | 0 |
-| bridgeEmitter connections | 2/8 emitters, 12/35+ events |
-| Fontes de event strings | 4 paralelas |
-| Services facades | 4 (anêmico) |
-| Ciclos de dependência | 1 real (config↔observability) |
-| Módulos órfãos | 3 (plugins, types, logs) |
-| Health endpoint | inexistente |
-| Rate limiter centralizado | inexistente |
-| AsyncLocalStorage/context | inexistente em copilot/ |
-| Feature flags runtime genérico | inexistente |
-| Shutdown handlers registrados | 3 (de ~8 necessários) |
-| God files >350 LoC | 24 |
-| Circuit breakers | 6 instâncias em 14 arquivos |
-| Try/catch blocks | 368 |
+| Métrica                           | Valor                         |
+| --------------------------------- | ----------------------------- |
+| Módulos prod                      | 20                            |
+| Arquivos prod                     | 320                           |
+| LoC prod                          | ~52.557                       |
+| Spec files (total)                | ~396                          |
+| Testes passando                   | ~21 (~5%)                     |
+| DI tokens definidos               | 41                            |
+| DI tokens registrados             | 12 (29%)                      |
+| DI tokens resolvidos              | 1 (2.4%)                      |
+| Singletons `let=null`             | 25                            |
+| EventBus subscribers cross-module | 0                             |
+| bridgeEmitter connections         | 2/8 emitters, 12/35+ events   |
+| Fontes de event strings           | 4 paralelas                   |
+| Services facades                  | 4 (anêmico)                   |
+| Ciclos de dependência             | 1 real (config↔observability) |
+| Módulos órfãos                    | 3 (plugins, types, logs)      |
+| Health endpoint                   | inexistente                   |
+| Rate limiter centralizado         | inexistente                   |
+| AsyncLocalStorage/context         | inexistente em copilot/       |
+| Feature flags runtime genérico    | inexistente                   |
+| Shutdown handlers registrados     | 3 (de ~8 necessários)         |
+| God files >350 LoC                | 24                            |
+| Circuit breakers                  | 6 instâncias em 14 arquivos   |
+| Try/catch blocks                  | 368                           |

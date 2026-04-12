@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import { createAgentEventObserver } from '../../../src/copilot/observability/agent-event-observer.js';
 

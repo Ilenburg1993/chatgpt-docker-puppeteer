@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach, afterEach } from 'node:test';
 /**
  * F67 — Teste de Integração: DialogLoopManager boot → send → stop
  *

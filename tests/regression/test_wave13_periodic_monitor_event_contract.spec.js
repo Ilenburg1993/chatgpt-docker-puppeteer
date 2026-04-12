@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import PeriodicHealthMonitor, { MONITOR_EVENTS } from '#infra/browser_pool/PeriodicHealthMonitor';
 

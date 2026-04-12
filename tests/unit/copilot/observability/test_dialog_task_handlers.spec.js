@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { describe, it, beforeEach } from 'node:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────

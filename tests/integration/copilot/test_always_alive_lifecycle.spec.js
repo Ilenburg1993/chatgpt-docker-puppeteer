@@ -20,6 +20,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { it } from 'node:test';
 
 // AlwaysAliveAgent é um singleton exportado do módulo — importamos diretamente
 // para garantir o mesmo objeto monitorado pelos listeners do sistema.

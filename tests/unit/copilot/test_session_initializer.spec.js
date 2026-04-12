@@ -14,6 +14,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 // Mesmo path que session-initializer.js usa internamente:
 // resolve(import.meta.dirname, '../../../../') relativo a src/copilot/agent/session/ = project root

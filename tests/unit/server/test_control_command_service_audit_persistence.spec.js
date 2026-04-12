@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
 
 import { createAuditJob } from '../../../src/infra/db/audit_job_repo.js';
 import { createAuditPatchProposal, getAuditPatchProposalById } from '../../../src/infra/db/audit_patch_repo.js';

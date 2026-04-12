@@ -7,6 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';
 

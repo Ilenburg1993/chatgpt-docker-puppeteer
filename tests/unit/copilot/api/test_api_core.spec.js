@@ -1,4 +1,5 @@
 // @ts-check
+import { describe, it, beforeEach } from 'node:test';
 /**
  * tests/unit/copilot/api/test_api_core.spec.js
  *

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave19: vite build mantém split/lazy e guardrails de bundle', async () => {
     const viteConfig = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/vite.config.js'), 'utf8');

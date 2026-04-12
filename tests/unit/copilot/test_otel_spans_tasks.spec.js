@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { describe, it } from 'node:test';
 
 describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
     /** @type {typeof import('../../../src/copilot/observability/otel.js')} */

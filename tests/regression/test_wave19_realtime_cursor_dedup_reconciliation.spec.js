@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { test } from 'node:test';
 
 test('wave19: useSsotRealtime aplica dedupe + reconciliação por cursor/event_id', async () => {
     const ssotRealtime = await fs.readFile(

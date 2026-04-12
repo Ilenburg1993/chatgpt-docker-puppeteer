@@ -1,5 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 import { AdaptiveThrottler, createRagAdaptiveThrottler } from '../../../tools/rag/lib/adaptive_throttler.mjs';
 
