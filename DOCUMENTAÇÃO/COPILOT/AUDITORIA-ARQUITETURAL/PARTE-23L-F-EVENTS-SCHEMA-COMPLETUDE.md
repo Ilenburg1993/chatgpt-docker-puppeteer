@@ -293,7 +293,7 @@ START ──→ L29 (Orphan Fix) ──→ L30 (Agent Schemas) ──→ L33 (St
 | ------ | ---------- | --------------------------------------------------------- |
 | 1.0    | 2026-04-12 | Auditoria pós-L28, 10 faixas L29-L38, schema 100% roadmap |
 | 2.0    | 2026-04-12 | L29-L35+L38 concluídos; L36-L37 adiados                   |
-| 3.0    | 2026-04-12 | L36-L37 concluídos — roadmap 100% completo                 |
+| 3.0    | 2026-04-12 | L36-L37 concluídos — roadmap 100% completo                |
 
 ---
 
