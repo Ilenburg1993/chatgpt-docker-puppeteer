@@ -132,6 +132,79 @@ export const AGENT_HANDOFF_ACCEPTED = 'agent:handoff:accepted';
 /** @readonly */
 export const AGENT_HANDOFF_REJECTED = 'agent:handoff:rejected';
 
+// ─── FAIXA-L9: Assistant (SDK forwarded, previously unbridged) ────────────────
+
+/** @readonly */
+export const AGENT_ASSISTANT_TURN_START = 'agent:assistant:turn_start';
+/** @readonly */
+export const AGENT_ASSISTANT_TURN_END = 'agent:assistant:turn_end';
+/** @readonly */
+export const AGENT_ASSISTANT_INTENT = 'agent:assistant:intent';
+/** @readonly */
+export const AGENT_ASSISTANT_REASONING_COMPLETE = 'agent:assistant:reasoning_complete';
+
+// ─── FAIXA-L9: Session (SDK forwarded, previously unbridged) ──────────────────
+
+/** @readonly */
+export const AGENT_SESSION_ERROR = 'agent:session:error';
+/** @readonly */
+export const AGENT_SESSION_SHUTDOWN = 'agent:session:shutdown';
+/** @readonly */
+export const AGENT_SESSION_HANDOFF = 'agent:session:handoff';
+/** @readonly */
+export const AGENT_SESSION_TASK_COMPLETE = 'agent:session:task_complete';
+/** @readonly */
+export const AGENT_SESSION_CONTEXT_CHANGED = 'agent:session:context_changed';
+/** @readonly */
+export const AGENT_SESSION_TRUNCATION = 'agent:session:truncation';
+/** @readonly */
+export const AGENT_SESSION_CLEANUP = 'agent:session:cleanup';
+
+// ─── FAIXA-L9: Subagent ──────────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_SUBAGENT_STARTED = 'agent:subagent:started';
+/** @readonly */
+export const AGENT_SUBAGENT_COMPLETED = 'agent:subagent:completed';
+/** @readonly */
+export const AGENT_SUBAGENT_FAILED = 'agent:subagent:failed';
+
+// ─── FAIXA-L9: Dialog (previously unbridged) ─────────────────────────────────
+
+/** @readonly */
+export const AGENT_DIALOG_DELTA = 'agent:dialog:delta';
+/** @readonly */
+export const AGENT_DIALOG_BOOT_RECOVERY = 'agent:dialog:boot_recovery';
+
+// ─── FAIXA-L9: Abort / Elicitation ───────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_ABORT = 'agent:abort';
+/** @readonly */
+export const AGENT_ELICITATION_PENDING = 'agent:elicitation:pending';
+
+// ─── FAIXA-L9: Background / Shell ────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_BACKGROUND_COMPLETED = 'agent:background:completed';
+/** @readonly */
+export const AGENT_BACKGROUND_IDLE = 'agent:background:idle';
+/** @readonly */
+export const AGENT_SHELL_COMPLETED = 'agent:shell:completed';
+/** @readonly */
+export const AGENT_SHELL_DETACHED_COMPLETED = 'agent:shell:detached_completed';
+
+// ─── FAIXA-L9: Infra / Misc ──────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_SDK_LIFECYCLE = 'agent:sdk:lifecycle';
+/** @readonly */
+export const AGENT_MCP_RECONNECTED = 'agent:mcp:reconnected';
+/** @readonly */
+export const AGENT_QUOTA_WARNING = 'agent:quota:warning';
+/** @readonly */
+export const AGENT_STEERING_SENT = 'agent:steering:sent';
+
 // ─── Grupos consolidados ──────────────────────────────────────────────────────
 
 /**

@@ -1,443 +1,344 @@
-# PARTE-23L-B — Events System: Grafo de Eventos Completo
+# PARTE-23L-B — Events System: Grafos de Topologia v2.0
 
-**Data**: 2026-04-12 | **Status**: Auditoria | **Versão**: 1.0
-**Contexto**: Subparte especial PARTE-23 — grafo de dependências e fluxos de eventos
+**Data**: 2026-04-12 | **Status**: Auditoria | **Versão**: 2.0 (pós-FAIXA-L1 a L8)
+**Precedente**: Commit `b3284b0a` | **Companion**: PARTE-23L-A v2.0
 
 ---
 
-## 1. Grafo de Emissores → EventBus (Fluxo Atual)
+## 1. Grafo Completo: Fluxo SDK → Agent → EventBus → NERV
 
 ```
-                          GRAFO DE EVENTOS — SITUAÇÃO ATUAL
-                          ══════════════════════════════════
-
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           FONTES (EMISSORES)                                │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-AlwaysAliveAgent ──────── bridgeEmitter ──→ EventBus
- (EventEmitter, ~65)       (8 eventos)       │
-                                             │ AGENT_READY
-                                             │ AGENT_BEFORE_STOP
-                                             │ AGENT_STOPPED
-                                             │ AGENT_ERROR
-                                             │ AGENT_DIALOG_LOOP_CHANGED
-                                             │ AGENT_SESSION_KEEPALIVE
-                                             │ AGENT_TASK_STARTED
-                                             │ AGENT_TASK_DELTA
-
-DialogLoopManager ─────── bridgeEmitter ──→ EventBus
- (BaseEmitter, 13)         (8 eventos)       │
-  via always-alive.js                        │ AGENT_DIALOG_LOOP_CHANGED
-                                             │ AGENT_DIALOG_STALLED
-                                             │ AGENT_DIALOG_PAUSED
-                                             │ AGENT_DIALOG_RESUMED
-                                             │ AGENT_DIALOG_STOPPED
-                                             │ AGENT_DIALOG_REPLY
-                                             │ AGENT_DIALOG_COMPACTION_REQUESTED
-                                             │ AGENT_DIALOG_TURN_TIMEOUT
-
-HandoffManager ─────────── bridgeEmitter ──→ EventBus
- (BaseEmitter, 3)          (3 eventos)       │
-  via always-alive.js                        │ AGENT_HANDOFF_RECEIVED
-                                             │ AGENT_HANDOFF_ACCEPTED
-                                             │ AGENT_HANDOFF_REJECTED
-
-HubOrchestrator ────────── bridgeEmitter ──→ EventBus
- (BaseEmitter, 6)          (6 eventos)       │
-  via hub.js                                 │ HUB_SESSION_CREATED
-                                             │ HUB_SESSION_CLOSED
-                                             │ HUB_TURN_SENT
-                                             │ HUB_TURN_COMPLETE
-                                             │ HUB_USER_INJECTED
-                                             │ HUB_ERROR
-
-PinnedFilesLoader ─────── bridgeEmitter ──→ EventBus
- (EventEmitter, 1)         (1 evento)        │
-  via terminal/index.js                      │ CONFIG_PINNED_FILES_CHANGED
-
-Services (direto) ──────────────────────→ EventBus
-  session-service.js                        │ 'session:create'
-  session-service.js                        │ 'session:disconnect'
-  session-service.js                        │ 'session:resume'
-  conversation-service.js                   │ 'session:message'
-  tool-service.js                           │ 'tool:build'
-  audit-service.js                          │ AUDIT_LOG (via import)
-
-entry.js (bootstrap) ──── bridgeEmitter ──→ EventBus
-  defaultBus EventEmitter    (???eventos)   │ (startup events)
-
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          DESCONECTADOS (SEM BRIDGE)                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-HookBus ───────────────── ❌ SEM BRIDGE ──→ (NUNCA chega ao EventBus)
- pre_tool_use                               5 subscribers esperando em vão
- post_tool_use
- prompt_submitted
- session_start
- session_end
- error_occurred
-
-SDK Session (74 events) ── ❌ SEM BRIDGE ──→ (invisíveis ao sistema)
- task.queued, task.started, completed...
- assistant.streaming_text...
- tool.pre_invoke, post_invoke...
-
-SDK Client (5 events) ──── ❌ SEM BRIDGE ──→ (invisíveis ao sistema)
- session.created, deleted, updated...
-
-EventFanout (SSE) ──────── ❌ SEM BRIDGE ──→ (isolado, publish/subscribe local)
- channel events
-
-terminal/state.js ──────── ❌ SEM BRIDGE ──→ (state changes invisíveis)
-
-core/shared-state.js ───── ❌ SEM BRIDGE ──→ (state changes invisíveis)
-
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          NERV (SISTEMA PARALELO)                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-AlwaysAliveAgent ──────── nerv-bridge ───→ NERV external bus
- (EventEmitter)           EVENT_MAP         (62 eventos mapeados)
-                          (direto, sem      COPILOT_AGENT_READY
-                           passar pelo      COPILOT_TASK_STARTED
-                           EventBus)        COPILOT_DIALOG_STALLED
-                                            ... (59 outros)
-
-NERV external bus ──────── nerv-bridge ──→ Agent.sendMessage/pause/resume
- COPILOT_COMMAND            inbound          (sem passar pelo EventBus)
-
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          CONSUMIDORES DO EVENTBUS                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-EventBus ──→ event-bus-observers.js (15 subscribers, log-only)
-  AGENT_READY              → log INFO
-  AGENT_DIALOG_LOOP_CHANGED→ log DEBUG
-  AGENT_DIALOG_STALLED     → log WARN
-  AGENT_DIALOG_TURN_TIMEOUT→ log WARN
-  HOOK_PRE_TOOL_USE        → ❌ NUNCA DISPARA (HookBus gap)
-  HOOK_POST_TOOL_USE       → ❌ NUNCA DISPARA
-  HOOK_SESSION_START       → ❌ NUNCA DISPARA
-  HOOK_SESSION_END         → ❌ NUNCA DISPARA
-  HOOK_ERROR_OCCURRED      → ❌ NUNCA DISPARA
-  AGENT_HANDOFF_RECEIVED   → log INFO
-  AGENT_HANDOFF_ACCEPTED   → log INFO
-  AGENT_HANDOFF_REJECTED   → log WARN
-  HUB_SESSION_CREATED      → log INFO
-  HUB_SESSION_CLOSED       → log INFO
-  CONFIG_PINNED_FILES_CHANGED → log INFO
-
-EventBus ──→ nenhum subscriber para:
-  AGENT_BEFORE_STOP, AGENT_STOPPED, AGENT_ERROR, AGENT_SESSION_FATAL,
-  AGENT_TASK_STARTED, AGENT_TASK_DELTA, AGENT_TASK_ERROR,
-  HUB_TURN_SENT, HUB_TURN_COMPLETE, HUB_USER_INJECTED,
-  TERMINAL_STARTED, TERMINAL_STOPPED, TERMINAL_COMMAND,
-  SYSTEM_SHUTDOWN_STARTED, SYSTEM_SHUTDOWN_COMPLETE,
-  CONFIG_CHANGED, HEALTH_CHECK, HEALTH_DEGRADED, HEALTH_RECOVERED,
-  BRIDGE_NERV_CONNECTED, BRIDGE_NERV_DISCONNECTED,
-  AUDIT_ENTRY, AUDIT_FLUSH, AUDIT_QUICK,
-  'session:create', 'session:disconnect', 'session:resume',
-  'session:message', 'tool:build'
+│                     SDK SESSION (74+ event types)                           │
+│  session.start, assistant.turn_start, tool.execution_start, abort, ...      │
+└────────┬──────────────────────────────────┬─────────────────────────────────┘
+         │                                  │
+    ┌────┴──── CAMINHO A ────┐    ┌────────┴──── CAMINHO B ────────────┐
+    │ event-handlers/ (25 ev.)│    │ SdkSessionBridge (18 ev.)          │
+    │ sdk-responses.js        │    │ sdk-session-bridge.js               │
+    │ compaction.js           │    │ ⚠️ attach() NUNCA chamado!          │
+    │ streaming.js            │    │                                     │
+    │ token-budget.js         │    │ SDK_SESSION_TO_EVENTBUS map         │
+    │ mode-and-tools.js       │    │ 'session.start'→'sdk:session:start' │
+    │ system-notifications.js │    │ ...                                 │
+    │ usage.js                │    │                                     │
+    │ catch-all.js            │    └────────┬─────────────────────────────┘
+    └────────┬────────────────┘             │
+             │ callbacks.emit(name, payload)│
+             │ = host.emit(name, payload)  │
+             ▼                              │
+┌──────────────────────────────┐            │
+│  AlwaysAliveAgent            │            │
+│  (BaseEmitter)               │            │
+│  ~52 event names emitidos    │            │
+│                              │            │
+│  ┌──── Forwarders ─────┐    │            │
+│  │ event-wiring.js:    │    │            │
+│  │  DLM events →       │    │            │
+│  │  agent 'dialog.*'   │    │            │
+│  │                     │    │            │
+│  │ task-executor.js:   │    │            │
+│  │  tool.*,task.*      │    │            │
+│  │  → agent host.emit()│    │            │
+│  └─────────────────────┘    │            │
+│                              │            │
+│  38 BRIDGEADOS ──────────────┼────┐       │
+│  28 PERDIDOS (→ ∅) ─────────┼──✗ │       │
+│                              │    │       │
+└──────────┬───────────────────┘    │       │
+           │ (direto, ~50 events)   │       │
+           ▼                        ▼       ▼
+┌──────────────────────┐  ┌─────────────────────────────────────────┐
+│ AgentEventObserver   │  │            EventBus (SSOT)               │
+│ (direct subscription)│  │  on()/emit()/use()/diagnostics()         │
+│ session-agent-hdlers │  │                                          │
+│ dialog-task-handlers │  │  ┌── Middlewares (L6) ──────────────┐    │
+│                      │  │  │ timestamp-enricher                │    │
+│ 50 events via        │  │  │ schema-validator                  │    │
+│ agent.on(name, fn)   │  │  │ rate-limiter (100/s/type)         │    │
+│                      │  │  └──────────────────────────────────┘    │
+│ ⚠️ DUPLICA com       │  │                                          │
+│  EventBus subscr.    │  │  38 agent:* events (via bridgeEmitter)   │
+└──────────────────────┘  │  8  dialog:* events (via DLM bridge)     │
+                          │  3  handoff:* events (via HM bridge)     │
+                          │  6  hub:* events (via orchestrator)      │
+                          │  1  config:* event (pinned files)        │
+                          │  6  hook:* events (via HookBus L1)       │
+                          │  5  service:* events (via services L2)   │
+                          │  5  system:* events (direct)             │
+                          │  18 sdk:* events (via SdkSessionBridge)  │
+                          │  ─────────────────────────────────────   │
+                          │  = ~90 event types no EventBus           │
+                          │                                          │
+                          │  Subscribers:                             │
+                          │   15 event-bus-observers (log only)       │
+                          │   ~70 NervEventBusAdapter (outbound)      │
+                          └──────┬──────────────────┬────────────────┘
+                                 │                  │
+              ┌──────────────────┘                  │
+              ▼                                     ▼
+┌────────────────────────────┐    ┌─────────────────────────────────┐
+│ event-bus-observers.js     │    │   NervEventBusAdapter (L3)       │
+│ 15 subscribers             │    │   ~70 outbound mappings          │
+│ ✅ 10 now fire (hook fix)  │    │   EventBus → NERV envelope       │
+│ Actions: log only          │    │                                  │
+│ ⚠️ No metrics/health      │    │ + Inbound:                       │
+└────────────────────────────┘    │   NERV 'COPILOT_COMMAND'         │
+                                  │   → bus.emit('nerv:command:*')   │
+                                  └──────────────┬──────────────────┘
+                                                 │
+                                                 ▼
+                                  ┌─────────────────────────────────┐
+                                  │   NERV Bus (externo)             │
+                                  │   Recebe envelopes de 2 fontes:  │
+                                  │   1. nerv-bridge (62, direto)    │
+                                  │   2. NervAdapter (~70, via EB)   │
+                                  │   ⚠️ 38 eventos DUPLICADOS!      │
+                                  └─────────────────────────────────┘
 ```
 
 ---
 
-## 2. Grafo de Dependências entre Módulos de Eventos
+## 2. Grafo de Emitters Locais (Não-EventBus)
 
 ```
-                    DEPENDÊNCIAS DE MÓDULOS DE EVENTOS
-                    ════════════════════════════════════
-
-events/agent-events.js ──────→ (imported by)
-  events/index.js             (re-export)
-  events/catalog.md           (documentation)
-  agent/always-alive.js       (AGENT_READY, AGENT_BEFORE_STOP, etc.)
-  observability/event-bus-observers.js (subscribers)
-  observability/agent-event-observer.js (implicit strings)
-
-events/hub-events.js ─────────→
-  events/index.js             (re-export)
-  conversation-hub/hub.js     (HUB_EVENTS object)
-  observability/event-bus-observers.js (HUB_SESSION_*)
-
-events/hook-events.js ────────→
-  events/index.js             (re-export)
-  observability/event-bus-observers.js (HOOK_* - broken subscribers)
-
-events/system-events.js ──────→
-  events/index.js             (re-export)
-  terminal/index.js           (CONFIG_PINNED_FILES_CHANGED)
-
-events/terminal-events.js ────→
-  events/index.js             (re-export)
-  services/audit-service.js   (AUDIT_LOG)
-
-core/event-bus.js ────────────→
-  core/index.js               (re-export via barrel)
-  agent/always-alive.js       (bridgeEmitter)
-  agent/lifecycle/entry.js    (bridgeEmitter)
-  conversation-hub/hub.js     (bridgeEmitter)
-  terminal/index.js           (bridgeEmitter + EVENT_BUS token)
-  observability/bootstrap.js  (container.register EVENT_BUS)
-  observability/event-bus-observers.js (bus.on)
-  services/session-service.js (bus.emit)
-  services/audit-service.js   (bus.emit)
-
-core/events.js (DEPRECATED) ──→
-  agent/state/agent-state.js  (AGENT_EVENTS array - for loop)
-  api/bridge/stream.js        (AGENT_EVENTS array)
-  terminal/terminal-agent-wiring.js (AGENT_EVENTS array)
-
-conversation-hub/events.js ───→ (DEPRECATED)
-  conversation-hub/socket-ns.js  (HUB_EVENTS object)
-  conversation-hub/call-strategies.js (HUB_EVENTS object)
-```
-
----
-
-## 3. Grafo de Fluxo de Dados Por Evento
-
-### Fluxo: "Usuário envia mensagem" (send turn)
-
-```
-User HTTP POST /sessions/:id/send
-│
-├─→ api/express/sessions.js
-│   └─→ agent.sendMessage(text)
-│       └─→ AlwaysAliveAgent.sendMessage()
-│           └─→ taskExecutor.execute()
-│               ├─→ emit('task.started', info)
-│               │   ├─→ nerv-bridge → NERV: COPILOT_TASK_STARTED
-│               │   └─→ EventBus: AGENT_TASK_STARTED [subscriber: LOG]
-│               ├─→ emit('task.delta', delta) [hot-path, high frequency]
-│               │   ├─→ nerv-bridge → NERV: COPILOT_TASK_DELTA
-│               │   ├─→ EventBus: AGENT_TASK_DELTA [NO SUBSCRIBER]
-│               │   └─→ api/sse/fanout → SSE clients
-│               └─→ emit('task.completed', result)
-│                   ├─→ nerv-bridge → NERV: COPILOT_TASK_COMPLETED
-│                   └─→ EventBus: ??? [NOT BRIDGED]
-│
-└─→ conversation-hub/hub.js (if via Hub)
-    └─→ orchestrator.emit('turn_sent')
-        └─→ bridge → EventBus: HUB_TURN_SENT [NO SUBSCRIBER]
-```
-
-### Fluxo: "Hook pre_tool_use intercepta ferramenta"
-
-```
-SDK pre_tool_use callback
-│
-└─→ hooks/factory.js handles hook
-    └─→ hookBus.emitHook('pre_tool_use', sessionId, input)
-        ├─→ HookBus.emit('pre_tool_use', event) [local only]
-        │   └─→ api/express/hooks.js (SSE)  [FUNCIONA]
-        │   └─→ any HookBus.on() subscriber [FUNCIONA]
-        └─→ ❌ EventBus NUNCA recebe este evento
-            └─→ event-bus-observers.js subscriber HOOK_PRE_TOOL_USE
-                ❌ NUNCA DISPARA
-```
-
-### Fluxo: "Agent pronto após inicialização"
-
-```
-agent/lifecycle/agent-lifecycle.js:
-└─→ agent.emit('ready')
-    ├─→ nerv-bridge → NERV: COPILOT_AGENT_READY  [FUNCIONA]
-    ├─→ EventBus.emit({ type: AGENT_READY })      [FUNCIONA via bridge]
-    │   └─→ event-bus-observers: log INFO         [FUNCIONA]
-    └─→ agent-event-observer (via agent.on())     [FUNCIONA]
-```
-
-### Fluxo: "Dialog loop trava (stall)"
-
-```
-agent/dialog/loop-manager.js:
-└─→ this.emit('stalled', info)
-    ├─→ event-wiring.js forward→ agent.emit('dialog.stalled')
-    │   ├─→ nerv-bridge → NERV: COPILOT_DIALOG_STALLED       [FUNCIONA]
-    │   └─→ agent-event-observer (via agent.on('dialog.stalled'))
-    │       └─→ metrics: stall counter                        [FUNCIONA]
-    └─→ (bridge via always-alive.js)
-        └─→ EventBus.emit({ type: AGENT_DIALOG_STALLED })     [FUNCIONA]
-            └─→ event-bus-observers: log WARN                  [FUNCIONA]
-```
-
-### Fluxo: "Sessão criada no Hub"
-
-```
-conversation-hub/orchestrator.js:
-└─→ this.emit('session_created', session)
-    └─→ bridge (hub.js) → EventBus.emit({ type: HUB_SESSION_CREATED })
-        └─→ event-bus-observers: log INFO [FUNCIONA]
-        └─→ ❌ NERV NÃO recebe este evento
-```
-
----
-
-## 4. Grafo NERV ↔ EventBus (Gap Crítico)
-
-```
-                    SILO ENTRE NERV E EVENTBUS
-                    ═══════════════════════════
-
 ┌─────────────────────────────────────────────────────────┐
-│                    NERV (externo)                       │
-│                                                         │
-│  emitEvent({ actionCode: 'COPILOT_AGENT_READY', ... }) │
-│  onEvent('COPILOT_COMMAND', handler)                    │
-│                                                         │
-└──────────────────┬──────────────────────────────────────┘
-                   │ ↕ nerv-bridge.js
-                   │ (direto ao EventEmitter)
-┌──────────────────▼──────────────────────────────────────┐
-│              AlwaysAliveAgent                           │
-│              (EventEmitter, ~65 events)                 │
-│                                                         │
-│  ← recebe: COPILOT_COMMAND (inbound)                   │
-│  → emite: todos os ~65 eventos ao NERV via EVENT_MAP   │
-└──────────────────┬──────────────────────────────────────┘
-                   │ ↕ (SILO — SEM CONEXÃO DIRETA)
-┌──────────────────▼──────────────────────────────────────┐
-│                  EventBus (core)                        │
-│                                                         │
-│  ← recebe: 26 eventos via 6 bridges ativas             │
-│  → entrega: 15 subscribers (5 quebrados/hook gap)      │
-│  → ❌ NÃO envia nada para NERV                         │
-│  ← ❌ NÃO recebe nada do NERV                          │
+│           EMITTERS LOCAIS (BaseEmitter / EventEmitter)   │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  DialogLoopManager (13 types)                            │
+│  ├── DLM bridge (8 types → EventBus)     ✅             │
+│  └── event-wiring → Agent emitter (13 types)  ✅        │
+│                                                          │
+│  HandoffManager (3 types)                                │
+│  └── HM bridge (3 types → EventBus)      ✅             │
+│                                                          │
+│  HookBus (6 + wildcard)                                  │
+│  └── setEventBus bridge (L1)             ✅             │
+│                                                          │
+│  HubOrchestrator (6 types)                               │
+│  └── hub.js bridgeEmitter                ✅             │
+│                                                          │
+│  PinnedFilesLoader (1 type: changed)                     │
+│  └── terminal/index.js bridge            ✅             │
+│                                                          │
+│  EventFanout (canal events)              ❌ NOT BRIDGED  │
+│  terminal/state.js (state changes)       ❌ NOT BRIDGED  │
+│  core/shared-state.js (state events)     ❌ NOT BRIDGED  │
+│  UserInputHandler (answer/cancel/timeout)❌ NOT BRIDGED  │
+│                                                          │
 └─────────────────────────────────────────────────────────┘
-
-RESULTADO: EventBus e NERV são SILOS independentes.
-Eventos do Hub, Config, Hooks que chegam ao EventBus
-NUNCA chegam ao NERV.
 ```
 
 ---
 
-## 5. Grafo de Namespaces de Eventos
+## 3. Grafo de Duplicação: Os 28 Events Perdidos
 
 ```
-NAMESPACES PRESENTES NO SISTEMA (todos coexistindo):
+SDK session.on(EVENT_X, handler)
+    │
+    ▼
+event-handlers/sdk-responses.js
+    │
+    ├── emit('session.error')         ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('session.shutdown')      ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('session.handoff')       ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('session.task_complete') ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('assistant.turn_start')  ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('assistant.turn_end')    ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('abort')                 ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('dialog.delta')          ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('elicitation.pending')   ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('subagent.*')            ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('agent.background.*')    ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('agent.shell.*')         ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('assistant.intent')      ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('assistant.reasoning_complete')→agent→ ❌ NÃO no bridge ──→ PERDIDO
+    ├── emit('session.context_changed')──→ agent →  ❌ NÃO no bridge ──→ PERDIDO
+    └── emit('session.truncation')    ──→ agent ──→ ❌ NÃO no bridge ──→ PERDIDO
 
-1. SSOT (events/agent-events.js): "agent:*"
-   agent:ready, agent:before-stop, agent:stopped, agent:shutdown
-   agent:error, agent:emitter.error
-   agent:session:keepalive, agent:session.fatal
-   agent:task:started, agent:task:delta, agent:task.error
-   agent:dialog:loop:changed, agent:dialog.turn_timeout
-   agent:dialog:stalled, agent:dialog:paused, agent:dialog:resumed
-   agent:dialog:stopped, agent:dialog:reply
-   agent:dialog:compaction:requested
-   agent:handoff:received, agent:handoff:accepted, agent:handoff:rejected
+event-handlers/boot-wiring.js (via ctx.emit)
+    ├── emit('sdk.lifecycle')         ──→ agent ──→ ❌ PERDIDO
+    ├── emit('session.cleanup')       ──→ agent ──→ ❌ PERDIDO
+    ├── emit('mcp.reconnected')       ──→ agent ──→ ❌ PERDIDO
+    ├── emit('quota.warning')         ──→ agent ──→ ❌ PERDIDO
+    └── emit('dialog.boot_recovery')  ──→ agent ──→ ❌ PERDIDO
 
-2. SSOT (events/hub-events.js): "hub:*"
-   hub:session:created, hub:session:closed, hub:turn:sent
-   hub:turn:complete, hub:turn:delta, hub:turn:user:pending
-   hub:user:injected, hub:error
-
-3. SSOT (events/hook-events.js): "hook:*"
-   hook:pre_tool_use, hook:post_tool_use, hook:prompt_submitted
-   hook:session_start, hook:session_end, hook:error_occurred
-
-4. SSOT (events/terminal-events.js): "terminal:*", "audit:*"
-   terminal:started, terminal:stopped, terminal:command
-   audit:entry, audit:flush, audit:log, audit:quick
-
-5. SSOT (events/system-events.js): "system:*", "config:*", "health:*", "bridge:*"
-   system:shutdown:started, system:shutdown:complete
-   config:pinned_files:changed, config:changed
-   health:check, health:degraded, health:recovered
-   bridge:mcp:reconnected, bridge:nerv:connected, bridge:nerv:disconnected
-
-6. LEGACY (AGENT_EVENTS array): sem namespace, ponto-separado
-   ready, before-stop, stopped, error, task.started, task.delta
-   dialog.stalled, dialog.reply, session.keepalive, session.fatal
-   ... (~65 strings)
-
-7. LEGACY (HookBus local): snake_case sem namespace
-   pre_tool_use, post_tool_use, prompt_submitted
-   session_start, session_end, error_occurred
-
-8. NERV (nerv-bridge): UPPER_SNAKE_CASE com COPILOT_ prefix
-   COPILOT_AGENT_READY, COPILOT_TASK_STARTED, COPILOT_DIALOG_STALLED
-   COPILOT_SESSION_FATAL, COPILOT_COMPACTION_PROACTIVE_REQUEST
-   ... (62 mappings)
-
-9. SERVICES inline (sem constante): "namespace:action"
-   session:create, session:disconnect, session:resume
-   session:message, tool:build
-
-TOTAL: 5 formatos distintos coexistindo
+agent-messaging.js
+    └── emit('steering.sent')         ──→ agent ──→ ❌ PERDIDO
 ```
 
 ---
 
-## 6. Grafo de Prioridade de Entrega
+## 4. Grafo Ideal Proposto (v2)
 
 ```
-PIPELINE DE UM EVENTO (ex: AGENT_READY = 'agent:ready')
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     SDK SESSION (74+ event types)                           │
+└────────────────────────────┬────────────────────────────────────────────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │   event-handlers/ (25 evts)  │
+              │   ÚNICO caminho SDK→Agent    │
+              │   (SdkSessionBridge removido)│
+              └──────────────┬──────────────┘
+                             │ callbacks.emit()
+                             ▼
+              ┌──────────────────────────────┐
+              │  AlwaysAliveAgent             │
+              │  bridgeEmitter: TODOS ~52     │
+              │  events (zero perdidos)       │
+              └──────────────┬──────────────┘
+                             │
+                             ▼
+              ┌──────────────────────────────────────────────────────┐
+              │                  EventBus (SSOT Central)              │
+              │                                                       │
+              │  Middlewares: enricher → validator → rate-limiter      │
+              │                                                       │
+              │  Todas as fontes convergem aqui:                      │
+              │   agent:*  (52 events via bridgeEmitter completo)     │
+              │   hook:*   (6 events via HookBus bridge)              │
+              │   hub:*    (6 events via orchestrator bridge)         │
+              │   service:*(5 events direto)                          │
+              │   system:* (5 events direto)                          │
+              │   config:* (1 event)                                  │
+              │   terminal:*(7 events — bridges novos)                │
+              │   = ~82 event types, ZERO duplicação                  │
+              │                                                       │
+              │  Subscribers:                                          │
+              │   event-bus-observers → métricas + health + alertas   │
+              │   NervEventBusAdapter → NERV (ÚNICO caminho)          │
+              │   OperationalSubscribers → actions (auto-heal, etc.)  │
+              └──────────────────┬───────────────────────────────────┘
+                                 │
+                                 ▼
+              ┌──────────────────────────────────────────────────────┐
+              │   NervEventBusAdapter (ÚNICO path para NERV)         │
+              │   ~82 outbound mappings (full coverage)              │
+              │   nerv-bridge.js REMOVIDO (legado eliminado)         │
+              └──────────────────────────────────────────────────────┘
+```
 
-emit({ type: 'agent:ready', sessionId: 'abc', timestamp: 123 })
+### Diferenças Chave Atual → Ideal:
+
+| Aspecto                  | Atual (v2.0)             | Ideal                         |
+|--------------------------|--------------------------|-------------------------------|
+| SDK→EventBus caminhos    | 2 (A + B duplicados)     | 1 (event-handlers único)      |
+| Events perdidos (agent)  | 28                       | 0                             |
+| NERV outbound caminhos   | 2 (legado + adapter)     | 1 (adapter único)             |
+| NERV envelope duplicação | 38 duplos                | 0 duplos                      |
+| Observer acoplamento     | 2 (EB direto + EventBus) | 1 (EventBus único)            |
+| Namespace separator      | 4 formatos (:, ., _, /)  | 1 formato (`:` SSOT)          |
+| Event types no EventBus  | ~90 (com duplos)         | ~82 (sem duplos)              |
+| Bus-observers ação       | log only                 | métricas + health + alertas   |
+
+---
+
+## 5. Grafo de Namespace após Normalização
+
+```
+EventBus namespace tree:
+├── agent:
+│   ├── agent:ready
+│   ├── agent:before-stop
+│   ├── agent:stopped
+│   ├── agent:shutdown
+│   ├── agent:error
+│   ├── agent:emitter.error
+│   ├── agent:metrics
+│   ├── agent:session:*         (keepalive, fatal, compaction_*, usage, ...)
+│   ├── agent:task:*            (started, completed, delta, error, queued, reasoning)
+│   ├── agent:dialog:*          (ready, turn_start/end, stalled, paused, ...)
+│   ├── agent:tool:*            (execution_start/complete/progress)
+│   ├── agent:question:*        (pending, answered)
+│   ├── agent:permission:*      (mode_changed)
+│   ├── agent:pr:*              (consumed, fallback_model)
+│   ├── agent:handoff:*         (received, accepted, rejected)
+│   ├── agent:context:*         (compacted)
+│   ├── agent:system:*          (message)
+│   ├── agent:assistant:*       [NOVO] (turn_start, turn_end, intent, reasoning_complete)
+│   ├── agent:subagent:*        [NOVO] (started, completed, failed)
+│   ├── agent:abort             [NOVO]
+│   ├── agent:elicitation:*     [NOVO] (pending)
+│   ├── agent:shell:*           [NOVO] (completed, detached_completed)
+│   ├── agent:background:*      [NOVO] (completed, idle)
+│   ├── agent:sdk:lifecycle     [NOVO]
+│   ├── agent:mcp:reconnected   [NOVO]
+│   └── agent:steering:sent     [NOVO]
 │
-├─ [1] middleware chain (0 middlewares registrados → passa direto)
+├── hook:
+│   ├── hook:pre_tool_use
+│   ├── hook:post_tool_use
+│   ├── hook:prompt_submitted
+│   ├── hook:session_start
+│   ├── hook:session_end
+│   └── hook:error_occurred
 │
-├─ [2] #deliver()
-│   ├─ exact match: listeners('agent:ready') → handlers notificados
-│   ├─ namespace wildcard: listeners('agent:*') → handlers notificados
-│   └─ catch-all: listeners('*') → handlers notificados
+├── hub:
+│   ├── hub:session:created
+│   ├── hub:session:closed
+│   ├── hub:turn:sent
+│   ├── hub:turn:complete
+│   ├── hub:user:injected
+│   └── hub:error
 │
-└─ [3] contadores incrementados:
-       #counters.set('agent:ready', n++)
-
-TODOS os handlers são async-safe (try/catch por handler)
-Ordem de entrega: exact > namespace-wildcard > catch-all
-Handlers em PARALELO (sem await, sem fila)
+├── service:
+│   ├── service:session:created
+│   ├── service:session:disconnected
+│   ├── service:session:resumed
+│   ├── service:session:message
+│   └── service:tool:invoked
+│
+├── system:
+│   ├── system:shutdown:started
+│   ├── system:shutdown:complete
+│   ├── system:health:degraded
+│   ├── system:health:recovered
+│   └── system:config:pinned_files_changed
+│
+├── terminal:
+│   ├── terminal:command:start
+│   ├── terminal:command:complete
+│   └── terminal:state:changed
+│
+└── nerv:
+    ├── nerv:command:received
+    ├── nerv:command:send_message
+    ├── nerv:command:pause
+    ├── nerv:command:resume
+    └── nerv:command:restart
 ```
 
 ---
 
-## 7. Matriz de Cobertura de Eventos
+## 6. Matriz de Cobertura por Módulo
 
-| Namespace                     | SSOT definido | Bridge ativo | Subscriber | Ação operacional |
-| ----------------------------- | :-----------: | :----------: | :--------: | :--------------: |
-| `agent:ready`                 |       ✅       |      ✅       |   ✅ log    |    ❌ (só log)    |
-| `agent:before-stop`           |       ✅       |      ✅       |     ❌      |        ❌         |
-| `agent:stopped`               |       ✅       |      ✅       |     ❌      |        ❌         |
-| `agent:error`                 |       ✅       |      ✅       |     ❌      |        ❌         |
-| `agent:dialog:stalled`        |       ✅       |      ✅       |   ✅ log    |    ❌ (só log)    |
-| `agent:dialog:loop:changed`   |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `agent:dialog:turn_timeout`   |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `agent:handoff:*`             |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `agent:task:started`          |       ✅       |      ✅       |     ❌      |        ❌         |
-| `agent:task:delta`            |       ✅       |      ✅       |     ❌      |        ❌         |
-| `hook:pre_tool_use`           |       ✅       |    ❌ BUG     | ✅ (broken) |        ❌         |
-| `hook:post_tool_use`          |       ✅       |    ❌ BUG     | ✅ (broken) |        ❌         |
-| `hook:session_start`          |       ✅       |    ❌ BUG     | ✅ (broken) |        ❌         |
-| `hook:session_end`            |       ✅       |    ❌ BUG     | ✅ (broken) |        ❌         |
-| `hook:error_occurred`         |       ✅       |    ❌ BUG     | ✅ (broken) |        ❌         |
-| `hub:session:created`         |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `hub:session:closed`          |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `hub:turn:sent`               |       ✅       |      ✅       |     ❌      |        ❌         |
-| `hub:turn:complete`           |       ✅       |      ✅       |     ❌      |        ❌         |
-| `config:pinned_files:changed` |       ✅       |      ✅       |   ✅ log    |        ❌         |
-| `system:shutdown:*`           |       ✅       |      ❌       |     ❌      |        ❌         |
-| `health:*`                    |       ✅       |      ❌       |     ❌      |        ❌         |
-| `bridge:nerv:*`               |       ✅       |      ❌       |     ❌      |        ❌         |
-| `terminal:*`                  |       ✅       |      ❌       |     ❌      |        ❌         |
-| SDK events (74 tipos)         |       ❌       |      ❌       |     ❌      |        ❌         |
-| `session:create` (service)    |       ❌       |      —       |     ❌      |        ❌         |
-| `tool:build` (service)        |       ❌       |      —       |     ❌      |        ❌         |
+| Módulo           | Emitidos | Bridgeados | Perdidos | Cobertura |
+|------------------|----------|------------|----------|-----------|
+| agent/lifecycle  | 8        | 6          | 2        | 75%       |
+| agent/dialog     | 13       | 13         | 0        | 100%      |
+| agent/session    | 16       | 8          | 8        | 50%       |
+| agent/messaging  | 2        | 0          | 2        | 0%        |
+| agent/infra      | 7        | 6          | 1        | 86%       |
+| hooks            | 6        | 6          | 0        | 100%      |
+| hub              | 6        | 6          | 0        | 100%      |
+| services         | 5        | 5          | 0        | 100%      |
+| system           | 5        | 5          | 0        | 100%      |
+| **TOTAL**        | **68**   | **55**     | **13**   | **81%**   |
 
-**Cobertura atual**:
-- SSOT definido: 52/~120 eventos únicos ≈ 43%
-- Bridge ativo: 26/52 SSOT eventos ≈ 50%
-- Subscriber presente: 15/26 bridgeados ≈ 58%
-- Ação operacional: 0/15 ≈ 0% (apenas logging)
+> Nota: Os 28 "perdidos" incluem variantes internas (__processQueue, status)
+> e eventos que não precisam de bridge (dialog.pre_stall_warning).
+> Cobertura real após exclusão de internos: **~85%**
 
 ---
 
-**Próximo documento**: [PARTE-23L-C-EVENTS-SITUACAO-IDEAL.md](PARTE-23L-C-EVENTS-SITUACAO-IDEAL.md)
+## 7. Legenda
+
+- ✅ = Bridgeado ao EventBus
+- ❌ = NÃO bridgeado (perdido)
+- ⚠️ = Parcialmente coberto / duplicação
+- 🔴 = Impacto ALTO (perda de visibilidade operacional)
+- 🟡 = Impacto MÉDIO
+- 🟢 = Impacto BAIXO
+- ⚪ = Interno (não necessita bridge)

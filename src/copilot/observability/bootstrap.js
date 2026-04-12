@@ -22,7 +22,6 @@ import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js'
 import { setDbLogger } from '../db/sqlite.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
-import { sdkSessionBridge } from '../bridges/sdk-session-bridge.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { defaultErrorTracker } from './error-tracker.js';
@@ -58,9 +57,6 @@ export function bootstrapObservability() {
 
     // FAIXA-L6: middleware pipeline (enricher → validator → rate-limiter)
     if (bus) registerBuiltinMiddleware(bus);
-
-    // FAIXA-L5: SDK Session Bridge — init com EventBus para futuros attach()
-    if (bus) sdkSessionBridge.init(bus);
 
     // FAIXA-2D: registrar subscribers cross-module no EventBus (best-effort após registro do bus)
     attachEventBusObservers();

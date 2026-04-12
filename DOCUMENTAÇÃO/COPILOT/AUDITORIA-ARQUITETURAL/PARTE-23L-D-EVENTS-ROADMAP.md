@@ -1,650 +1,317 @@
-# PARTE-23L-D — Events System: Roadmap de Hardening — Consolidado
+# PARTE-23L-D — Events System: Roadmap v3.0 (Expandido)
 
-**Data**: 2026-04-12 | **Status**: Em Execução | **Versão**: 2.0
-**Contexto**: Subparte especial PARTE-23 — plano consolidado, fases e subfases completas
-**Dependências**: PARTE-23L-A (auditoria), PARTE-23L-B (grafo), PARTE-23L-C (ideal)
-**Meta final**: Sistema de events totalmente novo — EventBus único backbone, NERV integrado,
-SDK bridgeado, middleware chain, zero strings hardcoded, observabilidade completa.
+**Data**: 2026-04-12 | **Status**: Roadmap | **Versão**: 3.0 (pós-FAIXA-L1 a L8)
+**Precedente**: PARTE-23L-A/B/C v2.0 (re-auditoria completa)
 
 ---
 
-## 0. Resumo Executivo
+## Sumário Executivo
 
-A auditoria identificou **10 gaps críticos** no sistema de eventos. Este roadmap organiza as
-correções em **8 faixas incrementais** de baixo para alto impacto, sem quebrar funcionalidades
-existentes. Cada faixa é independente e pode ser deployed separadamente.
-
-**Prioridade imediata**: GAP-01 (HookBus → EventBus) é um **BUG** que gera 5 subscribers mortos.
-Deve ser resolvido antes de qualquer nova feature de observabilidade de hooks.
-
----
-
-## 1. Mapa de Impacto × Esforço
-
-```
-                 ALTO IMPACTO
-                      │
-           NERV-UNIFY  │  SDK-BRIDGE
-           (L5)        │  (L6)
-                       │
-ALTO ESFORÇO ─────────-┼──────────── BAIXO ESFORÇO
-                       │
-           DIAGNOSTICS │  HOOK-BRIDGE (L1) ◄ URGENTE
-           REPLAY (L4) │  SERVICE-SSOT (L2)
-                       │  NERV-EVENTBUS-ADAPTER (L3)
-                       │
-                 BAIXO IMPACTO
-```
+O roadmap v3 organiza **18 faixas** (L1–L18) em 4 ondas:
+- **Onda 1 (L1–L8)**: ✅ CONCLUÍDA — implementação base
+- **Onda 2 (L9–L12)**: Eliminação de duplicação e cobertura completa
+- **Onda 3 (L13–L15)**: Remoção de legado e migração de observers
+- **Onda 4 (L16–L18)**: Inteligência operacional e observabilidade avançada
 
 ---
 
-## 2. Faixas de Implementação
+## Onda 1 — Implementações Base (✅ CONCLUÍDA)
 
-### FAIXA-L1 — Fix Bug HookBus + Subscribers Operacionais (URGENTE)
+### FAIXA-L1 — HookBus → EventBus bridge ✅ CONCLUÍDO
+- `hooks/bus.js`: adicionado `setEventBus(bus)` + bridge em `emitHook()`
+- `hooks/index.js`: adicionado `connectToEventBus(bus)`
+- `events/hook-events.js`: 5 constantes SSOT
+- `copilot-boot-wiring.js`: wiring HookBus → EventBus no bootstrap
+- **Commit**: `b3284b0a`
 
-**Prioridade**: 🔥 CRÍTICA — Bug em produção
-**Esforço**: 2-3 horas
-**Risco**: Baixo (adição, não remoção)
-**Impacto**: 5 subscribers quebrados passam a funcionar, hooks visíveis no EventBus
+### FAIXA-L2 — SSOT Expansion ✅ CONCLUÍDO
+- `events/agent-events.js`: 52 constantes (38 bridgeados)
+- `events/hook-events.js`: 5 constantes
+- `events/system-events.js`: 5 constantes
+- `events/service-events.js`: 5 constantes
+- `events/index.js`: barrel consolidado
+- **Commit**: `b3284b0a`
 
-#### L1.1 — Injetar EventBus no HookBus
+### FAIXA-L3 — NervEventBusAdapter ✅ CONCLUÍDO
+- `bridges/nerv-event-bus-adapter.js`: novo adapter bidirecional
+- `bridges/nerv-events.js`: ~70 EVENTBUS_TO_NERV mappings
+- `bridges/index.js`: barrel exportando adapter
+- **Commit**: `b3284b0a`
 
-**Arquivo**: `src/copilot/hooks/bus.js`
+### FAIXA-L4 — EventBus diagnostics ✅ CONCLUÍDO
+- `core/event-bus.js`: adicionados `diagnostics()`, `channels()`, `statsByNamespace()`
+- Suporte a wildcards `ns:*` para `statsByNamespace()`
+- **Commit**: `b3284b0a`
 
-```javascript
-// Adicionar campo #eventBus e método setEventBus()
-// Adicionar bridge no emitHook()
-```
+### FAIXA-L5 — SdkSessionBridge ✅ CONCLUÍDO (⚠️ não wired)
+- `bridges/sdk-session-bridge.js`: novo bridge SDK→EventBus direto
+- `events/sdk-events.js`: 18 constantes `sdk:*`
+- ⚠️ `attach(session)` nunca chamado → bridge INERTE em produção
+- **Commit**: `b3284b0a`
 
-- Adicionar `#eventBus = null` como campo privado
-- Criar `setEventBus(bus)` público
-- No `emitHook()`: após `this.emit(hookName, event)`, chamar `this.#eventBus?.emit({ type: HOOK_NAME_MAP[hookName], ...event })`
-- Importar constantes de `#copilot/events`
+### FAIXA-L6 — Middleware pipeline ✅ CONCLUÍDO
+- `events/middleware/timestamp-enricher.js`: enriquece `_source`, normaliza `timestamp`
+- `events/middleware/schema-validator.js`: bloqueia events mal-formados
+- `events/middleware/rate-limiter.js`: suprime flood (100/s/type)
+- `events/middleware/index.js`: barrel
+- **Commit**: `b3284b0a`
 
-**Arquivo**: `src/copilot/observability/bootstrap.js`
+### FAIXA-L7 — bridgeEmitter expansion ✅ CONCLUÍDO
+- `always-alive.js`: bridgeEmitter expandido de ~8 para 38 events
+- 8 DialogLoopManager + 3 HandoffManager events via bridges dedicados
+- **Commit**: `b3284b0a`
 
-```javascript
-// Após registrar EVENT_BUS no DI container:
-const bus = container.resolve(EVENT_BUS);
-import { hookBus } from '#copilot/hooks';
-hookBus.setEventBus(bus);
-```
-
-#### L1.2 — Transformar event-bus-observers nos hooks para ação real
-
-**Arquivo**: `src/copilot/observability/event-bus-observers.js`
-
-Subscribers de HOOK_* passam de `log()` para:
-- `HOOK_PRE_TOOL_USE` → log + metrics.inc('hooks.pre_tool_use')
-- `HOOK_POST_TOOL_USE` → log + metrics.inc('hooks.post_tool_use')
-- `HOOK_ERROR_OCCURRED` → log ERROR + errorTracker.track()
-- `HOOK_SESSION_START` → log + metrics.inc('hooks.session_start')
-- `HOOK_SESSION_END` → log + metrics.inc('hooks.session_end')
-
-#### Critérios de aceite L1
-- [ ] `hookBus.emitHook('pre_tool_use', ...)` resulta em `EventBus.emit({ type: 'hook:pre_tool_use' })`
-- [ ] `event-bus-observers.js` subscriber HOOK_PRE_TOOL_USE dispara
-- [ ] Sem quebra nos testes existentes de hooks
-- [ ] `npm run lint && npm run test:unit` ✅
-
----
-
-### FAIXA-L2 — Service Events → SSOT + Norma de Namespace
-
-**Prioridade**: Alta
-**Esforço**: 1-2 horas
-**Risco**: Baixo (strings aditivas no SSOT)
-**Impacto**: Zero strings hardcoded em services, conformidade C11
-
-#### L2.1 — Criar events/service-events.js
-
-```javascript
-// src/copilot/events/service-events.js
-export const SERVICE_SESSION_CREATED    = 'service:session:created';
-export const SERVICE_SESSION_DISCONNECTED = 'service:session:disconnected';
-export const SERVICE_SESSION_RESUMED    = 'service:session:resumed';
-export const SERVICE_SESSION_MESSAGE    = 'service:session:message';
-export const SERVICE_TOOL_INVOKED       = 'service:tool:invoked';
-```
-
-#### L2.2 — Atualizar barrel events/index.js
-
-Adicionar re-export de `service-events.js`.
-
-#### L2.3 — Substituir strings inline nos services
-
-| Arquivo                            | String antiga          | Constante nova                 |
-| ---------------------------------- | ---------------------- | ------------------------------ |
-| `services/session-service.js`      | `'session:create'`     | `SERVICE_SESSION_CREATED`      |
-| `services/session-service.js`      | `'session:disconnect'` | `SERVICE_SESSION_DISCONNECTED` |
-| `services/session-service.js`      | `'session:resume'`     | `SERVICE_SESSION_RESUMED`      |
-| `services/conversation-service.js` | `'session:message'`    | `SERVICE_SESSION_MESSAGE`      |
-| `services/tool-service.js`         | `'tool:build'`         | `SERVICE_TOOL_INVOKED`         |
-
-> Nota: O nome da string MUDA (ex: `'session:create'` → `'service:session:created'`).
-> Verificar se há subscribers para essas strings antes de renomear.
-> Se houver subscribers, manter alias temporário + deprecation warning.
-
-#### Critérios de aceite L2
-- [ ] `grep -rn "'session:create\|'session:disconnect\|'tool:build"` retorna 0 resultados
-- [ ] `events/service-events.js` exporta todas as constantes
-- [ ] Barrel `events/index.js` re-exporta `service-events.js`
-- [ ] `npm run lint` ✅
+### FAIXA-L8 — NERV map expansion + health ✅ CONCLUÍDO
+- `bridges/nerv-events.js`: expandido para ~70 entries
+- `server/routes/health.js`: endpoint `/health/events` para diagnostics
+- **Commit**: `b3284b0a`
 
 ---
 
-### FAIXA-L3 — NervEventBusAdapter: EventBus → NERV Unificado
+## Onda 2 — Cobertura Completa e Deduplicação
 
-**Prioridade**: Alta
-**Esforço**: 3-4 horas
-**Risco**: Médio (mexe no caminho crítico NERV)
-**Impacto**: NERV passa a receber Hub, Hook e Config events; caminho inbound auditável
+### FAIXA-L9 — Bridge dos 28 Events Perdidos ✅ CONCLUÍDO
 
-#### L3.1 — Criar events/nerv-events.js
+**Objetivo**: Bridgear todos os 28 events que o Agent emite mas NÃO chegam ao EventBus.
 
-```javascript
-// src/copilot/events/nerv-events.js
-// Mapeamento bidirecional EventBus ↔ NERV (extraído de nerv-bridge.js)
-export const EVENTBUS_TO_NERV = { ... };
-export const NERV_TO_EVENTBUS = { ... };
-export const NERV_COMMAND_RECEIVED    = 'nerv:command:received';
-export const NERV_COMMAND_SENDMESSAGE = 'nerv:command:send_message';
-export const NERV_COMMAND_PAUSE       = 'nerv:command:pause';
-export const NERV_COMMAND_RESUME      = 'nerv:command:resume';
-export const NERV_COMMAND_RESTART     = 'nerv:command:restart';
-```
+**Arquivos a modificar**:
+1. `events/agent-events.js` — adicionar 26 constantes SSOT (`AGENT_ASSISTANT_TURN_START`, etc.)
+2. `copilot/always-alive.js` — expandir bridgeEmitter com 26 novas entradas
+3. `bridges/nerv-events.js` — expandir EVENTBUS_TO_NERV com 26 mapeamentos
+4. `events/index.js` — re-exportar novas constantes no barrel
 
-#### L3.2 — Criar bridges/nerv-event-bus-adapter.js
+**Prioridade**: Começar pelos 7 de impacto ALTO:
+- `abort`, `session.error`, `session.shutdown`, `session.handoff`
+- `session.task_complete`, `assistant.turn_start`, `assistant.turn_end`
+- `dialog.delta`
 
-**Novo módulo** que substitui o acoplamento direto ao EventEmitter do agent:
+**Critério de conclusão**: `diagnostics().channels` ≥ 82, zero events perdidos
 
-```javascript
-/**
- * @file nerv-event-bus-adapter.js
- * Integra NERV ao EventBus como consumer/producer.
- *
- * Outbound: EventBus emite → NERV recebe
- * Inbound: NERV emite COPILOT_COMMAND → EventBus emite nerv:command:*
- */
-export class NervEventBusAdapter {
-    /** @param {{ bus: EventBus; nerv: object }} deps */
-    constructor({ bus, nerv }) { ... }
+**Estimativa**: ~150 linhas de código em 4 arquivos
 
-    /** Conecta ao NERV e subscreve no EventBus. */
-    mount() { ... }
+### FAIXA-L10 — Remoção do SdkSessionBridge ✅ CONCLUÍDO
 
-    /** Desconecta e limpa resources. */
-    unmount() { ... }
-}
-```
+**Objetivo**: Eliminar o caminho duplicado SDK→EventBus direto.
 
-#### L3.3 — Manter nerv-bridge.js como fallback
+**Justificativa**:
+- O SdkSessionBridge (L5) nunca teve `attach()` chamado em produção
+- Os 18 eventos dele são subconjunto dos 25 do Caminho A
+- Namespace `sdk:*` não tem consumers reais
+- Cria potencial de duplicação se `attach()` for ativado no futuro
 
-`nerv-bridge.js` permanece para o caminho legado do AlwaysAliveAgent EventEmitter → NERV.
-NervEventBusAdapter é ADICIONADO como segundo caminho (com filtro para evitar duplicatas).
+**Arquivos a modificar**:
+1. `bridges/sdk-session-bridge.js` — DELETAR
+2. `events/sdk-events.js` — DELETAR
+3. `bridges/index.js` — remover export
+4. `events/index.js` — remover re-export de sdk-events
+5. `copilot-boot-wiring.js` — remover `sdkSessionBridge.init(bus)` se existir
+6. `bridges/nerv-events.js` — remover mapeamentos `SDK_*` se existirem
 
-No futuro (FAIXA-L7), `nerv-bridge.js` poderá ser removido quando 100% dos eventos
-estiverem no EventBus.
+**Critério**: Zero imports de `sdk-events` ou `sdk-session-bridge` no codebase
 
-#### L3.4 — Wire em observability/bootstrap.js
+### FAIXA-L11 — Namespace Normalization 🟡 MÉDIO
 
-```javascript
-import { NervEventBusAdapter } from '#copilot/bridges/nerv-event-bus-adapter';
-// Após NERV ser injetado no container:
-const nervAdapter = new NervEventBusAdapter({ bus, nerv });
-nervAdapter.mount();
-// Registrar cleanup: nervAdapter.unmount() no shutdown
-```
+**Objetivo**: Padronizar todos os event names para formato `namespace:domain:action`.
 
-#### Critérios de aceite L3
-- [ ] `HUB_SESSION_CREATED` chega ao NERV via `NervEventBusAdapter`
-- [ ] `HOOK_PRE_TOOL_USE` chega ao NERV via `NervEventBusAdapter` (após L1)
-- [ ] `NERV COPILOT_COMMAND` emite `nerv:command:*` no EventBus
-- [ ] Sem duplicação de eventos já enviados pelo nerv-bridge legado
-- [ ] `npm run test:integration` ✅
+**Ações**:
+1. Auditar todas as strings fora do SSOT (~13 restantes)
+2. Substituir por constantes de `events/*.js`
+3. Normalizar separadores: `.` → `:` onde aplicável
+4. Manter backward-compat via aliases temporários no bridgeEmitter
 
----
+**Arquivos candidatos** (13 strings hardcoded restantes):
+- `copilot/agent/dialog/event-wiring.js` (EVENT_MAP com nomes `.`)
+- `copilot/agent/session/event-handlers/streaming.js` (delta emit)
+- `copilot/agent/context/agent-context.js` (status emit)
+- `copilot/orchestrator/hub.js` (hub events)
 
-### FAIXA-L4 — EventBus v2: diagnostics() + replay() + pipe()
+**Critério**: `grep -r "emit(" src/copilot | grep -v "events/" | wc -l` → 0
 
-**Prioridade**: Média
-**Esforço**: 2-3 horas
-**Risco**: Baixo (adição de capacidades ao EventBus existente)
-**Impacto**: Diagnóstico runtime, replay para debugging, composição de buses
+### FAIXA-L12 — SSOT Hardcoded Audit Tool 🟢 BAIXO
 
-#### L4.1 — Adicionar diagnostics() ao EventBus
+**Objetivo**: Script automatizado para detectar event strings fora do SSOT.
 
-```javascript
-// core/event-bus.js
-diagnostics() {
-    return {
-        listeners: Array.from(this.#listeners.entries()).map(([type, set]) => ({
-            type,
-            count: set.size,
-        })),
-        emitted: Object.fromEntries(this.#counters),
-        disposed: this.#disposed,
-        middlewareCount: this.#middleware.length,
-    };
-}
-```
-
-#### L4.2 — Adicionar channels()
-
-```javascript
-channels() {
-    return Array.from(this.#listeners.keys())
-        .filter(k => (this.#listeners.get(k)?.size ?? 0) > 0);
-}
-```
-
-#### L4.3 — Adicionar buffer circular para replay()
-
-```javascript
-// Ring buffer de 50 eventos por tipo (opcional, opt-in)
-// bus = new EventBus({ replayBuf fer: 50 })
-```
-
-#### L4.4 — Adicionar statsBy Namespace()
-
-```javascript
-statsByNamespace() {
-    const result = {};
-    for (const [type, count] of this.#counters) {
-        const ns = type.split(':')[0] ?? '_global';
-        result[ns] = (result[ns] ?? 0) + count;
-    }
-    return result;
-}
-```
-
-#### L4.5 — Expor via API de saúde
-
-`api/express/health.js` → adicionar endpoint `/health/events` que retorna `bus.diagnostics()`.
-
-#### Critérios de aceite L4
-- [ ] `bus.diagnostics()` retorna objeto com listeners e contadores
-- [ ] `bus.channels()` retorna array com types que têm subscribers
-- [ ] `/health/events` retorna dados corretos
-- [ ] `npm run test:unit` ✅
+**Deliverable**: `scripts/audit-event-strings.mjs`
+- Extrai todas as constantes de `events/*.js`
+- Compara com todos os `emit(string)` no codebase
+- Reporta strings não-SSOT
+- Integrado ao `make diagnose` e CI
 
 ---
 
-### FAIXA-L5 — SDK Session Event Bridge (Selecionado)
+## Onda 3 — Remoção de Legado e Migração
 
-**Prioridade**: Média
-**Esforço**: 3-4 horas
-**Risco**: Médio (SDK é external dep — API pode mudar)
-**Impacto**: Tool calls, compaction, streaming errors visíveis no EventBus
+### FAIXA-L13 — Remoção do nerv-bridge.js Legado 🔴 CRÍTICO
 
-#### L5.1 — Criar events/sdk-events.js
+**Objetivo**: Eliminar duplicação Agent→NERV (nerv-bridge + NervEventBusAdapter).
 
-```javascript
-export const SDK_TOOL_CALL          = 'sdk:tool:call';
-export const SDK_TOOL_RESULT        = 'sdk:tool:result';
-export const SDK_SESSION_STARTED    = 'sdk:session:started';
-export const SDK_SESSION_STOPPED    = 'sdk:session:stopped';
-export const SDK_MESSAGE_COMPLETE   = 'sdk:message:complete';
-export const SDK_MESSAGE_ERROR      = 'sdk:message:error';
-export const SDK_SESSION_USAGE      = 'sdk:session:usage';
-export const SDK_CONTEXT_COMPACTED  = 'sdk:context:compacted';
-```
+**Pré-requisito**: FAIXA-L9 completa (todos events no EventBus)
 
-#### L5.2 — Criar sdk/session-event-bridge.js
+**Verificação pré-remoção**:
+1. Listar todos os 62 events do nerv-bridge
+2. Confirmar que cada um tem equivalente no EVENTBUS_TO_NERV
+3. Se existir event no nerv-bridge que NÃO está no adapter → adicionar antes de remover
 
-Função `bridgeSdkSession(session, bus)` que:
-- Mapeia os 8 eventos selecionados (não os 74 — seria overhead desnecessário)
-- Retorna função de cleanup
-- High-frequency events (streaming deltas) são intencionalmente EXCLUÍDOS
+**Arquivos a modificar**:
+1. `bridges/nerv-bridge.js` — DELETAR (~452 linhas)
+2. `bridges/index.js` — remover export
+3. `copilot-boot-wiring.js` — remover wiring `nervBridge.attach(agent)`
+4. Qualquer import de nerv-bridge em outros módulos → remover
 
-#### L5.3 — Integrar em agent/lifecycle/entry.js
+**Critério**: Zero imports de `nerv-bridge` no codebase
+**Ganho**: Eliminação de ~452 linhas de código legado
 
-Após session ser inicializada:
-```javascript
-const unbridge = bridgeSdkSession(session, bus);
-agent.once('stopped', unbridge);
-```
+### FAIXA-L14 — Observer Migration (direto → EventBus) 🟡 MÉDIO
 
-#### Critérios de aceite L5
-- [ ] `SDK_TOOL_CALL` event aparece no EventBus quando SDK invoca tool
-- [ ] Streaming deltas não chegam ao EventBus (performance OK)
-- [ ] Cleanup correto na parada do agent
-- [ ] `npm run test:integration` ✅
+**Objetivo**: Migrar observers de `agent.on()` direto para `bus.on()`.
 
----
+**Pré-requisito**: FAIXA-L9 completa + L13 completa
 
-### FAIXA-L6 — Middleware Registry (Tracing + Schema Validation)
+**Fases**:
+1. **Criar** `observability/observers/eventbus-unified-handlers.js`
+   - Mesma lógica de `session-agent-handlers.js` + `dialog-task-handlers.js`
+   - Subscreve via `bus.on(SSOT_CONSTANT, handler)` em vez de `agent.on(string, handler)`
+   - ~50 handlers migrados
 
-**Prioridade**: Média
-**Esforço**: 4-5 horas
-**Risco**: Baixo (middleware é additive, não bloqueia)
-**Impacto**: Observabilidade profunda, validação de schemas, correlationId automático
+2. **Feature flag** `USE_EVENTBUS_OBSERVERS=true/false`
+   - Se true: usa unified handlers via EventBus
+   - Se false: mantém legacy handlers via agent
+   - Permite rollback seguro
 
-#### L6.1 — Criar events/middleware/ directory
+3. **Deprecar** `session-agent-handlers.js` (log warning no attach)
+4. **Deprecar** `dialog-task-handlers.js` (log warning no attach)
+5. **Remover** legacy handlers + `agent-event-observer.js` factory
+6. **Remover** feature flag quando estável
 
-```
-events/middleware/
-├── timestamp-enricher.js     → garante timestamp + correlationId em todo evento
-├── schema-validator.js       → valida shape mínimo (type string, timestamp number)
-├── rate-limiter.js           → limita high-frequency events (ex: task:delta max 100/s)
-└── index.js                  → exports
-```
+**Critério**: Zero `agent.on()` em observers/, somente `bus.on()`
 
-#### L6.2 — TimestampEnricher middleware
+### FAIXA-L15 — Event-Bus-Observers Upgrade 🟡 MÉDIO
 
-```javascript
-/** @type {import('../core/event-bus.js').Middleware} */
-export function timestampEnricher(event, next) {
-    const enriched = {
-        correlationId: event.correlationId ?? crypto.randomUUID(),
-        ...event,
-        timestamp: event.timestamp ?? Date.now(),
-    };
-    return next(enriched);
-}
-```
+**Objetivo**: Transformar bus-observers de log-only para ações reais.
 
-#### L6.3 — SchemaValidator middleware
+**Adições**:
+1. `MetricsCollector` — incrementa contadores/histogramas por event type
+2. `ErrorAlerter` — detecta `*:error`, `*:fatal` → trigger alerta
+3. `HealthUpdater` — degrada/recupera health score baseado em events
+4. `ActivityTracker` — atualiza last-activity para deadlock detection
+5. `CorrelationTracer` — injeta `_correlationId` via middleware para tracing
 
-```javascript
-export function schemaValidator(event, next) {
-    if (typeof event.type !== 'string' || !event.type) {
-        console.warn('[EventBus] evento sem type:', event);
-        return; // descarta silenciosamente (não lança)
-    }
-    return next(event);
-}
-```
-
-#### L6.4 — RateLimiter para HIGH_FREQUENCY_EVENTS
-
-Do SSOT: `HIGH_FREQUENCY_EVENTS = new Set(['agent:task:delta', ...])`.
-Middleware descarta se > 100 eventos/s por type.
-
-#### L6.5 — Wire em bootstrap.js
-
-```javascript
-bus.use(schemaValidator);
-bus.use(timestampEnricher);
-if (process.env.ENABLE_RATE_LIMITER === 'true') {
-    bus.use(createRateLimiter(HIGH_FREQUENCY_EVENTS, 100));
-}
-```
-
-#### Critérios de aceite L6
-- [ ] Todo evento do EventBus tem `correlationId` e `timestamp`
-- [ ] Evento sem `type` é descartado com warning (não lança)
-- [ ] High-frequency events (task:delta) não saturam o bus em load test
-- [ ] `npm run test:unit` ✅
+**Deliverable**: `observability/bus-actions/` com 5 módulos
+**Critério**: `bus.diagnostics()` mostra ≥5 subscribers com `hasAction: true`
 
 ---
 
-### FAIXA-L7 — agent-event-observer.js → EventBus Migration
+## Onda 4 — Inteligência Operacional
 
-**Prioridade**: Média
-**Esforço**: 2-3 horas
-**Risco**: Médio (migrar observers de métricas critica)
-**Impacto**: observability/agent-event-observer.js unificado com EventBus, pattern único
+### FAIXA-L16 — Correlation ID End-to-End 🟡 MÉDIO
 
-#### L7.1 — Analisar observer atual
+**Objetivo**: Cada evento carrega um `_correlationId` rastreável do SDK até o NERV.
 
-`agent-event-observer.js` usa `agent.on('event', handler)` para 9 eventos de métricas.
-Esses eventos chegam ao EventBus via bridge (já implementada).
-Portanto, equivalente `bus.on(AGENT_DIALOG_STALLED, handler)` funciona.
+**Implementação**:
+1. Middleware `correlation-id-injector.js` — gera UUID se ausente
+2. Propaga via `callbacks.context.correlationId` no SDK handler
+3. Preserva no bridgeEmitter → EventBus → NervAdapter
+4. Queryable via `bus.diagnostics({ correlationId: 'xxx' })`
 
-#### L7.2 — Migrar 9 subscribers
+**Benefício**: Debug: "de onde veio este event NERV?" → rastreio completo
 
-| Evento antigo (agent.on)  | Equivalente EventBus                    |
-| ------------------------- | --------------------------------------- |
-| `dialog.turn_start`       | AGENT_TASK_STARTED                      |
-| `dialog.turn_end`         | (compor de AGENT_TASK_STARTED → timing) |
-| `dialog.stalled`          | AGENT_DIALOG_STALLED                    |
-| `dialog.turn_timeout`     | AGENT_DIALOG_TURN_TIMEOUT               |
-| `task.completed`          | (AGENT_TASK_STARTED + delta tracking)   |
-| `task.error`              | AGENT_TASK_ERROR                        |
-| `permission.mode_changed` | (a mapear)                              |
-| `session.fatal`           | AGENT_SESSION_FATAL                     |
-| `agent.metrics`           | (a mapear)                              |
+### FAIXA-L17 — Event Flow Visualizer 🟢 BAIXO
 
-> Atenção: alguns mapeamentos requerem adicionar constantes em `events/agent-events.js`.
+**Objetivo**: Gerar grafos Mermaid automaticamente a partir do código.
 
-#### L7.3 — Deprecate agentEventObserver pattern
+**Deliverable**: `scripts/event-flow-graph.mjs`
+- AST parse de todos os `emit()` e `on()` no codebase
+- Gera `.md` com Mermaid diagram
+- Integrado ao `make diagnose`
 
-Manter `agent-event-observer.js` mas adicionar `@deprecated` e migrar para
-`event-bus-observers.js` expandido.
+**Output exemplo**:
+```mermaid
+graph TD
+    SDK[SDK Session] -->|25 events| HANDLERS[event-handlers/]
+    HANDLERS -->|emit| AGENT[Agent EventEmitter]
+    AGENT -->|38 bridged| EB[EventBus]
+    AGENT -.->|28 lost| VOID[∅ Lost]
+    EB -->|70 mapped| NERV[NERV Bus]
+    EB -->|15 subs| OBS[Observers]
+```
 
-#### Critérios de aceite L7
-- [ ] Métricas continuam funcionando após migração
-- [ ] `agent-event-observer.js` marcado @deprecated
-- [ ] Novos subscribers em `event-bus-observers.js` ou módulo dedicado de métricas
-- [ ] `npm run test:unit` ✅
+### FAIXA-L18 — Event Schema Registry 🟢 BAIXO
 
----
+**Objetivo**: Definir schemas JSON para cada event type, validação em dev.
 
-### FAIXA-L8 — Unificação Final NERV + Remoção of Legacy
+**Implementação**:
+1. `events/schemas/` — arquivos JSON Schema per event type
+2. `schema-validator.js` middleware upgrade — valida payload contra schema registrado
+3. Dev mode: strict validation (throw em payload inválido)
+4. Prod mode: log warning, não bloqueia
 
-**Prioridade**: Baixa (futuro)
-**Esforço**: 5-8 horas
-**Risco**: Alto (remoção de caminho crítico)
-**Impacto**: Sistema totalmente unificado, nerv-bridge.js removido
-
-#### L8.1 — Pré-condições
-
-- ✅ L3 (NervEventBusAdapter) deployado e estável
-- ✅ L5 (SDK bridge) deployado
-- ✅ L7 (agent-event-observer migrado)
-- ✅ 100% dos eventos do AlwaysAliveAgent chegam ao EventBus
-
-#### L8.2 — Migrar EVENT_MAP de nerv-bridge.js → nerv-events.js
-
-Mover todas as 62 entradas para `events/nerv-events.js` como `EVENTBUS_TO_NERV`.
-
-#### L8.3 — Remover nerv-bridge.js gradualmente
-
-1. Marcar como @deprecated
-2. Verificar com testes de integração que NervEventBusAdapter cobre todos os casos
-3. Remover arquivo
-
-#### L8.4 — Unificar hub.js#bridgeToNerv
-
-Remover método `#bridgeToNerv()` de `conversation-hub/hub.js`.
-Esses eventos já chegam ao NERV via NervEventBusAdapter (passo L3).
-
-#### Critérios de aceite L8
-- [ ] nerv-bridge.js removido
-- [ ] hub.js sem #bridgeToNerv
-- [ ] NERV continua recebendo todos os eventos que recebia antes
-- [ ] `npm run test:integration` ✅
-- [ ] `node scripts/arch-health.mjs` → score ≥ 92/100
+**Benefício**: Detecção de drift entre emitters e consumers, documentação viva
 
 ---
 
-## 3. Matriz de Dependências entre Faixas
+## Pré-requisitos e Dependências
 
 ```
-L1 (HookBus fix) ─────────────────────────────→ [independente]
-L2 (Service SSOT) ────────────────────────────→ [independente]
-L3 (NervEventBusAdapter) ──── depende de ─────→ [L1 para hooks; L2 opcional]
-L4 (EventBus v2) ─────────────────────────────→ [independente]
-L5 (SDK Bridge) ──────────────────────────────→ [independente]
-L6 (Middleware) ──── depende de ──────────────→ [EventBus v2 opcional, L4]
-L7 (Observer migration) ─── depende de ───────→ [L1, L2]
-L8 (Unificação final) ────── depende de ───────→ [L3, L5, L7]
+L9  (Bridge 28)           ──→ independente (pode começar imediatamente)
+L10 (Rm SdkBridge)        ──→ independente (pode começar imediatamente)
+L11 (Namespace Norm)      ──→ depende de L9 (para normalizar novos names)
+L12 (Audit Tool)          ──→ depende de L11 (para validar SSOT 100%)
+L13 (Rm nerv-bridge)      ──→ depende de L9 (cobertura completa no adapter)
+L14 (Observer Migration)  ──→ depende de L9 + L13
+L15 (Bus-Obs Upgrade)     ──→ depende de L14 (observers unificados)
+L16 (Correlation ID)      ──→ depende de L9 (todos events no bus)
+L17 (Flow Visualizer)     ──→ depende de L12 (usa mesmo AST tooling)
+L18 (Schema Registry)     ──→ depende de L12 + L15
+```
+
+```
+Grafo de Dependências:
+          ┌─ L10 (Rm SdkBridge) ─────────────────────────┐
+          │                                                │
+START ──→ L9 (Bridge 28) ──→ L11 (Namespace) ──→ L12 (Audit Tool) ──→ L18
+          │                                        │
+          ├──→ L13 (Rm nerv-bridge) ──→ L14 (Observer Migr) ──→ L15 (Bus-Obs) ──→ L18
+          │                                                        │
+          └──→ L16 (Correlation ID)                                └──→ L17 (Visualizer)
 ```
 
 ---
 
-## 4. Timeline Estimada
+## Ordem de Execução Recomendada
 
-| Faixa | Nome                      | Esforço | Risco | Prioritária |
-| ----- | ------------------------- | ------- | ----- | :---------: |
-| L1    | HookBus Bridge (bug fix)  | 2-3h    | Baixo |    🔥 SIM    |
-| L2    | Service Events SSOT       | 1-2h    | Baixo |    ✅ SIM    |
-| L4    | EventBus v2 (diagnostics) | 2-3h    | Baixo |    ✅ SIM    |
-| L3    | NervEventBusAdapter       | 3-4h    | Médio |   ⏳ Médio   |
-| L6    | Middleware Registry       | 4-5h    | Baixo |   ⏳ Médio   |
-| L5    | SDK Session Bridge        | 3-4h    | Médio |   ⏳ Médio   |
-| L7    | Observer Migration        | 2-3h    | Médio |   ⏳ Médio   |
-| L8    | Unificação Final          | 5-8h    | Alto  |  ⬜ Futuro   |
-
-**Total faixas prioritárias (L1+L2+L4)**: ~6-8 horas
-**Total faixas médias (L3+L5+L6+L7)**: ~12-16 horas
-**Total geral (L1-L8)**: ~22-32 horas
+| Sequência | Faixa | Risco    | Complexidade | Dependência |
+|-----------|-------|----------|--------------|-------------|
+| 1         | L9    | 🔴 ALTO  | Média        | Nenhuma     |
+| 2         | L10   | ⚠️ ALTO   | Baixa        | Nenhuma     |
+| 3         | L11   | 🟡 MÉDIO | Média        | L9          |
+| 4         | L13   | 🔴 ALTO  | Média        | L9          |
+| 5         | L14   | 🟡 MÉDIO | Alta         | L9 + L13    |
+| 6         | L12   | 🟢 BAIXO | Baixa        | L11         |
+| 7         | L15   | 🟡 MÉDIO | Média        | L14         |
+| 8         | L16   | 🟡 MÉDIO | Média        | L9          |
+| 9         | L17   | 🟢 BAIXO | Média        | L12         |
+| 10        | L18   | 🟢 BAIXO | Média        | L12 + L15   |
 
 ---
 
-## 5. Checklist Pré-Implementação
+## Score Estimado (arch-health)
 
-Antes de iniciar cada faixa:
+| Onda     | Score Atual | Score Estimado | Delta |
+|----------|-------------|----------------|-------|
+| Pós-L8   | 78/100 (C)  | —              | —     |
+| Pós-Onda2| —           | 80/100 (B-)    | +2    |
+| Pós-Onda3| —           | 85/100 (B)     | +5    |
+| Pós-Onda4| —           | 88/100 (B+)    | +3    |
 
-- [ ] Ler o PARTE-23L-A (situação atual) para contexto
-- [ ] Verificar arch-health baseline: `node scripts/arch-health.mjs`
-- [ ] Rodar base de testes: `npm run test:unit`
-- [ ] Confirmar lint limpo: `npm run lint`
-
-Pós cada faixa:
-
-- [ ] `npm run lint && npm run format:check`
-- [ ] `npm run test:unit`
-- [ ] `node scripts/arch-health.mjs` — score não pode cair
-- [ ] Atualizar PARTE-23L-D com status da faixa
+> Nota: Os maiores ganhos de score virão da remoção de singletons (que NÃO é escopo
+> deste roadmap de events). Para atingir 90+, é preciso PARTE-24 (DI Refactoring).
 
 ---
 
-## 6. Métricas de Sucesso
+## Changelog
 
-| Indicador                            | Atual | Meta L1-L4 | Meta L5-L8 |
-| ------------------------------------ | ----- | ---------- | ---------- |
-| Subscribers mortos (nunca disparam)  | 5     | 0          | 0          |
-| Strings de evento hardcoded          | ~18   | 0          | 0          |
-| Eventos bridgeados ao EventBus       | 26    | 32         | ~80        |
-| Eventos que NERV recebe via EventBus | 0     | 15+        | 40+        |
-| Middleware ativos                    | 0     | 3          | 4          |
-| arch-health score                    | 89    | ≥90        | ≥93        |
-| Wildcards em uso                     | 0     | 3+         | 5+         |
-| Diagnóstico runtime                  | ❌     | ✅          | ✅          |
-
----
-
-## 7. Ordem de Execução Recomendada (FAIXA-L Sprint 1)
-
-Para implementar imediatamente (próximo turno):
-
-```
-1. FAIXA-L1: Fix HookBus bridge (bug crítico — 5 subscribers mortos)
-   └─ hooks/bus.js: adicionar #eventBus + setEventBus() + bridge no emitHook()
-   └─ bootstrap.js: hookBus.setEventBus(bus)
-   └─ event-bus-observers.js: hook subscribers → log + metrics
-
-2. FAIXA-L2: service-events.js + migrar services
-   └─ events/service-events.js: 5 constantes
-   └─ events/index.js: re-export
-   └─ services/*.js: substituir 5 strings inline
-
-3. FAIXA-L4: EventBus diagnostics() + channels()
-   └─ core/event-bus.js: adicionar 4 métodos
-   └─ api/express/health.js: endpoint /health/events
-
-Commit após cada faixa concluída.
-git push após Sprint 1 completo (L1+L2+L4).
-```
-
----
-
-## 8. Status de Implementação (Tracking)
-
-| Faixa                        | Status       | Data       | Notas                                    |
-| ---------------------------- | ------------ | ---------- | ---------------------------------------- |
-| L1 — HookBus bridge          | ✅ CONCLUÍDO | 2026-03-15 | Fix GAP-EVENTS-01, hooks/bus.js + bootstrap |
-| L2 — Service SSOT            | ✅ CONCLUÍDO | 2026-03-15 | service-events.js + 3 services migrados  |
-| L4 — EventBus v2 diagnostics | ✅ CONCLUÍDO | 2026-03-15 | diagnostics(), channels(), statsByNamespace() |
-| L3 — NervEventBusAdapter     | ✅ CONCLUÍDO | 2026-03-15 | nerv-event-bus-adapter.js + nerv-events.js |
-| L6 — Middleware Registry     | ✅ CONCLUÍDO | 2026-03-15 | 3 middlewares + registerBuiltinMiddleware() |
-| L5 — SDK Bridge              | ✅ CONCLUÍDO | 2026-03-15 | sdk-events.js + sdk-session-bridge.js    |
-| L7 — Observer Migration      | ✅ CONCLUÍDO | 2026-03-15 | 30+ constantes SSOT + bridgeEmitter expandido |
-| L8 — Unificação Final        | ✅ CONCLUÍDO | 2026-03-15 | NERV map completo + /health/events endpoint |
-
----
-
-## 9. Diagrama de Ordem Canônica de Execução
-
-```
-ORDEM CANÔNICA — do mais urgente ao mais profundo
-
-SPRINT 1 (bug + foundation):
-┌────────┐    ┌────────┐    ┌────────┐
-│ L1     │───►│ L2     │───►│ L4     │
-│HookBus │    │Service │    │EventBus│
-│ fix    │    │  SSOT  │    │  v2    │
-│🔥 BUG  │    │        │    │        │
-└────────┘    └────────┘    └────────┘
-
-SPRINT 2 (NERV unificado + middleware):
-         ┌────────┐    ┌────────┐
-         │ L3     │    │ L6     │
-         │ NERV   │    │Middlew.│
-         │Adapter │    │Registry│
-         └────┬───┘    └────────┘
-              │ (depende L1+L2)
-
-SPRINT 3 (SDK + observer migration):
-         ┌────────┐    ┌────────┐
-         │ L5     │    │ L7     │
-         │  SDK   │    │Observer│
-         │Bridge  │    │Migrat. │
-         └────────┘    └────┬───┘
-                            │ (depende L1+L2)
-
-SPRINT 4 (consolidação final):
-                       ┌────────┐
-                       │ L8     │
-                       │Unific. │
-                       │ Final  │
-                       └────────┘
-                       (depende L3+L5+L7)
-```
-
----
-
-## 10. Novos Arquivos a Criar
-
-| Arquivo                                               | Faixa | Propósito                                 |
-| ----------------------------------------------------- | ----- | ----------------------------------------- |
-| `src/copilot/events/service-events.js`                | L2    | Constantes de eventos dos services        |
-| `src/copilot/events/nerv-events.js`                   | L3    | Mapeamento EventBus↔NERV actionCodes      |
-| `src/copilot/events/sdk-events.js`                    | L5    | Constantes para eventos bridgeados do SDK |
-| `src/copilot/events/middleware/index.js`              | L6    | Barrel do middleware registry             |
-| `src/copilot/events/middleware/timestamp-enricher.js` | L6    | Enriquece timestamp+correlationId         |
-| `src/copilot/events/middleware/schema-validator.js`   | L6    | Valida shape mínimo                       |
-| `src/copilot/events/middleware/rate-limiter.js`       | L6    | Throttle high-frequency events            |
-| `src/copilot/bridges/nerv-event-bus-adapter.js`       | L3    | EventBus→NERV adapter class               |
-| `src/copilot/sdk/session-event-bridge.js`             | L5    | Bridge session SDK → EventBus             |
-
----
-
-## 11. Arquivos a Modificar
-
-| Arquivo                                             | Faixa | Mudança                                                |
-| --------------------------------------------------- | ----- | ------------------------------------------------------ |
-| `src/copilot/hooks/bus.js`                          | L1    | +`#eventBus`, +`setEventBus()`, bridge em `emitHook()` |
-| `src/copilot/observability/bootstrap.js`            | L1    | `hookBus.setEventBus(bus)`                             |
-| `src/copilot/observability/event-bus-observers.js`  | L1    | Hook subscribers → log+metrics                         |
-| `src/copilot/events/index.js`                       | L2    | +re-export service-events.js                           |
-| `src/copilot/services/session-service.js`           | L2    | Strings inline → constantes                            |
-| `src/copilot/services/conversation-service.js`      | L2    | Strings inline → constantes                            |
-| `src/copilot/services/tool-service.js`              | L2    | Strings inline → constantes                            |
-| `src/copilot/core/event-bus.js`                     | L4    | +`diagnostics()`, +`channels()`, +`statsByNamespace()` |
-| `src/copilot/api/express/health.js`                 | L4    | +endpoint `/health/events`                             |
-| `src/copilot/events/index.js`                       | L3    | +re-export nerv-events.js                              |
-| `src/copilot/observability/bootstrap.js`            | L3    | Wire NervEventBusAdapter                               |
-| `src/copilot/events/index.js`                       | L5    | +re-export sdk-events.js                               |
-| `src/copilot/agent/lifecycle/entry.js`              | L5    | bridgeSdkSession()                                     |
-| `src/copilot/observability/bootstrap.js`            | L6    | bus.use() middleware                                   |
-| `src/copilot/observability/agent-event-observer.js` | L7    | @deprecated, migrate to bus.on()                       |
-| `src/copilot/bridges/nerv-bridge.js`                | L8    | @deprecated                                            |
-| `src/copilot/conversation-hub/hub.js`               | L8    | Remover #bridgeToNerv()                                |
-
----
-
-**Implementação iniciada em**: 2026-04-12
-**Referências**: [PARTE-23L-A](PARTE-23L-A-EVENTS-SITUACAO-ATUAL.md) | [PARTE-23L-B](PARTE-23L-B-EVENTS-GRAFO.md) | [PARTE-23L-C](PARTE-23L-C-EVENTS-SITUACAO-IDEAL.md)
+| Versão | Data       | Mudanças                                           |
+|--------|------------|----------------------------------------------------|
+| 1.0    | 2026-03-XX | 10 gaps, faixas L1–L8 originais                    |
+| 2.0    | 2026-04-XX | FAIXA L1–L8 marcadas ✅, status atualizado          |
+| 3.0    | 2026-04-12 | Re-auditoria v2, ondas 2–4 (L9–L18), 8 gaps novos |
