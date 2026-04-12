@@ -26,6 +26,7 @@ import {
 } from '../../events/index.js';
 import { defaultBus } from '#copilot/hooks';
 import { bootstrapLateDeps, bootstrapObservability, defaultErrorTracker, log } from '#copilot/observability';
+import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import { CopilotClient } from '#copilot/sdk';
 import { buildTool } from '#copilot/tools';
 import { logSwallowed } from '../../core/error-handlers.js';
@@ -45,6 +46,15 @@ bootstrapObservability();
 bootstrapLateDeps({ buildTool });
 setAuditBus(defaultBus);
 container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+
+// FAIXA-5A: descobrir e instalar plugins ao iniciar o processo
+{
+    const _pluginRegistry = new PluginRegistry();
+    const _pluginsDir = new URL('../../plugins', import.meta.url).pathname;
+    discoverPlugins(_pluginsDir, _pluginRegistry).catch((/** @type {any} */ e) => {
+        log('WARN', `[copilot/agent] Plugin discovery falhou (não crítico): ${e?.message ?? e}`);
+    });
+}
 
 // FAIXA-2A: bridge HookBus → EventBus central para observabilidade cross-module
 const _bus = container.resolve(EVENT_BUS);

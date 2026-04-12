@@ -24,7 +24,7 @@
  */
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError } from '#copilot/core';
+import { BridgeError, withRetry } from '#copilot/core';
 import { defaultMetrics, log, startSpanImmediate } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import net from 'node:net';
@@ -133,12 +133,9 @@ async function rpcCall(method, params) {
     });
     const t0 = Date.now();
 
-    const MAX_ATTEMPTS = 3;
-    /** @type {unknown} */
-    let lastError;
     try {
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            try {
+        const result = await withRetry(
+            async () => {
                 const response = await fetch(MCP_BASE, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -151,13 +148,6 @@ async function rpcCall(method, params) {
                         `MCP HTTP ${response.status}: ${response.statusText}`,
                         'MCP_HTTP_ERROR',
                     );
-                    // Só faz retry em erros 5xx (servidor); 4xx são definitivos
-                    if (response.status < 500) throw err;
-                    lastError = err;
-                    if (attempt < MAX_ATTEMPTS - 1) {
-                        await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
-                        continue;
-                    }
                     throw err;
                 }
 
@@ -167,23 +157,28 @@ async function rpcCall(method, params) {
                     throw new BridgeError(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`, 'MCP_RPC_ERROR');
                 }
 
-                span?.setAttribute('duration_ms', Date.now() - t0);
-                span?.setAttribute('status_code', 0);
-                span?.setStatus({ code: 1 });
-                defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
                 return json.result;
-            } catch (/** @type {any} */ e) {
-                lastError = e;
-                const isTransient = e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED' || e.name === 'TimeoutError';
-                if (!isTransient || attempt >= MAX_ATTEMPTS - 1) throw e;
-                log(
-                    'WARN',
-                    `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt + 1}/${MAX_ATTEMPTS}): ${e.message}`,
-                );
-                await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt) + Math.random() * 100));
-            }
-        }
-        throw lastError;
+            },
+            {
+                maxAttempts: 3,
+                baseDelayMs: 200,
+                shouldRetry: (/** @type {any} */ e) => {
+                    const isNetworkError =
+                        e?.code === 'ECONNRESET' || e?.code === 'ECONNREFUSED' || e?.name === 'TimeoutError';
+                    const isServerError = e instanceof BridgeError && e.message.includes('HTTP 5');
+                    return isNetworkError || isServerError;
+                },
+                onRetry: (/** @type {any} */ e, attempt) => {
+                    log('WARN', `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt}/3): ${e?.message}`);
+                },
+            },
+        );
+
+        span?.setAttribute('duration_ms', Date.now() - t0);
+        span?.setAttribute('status_code', 0);
+        span?.setStatus({ code: 1 });
+        defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
+        return result;
     } catch (/** @type {any} */ err) {
         span?.setAttribute('duration_ms', Date.now() - t0);
         span?.setAttribute('status_code', 2);
