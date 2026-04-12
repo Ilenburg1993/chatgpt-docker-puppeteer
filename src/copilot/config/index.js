@@ -10,7 +10,14 @@
 
 // Profile builders (buildAlwaysAliveConfig etc.) movidos para '#copilot/hooks/presets/profiles'.
 // Cf. PARTE-21C Faixa H: eliminação de violações L2→L3.
-export { DEFAULT_EXCLUDED_TOOLS } from './session-config.js';
+
+/**
+ * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
+ * @type {readonly string[]}
+ */
+export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
+    Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory'])
+);
 
 // ─── Env (variáveis de ambiente e constantes de configuração) ─────────────────
 export * from './env.js';

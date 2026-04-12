@@ -79,13 +79,6 @@ vi.mock('../../../../src/copilot/sdk/session.js', () => ({
     listSessions: vi.fn(),
 }));
 
-vi.mock('#copilot/config/session-config', () => ({
-    buildAlwaysAliveConfig: vi.fn(),
-    buildReadOnlyConfig: vi.fn(),
-    buildFullAccessConfig: vi.fn(),
-    buildDiagnosticConfig: vi.fn(),
-}));
-
 vi.mock('#copilot/config/env', () => ({
     COPILOT_CLI_URL: undefined,
     OTEL_EXPORTER_OTLP_ENDPOINT: undefined,

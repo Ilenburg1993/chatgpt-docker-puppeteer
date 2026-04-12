@@ -10,7 +10,7 @@ import EventEmitter from 'node:events';
 import { describe, it } from 'node:test';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import { getStatusSnapshot, listenerDiagnostics } from '../../../src/copilot/agent/state/agent-state.js';
-import { AGENT_EVENTS } from '../../../src/copilot/core/events.js';
+import { AGENT_EVENTS } from '../../../src/copilot/events/agent-events.js';
 
 describe('agent-state › getStatusSnapshot', () => {
     /**

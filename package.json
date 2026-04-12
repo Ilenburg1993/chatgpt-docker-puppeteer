@@ -70,7 +70,6 @@
     "#copilot/hooks/composer": "./src/copilot/hooks/composer.js",
     "#copilot/hooks/bus": "./src/copilot/hooks/bus.js",
     "#copilot/hooks/registry": "./src/copilot/hooks/registry.js",
-    "#copilot/hooks/session": "./src/copilot/hooks/session-lifecycle.js",
     "#copilot/hooks/error": "./src/copilot/hooks/error-handler.js",
     "#copilot/hooks/audit": "./src/copilot/hooks/audit.js",
     "#copilot/hooks/*": "./src/copilot/hooks/*.js",

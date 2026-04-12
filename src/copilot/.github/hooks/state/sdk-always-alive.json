@@ -1,9 +1,10 @@
 {
     "sessionId": "",
-    "startedAt": 1775979676350,
-    "resumedAt": 1775979676350,
+    "startedAt": 1776036864304,
+    "resumedAt": 1776036864304,
     "resumeCount": 0,
     "sendCount": 0,
     "model": "gpt-4.1",
-    "pendingQuestion": null
+    "pendingQuestion": null,
+    "gracefulShutdown": false
 }

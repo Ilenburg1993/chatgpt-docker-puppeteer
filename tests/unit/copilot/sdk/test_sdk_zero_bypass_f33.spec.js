@@ -219,18 +219,8 @@ describe('F171 — terminal/ sem bypass direto de SDK', () => {
 // ─── F172: hooks/ e config/ sem bypass (exceto re-export intencional) ──────
 
 describe('F172 — hooks/ e config/ sem bypass não-intencional de SDK', () => {
-    it('hooks/session-lifecycle.js usa barrel (não submodule models/*)', () => {
-        const src = read('src/copilot/hooks/session-lifecycle.js');
-        // Não deve ter bypass de submodules como sdk/models/*
-        const sdkModelsBypasses = [...src.matchAll(/from\s+'#copilot\/sdk\/models\/[^']+'/g)];
-        expect(sdkModelsBypasses).toHaveLength(0);
-    });
-
-    it('config/session-config.js usa barrel (não submodule sdk/index)', () => {
-        const src = read('src/copilot/config/session-config.js');
-        const sdkIndexBypasses = [...src.matchAll(/from\s+'#copilot\/sdk\/index'/g)];
-        expect(sdkIndexBypasses).toHaveLength(0);
-    });
+    // hooks/session-lifecycle.js removido (L40 shim cleanup)
+    // config/session-config.js removido (L40 shim cleanup)
 
     it('config/index.js re-export de tools-state está documentado como intencional', () => {
         // Garantir que o comentário de intencionalidade existe, ou pelo menos o import está isolado a tools-state

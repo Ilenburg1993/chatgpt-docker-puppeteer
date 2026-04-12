@@ -1,9 +1,9 @@
 # PRÉ-AUDITORIA ARQUITETURAL PROFUNDA — `src/copilot`
 
-> **Documento**: PARTE-24A-PRE-AUDITORIA-ARQUITETURAL.md  
-> **Versão**: 1.0  
-> **Data**: 2026-04-12  
-> **Escopo**: Planejamento completo da auditoria arquitetural profunda de `src/copilot/`  
+> **Documento**: PARTE-24A-PRE-AUDITORIA-ARQUITETURAL.md
+> **Versão**: 1.0
+> **Data**: 2026-04-12
+> **Escopo**: Planejamento completo da auditoria arquitetural profunda de `src/copilot/`
 > **Status**: EM EXECUÇÃO
 
 ---
@@ -25,40 +25,40 @@ Realizar uma auditoria arquitetural **profunda e exaustiva** de `src/copilot/`, 
 
 ## 2. Inventário Global
 
-| Métrica                    | Valor      |
-| -------------------------- | ---------- |
-| Arquivos `.js`             | 345        |
-| Linhas de código (LOC)     | 57.841     |
-| Diretórios                 | 52         |
-| Barrels (`index.js`)       | 43         |
-| Módulos top-level          | 18         |
-| Arquivos de teste          | 224        |
-| LOC de teste               | 43.474     |
-| Ratio teste/prod           | 0.75:1     |
+| Métrica                | Valor  |
+| ---------------------- | ------ |
+| Arquivos `.js`         | 345    |
+| Linhas de código (LOC) | 57.841 |
+| Diretórios             | 52     |
+| Barrels (`index.js`)   | 43     |
+| Módulos top-level      | 18     |
+| Arquivos de teste      | 224    |
+| LOC de teste           | 43.474 |
+| Ratio teste/prod       | 0.75:1 |
 
 ### 2.1. Módulos por tamanho (LOC)
 
-| Módulo             | Arquivos | LOC   | % Total |
-| ------------------ | -------- | ----- | ------- |
-| agent              | 57       | 8.274 | 14.3%   |
-| sdk                | 42       | 7.875 | 13.6%   |
-| terminal           | 47       | 7.753 | 13.4%   |
-| tools              | 28       | 6.352 | 11.0%   |
-| observability      | 31       | 5.645 | 9.8%    |
-| hooks              | 21       | 3.788 | 6.5%    |
-| api                | 21       | 3.348 | 5.8%    |
-| core               | 23       | 3.301 | 5.7%    |
-| conversation-hub   | 12       | 2.589 | 4.5%    |
-| bridges            | 12       | 2.142 | 3.7%    |
-| events             | 17       | 2.109 | 3.6%    |
-| channel            | 7        | 1.416 | 2.4%    |
-| config             | 7        | 1.279 | 2.2%    |
-| audit              | 8        | 884   | 1.5%    |
-| services           | 5        | 537   | 0.9%    |
-| db                 | 3        | 442   | 0.8%    |
-| plugins            | 2        | 257   | 0.4%    |
-| types              | 2        | 195   | 0.3%    |
-| **TOTAL**          | **345**  | **57.841** | **100%** |
+| Módulo           | Arquivos | LOC        | % Total  |
+| ---------------- | -------- | ---------- | -------- |
+| agent            | 57       | 8.274      | 14.3%    |
+| sdk              | 42       | 7.875      | 13.6%    |
+| terminal         | 47       | 7.753      | 13.4%    |
+| tools            | 28       | 6.352      | 11.0%    |
+| observability    | 31       | 5.645      | 9.8%     |
+| hooks            | 21       | 3.788      | 6.5%     |
+| api              | 21       | 3.348      | 5.8%     |
+| core             | 23       | 3.301      | 5.7%     |
+| conversation-hub | 12       | 2.589      | 4.5%     |
+| bridges          | 12       | 2.142      | 3.7%     |
+| events           | 17       | 2.109      | 3.6%     |
+| channel          | 7        | 1.416      | 2.4%     |
+| config           | 7        | 1.279      | 2.2%     |
+| audit            | 8        | 884        | 1.5%     |
+| services         | 5        | 537        | 0.9%     |
+| db               | 3        | 442        | 0.8%     |
+| plugins          | 2        | 257        | 0.4%     |
+| types            | 2        | 195        | 0.3%     |
+| **TOTAL**        | **345**  | **57.841** | **100%** |
 
 ---
 
@@ -91,10 +91,10 @@ types         → core
 
 | Par                      | Gravidade |
 | ------------------------ | --------- |
-| `config ↔ core`          | 🔴 ALTA   |
-| `config ↔ observability` | 🔴 ALTA   |
-| `events ↔ observability` | 🟡 MÉDIA  |
-| `hooks ↔ observability`  | 🟡 MÉDIA  |
+| `config ↔ core`          | 🔴 ALTA    |
+| `config ↔ observability` | 🔴 ALTA    |
+| `events ↔ observability` | 🟡 MÉDIA   |
+| `hooks ↔ observability`  | 🟡 MÉDIA   |
 
 ### 3.3. Ciclos Transitivos Principais
 
@@ -117,15 +117,15 @@ L0 (Foundation)    : types, events, core
 
 #### Violações de camada detectadas:
 
-| Módulo (camada)        | Depende de (camada)     | Violação |
-| ---------------------- | ----------------------- | -------- |
-| `core` (L0)            | `config` (L1)           | L0→L1   |
-| `events` (L0)          | `observability` (L1)    | L0→L1   |
-| `config` (L1)          | `sdk` (L2)              | L1→L2   |
-| `audit` (L1)           | `sdk` (L2)              | L1→L2   |
-| `observability` (L1)   | `sdk` (L2)              | L1→L2   |
-| `observability` (L1)   | `hooks` (L2)            | L1→L2   |
-| `hooks` (L2)           | `tools` (L3)            | L2→L3   |
+| Módulo (camada)      | Depende de (camada)  | Violação |
+| -------------------- | -------------------- | -------- |
+| `core` (L0)          | `config` (L1)        | L0→L1    |
+| `events` (L0)        | `observability` (L1) | L0→L1    |
+| `config` (L1)        | `sdk` (L2)           | L1→L2    |
+| `audit` (L1)         | `sdk` (L2)           | L1→L2    |
+| `observability` (L1) | `sdk` (L2)           | L1→L2    |
+| `observability` (L1) | `hooks` (L2)         | L1→L2    |
+| `hooks` (L2)         | `tools` (L3)         | L2→L3    |
 
 **Total: 7 violações de camada.**
 
@@ -135,20 +135,20 @@ L0 (Foundation)    : types, events, core
 
 ### 4.1. Imports de fora do workspace copilot
 
-| Arquivo                              | Import                    | Peso   |
-| ------------------------------------ | ------------------------- | ------ |
-| `conversation-hub/socket-ns.js`      | `#core/jwt_config`        | 🔴 ALTO |
-| `db/sqlite.js`                       | `#core/config`            | 🔴 ALTO |
+| Arquivo                         | Import             | Peso   |
+| ------------------------------- | ------------------ | ------ |
+| `conversation-hub/socket-ns.js` | `#core/jwt_config` | 🔴 ALTO |
+| `db/sqlite.js`                  | `#core/config`     | 🔴 ALTO |
 
 ### 4.2. Quem importa `src/copilot` de fora
 
-| Arquivo externo                      | Import                                | Tipo          |
-| ------------------------------------ | ------------------------------------- | ------------- |
-| `src/server/api/router.js`           | `../../copilot/api/bridge/index.js`   | Relative      |
-| `src/server/api/router.js`           | `../../copilot/api/express/index.js`  | Relative      |
-| `src/server/api/copilot-hub-router.js` | `#copilot/conversation-hub/hub`     | Alias         |
-| `src/server/controllers/health.js`   | `#copilot/core`                       | Alias         |
-| `src/server/main.js`                 | `#copilot/bridges`, `#copilot/core`, etc. | Alias (5+) |
+| Arquivo externo                        | Import                                    | Tipo       |
+| -------------------------------------- | ----------------------------------------- | ---------- |
+| `src/server/api/router.js`             | `../../copilot/api/bridge/index.js`       | Relative   |
+| `src/server/api/router.js`             | `../../copilot/api/express/index.js`      | Relative   |
+| `src/server/api/copilot-hub-router.js` | `#copilot/conversation-hub/hub`           | Alias      |
+| `src/server/controllers/health.js`     | `#copilot/core`                           | Alias      |
+| `src/server/main.js`                   | `#copilot/bridges`, `#copilot/core`, etc. | Alias (5+) |
 
 **Conclusão**: `src/copilot` **NÃO é autônomo** — depende de `#core/jwt_config` e `#core/config` do workspace pai. E o workspace pai depende fortemente de `src/copilot`.
 
@@ -194,18 +194,18 @@ src/server/main.js
 
 ## 6. Achados Críticos (Pré-Auditoria)
 
-| #   | Achado                                          | Gravidade | Módulo          |
-| --- | ----------------------------------------------- | --------- | --------------- |
-| A1  | `bootstrap.js` faltando → terminal não inicia   | 🔴 CRÍTICO | terminal        |
+| #   | Achado                                           | Gravidade | Módulo          |
+| --- | ------------------------------------------------ | --------- | --------------- |
+| A1  | `bootstrap.js` faltando → terminal não inicia    | 🔴 CRÍTICO | terminal        |
 | A2  | 4 ciclos bidirecionais de dependência            | 🔴 CRÍTICO | core/config/obs |
-| A3  | 7 violações de camada (L0→L1, L1→L2, L2→L3)    | 🔴 ALTO    | cross-module    |
+| A3  | 7 violações de camada (L0→L1, L1→L2, L2→L3)      | 🔴 ALTO    | cross-module    |
 | A4  | 2 imports externos (`#core/*`) quebram autonomia | 🔴 ALTO    | db, conv-hub    |
 | A5  | `.github/hooks/state/` dentro de src/copilot     | 🟡 MÉDIO   | .github         |
 | A6  | `services/` re-exporta de `conversation-hub/`    | 🟡 MÉDIO   | services        |
 | A7  | `channel/index.js` vazio (barrel sem exports)    | 🟡 MÉDIO   | channel         |
 | A8  | `tools/index.js` sem exports explícitas          | 🟡 MÉDIO   | tools           |
-| A9  | `agent` depende de 10 outros módulos              | 🟡 MÉDIO   | agent           |
-| A10 | `terminal` depende de 13 módulos (quase todos)    | 🟡 MÉDIO   | terminal        |
+| A9  | `agent` depende de 10 outros módulos             | 🟡 MÉDIO   | agent           |
+| A10 | `terminal` depende de 13 módulos (quase todos)   | 🟡 MÉDIO   | terminal        |
 
 ---
 
@@ -262,26 +262,26 @@ Conteúdo obrigatório:
 
 ### 8.1. Módulos a analisar em profundidade (Fase B)
 
-| Módulo             | Prioridade | Razão                                    |
-| ------------------ | ---------- | ---------------------------------------- |
+| Módulo             | Prioridade | Razão                                     |
+| ------------------ | ---------- | ----------------------------------------- |
 | `core`             | P0         | Foundation layer, ciclo com config        |
 | `events`           | P0         | Foundation layer, ciclo com observability |
 | `types`            | P0         | Foundation layer, deps de core            |
 | `config`           | P0         | Ciclos bidirecionais com core/obs         |
 | `observability`    | P0         | Ciclos com events/hooks/config            |
-| `agent`            | P1         | Maior módulo, 10 deps                    |
-| `sdk`              | P1         | 7875 LOC, interface com LLMs             |
-| `terminal`         | P1         | 13 deps, boot faltando                   |
-| `tools`            | P1         | 6352 LOC, barrel vazio                   |
+| `agent`            | P1         | Maior módulo, 10 deps                     |
+| `sdk`              | P1         | 7875 LOC, interface com LLMs              |
+| `terminal`         | P1         | 13 deps, boot faltando                    |
+| `tools`            | P1         | 6352 LOC, barrel vazio                    |
 | `hooks`            | P1         | Ciclo com observability + tools           |
-| `audit`            | P2         | Pequeno mas com dep de sdk               |
-| `bridges`          | P2         | Interface com MCP, git, GH               |
+| `audit`            | P2         | Pequeno mas com dep de sdk                |
+| `bridges`          | P2         | Interface com MCP, git, GH                |
 | `channel`          | P2         | Barrel vazio                              |
 | `conversation-hub` | P2         | Dep externa de `#core/jwt_config`         |
-| `api`              | P2         | Presentation layer                       |
-| `services`         | P2         | Re-exports questionáveis                 |
-| `db`               | P3         | Dep externa de `#core/config`            |
-| `plugins`          | P3         | Mínimo (257 LOC)                         |
+| `api`              | P2         | Presentation layer                        |
+| `services`         | P2         | Re-exports questionáveis                  |
+| `db`               | P3         | Dep externa de `#core/config`             |
+| `plugins`          | P3         | Mínimo (257 LOC)                          |
 
 ---
 
@@ -334,22 +334,22 @@ plugins          ← 1 módulo  (7%)
 
 ### 9.3. Instabilidade Métrica (Fan-out / (Fan-in + Fan-out))
 
-| Módulo           | Fan-in | Fan-out | Instabilidade | Categoria   |
-| ---------------- | ------ | ------- | ------------- | ----------- |
-| `sdk`            | 7      | 1       | 0.13          | Estável ✅   |
-| `core`           | 14     | 2       | 0.13          | Estável ✅   |
-| `events`         | 11     | 2       | 0.15          | Estável ✅   |
-| `db`             | 3      | 1       | 0.25          | Estável ✅   |
-| `plugins`        | 1      | 1       | 0.50          | Neutro ⚠️   |
-| `config`         | 8      | 3       | 0.27          | Estável ✅   |
-| `observability`  | 11     | 7       | 0.39          | Neutro ⚠️   |
-| `audit`          | 5      | 3       | 0.38          | Neutro ⚠️   |
-| `hooks`          | 3      | 7       | 0.70          | Instável 🔴 |
-| `tools`          | 4      | 6       | 0.60          | Instável ⚠️ |
-| `bridges`        | 3      | 5       | 0.63          | Instável ⚠️ |
-| `terminal`       | 0      | 13      | 1.00          | Instável 🔴 |
-| `services`       | 2      | 9       | 0.82          | Instável 🔴 |
-| `agent`          | 3      | 10      | 0.77          | Instável 🔴 |
+| Módulo          | Fan-in | Fan-out | Instabilidade | Categoria  |
+| --------------- | ------ | ------- | ------------- | ---------- |
+| `sdk`           | 7      | 1       | 0.13          | Estável ✅  |
+| `core`          | 14     | 2       | 0.13          | Estável ✅  |
+| `events`        | 11     | 2       | 0.15          | Estável ✅  |
+| `db`            | 3      | 1       | 0.25          | Estável ✅  |
+| `plugins`       | 1      | 1       | 0.50          | Neutro ⚠️   |
+| `config`        | 8      | 3       | 0.27          | Estável ✅  |
+| `observability` | 11     | 7       | 0.39          | Neutro ⚠️   |
+| `audit`         | 5      | 3       | 0.38          | Neutro ⚠️   |
+| `hooks`         | 3      | 7       | 0.70          | Instável 🔴 |
+| `tools`         | 4      | 6       | 0.60          | Instável ⚠️ |
+| `bridges`       | 3      | 5       | 0.63          | Instável ⚠️ |
+| `terminal`      | 0      | 13      | 1.00          | Instável 🔴 |
+| `services`      | 2      | 9       | 0.82          | Instável 🔴 |
+| `agent`         | 3      | 10      | 0.77          | Instável 🔴 |
 
 > Módulos L3/L4 (terminal, services, agent) DEVEM ser instáveis (dependem de muitos, poucos dependem deles) — isso é correto. O problema é quando módulos L0/L1/L2 são instáveis.
 
@@ -357,26 +357,26 @@ plugins          ← 1 módulo  (7%)
 
 ## 10. Testes — Cobertura por Módulo
 
-| Módulo             | Arquivos Fonte | Testes Dedicados | Ratio | Score |
-| ------------------ | -------------- | ---------------- | ----- | ----- |
-| sdk                | 42             | 39               | 0.93  | ✅     |
-| terminal           | 47             | 10               | 0.21  | 🔴     |
-| observability      | 31             | 8                | 0.26  | 🟡     |
-| tools              | 28             | 10               | 0.36  | 🟡     |
-| conversation-hub   | 12             | 6                | 0.50  | 🟡     |
-| hooks              | 21             | 2                | 0.10  | 🔴     |
-| bridges            | 12             | 4                | 0.33  | 🟡     |
-| api                | 21             | 4                | 0.19  | 🔴     |
-| events             | 17             | 2                | 0.12  | 🔴     |
-| agent              | 57             | 2+~20*           | 0.39  | 🟡     |
-| core               | 23             | ~10*             | 0.43  | 🟡     |
-| config             | 7              | 1                | 0.14  | 🔴     |
-| channel            | 7              | 2                | 0.29  | 🟡     |
-| audit              | 8              | 1                | 0.13  | 🔴     |
-| services           | 5              | 0                | 0.00  | 🔴     |
-| db                 | 3              | 1                | 0.33  | 🟡     |
-| plugins            | 2              | 0                | 0.00  | 🔴     |
-| types              | 2              | 0                | 0.00  | 🔴     |
+| Módulo           | Arquivos Fonte | Testes Dedicados | Ratio | Score |
+| ---------------- | -------------- | ---------------- | ----- | ----- |
+| sdk              | 42             | 39               | 0.93  | ✅     |
+| terminal         | 47             | 10               | 0.21  | 🔴     |
+| observability    | 31             | 8                | 0.26  | 🟡     |
+| tools            | 28             | 10               | 0.36  | 🟡     |
+| conversation-hub | 12             | 6                | 0.50  | 🟡     |
+| hooks            | 21             | 2                | 0.10  | 🔴     |
+| bridges          | 12             | 4                | 0.33  | 🟡     |
+| api              | 21             | 4                | 0.19  | 🔴     |
+| events           | 17             | 2                | 0.12  | 🔴     |
+| agent            | 57             | 2+~20*           | 0.39  | 🟡     |
+| core             | 23             | ~10*             | 0.43  | 🟡     |
+| config           | 7              | 1                | 0.14  | 🔴     |
+| channel          | 7              | 2                | 0.29  | 🟡     |
+| audit            | 8              | 1                | 0.13  | 🔴     |
+| services         | 5              | 0                | 0.00  | 🔴     |
+| db               | 3              | 1                | 0.33  | 🟡     |
+| plugins          | 2              | 0                | 0.00  | 🔴     |
+| types            | 2              | 0                | 0.00  | 🔴     |
 
 > \* Vários testes de agent e core estão no nível raiz de tests/unit/copilot/ (não em pastas dedicadas)
 
@@ -386,16 +386,16 @@ plugins          ← 1 módulo  (7%)
 
 Cada módulo receberá uma nota de 1-10 nos seguintes critérios:
 
-| Critério                | Peso | Descrição                                      |
-| ----------------------- | ---- | ---------------------------------------------- |
-| **Coesão**              | 20%  | Responsabilidade única, foco claro              |
-| **Acoplamento**         | 20%  | Fan-out controlado, deps mínimas               |
-| **Tipagem**             | 15%  | JSDoc completo, tipos corretos                 |
-| **Testes**              | 15%  | Cobertura, robustez                            |
-| **API Surface**         | 10%  | Barrel limpo, exports intencionais             |
-| **Error Handling**      | 10%  | Tratamento adequado, propagação clara          |
-| **Documentação**        | 5%   | README, JSDoc, inline comments                 |
-| **Segurança**           | 5%   | Validação de input, sanitização                |
+| Critério           | Peso | Descrição                             |
+| ------------------ | ---- | ------------------------------------- |
+| **Coesão**         | 20%  | Responsabilidade única, foco claro    |
+| **Acoplamento**    | 20%  | Fan-out controlado, deps mínimas      |
+| **Tipagem**        | 15%  | JSDoc completo, tipos corretos        |
+| **Testes**         | 15%  | Cobertura, robustez                   |
+| **API Surface**    | 10%  | Barrel limpo, exports intencionais    |
+| **Error Handling** | 10%  | Tratamento adequado, propagação clara |
+| **Documentação**   | 5%   | README, JSDoc, inline comments        |
+| **Segurança**      | 5%   | Validação de input, sanitização       |
 
 ---
 
@@ -411,6 +411,6 @@ DEPOIS → Gerar PARTE-24D-ROADMAP-ARQUITETURAL.md (faixas L39+, ondas, subfases
 
 ## 13. Changelog
 
-| Versão | Data       | Mudanças                         |
-| ------ | ---------- | -------------------------------- |
-| 1.0    | 2026-04-12 | Pré-auditoria completa, grafos   |
+| Versão | Data       | Mudanças                       |
+| ------ | ---------- | ------------------------------ |
+| 1.0    | 2026-04-12 | Pré-auditoria completa, grafos |

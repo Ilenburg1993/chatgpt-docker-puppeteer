@@ -17,7 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 // Mock url-validator
-vi.mock('../../../../src/copilot/sdk/url-validator.js', () => ({
+vi.mock('../../../../src/copilot/core/security/url-validator.js', () => ({
     validateUrl: vi.fn((/** @type {URL} */ url) => {
         const host = url.hostname;
         if (host === '127.0.0.1' || host === 'localhost' || host === '10.0.0.1' || host === '192.168.1.1') {

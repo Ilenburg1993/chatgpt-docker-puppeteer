@@ -1,0 +1,28 @@
+{
+    "snapshotId": "snap-1776034716017-7a684530",
+    "createdAt": 1776034716017,
+    "sessionId": "4915bd45-45e1-4d2f-8119-981ab93d91f3",
+    "model": "gpt-4.1-mini",
+    "status": "starting",
+    "sendCount": 0,
+    "dialogLoopActive": false,
+    "dialogPaused": false,
+    "pendingQuestion": null,
+    "stateSnapshot": {
+        "sessionId": "4915bd45-45e1-4d2f-8119-981ab93d91f3",
+        "startedAt": 1776034700991,
+        "resumedAt": 1776034700991,
+        "resumeCount": 0,
+        "sendCount": 0,
+        "model": "gpt-4.1-mini",
+        "pendingQuestion": null,
+        "gracefulShutdown": false
+    },
+    "prMetrics": {
+        "boots": 0,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 0
+    },
+    "reason": "auto-shutdown"
+}

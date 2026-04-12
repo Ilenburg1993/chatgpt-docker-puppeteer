@@ -52,7 +52,6 @@ const ALL_NON_SDK_JS = collectJsFiles(SRC_COPILOT).filter((f) => !f.startsWith('
 
 // Arquivos migrados na Faixa 19
 const F19_MIGRATED = [
-    'config/session-config.js',
     'config/system-prompt.js',
     'api/express/session-crud.js',
     'agent/infra/permission-controller.js',
@@ -173,11 +172,11 @@ describe('F19 — Barrel exporta CopilotClient', () => {
 // 4. Contagem de migração F19
 // ---------------------------------------------------------------------------
 describe('F19 — Contagem de migração', () => {
-    it('8 arquivos foram migrados na Faixa 19', () => {
-        expect(F19_MIGRATED).toHaveLength(8);
+    it('7 arquivos foram migrados na Faixa 19', () => {
+        expect(F19_MIGRATED).toHaveLength(7);
     });
 
-    it('Todos os 8 arquivos existem e são legíveis', () => {
+    it('Todos os 7 arquivos existem e são legíveis', () => {
         for (const file of F19_MIGRATED) {
             const src = readSource(file);
             expect(src.length, `${file} deve ter conteúdo`).toBeGreaterThan(0);

@@ -52,7 +52,7 @@ import {
     getSessionWorkspacePath,
     runSessionLifecycle,
     setSessionModel,
-} from '#copilot/sdk/session-lifecycle';
+} from '#copilot/sdk/sdk-session-wrapper';
 
 // ─── Helper: fake session ──────────────────────────────────────────────────
 

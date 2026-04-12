@@ -18,7 +18,7 @@ vi.mock('../../../src/copilot/bridges/mcp-tool-bridge.js', () => ({ buildMcpTool
 vi.mock('../../../src/copilot/config/mcp-servers.js', () => ({ buildMcpConfig: vi.fn(() => ({})) }));
 vi.mock('#copilot/hooks/bus', () => ({ attachBus: vi.fn((h) => h) }));
 vi.mock('#copilot/hooks/factory', () => ({ createHooks: vi.fn((opts) => opts) }));
-vi.mock('#copilot/hooks/session-lifecycle', () => ({
+vi.mock('#copilot/hooks/session-hooks', () => ({
     createSessionHooks: vi.fn(() => ({
         onSessionStart: vi.fn(),
         onSessionEnd: vi.fn(),

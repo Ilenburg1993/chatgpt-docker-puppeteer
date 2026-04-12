@@ -75,11 +75,6 @@ vi.mock('node:fs/promises', () => ({
     readdir: mocks.fsReaddir,
 }));
 
-vi.mock('#copilot/agent/infra/url-validator', () => ({
-    validateWebhookUrl: mocks.validateWebhookUrl,
-    checkResolvedIp: mocks.checkResolvedIp,
-}));
-
 // webhook-manager.js importa de #copilot/core (barrel) — mockar o sub-módulo real
 vi.mock('#copilot/core/security/url-validator', () => ({
     validateWebhookUrl: mocks.validateWebhookUrl,

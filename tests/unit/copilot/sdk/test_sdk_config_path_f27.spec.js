@@ -53,38 +53,38 @@ describe("F132 — zero-bypass: nenhum arquivo fora de sdk/ importa '@github/cop
     });
 });
 
-// ─── F129: DEFAULT_EXCLUDED_TOOLS via #copilot/config/session-config ──────────
+// ─── F129: DEFAULT_EXCLUDED_TOOLS via #copilot/config ──────────
 
-describe('F129 — DEFAULT_EXCLUDED_TOOLS acessível via config/session-config', () => {
-    it('session-config exporta DEFAULT_EXCLUDED_TOOLS', async () => {
-        const cfg = await import('#copilot/config/session-config');
+describe('F129 — DEFAULT_EXCLUDED_TOOLS acessível via config barrel', () => {
+    it('config barrel exporta DEFAULT_EXCLUDED_TOOLS', async () => {
+        const cfg = await import('#copilot/config');
         expect(cfg.DEFAULT_EXCLUDED_TOOLS).toBeDefined();
     });
 
     it('DEFAULT_EXCLUDED_TOOLS é array frozen', async () => {
-        const cfg = await import('#copilot/config/session-config');
+        const cfg = await import('#copilot/config');
         const tools = cfg.DEFAULT_EXCLUDED_TOOLS;
         expect(Array.isArray(tools)).toBe(true);
         expect(Object.isFrozen(tools)).toBe(true);
     });
 
     it('DEFAULT_EXCLUDED_TOOLS inclui powershell (padrão de segurança)', async () => {
-        const cfg = await import('#copilot/config/session-config');
+        const cfg = await import('#copilot/config');
         expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('powershell');
     });
 
     it('DEFAULT_EXCLUDED_TOOLS inclui web_fetch', async () => {
-        const cfg = await import('#copilot/config/session-config');
+        const cfg = await import('#copilot/config');
         expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('web_fetch');
     });
 
     it('DEFAULT_EXCLUDED_TOOLS inclui web_search', async () => {
-        const cfg = await import('#copilot/config/session-config');
+        const cfg = await import('#copilot/config');
         expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('web_search');
     });
 
     it('DEFAULT_EXCLUDED_TOOLS inclui memory', async () => {
-        const cfg = await import('#copilot/config/session-config');
+        const cfg = await import('#copilot/config');
         expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('memory');
     });
 });
@@ -109,16 +109,16 @@ describe('F130 — initializer.js usa #copilot/sdk para DEFAULT_EXCLUDED_TOOLS',
     });
 });
 
-// ─── F131: DEFAULT_EXCLUDED_TOOLS agora em config/session-config.js ──────────
+// ─── F131: DEFAULT_EXCLUDED_TOOLS definido em config/index.js ──────────
 
-describe('F131 — config/session-config.js exporta DEFAULT_EXCLUDED_TOOLS', () => {
-    it('config/session-config.js tem DEFAULT_EXCLUDED_TOOLS definido localmente', () => {
-        const content = readFileSync(join(SRC, 'config/session-config.js'), 'utf8');
+describe('F131 — config/index.js exporta DEFAULT_EXCLUDED_TOOLS', () => {
+    it('config/index.js tem DEFAULT_EXCLUDED_TOOLS definido localmente', () => {
+        const content = readFileSync(join(SRC, 'config/index.js'), 'utf8');
         expect(content).toContain('export const DEFAULT_EXCLUDED_TOOLS');
     });
 
-    it('config/session-config.js exporta DEFAULT_EXCLUDED_TOOLS como array', async () => {
-        const config = await import('#copilot/config/session-config');
+    it('config barrel exporta DEFAULT_EXCLUDED_TOOLS como array', async () => {
+        const config = await import('#copilot/config');
         expect(Array.isArray(config.DEFAULT_EXCLUDED_TOOLS)).toBe(true);
     });
 

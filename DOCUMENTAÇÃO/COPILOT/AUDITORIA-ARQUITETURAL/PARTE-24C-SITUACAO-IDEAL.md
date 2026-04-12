@@ -1,9 +1,9 @@
 # SITUAÇÃO ARQUITETURAL IDEAL — `src/copilot`
 
-> **Documento**: PARTE-24C-SITUACAO-IDEAL.md  
-> **Versão**: 1.0  
-> **Data**: 2026-04-12  
-> **Escopo**: Arquitetura-alvo ideal para `src/copilot/` — sistema 100% autônomo  
+> **Documento**: PARTE-24C-SITUACAO-IDEAL.md
+> **Versão**: 1.0
+> **Data**: 2026-04-12
+> **Escopo**: Arquitetura-alvo ideal para `src/copilot/` — sistema 100% autônomo
 > **Pré-requisito**: PARTE-24A (PRÉ-AUDITORIA) + PARTE-24B (SITUAÇÃO ATUAL)
 
 ---
@@ -49,26 +49,26 @@ REGRA: Lx só pode importar de Ly onde y < x. NUNCA o contrário.
 
 ### 2.1. Mudanças em relação ao modelo atual
 
-| Módulo            | Atual    | Ideal    | Justificativa |
-| ----------------- | -------- | -------- | ------------- |
-| `core/`           | L0       | L0       | Sem mudança |
-| `events/`         | L0       | L0       | Sem mudança |
-| `types/`          | L0       | L0       | Sem mudança — mas conteúdo redesenhado |
-| `config/`         | L1       | L1       | Sem mudança — mas ciclos eliminados |
-| `db/`             | L1       | L1       | Sem mudança — dependência externa eliminada |
-| `sdk/`            | L2       | L2       | Sem mudança |
-| `hooks/`          | L2       | L2       | Sem mudança — mas deps de L3 removidas |
-| `observability/`  | L1 → L2 | **L2**   | Sobe de camada. Obs depende de hooks e sdk (inaceitável em L1) |
-| `audit/`          | L1 → L2 | **L2**   | Sobe para L2. Não depende de sdk diretamente |
-| `bridges/`        | L2       | L3       | Sobe: bridges usam tools e sdk, são capability |
-| `channel/`        | L2       | L3       | Sobe: channel é capability de comunicação |
-| `plugins/`        | L2       | L3       | Sobe: plugins usam tools e hooks |
-| `agent/`          | L3       | **L4**   | Sobe: agent é orchestrator, não capability |
-| `conversation-hub/` | L3     | **L4**   | Sobe: hub depende de db + channel + agent |
-| `services/`       | L3       | **L4**   | Sobe: facades de orquestração |
-| `tools/`          | L3       | L3       | Sem mudança |
-| `api/`            | L4       | **L5**   | Sobe: entry point HTTP |
-| `terminal/`       | L4       | **L5**   | Sobe: entry point REPL |
+| Módulo              | Atual   | Ideal  | Justificativa                                                  |
+| ------------------- | ------- | ------ | -------------------------------------------------------------- |
+| `core/`             | L0      | L0     | Sem mudança                                                    |
+| `events/`           | L0      | L0     | Sem mudança                                                    |
+| `types/`            | L0      | L0     | Sem mudança — mas conteúdo redesenhado                         |
+| `config/`           | L1      | L1     | Sem mudança — mas ciclos eliminados                            |
+| `db/`               | L1      | L1     | Sem mudança — dependência externa eliminada                    |
+| `sdk/`              | L2      | L2     | Sem mudança                                                    |
+| `hooks/`            | L2      | L2     | Sem mudança — mas deps de L3 removidas                         |
+| `observability/`    | L1 → L2 | **L2** | Sobe de camada. Obs depende de hooks e sdk (inaceitável em L1) |
+| `audit/`            | L1 → L2 | **L2** | Sobe para L2. Não depende de sdk diretamente                   |
+| `bridges/`          | L2      | L3     | Sobe: bridges usam tools e sdk, são capability                 |
+| `channel/`          | L2      | L3     | Sobe: channel é capability de comunicação                      |
+| `plugins/`          | L2      | L3     | Sobe: plugins usam tools e hooks                               |
+| `agent/`            | L3      | **L4** | Sobe: agent é orchestrator, não capability                     |
+| `conversation-hub/` | L3      | **L4** | Sobe: hub depende de db + channel + agent                      |
+| `services/`         | L3      | **L4** | Sobe: facades de orquestração                                  |
+| `tools/`            | L3      | L3     | Sem mudança                                                    |
+| `api/`              | L4      | **L5** | Sobe: entry point HTTP                                         |
+| `terminal/`         | L4      | **L5** | Sobe: entry point REPL                                         |
 
 ---
 
@@ -440,18 +440,18 @@ tests/
 
 ## 10. Métricas-Alvo
 
-| Métrica                        | Atual     | Ideal     |
-| ------------------------------ | --------- | --------- |
-| Ciclos bidirecionais           | 4         | **0**     |
-| Violações de camada            | 7         | **0**     |
-| Dependências externas          | 2         | **0**     |
-| God Modules (>400 LOC)         | 12        | **0**     |
-| Módulos com 0 testes           | 3         | **0**     |
-| Shims de compat sem deadline   | 5         | **0**     |
-| Arquivos sem JSDoc (>100 LOC)  | 13        | **0**     |
-| Barrels problemáticos          | 4         | **0**     |
-| Score global                   | 5.9/10    | **8.5+**  |
-| Boot standalone funcional      | ❌        | **✅**    |
+| Métrica                       | Atual  | Ideal    |
+| ----------------------------- | ------ | -------- |
+| Ciclos bidirecionais          | 4      | **0**    |
+| Violações de camada           | 7      | **0**    |
+| Dependências externas         | 2      | **0**    |
+| God Modules (>400 LOC)        | 12     | **0**    |
+| Módulos com 0 testes          | 3      | **0**    |
+| Shims de compat sem deadline  | 5      | **0**    |
+| Arquivos sem JSDoc (>100 LOC) | 13     | **0**    |
+| Barrels problemáticos         | 4      | **0**    |
+| Score global                  | 5.9/10 | **8.5+** |
+| Boot standalone funcional     | ❌      | **✅**    |
 
 ---
 
@@ -512,6 +512,6 @@ As mudanças são **progressivas** — cada onda do roadmap (PARTE-24D) entrega 
 
 ## 13. Changelog
 
-| Versão | Data       | Mudanças                          |
-| ------ | ---------- | --------------------------------- |
-| 1.0    | 2026-04-12 | Arquitetura ideal — 12 seções     |
+| Versão | Data       | Mudanças                      |
+| ------ | ---------- | ----------------------------- |
+| 1.0    | 2026-04-12 | Arquitetura ideal — 12 seções |

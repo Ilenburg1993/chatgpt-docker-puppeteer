@@ -178,8 +178,8 @@ describe('F86 - Barrel complete export coverage', () => {
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
 
-    // ─── session-lifecycle.js (F6) ─────────────────────────────────────
-    it('exports session-lifecycle.js', async () => {
+    // ─── sdk-session-wrapper.js (F6) ─────────────────────────────────
+    it('exports session lifecycle wrappers', async () => {
         barrel = barrel ?? (await import('#copilot/sdk/index.js'));
         const names = [
             'abortSession',

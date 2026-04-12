@@ -10,5 +10,5 @@
  * @see EventBus
  */
 
-export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from './events.js';
-/** @typedef {import('./events.js').AgentEventName} AgentEventName */
+export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from '../events/agent-events.js';
+/** @typedef {import('../events/agent-events.js').AgentEventName} AgentEventName */

@@ -215,7 +215,6 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         'agents.js',
         'provider.js',
         'telemetry.js',
-        'session-lifecycle.js',
         'client-events.js',
         'client-facade.js',
         'feature-flags.js',
@@ -237,15 +236,9 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         const missing = [];
         for (const mod of REQUIRED_MODULES) {
             // models/selector.js é re-exportado via models/registry.js (aceitável)
-            // session-lifecycle.js é re-exportado via sdk-session-wrapper.js (aceitável)
             const basename = mod.replace('models/', '');
             if (mod === 'models/selector.js') {
                 if (!src.includes('models/registry.js')) {
-                    missing.push(mod);
-                }
-            } else if (mod === 'session-lifecycle.js') {
-                // Aceita tanto session-lifecycle.js quanto sdk-session-wrapper.js (que re-exporta o mesmo)
-                if (!src.includes('session-lifecycle') && !src.includes('sdk-session-wrapper')) {
                     missing.push(mod);
                 }
             } else if (!src.includes(basename)) {
