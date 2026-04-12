@@ -624,6 +624,8 @@ try {
         AGENT_TOOL_EXECUTION_START,
         AGENT_TOOL_EXECUTION_COMPLETE,
         AGENT_TOOL_EXECUTION_PROGRESS,
+        AGENT_DIALOG_PRE_STALL_WARNING,
+        AGENT_SESSION_IDLE,
     } = await import('../events/index.js');
     const bus = container.resolve(EVENT_BUS);
     if (bus) {
@@ -704,6 +706,9 @@ try {
             'pending_messages.modified': AGENT_PENDING_MESSAGES_MODIFIED,
             'exit_plan_mode.completed': AGENT_EXIT_PLAN_MODE_COMPLETED,
             'external_tool.completed': AGENT_EXTERNAL_TOOL_COMPLETED,
+            // ── FAIXA-L32: bridge completude ────────────────────────
+            'dialog.pre_stall_warning': AGENT_DIALOG_PRE_STALL_WARNING,
+            'session.idle': AGENT_SESSION_IDLE,
         });
         // FAIXA-2A: bridge DialogLoopManager → EventBus
         bridgeEmitter(alwaysAliveAgent.ctx.dialogLoop, bus, {

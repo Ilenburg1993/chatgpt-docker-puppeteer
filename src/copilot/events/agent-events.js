@@ -161,6 +161,8 @@ export const AGENT_SESSION_CONTEXT_CHANGED = 'agent:session:context_changed';
 export const AGENT_SESSION_TRUNCATION = 'agent:session:truncation';
 /** @readonly */
 export const AGENT_SESSION_CLEANUP = 'agent:session:cleanup';
+/** @readonly — FAIXA-L32: bridge completude */
+export const AGENT_SESSION_IDLE = 'agent:session:idle';
 
 // ─── FAIXA-L9: Subagent ──────────────────────────────────────────────────────
 
@@ -177,6 +179,8 @@ export const AGENT_SUBAGENT_FAILED = 'agent:subagent:failed';
 export const AGENT_DIALOG_DELTA = 'agent:dialog:delta';
 /** @readonly */
 export const AGENT_DIALOG_BOOT_RECOVERY = 'agent:dialog:boot_recovery';
+/** @readonly — FAIXA-L32: bridge completude */
+export const AGENT_DIALOG_PRE_STALL_WARNING = 'agent:dialog:pre_stall_warning';
 
 // ─── FAIXA-L9: Abort / Elicitation ───────────────────────────────────────────
 
@@ -299,6 +303,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'sdk.lifecycle',
     'session.cleanup',
     'session.keepalive',
+    'session.idle',
     'mcp.reconnected',
     'quota.warning',
     'dialog.boot_recovery',

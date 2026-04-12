@@ -8,8 +8,8 @@
  * AgentContext e emite eventos via host.
  *
  * @module copilot/agent/messaging/agent-messaging
- * @see EventBus
  * @internal
+ * @see EventBus
  */
 
 import { SessionError } from '#copilot/core';
@@ -41,7 +41,8 @@ import { writeStateAsync } from '../lifecycle/state-io.js';
  */
 export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal, resolve, reject }) {
     const task = /** @type {AgentTask} */ ({
-        id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,        message,
+        id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,
+        message,
         resolve,
         reject,
         enqueuedAt: Date.now(),
@@ -142,7 +143,7 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
  * @returns {boolean}
  */
 export function answerPendingQuestion(ctx, host, answer) {
-    const span = startSpanImmediate('copilot.agent.answer', { 'had_pending': String(ctx.pendingQuestion !== null) });
+    const span = startSpanImmediate('copilot.agent.answer', { had_pending: String(ctx.pendingQuestion !== null) });
     if (!ctx.pendingQuestion) {
         // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
         host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false });

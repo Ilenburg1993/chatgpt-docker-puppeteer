@@ -99,7 +99,7 @@ describe('Schema Registry (FAIXA-L18)', () => {
             assert.ok(types.includes('agent:ready'));
             assert.ok(types.includes('agent:task:completed'));
             assert.ok(types.includes('agent:dialog:turn_end'));
-            assert.ok(types.includes('agent:tool:start'));
+            assert.ok(types.includes('agent:tool:execution_start'));
         });
 
         it('todos os schemas tem type e required', () => {

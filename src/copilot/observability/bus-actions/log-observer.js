@@ -2,9 +2,8 @@
 /**
  * src/copilot/observability/bus-actions/log-observer.js — FAIXA-L23
  *
- * EventBus subscriber que loga eventos cross-module para observabilidade.
- * Substitui o antigo `event-bus-observers.js` (que era standalone/idempotente)
- * pelo padrão unificado de bus-action (L15).
+ * EventBus subscriber que loga eventos cross-module para observabilidade. Substitui o antigo `event-bus-observers.js`
+ * (que era standalone/idempotente) pelo padrão unificado de bus-action (L15).
  *
  * @module copilot/observability/bus-actions/log-observer
  */

@@ -2,8 +2,8 @@
 /**
  * src/copilot/observability/event-catalog.js — FAIXA-L25
  *
- * Catálogo dinâmico de eventos gerado a partir das constantes SSOT + emitter-events.
- * Também mantém rastreamento de dead-letters (eventos emitidos sem listener).
+ * Catálogo dinâmico de eventos gerado a partir das constantes SSOT + emitter-events. Também mantém rastreamento de
+ * dead-letters (eventos emitidos sem listener).
  *
  * @module copilot/observability/event-catalog
  * @see EventBus
@@ -73,8 +73,8 @@ export function recordDeadLetter(event) {
 }
 
 /**
- * Retorna o catálogo dinâmico de eventos, gerado a partir das constantes SSOT.
- * O resultado é cacheado após a primeira chamada.
+ * Retorna o catálogo dinâmico de eventos, gerado a partir das constantes SSOT. O resultado é cacheado após a primeira
+ * chamada.
  *
  * @returns {CatalogEntry[]}
  */

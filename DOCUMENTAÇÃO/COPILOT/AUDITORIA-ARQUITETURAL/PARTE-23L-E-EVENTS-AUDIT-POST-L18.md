@@ -272,7 +272,7 @@ START ──→ L19 (Internal Const) ──→ L20 (Terminal) ──→ L21 (Boo
 
 ## Changelog
 
-| Versão | Data       | Mudanças                                                             |
-| ------ | ---------- | -------------------------------------------------------------------- |
-| 5.0    | 2026-04-12 | Auditoria pós-L18 completa, 10 GAPs identificados, 10 faixas L19-L28 |
+| Versão | Data       | Mudanças                                                                               |
+| ------ | ---------- | -------------------------------------------------------------------------------------- |
+| 5.0    | 2026-04-12 | Auditoria pós-L18 completa, 10 GAPs identificados, 10 faixas L19-L28                   |
 | 5.1    | 2026-04-12 | Todas 10 faixas concluídas (8 implementadas, 2 resolved by design). Score: 96/100 (A+) |
