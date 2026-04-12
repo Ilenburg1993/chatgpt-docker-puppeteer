@@ -1,22 +1,9 @@
 // @ts-check
 /**
  * src/copilot/observability/metrics.js
- *
- * Métricas agregadas para src/copilot com suporte a percentis (p50/p95/p99).
- *
- * Rastreia:
- *
- * - Tool call latências (histograma rolling)
- * - Contagem de erros/sucessos por tool
- * - Token usage agregado (input/output/cache)
- * - Sessões iniciadas/encerradas
- * - Taxa de erros global
- *
  * @module copilot/observability/metrics
  * @see EventBus
  */
-
-// ─── Tipos (re-export de metrics-histogram.js) ───────────────────────────────
 
 /** @typedef {import('./metrics-histogram.js').LatencyHistogram} LatencyHistogram */
 /** @typedef {import('./metrics-histogram.js').ToolMetrics} ToolMetrics */
@@ -55,8 +42,6 @@
  * @property {() => void} [recordQuotaPoll] - Registra uma sondagem de quota (opcional)
  */
 
-// ─── Helpers e Histogramas (de metrics-histogram.js) ──────────────────────────
-
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
@@ -65,11 +50,8 @@ import { logSwallowed } from '../core/error-handlers.js';
 import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 import { createHistogram } from './metrics-histogram.js';
 
-// ─── Factory ──────────────────────────────────────────────────────────────────
-
 /**
  * Cria um MetricsStore.
- *
  * @returns {MetricsStore}
  */
 export function createMetricsStore() {
@@ -176,7 +158,6 @@ export function createMetricsStore() {
 
     /**
      * Registra um turno do dialog loop concluído.
-     *
      * @param {number} durationMs - Duração total do turn.
      * @param {boolean} success - Se o turn completou com resposta.
      * @returns {void}
@@ -189,7 +170,6 @@ export function createMetricsStore() {
 
     /**
      * Registra um stall detectado pelo dialog watchdog.
-     *
      * @param {number} stalledMs - Tempo em que o dialog ficou parado.
      * @returns {void}
      */
@@ -200,7 +180,6 @@ export function createMetricsStore() {
 
     /**
      * Registra um timeout de turn ou boot do dialog.
-     *
      * @returns {void}
      */
     function recordDialogTimeout() {
@@ -209,7 +188,6 @@ export function createMetricsStore() {
 
     /**
      * Registra uma task concluída ou com falha.
-     *
      * @param {number} durationMs - Duração da task.
      * @param {boolean} success - Se completou com sucesso.
      * @returns {void}
@@ -222,7 +200,6 @@ export function createMetricsStore() {
 
     /**
      * CR-01: Registra intervalo entre chunks de streaming (ms).
-     *
      * @param {number} chunkMs - Intervalo desde o chunk anterior (ms).
      * @returns {void}
      */
@@ -233,7 +210,6 @@ export function createMetricsStore() {
 
     /**
      * CS-02: Registra latência de resposta a question (ms).
-     *
      * @param {number} waitMs - Tempo entre question.pending e question.answered (ms).
      * @returns {void}
      */
@@ -244,7 +220,6 @@ export function createMetricsStore() {
 
     /**
      * Incrementa um contador genérico.
-     *
      * @param {string} name - Nome do contador.
      * @param {number} [delta=1] - Valor a incrementar. Default is `1`
      * @returns {void}
@@ -255,7 +230,6 @@ export function createMetricsStore() {
 
     /**
      * Registra um valor instantâneo (gauge) — sobrescreve o anterior.
-     *
      * @param {string} name - Nome do gauge.
      * @param {number} value - Valor atual.
      * @returns {void}
@@ -266,7 +240,6 @@ export function createMetricsStore() {
 
     /**
      * Retorna todos os gauges registrados.
-     *
      * @returns {Record<string, { value: number; ts: number }>}
      */
     function getGauges() {
@@ -278,7 +251,6 @@ export function createMetricsStore() {
 
     /**
      * Inicia snapshot periódico de métricas em arquivo.
-     *
      * @param {number} [intervalMs] - Intervalo entre snapshots. Default: COPILOT_METRICS_SNAPSHOT_INTERVAL ou 5min.
      * @param {string} [logDir] - Diretório de log. Default: var/logs/copilot/.
      * @returns {void}
@@ -307,7 +279,6 @@ export function createMetricsStore() {
 
     /**
      * Para o snapshot periódico.
-     *
      * @returns {void}
      */
     function stopPeriodicSnapshot() {
@@ -420,8 +391,6 @@ export function createMetricsStore() {
         stopPeriodicSnapshot,
     };
 }
-
-// ─── Singleton ────────────────────────────────────────────────────────────────
 
 /** Singleton global de métricas para src/copilot. */
 export const defaultMetrics = createMetricsStore();

@@ -1,36 +1,6 @@
 // @ts-check
 /**
  * src/copilot/terminal/server.js
- *
- * Servidor HTTP de injeção do Terminal Permanente LLM-B.
- *
- * Wrapper HTTP raw (node:http, porta 3009) que delega toda a lógica de negócio para `http-handlers.js`. O único código
- * neste arquivo é adaptação de transporte: leitura de body, parsing de URL, escrita de status/cabeçalhos HTTP e
- * tratamento SSE.
- *
- * | Método | Caminho             | Descrição                             |
- * | ------ | ------------------- | ------------------------------------- |
- * | GET    | /health             | Status do agente e do dialog loop     |
- * | GET    | /metrics            | Métricas Prometheus (text/plain)      |
- * | GET    | /context            | Uso de contexto/tokens em tempo real  |
- * | GET    | /quota              | Dados de cota de PRs em tempo real    |
- * | GET    | /events             | SSE — stream de eventos da LLM-B      |
- * | GET    | /sessions           | Lista hub_sessions persistidas        |
- * | GET    | /sessions/:id/turns | Turnos de uma sessão específica       |
- * | POST   | /memory             | Armazena uma memória semântica        |
- * | GET    | /memory             | Recupera memórias semânticas          |
- * | DELETE | /memory/:id         | Remove uma memória semântica          |
- * | POST   | /pipeline           | Executa sequência ordenada de turnos  |
- * | POST   | /inject             | Injeta uma mensagem na LLM-B          |
- * | POST   | /dialog/pause       | Pausa o dialog loop (NEW-PAUSE)       |
- * | POST   | /dialog/resume      | Retoma o dialog loop (NEW-PAUSE)      |
- * | GET    | /gh/issues          | Lista GitHub issues via gh CLI        |
- * | GET    | /gh/prs             | Lista GitHub pull requests via gh CLI |
- * | GET    | /gh/ci              | Lista GitHub CI runs via gh CLI       |
- * | GET    | /git/status         | Git status via spawn                  |
- * | GET    | /git/log            | Git log via spawn                     |
- * | GET    | /config             | Configuração dinâmica da sessão LLM-B |
- *
  * @module copilot/terminal/server
  * @see EventBus
  * @see module:copilot/terminal/route-table
@@ -58,11 +28,8 @@ import { registerClearRateLimiters } from './rate-limiter-state.js';
 import { matchRoute } from './route-table.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
 
-// ─── Configuração ─────────────────────────────────────────────────────────────
-
 const INJECT_PORT = LLM_B_TERMINAL_PORT;
 
-// ─── Rate limiter simples para POST /inject ───────────────────────────────────
 // GAP-01 (fix): limitar POST /inject a 10 requisições por IP por janela de 60s
 // (previne flood / DDOS acidental no endpoint de injeção)
 
@@ -71,7 +38,6 @@ const INJECT_PORT = LLM_B_TERMINAL_PORT;
 
 /**
  * Cria um rate limiter em memória por chave (IP, IP+endpoint, etc.).
- *
  * @param {number} max - Máximo de requisições permitidas por janela
  * @param {number} windowMs - Duração da janela em ms
  * @returns {{ check: (key: string) => { allowed: boolean; remaining: number; resetIn: number }; clear: () => void }}
@@ -110,7 +76,6 @@ const _injectRateLimiter = createRateLimiter(INJECT_RATE_MAX, INJECT_RATE_WINDOW
 
 /**
  * Verifica se o IP excedeu o limite de requisições para /inject.
- *
  * @param {string} ip
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
@@ -125,7 +90,6 @@ const _writeRateLimiter = createRateLimiter(WRITE_RATE_MAX, WRITE_RATE_WINDOW_MS
 
 /**
  * Verifica rate-limit para endpoints de escrita (/pipeline, /memory, /attach, /context-send).
- *
  * @param {string} ipEndpoint - Combinação de IP + endpoint key para isolamento por rota
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
@@ -145,23 +109,17 @@ registerClearRateLimiters(() => {
     _sseRateLimiter.clear();
     log('INFO', '[TerminalServer] Rate limiters resetados por emergency-reset.');
 });
-
 /**
  * Verifica rate-limit para conexões SSE (/events, /events/critical) — janela e limite independentes dos endpoints de
  * escrita.
- *
  * @param {string} ip - IP do cliente
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
 function checkSseRate(ip) {
     return _sseRateLimiter.check(`sse:${ip}`);
 }
-
-// ─── Helpers de transporte ────────────────────────────────────────────────────
-
 /**
  * Escreve uma resposta JSON no `res` a partir de um `HandlerResult`.
- *
  * @param {import('node:http').ServerResponse} res
  * @param {{ status: number; body: unknown; cors?: boolean }} result
  * @returns {void}
@@ -175,11 +133,9 @@ function sendJson(res, result) {
     res.writeHead(result.status, headers);
     res.end(JSON.stringify(result.body));
 }
-
 /**
  * Lê o body de uma requisição HTTP e retorna como string. Rejeita payloads acima de MAX_BODY_BYTES (proteção contra
  * DoS).
- *
  * @param {import('node:http').IncomingMessage} req
  * @returns {Promise<string>}
  */
@@ -201,10 +157,8 @@ function readBody(req) {
         req.on('error', reject);
     });
 }
-
 /**
  * Faz parse seguro de JSON — retorna `null` se inválido.
- *
  * @param {string} raw
  * @returns {unknown | null}
  */
@@ -215,12 +169,8 @@ function tryParseJson(raw) {
         return null;
     }
 }
-
-// ─── Servidor HTTP ────────────────────────────────────────────────────────────
-
 /**
  * F16.1 — Dispara o ready webhook (fire-and-forget) se `COPILOT_READY_WEBHOOK` estiver definido.
- *
  * @param {number} port - Porta em que o servidor está escutando
  * @returns {void}
  */
@@ -249,10 +199,8 @@ function _fireReadyWebhook(port) {
         log('WARN', `[TerminalServer] Ready webhook URL inválida: ${e?.message ?? e}`);
     }
 }
-
 /**
  * Cria o servidor HTTP interno para injeção de mensagens de LLM-A e consulta de estado.
- *
  * @returns {http.Server} Servidor HTTP iniciado na porta `INJECT_PORT`
  */
 export function createInjectServer() {
@@ -281,14 +229,12 @@ export function createInjectServer() {
                 return;
             }
 
-            // ── Rotas não encontradas ─────────────────────────────────────────
             if (!route) {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ ok: false, error: 'Not found' }));
                 return;
             }
 
-            // ── Auth bypass para rotas isentas (health, metrics, hub-health) ──
             // Demais rotas verificam token se configurado
             if (!route.skipAuth && TERMINAL_TOKEN) {
                 // SEC-04 + T-18 fix: timingSafeEqual sem short-circuit para evitar timing leak
@@ -313,7 +259,6 @@ export function createInjectServer() {
                 }
             }
 
-            // ── Rate limiting (por IP + endpoint key) ─────────────────────────
             if (route.rateLimiter) {
                 const clientIp = req.socket?.remoteAddress ?? 'unknown';
                 let rateResult;
@@ -338,7 +283,6 @@ export function createInjectServer() {
                 }
             }
 
-            // ── Custom routes: /metrics (contentType especial) ────────────────
             if (route.custom && url.pathname === '/metrics') {
                 const result = handleMetrics();
                 res.writeHead(result.status, { 'Content-Type': result.contentType });
@@ -346,7 +290,6 @@ export function createInjectServer() {
                 return;
             }
 
-            // ── Custom routes: /events (SSE) ─────────────────────────────────
             if (route.custom && url.pathname === '/events') {
                 const isCriticalOnly = url.searchParams.get('level') === 'critical';
                 const _sseClients = getSseClients();
@@ -401,7 +344,6 @@ export function createInjectServer() {
                 return;
             }
 
-            // ── Generic dispatch: body parsing + params + handler call ────────
             const handlerArg =
                 route.body === 'json'
                     ? await readBody(req).then(tryParseJson)

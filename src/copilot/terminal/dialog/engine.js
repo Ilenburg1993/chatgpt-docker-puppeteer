@@ -1,9 +1,6 @@
 // @ts-check
 /**
  * src/copilot/terminal/dialog/engine.js
- *
- * Motor de diálogo do Terminal Permanente LLM-B — dialog loop e execução de turnos.
- *
  * @module copilot/terminal/dialog/engine
  * @see EventBus
  */
@@ -44,33 +41,24 @@ import {
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
-// ─── Fila de serialização de turnos (TERM-01) ─────────────────────────────────
-
 const MAX_TURN_QUEUE_SIZE = 10;
-
 /** @type {number} */
 let _turnQueueDepth = 0;
 
 /**
  * Retorna a profundidade atual da fila de turnos.
- *
  * @returns {number}
  */
 export function getTurnQueueDepth() {
     return _turnQueueDepth;
 }
-
 /** @type {Promise<string | null>} */
 let _sendTurnMutex = Promise.resolve(null);
-
-// ─── Dialog loop ──────────────────────────────────────────────────────────────
-
 /** @type {Promise<void> | null} */
 let _ensureDialogLoopInFlight = null;
 
 /**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
- *
  * @returns {Promise<void>}
  */
 export function ensureDialogLoop() {
@@ -92,7 +80,6 @@ export function ensureDialogLoop() {
 
 /**
  * Implementação interna de ensureDialogLoop com retry.
- *
  * @returns {Promise<void>}
  */
 async function _doEnsureDialogLoop() {
@@ -126,7 +113,6 @@ async function _doEnsureDialogLoop() {
 
 /**
  * Tenta iniciar o dialog loop uma vez.
- *
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
@@ -177,11 +163,8 @@ async function _tryStartDialogLoop() {
     });
 }
 
-// ─── Envio de turnos ──────────────────────────────────────────────────────────
-
 /**
  * Envia um turno de diálogo para a LLM-B e exibe a resposta.
- *
  * @param {string} message - Mensagem a enviar
  * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')
  * @returns {Promise<string | null>}
@@ -212,7 +195,6 @@ export function sendTurn(message, actor = 'user') {
 
 /**
  * Implementação interna do turno.
- *
  * @param {string} message
  * @param {string} actor
  * @returns {Promise<string | null>}
@@ -242,7 +224,6 @@ async function _executeTurn(message, actor) {
         rl.setPrompt(PROMPT_WAITING);
     }
 
-    // ── Enriquecimento da mensagem ──────────────────────────────────────────
     let enrichedMessage = message;
 
     const queue = getAttachmentQueue();
@@ -280,7 +261,6 @@ async function _executeTurn(message, actor) {
             println('');
         }
 
-        // ── Thinking display (reasoning deltas) ─────────────────────────────
         const showThinking = getShowThinking();
         const model = alwaysAliveAgent.model;
         const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
@@ -289,7 +269,6 @@ async function _executeTurn(message, actor) {
         /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
         const onReasoning = showThinking ? createReasoningCallback(displayState) : undefined;
 
-        // ── Streaming response (message deltas) ─────────────────────────────
         /** @type {(chunk: string) => void} */
         const onDelta = createDeltaCallback(displayState);
 

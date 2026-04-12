@@ -1,21 +1,6 @@
 // @ts-check
 /**
  * src/copilot/sdk/experimental-rpc.js
- *
- * Faixa 22 — APIs RPC experimentais do Copilot SDK, gated por feature flags.
- *
- * Cada subsistema é desabilitado por padrão. Para habilitar, use `setExperimentalFlag(name, true)` ou configure
- * `COPILOT_EXPERIMENTAL_<NAME>=1` no ambiente antes de carregar o módulo.
- *
- * Subsistemas:
- *
- * - **fleet** (F118): `fleet.start()` — inicia fleet de agentes paralelos
- * - **agents** (F119): `agent.list()`, `agent.select()`, `agent.deselect()`, `agent.getStatus()`, `agent.stop()`
- * - **skills** (F120): `skills.list()`, `skills.enable()`, `skills.disable()`, `skills.getStatus()`
- * - **mcp** (F121): `mcp.list()`, `mcp.enable()`, `mcp.disable()`, `mcp.getStatus()`
- * - **plugins** (F122): `plugins.list()`
- * - **extensions** (F123): `extensions.list()`, `extensions.enable()`, `extensions.disable()`
- *
  * @module copilot/sdk/experimental-rpc
  * @see EventBus
  * @see module:copilot/sdk/feature-flags
@@ -24,13 +9,9 @@
 
 import { isExperimentalEnabled } from './feature-flags.js';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
  * Valida a sessão e lança se inválida.

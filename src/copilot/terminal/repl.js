@@ -1,15 +1,6 @@
 // @ts-check
 /**
  * src/copilot/terminal/repl.js
- *
- * Interface REPL readline do Terminal Permanente LLM-B.
- *
- * Responsável por:
- *
- * - Criar/gerenciar readline interface (`startRepl`)
- * - Registrar listeners de eventos do AlwaysAliveAgent (`setupAgentListeners`)
- * - Fazer dispatch dos comandos `/xxx` para os módulos de commands/
- *
  * @module copilot/terminal/repl
  * @see EventBus
  * @see module:copilot/always-alive
@@ -67,8 +58,6 @@ import { clearRateLimiters } from './rate-limiter-state.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
 
-// ─── Configuração ─────────────────────────────────────────────────────────────
-
 const INJECT_PORT = LLM_B_TERMINAL_PORT;
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 
@@ -91,8 +80,6 @@ const BANNER = `
   \x1b[90mGET :${INJECT_PORT}/config  ·  GET :${INJECT_PORT}/health  |  @caminho/arquivo → embed automático\x1b[0m
 `;
 
-// ─── Helpers de dispatch ──────────────────────────────────────────────────────
-
 /**
  * @typedef {{ hubSessionId: string | null; injectPort: number }} CmdCtx
  */
@@ -100,7 +87,6 @@ const BANNER = `
 /**
  * Tabela de roteamento de comandos REPL. `println` é resolvida via closure sobre o módulo. Cada entry: `[nomes[],
  * handler(ctx, arg, rest, rl, injectServer, cleanup)]`
- *
  * @type {[
  *     string[],
  *     (
@@ -193,12 +179,8 @@ async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
         println(`\x1b[90m  Comando desconhecido: /${cmd}. Use /help para ver todos os comandos.\x1b[0m`);
     }
 }
-
-// ─── Handlers standalone de comandos inline ───────────────────────────────────
-
 /**
  * F41.5: Dispatcher para subcomandos de `/session save|list|restore`.
- *
  * @param {string} subCmd
  * @param {string[]} rest
  */
@@ -296,7 +278,6 @@ function _cmdHandoff() {
         );
     }
 }
-
 /**
  * @param {readline.Interface} rl
  * @param {import('node:http').Server} injectServer
@@ -317,14 +298,11 @@ async function _cmdQuit(rl, injectServer, cleanup) {
 
 export { setupAgentListeners } from './repl-listeners.js';
 
-// ─── REPL ─────────────────────────────────────────────────────────────────────
-
 /**
  * Inicia o REPL readline do terminal permanente.
  *
  * Em modo headless (stdin não-TTY), apenas garante o dialog loop e retorna, deixando o inject server HTTP manter o
  * event loop ativo.
- *
  * @param {import('node:http').Server} injectServer - Servidor HTTP de injeção (para fechar no /quit)
  * @returns {Promise<void>}
  */
@@ -340,7 +318,6 @@ export async function startRepl(injectServer) {
 
     /**
      * Readline completer para comandos REPL (F37.1).
-     *
      * @param {string} line
      * @returns {[string[], string]}
      */

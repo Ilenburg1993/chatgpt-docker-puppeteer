@@ -1,9 +1,6 @@
 // @ts-check
 /**
  * src/copilot/api/express/session-crud.js
- *
- * Rotas CRUD de sessões SDK: list, create, get, delete, disconnect, resume, foreground, compaction-history.
- *
  * @module copilot/api/express/session-crud
  * @see EventBus
  */

@@ -1,39 +1,8 @@
 // @ts-check
 /**
  * src/copilot/channel/client.js
- *
- * LLM Bridge Client — camada conversacional de alto nível sobre o AlwaysAliveAgent.
- *
- * Permite que LLM-A (este agente) se comunique continuamente com LLM-B (Copilot SDK) dentro de uma sessão infinita, com
- * suporte a:
- *
- * - Envio de mensagens com coleta de tokens em streaming (task.delta)
- * - Histórico de conversa estruturado (turn-by-turn)
- * - Resposta automática ou manual a perguntas pendentes (onUserInputRequest)
- * - Callbacks por evento: onDelta, onComplete, onQuestion
- * - Protocolo StructuredMessage (Sprint A): chatStructured() para comunicação tipada LLM-A ↔ LLM-B
- *
  * @module copilot/channel/client
  * @see EventBus
- * @example
- *     ```js
- *     import { LlmBridgeClient } from '#copilot/channel';
- *
- *     const bridge = new LlmBridgeClient();
- *     const reply = await bridge.chat('Explique monads em uma linha.');
- *     console.log(reply.response);
- *     console.log(bridge.history);
- *
- *     // Protocolo estruturado:
- *     const result = await bridge.chatStructured({
- *         context: 'Sprint A implementado.',
- *         intent: 'Confirmar que novos testes passam',
- *         priority: 'high',
- *         responseType: 'diagnostic',
- *     });
- *     if (result.structured) console.log('Diagnóstico:', result.structured.output);
- *     ```;
- *
  * @see module:copilot/always-alive
  * @see module:copilot/channel/inject
  */
@@ -49,11 +18,8 @@ import {
 import { getLastNPairs as _getLastNPairs } from './client-history.js';
 import { chatStructured as _chatStructured } from './client-structured.js';
 
-// ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
-
 /**
  * Interface mínima do AlwaysAliveAgent usada pelo LlmBridgeClient.
- *
  * @typedef {Object} BridgeAgentLike
  * @property {string} status
  * @property {Function} sendMessage
@@ -73,14 +39,12 @@ let _agent = null;
 /**
  * Injeta o AlwaysAliveAgent singleton para quebrar dependência circular. Chamado em `startTerminalServer()` durante o
  * boot.
- *
  * @param {BridgeAgentLike} agent
  * @returns {void}
  */
 export function setBridgeAgent(agent) {
     _agent = agent;
 }
-
 /**
  * @returns {BridgeAgentLike}
  * @throws {Error} Se o agent não foi injetado via `setBridgeAgent()`.
@@ -93,34 +57,22 @@ function requireAgent() {
         );
     return _agent;
 }
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 /**
  * Uma entrada no histórico de conversa.
- *
  * @typedef {Object} ConversationTurn
  * @property {string} role - 'user' ou 'assistant'
  * @property {string} content - Conteúdo do turno
  * @property {number} timestamp - Epoch ms do turno
  * @property {string} [taskId] - ID da tarefa associada (somente assistant)
  * @property {number} [responseLen] - Comprimento da resposta (somente assistant)
- */
-
-/**
  * Resultado de uma chamada ao chat().
- *
  * @typedef {Object} ChatResult
  * @property {string} taskId - ID da tarefa Copilot SDK
  * @property {string} response - Resposta completa do modelo
  * @property {number} responseLen - Comprimento da resposta
  * @property {string[]} chunks - Chunks coletados via streaming (task.delta)
  * @property {number} durationMs - Tempo total da chamada em ms
- */
-
-/**
  * Opções para uma chamada ao chat().
- *
  * @typedef {Object} ChatOptions
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
@@ -129,11 +81,6 @@ function requireAgent() {
  *   enviar junto com a mensagem
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
  * @property {number} [retryDelayMs] - F11.4: delay base entre tentativas em ms (default: 1500; cresce 2× a cada retry)
- */
-
-// ─── Implementação ────────────────────────────────────────────────────────────
-
-/**
  * Cliente de alto nível para conversa contínua com LLM-B via AlwaysAliveAgent.
  *
  * Mantém histórico de conversa e gerencia listeners de streaming por turno.
@@ -169,7 +116,6 @@ export class LlmBridgeClient {
      *
      * Coleta chunks via task.delta durante o processamento para construir a resposta incrementalmente. Suporta
      * callbacks por evento.
-     *
      * @param {string} message - Mensagem a enviar para LLM-B
      * @param {ChatOptions} [opts] - Opções de callback e timeout
      * @returns {Promise<ChatResult>} Resultado completo com resposta e metadados
@@ -200,7 +146,6 @@ export class LlmBridgeClient {
 
     /**
      * Envia uma mensagem ao LLM-B e aguarda a resposta completa (implementação interna sem retry).
-     *
      * @param {string} message
      * @param {{
      *     onDelta?: ChatOptions['onDelta'];
@@ -323,7 +268,6 @@ export class LlmBridgeClient {
 
     /**
      * Envia uma mensagem estruturada (protocolo Sprint A) para LLM-B e tenta parsear a resposta.
-     *
      * @param {import('#copilot/core/structured-message').StructuredMessageInput} input
      * @param {ChatOptions & { turnNumber?: number; sessionId?: string }} [opts]
      * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>}
@@ -346,7 +290,6 @@ export class LlmBridgeClient {
      * Cada "slot" de concorrência é uma chain de Promises. Mensagens são atribuídas ciclicamente aos slots, garantindo
      * que até `concurrency` mensagens rodem simultâneas. Com `concurrency=1` (padrão), o comportamento é puramente
      * sequencial — preservando histórico de conversa.
-     *
      * @remarks
      *   **BUG-CRIT-06 (documentado)**: AlwaysAliveAgent serializa internamente a fila — paralelismo real exige múltiplas
      *   instâncias. O semáforo aqui controla a taxa de submissão ao agente.
@@ -388,11 +331,8 @@ export class LlmBridgeClient {
         return Promise.all(pending);
     }
 
-    // ─── Dialog Mode (delegates to client-dialog.js) ────────────────────────
-
     /**
      * Inicia a LLM-B em modo de "diálogo direto" (Dialog Loop).
-     *
      * @param {string} [bootPrompt] - Prompt de boot (usa padrão §15.8 quando omitido)
      * @param {{
      *     onReady?: () => void;
@@ -408,7 +348,6 @@ export class LlmBridgeClient {
 
     /**
      * Envia um turno de diálogo para a LLM-B no dialog loop.
-     *
      * @param {string} message
      * @param {{
      *     timeout?: number;
@@ -430,7 +369,6 @@ export class LlmBridgeClient {
 
     /**
      * Encerra o modo de diálogo direto.
-     *
      * @param {string} [reason='watchdog_restart'] Default is `'watchdog_restart'`
      * @returns {Promise<void>}
      */
@@ -440,7 +378,6 @@ export class LlmBridgeClient {
 
     /**
      * Responde a uma pergunta pendente do modelo.
-     *
      * @param {string} answer - Resposta a enviar ao modelo
      * @returns {boolean} True se havia pergunta pendente e foi respondida
      */
@@ -450,7 +387,6 @@ export class LlmBridgeClient {
 
     /**
      * Retorna o histórico de conversa completo.
-     *
      * @returns {ReadonlyArray<ConversationTurn>} Histórico imutável de turnos
      */
     get history() {
@@ -459,7 +395,6 @@ export class LlmBridgeClient {
 
     /**
      * Retorna os últimos N pares (user + assistant) do histórico.
-     *
      * @param {number} [pairs=5] Default is `5`
      * @param {{ summarize?: boolean }} [opts]
      * @returns {ReadonlyArray<ConversationTurn>}
@@ -470,7 +405,6 @@ export class LlmBridgeClient {
 
     /**
      * Retorna o número de turnos de conversa realizados desde a criação.
-     *
      * @returns {number} Número de turnos
      */
     get turnCount() {
@@ -479,7 +413,6 @@ export class LlmBridgeClient {
 
     /**
      * Limpa o histórico local de conversa (não afeta a sessão do SDK).
-     *
      * @returns {void}
      */
     clearHistory() {
@@ -493,7 +426,6 @@ export class LlmBridgeClient {
      *
      * F12.2: Valida que o role não cria sequência inválida (dois turnos idênticos seguidos), com exceção de 'system'
      * que pode aparecer a qualquer momento.
-     *
      * @param {'user' | 'assistant' | 'system'} role - Papel do turno
      * @param {string} content - Conteúdo do turno
      * @returns {void}
@@ -515,7 +447,6 @@ export class LlmBridgeClient {
 
     /**
      * ARCH-05: Adiciona ao histórico com auto-trim para evitar crescimento ilimitado.
-     *
      * @param {ConversationTurn} turn
      * @returns {void}
      */
@@ -543,14 +474,12 @@ export class LlmBridgeClient {
 
     /**
      * Retorna o snapshot de status do agente subjacente.
-     *
      * @returns {object} Snapshot de status do AlwaysAliveAgent
      */
     getAgentStatus() {
         return requireAgent().getStatusSnapshot();
     }
 }
-
 /**
  * Instância singleton do LlmBridgeClient para uso em toda a aplicação. Reutiliza o alwaysAliveAgent singleton
  * subjacente.

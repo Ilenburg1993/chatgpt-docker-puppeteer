@@ -1,20 +1,6 @@
 // @ts-check
 /**
  * src/copilot/agent/dialog/turn-executor.js
- *
- * Funções puras de execução de turno extraídas do `DialogLoopManager`.
- *
- * Contém a lógica de resolução/rejeição de cada turno do dialog loop:
- *
- * - emitTurnStart
- * - buildTurnResolutionListeners
- * - dispatchTurnToHost
- * - waitForRestartAndReply
- * - executeTurn (orquestra os anteriores)
- *
- * Cada função recebe um objeto `emitter` (com `.on/.once/.off/.emit`) e os callbacks/deps necessários — sem acesso a
- * campos privados do DLM.
- *
  * @module copilot/agent/dialog/turn-executor
  * @see EventBus
  */

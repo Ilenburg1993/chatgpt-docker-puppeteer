@@ -1,50 +1,13 @@
 // @ts-check
 /**
  * src/copilot/core/structured-message.js
- *
- * Protocolo StructuredMessage — Sprint A (Structured Dialog Protocol)
- *
- * Define o schema canônico para comunicação estruturada entre LLM-A (GitHub Copilot orquestrador) e LLM-B (Copilot SDK
- * / gpt-4.1). Substituição progressiva de mensagens texto puro por envelopes JSON tipados, auditáveis e parseáveis por
- * ambos os lados.
- *
- * Funcionalidades:
- *
- * - Schema Zod com validação (parse + safeParse)
- * - Funções builder para LLM-A criar mensagens tipadas
- * - Parser de resposta LLM-B com fallback gracioso (texto puro → null)
- * - Serializador para envio via chat()
- * - Constantes de responseType e priority
- *
  * @module copilot/core/structured-message
  * @see EventBus
- *
- * @example
- *     ```js
- *     import { buildStructuredRequest, parseStructuredResponse } from '#copilot/core';
- *
- *     // LLM-A cria mensagem tipada
- *     const msg = buildStructuredRequest({
- *         context: 'Sprint A implementado. 1419 testes passando.',
- *         intent: 'Confirmar que todos os testes novos passam',
- *         priority: 'high',
- *         responseType: 'diagnostic',
- *     });
- *
- *     // Enviando
- *     const raw = await bridge.chat(serializeStructuredMessage(msg));
- *
- *     // Parseando resposta LLM-B
- *     const parsed = parseStructuredResponse(raw);
- *     if (parsed) {
- *         console.log('Diagnóstico:', parsed.output);
- *     }
- *     ```;
  */
 
 import { z } from 'zod';
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// ─── Constantes ──────────────────────────────────────────────────────────────
 
 /**
  * Tipos de resposta suportados no protocolo StructuredMessage.
@@ -84,7 +47,7 @@ export const PRIORITY_LEVELS = /** @type {const} */ ({
     critical: 'critical',
 });
 
-// ─── Schema Zod ───────────────────────────────────────────────────────────────
+// ─── Schema Zod ──────────────────────────────────────────────────────────────
 
 /**
  * Schema Zod para validação de StructuredMessage.
@@ -172,7 +135,7 @@ export const StructuredMessageSchema = z
  */
 const StructuredMessageResponseSchema = StructuredMessageSchema.passthrough();
 
-// ─── Tipos TypeScript/JSDoc ───────────────────────────────────────────────────
+// ─── Tipos TypeScript/JSDoc ──────────────────────────────────────────────────
 
 /**
  * Mensagem estruturada do protocolo LLM-A ↔ LLM-B.
@@ -219,7 +182,7 @@ const StructuredMessageResponseSchema = StructuredMessageSchema.passthrough();
  * @property {Error} [parseError] - Erro ao parsear resposta estruturada (undefined quando bem-sucedido)
  */
 
-// ─── Builders ─────────────────────────────────────────────────────────────────
+// ─── Builders ────────────────────────────────────────────────────────────────
 
 /**
  * Cria uma mensagem StructuredMessage validada para envio de LLM-A → LLM-B.
@@ -263,7 +226,7 @@ export function buildStructuredResponse(input) {
     return /** @type {StructuredMessage} */ (StructuredMessageSchema.parse(input));
 }
 
-// ─── Serialização ─────────────────────────────────────────────────────────────
+// ─── Serialização ────────────────────────────────────────────────────────────
 
 /**
  * Serializa uma StructuredMessage para string JSON para envio via bridge.chat().
@@ -292,7 +255,7 @@ export function serializeStructuredMessage(msg, opts = {}) {
     ].join('\n');
 }
 
-// ─── Parser ───────────────────────────────────────────────────────────────────
+// ─── Parser ──────────────────────────────────────────────────────────────────
 
 /**
  * Tenta parsear a resposta bruta de LLM-B como StructuredMessage.
@@ -364,8 +327,6 @@ export function parseStructuredResponse(raw) {
 export function isStructuredMessage(value) {
     return StructuredMessageSchema.safeParse(value).success;
 }
-
-// ─── Helpers internos ─────────────────────────────────────────────────────────
 
 /**
  * Tenta fazer parse de uma string JSON e validar como StructuredMessage.

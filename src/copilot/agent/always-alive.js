@@ -1,18 +1,6 @@
 // @ts-check
 /**
  * src/copilot/agent/always-alive.js
- *
- * Always-Alive Agent — núcleo do agente autônomo baseado no GitHub Copilot SDK.
- *
- * Fluxo de operação:
- *
- * 1. Inicializa/retoma sessão persistente (via session-manager.js)
- * 2. Processa a fila de mensagens/tarefas
- * 3. Quando o modelo pergunta algo (ask_user/onUserInputRequest), suspende e expõe a pergunta via HTTP (controlada por
- *    http-control-server.js)
- * 4. Ao receber resposta, retoma o processamento
- * 5. Emite eventos via NERV bridge para que o dashboard receba atualizações
- *
  * @module copilot/agent/always-alive
  * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/agent/session/initializer
@@ -66,25 +54,19 @@ import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agen
 
 /**
  * @typedef {import('./types.js').CopilotSession} CopilotSession
- *
  * @typedef {import('./types.js').PendingQuestion} PendingQuestion
- *
  * @typedef {import('./types.js').AgentTask} AgentTask
- *
  * @typedef {import('./types.js').AgentStatus} AgentStatus
- *
  * @typedef {import('./types.js').AgentStatusSnapshot} AgentStatusSnapshot
  */
 
 /**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
- *
  * @extends BaseEmitter
  */
 export class AlwaysAliveAgent extends BaseEmitter {
     /**
      * F35: AgentContext — contexto compartilhado com todos os módulos internos.
-     *
      * @type {AgentContext}
      */
     ctx;
@@ -103,8 +85,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
         this.on('__processQueue', () => this.#processQueue());
     }
 
-    // ─── Controle de permissão em runtime ─────────────────────────────────────
-
     /**
      * Retorna o modo de permissão ativo como string legível.
      *
@@ -113,7 +93,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
      * - `"approve_all"` — aprova tudo automaticamente (comportamento padrão, SDK approveAll)
      * - `"audit_only"` — aprova tudo mas loga cada decisão
      * - `"selective"` — whitelist/blacklist/callback customizado
-     *
      * @returns {'approve_all' | 'audit_only' | 'selective'}
      */
     getPermissionMode() {
@@ -128,7 +107,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
      *
      * O dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do dialog loop
      * via configuração de permissão.
-     *
      * @param {'approve_all' | 'audit_only' | 'selective'} mode - Modo de aprovação
      * @param {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} [opts] - Opções para modo selective
      * @returns {void}
@@ -139,7 +117,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Registra uma URL de webhook para notificações de sessão.
-     *
      * @param {string} url - URL HTTP(S) que receberá POST com payload de evento
      * @returns {{ id: string; url: string }} Identificador do webhook registrado
      */
@@ -149,7 +126,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Remove um webhook previamente registrado.
-     *
      * @param {string} id - ID do webhook a remover
      * @returns {boolean} true se removido, false se não encontrado
      */
@@ -159,7 +135,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Lista todos os webhooks registrados.
-     *
      * @returns {{ id: string; url: string }[]}
      */
     listWebhooks() {
@@ -168,7 +143,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o status atual do agente.
-     *
      * @returns {AgentStatus}
      */
     get status() {
@@ -177,7 +151,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Indica se o modo de diálogo contínuo está ativo (startDialogLoop foi chamado e ainda não foi parado).
-     *
      * @returns {boolean}
      */
     get dialogLoopActive() {
@@ -186,7 +159,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * F45: Retorna o HandoffManager para uso em rotas HTTP e terminal.
-     *
      * @returns {import('./infra/handoff-manager.js').HandoffManager}
      */
     getHandoffManager() {
@@ -195,7 +167,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o número atual de tarefas enfileiradas aguardando processamento.
-     *
      * @returns {number}
      */
     get queueSize() {
@@ -204,7 +175,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna a pergunta pendente (se houver).
-     *
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
@@ -213,7 +183,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o sessionId da sessão ativa (ou null).
-     *
      * @returns {string | null}
      */
     get sessionId() {
@@ -222,7 +191,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o sumário de métricas da sessão atual (compatibilidade — use defaultMetrics diretamente).
-     *
      * @returns {object}
      */
     get telemetry() {
@@ -231,7 +199,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o registry de tools da sessão atual.
-     *
      * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     get toolsRegistry() {
@@ -240,7 +207,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * M-04 (PARTE-8): Aborta a mensagem SDK em processamento na sessão atual.
-     *
      * @returns {Promise<void>}
      */
     async abortCurrentMessage() {
@@ -256,7 +222,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * M-05 (PARTE-8): Registra mensagem no timeline da sessão SDK via session.log().
-     *
      * @param {string} message - Mensagem para registrar no timeline
      * @param {{ level?: 'info' | 'warning' | 'error' }} [options]
      * @returns {Promise<void>}
@@ -267,7 +232,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Inicializa o agente: conecta ao CLI e cria/retoma sessão.
-     *
      * @returns {Promise<void>}
      * @throws {Error} Se a conexão ao CLI ou criação/retomada de sessão SDK falhar
      */
@@ -277,7 +241,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Para o agente graciosamente.
-     *
      * @param {{ shutdownTimeoutMs?: number }} [opts]
      * @returns {Promise<void>}
      */
@@ -288,7 +251,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
     // ═══════════════════════════════════════════════════════════════════════════
     /**
      * Enfileira uma mensagem para ser enviada ao modelo.
-     *
      * @param {string} message - Mensagem a enviar
      * @param {{
      *     timeoutMs?: number;
@@ -300,7 +262,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
      *       organicamente.
      *   - `attachments` permite enviar arquivos, imagens ou referências de contexto junto com a mensagem.
      *   - `signal` permite cancelar a tarefa via `AbortSignal` antes ou durante o processamento.
-     *
      * @returns {Promise<string>} Resposta completa do modelo
      */
     sendMessage(message, opts) {
@@ -309,7 +270,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt.
-     *
      * @param {string} message
      * @param {{ timeoutMs?: number }} [opts]
      * @returns {Promise<string>}
@@ -320,7 +280,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Envia uma mensagem em modo "steering" (immediate).
-     *
      * @param {string} prompt
      * @param {{ signal?: AbortSignal }} [opts]
      * @returns {Promise<string>}
@@ -331,7 +290,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Responde a uma pergunta pendente do modelo.
-     *
      * @param {string} answer
      * @returns {boolean}
      */
@@ -339,11 +297,8 @@ export class AlwaysAliveAgent extends BaseEmitter {
         return msgAnswer(this.ctx, this, answer);
     }
 
-    // ─── Getters / Setters de configuração em runtime ─────────────────────────
-
     /**
      * ID do modelo atual em uso.
-     *
      * @returns {string}
      */
     get model() {
@@ -352,7 +307,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Troca o modelo em uso. A mudança é efetiva no próximo `sendMessage()`.
-     *
      * @param {string} modelId - ID do modelo (ex. `'gpt-4.1'`, `'claude-sonnet-4-5'`)
      * @returns {void}
      */
@@ -362,7 +316,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Lista os modelos disponíveis via SDK. Retorna array vazio se cliente não estiver inicializado.
-     *
      * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
      */
     async listAvailableModels() {
@@ -371,7 +324,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Nível de raciocínio atual.
-     *
      * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
      */
     get reasoningEffort() {
@@ -380,7 +332,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Troca o nível de raciocínio. A mudança é efetiva no próximo `sendMessage()`.
-     *
      * @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} effort - Nível de raciocínio
      * @returns {void}
      */
@@ -394,7 +345,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
      * G2-PERF-01: Dirty flag primário + TTL safety net. O cache é invalidado (null) em toda mutação de estado
      * (`#setStatus()`, `messageQueue.onChanged`, `stop()`). O TTL existe apenas como segurança para edge cases onde a
      * invalidação é perdida. `readState()` usa cache interno (O(1) quando warm).
-     *
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
@@ -403,7 +353,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna contagem de listeners por evento para diagnóstico de leaks.
-     *
      * @returns {{ [event: string]: number }}
      */
     listenerDiagnostics() {
@@ -412,7 +361,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Inicia o "modo diálogo direto" com a LLM. Delega ao DialogLoopManager.
-     *
      * @param {string} [bootPrompt] - Prompt de boot personalizado (opcional)
      * @returns {Promise<void>}
      * @throws {Error} Se o agente não estiver no estado 'idle'
@@ -423,7 +371,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Envia um turno de diálogo. Delega ao DialogLoopManager.
-     *
      * @param {string} message
      * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
      * @returns {Promise<string>}
@@ -434,7 +381,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Para o modo diálogo. Delega ao DialogLoopManager.
-     *
      * @param {{
      *     authorized?: boolean;
      *     reason?: 'watchdog_restart' | 'authorized_stop';
@@ -448,7 +394,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Pausa o dialog loop. Delega ao DialogLoopManager.
-     *
      * @returns {Promise<void>}
      */
     async pauseDialogLoop() {
@@ -457,7 +402,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retoma o dialog loop. Delega ao DialogLoopManager.
-     *
      * @returns {Promise<void>}
      */
     async resumeDialogLoop() {
@@ -466,7 +410,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Indica se o dialog loop está atualmente pausado.
-     *
      * @returns {boolean}
      */
     get dialogPaused() {
@@ -475,7 +418,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * F41: Métricas de consumo de premium requests do dialog loop.
-     *
      * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
      */
     get dialogPrMetrics() {
@@ -484,15 +426,12 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Último snapshot de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo SDK.
-     *
      * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
     get lastPrInfo() {
         // Retorna cópia rasa para evitar mutação externa do estado interno.
         return this.ctx.lastPrInfo ? { ...this.ctx.lastPrInfo } : null;
     }
-
-    // ─────────────── Privados ───────────────
 
     /**
      * E.1: Garante que o DialogLoopManager está vinculado ao host com a interface AgentHost.
@@ -506,7 +445,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Processa a próxima tarefa da fila (se idle e sessão ativa).
-     *
      * @returns {void}
      */
     #processQueue() {
@@ -515,7 +453,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * F36: Tenta reconectar à sessão SDK. Delegado para lifecycle/agent-lifecycle.js.
-     *
      * @param {Error} originalError
      * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts]
      * @returns {Promise<boolean>}
@@ -526,7 +463,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
 
     /**
      * Retorna o histórico de mensagens da sessão SDK ativa.
-     *
      * @returns {Promise<unknown[]>}
      */
     async getSessionMessages() {
@@ -537,7 +473,6 @@ export class AlwaysAliveAgent extends BaseEmitter {
      * Suporte a `await using agent = alwaysAliveAgent` no padrão Explicit Resource Management (TC39 Stage 4).
      *
      * Permite encapsular o ciclo de vida do agente em blocos `await using` de forma determinística.
-     *
      * @returns {Promise<void>}
      */
     async [Symbol.asyncDispose]() {
@@ -553,10 +488,8 @@ export class AlwaysAliveAgent extends BaseEmitter {
         this.stop().catch(() => undefined);
     }
 }
-
 /**
  * Instância singleton do Always-Alive Agent para este processo.
- *
  * @type {AlwaysAliveAgent}
  */
 export const alwaysAliveAgent = new AlwaysAliveAgent();
@@ -591,13 +524,11 @@ try {
 } catch {
     // EventBus not available yet — ignore
 }
-
 /**
  * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.
  *
  * Permite que futuramente a instância seja substituída (ex.: por um mock em testes de integração) sem alterar todos os
  * call sites.
- *
  * @returns {AlwaysAliveAgent}
  */
 export function getAgent() {

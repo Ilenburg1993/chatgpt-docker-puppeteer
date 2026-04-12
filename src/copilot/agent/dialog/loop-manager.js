@@ -1,18 +1,6 @@
 // @ts-check
 /**
  * src/copilot/agent/dialog/loop-manager.js
- *
- * DialogLoopManager — gerencia o ciclo de vida completo do dialog loop do agente.
- *
- * Extraído de always-alive.js para separação de concerns:
- *
- * - Mutex de serialização de turnos
- * - Backpressure da fila de dialog turns
- * - Watchdog de inatividade
- * - Protocolo READY/REPLY/DONE/STOPPED (via DialogProtocol)
- * - Pause/Resume zero-PR
- * - Fallback de modelo automático ao atingir quota/rate_limit
- *
  * @module copilot/agent/dialog/loop-manager
  * @see EventBus
  * @see module:copilot/always-alive
@@ -49,11 +37,7 @@ import { DialogWatchdog } from './watchdog.js';
  * @property {number} [watchdogStallMs] - Limiar de stall (default: 15min)
  * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por
  *   `scheduleFallback()`)
- */
-
-/**
  * Interface esperada do agente host (AlwaysAliveAgent) para interação bidirecional.
- *
  * @typedef {Object} AgentHost
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage - Envia mensagem ao SDK
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
@@ -67,7 +51,6 @@ import { DialogWatchdog } from './watchdog.js';
 
 /**
  * Gerenciador do dialog loop — encapsula mutex, watchdog, backpressure, pause/resume e protocolo READY/REPLY.
- *
  * @extends BaseEmitter
  */
 export class DialogLoopManager extends BaseEmitter {
@@ -139,7 +122,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Vincula o manager ao agente host. Deve ser chamado antes de startDialogLoop().
-     *
      * @param {AgentHost} host - Referência ao AlwaysAliveAgent
      */
     attach(host) {
@@ -170,7 +152,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Agenda o fallback de modelo para a próxima inicialização do loop.
-     *
      * @param {string} model - Modelo de fallback a usar
      */
     scheduleFallback(model) {
@@ -186,7 +167,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * F41B.8: Retorna métricas de PR consumidos pelo dialog loop (boots e resumes).
-     *
      * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }}
      */
     get prMetrics() {
@@ -211,7 +191,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Indica se o dialog loop está pausado (estado persistido em disco).
-     *
      * @returns {boolean}
      */
     get paused() {
@@ -220,7 +199,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Inicia o dialog loop. Boot com 1 PR — resolve quando o modelo emite READY.
-     *
      * @param {string} [bootPrompt] - Prompt de inicialização (default: DialogProtocol.buildBootPrompt())
      * @returns {Promise<void>}
      * @throws {SessionError} Se não vinculado a um host (NOT_ATTACHED) ou dialog loop já ativo (DIALOG_ALREADY_ACTIVE)
@@ -309,7 +287,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Envia um turno de diálogo. Chamadas concorrentes são serializadas via mutex.
-     *
      * @param {string} message
      * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
      * @returns {Promise<string>}
@@ -337,7 +314,6 @@ export class DialogLoopManager extends BaseEmitter {
      *
      * G2-ARCH-11: adiciona timeout de encerramento — se o turno em andamento não terminar em `shutdownTimeoutMs`
      * (default: 30 s), força desativação via `forceDeactivate()` para evitar espera indefinida.
-     *
      * @param {{
      *     authorized?: boolean;
      *     reason?: 'watchdog_restart' | 'authorized_stop';
@@ -392,7 +368,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Pausa o dialog loop sem encerrar o agentic turn. Zero-cost.
-     *
      * @param {string | null} sessionId
      * @returns {Promise<void>}
      */
@@ -412,7 +387,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Retoma o dialog loop após pause. Estratégia A (0 PR) ou B (1 PR).
-     *
      * @returns {Promise<void>}
      */
     async resume() {
@@ -491,7 +465,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * Processa input do SDK ask_user quando o dialog loop está ativo. Classifica o protocolo READY/REPLY/STOPPED.
-     *
      * @param {{ question: string }} input
      */
     handleProtocolInput({ question }) {
@@ -512,7 +485,6 @@ export class DialogLoopManager extends BaseEmitter {
 
     /**
      * F68.2: Encerra o span OTEL do dialog loop.
-     *
      * @param {boolean} success - Se o loop encerrou com sucesso (stop) ou forçadamente.
      */
     #endLoopSpan(success) {
@@ -545,7 +517,6 @@ export class DialogLoopManager extends BaseEmitter {
     /**
      * F31.3/F31.4: Compaction proativa baseada em token utilization. Emite `compaction.requested` quando ratio atinge
      * 90% (proativa) ou 95% (urgente). O AlwaysAliveAgent deve ouvir este evento e acionar compaction via SDK.
-     *
      * @param {{ currentTokens: number; tokenLimit: number; ratio: number }} budget
      */
     handleTokenBudget({ currentTokens, tokenLimit, ratio }) {
@@ -574,11 +545,8 @@ export class DialogLoopManager extends BaseEmitter {
         this.#compactionRequested = false;
     }
 
-    // ────────────── Privado ──────────────
-
     /**
      * Executa um turno serializado.
-     *
      * @param {string} message
      * @param {{ timeout: number; signal?: AbortSignal }} opts
      * @returns {Promise<string>}

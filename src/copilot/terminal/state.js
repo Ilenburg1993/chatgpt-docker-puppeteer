@@ -1,20 +1,6 @@
 // @ts-check
 /**
  * src/copilot/terminal/state.js
- *
- * Estado global compartilhado do Terminal Permanente LLM-B.
- *
- * Centraliza as variáveis mutáveis que precisam ser acessadas por dialog.js, server.js e repl.js sem depender de
- * closures no terminal-server.js monolítico.
- *
- * **F1 (Fase 2)**: expõe `stateEmitter` (EventEmitter) para observabilidade reativa. Emite eventos ao mudar campos
- * críticos, permitindo que consumidores reajam sem polling.
- *
- * Eventos emitidos:
- *
- * - `'hubSessionId:changed'` `(newId: string | null, prevId: string | null)` — ao mudar a hub session
- * - `'busy:changed'` `(busy: boolean)` — ao mudar o estado de ocupação do terminal
- *
  * @module copilot/terminal/state
  * @see EventBus
  */
@@ -31,7 +17,7 @@ import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSess
 import { createEmitter } from '#copilot/core';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
-// ─── Emitter reativo ──────────────────────────────────────────────────────────
+// ─── Emitter reativo ─────────────────────────────────────────────────────────
 
 /**
  * EventEmitter singleton para observar mudanças de estado do terminal.
@@ -55,7 +41,7 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
     SHOW_STREAMING_CHANGED: 'showStreaming:changed',
 });
 
-// ─── Estado compartilhado ─────────────────────────────────────────────────────
+// ─── Estado compartilhado ────────────────────────────────────────────────────
 
 // _hubSessionId é gerenciado em core/shared-state.js para permitir leitura por
 // módulos de camadas inferiores (ex: agent/) sem criar dependência de terminal/.
@@ -95,7 +81,7 @@ const _sseCriticalClients = new Set();
  */
 const _terminalReplayBuffer = new SseReplayBuffer();
 
-// ─── Getters / setters ────────────────────────────────────────────────────────
+// ─── Getters / setters ───────────────────────────────────────────────────────
 
 /** @returns {string | null} */
 export function getHubSessionId() {
@@ -155,7 +141,7 @@ export function getTerminalReplayBuffer() {
     return _terminalReplayBuffer;
 }
 
-// ─── Attachment queue ─────────────────────────────────────────────────────────
+// ─── Attachment queue ────────────────────────────────────────────────────────
 
 /** @returns {string[]} Cópia defensiva da fila de arquivos. */
 export function getAttachmentQueue() {
@@ -183,7 +169,7 @@ export function clearAttachments() {
     _attachmentQueue = [];
 }
 
-// ─── Plan mode ────────────────────────────────────────────────────────────────
+// ─── Plan mode ───────────────────────────────────────────────────────────────
 
 /** @returns {boolean} */
 export function getPlanMode() {
@@ -195,7 +181,7 @@ export function setPlanMode(value) {
     _planMode = value;
 }
 
-// ─── Thinking display (F18.2) ─────────────────────────────────────────────────
+// ─── Thinking display (F18.2) ────────────────────────────────────────────────
 
 /**
  * F18.2: Flag para exibir reasoning/thinking da LLM-B em tempo real no stdout. Controlável via comando `/thinking` e
@@ -216,7 +202,7 @@ export function setShowThinking(value) {
     stateEmitter.emit(TERMINAL_EVENTS.SHOW_THINKING_CHANGED, value);
 }
 
-// ─── Usage display (F20.2) ────────────────────────────────────────────────────
+// ─── Usage display (F20.2) ───────────────────────────────────────────────────
 
 /**
  * F20.2: Flag para exibir usage summary (tokens, custo) após cada turno. Controlável via comando `/usage` e variável de
@@ -300,7 +286,7 @@ export function getInjectHistory(n = 50) {
     return _injectHistory.slice(-limit);
 }
 
-// ─── K-6: Terminal State Machine ──────────────────────────────────────────────
+// ─── K-6: Terminal State Machine ─────────────────────────────────────────────
 
 /**
  * Fases do terminal (state machine formal).

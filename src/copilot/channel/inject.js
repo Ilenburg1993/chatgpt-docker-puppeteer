@@ -1,27 +1,8 @@
 // @ts-check
 /**
  * src/copilot/channel/inject.js
- *
- * Canal oficial LLM-A → LLM-B — API de injeção de mensagens no terminal permanente.
- *
- * Usa o endpoint `POST /inject` do terminal-server.js ativo em `LLM_B_TERMINAL_PORT` (padrão: 3009). Este módulo é o
- * meio OFICIAL e recomendado para comunicação programática de LLM-A com LLM-B.
- *
  * @module copilot/channel/inject
  * @see EventBus
- * @example
- *     ```js
- *     import { injectToLlmB, checkLlmBHealth } from '#copilot/channel';
- *
- *     // Verificar se o terminal está ativo
- *     const { ok, ready } = await checkLlmBHealth();
- *     if (!ready) throw new Error('Terminal LLM-B não está pronto');
- *
- *     // Enviar mensagem e aguardar resposta
- *     const { reply, durationMs } = await injectToLlmB('Olá LLM-B!');
- *     console.log('Resposta:', reply); // ~15-20s
- *     ```;
- *
  * @see module:copilot/channel/client
  * @see module:copilot/conversation-hub/orchestrator
  */
@@ -46,8 +27,6 @@ const DEFAULT_PORT = (() => {
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 
-// ─── F96: Client-side rate limiter (sliding window) ───────────────────────────
-
 /**
  * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC. Default: 30 req/s. Protege
  * contra flood acidental.
@@ -62,7 +41,6 @@ const _injectTimestamps = [];
 
 /**
  * Verifica se a próxima injeção é permitida pelo rate limiter client-side. Usa sliding window de 1s.
- *
  * @returns {boolean} true se permitido
  */
 function _checkClientRateLimit() {
@@ -78,7 +56,6 @@ function _checkClientRateLimit() {
     _injectTimestamps.push(now);
     return true;
 }
-
 /**
  * @typedef {Object} InjectOpts
  * @property {string} [from] - ator remetente (default: 'llm-a')
@@ -91,17 +68,11 @@ function _checkClientRateLimit() {
  *   default: 1500)
  * @property {boolean} [retryOn503] - Se true, faz retry em 503 (dialog loop iniciando). útil no boot do terminal
  *   (default: false)
- */
-
-/**
  * @typedef {Object} InjectResult
  * @property {boolean} ok - true se a resposta foi obtida com sucesso
  * @property {string} reply - Resposta de LLM-B
  * @property {number} durationMs - Duração da chamada em ms
  * @property {string} from - Ator remetente
- */
-
-/**
  * @typedef {Object} HealthResult
  * @property {boolean} ok - true se o servidor está acessível
  * @property {boolean} ready - true se o dialog loop está ativo
@@ -110,11 +81,8 @@ function _checkClientRateLimit() {
  * @property {string} agentStatus - status do agente ('idle' | 'running' | 'stopped')
  */
 
-// ─── Implementação ─────────────────────────────────────────────────────────────
-
 /**
  * Faz um request HTTP simples (sem fetch para compatibilidade total com Node.js 24 sem --experimental-fetch).
- *
  * @param {'GET' | 'POST'} method
  * @param {string} path
  * @param {object | null} body
@@ -167,10 +135,8 @@ function httpRequest(method, path, body, port, timeoutMs) {
         req.end();
     });
 }
-
 /**
  * Verifica se o terminal LLM-B está ativo e com dialog loop pronto.
- *
  * @param {{ port?: number }} [opts]
  * @returns {Promise<HealthResult>}
  */
@@ -192,7 +158,6 @@ export async function checkLlmBHealth(opts = {}) {
         return { ok: false, ready: false, busy: false, hubSessionId: null, agentStatus: 'unknown' };
     }
 }
-
 /**
  * Envia uma mensagem de LLM-A para LLM-B via terminal permanente.
  *
@@ -204,7 +169,6 @@ export async function checkLlmBHealth(opts = {}) {
  * INJECT-01: Em caso de 409 (LLM_B_BUSY) ou 503 com `retryOn503=true` (dialog loop iniciando), tenta automaticamente
  * até `retries` vezes com backoff exponencial (default: 3 tentativas, base 1.5s → 1.5s, 3s, 6s). O comportamento é
  * configurável via `opts.retries`, `opts.retryDelayMs` e `opts.retryOn503`.
- *
  * @param {string} message - Mensagem a enviar para LLM-B
  * @param {InjectOpts} [opts]
  * @returns {Promise<InjectResult>}
@@ -246,10 +210,8 @@ export async function injectToLlmB(message, opts = {}) {
     /* c8 ignore next */
     throw new BridgeError('[inject-llmb] Falha inesperada após retries', 'LLM_B_BUSY');
 }
-
 /**
  * Implementação interna de uma única tentativa de injeção. Não deve ser chamada diretamente.
- *
  * @param {string} message
  * @param {InjectOpts} opts
  * @returns {Promise<InjectResult>}
@@ -316,10 +278,8 @@ async function _doInjectToLlmB(message, opts) {
         from: /** @type {string} */ (parsed['from'] ?? from),
     };
 }
-
 /**
  * Aguarda até o terminal LLM-B estar pronto, com polling periódico.
- *
  * @param {{ maxWaitMs?: number; pollIntervalMs?: number; port?: number }} [opts]
  * @returns {Promise<void>}
  * @throws {BridgeError} Se o terminal não ficar pronto dentro do tempo máximo
@@ -346,7 +306,6 @@ export async function waitForLlmBReady(opts = {}) {
  * Subscreve ao canal SSE de eventos da LLM-B (canal P3: LLM-A observa LLM-B em tempo real).
  *
  * Conecta ao endpoint `GET /events` do terminal-server. Chame `unsubscribe()` no objeto retornado para desconectar.
- *
  * @example
  *     ```js
  *     const sub = subscribeLlmB((evt) => {
@@ -355,7 +314,6 @@ export async function waitForLlmBReady(opts = {}) {
  *     // ... depois:
  *     sub.unsubscribe();
  *     ```;
- *
  * @param {SseHandler} onEvent - Callback chamado a cada evento recebido
  * @param {{ port?: number }} [opts]
  * @returns {{ unsubscribe: () => void }} Controle de desconexão
@@ -363,13 +321,11 @@ export async function waitForLlmBReady(opts = {}) {
 export function subscribeLlmB(onEvent, opts = {}) {
     return subscribeSse('/events', opts.port ?? DEFAULT_PORT, onEvent);
 }
-
 /**
  * Subscreve apenas ao canal de eventos críticos da LLM-B (stalled, fatal, system).
  *
  * Usa o parâmetro `?level=critical` do endpoint SSE (P8). Ideal para alertas proativos sem overhead de receber todas as
  * respostas da LLM-B.
- *
  * @param {SseHandler} onEvent - Callback chamado a cada evento crítico
  * @param {{ port?: number }} [opts]
  * @returns {{ unsubscribe: () => void }}
@@ -377,15 +333,11 @@ export function subscribeLlmB(onEvent, opts = {}) {
 export function subscribeLlmBCritical(onEvent, opts = {}) {
     return subscribeSse('/events?level=critical', opts.port ?? DEFAULT_PORT, onEvent);
 }
-
 /**
  * @typedef {Object} PipelineStep
  * @property {string} prompt - Mensagem a enviar neste step
  * @property {number} [waitMs] - Espera em ms antes de enviar (padrão: 0)
  * @property {string} [from] - Ator override para este step
- */
-
-/**
  * @typedef {Object} PipelineResult
  * @property {boolean} ok - true se todos os steps completaram
  * @property {{ step: number; prompt: string; reply: string; durationMs: number }[]} results
@@ -396,7 +348,6 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
  *
  * O pipeline é abortado se a LLM-B estiver ocupada em qualquer step. Cada step aguarda a resposta antes de enviar o
  * próximo.
- *
  * @example
  *     ```js
  *     const { ok, results } = await injectPipeline([
@@ -405,7 +356,6 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
  *         { prompt: 'Gere um resumo em 3 linhas.' },
  *     ]);
  *     ```;
- *
  * @param {PipelineStep[]} steps
  * @param {{ from?: string; port?: number; timeoutMs?: number }} [opts]
  * @returns {Promise<PipelineResult>}

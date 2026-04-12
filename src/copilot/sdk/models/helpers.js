@@ -1,14 +1,6 @@
 // @ts-check
 /**
  * src/copilot/lib/models.js
- *
- * Helpers para listagem, roteamento e configuração de modelos do Copilot SDK. Fornece utilitários para selecionar
- * modelos compatíveis, verificar suporte a reasoningEffort e construir opções de sessão model-aware.
- *
- * Uso típico: import { listModels, pickModel, buildReasoningConfig } from '#copilot/sdk/models'; const models = await
- * listModels(client); const best = pickModel(models, { vision: true }); const opts =
- * buildReasoningConfig('claude-sonnet-4-5', 'high');
- *
  * @module copilot/lib/models
  * @see EventBus
  */
@@ -45,7 +37,7 @@ export function clearModelsCache() {
     _modelsCache = null;
 }
 
-// ─── Listagem e filtragem ─────────────────────────────────────────────────────
+// ─── Listagem e filtragem ────────────────────────────────────────────────────
 
 /**
  * Lista todos os modelos disponíveis usando o cliente SDK ativo.
@@ -106,7 +98,7 @@ export function filterVisionModels(models) {
     return models.filter((m) => m.capabilities.supports.vision);
 }
 
-// ─── Seleção e roteamento ─────────────────────────────────────────────────────
+// ─── Seleção e roteamento ────────────────────────────────────────────────────
 
 /**
  * Seleciona o primeiro modelo habilitado que atende aos critérios de capacidade. Retorna o modelo preferido ou
@@ -215,7 +207,7 @@ export function buildReasoningConfig(models, modelId, effort) {
     return { model: modelId, reasoningEffort: effort };
 }
 
-// ─── Informações de modelo ────────────────────────────────────────────────────
+// ─── Informações de modelo ───────────────────────────────────────────────────
 
 /**
  * Retorna informações de capacidade de um modelo pelo ID. Retorna `undefined` se o modelo não for encontrado.
@@ -254,7 +246,7 @@ export function getContextWindowSize(models, modelId) {
     return getModelById(models, modelId)?.capabilities.limits.max_context_window_tokens;
 }
 
-// ─── Faixa 14: Capability helpers adicionais ──────────────────────────────────
+// ─── Faixa 14: Capability helpers adicionais ─────────────────────────────────
 
 /**
  * Verifica se um modelo suporta vision (imagens).
