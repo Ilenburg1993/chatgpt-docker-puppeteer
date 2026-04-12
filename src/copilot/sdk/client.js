@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/lib/sdk-client.js
+ *
  * @module copilot/lib/sdk-client
  * @see EventBus
  * @see module:copilot/lib/session
@@ -18,6 +19,7 @@ export { CopilotClient };
 /**
  * Circuit breaker para operações de conexão ao SDK CLI. Protege contra retry storm em caso de CLI indisponível ou erro
  * de rede.
+ *
  * @type {CircuitBreaker}
  */
 export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', {
@@ -28,21 +30,33 @@ export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', 
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').SessionMetadata} SessionMetadata
+ *
  * @typedef {import('@github/copilot-sdk').SessionListFilter} SessionListFilter
+ *
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
+ *
  * @typedef {import('@github/copilot-sdk').GetStatusResponse} GetStatusResponse
+ *
  * @typedef {import('@github/copilot-sdk').GetAuthStatusResponse} GetAuthStatusResponse
+ *
  * @typedef {import('@github/copilot-sdk').ConnectionState} ConnectionState
+ *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
+ *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleHandler} SessionLifecycleHandler
+ *
  * @typedef {Object} SessionEntry
  * @property {CopilotSession} session - Sessão ativa
  * @property {string} model - Modelo utilizado
  * @property {number} createdAt - Timestamp de criação local (ms)
  * @property {number} messagesCount - Total de mensagens enviadas
+ *
  * @typedef {Object} ClientState
  * @property {CopilotClient | null} client - Instância do client ou null
  * @property {boolean} starting - Se está em processo de inicialização
@@ -67,6 +81,7 @@ const _sessions = new Map();
  * - O SDK conecta ao processo CLI existente em vez de fazer spawn de um novo.
  * - Reinicializações do processo SDK não consomem PRs adicionais.
  * - O CLI mantém a sessão viva entre reinicializações do Node.js.
+ *
  * @param {Partial<CopilotClientOptions>} [overrides] - Opções adicionais para sobrescrever
  * @returns {Partial<CopilotClientOptions>}
  */
@@ -97,6 +112,7 @@ export function buildClientOptions(overrides = {}) {
  * Retorna (ou cria) a instância singleton de CopilotClient já conectada.
  *
  * Se `COPILOT_CLI_URL` estiver definida, conecta ao CLI externo em vez de fazer spawn.
+ *
  * @param {Partial<CopilotClientOptions>} [overrides] - Opções adicionais (ex: cliPath, logLevel)
  * @returns {Promise<CopilotClient>}
  */
@@ -128,6 +144,7 @@ export async function getClient(overrides = {}) {
 }
 /**
  * Para o cliente graciosamente e limpa todas as sessões do registry.
+ *
  * @returns {Promise<Error[]>} Array de erros encontrados durante cleanup (vazio = sucesso total)
  */
 export async function stopClient() {
@@ -143,6 +160,7 @@ export async function stopClient() {
 }
 /**
  * Para o cliente de forma forçada (sem cleanup gracioso). Use apenas em emergências.
+ *
  * @returns {Promise<void>}
  */
 export async function forceStopClient() {
@@ -164,6 +182,7 @@ export async function forceStopClient() {
 }
 /**
  * Estado atual da conexão do client.
+ *
  * @returns {ConnectionState | 'not_started'}
  */
 export function getClientState() {
@@ -171,6 +190,7 @@ export function getClientState() {
 }
 /**
  * Executa ping no CLI para verificar conectividade.
+ *
  * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
  */
 export async function pingClient() {
@@ -179,6 +199,7 @@ export async function pingClient() {
 }
 /**
  * Retorna o status do CLI incluindo versão e informações de protocolo.
+ *
  * @returns {Promise<GetStatusResponse>}
  */
 export async function getClientStatus() {
@@ -187,6 +208,7 @@ export async function getClientStatus() {
 }
 /**
  * Retorna o status de autenticação GitHub do CLI.
+ *
  * @returns {Promise<GetAuthStatusResponse>}
  */
 export async function getAuthStatus() {
@@ -195,6 +217,7 @@ export async function getAuthStatus() {
 }
 /**
  * Lista todos os modelos disponíveis no CLI.
+ *
  * @returns {Promise<ModelInfo[]>}
  */
 export async function listAvailableModels() {
@@ -203,6 +226,7 @@ export async function listAvailableModels() {
 }
 /**
  * Cria uma nova sessão no CopilotClient e registra no registry em memória.
+ *
  * @param {SessionConfig} config - Configuração completa da sessão
  * @returns {Promise<CopilotSession>}
  */
@@ -221,6 +245,7 @@ export async function createClientSession(config) {
 /**
  * Retoma uma sessão existente e registra no registry em memória. Se a sessão já está ativa no registry, retorna a
  * existente sem nova conexão.
+ *
  * @param {string} sessionId - ID da sessão a retomar
  * @param {ResumeSessionConfig} config - Configuração de retomada
  * @returns {Promise<CopilotSession>}
@@ -245,6 +270,7 @@ export async function resumeClientSession(sessionId, config) {
 }
 /**
  * Desconecta uma sessão ativa e remove do registry.
+ *
  * @param {string} sessionId - ID da sessão a desconectar
  * @returns {Promise<void>}
  */
@@ -264,6 +290,7 @@ export async function disconnectClientSession(sessionId) {
 }
 /**
  * Deleta permanentemente uma sessão do disco do CLI (irreversível).
+ *
  * @param {string} sessionId - ID da sessão a deletar
  * @returns {Promise<void>}
  */
@@ -285,6 +312,7 @@ export async function deleteClientSession(sessionId) {
 }
 /**
  * Retorna a entrada de sessão ativa de um ID (somente registry em memória).
+ *
  * @param {string} sessionId
  * @returns {SessionEntry | undefined}
  */
@@ -293,6 +321,7 @@ export function getClientSession(sessionId) {
 }
 /**
  * Retorna todas as entradas de sessão ativas no registry em memória.
+ *
  * @returns {({ sessionId: string } & SessionEntry)[]}
  */
 export function listActiveClientSessions() {
@@ -303,6 +332,7 @@ export function listActiveClientSessions() {
 }
 /**
  * Lista todas as sessões salvas no disco do CLI (pode incluir sessões inativas).
+ *
  * @param {SessionListFilter} [filter] - Filtro opcional por repositório, etc.
  * @returns {Promise<SessionMetadata[]>}
  */
@@ -312,6 +342,7 @@ export async function listAllClientSessions(filter) {
 }
 /**
  * Incrementa o contador de mensagens enviadas de uma sessão no registry.
+ *
  * @param {string} sessionId
  * @returns {number} O novo total de mensagens (ou 0 se sessao nao encontrada)
  */
@@ -325,6 +356,7 @@ export function incrementSessionMessageCount(sessionId) {
 }
 /**
  * Retorna o número de sessões ativas no registry em memória.
+ *
  * @returns {number}
  */
 export function getActiveSessionCount() {
@@ -332,6 +364,7 @@ export function getActiveSessionCount() {
 }
 /**
  * Reseta o estado interno do módulo. **Apenas para uso em testes**.
+ *
  * @returns {void}
  */
 export function _resetClientState() {
@@ -341,6 +374,7 @@ export function _resetClientState() {
 }
 /**
  * Injeta um client mock para testes. **Apenas para uso em testes**.
+ *
  * @param {CopilotClient} mockClient
  * @returns {void}
  */

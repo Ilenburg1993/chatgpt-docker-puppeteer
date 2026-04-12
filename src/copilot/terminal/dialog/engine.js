@@ -1,14 +1,14 @@
 // @ts-check
 /**
  * src/copilot/terminal/dialog/engine.js
+ *
  * @module copilot/terminal/dialog/engine
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
 import { emitNerv } from '#copilot/bridges';
-import { llmBridgeClient } from '#copilot/services';
 import { log } from '#copilot/observability';
+import { alwaysAliveAgent, llmBridgeClient } from '#copilot/services';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,
@@ -47,6 +47,7 @@ let _turnQueueDepth = 0;
 
 /**
  * Retorna a profundidade atual da fila de turnos.
+ *
  * @returns {number}
  */
 export function getTurnQueueDepth() {
@@ -59,6 +60,7 @@ let _ensureDialogLoopInFlight = null;
 
 /**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
+ *
  * @returns {Promise<void>}
  */
 export function ensureDialogLoop() {
@@ -80,6 +82,7 @@ export function ensureDialogLoop() {
 
 /**
  * Implementação interna de ensureDialogLoop com retry.
+ *
  * @returns {Promise<void>}
  */
 async function _doEnsureDialogLoop() {
@@ -113,6 +116,7 @@ async function _doEnsureDialogLoop() {
 
 /**
  * Tenta iniciar o dialog loop uma vez.
+ *
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
@@ -165,6 +169,7 @@ async function _tryStartDialogLoop() {
 
 /**
  * Envia um turno de diálogo para a LLM-B e exibe a resposta.
+ *
  * @param {string} message - Mensagem a enviar
  * @param {string} [actor] - Quem está enviando ('user' | 'llm-a')
  * @returns {Promise<string | null>}
@@ -195,6 +200,7 @@ export function sendTurn(message, actor = 'user') {
 
 /**
  * Implementação interna do turno.
+ *
  * @param {string} message
  * @param {string} actor
  * @returns {Promise<string | null>}

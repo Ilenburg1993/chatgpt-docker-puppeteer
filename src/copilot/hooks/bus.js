@@ -12,8 +12,8 @@
  * @see module:copilot/hooks/factory
  */
 
-import { log } from '#copilot/observability';
 import { BaseEmitter } from '#copilot/core';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('./types.js').HookBusEvent} HookBusEvent

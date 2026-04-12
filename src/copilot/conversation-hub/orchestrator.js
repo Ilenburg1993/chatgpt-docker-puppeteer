@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/conversation-hub/orchestrator.js
+ *
  * @module copilot/conversation-hub/orchestrator
  * @see EventBus
  * @see module:copilot/conversation-hub/store
@@ -34,6 +35,7 @@ let _fallbackAgent = null;
 /**
  * Injeta o AlwaysAliveAgent como fallback global. Chamado em `bootstrapTools()` após o agent ser instanciado. Evita
  * import circular.
+ *
  * @param {AgentLike} agent
  * @returns {void}
  */
@@ -46,6 +48,7 @@ export function setFallbackAgent(agent) {
  * @property {number} [timeoutMs] - Timeout para a resposta (default: 120000)
  * @property {string} [model] - Modelo a registrar no turn (default: 'gpt-4.1')
  * @property {object} [structuredInput] - Campos extras para chatStructured() (context, intent, etc.)
+ *
  * @typedef {Object} OrchestratorResult
  * @property {number} turnId - ID do turn registrado no ConversationStore
  * @property {string} content - Resposta completa de LLM-B
@@ -67,6 +70,7 @@ export function setFallbackAgent(agent) {
  * - `session:created` { hubSessionId, title }
  * - `session:closed` { hubSessionId }
  * - `error` { hubSessionId, message, error }
+ *
  * @extends {BaseEmitter}
  */
 export class HubOrchestrator extends BaseEmitter {
@@ -87,6 +91,7 @@ export class HubOrchestrator extends BaseEmitter {
     /**
      * Mutex por sessão: garante que apenas um sendToLlmB() executa por vez por hubSessionId. Cada entry é a cauda da
      * cadeia de Promises — novo sendToLlmB() encadeia via .then().
+     *
      * @type {Map<string, Promise<void>>}
      */
     #inflightBySession = new Map();
@@ -94,6 +99,7 @@ export class HubOrchestrator extends BaseEmitter {
     /**
      * F6.5 (BUG-MOD-09): sessões já encerradas — previne re-inserção zumbi em #inflightBySession após closeSession()
      * ser chamado durante uma Promise em voo.
+     *
      * @type {Set<string>}
      */
     #closedSessions = new Set();
@@ -113,6 +119,7 @@ export class HubOrchestrator extends BaseEmitter {
     /**
      * Inicializa o orquestrador criando o LlmBridgeClient. Restaura turn counters das sessões ativas da DB para
      * garantir continuidade após restart.
+     *
      * @param {LlmBridgeClient} [bridgeOverride] - Bridge a usar em vez de criar uma nova instância (útil em testes).
      * @returns {void}
      */
@@ -139,6 +146,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Para o orquestrador e limpa recursos.
+     *
      * @returns {void}
      */
     destroy() {
@@ -152,6 +160,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Cria uma nova hub_session persistente.
+     *
      * @param {{ title?: string; metadata?: object }} [opts]
      * @returns {string} ID da hub_session criada
      */
@@ -182,6 +191,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Encerra uma hub_session.
+     *
      * @param {string} hubSessionId
      * @returns {void}
      */
@@ -212,6 +222,7 @@ export class HubOrchestrator extends BaseEmitter {
      * SERIALIZAÇÃO: chamadas concorrentes para a mesma hubSessionId são automaticamente enfileiradas via
      * #inflightBySession — nunca executam em paralelo. Isso previne race conditions no sendDialogTurn() e na escrita de
      * turns em SQLite.
+     *
      * @param {string} hubSessionId
      * @param {string | object} message - Texto da mensagem ou StructuredMessageInput
      * @param {SendToLlmBOpts} [opts]
@@ -259,6 +270,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Implementação interna de sendToLlmB — executada de forma serializada pelo mutex.
+     *
      * @param {string} hubSessionId
      * @param {string | object} message
      * @param {SendToLlmBOpts} opts
@@ -278,6 +290,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Injeta uma mensagem do usuário na hub_session. LLM-A pode posteriormente chamá-la via pollUserMessages().
+     *
      * @param {string} hubSessionId
      * @param {string} content
      * @param {{ metadata?: object }} [opts]
@@ -306,6 +319,7 @@ export class HubOrchestrator extends BaseEmitter {
     /**
      * Retorna as mensagens do usuário ainda não processadas por LLM-A. Marca automaticamente as mensagens como lidas
      * após retorná-las.
+     *
      * @param {string} hubSessionId
      * @returns {import('./store.js').ConversationTurn[]}
      */
@@ -324,6 +338,7 @@ export class HubOrchestrator extends BaseEmitter {
      * digitadas diretamente no terminal.
      *
      * Não re-persiste turnos — apenas emite os eventos com os IDs já gravados.
+     *
      * @param {string} hubSessionId
      * @param {{ turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string }} userTurn
      * @param {{ turnId: number; content: string; turnNumber: number; durationMs: number }} llmBTurn
@@ -356,6 +371,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Lê o histórico de turns de uma hub_session.
+     *
      * @param {string} hubSessionId
      * @param {import('./store-helpers.js').ReadTurnsOpts} [opts]
      * @returns {import('./store.js').ConversationTurn[]}
@@ -366,6 +382,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Lista as hub_sessions disponíveis.
+     *
      * @param {{ limit?: number; offset?: number; status?: import('./store-helpers.js').HubSessionStatus }} [opts]
      * @returns {import('./store.js').HubSession[]}
      */
@@ -375,6 +392,7 @@ export class HubOrchestrator extends BaseEmitter {
 
     /**
      * Obtém o sdkSessionId ativo do AlwaysAliveAgent.
+     *
      * @returns {string | undefined}
      */
     #getActiveSdkSessionId() {

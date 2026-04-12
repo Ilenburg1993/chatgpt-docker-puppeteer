@@ -15,8 +15,8 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { BaseEmitter } from '#copilot/core';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {Object} HandoffRequest

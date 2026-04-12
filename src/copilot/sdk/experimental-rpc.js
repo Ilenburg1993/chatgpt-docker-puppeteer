@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/sdk/experimental-rpc.js
+ *
  * @module copilot/sdk/experimental-rpc
  * @see EventBus
  * @see module:copilot/sdk/feature-flags

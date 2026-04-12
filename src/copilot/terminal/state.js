@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/terminal/state.js
+ *
  * @module copilot/terminal/state
  * @see EventBus
  */
@@ -13,8 +14,12 @@ import {
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
-import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
-import { createEmitter } from '#copilot/core';
+import {
+    CopilotError,
+    getHubSessionId as _getCoreHubSessionId,
+    createEmitter,
+    setSharedHubSessionId,
+} from '#copilot/core';
 import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
 
 // ─── Emitter reativo ─────────────────────────────────────────────────────────

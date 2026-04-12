@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/core/structured-message.js
+ *
  * @module copilot/core/structured-message
  * @see EventBus
  */
