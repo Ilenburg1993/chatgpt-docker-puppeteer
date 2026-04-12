@@ -729,30 +729,42 @@ async function bootstrap(options = {}) {
             log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
-        // Montagem opcional do copilotNervBridge (Upgrade 5) — conecta AlwaysAliveAgent ao NERV
+        // FAIXA-L13: NervEventBusAdapter — único relay EventBus ↔ NERV (substitui nerv-bridge legado)
         if (process.env.COPILOT_SDK_ENABLED !== 'false') {
             try {
-                const { copilotNervBridge, registerNervBridgeAgent } = await import('#copilot/bridges/nerv-bridge');
-                const { alwaysAliveAgent: _bridgeAgent } = await import('#copilot/agent/always-alive');
-                registerNervBridgeAgent(_bridgeAgent);
-                copilotNervBridge.mount(/** @type {any} */ (nerv));
-                log('INFO', '[COPILOT] copilotNervBridge montado — eventos do AlwaysAliveAgent fluem para NERV');
+                const { nervEventBusAdapter } = await import('#copilot/bridges/nerv-event-bus-adapter');
+                const { container, EVENT_BUS } = await import('#copilot/core');
+                const eventBus = container.resolve(EVENT_BUS);
+                if (eventBus) {
+                    nervEventBusAdapter.mount(eventBus, /** @type {any} */ (nerv));
+                    log('INFO', '[COPILOT] NervEventBusAdapter montado — EventBus ↔ NERV (FAIXA-L13)');
 
-                // FAIXA-L3: NervEventBusAdapter — relay EventBus centralizado → NERV (coexiste com nerv-bridge legado)
-                try {
-                    const { nervEventBusAdapter } = await import('#copilot/bridges/nerv-event-bus-adapter');
-                    const { container, EVENT_BUS } = await import('#copilot/core');
-                    const eventBus = container.resolve(EVENT_BUS);
-                    if (eventBus) {
-                        nervEventBusAdapter.mount(eventBus, /** @type {any} */ (nerv));
-                        log('INFO', '[COPILOT] NervEventBusAdapter montado — EventBus centralizado → NERV');
-                    }
-                } catch (/** @type {any} */ adapterErr) {
-                    log('WARN', `[COPILOT] Falha ao montar NervEventBusAdapter: ${adapterErr?.message}`);
+                    // Inbound commands: NERV → EventBus → Agent
+                    const { NERV_COMMAND_SEND_MESSAGE, NERV_COMMAND_PAUSE, NERV_COMMAND_RESUME, NERV_COMMAND_RESTART } =
+                        await import('#copilot/events');
+                    const { alwaysAliveAgent } = await import('#copilot/agent/always-alive');
+                    eventBus.on(NERV_COMMAND_SEND_MESSAGE, (/** @type {any} */ evt) => {
+                        const msg = evt?.message;
+                        if (typeof msg === 'string' && msg.trim()) {
+                            void alwaysAliveAgent.sendMessage(msg, evt?.options ?? {});
+                        }
+                    });
+                    eventBus.on(NERV_COMMAND_PAUSE, () => {
+                        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function') void alwaysAliveAgent.pauseDialogLoop();
+                    });
+                    eventBus.on(NERV_COMMAND_RESUME, () => {
+                        if (typeof alwaysAliveAgent.resumeDialogLoop === 'function')
+                            void alwaysAliveAgent.resumeDialogLoop();
+                    });
+                    eventBus.on(NERV_COMMAND_RESTART, async () => {
+                        await alwaysAliveAgent.stop();
+                        await alwaysAliveAgent.start();
+                    });
+                    log('INFO', '[COPILOT] Inbound NERV commands registrados via EventBus');
                 }
             } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);
-                log('WARN', `[COPILOT] Falha ao montar copilotNervBridge: ${_e.message}`);
+                log('WARN', `[COPILOT] Falha ao montar NervEventBusAdapter: ${_e.message}`);
             }
 
             // ConversationHub — ambiente permanente LLM-A ↔ LLM-B ↔ Usuário (Sprint Hub)

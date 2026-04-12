@@ -4,8 +4,8 @@
  *
  * FAIXA-L6 — Middleware que valida estrutura mínima de eventos.
  *
- * Garante que todo evento que passe pelo pipeline tenha `type` (string)
- * e `timestamp` (number). Eventos inválidos são logados e bloqueados.
+ * Garante que todo evento que passe pelo pipeline tenha `type` (string) e `timestamp` (number). Eventos inválidos são
+ * logados e bloqueados.
  *
  * @module copilot/events/middleware/schema-validator
  */

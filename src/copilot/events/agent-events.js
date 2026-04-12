@@ -23,14 +23,14 @@ export const AGENT_SHUTDOWN = 'agent:shutdown';
 /** @readonly */
 export const AGENT_ERROR = 'agent:error';
 /** @readonly */
-export const AGENT_EMITTER_ERROR = 'agent:emitter.error';
+export const AGENT_EMITTER_ERROR = 'agent:emitter:error';
 
 // ─── Agent session ────────────────────────────────────────────────────────────
 
 /** @readonly */
 export const AGENT_SESSION_KEEPALIVE = 'agent:session:keepalive';
 /** @readonly */
-export const AGENT_SESSION_FATAL = 'agent:session.fatal';
+export const AGENT_SESSION_FATAL = 'agent:session:fatal';
 
 // ─── Agent task ───────────────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ export const AGENT_TASK_STARTED = 'agent:task:started';
 /** @readonly */
 export const AGENT_TASK_DELTA = 'agent:task:delta';
 /** @readonly */
-export const AGENT_TASK_ERROR = 'agent:task.error';
+export const AGENT_TASK_ERROR = 'agent:task:error';
 /** @readonly */
 export const AGENT_TASK_COMPLETED = 'agent:task:completed';
 /** @readonly */
@@ -52,7 +52,7 @@ export const AGENT_TASK_REASONING = 'agent:task:reasoning';
 /** @readonly */
 export const AGENT_DIALOG_LOOP_CHANGED = 'agent:dialog:loop:changed';
 /** @readonly */
-export const AGENT_DIALOG_TURN_TIMEOUT = 'agent:dialog.turn_timeout';
+export const AGENT_DIALOG_TURN_TIMEOUT = 'agent:dialog:turn_timeout';
 /** @readonly */
 export const AGENT_DIALOG_STALLED = 'agent:dialog:stalled';
 /** @readonly */

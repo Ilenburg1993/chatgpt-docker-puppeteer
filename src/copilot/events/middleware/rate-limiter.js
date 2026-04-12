@@ -4,8 +4,8 @@
  *
  * FAIXA-L6 — Middleware que aplica rate limiting por event type.
  *
- * Previne flood de eventos repetitivos (ex.: `agent:task:delta` em loops rápidos).
- * Configurável via `createRateLimiter({ windowMs, maxPerWindow })`.
+ * Previne flood de eventos repetitivos (ex.: `agent:task:delta` em loops rápidos). Configurável via
+ * `createRateLimiter({ windowMs, maxPerWindow })`.
  *
  * @module copilot/events/middleware/rate-limiter
  */
@@ -14,8 +14,8 @@ import { log } from '#copilot/observability';
 
 /**
  * @typedef {object} RateLimiterOptions
- * @property {number} [windowMs=1000] - Janela de tempo em ms
- * @property {number} [maxPerWindow=100] - Máximo de emissões por type por janela
+ * @property {number} [windowMs=1000] - Janela de tempo em ms. Default is `1000`
+ * @property {number} [maxPerWindow=100] - Máximo de emissões por type por janela. Default is `100`
  */
 
 /**
@@ -36,7 +36,7 @@ export function createRateLimiter(options = {}) {
         const type = event.type;
 
         let entry = counters.get(type);
-        if (!entry || (now - entry.windowStart) >= windowMs) {
+        if (!entry || now - entry.windowStart >= windowMs) {
             entry = { count: 0, windowStart: now };
             counters.set(type, entry);
         }

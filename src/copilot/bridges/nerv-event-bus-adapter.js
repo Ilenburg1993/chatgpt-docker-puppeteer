@@ -5,12 +5,13 @@
  * FAIXA-L3 — Adapter que faz relay bidirecional EventBus ↔ NERV.
  *
  * Diferença em relação ao nerv-bridge.js original:
- * - nerv-bridge.js escuta o AlwaysAliveAgent (EventEmitter) diretamente
- * - NervEventBusAdapter escuta o **EventBus centralizado**, capturando TODOS
- *   os eventos (hooks, hub, services, system) — não só os do agent.
  *
- * Ambos coexistem durante a migração. Na FAIXA-L8, nerv-bridge.js será removido
- * e este adapter se tornará a única ponte com NERV.
+ * - nerv-bridge.js escuta o AlwaysAliveAgent (EventEmitter) diretamente
+ * - NervEventBusAdapter escuta o **EventBus centralizado**, capturando TODOS os eventos (hooks, hub, services, system) —
+ *   não só os do agent.
+ *
+ * Ambos coexistem durante a migração. Na FAIXA-L8, nerv-bridge.js será removido e este adapter se tornará a única ponte
+ * com NERV.
  *
  * @module copilot/bridges/nerv-event-bus-adapter
  * @see module:copilot/events/nerv-events
@@ -36,7 +37,7 @@ export class NervEventBusAdapter {
     /** @type {NervInstance | null} */
     #nerv = null;
 
-    /** @type {Array<() => void>} */
+    /** @type {(() => void)[]} */
     #unsubscribers = [];
 
     /** @type {(() => void) | null} */
@@ -48,7 +49,7 @@ export class NervEventBusAdapter {
     /**
      * Monta o adapter ligando EventBus → NERV (outbound) e NERV → EventBus (inbound).
      *
-     * @param {EventBus} bus   - EventBus centralizado
+     * @param {EventBus} bus - EventBus centralizado
      * @param {NervInstance} nerv - Instância NERV com `emitEvent`
      * @returns {void}
      */
@@ -74,12 +75,20 @@ export class NervEventBusAdapter {
      */
     unmount() {
         for (const unsub of this.#unsubscribers) {
-            try { unsub(); } catch { /* ignore */ }
+            try {
+                unsub();
+            } catch {
+                /* ignore */
+            }
         }
         this.#unsubscribers = [];
 
         if (this.#inboundUnsub) {
-            try { this.#inboundUnsub(); } catch { /* ignore */ }
+            try {
+                this.#inboundUnsub();
+            } catch {
+                /* ignore */
+            }
             this.#inboundUnsub = null;
         }
 
@@ -132,6 +141,18 @@ export class NervEventBusAdapter {
         });
     }
 
+    /**
+     * Emite um evento ad-hoc no NERV (para uso por módulos que não passam pelo EventBus). Substitui `emitNerv()` do
+     * nerv-bridge legado.
+     *
+     * @param {string} actionCode - Código da ação NERV (ex: 'copilot:turn:sent')
+     * @param {Record<string, unknown>} payload - Dados do evento
+     * @returns {void}
+     */
+    emitNerv(actionCode, payload) {
+        this.#safeEmitNerv(actionCode, payload);
+    }
+
     // ── Inbound: NERV → EventBus ───────────────────────────────────────────
 
     /**
@@ -169,3 +190,15 @@ export class NervEventBusAdapter {
  * @type {NervEventBusAdapter}
  */
 export const nervEventBusAdapter = new NervEventBusAdapter();
+
+/**
+ * Emite um evento ad-hoc no NERV via o adapter singleton. Drop-in replacement para `emitNerv()` do nerv-bridge legado
+ * (FAIXA-L13).
+ *
+ * @param {string} actionCode
+ * @param {Record<string, unknown>} payload
+ * @returns {void}
+ */
+export function emitNerv(actionCode, payload) {
+    nervEventBusAdapter.emitNerv(actionCode, payload);
+}

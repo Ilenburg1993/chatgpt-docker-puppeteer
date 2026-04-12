@@ -4,13 +4,14 @@
  *
  * FAIXA-L6 — Barrel + Middleware Registry.
  *
- * Exporta os 3 middleware built-in e a função `registerBuiltinMiddleware(bus)`
- * que conecta tudo ao EventBus de forma canônica.
+ * Exporta os 3 middleware built-in e a função `registerBuiltinMiddleware(bus)` que conecta tudo ao EventBus de forma
+ * canônica.
  *
  * Ordem de instalação no pipeline:
- *   1. timestampEnricher  (garante metadados)
- *   2. schemaValidator    (bloqueia eventos malformados)
- *   3. rateLimiter        (suprime flood)
+ *
+ * 1. timestampEnricher (garante metadados)
+ * 2. schemaValidator (bloqueia eventos malformados)
+ * 3. rateLimiter (suprime flood)
  *
  * @module copilot/events/middleware
  */
@@ -24,8 +25,7 @@ import { schemaValidator } from './schema-validator.js';
 import { timestampEnricher } from './timestamp-enricher.js';
 
 /**
- * Registra os middleware built-in no EventBus fornecido.
- * Deve ser chamado uma vez durante o bootstrap.
+ * Registra os middleware built-in no EventBus fornecido. Deve ser chamado uma vez durante o bootstrap.
  *
  * @param {import('../../core/event-bus.js').EventBus} bus
  * @param {{ rateLimiterWindowMs?: number; rateLimiterMax?: number }} [options]
@@ -33,8 +33,10 @@ import { timestampEnricher } from './timestamp-enricher.js';
 export function registerBuiltinMiddleware(bus, options = {}) {
     bus.use(timestampEnricher);
     bus.use(schemaValidator);
-    bus.use(createRateLimiter({
-        windowMs: options.rateLimiterWindowMs ?? 1000,
-        maxPerWindow: options.rateLimiterMax ?? 200,
-    }));
+    bus.use(
+        createRateLimiter({
+            windowMs: options.rateLimiterWindowMs ?? 1000,
+            maxPerWindow: options.rateLimiterMax ?? 200,
+        }),
+    );
 }

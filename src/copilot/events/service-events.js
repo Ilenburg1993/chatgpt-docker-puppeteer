@@ -4,8 +4,8 @@
  *
  * FAIXA-L2 — Constantes SSOT para eventos emitidos por services/*.
  *
- * Substitui strings inline hardcoded nos services por constantes centralizadas,
- * garantindo conformidade C11 (single source of truth para event strings).
+ * Substitui strings inline hardcoded nos services por constantes centralizadas, garantindo conformidade C11 (single
+ * source of truth para event strings).
  *
  * @module copilot/events/service-events
  */

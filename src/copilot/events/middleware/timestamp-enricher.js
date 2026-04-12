@@ -4,8 +4,7 @@
  *
  * FAIXA-L6 — Middleware que garante campo `_enriched` com metadados padronizados.
  *
- * Adiciona `_source` (hostname/pid) e normaliza `timestamp` se ausente.
- * Leve e fire-through — não bloqueia o pipeline.
+ * Adiciona `_source` (hostname/pid) e normaliza `timestamp` se ausente. Leve e fire-through — não bloqueia o pipeline.
  *
  * @module copilot/events/middleware/timestamp-enricher
  */

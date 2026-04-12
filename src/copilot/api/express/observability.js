@@ -20,7 +20,7 @@
  * @see EventBus
  */
 
-import { getMcpStatus, isMounted as isNervMounted } from '#copilot/bridges';
+import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
 import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config';
 import {
     DEFAULT_OTEL_FILE,
@@ -102,7 +102,7 @@ export default function createObservabilityRouter(deps) {
             }
 
             const mcpStatus = getMcpStatus();
-            const nervMounted = isNervMounted();
+            const nervMounted = nervEventBusAdapter.isMounted;
             const hasRecentAgentErrors = recentErrors.some((e) => e.source === 'agent');
 
             /** @type {Record<string, { status: string; details?: string }>} */
