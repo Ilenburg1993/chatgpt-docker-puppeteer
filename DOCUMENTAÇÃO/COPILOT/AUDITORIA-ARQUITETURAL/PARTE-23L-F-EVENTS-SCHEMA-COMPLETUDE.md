@@ -1,8 +1,8 @@
 # PARTE-23L-F — Events: Schema 100%, Rastreio Centralizado & Tratamento
 
-**Data**: 2026-04-12 | **Status**: Roadmap Ativo | **Versão**: 1.0
+**Data**: 2026-04-12 | **Status**: ✅ CONCLUÍDO | **Versão**: 2.0
 **Precedente**: PARTE-23L-E v5.1 (L19-L28 concluídas, Score 96/100)
-**Commits base**: `520b74ae` (HEAD main)
+**Commits**: `e571fbd4` (L29-L32), `338e5dae` (L33-L35+L38)
 
 ---
 
@@ -101,7 +101,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 ### Onda 8 — Schema 100% (eliminação de gaps de cobertura)
 
-#### FAIXA-L29 — Schema Orphan Cleanup 🔴 CRÍTICO
+#### FAIXA-L29 — Schema Orphan Cleanup ✅ CONCLUÍDO (`e571fbd4`)
 
 **Objetivo**: Corrigir os 13 schemas orphan para que apontem para constantes SSOT válidas.
 
@@ -113,7 +113,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: `schemaCount()` = N onde N = schemas com match SSOT 1:1
 
-#### FAIXA-L30 — Agent Event Schemas (79 → 100%) 🔴 CRÍTICO
+#### FAIXA-L30 — Agent Event Schemas (81 → 100%) ✅ CONCLUÍDO (`e571fbd4`)
 
 **Objetivo**: Criar schemas para todos os 79 agent-events.
 
@@ -127,7 +127,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Todos os 79 agent:* events têm schema
 
-#### FAIXA-L31 — Non-Agent Event Schemas (41 → 100%) 🟡 MÉDIO
+#### FAIXA-L31 — Non-Agent Event Schemas (41 → 100%) ✅ CONCLUÍDO (`e571fbd4`)
 
 **Objetivo**: Criar schemas para todos os 41 non-agent bus events.
 
@@ -150,7 +150,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 ### Onda 9 — Rastreio Fino & Tratamento
 
-#### FAIXA-L32 — Bridge Completude 🟢 BAIXO
+#### FAIXA-L32 — Bridge Completude ✅ CONCLUÍDO (`e571fbd4`)
 
 **Objetivo**: Bridgear os 2 emitter events candidatos + criar constantes SSOT.
 
@@ -162,7 +162,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Bridge coverage 53/56 → 53/56 (3 não-bridgeáveis)
 
-#### FAIXA-L33 — Schema Validation Strict Mode 🟡 MÉDIO
+#### FAIXA-L33 — Schema Validation Strict Mode ✅ CONCLUÍDO (`338e5dae`)
 
 **Objetivo**: Ativar validação de schema em runtime com tratamento adequado.
 
@@ -174,7 +174,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Todas emissões passam por validação; métricas expostas
 
-#### FAIXA-L34 — Dead Letter Queue Enhancement 🟡 MÉDIO
+#### FAIXA-L34 — Dead Letter Queue Enhancement ✅ CONCLUÍDO (`338e5dae`)
 
 **Objetivo**: Aprimorar rastreio de events sem subscribers.
 
@@ -186,7 +186,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Zero events silenciados; todos dead letters rastreados
 
-#### FAIXA-L35 — Flow Causality Tracing 🟢 BAIXO
+#### FAIXA-L35 — Flow Causality Tracing ✅ CONCLUÍDO (`338e5dae`)
 
 **Objetivo**: Registrar graph de causalidade event→event.
 
@@ -200,7 +200,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 ### Onda 10 — Hardening & Cleanup Final
 
-#### FAIXA-L36 — nerv-bridge.js Deletion 🟢 BAIXO
+#### FAIXA-L36 — nerv-bridge.js Deletion ⏸️ ADIADO (L13 já fez deprecation, file não causa impacto)
 
 **Objetivo**: Remover arquivo legado.
 
@@ -211,7 +211,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Arquivo deletado, zero referências
 
-#### FAIXA-L37 — Event System TypeCheck Full Clean 🟡 MÉDIO
+#### FAIXA-L37 — Event System TypeCheck Full Clean ⏸️ ADIADO (próxima onda)
 
 **Objetivo**: Zero erros TS em todos os arquivos do event system.
 
@@ -223,7 +223,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: TypeCheck clean
 
-#### FAIXA-L38 — Schema Coverage CI Script 🟢 BAIXO
+#### FAIXA-L38 — Schema Coverage CI Script ✅ CONCLUÍDO (`338e5dae`)
 
 **Objetivo**: Script automatizado que falha se schema coverage < 100%.
 
@@ -292,3 +292,20 @@ START ──→ L29 (Orphan Fix) ──→ L30 (Agent Schemas) ──→ L33 (St
 | Versão | Data       | Mudanças                                                   |
 | ------ | ---------- | ---------------------------------------------------------- |
 | 1.0    | 2026-04-12 | Auditoria pós-L28, 10 faixas L29-L38, schema 100% roadmap |
+| 2.0    | 2026-04-12 | L29-L35+L38 concluídos; L36-L37 adiados                   |
+
+---
+
+## 8. Resultado Final
+
+| Métrica                       | Antes (L28) | Depois (L38) |
+| ----------------------------- | ----------- | ------------ |
+| Constantes SSOT (bus)         | 120         | 122          |
+| Schemas registrados           | 42 (29 match) | 122 (100%) |
+| Orphans                       | 13          | 0            |
+| Bridge coverage               | 51/56       | 53/56        |
+| Schema validation             | Warn-only   | Strict mode  |
+| Dead letter tracking          | Básico      | Enhanced (reason, correlationId, cap) |
+| Causality tracing             | Nenhum      | eventId + causationId |
+| CI schema check               | Nenhum      | `npm run test:check-schemas` |
+| Score                         | 96/100 (A+) | 99/100 (A+)  |
