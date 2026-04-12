@@ -227,23 +227,3 @@ export function attachBus(hooks, bus = defaultBus) {
 
     return { ...hooks, ...wrapped };
 }
-
-/**
- * @typedef {import('./types.js').HookBusEvent} HookBusEvent
- *
- * @typedef {import('./types.js').SessionHooks} SessionHooks
- *
- * @typedef {import('./types.js').PreToolUseHandler} PreToolUseHandler
- *
- * @typedef {import('./types.js').PostToolUseHandler} PostToolUseHandler
- *
- * @typedef {import('./types.js').UserPromptSubmittedHandler} UserPromptSubmittedHandler
- *
- * @typedef {import('./types.js').SessionStartHandler} SessionStartHandler
- *
- * @typedef {import('./types.js').SessionEndHandler} SessionEndHandler
- *
- * @typedef {import('./types.js').ErrorOccurredHandler} ErrorOccurredHandler
- *
- * @typedef {import('./types.js').InvocationContext} InvocationContext
- */
