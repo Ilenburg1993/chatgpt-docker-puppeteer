@@ -11,7 +11,7 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, expect } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { readFileSync, existsSync } = require('node:fs');
@@ -237,11 +237,15 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         const missing = [];
         for (const mod of REQUIRED_MODULES) {
             // models/selector.js é re-exportado via models/registry.js (aceitável)
-            // para os outros, verificar basename no source do barrel
+            // session-lifecycle.js é re-exportado via sdk-session-wrapper.js (aceitável)
             const basename = mod.replace('models/', '');
-            // registry.js re-exporta selector.js — considerar coberto se registry.js está no barrel
             if (mod === 'models/selector.js') {
                 if (!src.includes('models/registry.js')) {
+                    missing.push(mod);
+                }
+            } else if (mod === 'session-lifecycle.js') {
+                // Aceita tanto session-lifecycle.js quanto sdk-session-wrapper.js (que re-exporta o mesmo)
+                if (!src.includes('session-lifecycle') && !src.includes('sdk-session-wrapper')) {
                     missing.push(mod);
                 }
             } else if (!src.includes(basename)) {

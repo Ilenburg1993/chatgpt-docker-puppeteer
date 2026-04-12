@@ -1,10 +1,10 @@
 // @ts-check
-import { describe, it } from 'node:test';
 /**
  * tests/unit/copilot/terminal/test_route_table.spec.js
  *
  * F186: Testes para route-table.js — matchRoute e integridade da ROUTE_TABLE.
  */
+import { describe, it, expect } from 'vitest';
 
 import { matchRoute, ROUTE_TABLE } from '../../../../src/copilot/terminal/route-table.js';
 

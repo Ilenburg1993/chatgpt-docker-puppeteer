@@ -99,9 +99,12 @@ function singletonCount() {
     let total = 0;
     let excluded = 0;
     const pattern = /^let\s+\w+\s*=/gm;
-    // Patterns que NÃO são singletons reais (logger fallbacks, flags, counters, caches, mutexes, config overrides, arrays, subscribers, infra state)
+    // Patterns que NÃO são singletons reais — apenas primitivos de controle de fluxo:
+    // logger fallbacks, boolean flags, counters, event-loop mutexes, config scalars.
+    // NOTA (FAIXA-1C C9): objetos null-initialized que guardam instâncias reais (ex: _agent,
+    // _client, _nerv, _tracer, _hub*) são singletons reais e NÃO devem ser excluídos.
     const excludeRe =
-        /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b|_?broadcastSse\b|_idCounter\b|_pendingInputSeq\b|_sseEventIdCounter\b|_turnQueueDepth\b|_persistenceFailureCount\b|_flushScheduled\b|exitHandlerRegistered\b|_agentListenersRegistered\b|_beforeStopRegistered\b|_rgAvailable\b|_modelsCache\b|_zodToJsonSchema\b|_mcpCircuitOpen\b|_mcpCircuitOpenAt\b|_bootAttemptCount\b|_permLogBytes\b|_backgroundCompactionThreshold\b|_stateDirReady\b|_fileCacheHits\b|_fileCacheMisses\b|_busy\b|_planMode\b|_showThinking\b|_showUsage\b|_showStreaming\b|_tokenSeq\b|shuttingDown\b|shutdownRegistered\b|_storeMutex\b|_sendTurnMutex\b|_writeQueue\b|_clearFn\b|_phase\b|_reflectionTimer\b|_registeredTools\b|_attachmentQueue\b|_injectHistory\b|_aliases\b|_contextCache\b|_stateCache\b|_infiniteSessionConfig\b|_toolsConfig\b|_mcpHealth\b|_inboundUnsub\b|_pendingReadyHandler\b|_ensureDialogLoopInFlight\b|_hubSessionId\b|_startPromise\b|_registry\b|_rl\b|_deps\b)/;
+        /^let\s+(?:_?log\b|_logDir\b|configuredLevel\b|minLevel\b|_recordCompaction\b|_?broadcastSse\b|_idCounter\b|_pendingInputSeq\b|_sseEventIdCounter\b|_turnQueueDepth\b|_persistenceFailureCount\b|_flushScheduled\b|exitHandlerRegistered\b|_agentListenersRegistered\b|_beforeStopRegistered\b|_zodToJsonSchema\b|_mcpCircuitOpen\b|_mcpCircuitOpenAt\b|_bootAttemptCount\b|_permLogBytes\b|_backgroundCompactionThreshold\b|_stateDirReady\b|_fileCacheHits\b|_fileCacheMisses\b|_busy\b|_planMode\b|_showThinking\b|_showUsage\b|_showStreaming\b|_tokenSeq\b|shuttingDown\b|shutdownRegistered\b|_storeMutex\b|_sendTurnMutex\b|_writeQueue\b|_clearFn\b|_phase\b|_reflectionTimer\b|_registeredTools\b|_attachmentQueue\b|_injectHistory\b|_aliases\b|_infiniteSessionConfig\b|_toolsConfig\b|_startPromise\b|_rl\b|_deps\b)/;
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
@@ -161,17 +164,21 @@ function fanOut() {
 }
 
 /**
- * Conta deep imports (non-barrel #copilot/module/subfile). Retorna total e refinado (excluindo logger allow-list).
+ * Conta deep imports (non-barrel #copilot/module/subfile/...). Retorna total e refinado (excluindo allow-list).
+ *
+ * FAIXA-1C C5: regex agora captura imports com 2+ segmentos após o módulo-raiz (ex: #copilot/a/b/c).
+ * A regex anterior só capturava exatamente 2 segmentos, ignorando paths com 3+ partes.
  *
  * @returns {{ total: number; refined: number }}
  */
 function deepImportCount() {
     const files = walkJs(COPILOT_ROOT);
     let total = 0;
-    let loggerCount = 0;
-    const deepRe = /#copilot\/[a-z-]+\/[a-z-]+/g;
-    // Allow-list: imports justificáveis (typedef-only ou logger allow-listed)
-    const allowListRe = /#copilot\/(?:observability\/logger|sdk\/types)/;
+    let allowListed = 0;
+    // C5: capturar qualquer caminho com pelo menos 2 segmentos após #copilot/
+    const deepRe = /#copilot\/[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9_./-]+)+/g;
+    // Allow-list: imports justificáveis (typedef-only, logger ou sdk/types)
+    const allowListRe = /#copilot\/(?:observability\/logger|sdk\/types)(?:\/|$)/;
 
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
@@ -181,17 +188,81 @@ function deepImportCount() {
             if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
                 continue;
             }
-            const matches = trimmed.match(deepRe);
-            if (matches) {
-                total += matches.length;
-                for (const m of matches) {
-                    if (allowListRe.test(m)) loggerCount++;
-                }
+            // Exclui linhas que são apenas @typedef (JSDoc type-only imports)
+            if (trimmed.startsWith('@typedef') || trimmed.includes('@typedef {import(')) {
+                continue;
             }
             deepRe.lastIndex = 0;
+            let m;
+            while ((m = deepRe.exec(trimmed)) !== null) {
+                total++;
+                if (allowListRe.test(m[0])) allowListed++;
+            }
         }
     }
-    return { total, refined: total - loggerCount };
+    return { total, refined: total - allowListed };
+}
+
+/**
+ * Conta emissores locais (classes que estendem BaseEmitter em vez de emitir via EventBus).
+ *
+ * FAIXA-1C C2: este padrão indica que eventos não passam pelo EventBus central,
+ * tornando subscribers impossíveis de adicionar sem modificar o emissor.
+ *
+ * @returns {{ localEmitterCount: number; files: string[] }}
+ */
+function localEmitterCount() {
+    const files = walkJs(COPILOT_ROOT);
+    const extendsRe = /\bextends\s+BaseEmitter\b/;
+    /** @type {string[]} */
+    const found = [];
+    for (const f of files) {
+        const src = readFileSync(f, 'utf-8');
+        if (extendsRe.test(src)) {
+            found.push(f.replace(COPILOT_ROOT + '/', ''));
+        }
+    }
+    return { localEmitterCount: found.length, files: found };
+}
+
+/**
+ * Detecta violações de camada via imports proibidos.
+ *
+ * FAIXA-1C violations: substitui o hardcoded 0 por detecção real de
+ * padrões como: core/ importando de agent/, services/ importando de terminal/api/,
+ * events/ importando de qualquer módulo de nível > L1.
+ *
+ * @returns {number} contagem de violações detectadas
+ */
+function layerViolations() {
+    /** @type {Array<{module: string; forbids: RegExp}>} */
+    const rules = [
+        // L0: core/ não pode importar de módulos higher-level
+        { module: 'core', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        // L0: events/ não pode importar de módulos higher-level
+        { module: 'events', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        // L0: db/ não pode importar de módulos higher-level
+        { module: 'db', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        // L1: audit/ não pode importar de L3+
+        { module: 'audit', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|conversation-hub|channel)/ },
+    ];
+
+    let violations = 0;
+    for (const rule of rules) {
+        const dir = join(COPILOT_ROOT, rule.module);
+        if (!existsSync(dir)) continue;
+        const files = walkJs(dir);
+        for (const f of files) {
+            const src = readFileSync(f, 'utf-8');
+            for (const line of src.split('\n')) {
+                const t = line.trim();
+                if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) continue;
+                if (!t.includes('#copilot/')) continue;
+                if (rule.forbids.test(t)) violations++;
+            }
+        }
+    }
+    return violations;
 }
 
 /**
@@ -224,6 +295,14 @@ function testCount() {
 /**
  * Calcula health score de A a F.
  *
+ * FAIXA-1C: pesos recalibrados para refletir estado real:
+ * - singletons: threshold baixado (>10 penaliza; antes >20) para capturar os ~25 reais
+ * - fan-out: mantido (>8 penaliza)
+ * - violations: agora calculado real (não hardcoded 0)
+ * - deepImports: peso aumentado (-0.5 por item; antes -0.25)
+ * - localEmitters: nova penalidade para emissores locais (não passam pelo EventBus)
+ * - tests: bonus reduzido (cap 5 pts, escala por 100 arquivos; antes cap 10 por 200 arquivos)
+ *
  * @param {object} metrics
  * @param {number} metrics.barrelRatio
  * @param {number} metrics.singletons
@@ -232,6 +311,7 @@ function testCount() {
  * @param {number} metrics.deepImports
  * @param {number} metrics.diTokens
  * @param {number} metrics.tests
+ * @param {number} metrics.localEmitters
  * @returns {{ score: number; grade: string }}
  */
 function calcHealthScore(metrics) {
@@ -240,8 +320,8 @@ function calcHealthScore(metrics) {
     // Barrel coverage (max -20)
     score -= Math.max(0, (100 - metrics.barrelRatio) * 0.2);
 
-    // Singletons (max -15, penalize >20)
-    score -= Math.min(15, Math.max(0, metrics.singletons - 20) * 0.5);
+    // Singletons (max -15, penalize >10 — threshold calibrado para realidade)
+    score -= Math.min(15, Math.max(0, metrics.singletons - 10) * 1.0);
 
     // Fan-out (max -15, penalize >8)
     score -= Math.min(15, Math.max(0, metrics.maxFanOut - 8) * 2);
@@ -249,14 +329,17 @@ function calcHealthScore(metrics) {
     // Violations (max -20, -5 each)
     score -= Math.min(20, metrics.violations * 5);
 
-    // Deep imports — refined only: non-barrel non-allow-listed imports (max -15, -0.25 each)
-    score -= Math.min(15, metrics.deepImports * 0.25);
+    // Deep imports — refined only (max -15, -0.5 each — peso dobrado para refletir impacto real)
+    score -= Math.min(15, metrics.deepImports * 0.5);
 
-    // DI tokens (bonus up to +5 for 13+ tokens)
-    score += Math.min(5, metrics.diTokens * 0.38);
+    // Local emitters (max -10, -1.5 each — emissores que não usam EventBus)
+    score -= Math.min(10, metrics.localEmitters * 1.5);
 
-    // Tests (bonus up to +10 for 100+ test files)
-    score += Math.min(10, metrics.tests * 0.05);
+    // DI tokens (bonus up to +5 for 14+ tokens)
+    score += Math.min(5, metrics.diTokens * 0.36);
+
+    // Tests (bonus up to +5 for 100+ test files — reduzido de 10 para 5)
+    score += Math.min(5, metrics.tests * 0.05);
 
     score = Math.round(Math.max(0, Math.min(100, score)));
 
@@ -280,15 +363,18 @@ const fan = fanOut();
 const deepImports = deepImportCount();
 const diTokens = diTokenCount();
 const tests = testCount();
+const localEmitters = localEmitterCount();
+const violations = layerViolations();
 
 const { score, grade } = calcHealthScore({
     barrelRatio: barrel.ratio,
     singletons: singletons.refined,
     maxFanOut: fan.max,
-    violations: 0, // layer check integration — 0 known
+    violations,
     deepImports: deepImports.refined,
     diTokens,
     tests,
+    localEmitters: localEmitters.localEmitterCount,
 });
 
 const report = {
@@ -308,6 +394,8 @@ const report = {
     deepImports,
     diTokens,
     tests,
+    localEmitters,
+    violations,
     health: { score, grade },
 };
 
@@ -327,7 +415,8 @@ if (jsonOnly) {
         console.log(`  Deep imports:       ${deepImports.total} (refined: ${deepImports.refined})`);
         console.log(`  DI tokens:          ${diTokens}`);
         console.log(`  Test files:         ${tests}`);
-        console.log(`  Layer violations:   0 (last check)`);
+        console.log(`  Local emitters:     ${localEmitters.localEmitterCount} (${localEmitters.files.join(', ')})`);
+        console.log(`  Layer violations:   ${violations}`);
         console.log('');
         console.log(`  ★ Health Score:     ${score}/100 (${grade})`);
         console.log('');
