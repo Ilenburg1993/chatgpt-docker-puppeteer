@@ -122,6 +122,7 @@ export const EVENT_NAMES = /** @type {const} */ ({
  * @property {number} timestamp - Unix epoch ms.
  * @property {string} [correlationId] - UUID de correlação para rastreamento ponta-a-ponta (FAIXA-L16).
  * @property {string} [source] - Módulo/subsistema de origem.
+ * @property {string} [_source] - Identificador host:pid injetado pelo timestampEnricher (FAIXA-L27).
  * @property {Record<string, unknown>} [meta] - Metadata adicional.
  */
 

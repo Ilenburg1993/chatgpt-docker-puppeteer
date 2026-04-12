@@ -25,7 +25,7 @@ import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { defaultErrorTracker } from './error-tracker.js';
-import { attachEventBusObservers } from './event-bus-observers.js';
+import { createLogObserver } from './bus-actions/log-observer.js';
 import { LOG_DIR, log } from './logger.js';
 
 /**
@@ -58,8 +58,8 @@ export function bootstrapObservability() {
     // FAIXA-L6: middleware pipeline (enricher → validator → rate-limiter)
     if (bus) registerBuiltinMiddleware(bus);
 
-    // FAIXA-2D: registrar subscribers cross-module no EventBus (best-effort após registro do bus)
-    attachEventBusObservers();
+    // FAIXA-L23: log-observer via bus-action (substitui o antigo event-bus-observers.js)
+    if (bus) createLogObserver({ bus });
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
     registerShutdownHandler(

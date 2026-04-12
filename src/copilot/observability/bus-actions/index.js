@@ -9,4 +9,5 @@ export { createActivityTracker } from './activity-tracker.js';
 export { createCorrelationTracer } from './correlation-tracer.js';
 export { createErrorAlerterAction } from './error-alerter.js';
 export { createHealthUpdater } from './health-updater.js';
+export { createLogObserver } from './log-observer.js';
 export { createMetricsCollector } from './metrics-collector.js';

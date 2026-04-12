@@ -149,4 +149,123 @@ export const BUILTIN_SCHEMAS = [
         required: ['type', 'timestamp'],
         description: 'Compactação de memória concluída',
     },
+
+    // ── FAIXA-L28: Schemas adicionais para cobertura expandida ────────────────
+
+    // Dialog
+    {
+        type: 'agent:dialog:loop:changed',
+        required: ['type', 'timestamp'],
+        fields: { active: 'boolean' },
+        description: 'Estado do dialog loop mudou (ativo/inativo)',
+    },
+    {
+        type: 'agent:dialog:turn_start',
+        required: ['type', 'timestamp'],
+        description: 'Início de turno do dialog',
+    },
+
+    // Session
+    {
+        type: 'agent:session:created',
+        required: ['type', 'timestamp'],
+        fields: { sessionId: 'string' },
+        description: 'Sessão SDK criada',
+    },
+    {
+        type: 'agent:session:cleanup',
+        required: ['type', 'timestamp'],
+        description: 'Limpeza de sessão concluída',
+    },
+
+    // Handoff
+    {
+        type: 'agent:handoff:received',
+        required: ['type', 'timestamp'],
+        description: 'Handoff recebido de outro agente',
+    },
+    {
+        type: 'agent:handoff:accepted',
+        required: ['type', 'timestamp'],
+        description: 'Handoff aceito',
+    },
+    {
+        type: 'agent:handoff:rejected',
+        required: ['type', 'timestamp'],
+        fields: { rejectReason: 'string' },
+        description: 'Handoff rejeitado',
+    },
+
+    // Hook events
+    {
+        type: 'hook:pre_tool_use',
+        required: ['type', 'timestamp'],
+        description: 'Hook pré-uso de tool',
+    },
+    {
+        type: 'hook:post_tool_use',
+        required: ['type', 'timestamp'],
+        description: 'Hook pós-uso de tool',
+    },
+    {
+        type: 'hook:session_start',
+        required: ['type', 'timestamp'],
+        description: 'Hook de início de sessão',
+    },
+    {
+        type: 'hook:session_end',
+        required: ['type', 'timestamp'],
+        description: 'Hook de fim de sessão',
+    },
+
+    // Hub events
+    {
+        type: 'hub:session:created',
+        required: ['type', 'timestamp'],
+        fields: { sessionId: 'string' },
+        description: 'Sessão do ConversationHub criada',
+    },
+    {
+        type: 'hub:session:closed',
+        required: ['type', 'timestamp'],
+        fields: { sessionId: 'string' },
+        description: 'Sessão do ConversationHub fechada',
+    },
+
+    // System events
+    {
+        type: 'system:health:check',
+        required: ['type', 'timestamp'],
+        description: 'Health check do sistema',
+    },
+    {
+        type: 'system:shutdown:start',
+        required: ['type', 'timestamp'],
+        description: 'Início do shutdown graceful',
+    },
+    {
+        type: 'system:shutdown:complete',
+        required: ['type', 'timestamp'],
+        description: 'Shutdown graceful concluído',
+    },
+
+    // Config events
+    {
+        type: 'config:pinned_files:changed',
+        required: ['type', 'timestamp'],
+        description: 'Pinned files alterados',
+    },
+
+    // Agent metrics
+    {
+        type: 'agent:metrics',
+        required: ['type', 'timestamp'],
+        description: 'Snapshot periódico de métricas do agente',
+    },
+    {
+        type: 'agent:permission:mode_changed',
+        required: ['type', 'timestamp'],
+        fields: { mode: 'string' },
+        description: 'Modo de permissão alterado',
+    },
 ];

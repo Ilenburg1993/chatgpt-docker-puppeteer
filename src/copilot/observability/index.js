@@ -42,8 +42,10 @@ export { bootstrapLateDeps, bootstrapObservability } from './bootstrap.js';
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';
 
-// ─── EventBus Observers (FAIXA-2D) ───────────────────────────────────────────
+// ─── EventBus Observers (FAIXA-2D → L23: migrado para bus-actions/log-observer) ──
+/** @deprecated Use createLogObserver from bus-actions/log-observer.js */
 export { attachEventBusObservers, detachEventBusObservers } from './event-bus-observers.js';
+export { createLogObserver } from './bus-actions/log-observer.js';
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 export { createAuditLog, defaultAuditLog } from '#copilot/audit';
