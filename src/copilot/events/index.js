@@ -82,6 +82,15 @@ export const HOOK_SESSION_END = 'hook:session_end';
 /** @readonly */
 export const HOOK_ERROR_OCCURRED = 'hook:error_occurred';
 
+// ─── Handoff events ───────────────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_HANDOFF_RECEIVED = 'agent:handoff:received';
+/** @readonly */
+export const AGENT_HANDOFF_ACCEPTED = 'agent:handoff:accepted';
+/** @readonly */
+export const AGENT_HANDOFF_REJECTED = 'agent:handoff:rejected';
+
 // ─── Hub (Conversation Hub) ───────────────────────────────────────────────────
 
 /** @readonly */

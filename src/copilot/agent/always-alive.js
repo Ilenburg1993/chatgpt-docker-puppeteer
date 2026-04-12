@@ -559,6 +559,9 @@ try {
         AGENT_DIALOG_REPLY,
         AGENT_DIALOG_COMPACTION_REQUESTED,
         AGENT_DIALOG_TURN_TIMEOUT,
+        AGENT_HANDOFF_RECEIVED,
+        AGENT_HANDOFF_ACCEPTED,
+        AGENT_HANDOFF_REJECTED,
         AGENT_SESSION_KEEPALIVE,
         AGENT_TASK_STARTED,
         AGENT_TASK_DELTA,
@@ -585,6 +588,12 @@ try {
             reply: AGENT_DIALOG_REPLY,
             'compaction.requested': AGENT_DIALOG_COMPACTION_REQUESTED,
             turn_timeout: AGENT_DIALOG_TURN_TIMEOUT,
+        });
+        // FAIXA-2A: bridge HandoffManager → EventBus
+        bridgeEmitter(alwaysAliveAgent.ctx.handoff, bus, {
+            'handoff.received': AGENT_HANDOFF_RECEIVED,
+            'handoff.accepted': AGENT_HANDOFF_ACCEPTED,
+            'handoff.rejected': AGENT_HANDOFF_REJECTED,
         });
     }
 } catch {

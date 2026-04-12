@@ -2,11 +2,13 @@
 /**
  * src/copilot/types/events.js
  *
- * Catálogo canônico de nomes de eventos cross-module do sistema Copilot.
+ * @deprecated Use `src/copilot/events/index.js` (SSOT canônico) para constantes de eventos.
+ * Este arquivo será removido em uma release futura.
+ *
+ * Catálogo de nomes de eventos cross-module do sistema Copilot (legado).
  *
  * Define namespaces e nomes de eventos usados pelo HookBus, EventBus futuro,
- * e subsistemas de observabilidade. Serve como SSOT para strings de eventos,
- * evitando magic strings espalhadas pelo codebase.
+ * e subsistemas de observabilidade.
  *
  * **Puro** — apenas constantes e tipagem, zero lógica.
  *
