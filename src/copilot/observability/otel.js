@@ -29,9 +29,20 @@ import {
     COPILOT_OTEL_SOURCE_NAME,
 } from '#copilot/config';
 import path from 'node:path';
-import { LOG_DIR } from './logger.js';
+import { fileURLToPath } from 'node:url';
 
-const LOGS_DIR = LOG_DIR;
+const __otel_dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__otel_dirname, '..', '..', '..');
+
+/**
+ * Resolve o diretório de logs de forma independente para evitar dependência
+ * circular com logger.js (que também importa de #copilot/config).
+ */
+const LOGS_DIR = COPILOT_OTEL_ENDPOINT
+    ? ''
+    : (process.env.COPILOT_LOG_DIR
+        ? path.resolve(process.env.COPILOT_LOG_DIR)
+        : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot'));
 
 const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');
 

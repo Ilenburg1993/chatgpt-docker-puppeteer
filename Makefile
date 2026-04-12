@@ -847,6 +847,8 @@ profiles-stats:
 diagnose:
 	@echo "$(CYAN)🔍 Diagnosticando crashes$(NC)"
 	@$(NPM) run diagnose
+	@echo "$(CYAN)🔍 Auditoria SSOT event strings$(NC)"
+	@node scripts/audit-event-strings.mjs || true
 
 rebuild: clean workspace-clean start
 	@echo "$(GREEN)✅ Rebuild completo concluído$(NC)"

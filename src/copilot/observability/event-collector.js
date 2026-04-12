@@ -18,9 +18,15 @@ import {
     injectRecordCompaction,
     quotaState,
 } from './collectors/index.js';
-import { LOG_DIR, log } from './logger.js';
+import { log } from './logger.js';
+import { fileURLToPath } from 'node:url';
 
-const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : LOG_DIR;
+/**
+ * Resolve LOGS_DIR sem depender de LOG_DIR (evita TDZ em import cíclico).
+ * @see logger.js - mesma logica de resolucao.
+ */
+const _ecProjectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const LOGS_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.join(_ecProjectRoot, 'var', 'logs', 'copilot');
 const EVENTS_FILE = path.join(LOGS_DIR, 'events.jsonl');
 const MAX_EVENTS_BYTES = COPILOT_EVENTS_MAX_BYTES;
 
