@@ -17,9 +17,9 @@
  * @module copilot/events/middleware
  */
 
-export { correlationEnricher, setCausationContext, getCausationContext } from './correlation-enricher.js';
+export { correlationEnricher, getCausationContext, setCausationContext } from './correlation-enricher.js';
 export { createRateLimiter } from './rate-limiter.js';
-export { schemaValidator, getValidationStats, resetValidationStats } from './schema-validator.js';
+export { getValidationStats, resetValidationStats, schemaValidator } from './schema-validator.js';
 export { timestampEnricher } from './timestamp-enricher.js';
 
 import { BUILTIN_SCHEMAS } from '../schemas/builtin-schemas.js';

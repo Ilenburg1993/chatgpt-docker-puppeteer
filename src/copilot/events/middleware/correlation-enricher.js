@@ -18,8 +18,8 @@ import { randomUUID } from 'node:crypto';
 let _currentCausation;
 
 /**
- * Define o causationId para eventos emitidos dentro de um handler.
- * Usar antes de emitir eventos dentro de um listener para rastrear causalidade.
+ * Define o causationId para eventos emitidos dentro de um handler. Usar antes de emitir eventos dentro de um listener
+ * para rastrear causalidade.
  *
  * @param {string | undefined} eventId
  */

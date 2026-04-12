@@ -6,21 +6,21 @@
  *
  * - Validação base: `type` (string) e `timestamp` (number) são obrigatórios.
  * - Validação estendida (L18): se houver schema registrado, valida campos required e tipos.
- * - Strict mode (L33): contadores de violações, tracking de eventos sem schema,
- *   e opção STRICT_SCHEMA=1 para bloquear em dev.
+ * - Strict mode (L33): contadores de violações, tracking de eventos sem schema, e opção STRICT_SCHEMA=1 para bloquear em
+ *   dev.
  *
  * @module copilot/events/middleware/schema-validator
  */
 
 import { log } from '#copilot/observability';
-import { validateEvent, getEventSchema } from '../schemas/registry.js';
+import { getEventSchema, validateEvent } from '../schemas/registry.js';
 
 const IS_DEV = process.env.NODE_ENV !== 'production';
 const STRICT = process.env.STRICT_SCHEMA === '1';
 
 // ── L33: Counters & diagnostics ──────────────────────────
 
-/** @type {{ blocked: number, warned: number, unregistered: number, corrected: number }} */
+/** @type {{ blocked: number; warned: number; unregistered: number; corrected: number }} */
 const _counters = { blocked: 0, warned: 0, unregistered: 0, corrected: 0 };
 
 /** @type {Set<string>} - Types seen without a registered schema */
@@ -29,7 +29,13 @@ const _unregisteredTypes = new Set();
 /**
  * Retorna snapshot dos contadores de validação.
  *
- * @returns {{ blocked: number, warned: number, unregistered: number, corrected: number, unregisteredTypes: string[] }}
+ * @returns {{
+ *     blocked: number;
+ *     warned: number;
+ *     unregistered: number;
+ *     corrected: number;
+ *     unregisteredTypes: string[];
+ * }}
  */
 export function getValidationStats() {
     return {

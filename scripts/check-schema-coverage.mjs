@@ -3,21 +3,21 @@
 /**
  * scripts/check-schema-coverage.mjs — FAIXA-L38
  *
- * Script CI que verifica cobertura 100% de schemas para todos os bus events SSOT.
- * Falha (exit 1) se qualquer bus event não tiver schema registrado.
+ * Script CI que verifica cobertura 100% de schemas para todos os bus events SSOT. Falha (exit 1) se qualquer bus event
+ * não tiver schema registrado.
  *
  * Uso: node scripts/check-schema-coverage.mjs
  */
 
-import { registerEventSchemas, schemaCount, getEventSchema } from '../src/copilot/events/schemas/registry.js';
-import { BUILTIN_SCHEMAS } from '../src/copilot/events/schemas/builtin-schemas.js';
 import * as agentEvents from '../src/copilot/events/agent-events.js';
 import * as hookEvents from '../src/copilot/events/hook-events.js';
 import * as hubEvents from '../src/copilot/events/hub-events.js';
-import * as terminalEvents from '../src/copilot/events/terminal-events.js';
-import * as systemEvents from '../src/copilot/events/system-events.js';
-import * as serviceEvents from '../src/copilot/events/service-events.js';
 import * as nervEvents from '../src/copilot/events/nerv-events.js';
+import { BUILTIN_SCHEMAS } from '../src/copilot/events/schemas/builtin-schemas.js';
+import { getEventSchema, registerEventSchemas, schemaCount } from '../src/copilot/events/schemas/registry.js';
+import * as serviceEvents from '../src/copilot/events/service-events.js';
+import * as systemEvents from '../src/copilot/events/system-events.js';
+import * as terminalEvents from '../src/copilot/events/terminal-events.js';
 
 // ── Load schemas ──────────────────────────────────────────
 registerEventSchemas(BUILTIN_SCHEMAS);

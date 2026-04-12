@@ -64,7 +64,7 @@ const _deadLetters = new Map();
  * Registra um evento emitido sem listeners (dead-letter).
  *
  * @param {string} event - Nome do evento
- * @param {{ reason?: string, correlationId?: string }} [opts]
+ * @param {{ reason?: string; correlationId?: string }} [opts]
  */
 export function recordDeadLetter(event, opts) {
     const existing = _deadLetters.get(event);

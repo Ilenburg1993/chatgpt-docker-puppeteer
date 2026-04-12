@@ -10,58 +10,58 @@
 
 ### 1.1 Inventário Numérico
 
-| Métrica                          | Valor     |
-| -------------------------------- | --------- |
-| **Constantes SSOT (bus)**        | 120       |
-| **Constantes SSOT (emitter)**    | 56        |
-| **Total constantes**             | 176       |
-| **Schemas registrados**          | 42        |
-| **Schemas com match SSOT**       | 29 (24%)  |
-| **Schemas orphan (sem SSOT)**    | 13        |
-| **Bus events SEM schema**        | 91 (76%)  |
-| **Bridge coverage**              | 51/56 (91%) |
-| **Emitter events não-bridgeados**| 5         |
-| **Bus-actions ativos**           | 6         |
-| **Middleware stages**            | 4         |
-| **Dynamic catalog entries**      | 176       |
+| Métrica                           | Valor       |
+| --------------------------------- | ----------- |
+| **Constantes SSOT (bus)**         | 120         |
+| **Constantes SSOT (emitter)**     | 56          |
+| **Total constantes**              | 176         |
+| **Schemas registrados**           | 42          |
+| **Schemas com match SSOT**        | 29 (24%)    |
+| **Schemas orphan (sem SSOT)**     | 13          |
+| **Bus events SEM schema**         | 91 (76%)    |
+| **Bridge coverage**               | 51/56 (91%) |
+| **Emitter events não-bridgeados** | 5           |
+| **Bus-actions ativos**            | 6           |
+| **Middleware stages**             | 4           |
+| **Dynamic catalog entries**       | 176         |
 
 ### 1.2 Schemas Orphan (type não existe no SSOT)
 
 Estes 13 schemas foram registrados com types que não correspondem a nenhuma constante SSOT:
 
-| Schema Type              | Problema                                      | Correção                                  |
-| ------------------------ | --------------------------------------------- | ----------------------------------------- |
-| `agent:session:created`  | SSOT é `service:session:created`              | Renomear → `service:session:created`      |
-| `agent:streaming:start`  | Não existe no SSOT                            | Remover ou criar constante                |
-| `agent:streaming:token`  | Não existe no SSOT                            | Remover ou criar constante                |
-| `agent:streaming:complete`| Não existe no SSOT                           | Remover ou criar constante                |
-| `agent:tool:start`       | SSOT é `agent:tool:execution_start`           | Renomear → `agent:tool:execution_start`   |
-| `agent:tool:end`         | SSOT é `agent:tool:execution_complete`        | Renomear → `agent:tool:execution_complete`|
-| `agent:tool:error`       | SSOT é `agent:task:error` (tool-level)        | Avaliar necessidade                       |
-| `hook:registered`        | Não existe no SSOT                            | Remover ou criar constante                |
-| `hub:session:created`    | SSOT `session:created` (hub-events)           | Renomear → `session:created`              |
-| `hub:session:closed`     | SSOT `session:closed` (hub-events)            | Renomear → `session:closed`               |
-| `memory:compaction_complete` | Não existe no SSOT                        | Remover (coberto por session:compaction)  |
-| `system:health:check`    | SSOT é `health:check` (system-events)         | Renomear → `health:check`                 |
-| `system:shutdown:start`  | SSOT é `system:shutdown:started`              | Renomear → `system:shutdown:started`      |
+| Schema Type                  | Problema                               | Correção                                   |
+| ---------------------------- | -------------------------------------- | ------------------------------------------ |
+| `agent:session:created`      | SSOT é `service:session:created`       | Renomear → `service:session:created`       |
+| `agent:streaming:start`      | Não existe no SSOT                     | Remover ou criar constante                 |
+| `agent:streaming:token`      | Não existe no SSOT                     | Remover ou criar constante                 |
+| `agent:streaming:complete`   | Não existe no SSOT                     | Remover ou criar constante                 |
+| `agent:tool:start`           | SSOT é `agent:tool:execution_start`    | Renomear → `agent:tool:execution_start`    |
+| `agent:tool:end`             | SSOT é `agent:tool:execution_complete` | Renomear → `agent:tool:execution_complete` |
+| `agent:tool:error`           | SSOT é `agent:task:error` (tool-level) | Avaliar necessidade                        |
+| `hook:registered`            | Não existe no SSOT                     | Remover ou criar constante                 |
+| `hub:session:created`        | SSOT `session:created` (hub-events)    | Renomear → `session:created`               |
+| `hub:session:closed`         | SSOT `session:closed` (hub-events)     | Renomear → `session:closed`                |
+| `memory:compaction_complete` | Não existe no SSOT                     | Remover (coberto por session:compaction)   |
+| `system:health:check`        | SSOT é `health:check` (system-events)  | Renomear → `health:check`                  |
+| `system:shutdown:start`      | SSOT é `system:shutdown:started`       | Renomear → `system:shutdown:started`       |
 
 ### 1.3 Emitter Events Não-Bridgeados (5)
 
-| Constante                      | Valor               | Ação                                       |
-| ------------------------------ | -------------------- | ------------------------------------------ |
-| `EMITTER_PROCESS_QUEUE`        | `__processQueue`     | ❌ Internal — não bridgear (ok)             |
-| `EMITTER_TURN_START`           | `turn_start`         | ❌ Já bridgeado via `dialog.turn_start` (ok)|
-| `EMITTER_TURN_END`             | `turn_end`           | ❌ Já bridgeado via `dialog.turn_end` (ok)  |
-| `EMITTER_LOOP_PRE_STALL_WARNING` | `pre_stall_warning`| 🔸 Candidato a bridge → `agent:dialog:pre_stall_warning` |
-| `EMITTER_SESSION_IDLE`         | `session.idle`       | 🔸 Candidato a bridge → `agent:session:idle` |
+| Constante                        | Valor               | Ação                                                    |
+| -------------------------------- | ------------------- | ------------------------------------------------------- |
+| `EMITTER_PROCESS_QUEUE`          | `__processQueue`    | ❌ Internal — não bridgear (ok)                          |
+| `EMITTER_TURN_START`             | `turn_start`        | ❌ Já bridgeado via `dialog.turn_start` (ok)             |
+| `EMITTER_TURN_END`               | `turn_end`          | ❌ Já bridgeado via `dialog.turn_end` (ok)               |
+| `EMITTER_LOOP_PRE_STALL_WARNING` | `pre_stall_warning` | 🔸 Candidato a bridge → `agent:dialog:pre_stall_warning` |
+| `EMITTER_SESSION_IDLE`           | `session.idle`      | 🔸 Candidato a bridge → `agent:session:idle`             |
 
 ### 1.4 Hardcoded Strings Residuais
 
-| Local                           | String              | Tipo      | Ação       |
-| -------------------------------- | -------------------- | --------- | ---------- |
-| `config/pinned-files.js` (×2)   | `'changed'`          | Local     | ❌ Legítimo |
-| `terminal/state.js`             | `'phase:changed'`    | Local     | ❌ Legítimo |
-| `bridges/nerv-bridge.js`        | `'before-stop'/'ready'` | DEPRECATED | 🔸 Delete file |
+| Local                         | String                  | Tipo       | Ação          |
+| ----------------------------- | ----------------------- | ---------- | ------------- |
+| `config/pinned-files.js` (×2) | `'changed'`             | Local      | ❌ Legítimo    |
+| `terminal/state.js`           | `'phase:changed'`       | Local      | ❌ Legítimo    |
+| `bridges/nerv-bridge.js`      | `'before-stop'/'ready'` | DEPRECATED | 🔸 Delete file |
 
 ---
 
@@ -200,7 +200,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 ### Onda 10 — Hardening & Cleanup Final
 
-#### FAIXA-L36 — nerv-bridge.js Deletion ⏸️ ADIADO (L13 já fez deprecation, file não causa impacto)
+#### FAIXA-L36 — nerv-bridge.js Deletion ✅ CONCLUÍDO
 
 **Objetivo**: Remover arquivo legado.
 
@@ -211,7 +211,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 
 **Critério**: Arquivo deletado, zero referências
 
-#### FAIXA-L37 — Event System TypeCheck Full Clean ⏸️ ADIADO (próxima onda)
+#### FAIXA-L37 — Event System TypeCheck Full Clean ✅ CONCLUÍDO (0 erros em node + strict)
 
 **Objetivo**: Zero erros TS em todos os arquivos do event system.
 
@@ -263,49 +263,50 @@ START ──→ L29 (Orphan Fix) ──→ L30 (Agent Schemas) ──→ L33 (St
 
 ## 5. Ordem de Execução Recomendada
 
-| Seq | Faixa | Risco      | Prioridade | Dependência    | Esforço   |
-| --- | ----- | ---------- | ---------- | -------------- | --------- |
-| 1   | L29   | 🔴 CRÍTICO  | ALTA       | Nenhuma        | Baixo     |
-| 2   | L30   | 🔴 CRÍTICO  | ALTA       | L29            | Alto      |
-| 3   | L31   | 🟡 MÉDIO    | MÉDIA      | L29            | Médio     |
-| 4   | L32   | 🟢 BAIXO    | BAIXA      | Nenhuma        | Baixo     |
-| 5   | L33   | 🟡 MÉDIO    | MÉDIA      | L30+L31        | Médio     |
-| 6   | L34   | 🟡 MÉDIO    | MÉDIA      | Nenhuma        | Médio     |
-| 7   | L36   | 🟢 BAIXO    | BAIXA      | Nenhuma        | Trivial   |
-| 8   | L35   | 🟢 BAIXO    | BAIXA      | L33            | Alto      |
-| 9   | L37   | 🟡 MÉDIO    | MÉDIA      | L30+L31        | Médio     |
-| 10  | L38   | 🟢 BAIXO    | BAIXA      | L30+L31+L33    | Baixo     |
+| Seq | Faixa | Risco     | Prioridade | Dependência | Esforço |
+| --- | ----- | --------- | ---------- | ----------- | ------- |
+| 1   | L29   | 🔴 CRÍTICO | ALTA       | Nenhuma     | Baixo   |
+| 2   | L30   | 🔴 CRÍTICO | ALTA       | L29         | Alto    |
+| 3   | L31   | 🟡 MÉDIO   | MÉDIA      | L29         | Médio   |
+| 4   | L32   | 🟢 BAIXO   | BAIXA      | Nenhuma     | Baixo   |
+| 5   | L33   | 🟡 MÉDIO   | MÉDIA      | L30+L31     | Médio   |
+| 6   | L34   | 🟡 MÉDIO   | MÉDIA      | Nenhuma     | Médio   |
+| 7   | L36   | 🟢 BAIXO   | BAIXA      | Nenhuma     | Trivial |
+| 8   | L35   | 🟢 BAIXO   | BAIXA      | L33         | Alto    |
+| 9   | L37   | 🟡 MÉDIO   | MÉDIA      | L30+L31     | Médio   |
+| 10  | L38   | 🟢 BAIXO   | BAIXA      | L30+L31+L33 | Baixo   |
 
 ## 6. Score Estimado
 
-| Marco                   | Score Estimado   | Delta |
-| ----------------------- | ---------------- | ----- |
-| Pós-L28 (atual)         | 96/100 (A+)      | —     |
-| Pós-Onda8 (L29-L31)     | 98/100 (A+)      | +2    |
-| Pós-Onda9 (L32-L35)     | 99/100 (A+)      | +1    |
-| Pós-Onda10 (L36-L38)    | 100/100 (S)      | +1    |
+| Marco                | Score Estimado | Delta |
+| -------------------- | -------------- | ----- |
+| Pós-L28 (atual)      | 96/100 (A+)    | —     |
+| Pós-Onda8 (L29-L31)  | 98/100 (A+)    | +2    |
+| Pós-Onda9 (L32-L35)  | 99/100 (A+)    | +1    |
+| Pós-Onda10 (L36-L38) | 100/100 (S)    | +1    |
 
 ---
 
 ## 7. Changelog
 
-| Versão | Data       | Mudanças                                                   |
-| ------ | ---------- | ---------------------------------------------------------- |
+| Versão | Data       | Mudanças                                                  |
+| ------ | ---------- | --------------------------------------------------------- |
 | 1.0    | 2026-04-12 | Auditoria pós-L28, 10 faixas L29-L38, schema 100% roadmap |
 | 2.0    | 2026-04-12 | L29-L35+L38 concluídos; L36-L37 adiados                   |
+| 3.0    | 2026-04-12 | L36-L37 concluídos — roadmap 100% completo                 |
 
 ---
 
 ## 8. Resultado Final
 
-| Métrica                       | Antes (L28) | Depois (L38) |
-| ----------------------------- | ----------- | ------------ |
-| Constantes SSOT (bus)         | 120         | 122          |
-| Schemas registrados           | 42 (29 match) | 122 (100%) |
-| Orphans                       | 13          | 0            |
-| Bridge coverage               | 51/56       | 53/56        |
-| Schema validation             | Warn-only   | Strict mode  |
-| Dead letter tracking          | Básico      | Enhanced (reason, correlationId, cap) |
-| Causality tracing             | Nenhum      | eventId + causationId |
-| CI schema check               | Nenhum      | `npm run test:check-schemas` |
-| Score                         | 96/100 (A+) | 99/100 (A+)  |
+| Métrica               | Antes (L28)   | Depois (L38)                          |
+| --------------------- | ------------- | ------------------------------------- |
+| Constantes SSOT (bus) | 120           | 122                                   |
+| Schemas registrados   | 42 (29 match) | 122 (100%)                            |
+| Orphans               | 13            | 0                                     |
+| Bridge coverage       | 51/56         | 53/56                                 |
+| Schema validation     | Warn-only     | Strict mode                           |
+| Dead letter tracking  | Básico        | Enhanced (reason, correlationId, cap) |
+| Causality tracing     | Nenhum        | eventId + causationId                 |
+| CI schema check       | Nenhum        | `npm run test:check-schemas`          |
+| Score                 | 96/100 (A+)   | 100/100 (S)                           |
