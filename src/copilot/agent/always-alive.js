@@ -552,6 +552,13 @@ try {
         AGENT_STOPPED,
         AGENT_ERROR,
         AGENT_DIALOG_LOOP_CHANGED,
+        AGENT_DIALOG_STALLED,
+        AGENT_DIALOG_PAUSED,
+        AGENT_DIALOG_RESUMED,
+        AGENT_DIALOG_STOPPED,
+        AGENT_DIALOG_REPLY,
+        AGENT_DIALOG_COMPACTION_REQUESTED,
+        AGENT_DIALOG_TURN_TIMEOUT,
         AGENT_SESSION_KEEPALIVE,
         AGENT_TASK_STARTED,
         AGENT_TASK_DELTA,
@@ -567,6 +574,17 @@ try {
             'session.keepalive': AGENT_SESSION_KEEPALIVE,
             'task.started': AGENT_TASK_STARTED,
             'task.delta': AGENT_TASK_DELTA,
+        });
+        // FAIXA-2A: bridge DialogLoopManager → EventBus
+        bridgeEmitter(alwaysAliveAgent.ctx.dialogLoop, bus, {
+            changed: AGENT_DIALOG_LOOP_CHANGED,
+            stalled: AGENT_DIALOG_STALLED,
+            paused: AGENT_DIALOG_PAUSED,
+            resumed: AGENT_DIALOG_RESUMED,
+            stopped: AGENT_DIALOG_STOPPED,
+            reply: AGENT_DIALOG_REPLY,
+            'compaction.requested': AGENT_DIALOG_COMPACTION_REQUESTED,
+            turn_timeout: AGENT_DIALOG_TURN_TIMEOUT,
         });
     }
 } catch {

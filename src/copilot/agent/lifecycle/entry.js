@@ -14,7 +14,16 @@
  */
 
 import { setAuditBus } from '#copilot/audit';
-import { AUDIT_BUS, TimeoutError, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
+import { AUDIT_BUS, TimeoutError, bridgeEmitter, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
+import { EVENT_BUS } from '../../core/di-tokens.js';
+import {
+    HOOK_ERROR_OCCURRED,
+    HOOK_POST_TOOL_USE,
+    HOOK_PRE_TOOL_USE,
+    HOOK_PROMPT_SUBMITTED,
+    HOOK_SESSION_END,
+    HOOK_SESSION_START,
+} from '../../events/index.js';
 import { defaultBus } from '#copilot/hooks';
 import { bootstrapLateDeps, bootstrapObservability, defaultErrorTracker, log } from '#copilot/observability';
 import { CopilotClient } from '#copilot/sdk';
@@ -36,6 +45,19 @@ bootstrapObservability();
 bootstrapLateDeps({ buildTool });
 setAuditBus(defaultBus);
 container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+
+// FAIXA-2A: bridge HookBus → EventBus central para observabilidade cross-module
+const _bus = container.resolve(EVENT_BUS);
+if (_bus) {
+    bridgeEmitter(defaultBus, _bus, {
+        pre_tool_use: HOOK_PRE_TOOL_USE,
+        post_tool_use: HOOK_POST_TOOL_USE,
+        prompt_submitted: HOOK_PROMPT_SUBMITTED,
+        session_start: HOOK_SESSION_START,
+        session_end: HOOK_SESSION_END,
+        error_occurred: HOOK_ERROR_OCCURRED,
+    });
+}
 
 /**
  * Inicializa o agente com retry centralizado (até {@link BOOT_MAX_RETRIES} tentativas).

@@ -54,6 +54,33 @@ export const AGENT_TASK_ERROR = 'agent:task.error';
 export const AGENT_DIALOG_LOOP_CHANGED = 'agent:dialog:loop:changed';
 /** @readonly */
 export const AGENT_DIALOG_TURN_TIMEOUT = 'agent:dialog.turn_timeout';
+/** @readonly */
+export const AGENT_DIALOG_STALLED = 'agent:dialog:stalled';
+/** @readonly */
+export const AGENT_DIALOG_PAUSED = 'agent:dialog:paused';
+/** @readonly */
+export const AGENT_DIALOG_RESUMED = 'agent:dialog:resumed';
+/** @readonly */
+export const AGENT_DIALOG_STOPPED = 'agent:dialog:stopped';
+/** @readonly */
+export const AGENT_DIALOG_REPLY = 'agent:dialog:reply';
+/** @readonly */
+export const AGENT_DIALOG_COMPACTION_REQUESTED = 'agent:dialog:compaction:requested';
+
+// ─── Hook events (bridgeable via HookBus → EventBus) ─────────────────────────
+
+/** @readonly */
+export const HOOK_PRE_TOOL_USE = 'hook:pre_tool_use';
+/** @readonly */
+export const HOOK_POST_TOOL_USE = 'hook:post_tool_use';
+/** @readonly */
+export const HOOK_PROMPT_SUBMITTED = 'hook:prompt_submitted';
+/** @readonly */
+export const HOOK_SESSION_START = 'hook:session_start';
+/** @readonly */
+export const HOOK_SESSION_END = 'hook:session_end';
+/** @readonly */
+export const HOOK_ERROR_OCCURRED = 'hook:error_occurred';
 
 // ─── Hub (Conversation Hub) ───────────────────────────────────────────────────
 
