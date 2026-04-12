@@ -20,6 +20,7 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import observabilityRouterModule from '#copilot/api/express/observability';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
@@ -116,20 +117,54 @@ vi.mock('#copilot/audit/pipeline', () => ({
     getAuditTail: mockGetAuditTail,
 }));
 
+vi.mock('#copilot/config', () => ({
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
+    COPILOT_MCP_SERVERS: '',
+    COPILOT_CUSTOM_AGENTS: '',
+    COPILOT_DISABLED_AGENTS: '',
+}));
+
 vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: vi.fn(),
 }));
 
-// ─── Import router após mocks ───────────────────────────────────────────────
+vi.mock('#copilot/bridges', () => ({
+    getMcpStatus: mockGetMcpStatus,
+    isMounted: mockIsNervMounted,
+}));
 
-const { default: observabilityRouter } = await import('#copilot/api/express/observability');
+vi.mock('#copilot/services', () => ({
+    createAuditService: vi.fn(() => ({
+        getDefaultLog: () => mockDefaultAuditLog,
+        getTail: (n) => mockGetAuditTail(n),
+        flush: vi.fn(),
+    })),
+}));
+
+vi.mock('#copilot/observability', () => ({
+    log: mockLog,
+    getRecentLogs: mockGetRecentLogs,
+    LOG_DIR: '/tmp/test-logs',
+    defaultMetrics: { getSummary: mockGetSummary },
+    defaultErrorTracker: {
+        getErrors: mockGetErrors,
+        getStats: mockGetStats,
+        clearErrors: mockClearErrors,
+    },
+    getLastQuotaSnapshots: mockGetLastQuotaSnapshots,
+    getCatalog: mockGetCatalog,
+    getDeadLetters: mockGetDeadLetters,
+    isOtelEnabled: vi.fn(() => true),
+    DEFAULT_OTEL_FILE: '/tmp/otel-traces.json',
+}));
 
 // ─── Test App ────────────────────────────────────────────────────────────────
 
 function createApp() {
     const app = express();
     app.use(express.json());
-    app.use('/api/sdk', observabilityRouter);
+    const router = observabilityRouterModule({ agent: { getStatusSnapshot: mockGetStatusSnapshot } });
+    app.use('/api/sdk', router);
     return app;
 }
 
