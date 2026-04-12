@@ -214,12 +214,24 @@ function deepImportCount() {
 function localEmitterCount() {
     const files = walkJs(COPILOT_ROOT);
     const extendsRe = /\bextends\s+BaseEmitter\b/;
+    // Emitters que têm bridge configurado via bridgeEmitter() — não penalizar
+    // FAIXA-2A: always-alive.js → agent + dialogLoop + handoff bridge
+    //           entry.js        → HookBus (hooks/bus.js) bridge
+    const BRIDGED = new Set([
+        'agent/always-alive.js',      // bridges: agent, dialogLoop, handoff
+        'hooks/bus.js',               // bridge: HookBus → EventBus (via entry.js)
+        'agent/dialog/loop-manager.js', // bridge: dialogLoop → EventBus (via always-alive.js)
+        'agent/infra/handoff-manager.js', // bridge: handoff → EventBus (via always-alive.js)
+    ]);
     /** @type {string[]} */
     const found = [];
     for (const f of files) {
         const src = readFileSync(f, 'utf-8');
         if (extendsRe.test(src)) {
-            found.push(f.replace(COPILOT_ROOT + '/', ''));
+            const rel = f.replace(COPILOT_ROOT + '/', '');
+            if (!BRIDGED.has(rel)) {
+                found.push(rel);
+            }
         }
     }
     return { localEmitterCount: found.length, files: found };
