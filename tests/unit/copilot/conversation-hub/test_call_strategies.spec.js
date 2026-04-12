@@ -41,9 +41,9 @@ describe('callViaDialogLoop', () => {
     it('lança SessionError quando agent não suporta sendDialogTurn', async () => {
         const agent = { on: vi.fn(), off: vi.fn() };
         const ctx = makeCtx();
-        await expect(
-            () => callViaDialogLoop(/** @type {any} */ (agent), 'hello', 'hello', ctx),
-        ).rejects.toThrow('sendDialogTurn');
+        await expect(() => callViaDialogLoop(/** @type {any} */ (agent), 'hello', 'hello', ctx)).rejects.toThrow(
+            'sendDialogTurn',
+        );
     });
 
     it('registra e remove listener de task.delta', async () => {
@@ -91,12 +91,8 @@ describe('callViaDialogLoop', () => {
             off: vi.fn(),
         };
         const ctx = makeCtx();
-        await expect(
-            () => callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx),
-        ).rejects.toThrow();
-        expect(
-            agent.off.mock.calls.some((c) => c[0] === 'task.delta'),
-        ).toBeTruthy(); // off deve ser chamado no finally
+        await expect(() => callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx)).rejects.toThrow();
+        expect(agent.off.mock.calls.some((c) => c[0] === 'task.delta')).toBeTruthy(); // off deve ser chamado no finally
     });
 });
 

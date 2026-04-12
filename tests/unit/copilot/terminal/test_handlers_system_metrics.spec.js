@@ -5,7 +5,7 @@
  * Testes para handlers/system-metrics.js — endpoints de history, git status/log. Foca nos handlers testáveis sem mocks
  * pesados de agent singletons.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
     handleGetHistory,

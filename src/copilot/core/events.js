@@ -1,14 +1,13 @@
 // @ts-check
 /**
  * @module copilot/core/agent-events
- * @see EventBus
  * @file Constantes de eventos emitidos pelo AlwaysAliveAgent.
- *
- * @deprecated FAIXA-2B: Importar de `#copilot/events` (via `events/agent-events.js`) em vez deste módulo.
- *   Este arquivo é mantido para compatibilidade retroativa e será removido em versão futura.
- *   Consumidores atuais: `agent/state/agent-state.js`, `api/bridge/stream.js`, `terminal/terminal-agent-wiring.js`.
+ * @deprecated FAIXA-2B: Importar de `#copilot/events` (via `events/agent-events.js`) em vez deste módulo. Este arquivo
+ *   é mantido para compatibilidade retroativa e será removido em versão futura. Consumidores atuais:
+ *   `agent/state/agent-state.js`, `api/bridge/stream.js`, `terminal/terminal-agent-wiring.js`.
  *
  *   Originalmente em `agent/events.js` — movido para `core/` (R9) para eliminar a dependência invertida `core/ → agent/`.
+ * @see EventBus
  */
 
 /**
@@ -193,12 +192,12 @@ export const HIGH_FREQUENCY_EVENTS = /** @type {ReadonlySet<AgentEventName>} */ 
 // Futuramente, quando AGENT_EVENTS migrar para importar de `#copilot/events`, este arquivo pode ser
 // substituído por um simples thin re-export.
 export {
-    AGENT_READY,
     AGENT_BEFORE_STOP,
-    AGENT_STOPPED,
-    AGENT_SHUTDOWN,
     AGENT_ERROR,
-    AGENT_HANDOFF_RECEIVED,
     AGENT_HANDOFF_ACCEPTED,
+    AGENT_HANDOFF_RECEIVED,
     AGENT_HANDOFF_REJECTED,
+    AGENT_READY,
+    AGENT_SHUTDOWN,
+    AGENT_STOPPED,
 } from '../events/agent-events.js';

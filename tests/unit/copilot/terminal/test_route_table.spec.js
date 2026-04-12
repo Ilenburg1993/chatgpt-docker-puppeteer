@@ -4,7 +4,7 @@
  *
  * F186: Testes para route-table.js — matchRoute e integridade da ROUTE_TABLE.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { matchRoute, ROUTE_TABLE } from '../../../../src/copilot/terminal/route-table.js';
 

@@ -4,16 +4,17 @@
  *
  * FAIXA-2D — Subscribers cross-module do EventBus para observabilidade.
  *
- * Complementa o `agent-event-observer.js` (que escuta diretamente o AgentEmitter) com subscribers
- * via EventBus global, permitindo observar eventos bridgeados de outros módulos (HookBus, DialogLoop,
- * HandoffManager, PinnedFilesLoader, HubOrchestrator).
+ * Complementa o `agent-event-observer.js` (que escuta diretamente o AgentEmitter) com subscribers via EventBus global,
+ * permitindo observar eventos bridgeados de outros módulos (HookBus, DialogLoop, HandoffManager, PinnedFilesLoader,
+ * HubOrchestrator).
  *
  * Deve ser chamado após `bootstrapObservability()` e após o EventBus estar registrado no container.
  *
  * Design:
- *   - Zero acoplamento de runtime com módulos de nível superior
- *   - Todos os subscribers são registrados via `bus.on()` e podem ser removidos via `detach()`
- *   - Seguro a erros: exceções nos handlers são capturadas e logadas
+ *
+ * - Zero acoplamento de runtime com módulos de nível superior
+ * - Todos os subscribers são registrados via `bus.on()` e podem ser removidos via `detach()`
+ * - Seguro a erros: exceções nos handlers são capturadas e logadas
  *
  * @module copilot/observability/event-bus-observers
  * @see EventBus

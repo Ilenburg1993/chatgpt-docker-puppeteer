@@ -5,7 +5,7 @@
  * F183: Testes para file-context.js — funções puras de detecção, extração e embedding.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
     clearFileCache,

@@ -17,10 +17,10 @@
  *   - GET /observability/events/catalog + /events/dead-letter
  */
 
+import observabilityRouterModule from '#copilot/api/express/observability';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import observabilityRouterModule from '#copilot/api/express/observability';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
@@ -76,7 +76,10 @@ vi.mock('#copilot/observability/error-tracker', () => ({
 
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
-    getRecentLogs: mockGetRecentLogs, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    getRecentLogs: mockGetRecentLogs,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: { getStatusSnapshot: mockGetStatusSnapshot },

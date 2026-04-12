@@ -101,6 +101,7 @@ async function applyRoutes(app) {
     app.get('/api/health/pm2', healthController.getPm2Health);
     app.get('/api/health/kernel', healthController.getKernelHealth);
     app.get('/api/health/disk', healthController.getDiskHealth);
+    app.get('/api/health/events', healthController.getEventsHealth);
 
     // Metrics endpoint (delegado a `controllers/metrics.js`)
     app.get('/api/metrics', metricsController.getMetrics);

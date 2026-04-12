@@ -11,6 +11,7 @@
  */
 
 import { container, EVENT_BUS } from '#copilot/core';
+import { SERVICE_SESSION_CREATED, SERVICE_SESSION_DISCONNECTED, SERVICE_SESSION_RESUMED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import {
     approveAll,
@@ -85,7 +86,7 @@ export class SessionService {
     async createSession(config) {
         log('INFO', `[SessionService] criando sessão com model=${config.model ?? 'default'}`);
         const session = await createClientSession(config);
-        this.#bus()?.emit({ type: 'session:create' });
+        this.#bus()?.emit({ type: SERVICE_SESSION_CREATED });
         return session;
     }
 
@@ -108,7 +109,7 @@ export class SessionService {
     async disconnectSession(sessionId) {
         log('INFO', `[SessionService] desconectando sessão ${sessionId}`);
         await disconnectClientSession(sessionId);
-        this.#bus()?.emit({ type: 'session:disconnect' });
+        this.#bus()?.emit({ type: SERVICE_SESSION_DISCONNECTED });
     }
 
     /**
@@ -121,7 +122,7 @@ export class SessionService {
     async resumeSession(sessionId, config) {
         log('INFO', `[SessionService] retomando sessão ${sessionId}`);
         const session = await resumeClientSession(sessionId, config);
-        this.#bus()?.emit({ type: 'session:resume' });
+        this.#bus()?.emit({ type: SERVICE_SESSION_RESUMED });
         return session;
     }
 

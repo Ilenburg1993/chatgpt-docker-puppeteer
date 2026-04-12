@@ -11,7 +11,7 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { readFileSync, existsSync } = require('node:fs');

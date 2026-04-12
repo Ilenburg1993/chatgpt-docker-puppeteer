@@ -40,6 +40,12 @@ export const AGENT_TASK_STARTED = 'agent:task:started';
 export const AGENT_TASK_DELTA = 'agent:task:delta';
 /** @readonly */
 export const AGENT_TASK_ERROR = 'agent:task.error';
+/** @readonly */
+export const AGENT_TASK_COMPLETED = 'agent:task:completed';
+/** @readonly */
+export const AGENT_TASK_QUEUED = 'agent:task:queued';
+/** @readonly */
+export const AGENT_TASK_REASONING = 'agent:task:reasoning';
 
 // ─── Agent dialog ─────────────────────────────────────────────────────────────
 
@@ -59,6 +65,63 @@ export const AGENT_DIALOG_STOPPED = 'agent:dialog:stopped';
 export const AGENT_DIALOG_REPLY = 'agent:dialog:reply';
 /** @readonly */
 export const AGENT_DIALOG_COMPACTION_REQUESTED = 'agent:dialog:compaction:requested';
+/** @readonly */
+export const AGENT_DIALOG_TURN_START = 'agent:dialog:turn_start';
+/** @readonly */
+export const AGENT_DIALOG_TURN_END = 'agent:dialog:turn_end';
+/** @readonly */
+export const AGENT_DIALOG_READY = 'agent:dialog:ready';
+
+// ─── Agent tool ───────────────────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_TOOL_EXECUTION_START = 'agent:tool:execution_start';
+/** @readonly */
+export const AGENT_TOOL_EXECUTION_COMPLETE = 'agent:tool:execution_complete';
+/** @readonly */
+export const AGENT_TOOL_EXECUTION_PROGRESS = 'agent:tool:execution_progress';
+
+// ─── Agent session (extended) ─────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_SESSION_COMPACTION_START = 'agent:session:compaction_start';
+/** @readonly */
+export const AGENT_SESSION_COMPACTION_COMPLETE = 'agent:session:compaction_complete';
+/** @readonly */
+export const AGENT_SESSION_USAGE = 'agent:session:usage';
+/** @readonly */
+export const AGENT_SESSION_TOKEN_BUDGET_WARNING = 'agent:session:token_budget_warning';
+/** @readonly */
+export const AGENT_SESSION_MODE_CHANGED = 'agent:session:mode_changed';
+/** @readonly */
+export const AGENT_SESSION_HISTORY_SYNCED = 'agent:session:history_synced';
+/** @readonly */
+export const AGENT_SESSION_INFO = 'agent:session:info';
+/** @readonly */
+export const AGENT_SESSION_TITLE_CHANGED = 'agent:session:title_changed';
+/** @readonly */
+export const AGENT_SESSION_SNAPSHOT_REWIND = 'agent:session:snapshot_rewind';
+/** @readonly */
+export const AGENT_SESSION_WORKSPACE_FILE_CHANGED = 'agent:session:workspace_file_changed';
+
+// ─── Agent misc ───────────────────────────────────────────────────────────────
+
+/** @readonly */
+export const AGENT_CONTEXT_COMPACTED = 'agent:context:compacted';
+/** @readonly */
+export const AGENT_METRICS = 'agent:metrics';
+/** @readonly */
+export const AGENT_PERMISSION_MODE_CHANGED = 'agent:permission:mode_changed';
+/** @readonly */
+export const AGENT_PR_CONSUMED = 'agent:pr:consumed';
+/** @readonly */
+export const AGENT_PR_FALLBACK_MODEL = 'agent:pr:fallback_model';
+/** @readonly */
+export const AGENT_QUESTION_PENDING = 'agent:question:pending';
+/** @readonly */
+export const AGENT_QUESTION_ANSWERED = 'agent:question:answered';
+/** @readonly */
+export const AGENT_SYSTEM_MESSAGE = 'agent:system:message';
 
 // ─── Agent handoff ────────────────────────────────────────────────────────────
 
@@ -74,11 +137,11 @@ export const AGENT_HANDOFF_REJECTED = 'agent:handoff:rejected';
 /**
  * Array completo de nomes de eventos emitidos pelo AlwaysAliveAgent.
  *
- * Migrado de `core/events.js`. Mantido para compatibilidade com consumidores que iteram via loop.
- * Inclui todos os eventos internos (incluindo strings legadas sem prefixo `agent:`).
+ * Migrado de `core/events.js`. Mantido para compatibilidade com consumidores que iteram via loop. Inclui todos os
+ * eventos internos (incluindo strings legadas sem prefixo `agent:`).
  *
- * @readonly
  * @type {readonly string[]}
+ * @readonly
  */
 export const AGENT_EVENTS = /** @type {const} */ ([
     // ── task (⚠️ CONSOME PR via sendMessage) ───────────────────────────

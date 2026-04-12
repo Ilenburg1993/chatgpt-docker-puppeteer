@@ -135,7 +135,7 @@ describe('socket-ns mountCopilotNamespace', () => {
         orch.init(/** @type {any} */ (bridge));
 
         const result = mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
-        expect(result).toBeTruthy() // deve retornar o namespace;
+        expect(result).toBeTruthy(); // deve retornar o namespace;
         expect(mockIo.of.mock.calls[0][0] === '/copilot').toBeTruthy();
 
         // Cleanup
@@ -165,7 +165,7 @@ describe('socket-ns mountCopilotNamespace', () => {
         mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
         const count2 = mockIo.of.mock.calls.length;
 
-        expect(count1).toBe(count2) // of() não deve ser chamado novamente no re-mount;
+        expect(count1).toBe(count2); // of() não deve ser chamado novamente no re-mount;
 
         mod.unmountCopilotNamespace();
         orch.destroy();

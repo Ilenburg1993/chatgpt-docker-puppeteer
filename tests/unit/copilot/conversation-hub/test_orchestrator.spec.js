@@ -109,7 +109,7 @@ describe('HubOrchestrator lifecycle', () => {
 
         // Após destroy, listeners foram removidos
         orch.emit('session:created', {});
-        expect(eventFired).toBeFalsy() // Listener deve ser removido após destroy;
+        expect(eventFired).toBeFalsy(); // Listener deve ser removido após destroy;
     });
 });
 
@@ -153,9 +153,7 @@ describe('HubOrchestrator session management', () => {
         const id = orch.createSession();
         orch.closeSession(id);
 
-        await expect(
-            () => orch.sendToLlmB(id, 'hello'),
-        ).rejects.toThrow('encerrada');
+        await expect(() => orch.sendToLlmB(id, 'hello')).rejects.toThrow('encerrada');
     });
 
     it('listSessions retorna sessões do store', () => {
@@ -239,9 +237,7 @@ describe('HubOrchestrator sendToLlmB', () => {
         orch.on('error', (d) => errorEvents.push(d));
 
         const id = orch.createSession();
-        await expect(
-            () => orch.sendToLlmB(id, 'will fail'),
-        ).rejects.toThrow('bridge failure');
+        await expect(() => orch.sendToLlmB(id, 'will fail')).rejects.toThrow('bridge failure');
 
         expect(errorEvents.length).toBe(1);
 
@@ -257,9 +253,7 @@ describe('HubOrchestrator sendToLlmB', () => {
         const orch = new HubOrchestrator(store, createMockAgent());
         // Não chama init()
         const id = store.createHubSession({ title: 'no-init' });
-        await expect(
-            () => orch.sendToLlmB(id, 'hello'),
-        ).rejects.toThrow('inicializado');
+        await expect(() => orch.sendToLlmB(id, 'hello')).rejects.toThrow('inicializado');
         orch.destroy();
     });
 
@@ -269,9 +263,7 @@ describe('HubOrchestrator sendToLlmB', () => {
         orch.init(/** @type {any} */ (createMockBridge()));
 
         const id = orch.createSession();
-        await expect(
-            () => orch.sendToLlmB(id, 'hello'),
-        ).rejects.toThrow('ativo');
+        await expect(() => orch.sendToLlmB(id, 'hello')).rejects.toThrow('ativo');
 
         orch.destroy();
     });
@@ -356,7 +348,7 @@ describe('HubOrchestrator history', () => {
         await orch.sendToLlmB(id, 'msg for history');
 
         const history = orch.readHistory(id);
-        expect(history.length >= 2).toBeTruthy() // Deve ter turn de LLM-A e LLM-B;
+        expect(history.length >= 2).toBeTruthy(); // Deve ter turn de LLM-A e LLM-B;
 
         orch.destroy();
     });

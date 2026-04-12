@@ -16,7 +16,6 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
-
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
 // O alwaysAliveAgent é um singleton que EventEmitter; precisamos interceptar
@@ -72,7 +71,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
     it('exporta chatStructured como método de LlmBridgeClient', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const instance = new mod.LlmBridgeClient();
-        expect(typeof instance.chatStructured === 'function').toBeTruthy() // chatStructured deve ser método;
+        expect(typeof instance.chatStructured === 'function').toBeTruthy(); // chatStructured deve ser método;
     });
 
     it('chatStructured() retorna shape StructuredChatResult', async () => {
@@ -97,12 +96,12 @@ describe('LlmBridgeClient › chatStructured()', () => {
         });
 
         // Deve ter todos os campos de StructuredChatResult
-        expect('structured' in result).toBeTruthy() // deve ter campo structured;
-        expect('raw' in result).toBeTruthy() // deve ter campo raw;
-        expect('taskId' in result).toBeTruthy() // deve ter campo taskId;
-        expect('durationMs' in result).toBeTruthy() // deve ter campo durationMs;
-        expect('chunks' in result).toBeTruthy() // deve ter campo chunks;
-        expect('responseLen' in result).toBeTruthy() // deve ter campo responseLen;
+        expect('structured' in result).toBeTruthy(); // deve ter campo structured;
+        expect('raw' in result).toBeTruthy(); // deve ter campo raw;
+        expect('taskId' in result).toBeTruthy(); // deve ter campo taskId;
+        expect('durationMs' in result).toBeTruthy(); // deve ter campo durationMs;
+        expect('chunks' in result).toBeTruthy(); // deve ter campo chunks;
+        expect('responseLen' in result).toBeTruthy(); // deve ter campo responseLen;
     });
 
     it('parseia resposta JSON de LLM-B → structured ≠ null', async () => {
@@ -149,7 +148,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         });
 
         expect(result.structured).toBe(null); // structured deve ser null para texto puro
-        expect(result.raw.length > 0).toBeTruthy() // raw deve ter conteúdo mesmo sem parse;
+        expect(result.raw.length > 0).toBeTruthy(); // raw deve ter conteúdo mesmo sem parse;
     });
 
     it('propaga raw sempre (JSON e texto puro)', async () => {
@@ -205,7 +204,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const onDelta = (/** @type {any} */ _chunk) => {};
         await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' }, { onDelta });
 
-        expect(capturedOpts !== null).toBeTruthy() // opts deve ter sido passado para chat();
+        expect(capturedOpts !== null).toBeTruthy(); // opts deve ter sido passado para chat();
         expect(capturedOpts.onDelta).toBe(onDelta); // onDelta deve ser passado adiante
     });
 
@@ -227,17 +226,17 @@ describe('LlmBridgeClient › chatStructured()', () => {
             responseType: 'diagnostic',
         });
 
-        expect(capturedMsg.includes('STRUCTURED_PROTOCOL_V1:')).toBeTruthy() // deve incluir instrução de protocolo;
-        expect(capturedMsg.includes('"context"')).toBeTruthy() // deve incluir campo context serializado;
-        expect(capturedMsg.includes('"intent"')).toBeTruthy() // deve incluir campo intent serializado;
+        expect(capturedMsg.includes('STRUCTURED_PROTOCOL_V1:')).toBeTruthy(); // deve incluir instrução de protocolo;
+        expect(capturedMsg.includes('"context"')).toBeTruthy(); // deve incluir campo context serializado;
+        expect(capturedMsg.includes('"intent"')).toBeTruthy(); // deve incluir campo intent serializado;
     });
 
     it('lança ZodError para input inválido (context vazio)', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
-        await expect(
-            () => b.chatStructured({ context: '', intent: 'i', responseType: 'diagnostic' }),
+        await expect(() =>
+            b.chatStructured({ context: '', intent: 'i', responseType: 'diagnostic' }),
         ).rejects.toThrow();
     });
 

@@ -737,6 +737,19 @@ async function bootstrap(options = {}) {
                 registerNervBridgeAgent(_bridgeAgent);
                 copilotNervBridge.mount(/** @type {any} */ (nerv));
                 log('INFO', '[COPILOT] copilotNervBridge montado — eventos do AlwaysAliveAgent fluem para NERV');
+
+                // FAIXA-L3: NervEventBusAdapter — relay EventBus centralizado → NERV (coexiste com nerv-bridge legado)
+                try {
+                    const { nervEventBusAdapter } = await import('#copilot/bridges/nerv-event-bus-adapter');
+                    const { container, EVENT_BUS } = await import('#copilot/core');
+                    const eventBus = container.resolve(EVENT_BUS);
+                    if (eventBus) {
+                        nervEventBusAdapter.mount(eventBus, /** @type {any} */ (nerv));
+                        log('INFO', '[COPILOT] NervEventBusAdapter montado — EventBus centralizado → NERV');
+                    }
+                } catch (/** @type {any} */ adapterErr) {
+                    log('WARN', `[COPILOT] Falha ao montar NervEventBusAdapter: ${adapterErr?.message}`);
+                }
             } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);
                 log('WARN', `[COPILOT] Falha ao montar copilotNervBridge: ${_e.message}`);

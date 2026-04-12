@@ -5,6 +5,8 @@
 **Precedente**: PARTE-23A (diagnóstico), 23B (events), 23C (services), 23D (bugs/features), 23E (grafos)
 
 > **Exclusões explícitas**: God files splitting (apenas via natural refactoring), migração direta para TS
+>
+> LEIA O ARQUIVO A SEGUIR, QUE SUBSTITUI ESTE: DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL/PARTE-23I-ROADMAP-EXPANDIDO-V2.md
 
 ---
 

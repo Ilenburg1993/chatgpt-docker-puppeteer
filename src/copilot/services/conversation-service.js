@@ -9,6 +9,7 @@
 
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { container, EVENT_BUS } from '#copilot/core';
+import { SERVICE_SESSION_MESSAGE } from '#copilot/events';
 import { log } from '#copilot/observability';
 
 /**
@@ -63,7 +64,7 @@ export class ConversationService {
     sendToLlmB(hubSessionId, message, options) {
         log('DEBUG', `[ConversationService] enviando para LLM-B sessão ${hubSessionId}`);
         void conversationHub.sendToLlmB(hubSessionId, message, options);
-        this.#bus()?.emit({ type: 'session:message' });
+        this.#bus()?.emit({ type: SERVICE_SESSION_MESSAGE });
     }
 
     /**

@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 describe('copilot/plugins/PluginRegistry', () => {
     /** @returns {Promise<import('#copilot/plugins').PluginRegistry>} */
@@ -158,17 +158,23 @@ describe('copilot/plugins/PluginRegistry', () => {
         reg.register({
             name: 'alpha',
             type: /** @type {const} */ ('tool'),
-            install: () => { installed.push('alpha'); },
+            install: () => {
+                installed.push('alpha');
+            },
         });
         reg.register({
             name: 'beta',
             type: /** @type {const} */ ('hook'),
-            install: () => { installed.push('beta'); },
+            install: () => {
+                installed.push('beta');
+            },
         });
         reg.register({
             name: 'gamma',
             type: /** @type {const} */ ('service'),
-            install: () => { installed.push('gamma'); },
+            install: () => {
+                installed.push('gamma');
+            },
         });
         const { createContainer } = await import('../../../src/copilot/core/di.js');
         const result = await activatePlugins(reg, createContainer(), ['alpha', 'gamma']);

@@ -18,8 +18,8 @@
  */
 
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
-import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { bridgeEmitter } from '#copilot/core';
+import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
@@ -29,7 +29,14 @@ import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
-import { BRIDGE_AGENT, EVENT_BUS, FALLBACK_AGENT, HUB, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../core/di-tokens.js';
+import {
+    BRIDGE_AGENT,
+    EVENT_BUS,
+    FALLBACK_AGENT,
+    HUB,
+    NERV_BRIDGE_AGENT,
+    PERMISSION_AGENT,
+} from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';

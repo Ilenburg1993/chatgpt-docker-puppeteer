@@ -217,4 +217,40 @@ async function getDiskHealth(req, res) {
     }
 }
 
-export { getChromeHealth, getDiskHealth, getHealth, getKernelHealth, getPm2Health };
+/**
+ * GET /api/health/events - Diagnóstico do EventBus centralizado (FAIXA-L8).
+ *
+ * @param {HealthRequestLike} _req
+ * @param {HealthResponseLike} res
+ * @returns {Promise<void>}
+ */
+async function getEventsHealth(_req, res) {
+    try {
+        const { container, EVENT_BUS } = await import('#copilot/core');
+        const bus = container.resolve(EVENT_BUS);
+        if (!bus || typeof bus.diagnostics !== 'function') {
+            res.json({ status: 'unavailable', message: 'EventBus not registered or lacks diagnostics()' });
+            return;
+        }
+        const diag = bus.diagnostics();
+        const byNs = typeof bus.statsByNamespace === 'function' ? bus.statsByNamespace() : {};
+        const channels = typeof bus.channels === 'function' ? bus.channels() : [];
+        res.json({
+            status: 'ok',
+            timestamp: Date.now(),
+            totalListeners: diag.totalListeners,
+            middlewareCount: diag.middlewareCount,
+            disposed: diag.disposed,
+            channels,
+            emittedByNamespace: byNs,
+            emittedTotal: diag.emitted,
+            listeners: diag.listeners,
+        });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Events health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
+    }
+}
+
+export { getChromeHealth, getDiskHealth, getEventsHealth, getHealth, getKernelHealth, getPm2Health };

@@ -166,8 +166,8 @@ function fanOut() {
 /**
  * Conta deep imports (non-barrel #copilot/module/subfile/...). Retorna total e refinado (excluindo allow-list).
  *
- * FAIXA-1C C5: regex agora captura imports com 2+ segmentos após o módulo-raiz (ex: #copilot/a/b/c).
- * A regex anterior só capturava exatamente 2 segmentos, ignorando paths com 3+ partes.
+ * FAIXA-1C C5: regex agora captura imports com 2+ segmentos após o módulo-raiz (ex: #copilot/a/b/c). A regex anterior
+ * só capturava exatamente 2 segmentos, ignorando paths com 3+ partes.
  *
  * @returns {{ total: number; refined: number }}
  */
@@ -206,8 +206,8 @@ function deepImportCount() {
 /**
  * Conta emissores locais (classes que estendem BaseEmitter em vez de emitir via EventBus).
  *
- * FAIXA-1C C2: este padrão indica que eventos não passam pelo EventBus central,
- * tornando subscribers impossíveis de adicionar sem modificar o emissor.
+ * FAIXA-1C C2: este padrão indica que eventos não passam pelo EventBus central, tornando subscribers impossíveis de
+ * adicionar sem modificar o emissor.
  *
  * @returns {{ localEmitterCount: number; files: string[] }}
  */
@@ -218,8 +218,8 @@ function localEmitterCount() {
     // FAIXA-2A: always-alive.js → agent + dialogLoop + handoff bridge
     //           entry.js        → HookBus (hooks/bus.js) bridge
     const BRIDGED = new Set([
-        'agent/always-alive.js',      // bridges: agent, dialogLoop, handoff
-        'hooks/bus.js',               // bridge: HookBus → EventBus (via entry.js)
+        'agent/always-alive.js', // bridges: agent, dialogLoop, handoff
+        'hooks/bus.js', // bridge: HookBus → EventBus (via entry.js)
         'agent/dialog/loop-manager.js', // bridge: dialogLoop → EventBus (via always-alive.js)
         'agent/infra/handoff-manager.js', // bridge: handoff → EventBus (via always-alive.js)
     ]);
@@ -240,23 +240,37 @@ function localEmitterCount() {
 /**
  * Detecta violações de camada via imports proibidos.
  *
- * FAIXA-1C violations: substitui o hardcoded 0 por detecção real de
- * padrões como: core/ importando de agent/, services/ importando de terminal/api/,
- * events/ importando de qualquer módulo de nível > L1.
+ * FAIXA-1C violations: substitui o hardcoded 0 por detecção real de padrões como: core/ importando de agent/, services/
+ * importando de terminal/api/, events/ importando de qualquer módulo de nível > L1.
  *
  * @returns {number} contagem de violações detectadas
  */
 function layerViolations() {
-    /** @type {Array<{module: string; forbids: RegExp}>} */
+    /** @type {{ module: string; forbids: RegExp }[]} */
     const rules = [
         // L0: core/ não pode importar de módulos higher-level
-        { module: 'core', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        {
+            module: 'core',
+            forbids:
+                /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/,
+        },
         // L0: events/ não pode importar de módulos higher-level
-        { module: 'events', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        {
+            module: 'events',
+            forbids:
+                /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/,
+        },
         // L0: db/ não pode importar de módulos higher-level
-        { module: 'db', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/ },
+        {
+            module: 'db',
+            forbids:
+                /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|observability|conversation-hub|channel|sdk)/,
+        },
         // L1: audit/ não pode importar de L3+
-        { module: 'audit', forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|conversation-hub|channel)/ },
+        {
+            module: 'audit',
+            forbids: /#copilot\/(?:agent|terminal|api|services|bridges|hooks|tools|conversation-hub|channel)/,
+        },
     ];
 
     let violations = 0;
@@ -308,6 +322,7 @@ function testCount() {
  * Calcula health score de A a F.
  *
  * FAIXA-1C: pesos recalibrados para refletir estado real:
+ *
  * - singletons: threshold baixado (>10 penaliza; antes >20) para capturar os ~25 reais
  * - fan-out: mantido (>8 penaliza)
  * - violations: agora calculado real (não hardcoded 0)

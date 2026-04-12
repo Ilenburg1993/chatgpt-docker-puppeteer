@@ -14,8 +14,22 @@
  */
 
 import { setAuditBus } from '#copilot/audit';
-import { AUDIT_BUS, TimeoutError, bridgeEmitter, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
+import {
+    AUDIT_BUS,
+    TimeoutError,
+    bridgeEmitter,
+    container,
+    registerShutdownHandler,
+    runShutdown,
+    withRetry,
+} from '#copilot/core';
+import { defaultBus } from '#copilot/hooks';
+import { bootstrapLateDeps, bootstrapObservability, defaultErrorTracker, log } from '#copilot/observability';
+import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
+import { CopilotClient } from '#copilot/sdk';
+import { buildTool } from '#copilot/tools';
 import { EVENT_BUS } from '../../core/di-tokens.js';
+import { logSwallowed } from '../../core/error-handlers.js';
 import {
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
@@ -24,12 +38,6 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../events/index.js';
-import { defaultBus } from '#copilot/hooks';
-import { bootstrapLateDeps, bootstrapObservability, defaultErrorTracker, log } from '#copilot/observability';
-import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
-import { CopilotClient } from '#copilot/sdk';
-import { buildTool } from '#copilot/tools';
-import { logSwallowed } from '../../core/error-handlers.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
     BOOT_MAX_RETRIES,

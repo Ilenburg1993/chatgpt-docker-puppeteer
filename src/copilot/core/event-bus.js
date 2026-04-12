@@ -170,6 +170,49 @@ export class EventBus {
     }
 
     /**
+     * Retorna contadores agrupados por namespace (parte antes do primeiro ':').
+     *
+     * @returns {Record<string, number>}
+     */
+    statsByNamespace() {
+        /** @type {Record<string, number>} */
+        const result = {};
+        for (const [type, count] of this.#counters) {
+            const colonIdx = type.indexOf(':');
+            const ns = colonIdx > 0 ? type.slice(0, colonIdx) : '_global';
+            result[ns] = (result[ns] ?? 0) + count;
+        }
+        return result;
+    }
+
+    /**
+     * Retorna diagnóstico completo do bus em runtime.
+     *
+     * @returns {{ listeners: { type: string; count: number }[]; emitted: Record<string, number>; disposed: boolean; middlewareCount: number; totalListeners: number }}
+     */
+    diagnostics() {
+        return {
+            listeners: Array.from(this.#listeners.entries()).map(([type, set]) => ({
+                type,
+                count: set.size,
+            })),
+            emitted: Object.fromEntries(this.#counters),
+            disposed: this.#disposed,
+            middlewareCount: this.#middleware.length,
+            totalListeners: this.listenerCount,
+        };
+    }
+
+    /**
+     * Retorna lista de event types com pelo menos 1 subscriber ativo.
+     *
+     * @returns {string[]}
+     */
+    channels() {
+        return Array.from(this.#listeners.keys()).filter(k => (this.#listeners.get(k)?.size ?? 0) > 0);
+    }
+
+    /**
      * Remove todos os listeners e middleware. EventBus fica inoperante.
      */
     dispose() {

@@ -8,6 +8,7 @@
  */
 
 import { container, EVENT_BUS } from '#copilot/core';
+import { SERVICE_TOOL_INVOKED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { allTools, buildTool, getDisabledTools, isToolDisabled } from '#copilot/tools';
 
@@ -43,7 +44,7 @@ export class ToolService {
     buildTool(options) {
         log('DEBUG', '[ToolService] construindo ferramenta');
         const tool = buildTool(options);
-        this.#bus()?.emit({ type: 'tool:build' });
+        this.#bus()?.emit({ type: SERVICE_TOOL_INVOKED });
         return tool;
     }
 

@@ -4,10 +4,9 @@
  *
  * F55/F314 — Constantes de eventos do Conversation Hub (socket namespaces).
  *
- * @deprecated FAIXA-2B: Importar de `#copilot/events` em vez deste módulo.
- *   Maintained para compatibilidade retroativa. Será removido em versão futura.
- *
  * @module copilot/conversation-hub/events
+ * @deprecated FAIXA-2B: Importar de `#copilot/events` em vez deste módulo. Maintained para compatibilidade retroativa.
+ *   Será removido em versão futura.
  * @see EventBus
  */
 

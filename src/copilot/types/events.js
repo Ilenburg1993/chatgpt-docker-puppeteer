@@ -2,17 +2,15 @@
 /**
  * src/copilot/types/events.js
  *
- * @deprecated Use `src/copilot/events/index.js` (SSOT canônico) para constantes de eventos.
- * Este arquivo será removido em uma release futura.
- *
- * Catálogo de nomes de eventos cross-module do sistema Copilot (legado).
- *
- * Define namespaces e nomes de eventos usados pelo HookBus, EventBus futuro,
- * e subsistemas de observabilidade.
- *
- * **Puro** — apenas constantes e tipagem, zero lógica.
- *
  * @module copilot/types/events
+ * @deprecated Use `src/copilot/events/index.js` (SSOT canônico) para constantes de eventos. Este arquivo será removido
+ *   em uma release futura.
+ *
+ *   Catálogo de nomes de eventos cross-module do sistema Copilot (legado).
+ *
+ *   Define namespaces e nomes de eventos usados pelo HookBus, EventBus futuro, e subsistemas de observabilidade.
+ *
+ *   **Puro** — apenas constantes e tipagem, zero lógica.
  */
 
 // ─── Namespaces ──────────────────────────────────────────────────────────────
@@ -113,7 +111,7 @@ export const EVENT_NAMES = /** @type {const} */ ({
 /**
  * Nome de namespace de evento válido.
  *
- * @typedef {typeof EVENT_NAMESPACES[keyof typeof EVENT_NAMESPACES]} EventNamespace
+ * @typedef {(typeof EVENT_NAMESPACES)[keyof typeof EVENT_NAMESPACES]} EventNamespace
  */
 
 /**
