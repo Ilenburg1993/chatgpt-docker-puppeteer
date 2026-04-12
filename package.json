@@ -306,6 +306,7 @@
     "summarize-code": "python3 agents/code_explainer/generate_summary.py",
     "terminal:llm-b": "COPILOT_LOG_LEVEL=INFO node --strip-types src/copilot/terminal/bootstrap.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:regression",
+    "test:check-schemas": "node scripts/check-schema-coverage.mjs",
     "test:coverage": "npx c8 npm test",
     "test:e2e": "env -u NO_COLOR node --strip-types --test 'tests/e2e/**/*.spec.js'",
     "test:integration": "env -u NO_COLOR node --strip-types --test 'tests/integration/**/*.spec.js'",

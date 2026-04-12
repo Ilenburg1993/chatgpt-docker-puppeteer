@@ -44,13 +44,17 @@ function extractEntries(mod, origin) {
 /** @type {CatalogEntry[] | null} */
 let _cache = null;
 
-// ─── Dead-letter tracking ─────────────────────────────────────────────────────
+// ─── Dead-letter tracking (L34: enhanced) ────────────────────────────────────
+
+const MAX_DEAD_LETTERS = 500;
 
 /**
  * @typedef {object} DeadLetterEntry
  * @property {string} event - Nome do evento sem listener
  * @property {number} count - Vezes emitido sem listener
  * @property {number} lastTs - Timestamp da última ocorrência
+ * @property {string | undefined} [reason] - Motivo (no_listener, schema_blocked, etc.)
+ * @property {string | undefined} [correlationId] - Correlation ID do primeiro evento
  */
 
 /** @type {Map<string, DeadLetterEntry>} */
@@ -60,14 +64,27 @@ const _deadLetters = new Map();
  * Registra um evento emitido sem listeners (dead-letter).
  *
  * @param {string} event - Nome do evento
+ * @param {{ reason?: string, correlationId?: string }} [opts]
  */
-export function recordDeadLetter(event) {
+export function recordDeadLetter(event, opts) {
     const existing = _deadLetters.get(event);
     if (existing) {
         existing.count++;
         existing.lastTs = Date.now();
+        if (opts?.reason && !existing.reason) existing.reason = opts.reason;
     } else {
-        _deadLetters.set(event, { event, count: 1, lastTs: Date.now() });
+        if (_deadLetters.size >= MAX_DEAD_LETTERS) {
+            // Evict oldest entry to prevent unbounded growth
+            const oldest = [..._deadLetters.entries()].sort((a, b) => a[1].lastTs - b[1].lastTs)[0];
+            if (oldest) _deadLetters.delete(oldest[0]);
+        }
+        _deadLetters.set(event, {
+            event,
+            count: 1,
+            lastTs: Date.now(),
+            reason: opts?.reason,
+            correlationId: opts?.correlationId,
+        });
     }
     defaultMetrics.recordCounter('copilot.events.dead_letter_total');
 }

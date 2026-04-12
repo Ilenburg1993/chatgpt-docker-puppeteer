@@ -121,6 +121,8 @@ export const EVENT_NAMES = /** @type {const} */ ({
  * @property {string} type - Nome canônico do evento (ex: `session:start`).
  * @property {number} timestamp - Unix epoch ms.
  * @property {string} [correlationId] - UUID de correlação para rastreamento ponta-a-ponta (FAIXA-L16).
+ * @property {string} [eventId] - UUID único deste evento (FAIXA-L35).
+ * @property {string} [causationId] - eventId do evento causador para rastreio de causalidade (FAIXA-L35).
  * @property {string} [source] - Módulo/subsistema de origem.
  * @property {string} [_source] - Identificador host:pid injetado pelo timestampEnricher (FAIXA-L27).
  * @property {Record<string, unknown>} [meta] - Metadata adicional.
