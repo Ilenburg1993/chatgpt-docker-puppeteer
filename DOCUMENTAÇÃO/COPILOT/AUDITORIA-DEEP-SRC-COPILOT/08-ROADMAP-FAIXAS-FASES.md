@@ -9,12 +9,12 @@
 
 ## STATUS DE EXECUÇÃO
 
-| Faixa | Status | Commit | Data |
-|-------|--------|--------|------|
-| **Faixa 0** | ✅ CONCLUÍDA | `5ecbceb1` | 2026-06-11 |
-| **Faixa 1** | ✅ VALIDADA (já implementada) | — | 2026-06-11 |
-| Faixa 2 | 🔄 EM PROGRESSO | — | — |
-| Faixa 3-5 | ⏳ PENDENTE | — | — |
+| Faixa       | Status                       | Commit     | Data       |
+| ----------- | ---------------------------- | ---------- | ---------- |
+| **Faixa 0** | ✅ CONCLUÍDA                  | `5ecbceb1` | 2026-06-11 |
+| **Faixa 1** | ✅ VALIDADA (já implementada) | —          | 2026-06-11 |
+| Faixa 2     | ✅ CONCLUÍDA                  | `8e2006eb` | 2026-06-11 |
+| Faixa 3-5   | ⏳ PENDENTE                   | —          | —          |
 
 ### Notas da Faixa 0
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js
@@ -33,6 +33,16 @@ A validação detalhada revelou que a maioria dos findings da Faixa 1 **já est�
 - **1.4.1** (setInterval cleanup): BALANCEADO — 11 setInterval vs 11 clearInterval, todos com `registerTimer()` ou cleanup direto
 - **1.4.2** (event listener .on/.off): FUNCIONAL — gap é nominal (251 vs 55), sistema usa padrão de unsubscribe via callback arrays (`unsubs[]`)
 - **1.1/1.2** (testes): PENDENTES mas não bloqueantes — cobertura existe para modules críticos, faltam server/routes tests
+
+### Notas da Faixa 2
+- **2.2.1** (delete deprecated 0 imports): Removidos `api/bridge/` (5 stubs, 73 LOC), `api/sse/` (4 stubs, 55 LOC), `conversation-hub/socket-ns.js` (18 LOC) — total 146 LOC de dead code
+- **2.2.2** (migrate deprecated poucos imports): 5 files migrados de stubs deletados para paths canônicos em `server/`
+- **2.4.1** (magic numbers): Extraídos timeouts hardcoded para constantes nomeadas em 6 files (session-tools, git-bridge-read/write, tools/git, read-tools-search, error-alerting)
+- **2.2.3** (deprecated deep pass — `8e2006eb`): Eliminados **todos** os `@deprecated` de `src/copilot/`:
+  - MODULE-LEVEL: 5 arquivos resolvidos (2 deletados, 1 movido para events/, 1 JSDoc atualizado, 1 barrel deletado)
+  - FUNCTION-LEVEL: 9 arquivos, 16 funções: 5 sync shims broken removidos (snapshot.js), 3 sync cache-API legitimados (state-io.js), 4 dead sync shims deletados (alias-store, sdk/tools), 4 tags misleading removidas (todo, observability, audit, api/express)
+  - Limpeza: alias `#copilot/api` removido de package.json (target deletado), barrels sdk/index.js atualizados
+  - API Architecture audit: arquitetura validada — `api/express/` (SDK client routes) e `server/routes/` (operacional) servem audiências distintas, sem duplicação real
 
 ---
 
