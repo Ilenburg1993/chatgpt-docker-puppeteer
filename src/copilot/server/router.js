@@ -16,6 +16,7 @@ import { createGitRouter } from './routes/git.js';
 import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
 import { createObservabilityRouter } from './routes/observability.js';
+import { createSseRouter } from './routes/sse.js';
 
 /**
  * Monta todos os routers do servidor copilot no app Express.
@@ -39,7 +40,8 @@ import { createObservabilityRouter } from './routes/observability.js';
  * - POST /system/reset
  * - GET  /git/status, /git/log
  * - GET  /gh/issues, /gh/prs, /gh/ci
- * - GET  /events (SSE — montado em Onda 3.5/3.6)
+ * - GET  /events (SSE — Onda 4.0: router canônico server/routes/sse.js)
+ * - GET  /events/critical (SSE críticos — Onda 4.0)
  *
  * @param {import('express').Application} app
  * @param {object} [opts]
@@ -68,6 +70,7 @@ export function mountCopilotRoutes(app, opts) {
     app.use('/memory', createMemoryRouter());
     app.use(createObservabilityRouter());
     app.use(createGitRouter());
+    app.use(createSseRouter());
 
     void authMiddleware; // usado implicitamente via createCopilotApp opts
 }
