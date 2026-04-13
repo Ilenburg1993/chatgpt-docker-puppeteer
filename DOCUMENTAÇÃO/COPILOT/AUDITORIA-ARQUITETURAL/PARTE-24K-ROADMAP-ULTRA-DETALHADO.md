@@ -16,7 +16,11 @@
 | 3.2  | ✅ CONCLUÍDA | `37e1946f` |
 | 3.3  | ✅ CONCLUÍDA | `37e1946f` |
 | 3.4  | ✅ CONCLUÍDA | `54f0ba99` |
-| 3.5–3.9 | ⬜ PENDENTE | — |
+| 3.5  | ✅ CONCLUÍDA | `7e07a162` |
+| 3.6  | ✅ CONCLUÍDA | `7e07a162` |
+| 3.7  | ✅ CONCLUÍDA | `7e07a162` |
+| 3.8  | ✅ CONCLUÍDA | (próximo commit) |
+| 3.9  | ⬜ PENDENTE | — |
 
 **Onda 3.2 entregou**:
 - `server/socket/hub-ns.js` — Namespace Socket.IO /copilot (L56.2)
