@@ -4,23 +4,27 @@
  *
  * HTTP Bridge — agrega sub-módulos de rota e expõe o Always-Alive Agent via API REST.
  *
- * Rotas montadas em /api/copilot/* pelo router principal:
- *
- * GET /api/copilot/status — Status do agente + pergunta pendente GET /api/copilot/health — Health check para
- * orquestradores e load balancers GET /api/copilot/session — Info sobre a sessão ativa POST /api/copilot/start — Inicia
- * o agente (se parado) POST /api/copilot/stop — Para o agente graciosamente POST /api/copilot/send — Envia mensagem ao
- * agente (async) POST /api/copilot/answer — Responde pergunta pendente do modelo GET /api/copilot/stream — SSE global
- * de eventos em tempo real POST /api/copilot/dialog/start — Inicia Dialog Loop (padrão §15.8 — 0 PR por turno) POST
- * /api/copilot/dialog/turn — Envia turno de diálogo POST /api/copilot/dialog/stop — Encerra Dialog Loop
- *
- * Implementação distribuída em sub-módulos (Fase R):
- *
- * - bridge-control.js → GET /status, /health, /session · POST /start, /stop
- * - bridge-tasks.js → POST /send, /answer
- * - bridge-stream.js → GET /stream (SSE)
- * - bridge-dialog.js → POST /dialog/start, /dialog/turn, /dialog/stop
- *
  * @module copilot/api/http-bridge
+ * @deprecated Onda 4.5 — Substituído por `server/routes/copilot-api.js` (createCopilotApiRouter, Onda 4.2). Os
+ *   sub-módulos bridge (control, tasks, stream, dialog) continuam canônicos e são reutilizados por ambos os entry
+ *   points. Este barrel é mantido apenas para backward compat. Remover na Onda 5.0.
+ *
+ *   Rotas montadas em /api/copilot/* pelo router principal:
+ *
+ *   GET /api/copilot/status — Status do agente + pergunta pendente GET /api/copilot/health — Health check para
+ *   orquestradores e load balancers GET /api/copilot/session — Info sobre a sessão ativa POST /api/copilot/start —
+ *   Inicia o agente (se parado) POST /api/copilot/stop — Para o agente graciosamente POST /api/copilot/send — Envia
+ *   mensagem ao agente (async) POST /api/copilot/answer — Responde pergunta pendente do modelo GET /api/copilot/stream
+ *   — SSE global de eventos em tempo real POST /api/copilot/dialog/start — Inicia Dialog Loop (padrão §15.8 — 0 PR por
+ *   turno) POST /api/copilot/dialog/turn — Envia turno de diálogo POST /api/copilot/dialog/stop — Encerra Dialog Loop
+ *
+ *   Implementação distribuída em sub-módulos (Fase R):
+ *
+ *   - bridge-control.js → GET /status, /health, /session · POST /start, /stop
+ *   - bridge-tasks.js → POST /send, /answer
+ *   - bridge-stream.js → GET /stream (SSE)
+ *   - bridge-dialog.js → POST /dialog/start, /dialog/turn, /dialog/stop
+ *
  * @see EventBus
  */
 

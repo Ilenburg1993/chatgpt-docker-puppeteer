@@ -72,7 +72,7 @@ export function broadcastSse(event, data) {
  * @param {object} data
  * @param {{
  *     hubSessionId?: string | null;
- *     replayBuffer?: import('../../api/sse/replay-buffer.js').SseReplayBuffer;
+ *     replayBuffer?: import('../../server/sse/replay-buffer.js').SseReplayBuffer;
  * }} [ctx]
  * @returns {boolean}
  */
