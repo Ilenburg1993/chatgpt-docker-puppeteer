@@ -2,8 +2,7 @@
 /**
  * src/copilot/server/routes/copilot-api/control.js
  *
- * Rotas de controle do AlwaysAliveAgent: status, health, session, start, stop,
- * permissions, steer.
+ * Rotas de controle do AlwaysAliveAgent: status, health, session, start, stop, permissions, steer.
  *
  * Onda 4.8 — migrado de `api/bridge/control.js` para `server/routes/copilot-api/`.
  *
@@ -47,6 +46,7 @@ const _sdkVersion = (() => {
  *     starvationAlert: boolean;
  *     oldestTaskWaitMs: number;
  * }} AgentSnap
+ *
  *
  * @typedef {import('../../../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */

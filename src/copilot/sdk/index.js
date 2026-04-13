@@ -33,9 +33,11 @@
  */
 
 export {
+    CopilotClient,
     _injectClientForTest,
     _resetClientState,
-    buildClientOptions, CopilotClient, createClientSession,
+    buildClientOptions,
+    createClientSession,
     deleteClientSession,
     disconnectClientSession,
     forceStopClient,
@@ -51,8 +53,8 @@ export {
     listAvailableModels,
     pingClient,
     resumeClientSession,
-    stopClient
-} from './client.js';
+    stopClient,
+} from './session/client.js';
 
 // Hook factory e permission removidos — consumidores devem importar de '#copilot/hooks' (L3), não via sdk (L1).
 // Cf. PARTE-21C Faixa H: eliminação de violações L1→L3.
@@ -64,10 +66,11 @@ export {
     disconnectSession,
     listSessions,
     resumeOrCreate,
-    resumeSession
-} from './session.js';
+    resumeSession,
+} from './session/lifecycle.js';
 
 export {
+    READ_ONLY_TOOLS,
     buildAgentList,
     createAgent,
     createAnalystAgent,
@@ -77,12 +80,20 @@ export {
     filterInferableAgents,
     getCurrentAgent,
     isValidAgentName,
-    listAgents, READ_ONLY_TOOLS, reloadAgents,
-    selectAgent
-} from './agents.js';
+    listAgents,
+    reloadAgents,
+    selectAgent,
+} from './agent/agents.js';
 
 export {
-    AutoDowngradeDetector, autoDowngradeDetector, ModelRegistry, modelRegistry, ModelSelector, modelSelector, ModelStatsTracker, modelStatsTracker
+    AutoDowngradeDetector,
+    ModelRegistry,
+    ModelSelector,
+    ModelStatsTracker,
+    autoDowngradeDetector,
+    modelRegistry,
+    modelSelector,
+    modelStatsTracker,
 } from './models/registry.js';
 
 export {
@@ -105,7 +116,7 @@ export {
     listModels,
     pickModel,
     resolveModelId,
-    supportsReasoning
+    supportsReasoning,
 } from './models/helpers.js';
 
 export { validateUrl, validateUrlString } from '#copilot/core';
@@ -126,16 +137,17 @@ export {
     SESSION_LIFECYCLE_EVENTS,
     SESSION_MODES,
     SYSTEM_PROMPT_SECTION_NAMES,
-    TOOL_RESULT_TYPES
+    TOOL_RESULT_TYPES,
 } from './constants.js';
 
 // ─── Faixa 2: Tools & Permissions (rev.4) ────────────────────────────────────
-export { approveAll, createAllowlistPermissionHandler } from './permissions.js';
-export { createTool, createToolSync, defineTool } from './tools.js';
+export { approveAll, createAllowlistPermissionHandler } from './session/permissions.js';
+export { createTool, createToolSync, defineTool } from './tools/core.js';
 // Nota: createPermissionHandler já exportado via #copilot/hooks/permission acima
 
 // ─── Faixa 3: SystemMessage Builder (rev.4) ──────────────────────────────────
 export {
+    SYSTEM_PROMPT_SECTIONS,
     appendSystemMessage,
     appendToGuidelines,
     customizeSystemMessage,
@@ -144,19 +156,21 @@ export {
     replaceIdentity,
     replaceSystemMessage,
     sectionOverride,
-    supportsCustomizeMode, SYSTEM_PROMPT_SECTIONS
-} from './system-message.js';
+    supportsCustomizeMode,
+} from './session/system-message.js';
 
 // ─── Faixa 4: Unified Config Builder (rev.4) ─────────────────────────────────
 // Nota: DEFAULT_EXCLUDED_TOOLS, buildAlwaysAliveConfig, buildDiagnosticConfig,
 // buildFullAccessConfig, buildReadOnlyConfig removidos — importar de '#copilot/config/session-config'.
 // Cf. PARTE-21C Faixa H: eliminação de violações L1→L2.
 export {
-    buildSessionConfig, DEFAULT_DIAGNOSTIC_MODEL,
+    DEFAULT_DIAGNOSTIC_MODEL,
     DEFAULT_INFINITE_SESSION,
-    DEFAULT_MODEL, getProjectDefaults,
+    DEFAULT_MODEL,
+    buildSessionConfig,
+    getProjectDefaults,
     mergeExcludedTools,
-    mergeTools
+    mergeTools,
 } from './config.js';
 
 // ─── Faixa 5: Client & Session Facade (rev.4) ────────────────────────────────
@@ -166,8 +180,8 @@ export {
     quickDisconnect,
     quickResume,
     quickSession,
-    shutdownClient
-} from './client-facade.js';
+    shutdownClient,
+} from './session/client-facade.js';
 // Nota: buildConfig e getDefaults são aliases de buildSessionConfig e getProjectDefaults
 // já exportados acima (Faixa 4) — não re-exportar para evitar duplicadas.
 
@@ -178,8 +192,8 @@ export {
     getSessionMessages,
     getSessionWorkspacePath,
     runSessionLifecycle,
-    setSessionModel
-} from './sdk-session-wrapper.js';
+    setSessionModel,
+} from './session/wrapper.js';
 
 // ─── Faixa 7: RPC Core Subsystems (rev.4) ────────────────────────────────────
 export {
@@ -187,8 +201,11 @@ export {
     // Faixa 8: Advanced RPC subsystems
     compactionCompact,
     createSessionRpcFacade,
-    modeGet, modelGetCurrent,
-    modelSwitchTo, modeSet, permissionsHandlePending,
+    modeGet,
+    modeSet,
+    modelGetCurrent,
+    modelSwitchTo,
+    permissionsHandlePending,
     planDelete,
     planRead,
     planUpdate,
@@ -199,11 +216,11 @@ export {
     uiElicitation,
     workspaceCreateFile,
     workspaceListFiles,
-    workspaceReadFile
+    workspaceReadFile,
 } from './rpc.js';
 
 // ─── Faixa 9: Server RPC + Health ──────────────────────────────────────────────
-export { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from './server-rpc.js';
+export { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from './rpc/server.js';
 
 export {
     getAuthStatus as checkAuthStatus,
@@ -211,12 +228,12 @@ export {
     getQuota,
     getAuthStatus as healthGetAuthStatus,
     isServerReachable,
-    pingCheck
-} from './health.js';
+    pingCheck,
+} from './telemetry/health.js';
 
 // ─── Faixa 21: Quota Monitor ──────────────────────────────────────────────────
 
-export { createQuotaMonitor } from './quota-monitor.js';
+export { createQuotaMonitor } from './telemetry/quota-monitor.js';
 
 // ─── Faixa 10: Event System Typed ─────────────────────────────────────────────
 
@@ -228,21 +245,23 @@ export {
     isKnownEventType,
     onAllSessionEvents,
     onSessionEvent,
-    onSessionEvents
-} from './events.js';
+    onSessionEvents,
+} from './session/events.js';
 
 // ─── Faixa 11: Session Lifecycle Events ───────────────────────────────────────
 
 export {
-    isLifecycleEventType, LIFECYCLE_EVENTS, onAllLifecycleEvents,
+    LIFECYCLE_EVENTS,
+    isLifecycleEventType,
+    onAllLifecycleEvents,
     onLifecycleEvent,
     onLifecycleEvents,
     onSessionBackground,
     onSessionCreated,
     onSessionDeleted,
     onSessionForeground,
-    onSessionUpdated
-} from './client-events.js';
+    onSessionUpdated,
+} from './session/client-events.js';
 
 // ─── Faixa 12: Provider/BYOK Support ─────────────────────────────────────────
 
@@ -251,8 +270,8 @@ export {
     azureProvider,
     isValidProviderType,
     openaiProvider,
-    validateProviderConfig
-} from './provider.js';
+    validateProviderConfig,
+} from './session/provider.js';
 
 // ─── Faixa 13: Telemetry & Tracing ───────────────────────────────────────────
 
@@ -261,21 +280,23 @@ export {
     createOtlpTelemetry,
     createStaticTraceProvider,
     createTelemetryConfig,
-    getTraceContext
-} from './telemetry.js';
+    getTraceContext,
+} from './telemetry/tracing.js';
 
 // ─── Faixa 16: Barrel Completeness ───────────────────────────────────────────
 
 export {
+    BUILTIN_HANDLER_MAP,
     _resetRegistry as _resetCustomToolsRegistry,
-    buildCustomTools, BUILTIN_HANDLER_MAP, getCustomToolDefinitions,
+    buildCustomTools,
+    getCustomToolDefinitions,
     loadCustomTools,
     loadCustomToolsAsync,
     registerCustomTool,
-    removeCustomTool
-} from './custom-tools.js';
+    removeCustomTool,
+} from './tools/custom.js';
 
-export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools-state.js';
+export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/state.js';
 
 // ─── tools-registry.js — registry de ferramentas por sessão ─
 export {
@@ -293,8 +314,8 @@ export {
     listToolNames,
     mergeRegistries,
     registerTool,
-    registerTools
-} from './tools-registry.js';
+    registerTools,
+} from './tools/registry.js';
 
 // ─── Faixa 22: Experimental Features (gated) ─────────────────────────────────
 
@@ -303,7 +324,7 @@ export {
     getExperimentalFlags,
     isExperimentalEnabled,
     resetExperimentalFlags,
-    setExperimentalFlag
+    setExperimentalFlag,
 } from './feature-flags.js';
 
 export {
@@ -324,11 +345,11 @@ export {
     skillsDisable,
     skillsEnable,
     skillsGetStatus,
-    skillsList
-} from './experimental-rpc.js';
+    skillsList,
+} from './rpc/experimental.js';
 
-export { setCustomToolsBuilder } from './custom-tools.js';
 export { setSdkLogger } from './logger.js';
+export { setCustomToolsBuilder } from './tools/custom.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
 export { SDK_LOGGER, TOOLS_BUILDER } from './di-tokens.js';

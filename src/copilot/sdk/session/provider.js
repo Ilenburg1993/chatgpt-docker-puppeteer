@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { PROVIDER_TYPES } from './constants.js';
+import { PROVIDER_TYPES } from '../constants.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

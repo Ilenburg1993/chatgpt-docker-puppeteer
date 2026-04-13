@@ -13,7 +13,7 @@
  */
 
 import { approveAll } from '@github/copilot-sdk';
-import { log } from './logger.js';
+import { log } from '../logger.js';
 
 // Re-export canônico do SDK
 export { approveAll };

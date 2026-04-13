@@ -1,12 +1,13 @@
 // @ts-check
 /**
  * src/copilot/lib/models.js
+ *
  * @module copilot/lib/models
  * @see EventBus
  */
 
 import { ConfigError } from '#copilot/core';
-import { getClient } from '../client.js';
+import { getClient } from '../session/client.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo

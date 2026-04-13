@@ -22,7 +22,7 @@ import {
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-} from './rpc-session.js';
+} from './rpc/session.js';
 
 export {
     modeGet,
@@ -36,7 +36,7 @@ export {
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-} from './rpc-session.js';
+} from './rpc/session.js';
 
 export {
     commandsHandlePending,
@@ -46,7 +46,7 @@ export {
     shellKill,
     toolsHandlePendingCall,
     uiElicitation,
-} from './rpc-ops.js';
+} from './rpc/ops.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession

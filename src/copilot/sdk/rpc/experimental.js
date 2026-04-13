@@ -8,7 +8,7 @@
  * @see module:copilot/sdk/rpc
  */
 
-import { isExperimentalEnabled } from './feature-flags.js';
+import { isExperimentalEnabled } from '../feature-flags.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession

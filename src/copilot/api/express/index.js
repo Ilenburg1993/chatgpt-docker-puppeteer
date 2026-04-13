@@ -13,10 +13,10 @@
  * - `routes/agent.js` — /agent/info, /agent/tools, /agent/telemetry, /agent/state, /agent/stream
  * - `routes/webhooks.js` — /webhooks, /webhooks/:id
  *
- * @deprecated Onda 4.9 — O ponto canônico de montagem é `server/routes/sdk/index.js` (Onda 4.3).
- *   A lógica interna (sub-módulos) será migrada para `server/routes/sdk/` na Onda 5.
- *   Este barrel é invocado indiretamente via re-export do `server/routes/sdk/index.js`.
  * @module copilot/api/sdk-api
+ * @deprecated Onda 4.9 — O ponto canônico de montagem é `server/routes/sdk/index.js` (Onda 4.3). A lógica interna
+ *   (sub-módulos) será migrada para `server/routes/sdk/` na Onda 5. Este barrel é invocado indiretamente via re-export
+ *   do `server/routes/sdk/index.js`.
  * @see EventBus
  */
 

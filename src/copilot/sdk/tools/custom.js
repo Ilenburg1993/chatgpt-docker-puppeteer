@@ -18,10 +18,10 @@
 
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { logSwallowed } from '../core/error-handlers.js';
-import { safeJsonParse } from '../core/safe-json.js';
-import { CustomToolsFileSchema } from '../core/schemas.js';
-import { log } from './logger.js';
+import { logSwallowed } from '../../core/error-handlers.js';
+import { safeJsonParse } from '../../core/safe-json.js';
+import { CustomToolsFileSchema } from '../../core/schemas.js';
+import { log } from '../logger.js';
 
 /**
  * @typedef {(opts: {

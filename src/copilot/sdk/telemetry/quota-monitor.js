@@ -13,16 +13,16 @@
  * @see module:copilot/sdk/health
  */
 
-import { accountGetQuota } from './server-rpc.js';
+import { accountGetQuota } from '../rpc/server.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
- * @typedef {import('./server-rpc.js').CopilotClient} CopilotClient
+ * @typedef {import('../rpc/server.js').CopilotClient} CopilotClient
  *
- * @typedef {import('./server-rpc.js').QuotaSnapshot} QuotaSnapshot
+ * @typedef {import('../rpc/server.js').QuotaSnapshot} QuotaSnapshot
  *
- * @typedef {import('./server-rpc.js').AccountQuotaResult} AccountQuotaResult
+ * @typedef {import('../rpc/server.js').AccountQuotaResult} AccountQuotaResult
  */
 
 /**
@@ -129,7 +129,7 @@ export function createQuotaMonitor(opts) {
             if (
                 typeof _timer === 'object' &&
                 _timer !== null &&
-                typeof /** @type {any} */ (_timer).unref === 'function'
+                typeof (/** @type {any} */ (_timer).unref) === 'function'
             ) {
                 /** @type {any} */ (_timer).unref();
             }

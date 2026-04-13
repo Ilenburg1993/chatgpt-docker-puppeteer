@@ -18,7 +18,7 @@
  * @see module:copilot/sdk/health
  */
 
-import { log as appLog } from './logger.js';
+import { log as appLog } from '../logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient

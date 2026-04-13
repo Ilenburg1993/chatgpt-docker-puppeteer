@@ -13,16 +13,16 @@
  */
 
 import { forceStopClient, getClient, getClientState, stopClient } from './client.js';
-import { createSession, disconnectSession, resumeOrCreate } from './session.js';
+import { createSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  *
- * @typedef {import('./session.js').SessionCreateOptions} SessionCreateOptions
+ * @typedef {import('./lifecycle.js').SessionCreateOptions} SessionCreateOptions
  *
- * @typedef {import('./session.js').SessionResult} SessionResult
+ * @typedef {import('./lifecycle.js').SessionResult} SessionResult
  */
 
 // ─── quickSession ─────────────────────────────────────────────────────────────
@@ -121,11 +121,11 @@ export function isClientReady() {
  *
  * @returns {Partial<SessionConfig>}
  */
-export { getProjectDefaults as getDefaults } from './config.js';
+export { getProjectDefaults as getDefaults } from '../config.js';
 
 // ─── buildConfig ──────────────────────────────────────────────────────────────
 
 /**
  * Alias para `buildSessionConfig()` — constrói SessionConfig com merge de defaults.
  */
-export { buildSessionConfig as buildConfig } from './config.js';
+export { buildSessionConfig as buildConfig } from '../config.js';

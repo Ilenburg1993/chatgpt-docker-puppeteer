@@ -22,8 +22,8 @@ import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js'
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
-import { setCustomToolsBuilder } from '../sdk/custom-tools.js';
 import { setSdkLogger } from '../sdk/logger.js';
+import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
 import { createLogObserver } from './bus-actions/log-observer.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { LOG_DIR, log } from './logger.js';

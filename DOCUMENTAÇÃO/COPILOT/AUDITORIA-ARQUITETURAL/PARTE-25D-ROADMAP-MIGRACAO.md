@@ -551,28 +551,28 @@ O roadmap estará **completo** quando:
 ### Impacto quantitativo
 
 | Métrica                                  | Antes (Onda 3.9) | Depois (Onda 4.9) |
-| ---------------------------------------- | ----------------- | ------------------ |
-| Routers em `server/routes/`              | 5                 | 10+                |
-| Lógica em `api/bridge/` (LOC)            | 762               | 0 (stubs)          |
-| Lógica em `server/routes/copilot-api/`   | 0                 | 762                |
-| `api/` arquivos com `@deprecated`        | 5 (SSE)           | 21 (todos)         |
-| Endpoints SSE canônicos em `server/sse/` | parcial           | completo           |
-| Dependência circular server→api          | sim               | eliminada           |
+| ---------------------------------------- | ---------------- | ----------------- |
+| Routers em `server/routes/`              | 5                | 10+               |
+| Lógica em `api/bridge/` (LOC)            | 762              | 0 (stubs)         |
+| Lógica em `server/routes/copilot-api/`   | 0                | 762               |
+| `api/` arquivos com `@deprecated`        | 5 (SSE)          | 21 (todos)        |
+| Endpoints SSE canônicos em `server/sse/` | parcial          | completo          |
+| Dependência circular server→api          | sim              | eliminada         |
 
 ### Ondas concluídas
 
-| Onda | Commit      | Descrição                                          |
-| ---- | ----------- | -------------------------------------------------- |
-| 4.0  | `541b30d1`  | SSE endpoint canônico `server/routes/sse.js`       |
-| 4.1  | `c84721bc`  | Sessions CRUD completo                             |
-| 4.2  | `25136e54`  | copilot-api router reutilizando bridge sub-módulos |
-| 4.3  | `4bae09d6`  | SDK API wrapper em `server/routes/sdk/`            |
-| 4.4  | `78b3b711`  | `server/sse/state.js` implementação própria        |
-| 4.5  | `8e7ddf03`  | Consolidação SSE + deprecação barrels api/         |
-| 4.6  | design      | services/ → bridge pattern validado por design     |
-| 4.7  | —           | sdk/ subdivide → adiado para Onda 5 (7800 LOC)    |
-| 4.8  | `c0a89bab`  | bridge/ → stubs; lógica em copilot-api/            |
-| 4.9  | `c0a89bab`  | api/express/ marked @deprecated                    |
+| Onda | Commit     | Descrição                                          |
+| ---- | ---------- | -------------------------------------------------- |
+| 4.0  | `541b30d1` | SSE endpoint canônico `server/routes/sse.js`       |
+| 4.1  | `c84721bc` | Sessions CRUD completo                             |
+| 4.2  | `25136e54` | copilot-api router reutilizando bridge sub-módulos |
+| 4.3  | `4bae09d6` | SDK API wrapper em `server/routes/sdk/`            |
+| 4.4  | `78b3b711` | `server/sse/state.js` implementação própria        |
+| 4.5  | `8e7ddf03` | Consolidação SSE + deprecação barrels api/         |
+| 4.6  | design     | services/ → bridge pattern validado por design     |
+| 4.7  | —          | sdk/ subdivide → adiado para Onda 5 (7800 LOC)     |
+| 4.8  | `c0a89bab` | bridge/ → stubs; lógica em copilot-api/            |
+| 4.9  | `c0a89bab` | api/express/ marked @deprecated                    |
 
 ### Gaps residuais para Onda 5
 

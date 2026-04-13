@@ -10,17 +10,17 @@
  * @see module:copilot/sdk/server-rpc
  */
 
-import { log as appLog } from './logger.js';
-import { accountGetQuota, ping } from './server-rpc.js';
+import { log as appLog } from '../logger.js';
+import { accountGetQuota, ping } from '../rpc/server.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  *
- * @typedef {import('./server-rpc.js').PingResult} PingResult
+ * @typedef {import('../rpc/server.js').PingResult} PingResult
  *
- * @typedef {import('./server-rpc.js').AccountQuotaResult} AccountQuotaResult
+ * @typedef {import('../rpc/server.js').AccountQuotaResult} AccountQuotaResult
  *
- * @typedef {import('./server-rpc.js').QuotaSnapshot} QuotaSnapshot
+ * @typedef {import('../rpc/server.js').QuotaSnapshot} QuotaSnapshot
  *
  * @typedef {'healthy' | 'degraded' | 'unhealthy'} HealthStatus
  *

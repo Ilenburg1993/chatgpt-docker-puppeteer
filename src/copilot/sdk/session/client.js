@@ -11,9 +11,9 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
-import { CircuitBreaker } from '../core/circuit-breaker.js';
-import { logSwallowed } from '../core/error-handlers.js';
-import { log } from './logger.js';
+import { CircuitBreaker } from '../../core/circuit-breaker.js';
+import { logSwallowed } from '../../core/error-handlers.js';
+import { log } from '../logger.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
 export { CopilotClient };

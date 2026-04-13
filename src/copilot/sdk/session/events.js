@@ -17,7 +17,7 @@
  * @see EventBus
  */
 
-import { SESSION_EVENTS } from './constants.js';
+import { SESSION_EVENTS } from '../constants.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

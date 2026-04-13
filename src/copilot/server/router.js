@@ -3,10 +3,9 @@
  * @module copilot/server/router
  * @file Barrel de rotas: monta todos os routers copilot no app Express.
  *
- * Centraliza o mounting e as regras de auth-exempt por router.
- * Onda 3.1 — L55.8.
+ *   Centraliza o mounting e as regras de auth-exempt por router. Onda 3.1 — L55.8.
  *
- * src/copilot/server/router.js
+ *   src/copilot/server/router.js
  */
 
 import { COPILOT_SDK_ENABLED } from '#copilot/config';
@@ -26,33 +25,34 @@ import { createSseRouter } from './routes/sse.js';
  * Monta todos os routers do servidor copilot no app Express.
  *
  * Estrutura de rotas:
- * - GET  /health                    (skipAuth)
- * - GET  /hub-health                (skipAuth)
- * - GET  /metrics                   (skipAuth)
- * - GET  /context, /quota, /pr-budget
- * - POST /inject                    (rate: inject)
- * - POST /pipeline                  (rate: write)
+ *
+ * - GET /health (skipAuth)
+ * - GET /hub-health (skipAuth)
+ * - GET /metrics (skipAuth)
+ * - GET /context, /quota, /pr-budget
+ * - POST /inject (rate: inject)
+ * - POST /pipeline (rate: write)
  * - POST /dialog/pause, /dialog/resume
- * - GET  /handoff, POST /handoff/:id/accept|reject
- * - GET  /config, /config/skills, /config/tools, /config/tools/custom
- * - PUT  /config/infinite-session, /config/skills, /config/tools
+ * - GET /handoff, POST /handoff/:id/accept|reject
+ * - GET /config, /config/skills, /config/tools, /config/tools/custom
+ * - PUT /config/infinite-session, /config/skills, /config/tools
  * - POST /config/tools/custom
  * - DELETE /config/tools/custom/:name
- * - GET  /memory, POST /memory, DELETE /memory/:memoryId
- * - GET  /errors, /tool-stats, /history, /audit
- * - GET  /sessions, /sessions/:sessionId/turns
+ * - GET /memory, POST /memory, DELETE /memory/:memoryId
+ * - GET /errors, /tool-stats, /history, /audit
+ * - GET /sessions, /sessions/:sessionId/turns
  * - POST /system/reset
- * - GET  /git/status, /git/log
- * - GET  /gh/issues, /gh/prs, /gh/ci
- * - GET  /events (SSE — Onda 4.0: router canônico server/routes/sse.js)
- * - GET  /events/critical (SSE críticos — Onda 4.0)
- * - GET  /sessions, GET /sessions/:id, POST /sessions, DELETE /sessions/:id (Onda 4.1)
- * - GET  /sessions/:id/turns (Onda 4.1)
- * - GET  /status, /health (agent), /session, /permissions (Onda 4.2)
+ * - GET /git/status, /git/log
+ * - GET /gh/issues, /gh/prs, /gh/ci
+ * - GET /events (SSE — Onda 4.0: router canônico server/routes/sse.js)
+ * - GET /events/critical (SSE críticos — Onda 4.0)
+ * - GET /sessions, GET /sessions/:id, POST /sessions, DELETE /sessions/:id (Onda 4.1)
+ * - GET /sessions/:id/turns (Onda 4.1)
+ * - GET /status, /health (agent), /session, /permissions (Onda 4.2)
  * - POST /start, /stop, /permissions, /steer, /send, /answer (Onda 4.2)
- * - GET  /stream, /stream/tasks (SSE AlwaysAliveAgent — Onda 4.2)
+ * - GET /stream, /stream/tasks (SSE AlwaysAliveAgent — Onda 4.2)
  * - POST /dialog/start, /dialog/turn, /dialog/stop (Onda 4.2)
- * - GET  /sdk/* (SDK API — Onda 4.3, ativo quando COPILOT_SDK_ENABLED=true)
+ * - GET /sdk/* (SDK API — Onda 4.3, ativo quando COPILOT_SDK_ENABLED=true)
  *
  * @param {import('express').Application} app
  * @param {object} [opts]

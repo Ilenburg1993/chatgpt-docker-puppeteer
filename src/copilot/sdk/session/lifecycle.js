@@ -17,7 +17,7 @@
  */
 
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
-import { log } from './logger.js';
+import { log } from '../logger.js';
 
 /**
  * @typedef {InstanceType<typeof CopilotClient>} CopilotClientInstance
