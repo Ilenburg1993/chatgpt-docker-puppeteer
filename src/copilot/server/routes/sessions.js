@@ -20,8 +20,8 @@
 
 import { conversationStore } from '#copilot/services';
 import { Router } from 'express';
-import { bridgeHandler } from '../handler-bridge.js';
 import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
+import { bridgeHandler } from '../handler-bridge.js';
 
 /**
  * @typedef {import('express').Request} Req

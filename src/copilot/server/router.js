@@ -13,13 +13,13 @@ import { COPILOT_SDK_ENABLED } from '#copilot/config';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { createAgentRouter } from './routes/agent.js';
 import { createConfigRouter } from './routes/config.js';
-import { createCopilotApiRouter } from './routes/copilot-api.js';
+import { createCopilotApiRouter } from './routes/copilot-api/index.js';
 import { createGitRouter } from './routes/git.js';
 import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
 import { createObservabilityRouter } from './routes/observability.js';
-import { createSessionsRouter } from './routes/sessions.js';
 import { createSdkRouter } from './routes/sdk/index.js';
+import { createSessionsRouter } from './routes/sessions.js';
 import { createSseRouter } from './routes/sse.js';
 
 /**

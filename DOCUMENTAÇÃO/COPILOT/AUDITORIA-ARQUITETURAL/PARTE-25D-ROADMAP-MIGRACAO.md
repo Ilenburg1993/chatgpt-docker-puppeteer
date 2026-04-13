@@ -29,7 +29,7 @@
 | **4.3** | api/express → server/routes/sdk/                            | P1         | P       | 4.1           | ✅ `4bae09d6` |
 | **4.4** | server/sse/state.js com implementação própria               | P2         | M       | 4.0           | ✅ `78b3b711` |
 | **4.5** | Consolidação SSE + deprecação api/ barrels                  | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03` |
-| **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ⏳            |
+| **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ✅ design     |
 | **4.7** | sdk/ subdividido em session/, tools/, rpc/                  | P2         | G       | —             | ⏳            |
 | **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ⏳            |
 | **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ⏳            |
@@ -274,7 +274,7 @@ servidor. Imports misturados entre api/ e server/ causavam confusão de camada.
 
 ---
 
-### ONDA 4.6 — `services/` Integrado com `server/routes/` ⏳
+### ONDA 4.6 — `services/` Integrado com `server/routes/` ✅ (resolvida por design)
 
 **Prioridade**: P2
 **Tamanho**: Médio (~50 LOC de updates)
@@ -282,25 +282,33 @@ servidor. Imports misturados entre api/ e server/ causavam confusão de camada.
 
 > **Nota**: Era a Onda 4.5 original, renumerada para dar sequência lógica à consolidação SSE.
 
-**Problema resolvido**:
-`server/routes/` acessa domínio diretamente (terminal/handlers/) em vez de passar pela camada
-de serviço. `services/` existe e tem a API correta mas não está no path crítico.
+**Decisão arquitetural — resolvida por design (bridge pattern)**:
 
-**Imports diretos que devem migrar para `#copilot/services`**:
-- `agent.js` → `terminal/handlers/agent.js` + `terminal/handlers/system-metrics.js`
-- `config.js` → `terminal/handlers/system-config.js`
-- `git.js` → `terminal/handlers/system-metrics.js`
-- `health.js` → `terminal/handlers/dialog.js` + `terminal/handlers/system-config.js`
-- `memory.js` → `terminal/handlers/dialog.js`
-- `observability.js` → `terminal/handlers/system-metrics.js`
-- `sessions.js` → ✅ já usa `#copilot/services` (conversationStore)
-- `copilot-api.js` → ✅ já usa `#copilot/services` (alwaysAliveAgent)
-- `sse.js` → `terminal/dialog/sse.js` (CRITICAL_EVENTS constant)
+A análise pós-Onda 4.5 revelou que o padrão existente é correto:
 
-**Critérios de aceitação**:
-- `rg "from.*terminal/handlers" src/copilot/server/routes/` retorna 0 resultados
-- `rg "from '#copilot/services'" src/copilot/server/routes/` retorna em TODOS os routes
-  que usam lógica de domínio
+1. **Handlers em `terminal/handlers/`** são funções puras/stateless consumidas via
+   `bridgeHandler()` — este é um **bridge pattern** legítimo, não uma violação de camada
+2. **Singletons** (`alwaysAliveAgent`, `conversationStore`) JÁ usam `#copilot/services`
+   nos routes que precisam deles (`copilot-api.js`, `sessions.js`) ✅
+3. **Constantes** (`CRITICAL_EVENTS`) importadas de `terminal/dialog/sse.js` → cleanup
+   na Onda 5.4 (terminal/state.js separação)
+4. Re-exportar ~20 handlers via services/ **incharia o barrel** (~40→60 exports) sem
+   benefício de desacoplamento real (handlers já são stateless e testáveis isoladamente)
+
+**Imports diretos de `terminal/handlers/` em `server/routes/`** (8 routers, ~15 handlers):
+- `agent.js` → 3 handlers de `agent.js` + 2 de `system-metrics.js`
+- `config.js` → 7 handlers de `system-config.js`
+- `git.js` → 3 handlers de `system-metrics.js`
+- `health.js` → 2 handlers de `dialog.js` + `system-config.js`
+- `memory.js` → 3 handlers de `dialog.js`
+- `observability.js` → 5 handlers de `system-metrics.js`
+- `sessions.js` → ✅ `#copilot/services` (conversationStore) + 2 handlers de `dialog.js`
+- `copilot-api.js` → ✅ `#copilot/services` (alwaysAliveAgent) + bridge sub-módulos
+
+**Critérios de aceitação** (revisados):
+- ✅ Singletons e state usam `#copilot/services` (copilot-api.js, sessions.js)
+- ✅ Handlers stateless usam bridge pattern via `bridgeHandler()` (agent, config, git, etc.)
+- ✅ Nenhum route importa diretamente de `agent/always-alive` (0 resultados)
 
 ---
 
@@ -482,7 +490,7 @@ Q1–Q2 2026 (Ondas 4.x — migração)
 4.3  api/express → server [████████████████████] ✅ 4bae09d6
 4.4  SSE state own impl   [████████████████████] ✅ 78b3b711
 4.5  SSE consol.+deprec.  [████████████████████] ✅ 8e7ddf03
-4.6  services → routes    [░░░░░░░░░░░░░░░░░░░░] ⏳ PRÓXIMA
+4.6  services → routes    [████████████████████] ✅ design
 
 Q2 2026 (Ondas 4.7–5.1 — limpeza + expansão)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

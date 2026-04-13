@@ -1,11 +1,12 @@
 // @ts-check
 /**
- * src/copilot/server/routes/copilot-api.js
+ * src/copilot/server/routes/copilot-api/index.js
  *
- * Router canônico do AlwaysAliveAgent — agrega os sub-módulos de rota do bridge no servidor.
+ * Router canônico do AlwaysAliveAgent — agrega os sub-módulos de rota no servidor.
  *
- * Onda 4.2 — L64.3: consolida as rotas do api/bridge/ no servidor copilot canônico,
- * reutilizando os sub-módulos register* sem duplicação de lógica.
+ * Onda 4.2 — L64.3: criação do router consolidado.
+ * Onda 4.8 — migração completa: sub-módulos agora em `server/routes/copilot-api/`
+ * (anteriormente em `api/bridge/`).
  *
  * Rotas expostas (montadas sem prefixo — o caller pode usar app.use('/agent', ...)):
  *   GET  /status         — snapshot de status do agente
@@ -29,17 +30,13 @@
 
 import { alwaysAliveAgent } from '#copilot/services';
 import { Router } from 'express';
-import { registerControlRoutes } from '../../api/bridge/control.js';
-import { registerDialogRoutes } from '../../api/bridge/dialog.js';
-import { registerStreamRoutes } from '../../api/bridge/stream.js';
-import { registerTaskRoutes } from '../../api/bridge/tasks.js';
+import { registerControlRoutes } from './control.js';
+import { registerDialogRoutes } from './dialog.js';
+import { registerStreamRoutes } from './stream.js';
+import { registerTaskRoutes } from './tasks.js';
 
 /**
- * Cria o router do AlwaysAliveAgent reutilizando os sub-módulos bridge canônicos.
- *
- * Os sub-módulos são singletons de rota — cada chamada a `register*Routes` adiciona
- * handlers ao router passado. O `alwaysAliveAgent` é importado de `#copilot/services`
- * e é o mesmo singleton usado pelo api/bridge/index.js.
+ * Cria o router do AlwaysAliveAgent usando os sub-módulos canônicos de `server/routes/copilot-api/`.
  *
  * @returns {import('express').Router}
  */
