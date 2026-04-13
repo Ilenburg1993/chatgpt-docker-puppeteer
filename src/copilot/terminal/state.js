@@ -22,7 +22,7 @@ import {
     createEmitter,
     setSharedHubSessionId,
 } from '#copilot/core';
-import { SseReplayBuffer } from '../api/sse/replay-buffer.js';
+import { SseReplayBuffer } from '../server/sse/replay-buffer.js';
 
 // ─── Emitter reativo ─────────────────────────────────────────────────────────
 
