@@ -67,7 +67,7 @@ export function createObservabilityRouter() {
 
     // GET /metrics — skipAuth, retorna texto (custom: prometheus ou plain)
     // Nota: handleMetrics pode retornar text/plain; a bridge usa res.json() que pode não ser ideal.
-    // A rota fica aqui como placeholder — server/sse/ trata o caso custom completo em Onda 3.6.
+    // A rota fica aqui como placeholder — infra/sse/ trata o caso custom completo.
     router.get('/metrics', bridgeHandler(handleMetrics));
 
     return router;

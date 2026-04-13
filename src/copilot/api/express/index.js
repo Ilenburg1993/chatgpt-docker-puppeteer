@@ -11,7 +11,8 @@
  * - `routes/client.js` — /ping, /status, /auth, /models, /tools, /client/*
  * - `routes/sessions.js` — /sessions, /sessions/active, /sessions/last, /sessions/foreground, /sessions/:id, e sub-rotas
  * - `routes/agent.js` — /agent/info, /agent/tools, /agent/telemetry, /agent/state, /agent/stream
- * - `routes/webhooks.js` — /webhooks, /webhooks/:id
+ * - `routes/hooks.js` — /hooks (introspecção de hooks)
+ * - `routes/observability.js` — /metrics, /errors, /health, /log-level
  *
  * @module copilot/api/sdk-api
  * @see EventBus
@@ -25,7 +26,6 @@ import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
 import createObservabilityRouter from './observability.js';
 import sessionsRouter from './sessions.js';
-import { webhooksRouter } from '../../server/routes/webhooks.js';
 
 /**
  * Cria o router principal da SDK API com injeção de dependências.
@@ -54,7 +54,6 @@ export default function createSdkApiRouter() {
     router.use('/', createClientRouter(sharedDeps));
     router.use('/', sessionsRouter);
     router.use('/', createAgentRouter(sharedDeps));
-    router.use('/', webhooksRouter);
     // P.2: rotas de introspecção de hooks (registry + SSE events)
     router.use('/', hooksRouter);
     // Rotas de observabilidade (metrics, errors, logs, health, log-level)

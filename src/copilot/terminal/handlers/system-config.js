@@ -9,10 +9,8 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent, setBackgroundCompactionThreshold } from '#copilot/services';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
-import { conversationHub, conversationStore } from '#copilot/services';
 import { defaultMetrics } from '#copilot/observability';
 import {
     BUILTIN_HANDLER_MAP,
@@ -22,13 +20,19 @@ import {
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
+import {
+    alwaysAliveAgent,
+    conversationHub,
+    conversationStore,
+    setBackgroundCompactionThreshold,
+} from '#copilot/services';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
+import { getSseClients, getSseCriticalClients } from '../../infra/sse/state.js';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode } from '../state.js';
-import { getSseClients, getSseCriticalClients } from '../../server/sse/state.js';
 
 /**
  * @typedef {import('./shared.js').HandlerResult} HandlerResult

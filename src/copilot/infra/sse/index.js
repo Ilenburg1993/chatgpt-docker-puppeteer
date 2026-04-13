@@ -1,10 +1,11 @@
 // @ts-check
 /**
- * Barrel — SSE (Server-Sent Events) — canônico no server.
+ * Barrel — SSE (Server-Sent Events) — infraestrutura compartilhada.
  *
- * Onda 3.6: este é o barrel canônico. O `api/sse/index.js` é re-export de compatibilidade.
+ * Movido de `server/sse/` para `infra/sse/` — este módulo é usado por
+ * api/express/, server/routes/ e terminal/, portanto pertence à camada infra.
  *
- * @module copilot/server/sse
+ * @module copilot/infra/sse
  */
 
 export { EventFanout, eventFanout } from './fanout.js';

@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * src/copilot/server/sse/state.js
+ * src/copilot/infra/sse/state.js
  *
- * Estado SSE canônico do servidor copilot.
+ * Estado SSE canônico (movido de server/sse/ para infra/sse/ — infraestrutura compartilhada).
  *
  * Onda 4.4 — L64.5: implementação própria sem re-export de `terminal/state.js`.
  * Elimina a inversão de camada server → terminal identificada na PARTE-25C.
@@ -12,7 +12,7 @@
  * - `_serverReplayBuffer`: buffer de replay dedicado ao endpoint /events do servidor
  *   (o `createSseWriter` escreve nele automaticamente via replayBuffer.push())
  *
- * @module copilot/server/sse/state
+ * @module copilot/infra/sse/state
  */
 
 import { SseReplayBuffer } from './replay-buffer.js';
@@ -47,7 +47,7 @@ export function getSseCriticalClients() {
 /**
  * Retorna o buffer de replay SSE do servidor.
  *
- * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (server/sse/utils.js),
+ * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (infra/sse/utils.js),
  * que chama replayBuffer.push() automaticamente a cada evento enviado.
  *
  * @returns {SseReplayBuffer}

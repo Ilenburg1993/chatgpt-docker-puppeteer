@@ -8,10 +8,10 @@
  * @see EventBus
  */
 
-import { eventFanout } from '../../server/sse/index.js';
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/services';
-import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../server/sse/state.js';
+import { eventFanout } from '../../infra/sse/index.js';
+import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { getHubSessionId } from '../state.js';
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
@@ -73,7 +73,7 @@ export function broadcastSse(event, data) {
  * @param {object} data
  * @param {{
  *     hubSessionId?: string | null;
- *     replayBuffer?: import('../../server/sse/replay-buffer.js').SseReplayBuffer;
+ *     replayBuffer?: import('../../infra/sse/replay-buffer.js').SseReplayBuffer;
  * }} [ctx]
  * @returns {boolean}
  */

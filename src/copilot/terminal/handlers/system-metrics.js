@@ -9,24 +9,13 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
 import { defaultAuditLog } from '#copilot/audit';
-import {
-    gitLog,
-    gitStatus,
-    listIssues,
-    listPrs,
-    listRuns,
-} from '#copilot/bridges';
-import {
-    defaultErrorTracker,
-    defaultMetrics,
-    getStatsByCategory,
-    getToolStats,
-} from '#copilot/observability';
+import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
+import { defaultErrorTracker, defaultMetrics, getStatsByCategory, getToolStats } from '#copilot/observability';
+import { alwaysAliveAgent } from '#copilot/services';
+import { getSseClients } from '../../infra/sse/state.js';
 import { clearRateLimiters } from '../rate-limiter-state.js';
 import { getInjectHistory } from '../state.js';
-import { getSseClients } from '../../server/sse/state.js';
 
 /**
  * @typedef {import('./shared.js').HandlerResult} HandlerResult
