@@ -156,7 +156,7 @@ export async function startTerminalServer() {
 
     // Criar hub_session permanente (best-effort)
     try {
-        conversationHub.initStandalone();
+        await conversationHub.init();
         const hubSessionId = conversationHub.store.createHubSession({
             title: 'Terminal Permanente LLM-B',
             metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
@@ -205,6 +205,11 @@ export async function startTerminalServer() {
     );
 
     const copilotServer = await copilotServerPromise;
+
+    // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)
+    if (copilotServer.io && conversationHub.isReady) {
+        conversationHub.attachSocketIO(copilotServer.io);
+    }
 
     registerShutdownHandler(
         'terminal.injectServer',

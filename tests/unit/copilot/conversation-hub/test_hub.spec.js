@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/conversation-hub/test_hub.spec.js
  *
- * F165: Testes para hub.js — ConversationHub singleton facade. Testa initStandalone (sem Socket.io), lifecycle, facade
+ * F165: Testes para hub.js — ConversationHub singleton facade. Testa init() (standalone, sem Socket.io), lifecycle, facade
  * methods, isReady, stop, close.
  */
 
@@ -13,26 +13,26 @@ import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js
 
 // ─── Helper ──────────────────────────────────────────────────────────────
 
-/** Helper para criar instância não-singleton com initStandalone */
-function createHub() {
+/** Helper para criar instância não-singleton com init() standalone */
+async function createHub() {
     const hub = new ConversationHub();
-    hub.initStandalone();
+    await hub.init();
     return hub;
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('ConversationHub lifecycle', () => {
-    it('initStandalone marca isReady=true', () => {
-        const hub = createHub();
+    it('init() sem args marca isReady=true', async () => {
+        const hub = await createHub();
         assert.strictEqual(hub.isReady, true);
         hub.stop();
     });
 
-    it('initStandalone é idempotente', () => {
+    it('init() é idempotente', async () => {
         const hub = new ConversationHub();
-        hub.initStandalone();
-        hub.initStandalone(); // should be no-op
+        await hub.init();
+        await hub.init(); // should be no-op
         assert.strictEqual(hub.isReady, true);
         hub.stop();
     });
@@ -42,8 +42,8 @@ describe('ConversationHub lifecycle', () => {
         assert.throws(() => hub.orchestrator, /Não inicializado/);
     });
 
-    it('stop reseta isReady para false', () => {
-        const hub = createHub();
+    it('stop reseta isReady para false', async () => {
+        const hub = await createHub();
         assert.strictEqual(hub.isReady, true);
         hub.stop();
         assert.strictEqual(hub.isReady, false);
@@ -56,7 +56,7 @@ describe('ConversationHub lifecycle', () => {
     });
 
     it('close fecha sessões ativas e para o hub', async () => {
-        const hub = createHub();
+        const hub = await createHub();
         // Criar uma sessão ativa
         const sessionId = hub.createSession({ title: 'close-test' });
         assert.ok(sessionId);
@@ -70,8 +70,8 @@ describe('ConversationHub facade methods (standalone)', () => {
     /** @type {ConversationHub} */
     let hub;
 
-    beforeEach(() => {
-        hub = createHub();
+    beforeEach(async () => {
+        hub = await createHub();
     });
 
     afterEach(() => {

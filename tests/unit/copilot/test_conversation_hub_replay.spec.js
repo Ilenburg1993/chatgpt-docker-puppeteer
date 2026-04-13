@@ -67,9 +67,9 @@ before(() => {
     store = new ConversationStore();
     store.init(testDb);
 
-    // Usar hub com store diretamente via standalone init
+    // Usar hub com store diretamente via init() (sem io = standalone)
     hub = new ConversationHub();
-    // ConversationHub.initStandalone() usa store singleton — inicializamos manualmente
+    // ConversationHub.init() usa store singleton — inicializamos manualmente
     // para controlar o DB in-memory
 });
 

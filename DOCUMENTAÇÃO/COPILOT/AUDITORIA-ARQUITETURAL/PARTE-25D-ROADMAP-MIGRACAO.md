@@ -21,29 +21,29 @@
 
 ## SUMÁRIO DE ONDAS
 
-| Onda    | Nome                                                        | Prioridade | Tamanho | Depende de    | Status       |
-| ------- | ----------------------------------------------------------- | ---------- | ------- | ------------- | ------------ |
-| **4.0** | SSE endpoint canônico em server/                            | P1         | M       | —             | ✅ `541b30d1` |
-| **4.1** | Sessions CRUD em server/routes/                             | P1         | M       | —             | ✅ `c84721bc` |
-| **4.2** | api/bridge → server/routes/copilot-api.js                   | P1         | M       | 4.0           | ✅ `25136e54` |
-| **4.3** | api/express → server/routes/sdk/                            | P1         | P       | 4.1           | ✅ `4bae09d6` |
-| **4.4** | server/sse/state.js com implementação própria               | P2         | M       | 4.0           | ✅ `78b3b711` |
-| **4.5** | Consolidação SSE + deprecação api/ barrels                  | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03` |
-| **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ✅ design     |
-| **4.7** | sdk/ subdividido — agent/, session/, tools/, rpc/, telemetry/ | P2         | G       | —             | ✅ `843eb1c0` |
-| **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ✅ `c0a89bab` |
-| **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ✅ `c0a89bab` |
-| **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated | P3         | P       | —             | ⏳            |
-| **5.1** | autonomy check expandido para 15 checks                     | P2         | P       | 4.6           | ⏳            |
-| **5.2** | Webhooks router em server/routes/                           | P3         | M       | 4.3           | ⏳            |
-| **5.3** | OpenAPI spec atualizada para server/routes/                 | P3         | M       | 4.8, 4.9      | ⏳            |
-| **5.4** | terminal/state.js separação de concerns (SSE cleanup)       | P3         | M       | 4.4           | ⏳            |
-| **5.5** | infra/ expansão ou remoção                                  | P4         | P       | —             | ⏳            |
-| **5.6** | ~~sdk/ subdiretório session/~~                              | —          | —       | —             | ✅ absorvido 4.7 |
-| **5.7** | ~~sdk/ subdiretório tools/~~                                | —          | —       | —             | ✅ absorvido 4.7 |
-| **5.8** | ~~sdk/ subdiretório rpc/~~                                  | —          | —       | —             | ✅ absorvido 4.7 |
-| **5.9** | Health checks por domínio                                   | P3         | M       | 4.6           | ⏳            |
-| **6.0** | Schema validation em server/routes/ inputs                  | P2         | G       | 4.6           | ⏳            |
+| Onda    | Nome                                                          | Prioridade | Tamanho | Depende de    | Status          |
+| ------- | ------------------------------------------------------------- | ---------- | ------- | ------------- | --------------- |
+| **4.0** | SSE endpoint canônico em server/                              | P1         | M       | —             | ✅ `541b30d1`    |
+| **4.1** | Sessions CRUD em server/routes/                               | P1         | M       | —             | ✅ `c84721bc`    |
+| **4.2** | api/bridge → server/routes/copilot-api.js                     | P1         | M       | 4.0           | ✅ `25136e54`    |
+| **4.3** | api/express → server/routes/sdk/                              | P1         | P       | 4.1           | ✅ `4bae09d6`    |
+| **4.4** | server/sse/state.js com implementação própria                 | P2         | M       | 4.0           | ✅ `78b3b711`    |
+| **4.5** | Consolidação SSE + deprecação api/ barrels                    | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03`    |
+| **4.6** | services/ integrado com server/routes/ (handlers→services)    | P2         | M       | 4.2, 4.3      | ✅ design        |
+| **4.7** | sdk/ subdividido — agent/, session/, tools/, rpc/, telemetry/ | P2         | G       | —             | ✅ `843eb1c0`    |
+| **4.8** | api/bridge remov. como código fonte (stubs ou delete)         | P3         | P       | 4.2           | ✅ `c0a89bab`    |
+| **4.9** | api/express remov. como código fonte (stubs ou delete)        | P3         | P       | 4.3           | ✅ `c0a89bab`    |
+| **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated   | P3         | P       | —             | ⏳               |
+| **5.1** | autonomy check expandido para 15 checks                       | P2         | P       | 4.6           | ⏳               |
+| **5.2** | Webhooks router em server/routes/                             | P3         | M       | 4.3           | ⏳               |
+| **5.3** | OpenAPI spec atualizada para server/routes/                   | P3         | M       | 4.8, 4.9      | ⏳               |
+| **5.4** | terminal/state.js separação de concerns (SSE cleanup)         | P3         | M       | 4.4           | ⏳               |
+| **5.5** | infra/ expansão ou remoção                                    | P4         | P       | —             | ⏳               |
+| **5.6** | ~~sdk/ subdiretório session/~~                                | —          | —       | —             | ✅ absorvido 4.7 |
+| **5.7** | ~~sdk/ subdiretório tools/~~                                  | —          | —       | —             | ✅ absorvido 4.7 |
+| **5.8** | ~~sdk/ subdiretório rpc/~~                                    | —          | —       | —             | ✅ absorvido 4.7 |
+| **5.9** | Health checks por domínio                                     | P3         | M       | 4.6           | ⏳               |
+| **6.0** | Schema validation em server/routes/ inputs                    | P2         | G       | 4.6           | ⏳               |
 
 ### Mudanças no roadmap vs versão original
 

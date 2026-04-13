@@ -5,7 +5,7 @@
  * ConversationHub — singleton que compõe ConversationStore + HubOrchestrator + Namespace Socket.io.
  *
  * É o ponto de entrada único para o ambiente permanente LLM-A ↔ LLM-B ↔ Usuário. Deve ser inicializado via
- * conversationHub.init({ io, nerv }) na FASE 10 do boot do main-server.
+ * conversationHub.init({ io, nerv }) ou conversationHub.init() (standalone) no boot.
  *
  * @module copilot/conversation-hub/hub
  * @see module:copilot/conversation-hub/orchestrator
@@ -32,7 +32,7 @@ import { conversationStore } from './store.js';
 
 /**
  * @typedef {Object} HubInitOpts
- * @property {import('socket.io').Server} io - Instância Socket.io Server (obrigatório)
+ * @property {import('socket.io').Server} [io] - Instância Socket.io Server (opcional — se omitido, inicia sem realtime)
  * @property {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} [nerv]
  *   - Instância NERV bus (opcional, para forwarding de eventos)
  */
@@ -58,7 +58,10 @@ export class ConversationHub {
     /**
      * Inicializa todos os componentes do hub. É idempotente: chamadas adicionais são no-op.
      *
-     * @param {HubInitOpts} opts
+     * Se `io` for omitido, inicializa sem Socket.IO (equivalente ao antigo `initStandalone()`).
+     * Socket.IO pode ser conectado posteriormente via {@link attachSocketIO}.
+     *
+     * @param {HubInitOpts} [opts]
      * @returns {Promise<void>}
      */
     async init(opts) {
@@ -74,11 +77,13 @@ export class ConversationHub {
         this.#orchestrator = new HubOrchestrator(conversationStore);
         this.#orchestrator.init();
 
-        // 3. Montar namespace Socket.io /copilot
-        mountCopilotNamespace(opts.io, this.#orchestrator, conversationStore);
+        // 3. Montar namespace Socket.io /copilot (se io fornecido)
+        if (opts?.io) {
+            mountCopilotNamespace(opts.io, this.#orchestrator, conversationStore);
+        }
 
         // 4. (Opcional) Encaminhar eventos para NERV bus
-        if (opts.nerv) {
+        if (opts?.nerv) {
             this.#bridgeToNerv(opts.nerv);
         }
 
@@ -86,28 +91,26 @@ export class ConversationHub {
         this.#bridgeToEventBus();
 
         this.#initialized = true;
-        log('INFO', '[ConversationHub] Ambiente permanente LLM-A ↔ LLM-B ↔ Usuário inicializado.');
+        const mode = opts?.io ? 'completo (Socket.IO + EventBus)' : 'standalone (sem Socket.IO)';
+        log('INFO', `[ConversationHub] Inicializado — modo ${mode}.`);
     }
 
     /**
-     * Inicializa o hub em modo standalone (sem Socket.io, sem NERV). Indicado para o terminal LLM-B rodando de forma
-     * isolada, sem o main server. Ativa o ConversationStore e o HubOrchestrator — persistência e eventos funcionam
-     * normalmente; broadcast Socket.io é simplesmente omitido.
+     * Conecta Socket.IO ao hub já inicializado. Permite iniciar sem io e fazer upgrade depois.
      *
-     * É idempotente: se `init()` ou `initStandalone()` já foram chamados, é no-op.
-     *
-     * @deprecated Onda 3.4 — Prefira `init({ io })` via `startCopilotServer` para ativar Socket.IO.
-     *   Mantido para compatibilidade e fallback até Onda 3.9.
+     * @param {import('socket.io').Server} io
      * @returns {void}
+     * @throws {SessionError} Se hub não inicializado
      */
-    initStandalone() {
-        if (this.#initialized) return;
-
-        conversationStore.init();
-        this.#orchestrator = new HubOrchestrator(conversationStore);
-        this.#orchestrator.init();
-        this.#initialized = true;
-        log('INFO', '[ConversationHub] Modo standalone ativo (sem Socket.io/NERV).');
+    attachSocketIO(io) {
+        if (!this.#initialized || !this.#orchestrator) {
+            throw new SessionError(
+                '[ConversationHub] Não inicializado. Chame init() antes de attachSocketIO().',
+                'HUB_NOT_INITIALIZED',
+            );
+        }
+        mountCopilotNamespace(io, this.#orchestrator, conversationStore);
+        log('INFO', '[ConversationHub] Socket.IO conectado via attachSocketIO().');
     }
 
     // ─── Acesso ao orquestrador ────────────────────────────────────────────────
@@ -313,7 +316,7 @@ export class ConversationHub {
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
 /**
- * Instância singleton do ConversationHub. Inicialize com `conversationHub.init({ io, nerv })` no boot do server.
+ * Instância singleton do ConversationHub. Inicialize com `conversationHub.init()` ou `init({ io })` no boot.
  *
  * @type {ConversationHub}
  */
