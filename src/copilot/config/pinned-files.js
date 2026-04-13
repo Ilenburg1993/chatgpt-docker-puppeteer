@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { BaseEmitter } from '#copilot/core';
+import { BaseEmitter } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';

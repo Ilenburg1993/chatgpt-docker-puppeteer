@@ -7,9 +7,9 @@
  * @module copilot/server/routes/health-registry
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
-import { bridgeEmitter } from '#copilot/core';
+import { alwaysAliveAgent } from '#copilot/services';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { bridgeEmitter } from '#copilot/core';
 import { registerModuleHealth } from './health-modules.js';
 
 /**
@@ -30,9 +30,7 @@ export function registerCopilotHealthChecks() {
 
     // ── ConversationHub ──────────────────────────────────────────────────────
     registerModuleHealth('conversation-hub', () => {
-        const activeSessions = conversationHub.isReady
-            ? conversationStore.countHubSessions({ status: 'active' })
-            : 0;
+        const activeSessions = conversationHub.isReady ? conversationStore.countHubSessions({ status: 'active' }) : 0;
         return {
             ok: true,
             details: {

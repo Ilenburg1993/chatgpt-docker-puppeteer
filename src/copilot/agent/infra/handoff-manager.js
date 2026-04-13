@@ -15,8 +15,7 @@
  * @see EventBus
  */
 
-import { BaseEmitter } from '#copilot/core';
-import { EMITTER_HANDOFF_ACCEPTED, EMITTER_HANDOFF_RECEIVED, EMITTER_HANDOFF_REJECTED } from '#copilot/events';
+import { BaseEmitter, EMITTER_HANDOFF_ACCEPTED, EMITTER_HANDOFF_RECEIVED, EMITTER_HANDOFF_REJECTED } from '#copilot/events';
 import { log } from '#copilot/observability';
 
 /**

@@ -12,8 +12,8 @@
  * @see module:copilot/hooks/factory
  */
 
-import { BaseEmitter } from '#copilot/core';
 import {
+    BaseEmitter,
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
     HOOK_PRE_TOOL_USE,

@@ -11,7 +11,8 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { BaseEmitter, bridgeEmitter, logSwallowed } from '#copilot/core';
+import { BaseEmitter } from '#copilot/events';
+import { bridgeEmitter, logSwallowed } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)

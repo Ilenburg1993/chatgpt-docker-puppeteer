@@ -16,10 +16,10 @@ import {
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
+import { createEmitter } from '#copilot/events';
 import {
     CopilotError,
     getHubSessionId as _getCoreHubSessionId,
-    createEmitter,
     setSharedHubSessionId,
 } from '#copilot/core';
 

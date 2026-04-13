@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { createEmitter } from '#copilot/core';
+import { createEmitter } from '#copilot/events';
 
 /**
  * @typedef {Object} FanoutEvent

@@ -12,8 +12,9 @@
  */
 
 import { getCopilotFallbackModel } from '#copilot/config';
-import { BaseEmitter, SessionError } from '#copilot/core';
+import { SessionError } from '#copilot/core';
 import {
+    BaseEmitter,
     EMITTER_LOOP_CHANGED,
     EMITTER_LOOP_COMPACTION_REQUESTED,
     EMITTER_LOOP_PAUSED,

@@ -12,7 +12,6 @@
  * @module copilot/events/middleware/schema-validator
  */
 
-import { log } from '#copilot/observability';
 import { getEventSchema, validateEvent } from '../schemas/registry.js';
 
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -63,12 +62,12 @@ export function resetValidationStats() {
 export function schemaValidator(event, next) {
     // ── Base validation (L6) ─────────────────────────────
     if (typeof event.type !== 'string' || event.type.length === 0) {
-        log('WARN', `[schema-validator] Evento bloqueado - type inválido: ${JSON.stringify(event.type)}`);
+        console.warn(`[schema-validator] Evento bloqueado - type inválido: ${JSON.stringify(event.type)}`);
         _counters.blocked++;
         return; // não chama next() → evento descartado
     }
     if (typeof event.timestamp !== 'number') {
-        log('WARN', `[schema-validator] Evento ${event.type} - timestamp inválido, auto-corrigido.`);
+        console.warn(`[schema-validator] Evento ${event.type} - timestamp inválido, auto-corrigido.`);
         event.timestamp = Date.now();
         _counters.corrected++;
     }
@@ -85,11 +84,11 @@ export function schemaValidator(event, next) {
         const msg = `[schema-validator] ${event.type}: ${result.errors.join('; ')}`;
         _counters.warned++;
         if (STRICT && IS_DEV) {
-            log('WARN', `${msg} [BLOCKED: STRICT_SCHEMA=1]`);
+            console.warn(`${msg} [BLOCKED: STRICT_SCHEMA=1]`);
             _counters.blocked++;
             return; // bloqueia em strict mode
         }
-        log('WARN', msg);
+        console.warn(msg);
     }
 
     next();

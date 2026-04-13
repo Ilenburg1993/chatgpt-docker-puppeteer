@@ -10,7 +10,6 @@
  * @module copilot/events/middleware/rate-limiter
  */
 
-import { log } from '#copilot/observability';
 
 /**
  * @typedef {object} RateLimiterOptions
@@ -46,7 +45,7 @@ export function createRateLimiter(options = {}) {
         if (entry.count > maxPerWindow) {
             // Log apenas na primeira vez que excede
             if (entry.count === maxPerWindow + 1) {
-                log('WARN', `[rate-limiter] ${type} excedeu ${maxPerWindow}/${windowMs}ms — eventos suprimidos.`);
+                console.warn(`[rate-limiter] ${type} excedeu ${maxPerWindow}/${windowMs}ms — eventos suprimidos.`);
             }
             return; // não chama next() → evento suprimido
         }

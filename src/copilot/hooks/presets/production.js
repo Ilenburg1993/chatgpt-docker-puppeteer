@@ -18,8 +18,6 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
-import { isToolDisabled } from '#copilot/tools';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
@@ -52,6 +50,7 @@ import { createPromptTransformer } from '../prompt-transformer.js';
  * @property {number} [circuitBreakerMaxRetries] - Máx retries antes de abrir o circuit. Padrão: 3.
  * @property {number} [circuitBreakerResetMs] - Tempo de reset do circuit em ms. Padrão: 60000.
  * @property {(entry: ProductionAuditEntry) => void} [auditSink] - Destino do audit log. Padrão: core/logger.
+ * @property {(toolName: string) => boolean} [isToolDisabled] - Predicate para verificar se tool foi desabilitada em runtime. Padrão: sempre false.
  */
 
 /**
@@ -89,6 +88,7 @@ export function createProductionHooks(opts = {}) {
         circuitBreakerMaxRetries = 3,
         circuitBreakerResetMs = 60_000,
         auditSink,
+        isToolDisabled = () => false,
     } = opts;
 
     /**
@@ -99,15 +99,13 @@ export function createProductionHooks(opts = {}) {
             try {
                 auditSink(entry);
             } catch (sinkError) {
-                // UPG-PROD-001: falha no sink não deve ser silenciosa — registra via logger core
-                log(
-                    'WARN',
+                // UPG-PROD-001: falha no sink não deve ser silenciosa — registra via console
+                console.warn(
                     `[preset/production] auditSink falhou para ${entry.hookName}: ${/** @type {Error} */ (sinkError).message ?? sinkError}`,
                 );
             }
         } else {
-            log(
-                'INFO',
+            console.info(
                 `[preset/production] ${entry.hookName}${entry.toolName ? ` tool='${entry.toolName}'` : ''}${entry.decision ? ` decision=${entry.decision}` : ''}${entry.sessionId ? ` session=${entry.sessionId}` : ''}`,
             );
         }
@@ -274,8 +272,7 @@ export function createProductionHooks(opts = {}) {
             timestamp: Date.now(),
             input,
         });
-        log(
-            'INFO',
+        console.info(
             `[preset/production] sessão encerrada: reason='${input.reason}' sessionId='${invocation?.sessionId}'`,
         );
     }
@@ -308,7 +305,7 @@ export function createProductionHooks(opts = {}) {
             }
         },
         onTrip: (ctx) => {
-            log('WARN', `[preset/production] circuit breaker ativado para '${ctx}'`);
+            console.warn(`[preset/production] circuit breaker ativado para '${ctx}'`);
         },
     });
 

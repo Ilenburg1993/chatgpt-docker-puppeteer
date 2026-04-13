@@ -13,8 +13,9 @@
 | ----------- | ---------------------------- | ---------- | ---------- |
 | **Faixa 0** | ✅ CONCLUÍDA                  | `5ecbceb1` | 2026-06-11 |
 | **Faixa 1** | ✅ VALIDADA (já implementada) | —          | 2026-06-11 |
-| Faixa 2     | ✅ CONCLUÍDA                  | `8e2006eb` | 2026-06-11 |
-| Faixa 3-5   | ⏳ PENDENTE                   | —          | —          |
+| **Faixa 2** | ✅ CONCLUÍDA                  | `8e2006eb` | 2026-06-11 |
+| **Faixa 3** | 🔄 EM PROGRESSO               | `ac9b008b` | 2026-04-13 |
+| Faixa 4-5   | ⏳ PENDENTE                   | —          | —          |
 
 ### Notas da Faixa 0
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js
@@ -43,6 +44,11 @@ A validação detalhada revelou que a maioria dos findings da Faixa 1 **já est�
   - FUNCTION-LEVEL: 9 arquivos, 16 funções: 5 sync shims broken removidos (snapshot.js), 3 sync cache-API legitimados (state-io.js), 4 dead sync shims deletados (alias-store, sdk/tools), 4 tags misleading removidas (todo, observability, audit, api/express)
   - Limpeza: alias `#copilot/api` removido de package.json (target deletado), barrels sdk/index.js atualizados
   - API Architecture audit: arquitetura validada — `api/express/` (SDK client routes) e `server/routes/` (operacional) servem audiências distintas, sem duplicação real
+
+### Notas da Faixa 3 (em progresso — commit `ac9b008b`, 2026-04-13)
+- **Violação API→Server (webhook)**: `api/express/index.js` importava `webhooksRouter` de `server/routes/webhooks.js` — dependência ascendente eliminada. Webhooks servidos exclusivamente pelo server root via `server/router.js`.
+- **Violação cross-cutting SSE**: `server/sse/` era usado por `api/express/`, `terminal/` e `server/routes/` — movido para `src/copilot/infra/sse/` como infraestrutura transversal legítima. Adicionado ao barrel `infra/index.js`.
+- **3.1.1–3.1.6** (core/events/config/hooks layer fixes): EM ANÁLISE.
 
 ---
 

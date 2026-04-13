@@ -29,7 +29,6 @@
  *     ```;
  */
 
-export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from '../events/agent-events.js';
 export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 /** @typedef {import('../events/agent-events.js').AgentEventName} AgentEventName */
 export * as ErrorCodes from './error-codes.js';
@@ -72,6 +71,3 @@ export { createCache } from './cache.js';
 
 // ─── Mutex ────────────────────────────────────────────────────────────────────
 export { createMutex, createMutexPool, withMutex } from './mutex.js';
-
-// ─── Emitter ──────────────────────────────────────────────────────────────────
-export { BaseEmitter, createEmitter } from '../events/create-emitter.js';

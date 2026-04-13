@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
-import { AGENT_EVENTS } from '#copilot/core';
 import {
+    AGENT_EVENTS,
     EMITTER_DIALOG_LOOP_CHANGED,
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
