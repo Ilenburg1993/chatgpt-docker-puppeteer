@@ -20,8 +20,10 @@
 
 import { conversationStore } from '#copilot/services';
 import { Router } from 'express';
+import { z } from 'zod';
 import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
 import { bridgeHandler } from '../handler-bridge.js';
+import { validate } from '../middleware/validate.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -69,15 +71,21 @@ export function createSessionsRouter() {
         }
     });
 
+    const createSessionSchema = z.object({
+        title: z.string().optional(),
+        sdkSessionId: z.string().optional(),
+        metadata: z.record(z.unknown()).optional(),
+    });
+
     // ── POST /sessions — cria nova session ────────────────────────────────────
-    router.post('/sessions', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { title, sdkSessionId, metadata } = /** @type {Record<string, unknown>} */ (req.body ?? {});
+    router.post('/sessions', validate({ body: createSessionSchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { title, sdkSessionId, metadata } = /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (req.body);
         try {
             /** @type {{ title?: string; sdkSessionId?: string; metadata?: object }} */
             const hubOpts = {};
-            if (typeof title === 'string') hubOpts.title = title;
-            if (typeof sdkSessionId === 'string') hubOpts.sdkSessionId = sdkSessionId;
-            if (metadata && typeof metadata === 'object') hubOpts.metadata = /** @type {object} */ (metadata);
+            if (title) hubOpts.title = title;
+            if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
+            if (metadata) hubOpts.metadata = metadata;
             const id = conversationStore.createHubSession(hubOpts);
             res.status(201).json({ ok: true, id });
         } catch (/** @type {any} */ e) {

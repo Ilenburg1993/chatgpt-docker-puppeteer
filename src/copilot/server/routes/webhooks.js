@@ -15,8 +15,10 @@
 
 import { validateUrlString } from '#copilot/core';
 import { Router } from 'express';
+import { z } from 'zod';
 
 import { alwaysAliveAgent } from '#copilot/services';
+import { validate } from '../middleware/validate.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -41,18 +43,16 @@ router.get('/webhooks', (_req, /** @type {Res} */ res) => {
 // POST /webhooks
 // ─────────────────────────────────────────────────────────────────────────────
 
+const webhookBodySchema = z.object({ url: z.string().url() });
+
 /**
  * Registra uma nova URL de webhook.
  *
  * Body: `{ url: string }`
  * Response: `{ ok: true, id: string, url: string }`
  */
-router.post('/webhooks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-    const { url } = /** @type {{ url?: string }} */ (req.body ?? {});
-    if (!url || typeof url !== 'string') {
-        res.status(400).json({ ok: false, error: 'Campo "url" é obrigatório e deve ser string' });
-        return;
-    }
+router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
+    const { url } = /** @type {{ url: string }} */ (req.body);
 
     const validation = validateUrlString(url);
     if (!validation.safe) {
