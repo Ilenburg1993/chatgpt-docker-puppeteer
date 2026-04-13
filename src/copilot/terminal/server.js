@@ -5,6 +5,8 @@
  *   autenticação por token e audit log.
  *
  *   src/copilot/terminal/server.js
+ * @deprecated Onda 3.3 — substituído por `src/copilot/server/` (startCopilotServer).
+ *   Mantido como implementação de fallback. Remover na Onda 3.9.
  * @see EventBus
  * @see module:copilot/terminal/route-table
  * @see module:copilot/terminal/repl

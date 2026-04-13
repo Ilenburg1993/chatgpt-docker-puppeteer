@@ -29,12 +29,13 @@ import { conversationHub } from '../conversation-hub/hub.js';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
+import { startCopilotServer } from '../server/index.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';
 import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
-import { createInjectServer } from './server.js';
+import { createInjectServer as _legacyCreateInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 
@@ -154,8 +155,6 @@ export async function startTerminalServer() {
         });
     });
 
-    const injectServer = createInjectServer();
-
     // Criar hub_session permanente (best-effort)
     try {
         conversationHub.initStandalone();
@@ -168,6 +167,20 @@ export async function startTerminalServer() {
     } catch (/** @type {any} */ e) {
         log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
     }
+
+    // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
+    // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
+    const _hubReady = conversationHub.isReady;
+    /** @type {import('../server/index.js').CopilotServerOptions} */
+    const _serverOpts = {};
+    if (_hubReady) {
+        _serverOpts.orchestrator = conversationHub.orchestrator;
+        _serverOpts.store = conversationHub.store;
+    }
+    const copilotServerPromise = startCopilotServer(_serverOpts).catch((/** @type {any} */ e) => {
+        log('WARN', `[TerminalServer] startCopilotServer falhou, fallback para legacy: ${e.message}`);
+        return _legacyCreateInjectServer();
+    });
 
     registerAgentEventListeners(printStandaloneBanner);
     startReflectionLoop();
@@ -195,11 +208,13 @@ export async function startTerminalServer() {
         10,
     );
 
+    const copilotServer = await copilotServerPromise;
+
     registerShutdownHandler(
         'terminal.injectServer',
         async () => {
-            await new Promise((resolve) => injectServer.close(resolve));
-            log('INFO', '[TerminalServer] Inject server encerrado via shutdown handler.');
+            await copilotServer.close();
+            log('INFO', '[TerminalServer] Copilot server encerrado via shutdown handler.');
         },
         20,
     );
@@ -224,5 +239,8 @@ export async function startTerminalServer() {
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
 
-    await startRepl(injectServer);
+    // Extrair httpServer compatível com startRepl (aceita http.Server)
+    // CopilotServer tem .httpServer; o fallback legacy retorna http.Server diretamente
+    const httpServerForRepl = /** @type {any} */ (copilotServer).httpServer ?? copilotServer;
+    await startRepl(/** @type {import('node:http').Server} */ (httpServerForRepl));
 }

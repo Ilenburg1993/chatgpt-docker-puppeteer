@@ -1,10 +1,27 @@
 # PARTE-24K — ROADMAP ULTRA-DETALHADO: COPILOT SERVER DEDICADO
 
 > **Documento**: PARTE-24K-ROADMAP-ULTRA-DETALHADO.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
+> **Versão**: 1.2
+> **Data**: 2026-04-13 (atualizado)
 > **Escopo**: Roadmap de implementação cirúrgico e completo — arquivo de referência máster para toda a
 > reestruturação do `src/copilot`. Substitui PARTE-24J como roadmap canônico.
+
+## STATUS DE IMPLEMENTAÇÃO
+
+| Onda | Status | Commit |
+|------|--------|--------|
+| 2.7  | ✅ CONCLUÍDA | `6a9f366e` |
+| 3.0  | ✅ CONCLUÍDA | `b01f600e` |
+| 3.1  | ✅ CONCLUÍDA | `b01f600e` |
+| 3.2  | ✅ CONCLUÍDA | (próximo commit) |
+| 3.3  | ⬜ PENDENTE | — |
+| 3.4–3.9 | ⬜ PENDENTE | — |
+
+**Onda 3.2 entregou**:
+- `server/socket/hub-ns.js` — Namespace Socket.IO /copilot (L56.2)
+- `server/socket/index.js` — Factory `createCopilotSocket(httpServer)` (L56.3)
+- `server/index.js` — Completo com Socket.IO opt-in via `opts.orchestrator + opts.store` (L56.4)
+- `scripts/check-copilot-server.mjs` — Smoke test validado ✅ (L56.5)
 
 ---
 

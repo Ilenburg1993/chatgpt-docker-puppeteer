@@ -3,7 +3,8 @@
  * @module copilot/server
  * @file Ponto de entrada do servidor copilot dedicado.
  *
- * Onda 3.0 — L54.7 (stub): exporta createCopilotServer com implementação pendente.
+ * Onda 3.0 — L54.7: Express app + middleware criados.
+ * Onda 3.1 — L55.8: mountCopilotRoutes integrado.
  * Onda 3.2 — L56.4: implementação completa com Express + Socket.IO.
  *
  * src/copilot/server/index.js
@@ -15,6 +16,7 @@ import { log } from '#copilot/observability';
 import http from 'node:http';
 import { createCopilotApp, registerErrorHandler } from './app.js';
 import { mountCopilotRoutes } from './router.js';
+import { createCopilotSocket } from './socket/index.js';
 
 /**
  * @typedef {object} CopilotServerOptions
@@ -22,12 +24,16 @@ import { mountCopilotRoutes } from './router.js';
  * @property {string} [host] - Host de bind. Default: '127.0.0.1' (loopback only)
  * @property {string} [token] - Token bearer override
  * @property {boolean} [skipAuth] - Desabilitar auth (test)
+ * @property {import('../conversation-hub/orchestrator.js').HubOrchestrator} [orchestrator] - Orchestrator do hub
+ * @property {import('../conversation-hub/store.js').ConversationStore} [store] - Store do hub
+ * @property {boolean} [withSocket] - Se true, inicializa Socket.IO. Default: true se orchestrator fornecido
  */
 
 /**
  * @typedef {object} CopilotServer
  * @property {http.Server} httpServer - Servidor HTTP Node.js
  * @property {import('express').Application} app - App Express
+ * @property {import('socket.io').Server | null} io - Socket.IO server (null se withSocket=false)
  * @property {number} port - Porta em uso
  * @property {() => Promise<void>} close - Para o servidor graciosamente
  */
@@ -35,11 +41,7 @@ import { mountCopilotRoutes } from './router.js';
 /**
  * Cria e inicia o servidor copilot dedicado (Express + Socket.IO).
  *
- * STUB — Onda 3.0: Express app criado mas rotas não montadas ainda.
- * Onda 3.1 monta as rotas. Onda 3.2 adiciona Socket.IO e completa.
- *
- * O terminal/server.js (createInjectServer) continua sendo o servidor ativo
- * até a Onda 3.3 quando terminal/index.js é migrado para usar startCopilotServer().
+ * Após Onda 3.3, este é o único servidor ativo — terminal/server.js é deprecado.
  *
  * @param {CopilotServerOptions} [opts]
  * @returns {Promise<CopilotServer>}
@@ -57,22 +59,32 @@ export async function startCopilotServer(opts) {
     // Onda 3.1: montar todas as rotas copilot
     mountCopilotRoutes(app, { token: opts?.token });
 
-    // Onda 3.2: createCopilotSocket(httpServer) será chamado aqui
-
     // Error handler deve ser registrado APÓS rotas
     registerErrorHandler(app);
 
     const httpServer = http.createServer(app);
+
+    // Onda 3.2: Socket.IO — só monta se orchestrator/store foram fornecidos
+    const withSocket = opts?.withSocket ?? (!!opts?.orchestrator && !!opts?.store);
+    let io = null;
+
+    if (withSocket && opts?.orchestrator && opts?.store) {
+        const socketResult = createCopilotSocket(httpServer, opts.orchestrator, opts.store);
+        io = socketResult.io;
+    }
 
     await new Promise((resolve, reject) => {
         httpServer.listen(port, host, () => resolve(undefined));
         httpServer.once('error', reject);
     });
 
-    log('INFO', `[CopilotServer] Servidor iniciado em http://${host}:${port}`);
+    log('INFO', `[CopilotServer] Servidor iniciado em http://${host}:${port}${io ? ' + socket.io' : ''}`);
 
     // Graceful shutdown
     registerShutdownHandler('copilot.server', async () => {
+        if (io) {
+            await new Promise((resolve) => io.close(() => resolve(undefined)));
+        }
         await new Promise((resolve) => httpServer.close(resolve));
         log('INFO', '[CopilotServer] Servidor encerrado.');
     });
@@ -80,10 +92,16 @@ export async function startCopilotServer(opts) {
     return {
         httpServer,
         app,
+        io,
         port,
         close: () =>
             new Promise((resolve) => {
-                httpServer.close(() => resolve());
+                const closeHttp = () => httpServer.close(() => resolve());
+                if (io) {
+                    void io.close(() => closeHttp());
+                } else {
+                    closeHttp();
+                }
             }),
     };
 }

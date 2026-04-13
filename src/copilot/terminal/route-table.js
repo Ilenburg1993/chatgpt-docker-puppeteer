@@ -5,7 +5,8 @@
  * Tabela declarativa de rotas para o terminal server HTTP. Centraliza method, path, handler, auth bypass, rate limiter
  * e body parsing numa estrutura de dados inspecionável — reduzindo a lógica imperativa em server.js.
  *
- * **Cada rota é um objeto com:**
+ * @deprecated Onda 3.3 — substituído por `src/copilot/server/routes/` (Express routers).
+ *   Mantido como implementação de fallback. Remover na Onda 3.9.
  *
  * - `method` — método HTTP (GET, POST, PUT, DELETE)
  * - `path` — pathname exato (ex: '/health') ou regex (ex: /^/sessions/[^/]+/turns$/)
