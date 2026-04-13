@@ -30,7 +30,7 @@
 | **4.4** | server/sse/state.js com implementação própria               | P2         | M       | 4.0           | ✅ `78b3b711` |
 | **4.5** | Consolidação SSE + deprecação api/ barrels                  | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03` |
 | **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ✅ design     |
-| **4.7** | sdk/ subdividido em session/, tools/, rpc/                  | P2         | G       | —             | ⏳            |
+| **4.7** | sdk/ subdividido — agent/, session/, tools/, rpc/, telemetry/ | P2         | G       | —             | ✅ `843eb1c0` |
 | **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ✅ `c0a89bab` |
 | **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ✅ `c0a89bab` |
 | **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated | P3         | P       | —             | ⏳            |
@@ -39,9 +39,9 @@
 | **5.3** | OpenAPI spec atualizada para server/routes/                 | P3         | M       | 4.8, 4.9      | ⏳            |
 | **5.4** | terminal/state.js separação de concerns (SSE cleanup)       | P3         | M       | 4.4           | ⏳            |
 | **5.5** | infra/ expansão ou remoção                                  | P4         | P       | —             | ⏳            |
-| **5.6** | sdk/ subdiretório session/                                  | P3         | M       | 4.7           | ⏳            |
-| **5.7** | sdk/ subdiretório tools/                                    | P3         | M       | 4.7           | ⏳            |
-| **5.8** | sdk/ subdiretório rpc/                                      | P3         | M       | 4.7           | ⏳            |
+| **5.6** | ~~sdk/ subdiretório session/~~                              | —          | —       | —             | ✅ absorvido 4.7 |
+| **5.7** | ~~sdk/ subdiretório tools/~~                                | —          | —       | —             | ✅ absorvido 4.7 |
+| **5.8** | ~~sdk/ subdiretório rpc/~~                                  | —          | —       | —             | ✅ absorvido 4.7 |
 | **5.9** | Health checks por domínio                                   | P3         | M       | 4.6           | ⏳            |
 | **6.0** | Schema validation em server/routes/ inputs                  | P2         | G       | 4.6           | ⏳            |
 
@@ -316,36 +316,35 @@ A análise pós-Onda 4.5 revelou que o padrão existente é correto:
 
 ---
 
-### ONDA 4.7 — `sdk/` Subdividido
+### ONDA 4.7 — `sdk/` Subdividido ✅ `843eb1c0`
 
 **Prioridade**: P2
-**Tamanho**: Grande (reorganização de 41 arquivos)
+**Tamanho**: Grande (24 arquivos movidos, 5 clusters)
 **Depende de**: Nada (é additive — cria subdiretórios, move arquivos sem mudar conteúdo)
 
 **Problema resolvido**:
-`sdk/` tem 41 arquivos planos (apenas `models/` como subdiretório). Dificulta navegação, onboarding, e testabilidade.
+`sdk/` tinha 38 arquivos planos (apenas `models/` como subdiretório). Dificultava navegação, onboarding, e testabilidade.
 
-**O que fazer** (em 3 sub-ondas ou juntas):
+**Implementação (commit `843eb1c0`)**:
+
+5 clusters criados, 24 arquivos movidos via `git mv`:
 
 ```
-sdk/session/
-  session.js, sdk-session-wrapper.js, rpc-session.js
-
-sdk/tools/
-  tools.js, tools-registry.js, tools-state.js, custom-tools.js
-
-sdk/rpc/
-  rpc.js, rpc-ops.js, server-rpc.js, experimental-rpc.js
+sdk/agent/      — agents.js, contract.js, bridge-contract.js, channel-contract.js (4)
+sdk/session/    — lifecycle.js, wrapper.js, client.js, client-facade.js, client-events.js,
+                  events.js, provider.js, permissions.js, system-message.js (9)
+sdk/tools/      — core.js, registry.js, state.js, custom.js (4)
+sdk/rpc/        — server.js, session.js, ops.js, experimental.js (4)
+sdk/telemetry/  — health.js, quota-monitor.js, tracing.js (3)
 ```
 
-Para cada arquivo movido:
-1. Criar o arquivo no novo local com conteúdo idêntico
-2. Converter o arquivo original em re-export stub (compatibilidade)
-3. Atualizar `sdk/index.js` para importar do novo local
+Arquivos shared permanecem na raiz: types.js, constants.js, config.js, logger.js,
+di-tokens.js, utils.js, event-helpers.js, http-request.js, feature-flags.js.
 
-**Critérios de aceitação**:
-- Todos os importadores externos do `sdk/` continuam funcionando
-- `npm run typecheck:node` sem novos erros
+- 19 subpath compat entries adicionadas em package.json (override do wildcard `#copilot/sdk/*`)
+- Todos os imports relativos + JSDoc typedefs corrigidos
+- Barrel `sdk/index.js` atualizado para apontar aos novos caminhos
+- Typecheck: zero errors / Lint: zero errors
 
 ---
 
@@ -464,12 +463,10 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.6–5.8 — `sdk/` Subdiretórios (Sequencial ou Paralelo)
+### ~~ONDA 5.6–5.8~~ — `sdk/` Subdiretórios — ✅ Absorvido pela Onda 4.7
 
-Ver Onda 4.7 — sub-ondas para cada subdiretório:
-- **5.6**: `sdk/session/`
-- **5.7**: `sdk/tools/`
-- **5.8**: `sdk/rpc/`
+> As sub-ondas 5.6 (session/), 5.7 (tools/), 5.8 (rpc/) foram integralmente implementadas
+> na Onda 4.7 (`843eb1c0`), que também incluiu os clusters agent/ e telemetry/.
 
 ---
 
@@ -506,7 +503,7 @@ Q1–Q2 2026 (Ondas 4.x — migração)
 
 Q2 2026 (Ondas 4.7–5.1 — limpeza + expansão)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4.7  sdk/ subdivide       [░░░░░░░░░░░░░░░░░░░░]
+4.7  sdk/ subdivide       [████████████████████] ✅ 843eb1c0
 4.8  api/bridge stubs     [████████████████████] ✅ c0a89bab
 4.9  api/express stubs    [████████████████████] ✅ c0a89bab
 5.0  hub initStandalone   [░░░░░░░░░░░░░░░░░░░░]
@@ -518,9 +515,7 @@ Q3 2026 (Ondas 5.2–6.0 — polimento)
 5.3  OpenAPI update       [░░░░░░░░░░░░░░░░░░░░] (após stubs)
 5.4  terminal/state sep   [░░░░░░░░░░░░░░░░░░░░] (após 4.4)
 5.5  infra/ decisão       [░░░░░░░░░░░░░░░░░░░░]
-5.6  sdk/session/         [░░░░░░░░░░░░░░░░░░░░]
-5.7  sdk/tools/           [░░░░░░░░░░░░░░░░░░░░]
-5.8  sdk/rpc/             [░░░░░░░░░░░░░░░░░░░░]
+5.6–5.8 sdk/ subdirs      [████████████████████] ✅ absorvido 4.7
 5.9  Health per-domain    [░░░░░░░░░░░░░░░░░░░░]
 6.0  Schema validation    [░░░░░░░░░░░░░░░░░░░░]
 ```
