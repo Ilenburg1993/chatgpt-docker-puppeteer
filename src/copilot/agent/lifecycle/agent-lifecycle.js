@@ -34,8 +34,8 @@ import { container } from '../../core/di-container.js';
 import { EVENT_BUS } from '../../core/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 
+import { getHubSessionId } from '#copilot/core';
 import { conversationStore } from '../../conversation-hub/store.js';
-import { getHubSessionId } from '../../core/shared-state.js';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
 import { setSessionRpc } from '../infra/tools-bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';

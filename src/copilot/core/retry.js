@@ -2,12 +2,13 @@
 /**
  * src/copilot/core/retry.js
  *
- * Utilitário centralizado de retry com backoff exponencial + jitter. Substitui padrões duplicados em entry.js,
- * mcp-tool-bridge.js, reconnect-policy.js, etc.
+ * Utilitários de retry com backoff exponencial + jitter e timeout com AbortController.
  *
  * @module copilot/core/retry
  * @see EventBus
  */
+
+import { TimeoutError } from './errors.js';
 
 /**
  * @typedef {object} RetryOptions
@@ -82,4 +83,37 @@ export async function withRetry(fn, opts = {}) {
     }
 
     throw lastError;
+}
+
+// ─── Timeout ──────────────────────────────────────────────────────────────────
+
+/**
+ * Executa uma função async com timeout via AbortSignal. Lança TimeoutError se o timeout expirar antes da conclusão.
+ *
+ * @template T
+ * @param {(signal: AbortSignal) => Promise<T>} fn - Função async que recebe AbortSignal
+ * @param {number} timeoutMs - Timeout em ms
+ * @param {string} [label='operation'] - Label para a mensagem de erro. Default is `'operation'`
+ * @returns {Promise<T>}
+ */
+export async function withTimeout(fn, timeoutMs, label = 'operation') {
+    const controller = new AbortController();
+
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+
+    try {
+        const result = await Promise.race([
+            fn(controller.signal),
+            new Promise((_, reject) => {
+                timer = setTimeout(() => {
+                    controller.abort();
+                    reject(new TimeoutError(`${label} timed out after ${timeoutMs}ms`));
+                }, timeoutMs);
+            }),
+        ]);
+        return /** @type {T} */ (result);
+    } finally {
+        clearTimeout(timer);
+    }
 }

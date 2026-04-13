@@ -29,13 +29,13 @@
  *     ```;
  */
 
-export { withTimeout } from './abort-utils.js';
+export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, PR_CONSUMING_EVENTS } from '../events/agent-events.js';
 export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
-export * from './constants.js';
+/** @typedef {import('../events/agent-events.js').AgentEventName} AgentEventName */
 export * as ErrorCodes from './error-codes.js';
 export { isFatalError, isTransientError, logSwallowed, wrapAsync } from './error-handlers.js';
 export * from './errors.js';
-export { withRetry } from './retry.js';
+export { withRetry, withTimeout } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';
 export * from './schemas.js';
 export { isShuttingDown, registerShutdownHandler, runShutdown, setShutdownLogger } from './shutdown.js';

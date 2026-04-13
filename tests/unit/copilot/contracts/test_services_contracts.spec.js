@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('copilot/services barrel', () => {
     it('exporta SessionService e factory', async () => {

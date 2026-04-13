@@ -14,10 +14,9 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { existsSync } from 'node:fs';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'vitest';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 
@@ -36,9 +35,23 @@ function readSrc(relPath) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const EXPECTED_MODULES = [
-    'agent', 'api', 'audit', 'bridges', 'channel', 'config',
-    'conversation-hub', 'core', 'db', 'hooks', 'observability',
-    'plugins', 'sdk', 'services', 'terminal', 'tools', 'types',
+    'agent',
+    'api',
+    'audit',
+    'bridges',
+    'channel',
+    'config',
+    'conversation-hub',
+    'core',
+    'db',
+    'hooks',
+    'observability',
+    'plugins',
+    'sdk',
+    'services',
+    'terminal',
+    'tools',
+    'types',
 ];
 
 describe('W4-9 — barrel coverage: todos os 17 módulos', () => {
@@ -110,8 +123,7 @@ describe('W4-9 — violação de camada L3→L4: bridges não importa agent', ()
 
     it('tools/*.js não importa diretamente de ../agent/ (apenas #copilot/agent barrel)', () => {
         const toolsDir = copilotPath('tools');
-        const files = readdirSync(toolsDir)
-            .filter((f) => f.endsWith('.js') && !f.startsWith('todo'));
+        const files = readdirSync(toolsDir).filter((f) => f.endsWith('.js') && !f.startsWith('todo'));
         const violations = [];
 
         for (const file of files) {
@@ -136,9 +148,19 @@ describe('W4-9 — violação de camada L3→L4: bridges não importa agent', ()
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const EXPECTED_DI_TOKENS = [
-    'SHUTDOWN_LOGGER', 'DB_LOGGER', 'SDK_LOGGER', 'TOOLS_BUILDER',
-    'AUDIT_LOGGER', 'AUDIT_BUS', 'BRIDGE_AGENT', 'FALLBACK_AGENT',
-    'HUB', 'PERMISSION_AGENT', 'SESSION_RPC', 'NERV_BRIDGE_AGENT', 'EVENT_BUS',
+    'SHUTDOWN_LOGGER',
+    'DB_LOGGER',
+    'SDK_LOGGER',
+    'TOOLS_BUILDER',
+    'AUDIT_LOGGER',
+    'AUDIT_BUS',
+    'BRIDGE_AGENT',
+    'FALLBACK_AGENT',
+    'HUB',
+    'PERMISSION_AGENT',
+    'SESSION_RPC',
+    'NERV_BRIDGE_AGENT',
+    'EVENT_BUS',
 ];
 
 describe('W4-9 — DI tokens: todos os 13 tokens canônicos', () => {
@@ -166,10 +188,7 @@ describe('W4-9 — DI tokens: todos os 13 tokens canônicos', () => {
 describe('W4-9 — F21 allow-list: imports permitidos importam sem erro', () => {
     it('#copilot/sdk/types pode ser importado via typedef sem erro de runtime', async () => {
         // sdk/types é typedef-only — o arquivo existe e pode ser carregado
-        assert.ok(
-            existsSync(copilotPath('sdk', 'types.js')),
-            'src/copilot/sdk/types.js deve existir',
-        );
+        assert.ok(existsSync(copilotPath('sdk', 'types.js')), 'src/copilot/sdk/types.js deve existir');
     });
 
     it('#copilot/observability/logger pode ser carregado', async () => {
