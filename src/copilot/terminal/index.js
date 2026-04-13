@@ -22,29 +22,21 @@ import { bridgeEmitter } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
-import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
+import { alwaysAliveAgent } from '../agent/index.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
-import { setBridgeAgent } from '../channel/client.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { conversationHub } from '../conversation-hub/hub.js';
-import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
-import { container, wireLegacySetters } from '../core/di-container.js';
-import {
-    BRIDGE_AGENT,
-    EVENT_BUS,
-    FALLBACK_AGENT,
-    HUB,
-    NERV_BRIDGE_AGENT,
-    PERMISSION_AGENT,
-} from '../core/di-tokens.js';
+import { container } from '../core/di-container.js';
+import { EVENT_BUS } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
-import { loadAliasesAsync } from './alias-store.js';
+import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
+import { loadAliasesAsync } from './alias-store.js';
 
 /**
  * F10.3: Imprime o banner de diagnóstico do modo de operação (standalone vs. conectado ao server).
@@ -122,24 +114,8 @@ export async function startTerminalServer() {
 
     await loadAliasesAsync();
 
-    // ARCH-02 (fix): injetar hub explicitamente nas hub-tools para evitar import dinâmico oculto
-    // ARCH-03 (fix): injetar broadcastSse nas hook-tools para remover import dinâmico circular
-    configureHookTools({ broadcastSse });
-
-    // DI container — registrar dependências de runtime (agent/tools stack)
-    container.register(HUB, () => conversationHub, 'singleton');
-    container.register(PERMISSION_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(FALLBACK_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
-    container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
-
-    // K-5: wiring centralizado — resolve tokens e invoca setters legados
-    wireLegacySetters(container, [
-        { token: HUB, setter: setHub },
-        { token: PERMISSION_AGENT, setter: setPermissionAgent },
-        { token: FALLBACK_AGENT, setter: setFallbackAgent },
-        { token: BRIDGE_AGENT, setter: setBridgeAgent },
-    ]);
+    // DI wiring extraído para di-wiring.js — registra tokens agent/tools e injeta setters legados
+    wireTerminalDI();
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files

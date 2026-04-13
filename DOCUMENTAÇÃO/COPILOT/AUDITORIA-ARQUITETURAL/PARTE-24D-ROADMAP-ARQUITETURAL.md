@@ -15,7 +15,8 @@ O roadmap está organizado em **6 Ondas** de execução, cada uma com **faixas**
 
 ```
 ONDA 1 — FOUNDATION CLEANUP     (L39–L46)    ~800 LOC alteradas    ✅ CONCLUÍDA
-ONDA 2 — AUTONOMY               (L47–L53)    ~1200 LOC alteradas
+ONDA 2 — AUTONOMY               (L47–L53)    ~1200 LOC alteradas   ✅ CONCLUÍDA
+ONDA 2.5 — BOOT CONSOLIDATION   (L53.1–53.7) ~400 LOC alteradas   (ver PARTE-24E)
 ONDA 3 — CYCLE ELIMINATION      (L54–L61)    ~1500 LOC alteradas
 ONDA 4 — GOD MODULE DECOMP      (L62–L70)    ~2000 LOC alteradas
 ONDA 5 — BOOT & WIRING          (L71–L76)    ~1000 LOC alteradas
@@ -108,11 +109,13 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ---
 
-## 3. ONDA 2 — Autonomy
+## 3. ONDA 2 — Autonomy ✅ CONCLUÍDA
 
 > **Objetivo**: Eliminar as 2 dependências externas e garantir que src/copilot funcione como pacote autônomo.
+>
+> **Status**: 100% concluída. Commit: `8d1b8487` (L47-L53).
 
-### L47 — Internalizar JWT config
+### L47 — ✅ Internalizar JWT config
 
 | Item           | Detalhe                                                                                                                                                                                                                                      |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -120,7 +123,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Analisar o que `#core/jwt_config` exporta<br>2. Criar `config/auth.js` com defaults equivalentes<br>3. Registrar via DI token JWT_CONFIG<br>4. Atualizar `conversation-hub/socket-ns.js`<br>5. Permitir override via DI no boot do server |
 | **Acceptance** | Zero imports de `#core/jwt_config` em src/copilot/. Tests green                                                                                                                                                                              |
 
-### L48 — Internalizar DB path config
+### L48 — ✅ Internalizar DB path config
 
 | Item           | Detalhe                                                                                                                                                                   |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,7 +131,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Adicionar `COPILOT_DB_PATH` a `config/env.js` com default<br>2. Atualizar `db/sqlite.js` para usar `config/env.js`<br>3. Verificar que default produz path equivalente |
 | **Acceptance** | Zero imports de `#core/config` em src/copilot/. Tests green                                                                                                               |
 
-### L49 — Criar `copilot/bootstrap.js` (entry point canônico)
+### L49 — ✅ Criar `copilot/bootstrap.js` (entry point canônico)
 
 | Item           | Detalhe                                                                                                                                                                                                                                                                                                    |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -136,7 +139,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Criar `src/copilot/bootstrap.js` com `bootCopilot({ mode })` export<br>2. Implementar `initContainer()` + registro sequential por camada<br>3. Implementar modo 'terminal' (invoca `terminal/index.js`)<br>4. Implementar modo 'server' (retorna bridge para Express)<br>5. Registrar graceful shutdown |
 | **Acceptance** | `node --strip-types src/copilot/bootstrap.js` inicia terminal. Tests green                                                                                                                                                                                                                                 |
 
-### L50 — Criar `terminal/bootstrap.js` (standalone)
+### L50 — ✅ Criar `terminal/bootstrap.js` (standalone)
 
 | Item           | Detalhe                                                                                                                                                                                          |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -144,7 +147,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Criar arquivo com import de `../bootstrap.js`<br>2. `await bootCopilot({ mode: 'terminal' })`<br>3. Testar que `npm run terminal:llm-b` funciona<br>4. Atualizar `package.json` se necessário |
 | **Acceptance** | `npm run terminal:llm-b` funciona end-to-end                                                                                                                                                     |
 
-### L51 — Adaptar `server/main.js` para usar bootstrap
+### L51 — ✅ Adaptar `server/main.js` para usar bootstrap
 
 | Item           | Detalhe                                                                                                                                                                             |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -152,7 +155,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Substituir 5+ dynamic imports por `bootCopilot({ mode: 'server', express: app })`<br>2. Bridge retorna handlers registrados no DI<br>3. Manter backward compat durante transição |
 | **Acceptance** | Server inicia normalmente. Rotas /api/copilot/* functam. Tests green                                                                                                                |
 
-### L52 — Mover package.json imports para src/copilot
+### L52 — ✅ Mover package.json imports para src/copilot
 
 | Item           | Detalhe                                                                                                                                                                         |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -160,7 +163,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Listar todos os subpath imports com `#copilot/` em `package.json`<br>2. Verificar que cada alias resolve para `src/copilot/...`<br>3. Adicionar aliases faltando (se houver) |
 | **Acceptance** | Todos os `#copilot/*` aliases consistentes                                                                                                                                      |
 
-### L53 — Smoke test de autonomia
+### L53 — ✅ Smoke test de autonomia
 
 | Item             | Detalhe                                                                                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

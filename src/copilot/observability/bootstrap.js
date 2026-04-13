@@ -28,15 +28,23 @@ import { createLogObserver } from './bus-actions/log-observer.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { LOG_DIR, log } from './logger.js';
 
+/** @type {boolean} */
+let _obsBooted = false;
+
 /**
  * Conecta `core/error-handlers`, `core/shutdown`, `db/sqlite`, `sdk/` e `audit/` às implementações reais de log e
- * tracking. Idempotente — pode ser chamado mais de uma vez sem efeito adverso.
+ * tracking. Idempotente — chamadas subsequentes são ignoradas com log de aviso.
  *
  * Também registra os tokens DI correspondentes no container global para consumo via DI.
  *
  * @returns {void}
  */
 export function bootstrapObservability() {
+    if (_obsBooted) {
+        log('WARN', '[observability/bootstrap] bootstrapObservability já executado — ignorando.');
+        return;
+    }
+    _obsBooted = true;
     registerErrorHandlerDeps({
         log,
         tracker: defaultErrorTracker,

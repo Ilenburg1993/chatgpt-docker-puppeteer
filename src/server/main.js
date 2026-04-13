@@ -729,92 +729,22 @@ async function bootstrap(options = {}) {
             log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
-        // L49/L51: bootstrap canônico do copilot (DI L0 — observability, loggers, event bus)
+        // L49/L51 + L53.11: bootstrap canônico unificado do copilot (DI + NERV + Hub + Agent)
         if (process.env.COPILOT_SDK_ENABLED !== 'false') {
             try {
                 const { bootCopilot } = await import('#copilot/bootstrap');
-                await bootCopilot({ mode: 'server' });
-                log('INFO', '[COPILOT] bootstrap.js executado (mode=server)');
+                const ioInstance = socketHub.getIO?.() ?? /** @type {any} */ (socketHub).io ?? null;
+                await bootCopilot({
+                    mode: 'server',
+                    context: {
+                        io: ioInstance,
+                        nerv: /** @type {any} */ (nerv),
+                    },
+                });
+                log('INFO', '[COPILOT] bootstrap.js executado (mode=server, wiring completo)');
             } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);
                 log('WARN', `[COPILOT] Falha no bootstrap: ${_e.message}`);
-            }
-        }
-
-        // FAIXA-L13: NervEventBusAdapter — único relay EventBus ↔ NERV (substitui nerv-bridge legado)
-        if (process.env.COPILOT_SDK_ENABLED !== 'false') {
-            try {
-                const { nervEventBusAdapter } = await import('#copilot/bridges/nerv-event-bus-adapter');
-                const { container, EVENT_BUS } = await import('#copilot/core');
-                const eventBus = container.resolve(EVENT_BUS);
-                if (eventBus) {
-                    nervEventBusAdapter.mount(eventBus, /** @type {any} */ (nerv));
-                    log('INFO', '[COPILOT] NervEventBusAdapter montado — EventBus ↔ NERV (FAIXA-L13)');
-
-                    // Inbound commands: NERV → EventBus → Agent
-                    const { NERV_COMMAND_SEND_MESSAGE, NERV_COMMAND_PAUSE, NERV_COMMAND_RESUME, NERV_COMMAND_RESTART } =
-                        await import('#copilot/events');
-                    const { alwaysAliveAgent } = await import('#copilot/agent/always-alive');
-                    eventBus.on(NERV_COMMAND_SEND_MESSAGE, (/** @type {any} */ evt) => {
-                        const msg = evt?.message;
-                        if (typeof msg === 'string' && msg.trim()) {
-                            void alwaysAliveAgent.sendMessage(msg, evt?.options ?? {});
-                        }
-                    });
-                    eventBus.on(NERV_COMMAND_PAUSE, () => {
-                        if (typeof alwaysAliveAgent.pauseDialogLoop === 'function')
-                            void alwaysAliveAgent.pauseDialogLoop();
-                    });
-                    eventBus.on(NERV_COMMAND_RESUME, () => {
-                        if (typeof alwaysAliveAgent.resumeDialogLoop === 'function')
-                            void alwaysAliveAgent.resumeDialogLoop();
-                    });
-                    eventBus.on(NERV_COMMAND_RESTART, async () => {
-                        await alwaysAliveAgent.stop();
-                        await alwaysAliveAgent.start();
-                    });
-                    log('INFO', '[COPILOT] Inbound NERV commands registrados via EventBus');
-                }
-            } catch (/** @type {any} */ e) {
-                const _e = /** @type {any} */ (e);
-                log('WARN', `[COPILOT] Falha ao montar NervEventBusAdapter: ${_e.message}`);
-            }
-
-            // ConversationHub — ambiente permanente LLM-A ↔ LLM-B ↔ Usuário (Sprint Hub)
-            try {
-                const { conversationHub } = await import('#copilot/conversation-hub/hub');
-                const ioInstance = socketHub.getIO?.() ?? /** @type {any} */ (socketHub).io ?? null;
-                if (ioInstance) {
-                    await conversationHub.init({ io: ioInstance, nerv: /** @type {any} */ (nerv) });
-                    log('INFO', '[COPILOT] ConversationHub inicializado — namespace /copilot ativo');
-                } else {
-                    log('WARN', '[COPILOT] ConversationHub: ioInstance não disponível via socketHub.getIO()');
-                }
-            } catch (/** @type {any} */ e) {
-                const _e = /** @type {any} */ (e);
-                log('WARN', `[COPILOT] Falha ao inicializar ConversationHub: ${_e.message}`);
-            }
-
-            // AlwaysAliveAgent auto-start — inicia o agente se não rodando como processo PM2 separado
-            // Em produção, o agente roda como processo separado (copilot-sdk-agent) e não precisa deste bloco.
-            // Em desenvolvimento (único processo), este bloco garante que o agente esteja ativo.
-            if (process.env.COPILOT_AGENT_AUTOSTART !== 'false') {
-                try {
-                    const { alwaysAliveAgent } = await import('#copilot/agent/always-alive');
-                    if (alwaysAliveAgent.status === 'stopped') {
-                        log('INFO', '[COPILOT] Auto-starting AlwaysAliveAgent...');
-                        await alwaysAliveAgent.start();
-                        log('INFO', `[COPILOT] AlwaysAliveAgent ativo. SessionId: ${alwaysAliveAgent.sessionId}`);
-                    } else {
-                        log('INFO', `[COPILOT] AlwaysAliveAgent já ativo (status=${alwaysAliveAgent.status})`);
-                    }
-                } catch (/** @type {any} */ e) {
-                    const _e = /** @type {any} */ (e);
-                    log(
-                        'WARN',
-                        `[COPILOT] Falha ao auto-iniciar AlwaysAliveAgent: ${_e.message} — hub disponível mas sem agente\n${_e.stack ?? '(sem stack)'}`,
-                    );
-                }
             }
         }
 
