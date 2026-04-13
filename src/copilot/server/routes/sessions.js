@@ -4,16 +4,13 @@
  *
  * Router Express canônico para operações CRUD de hub sessions.
  *
- * Onda 4.1 — L64.2: consolida o CRUD completo de sessions em um módulo dedicado.
- * As rotas GET /sessions e GET /sessions/:id/turns foram movidas de observability.js
- * para cá, adicionando GET /sessions/:id, POST /sessions e DELETE /sessions/:id.
+ * Onda 4.1 — L64.2: consolida o CRUD completo de sessions em um módulo dedicado. As rotas GET /sessions e GET
+ * /sessions/:id/turns foram movidas de observability.js para cá, adicionando GET /sessions/:id, POST /sessions e DELETE
+ * /sessions/:id.
  *
- * Rotas expostas:
- *   GET    /sessions                       — lista sessions (paginada, filtro ?status=)
- *   GET    /sessions/:sessionId            — obtém uma session por ID
- *   POST   /sessions                       — cria uma nova session
- *   DELETE /sessions/:sessionId            — fecha (soft-delete) uma session
- *   GET    /sessions/:sessionId/turns      — lista turnos de uma session (paginada)
+ * Rotas expostas: GET /sessions — lista sessions (paginada, filtro ?status=) GET /sessions/:sessionId — obtém uma
+ * session por ID POST /sessions — cria uma nova session DELETE /sessions/:sessionId — fecha (soft-delete) uma session
+ * GET /sessions/:sessionId/turns — lista turnos de uma session (paginada)
  *
  * @module copilot/server/routes/sessions
  */
@@ -27,7 +24,9 @@ import { validate } from '../middleware/validate.js';
 
 /**
  * @typedef {import('express').Request} Req
+ *
  * @typedef {import('express').Response} Res
+ *
  * @typedef {import('express').NextFunction} NextFn
  */
 
@@ -78,28 +77,31 @@ export function createSessionsRouter() {
     });
 
     // ── POST /sessions — cria nova session ────────────────────────────────────
-    router.post('/sessions', validate({ body: createSessionSchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { title, sdkSessionId, metadata } = /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (req.body);
-        try {
-            /** @type {{ title?: string; sdkSessionId?: string; metadata?: object }} */
-            const hubOpts = {};
-            if (title) hubOpts.title = title;
-            if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
-            if (metadata) hubOpts.metadata = metadata;
-            const id = conversationStore.createHubSession(hubOpts);
-            res.status(201).json({ ok: true, id });
-        } catch (/** @type {any} */ e) {
-            res.status(500).json({ ok: false, error: e.message });
-        }
-    });
+    router.post(
+        '/sessions',
+        validate({ body: createSessionSchema }),
+        (/** @type {Req} */ req, /** @type {Res} */ res) => {
+            const { title, sdkSessionId, metadata } =
+                /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (req.body);
+            try {
+                /** @type {{ title?: string; sdkSessionId?: string; metadata?: object }} */
+                const hubOpts = {};
+                if (title) hubOpts.title = title;
+                if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
+                if (metadata) hubOpts.metadata = metadata;
+                const id = conversationStore.createHubSession(hubOpts);
+                res.status(201).json({ ok: true, id });
+            } catch (/** @type {any} */ e) {
+                res.status(500).json({ ok: false, error: e.message });
+            }
+        },
+    );
+
+    const sessionParamsSchema = z.object({ sessionId: z.string().min(1) });
 
     // ── DELETE /sessions/:sessionId — fecha session (soft-close) ──────────────
-    router.delete('/sessions/:sessionId', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+    router.delete('/sessions/:sessionId', validate({ params: sessionParamsSchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const sessionId = String(req.params['sessionId'] ?? '');
-        if (!sessionId) {
-            res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
-            return;
-        }
         try {
             const existing = conversationStore.getHubSession(sessionId);
             if (!existing) {

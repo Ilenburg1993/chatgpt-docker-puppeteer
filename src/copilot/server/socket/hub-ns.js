@@ -118,7 +118,11 @@ function _setupAuthMiddleware(ns) {
     try {
         getJwtSecret();
     } catch (/** @type {any} */ secretErr) {
-        log('WARN', `[hub-ns/copilot] JWT_SECRET inválido: ${secretErr.message}. Auth desabilitado.`);
+        log('ERROR', `[hub-ns/copilot] JWT_SECRET inválido: ${secretErr.message}. Namespace bloqueado (fail-closed).`);
+        // S-C-01 fix: fail-closed — rejeitar todas as conexões em vez de desabilitar auth
+        ns.use((_socket, next) => {
+            next(new Error('COPILOT_NS: Servidor sem JWT_SECRET configurado. Conexões bloqueadas.'));
+        });
         return;
     }
     ns.use(async (/** @type {SocketClient} */ socket, /** @type {function} */ next) => {

@@ -46,7 +46,7 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
  * @returns {void}
  */
 export function loadAliases() {
-    loadAliasesAsync().catch(() => {});
+    loadAliasesAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'terminal.aliasStore.loadSync'));
 }
 
 /**

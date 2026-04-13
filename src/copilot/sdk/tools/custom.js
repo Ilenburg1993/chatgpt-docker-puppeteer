@@ -156,7 +156,7 @@ let _registry = new Map();
  * @returns {void}
  */
 export function loadCustomTools() {
-    loadCustomToolsAsync().catch(() => {});
+    loadCustomToolsAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'sdk.customTools.loadRegistrySync'));
 }
 
 /**

@@ -15,6 +15,7 @@ import { createAuthMiddleware } from './middleware/auth.js';
 import { createCorsMiddleware } from './middleware/cors.js';
 import { copilotErrorHandler } from './middleware/error-handler.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { securityHeadersMiddleware } from './middleware/security-headers.js';
 
 /**
  * Opções para criação do app Express copilot.
@@ -43,11 +44,15 @@ import { requestIdMiddleware } from './middleware/request-id.js';
 export function createCopilotApp(opts) {
     const app = express();
 
-    // 1. Rastreabilidade: X-Request-ID
+    // 1. Security headers (S-A-09)
+    app.use(securityHeadersMiddleware);
+
+    // 2. Rastreabilidade: X-Request-ID
     app.use(requestIdMiddleware);
 
-    // 2. CORS: wildcard seguro (bind 127.0.0.1 only)
-    app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? '*' }));
+    // 3. CORS: default restrito a loopback (S-A-10); caller pode override via corsOrigin
+    const DEFAULT_CORS_ORIGIN = 'http://localhost:*';
+    app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? DEFAULT_CORS_ORIGIN }));
 
     // 3. Body parsing: JSON, limite 2MB (alinhado com terminal/server.js readBody MAX_BODY_BYTES)
     app.use(express.json({ limit: '2mb' }));

@@ -35,7 +35,7 @@ let _toolsConfig = { allowlist: null, denylist: [] };
  * @returns {void}
  */
 export function loadToolsConfig() {
-    loadToolsConfigAsync().catch(() => {});
+    loadToolsConfigAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'sdk.toolsState.loadConfigSync'));
 }
 
 /**

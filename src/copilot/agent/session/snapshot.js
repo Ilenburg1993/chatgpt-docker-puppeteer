@@ -136,7 +136,7 @@ export function listSnapshots() {
     /** @type {SnapshotListItem[]} */
     const result = [];
     // F52: retorna vazio sincronamente, callers síncronos devem migrar para async
-    listSnapshotsAsync().catch(() => {});
+    listSnapshotsAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.listSync.fallback'));
     return result;
 }
 
@@ -149,7 +149,7 @@ export function listSnapshots() {
  */
 export function loadSnapshot(snapshotId) {
     // F52: retorna null sincronamente, callers devem migrar para async
-    loadSnapshotAsync(snapshotId).catch(() => {});
+    loadSnapshotAsync(snapshotId).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.loadSync.fallback'));
     return null;
 }
 

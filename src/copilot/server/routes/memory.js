@@ -11,6 +11,7 @@
  */
 
 import { Router } from 'express';
+import { z } from 'zod';
 import {
     handleDeleteMemory,
     handleRecallMemories,
@@ -18,6 +19,18 @@ import {
 } from '../../terminal/handlers/dialog.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
+import { validate } from '../middleware/validate.js';
+
+// ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
+const storeMemoryBodySchema = z.object({
+    content: z.string().min(1).max(32_000),
+    tag: z.string().max(128).optional(),
+    metadata: z.record(z.unknown()).optional(),
+});
+
+const memoryParamsSchema = z.object({
+    memoryId: z.string().min(1),
+});
 
 /**
  * Cria o router de memória do servidor copilot.
@@ -38,11 +51,12 @@ export function createMemoryRouter() {
     );
 
     // POST /memory — rate limit write
-    router.post('/', writeRateMiddleware, bridgeHandler(handleStoreMemory));
+    router.post('/', writeRateMiddleware, validate({ body: storeMemoryBodySchema }), bridgeHandler(handleStoreMemory));
 
     // DELETE /memory/:memoryId
     router.delete(
         '/:memoryId',
+        validate({ params: memoryParamsSchema }),
         bridgeHandler(/** @type {import('../handler-bridge.js').CopilotHandler} */ (handleDeleteMemory), (req) => ({
             memoryId: req.params['memoryId'] ?? '',
         })),

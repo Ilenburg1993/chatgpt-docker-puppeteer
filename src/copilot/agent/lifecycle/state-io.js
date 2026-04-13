@@ -95,7 +95,7 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
 export function readState() {
     if (_stateCache !== null) return _stateCache;
     // F52: em vez de readFileSync, dispara async load e retorna null
-    readStateAsync().catch(() => {});
+    readStateAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.readState.asyncFallback'));
     return null;
 }
 
@@ -244,7 +244,7 @@ export async function clearStateAsync() {
  */
 export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
     await Promise.race([
-        _writeQueue.then(() => undefined).catch(() => undefined),
+        _writeQueue.then(() => undefined).catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.drainWrites')),
         new Promise((resolve) => setTimeout(resolve, timeoutMs)),
     ]);
 }

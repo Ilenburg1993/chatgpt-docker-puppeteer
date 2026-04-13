@@ -11,7 +11,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { BaseEmitter, bridgeEmitter } from '#copilot/core';
+import { BaseEmitter, bridgeEmitter, logSwallowed } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
@@ -533,8 +533,8 @@ export class AlwaysAliveAgent extends BaseEmitter {
      * fire-and-forget; útil em contextos onde `await using` não é possível.
      */
     [Symbol.dispose]() {
-        // fire-and-forget: swallow errors — Symbol.dispose não suporta await
-        this.stop().catch(() => undefined);
+        // fire-and-forget: Symbol.dispose não suporta await
+        this.stop().catch((/** @type {any} */ e) => logSwallowed(e, 'AlwaysAliveAgent.Symbol.dispose'));
     }
 }
 /**
@@ -730,8 +730,12 @@ try {
             'handoff.rejected': AGENT_HANDOFF_REJECTED,
         });
     }
-} catch {
-    // EventBus not available yet — ignore
+} catch (/** @type {any} */ _busWiringErr) {
+    // EventBus not available yet — expected during early bootstrap
+    // C-06 fix: log non-MODULE_NOT_FOUND errors for visibility
+    if (_busWiringErr?.code !== 'ERR_MODULE_NOT_FOUND' && _busWiringErr?.code !== 'MODULE_NOT_FOUND') {
+        logSwallowed(_busWiringErr, 'AlwaysAliveAgent.eventBusWiring');
+    }
 }
 /**
  * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.

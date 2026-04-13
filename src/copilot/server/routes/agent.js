@@ -13,6 +13,7 @@
  */
 
 import { Router } from 'express';
+import { z } from 'zod';
 import {
     handleAcceptHandoff,
     handleDialogPause,
@@ -26,6 +27,25 @@ import {
 import { handleGetPrBudget, handleGetQuota } from '../../terminal/handlers/system-metrics.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { injectRateMiddleware, writeRateMiddleware } from '../middleware/rate-limiter.js';
+import { validate } from '../middleware/validate.js';
+
+// ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
+const injectBodySchema = z.object({
+    content: z.string().min(1).max(64_000),
+    metadata: z.record(z.unknown()).optional(),
+});
+
+const pipelineBodySchema = z.object({
+    steps: z.array(z.object({ type: z.string(), config: z.record(z.unknown()).optional() })).min(1),
+});
+
+const handoffParamsSchema = z.object({
+    handoffId: z.string().min(1),
+});
+
+const rejectBodySchema = z.object({
+    reason: z.string().optional(),
+});
 
 /**
  * Cria o router de agente do servidor copilot.
@@ -42,10 +62,10 @@ export function createAgentRouter() {
     router.get('/handoff', bridgeHandler(handleGetHandoffs));
 
     // POST /inject — rate limit inject
-    router.post('/inject', injectRateMiddleware, bridgeHandler(handleInject));
+    router.post('/inject', injectRateMiddleware, validate({ body: injectBodySchema }), bridgeHandler(handleInject));
 
     // POST /pipeline — rate limit write
-    router.post('/pipeline', writeRateMiddleware, bridgeHandler(handlePipeline));
+    router.post('/pipeline', writeRateMiddleware, validate({ body: pipelineBodySchema }), bridgeHandler(handlePipeline));
 
     // POST /dialog
     router.post('/dialog/pause', bridgeHandler(handleDialogPause));
@@ -54,10 +74,12 @@ export function createAgentRouter() {
     // Handoff com parâmetro de rota
     router.post(
         '/handoff/:handoffId/accept',
+        validate({ params: handoffParamsSchema }),
         bridgeHandler(handleAcceptHandoff, (req) => ({ handoffId: req.params['handoffId'] ?? '' })),
     );
     router.post(
         '/handoff/:handoffId/reject',
+        validate({ params: handoffParamsSchema, body: rejectBodySchema }),
         bridgeHandler(handleRejectHandoff, (req) => ({
             handoffId: req.params['handoffId'] ?? '',
             body: req.body,
