@@ -729,6 +729,18 @@ async function bootstrap(options = {}) {
             log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
+        // L49/L51: bootstrap canônico do copilot (DI L0 — observability, loggers, event bus)
+        if (process.env.COPILOT_SDK_ENABLED !== 'false') {
+            try {
+                const { bootCopilot } = await import('#copilot/bootstrap');
+                await bootCopilot({ mode: 'server' });
+                log('INFO', '[COPILOT] bootstrap.js executado (mode=server)');
+            } catch (/** @type {any} */ e) {
+                const _e = /** @type {any} */ (e);
+                log('WARN', `[COPILOT] Falha no bootstrap: ${_e.message}`);
+            }
+        }
+
         // FAIXA-L13: NervEventBusAdapter — único relay EventBus ↔ NERV (substitui nerv-bridge legado)
         if (process.env.COPILOT_SDK_ENABLED !== 'false') {
             try {

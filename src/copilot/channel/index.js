@@ -62,7 +62,7 @@ export {
     injectToLlmB,
     subscribeLlmB,
     subscribeLlmBCritical,
-    waitForLlmBReady,
+    waitForLlmBReady
 } from './inject.js';
 
 // ─── SDK Client (modo standalone / em-processo) ────────────────────────────────

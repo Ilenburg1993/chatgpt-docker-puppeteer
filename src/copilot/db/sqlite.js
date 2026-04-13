@@ -21,7 +21,6 @@
  */
 
 import { ConfigError, registerShutdownHandler } from '#copilot/core';
-import CONFIG from '#core/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -65,8 +64,7 @@ let copilotDb = null;
  */
 function resolveCopilotDbPath() {
     const fromEnv = ENV_DB_PATH;
-    const fromConfig = typeof CONFIG?.all?.['COPILOT_DB_PATH'] === 'string' ? CONFIG.all['COPILOT_DB_PATH'] : null;
-    const raw = fromEnv || fromConfig || path.join(process.cwd(), 'data', 'copilot.sqlite');
+    const raw = fromEnv || path.join(process.cwd(), 'data', 'copilot.sqlite');
 
     const looksLikeDir = raw.endsWith(path.sep) || raw.endsWith('/') || raw.endsWith('\\');
     const resolved = looksLikeDir ? path.join(raw, 'copilot.sqlite') : raw;
