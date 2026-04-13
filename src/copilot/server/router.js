@@ -12,6 +12,7 @@
 import { createAuthMiddleware } from './middleware/auth.js';
 import { createAgentRouter } from './routes/agent.js';
 import { createConfigRouter } from './routes/config.js';
+import { createCopilotApiRouter } from './routes/copilot-api.js';
 import { createGitRouter } from './routes/git.js';
 import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
@@ -45,6 +46,10 @@ import { createSseRouter } from './routes/sse.js';
  * - GET  /events/critical (SSE críticos — Onda 4.0)
  * - GET  /sessions, GET /sessions/:id, POST /sessions, DELETE /sessions/:id (Onda 4.1)
  * - GET  /sessions/:id/turns (Onda 4.1)
+ * - GET  /status, /health (agent), /session, /permissions (Onda 4.2)
+ * - POST /start, /stop, /permissions, /steer, /send, /answer (Onda 4.2)
+ * - GET  /stream, /stream/tasks (SSE AlwaysAliveAgent — Onda 4.2)
+ * - POST /dialog/start, /dialog/turn, /dialog/stop (Onda 4.2)
  *
  * @param {import('express').Application} app
  * @param {object} [opts]
@@ -75,6 +80,7 @@ export function mountCopilotRoutes(app, opts) {
     app.use(createGitRouter());
     app.use(createSseRouter());
     app.use(createSessionsRouter());
+    app.use(createCopilotApiRouter());
 
     void authMiddleware; // usado implicitamente via createCopilotApp opts
 }
