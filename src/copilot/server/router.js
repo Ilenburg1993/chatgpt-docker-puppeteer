@@ -15,6 +15,8 @@ import { createConfigRouter } from './routes/config.js';
 import { createCopilotApiRouter } from './routes/copilot-api/index.js';
 import { createGitRouter } from './routes/git.js';
 import { createHealthRouter } from './routes/health.js';
+import { createHealthModulesRouter } from './routes/health-modules.js';
+import { registerCopilotHealthChecks } from './routes/health-registry.js';
 import { createMemoryRouter } from './routes/memory.js';
 import { createObservabilityRouter } from './routes/observability.js';
 import { createSdkRouter } from './routes/sdk/index.js';
@@ -66,6 +68,10 @@ export function mountCopilotRoutes(app, opts) {
     // Rotas auth-exempt: health não precisa de token
     // O createHealthRouter não usa authMiddleware global do app
     app.use(createHealthRouter());
+
+    // Onda 5.9: health checks per-domain
+    registerCopilotHealthChecks();
+    app.use(createHealthModulesRouter());
 
     // GET /metrics — skipAuth (prometheus scrapper)
     // Montado como parte do observability router mas sem auth
