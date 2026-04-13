@@ -8,9 +8,11 @@
  * @see EventBus
  */
 
+// Faixa-3.1: broadcast functions vivem em conversation-hub (server injeta o namespace via setCopilotNamespace)
+export { broadcastGlobal, broadcastToSession, setCopilotNamespace } from './broadcast.js';
+// Nota: getCopilotNamespace e mountCopilotNamespace são concerns do server layer — importar de #copilot/server
 export { ConversationHub, conversationHub } from './hub.js';
 export { HubOrchestrator } from './orchestrator.js';
-export { broadcastGlobal, broadcastToSession, getCopilotNamespace, mountCopilotNamespace } from '../server/socket/hub-ns.js';
 export { ConversationStore, conversationStore } from './store.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────

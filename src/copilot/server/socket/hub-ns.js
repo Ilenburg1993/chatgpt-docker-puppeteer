@@ -16,11 +16,12 @@
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config';
 import { logSwallowed } from '#copilot/core';
+import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { setCopilotNamespace } from '../../conversation-hub/broadcast.js';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '../../config/auth.js';
-import { HUB_EVENTS } from '#copilot/events';
 
 /**
  * @typedef {import('socket.io').Namespace} SocketNamespace
@@ -71,6 +72,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     _bridgeOrchestratorEvents(ns, orchestrator);
 
     copilotNamespace = ns;
+    setCopilotNamespace(ns);
     log('INFO', '[hub-ns/copilot] Namespace /copilot montado com sucesso.');
     return ns;
 }
@@ -354,15 +356,17 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
     orchestrator.on(
         HUB_EVENTS.TURN_COMPLETE,
         (
-            /** @type {{
-    hubSessionId: string;
-    turnId: number;
-    role: string;
-    content: string;
-    structured: any;
-    durationMs: number;
-    turnNumber: number;
-}} */ data,
+            /**
+             * @type {{
+             *     hubSessionId: string;
+             *     turnId: number;
+             *     role: string;
+             *     content: string;
+             *     structured: any;
+             *     durationMs: number;
+             *     turnNumber: number;
+             * }}
+             */ data,
         ) => {
             ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_COMPLETE, data);
         },
@@ -406,34 +410,7 @@ export function unmountCopilotNamespace() {
         logSwallowed(e, 'hub.socketNs.unmount');
     }
     copilotNamespace = null;
-}
-
-/**
- * Emite um evento para todos os clients em uma hub_session específica.
- *
- * @param {string} hubSessionId
- * @param {string} event
- * @param {unknown} payload
- * @returns {void}
- */
-export function broadcastToSession(hubSessionId, event, payload) {
-    if (!copilotNamespace) {
-        log('DEBUG', `[hub-ns] Namespace não montado. Broadcast '${event}' ignorado.`);
-        return;
-    }
-    copilotNamespace.to(hubSessionId).emit(event, payload);
-}
-
-/**
- * Emite um evento para todos os clients conectados ao namespace.
- *
- * @param {string} event
- * @param {unknown} payload
- * @returns {void}
- */
-export function broadcastGlobal(event, payload) {
-    if (!copilotNamespace) return;
-    copilotNamespace.emit(event, payload);
+    setCopilotNamespace(null);
 }
 
 /**

@@ -24,7 +24,7 @@ import {
 import { log } from '#copilot/observability';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
-import { mountCopilotNamespace, unmountCopilotNamespace } from '../server/socket/hub-ns.js';
+import { setCopilotNamespace } from './broadcast.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { conversationStore } from './store.js';
 
@@ -33,6 +33,9 @@ import { conversationStore } from './store.js';
 /**
  * @typedef {Object} HubInitOpts
  * @property {import('socket.io').Server} [io] - Instância Socket.io Server (opcional — se omitido, inicia sem realtime)
+ * @property {(io: import('socket.io').Server, orchestrator: HubOrchestrator, store: import('./store.js').ConversationStore) => void} [mountFn]
+ *   - Função de montagem do namespace Socket.IO (injetada pelo server layer para evitar dependência direta).
+ *   Se omitida, socket mounting é responsabilidade do chamador (ex.: createCopilotSocket).
  * @property {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} [nerv]
  *   - Instância NERV bus (opcional, para forwarding de eventos)
  */
@@ -77,9 +80,14 @@ export class ConversationHub {
         this.#orchestrator = new HubOrchestrator(conversationStore);
         this.#orchestrator.init();
 
-        // 3. Montar namespace Socket.io /copilot (se io fornecido)
+        // 3. Montar namespace Socket.io /copilot (se io e mountFn fornecidos)
+        // Faixa-3.1: mountFn é injetada pelo server layer — hub.js não importa de server/
         if (opts?.io) {
-            mountCopilotNamespace(opts.io, this.#orchestrator, conversationStore);
+            if (opts.mountFn) {
+                opts.mountFn(opts.io, this.#orchestrator, conversationStore);
+            } else {
+                log('DEBUG', '[ConversationHub] opts.io fornecido sem opts.mountFn — namespace Socket.IO montado externamente (createCopilotSocket).');
+            }
         }
 
         // 4. (Opcional) Encaminhar eventos para NERV bus
@@ -102,15 +110,29 @@ export class ConversationHub {
      * @returns {void}
      * @throws {SessionError} Se hub não inicializado
      */
-    attachSocketIO(io) {
+    /**
+     * Conecta Socket.IO ao hub já inicializado via função de montagem injetável.
+     * Permite iniciar sem io e fazer upgrade depois (ex.: terminal standalone → full).
+     *
+     * @param {import('socket.io').Server} io
+     * @param {(io: import('socket.io').Server, orchestrator: HubOrchestrator, store: import('./store.js').ConversationStore) => void} [mountFn]
+     *   - Função de montagem injetada pelo server layer. Se omitida, namespace já deve estar montado.
+     * @returns {void}
+     * @throws {SessionError} Se hub não inicializado
+     */
+    attachSocketIO(io, mountFn) {
         if (!this.#initialized || !this.#orchestrator) {
             throw new SessionError(
                 '[ConversationHub] Não inicializado. Chame init() antes de attachSocketIO().',
                 'HUB_NOT_INITIALIZED',
             );
         }
-        mountCopilotNamespace(io, this.#orchestrator, conversationStore);
-        log('INFO', '[ConversationHub] Socket.IO conectado via attachSocketIO().');
+        if (mountFn) {
+            mountFn(io, this.#orchestrator, conversationStore);
+            log('INFO', '[ConversationHub] Socket.IO conectado via attachSocketIO() com mountFn.');
+        } else {
+            log('INFO', '[ConversationHub] Socket.IO disponível — namespace já montado por createCopilotSocket().');
+        }
     }
 
     // ─── Acesso ao orquestrador ────────────────────────────────────────────────
@@ -220,8 +242,9 @@ export class ConversationHub {
             this.#orchestrator.destroy();
             this.#orchestrator = null;
         }
-        // ARCH-06 fix: desmontar namespace Socket.io para evitar estado inconsistente após restart
-        unmountCopilotNamespace();
+        // ARCH-06 fix / Faixa-3.1: limpar referência do namespace de broadcast
+        // O server layer (createCopilotSocket) cuida do unmount real via io.close() no shutdown handler.
+        setCopilotNamespace(null);
         this.#initialized = false;
         log('INFO', '[ConversationHub] Parado.');
     }
