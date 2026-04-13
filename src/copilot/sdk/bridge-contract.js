@@ -3,8 +3,8 @@
  * Contrato de plugin para Bridges do Copilot.
  *
  * Define a interface mínima que um Bridge plugin deve implementar para conectar o sistema a serviços externos (Git,
- * GitHub, MCP, Nerv, etc.). Os módulos `nerv-bridge.js`, `mcp-tool-bridge.js` e `git-bridge.js` satisfazem variações
- * deste contrato.
+ * GitHub, MCP, Nerv, etc.). Os módulos `nerv-event-bus-adapterbus-adapter.js`, `mcp-tool-bridge.js` e `git-bridge.js`
+ * satisfazem variações deste contrato.
  *
  * @module copilot/sdk/bridge-contract
  * @see EventBus

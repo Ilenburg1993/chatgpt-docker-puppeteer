@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/terminal/state.js
- *
  * @module copilot/terminal/state
+ * @file Estado global do terminal LLM-B: configurações de display, histórico de injeções, attachments e emitter para
+ *   notificação de mudanças de estado.
+ *
+ *   src/copilot/terminal/state.js
  * @see EventBus
  */
 

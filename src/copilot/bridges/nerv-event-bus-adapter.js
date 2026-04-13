@@ -4,14 +4,8 @@
  *
  * FAIXA-L3 — Adapter que faz relay bidirecional EventBus ↔ NERV.
  *
- * Diferença em relação ao nerv-bridge.js original:
- *
- * - nerv-bridge.js escuta o AlwaysAliveAgent (EventEmitter) diretamente
- * - NervEventBusAdapter escuta o **EventBus centralizado**, capturando TODOS os eventos (hooks, hub, services, system) —
- *   não só os do agent.
- *
- * Ambos coexistem durante a migração. Na FAIXA-L8, nerv-bridge.js será removido e este adapter se tornará a única ponte
- * com NERV.
+ * Escuta o **EventBus centralizado**, capturando TODOS os eventos (hooks, hub, services, system) — não só os do agent.
+ * É a única ponte com NERV.
  *
  * @module copilot/bridges/nerv-event-bus-adapter
  * @see module:copilot/events/nerv-events
@@ -142,8 +136,7 @@ export class NervEventBusAdapter {
     }
 
     /**
-     * Emite um evento ad-hoc no NERV (para uso por módulos que não passam pelo EventBus). Substitui `emitNerv()` do
-     * nerv-bridge legado.
+     * Emite um evento ad-hoc no NERV (para uso por módulos que não passam pelo EventBus).
      *
      * @param {string} actionCode - Código da ação NERV (ex: 'copilot:turn:sent')
      * @param {Record<string, unknown>} payload - Dados do evento
@@ -192,8 +185,7 @@ export class NervEventBusAdapter {
 export const nervEventBusAdapter = new NervEventBusAdapter();
 
 /**
- * Emite um evento ad-hoc no NERV via o adapter singleton. Drop-in replacement para `emitNerv()` do nerv-bridge legado
- * (FAIXA-L13).
+ * Emite um evento ad-hoc no NERV via o adapter singleton.
  *
  * @param {string} actionCode
  * @param {Record<string, unknown>} payload

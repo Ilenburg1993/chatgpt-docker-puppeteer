@@ -89,7 +89,10 @@ vi.mock('#copilot/config/env', () => ({
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 import {
     buildConfig,

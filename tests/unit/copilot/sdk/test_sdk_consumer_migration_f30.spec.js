@@ -59,13 +59,7 @@ describe('F147 — bridges/ usa barrel para onSessionEvent e createTool', () => 
         expect(src('bridges/mcp-tool-bridge.js')).toMatch(/import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk'/);
     });
 
-    it('nerv-bridge.js não importa de #copilot/sdk/events.js', () => {
-        expect(src('bridges/nerv-bridge.js')).not.toContain("from '#copilot/sdk/events.js'");
-    });
-
-    it('nerv-bridge.js importa onSessionEvent de #copilot/sdk', () => {
-        expect(src('bridges/nerv-bridge.js')).toMatch(/from\s*'#copilot\/sdk'/);
-    });
+    // nerv-bridge.js removido em L36 — testes migrados
 });
 
 // ─── F148: agent/lifecycle/ usa barrel ─────────────────────────────────────

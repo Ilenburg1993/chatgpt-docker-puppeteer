@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/test_session_config.spec.js
  *
- * Testes estruturais para DEFAULT_EXCLUDED_TOOLS (config/index.js)
- * e session profile builders (hooks/presets/profiles.js).
+ * Testes estruturais para DEFAULT_EXCLUDED_TOOLS (config/index.js) e session profile builders
+ * (hooks/presets/profiles.js).
  *
  * Estratégia: análise de source code para evitar inicialização do SDK.
  */

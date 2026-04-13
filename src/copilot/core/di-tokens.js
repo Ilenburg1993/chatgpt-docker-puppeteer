@@ -112,7 +112,7 @@ export const PERMISSION_AGENT = createToken('PERMISSION_AGENT');
 export const SESSION_RPC = createToken('SESSION_RPC');
 
 /**
- * Agent para nerv-bridge (AlwaysAliveAgent-like).
+ * Agent para NERV event bus adapter (AlwaysAliveAgent-like).
  *
  * @type {import('./di.js').Token<object>}
  */

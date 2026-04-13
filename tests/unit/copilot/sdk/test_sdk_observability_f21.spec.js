@@ -4,9 +4,9 @@
  *
  * Faixa 21 — Observability Integration: typed events, quota monitor, auth status.
  *
- * F113: event-collector usa onSessionEvent (typed events bridge) F114: nerv-bridge usa onSessionEvent (SDK session
- * typed events) F115: quota-monitor.js — polling periódico com callbacks F116: health.js — checkAuthStatus exposto no
- * barrel + healthGetAuthStatus alias F117: integração typed events → nerv bridge → quota → auth
+ * F113: event-collector usa onSessionEvent (typed events bridge) F114: (removido — nerv-bridge.js excluído em L36)
+ * F115: quota-monitor.js — polling periódico com callbacks F116: health.js — checkAuthStatus exposto no barrel +
+ * healthGetAuthStatus alias F117: integração typed events → quota → auth
  */
 
 import { createRequire } from 'node:module';
@@ -54,32 +54,7 @@ describe('F21 — F113: event-collector usa onSessionEvent typed', () => {
     });
 });
 
-// ─── F114: nerv-bridge usa onSessionEvent ─────────────────────────────────────
-
-describe('F21 — F114: nerv-bridge usa onSessionEvent typed', () => {
-    it('nerv-bridge.js importa onSessionEvent de #copilot/sdk (barrel ou events.js)', () => {
-        const src = readSource('bridges/nerv-bridge.js');
-        expect(src).toMatch(/from '#copilot\/sdk(?:\/events\.js)?'/);
-        expect(src).toContain('onSessionEvent');
-    });
-
-    it('nerv-bridge.js exporta subscribeSessionEvent', () => {
-        const src = readSource('bridges/nerv-bridge.js');
-        expect(src).toContain('export function subscribeSessionEvent');
-    });
-
-    it('subscribeSessionEvent delega para onSessionEvent', () => {
-        const src = readSource('bridges/nerv-bridge.js');
-        const fn = src.match(/function subscribeSessionEvent[\s\S]{0,200}}/);
-        expect(fn).not.toBeNull();
-        expect(fn?.[0]).toContain('onSessionEvent');
-    });
-
-    it('nerv-bridge preserva copilotNervBridge export', () => {
-        const src = readSource('bridges/nerv-bridge.js');
-        expect(src).toContain('export const copilotNervBridge');
-    });
-});
+// ─── F114: nerv-bridge removido (L36) — testes migrados para nerv-event-bus-adapter ──
 
 // ─── F115: quota-monitor.js ───────────────────────────────────────────────────
 
@@ -203,12 +178,9 @@ describe('F21 — F117: integração observability', () => {
         expect(src).toContain("from './server-rpc.js'");
     });
 
-    it('event-collector e nerv-bridge não importam @github/copilot-sdk direto (runtime)', () => {
+    it('event-collector não importa @github/copilot-sdk direto (runtime)', () => {
         const collector = readSource('observability/event-collector.js');
-        const bridge = readSource('bridges/nerv-bridge.js');
-        // Sem runtime imports diretos (apenas JSDoc type refs são aceitos)
         const runtimeImportPattern = /^\s*import\s.*from\s+['"]@github\/copilot-sdk['"]/m;
         expect(runtimeImportPattern.test(collector)).toBe(false);
-        expect(runtimeImportPattern.test(bridge)).toBe(false);
     });
 });

@@ -33,7 +33,7 @@ export const TOOL_ERROR = 'TOOL_ERROR';
 
 // ─── Bridge / Integração ─────────────────────────────────────────────────────
 
-/** Erro na bridge HTTP/NervBridge/MCP. */
+/** Erro na bridge HTTP/NERV/MCP. */
 export const BRIDGE_ERROR = 'BRIDGE_ERROR';
 
 // ─── Timeout ─────────────────────────────────────────────────────────────────

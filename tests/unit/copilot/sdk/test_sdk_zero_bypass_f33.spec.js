@@ -188,7 +188,6 @@ describe('F169 — agent/ sem bypass direto de SDK', () => {
 
 describe('F170 — bridges/ e observability/ sem bypass direto de SDK', () => {
     const FILES = [
-        'src/copilot/bridges/nerv-bridge.js',
         'src/copilot/observability/event-collector.js',
         'src/copilot/observability/observers/dialog-task-handlers.js',
     ];

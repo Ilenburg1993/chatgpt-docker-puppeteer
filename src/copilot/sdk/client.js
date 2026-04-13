@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/lib/sdk-client.js
+ * @module copilot/sdk/client
+ * @file Wrapper do CopilotClient com circuit breaker para operações de conexão. Re-exporta CopilotClient do SDK para
+ *   uso via barrel `#copilot/sdk`.
  *
- * @module copilot/lib/sdk-client
+ *   src/copilot/sdk/client.js
  * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive

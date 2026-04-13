@@ -27,16 +27,10 @@ describe('bridges/ barrel — exportações', () => {
         assert.equal(typeof mod.buildMcpTools, 'function', 'buildMcpTools deve ser função');
     });
 
-    it('exporta funções de Nerv bridge', async () => {
+    it('exporta NervEventBusAdapter e emitNerv', async () => {
         const mod = await import('../../../src/copilot/bridges/index.js');
         assert.equal(typeof mod.emitNerv, 'function', 'emitNerv deve ser função');
-        assert.equal(typeof mod.isMounted, 'function', 'isMounted deve ser função');
-        assert.equal(typeof mod.mount, 'function', 'mount deve ser função');
-        assert.equal(typeof mod.unmount, 'function', 'unmount deve ser função');
-    });
-
-    it('exporta copilotNervBridge objeto', async () => {
-        const mod = await import('../../../src/copilot/bridges/index.js');
-        assert.ok(mod.copilotNervBridge !== undefined, 'copilotNervBridge deve existir no barrel');
+        assert.equal(typeof mod.NervEventBusAdapter, 'function', 'NervEventBusAdapter deve ser classe');
+        assert.ok(mod.nervEventBusAdapter !== undefined, 'nervEventBusAdapter singleton deve existir');
     });
 });

@@ -9,7 +9,7 @@
  *
  * @module copilot/conversation-hub/hub
  * @see module:copilot/conversation-hub/orchestrator
- * @see module:copilot/bridges/nerv-bridge
+ * @see module:copilot/bridges/nerv-event-bus-adapterbus-adapter
  */
 
 import { SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';

@@ -1,7 +1,10 @@
 // @ts-check
 /**
- * src/copilot/terminal/file-context.js
  * @module copilot/terminal/file-context
+ * @file Contexto de arquivos para o terminal: leitura, embedding e envio de conteúdo de arquivos locais como contexto
+ *   adicional em turnos de diálogo.
+ *
+ *   src/copilot/terminal/file-context.js
  * @see EventBus
  */
 
@@ -56,11 +59,13 @@ const EXT_LANG = {
 
 /**
  * Contexto de um arquivo lido para embedding.
+ *
  * @typedef {{ path: string; content: string; size: number; lang: string }} FileContext
  */
 
 /**
  * Entrada no cache de file-context.
+ *
  * @typedef {{ ctx: FileContext; expiresAt: number }} FileCacheEntry
  */
 
@@ -75,6 +80,7 @@ let _fileCacheMisses = 0;
 
 /**
  * Retorna estatísticas de uso do cache de file-context.
+ *
  * @returns {{ hits: number; misses: number; size: number }}
  */
 export function getFileCacheStats() {
@@ -82,6 +88,7 @@ export function getFileCacheStats() {
 }
 /**
  * Invalida todas as entradas do cache de file-context.
+ *
  * @returns {void}
  */
 export function clearFileCache() {
@@ -89,6 +96,7 @@ export function clearFileCache() {
 }
 /**
  * Detecta a linguagem de marcação para um caminho de arquivo baseado na extensão.
+ *
  * @param {string} filePath - Caminho do arquivo
  * @returns {string} Rótulo de linguagem para bloco de código markdown
  */
@@ -101,6 +109,7 @@ export function detectLang(filePath) {
  *
  * AB.1: Usa cache em memória com TTL de 30s para evitar re-leituras desnecessárias. Emite erro se o arquivo não
  * existir, não for legível ou exceder `MAX_EMBED_BYTES`.
+ *
  * @param {string} filePath - Caminho (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext>}
  * @throws {Error} Se o arquivo não existir ou exceder o limite de tamanho
@@ -142,6 +151,7 @@ export async function readFileContext(filePath) {
 }
 /**
  * Monta o bloco markdown para um único contexto de arquivo.
+ *
  * @param {FileContext} ctx - Contexto do arquivo
  * @returns {string}
  */
@@ -150,6 +160,7 @@ function buildBlock(ctx) {
 }
 /**
  * Embute um único arquivo no início da mensagem.
+ *
  * @param {FileContext} ctx - Contexto do arquivo
  * @param {string} message - Mensagem original do usuário
  * @returns {string} Mensagem enriquecida com o bloco de arquivo
@@ -162,6 +173,7 @@ export function embedContextBlock(ctx, message) {
  *
  * Respeita `MAX_EMBED_BYTES` total: se o total acumulado exceder o limite, para de adicionar novos arquivos e retorna o
  * que couber.
+ *
  * @param {FileContext[]} ctxs - Lista de contextos na ordem desejada
  * @param {string} message - Mensagem original do usuário
  * @returns {string} Mensagem enriquecida com blocos de arquivo
@@ -188,6 +200,7 @@ export function embedMultiple(ctxs, message) {
  * - `@./config.json`
  * - `@config.json`
  * - `@"path com espaço/arquivo.js"`
+ *
  * @param {string} message - Mensagem original
  * @returns {{ paths: string[]; strippedMessage: string }} Caminhos extraídos e mensagem sem as referências
  */
@@ -213,6 +226,7 @@ export function extractAtReferences(message) {
  *
  * Respeita `MAX_EMBED_BYTES` total: para de adicionar arquivos quando o limite é atingido. Ignora arquivos binários e
  * sub-diretórios. Lança erro se o diretório não existir.
+ *
  * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
  * @throws {Error} Se o diretório não existir ou não for legível
@@ -279,6 +293,7 @@ export async function readDirectoryContext(dirPath) {
  * - `selection` → usa `text` como conteúdo do bloco markdown
  * - `content` → usa `content` diretamente como bloco markdown
  * - `blob` → decodifica base64 e embute como bloco de texto (F6.8, SDK v0.2.0+)
+ *
  * @param {RawAttachment} att - Attachment a converter
  * @returns {Promise<string | null>} Texto markdown, ou null se o attachment for inválido/vazio
  */

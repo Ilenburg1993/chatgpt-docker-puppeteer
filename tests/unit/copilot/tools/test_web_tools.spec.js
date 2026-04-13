@@ -38,7 +38,10 @@ vi.mock('#copilot/config/env', () => ({
 
 // Mock logger
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 // Mock error-handlers
 vi.mock('#copilot/core/error-handlers', () => ({

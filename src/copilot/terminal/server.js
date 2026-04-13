@@ -1,7 +1,10 @@
 // @ts-check
 /**
- * src/copilot/terminal/server.js
  * @module copilot/terminal/server
+ * @file Servidor HTTP do terminal LLM-B: endpoints de inject, SSE, health e comandos. Implementa rate limiting,
+ *   autenticação por token e audit log.
+ *
+ *   src/copilot/terminal/server.js
  * @see EventBus
  * @see module:copilot/terminal/route-table
  * @see module:copilot/terminal/repl
@@ -38,6 +41,7 @@ const INJECT_PORT = LLM_B_TERMINAL_PORT;
 
 /**
  * Cria um rate limiter em memória por chave (IP, IP+endpoint, etc.).
+ *
  * @param {number} max - Máximo de requisições permitidas por janela
  * @param {number} windowMs - Duração da janela em ms
  * @returns {{ check: (key: string) => { allowed: boolean; remaining: number; resetIn: number }; clear: () => void }}
@@ -76,6 +80,7 @@ const _injectRateLimiter = createRateLimiter(INJECT_RATE_MAX, INJECT_RATE_WINDOW
 
 /**
  * Verifica se o IP excedeu o limite de requisições para /inject.
+ *
  * @param {string} ip
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
@@ -90,6 +95,7 @@ const _writeRateLimiter = createRateLimiter(WRITE_RATE_MAX, WRITE_RATE_WINDOW_MS
 
 /**
  * Verifica rate-limit para endpoints de escrita (/pipeline, /memory, /attach, /context-send).
+ *
  * @param {string} ipEndpoint - Combinação de IP + endpoint key para isolamento por rota
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
@@ -112,6 +118,7 @@ registerClearRateLimiters(() => {
 /**
  * Verifica rate-limit para conexões SSE (/events, /events/critical) — janela e limite independentes dos endpoints de
  * escrita.
+ *
  * @param {string} ip - IP do cliente
  * @returns {{ allowed: boolean; remaining: number; resetIn: number }}
  */
@@ -120,6 +127,7 @@ function checkSseRate(ip) {
 }
 /**
  * Escreve uma resposta JSON no `res` a partir de um `HandlerResult`.
+ *
  * @param {import('node:http').ServerResponse} res
  * @param {{ status: number; body: unknown; cors?: boolean }} result
  * @returns {void}
@@ -136,6 +144,7 @@ function sendJson(res, result) {
 /**
  * Lê o body de uma requisição HTTP e retorna como string. Rejeita payloads acima de MAX_BODY_BYTES (proteção contra
  * DoS).
+ *
  * @param {import('node:http').IncomingMessage} req
  * @returns {Promise<string>}
  */
@@ -159,6 +168,7 @@ function readBody(req) {
 }
 /**
  * Faz parse seguro de JSON — retorna `null` se inválido.
+ *
  * @param {string} raw
  * @returns {unknown | null}
  */
@@ -171,6 +181,7 @@ function tryParseJson(raw) {
 }
 /**
  * F16.1 — Dispara o ready webhook (fire-and-forget) se `COPILOT_READY_WEBHOOK` estiver definido.
+ *
  * @param {number} port - Porta em que o servidor está escutando
  * @returns {void}
  */
@@ -201,6 +212,7 @@ function _fireReadyWebhook(port) {
 }
 /**
  * Cria o servidor HTTP interno para injeção de mensagens de LLM-A e consulta de estado.
+ *
  * @returns {http.Server} Servidor HTTP iniciado na porta `INJECT_PORT`
  */
 export function createInjectServer() {

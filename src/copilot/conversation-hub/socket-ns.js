@@ -1,7 +1,10 @@
 // @ts-check
 /**
- * src/copilot/conversation-hub/socket-ns.js
  * @module copilot/conversation-hub/socket-ns
+ * @file Namespace Socket.IO para o conversation hub: autenticação JWT, roteamento de eventos e broadcast de mensagens
+ *   entre clientes conectados.
+ *
+ *   src/copilot/conversation-hub/socket-ns.js
  * @see EventBus
  */
 
@@ -15,6 +18,7 @@ import { HUB_EVENTS } from './events.js';
 
 /**
  * @typedef {import('socket.io').Namespace} SocketNamespace
+ *
  * @typedef {import('socket.io').Socket} SocketClient
  */
 
@@ -25,6 +29,7 @@ const HandshakeAuthSchema = z.object({
 
 /**
  * Namespace Socket.io /copilot. Inicializado por mountCopilotNamespace().
+ *
  * @type {SocketNamespace | null}
  */
 let copilotNamespace = null;
@@ -40,6 +45,7 @@ let copilotNamespace = null;
  *
  * Autenticação: reutiliza a configuração `DASHBOARD_SOCKET_AUTH_REQUIRED` do main namespace, mas com flag própria
  * `COPILOT_HUB_SOCKET_AUTH_REQUIRED` para override.
+ *
  * @param {import('socket.io').Server} io - Instância do `socket.io` Server existente
  * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
  * @param {import('./store.js').ConversationStore} store
@@ -67,6 +73,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
 }
 /**
  * Cria e retorna a função de rate-limit para injects, com buckets por socket e por IP.
+ *
  * @returns {(socketId: string, ip: string) => boolean}
  */
 function _createInjectRateLimiter() {
@@ -105,6 +112,7 @@ function _createInjectRateLimiter() {
 }
 /**
  * Instala o middleware JWT de autenticação no namespace.
+ *
  * @param {SocketNamespace} ns
  * @returns {void}
  */
@@ -143,6 +151,7 @@ function _setupAuthMiddleware(ns) {
 }
 /**
  * Registra todos os handlers de eventos de conexão de clientes no namespace.
+ *
  * @param {SocketNamespace} ns
  * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
  * @param {import('./store.js').ConversationStore} store
@@ -314,6 +323,7 @@ function _handleTurnsHistory(socket, store) {
 }
 /**
  * Conecta eventos do HubOrchestrator ao namespace — bridge orquestradora → clientes.
+ *
  * @param {SocketNamespace} ns
  * @param {import('./orchestrator.js').HubOrchestrator} orchestrator
  * @returns {void}
@@ -378,6 +388,7 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
 }
 /**
  * Retorna o namespace /copilot já montado, ou null se ainda não foi inicializado.
+ *
  * @returns {SocketNamespace | null}
  */
 export function getCopilotNamespace() {
@@ -386,6 +397,7 @@ export function getCopilotNamespace() {
 /**
  * ARCH-06 fix: Desmonta o namespace /copilot, desconectando todos os clients e limpando a referência. Deve ser chamado
  * em ConversationHub.stop() para evitar estado inconsistente após restart.
+ *
  * @returns {void}
  */
 export function unmountCopilotNamespace() {
@@ -400,6 +412,7 @@ export function unmountCopilotNamespace() {
 }
 /**
  * Emite um evento para todos os clients em uma hub_session específica.
+ *
  * @param {string} hubSessionId
  * @param {string} event
  * @param {unknown} payload
@@ -414,6 +427,7 @@ export function broadcastToSession(hubSessionId, event, payload) {
 }
 /**
  * Emite um evento para todos os clients conectados ao namespace.
+ *
  * @param {string} event
  * @param {unknown} payload
  * @returns {void}
@@ -424,6 +438,7 @@ export function broadcastGlobal(event, payload) {
 }
 /**
  * Determina se a autenticação é obrigatória no namespace /copilot.
+ *
  * @returns {boolean}
  */
 function _parseAuthRequired() {

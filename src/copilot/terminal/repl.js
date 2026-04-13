@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/terminal/repl.js
- *
  * @module copilot/terminal/repl
+ * @file REPL interativo do terminal LLM-B: lê input do usuário, resolve aliases, despacha comandos e exibe respostas
+ *   formatadas com suporte a streaming.
+ *
+ *   src/copilot/terminal/repl.js
  * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/terminal/dialog

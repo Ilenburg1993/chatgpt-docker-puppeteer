@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/agent/always-alive.js
- *
  * @module copilot/agent/always-alive
+ * @file Agente always-alive: bootstrap, lifecycle e orquestração do loop de diálogo contínuo. Gerencia estado do
+ *   agente, fila de mensagens e integração com o bus de eventos.
+ *
+ *   src/copilot/agent/always-alive.js
  * @see module:copilot/agent/dialog/loop-manager
  * @see module:copilot/agent/session/initializer
  * @see module:copilot/agent/lifecycle/state-io

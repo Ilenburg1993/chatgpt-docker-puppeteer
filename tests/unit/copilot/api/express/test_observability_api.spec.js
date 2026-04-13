@@ -85,14 +85,6 @@ vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: { getStatusSnapshot: mockGetStatusSnapshot },
 }));
 
-vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
-    getMcpStatus: mockGetMcpStatus,
-}));
-
-vi.mock('#copilot/bridges/nerv-bridge', () => ({
-    isMounted: mockIsNervMounted,
-}));
-
 vi.mock('#copilot/config/env', () => ({
     OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
 
@@ -131,10 +123,14 @@ vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/bridges', () => ({
-    getMcpStatus: mockGetMcpStatus,
-    isMounted: mockIsNervMounted,
-}));
+vi.mock('#copilot/bridges', () => {
+    const _adapter = {};
+    Object.defineProperty(_adapter, 'isMounted', { get: () => mockIsNervMounted(), configurable: true });
+    return {
+        getMcpStatus: mockGetMcpStatus,
+        nervEventBusAdapter: _adapter,
+    };
+});
 
 vi.mock('#copilot/services', () => ({
     createAuditService: vi.fn(() => ({

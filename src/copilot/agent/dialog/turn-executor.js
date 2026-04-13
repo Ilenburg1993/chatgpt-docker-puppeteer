@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/turn-executor.js
- *
  * @module copilot/agent/dialog/turn-executor
+ * @file Executor de turno individual: envia mensagem ao SDK, processa resposta, emite eventos de início/fim e trata
+ *   erros de sessão por turno.
+ *
+ *   src/copilot/agent/dialog/turn-executor.js
  * @see EventBus
  */
 

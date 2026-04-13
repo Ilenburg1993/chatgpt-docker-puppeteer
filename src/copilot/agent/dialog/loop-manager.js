@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/loop-manager.js
- *
  * @module copilot/agent/dialog/loop-manager
+ * @file Gerenciador do loop de diálogo: controla turnos, compaction, stall detection e watchdog. Coordena a execução de
+ *   cada turno via TurnExecutor.
+ *
+ *   src/copilot/agent/dialog/loop-manager.js
  * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/dialog/protocol

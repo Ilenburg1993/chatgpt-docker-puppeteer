@@ -1,7 +1,10 @@
 // @ts-check
 /**
- * src/copilot/observability/metrics.js
  * @module copilot/observability/metrics
+ * @file Store centralizado de métricas: latência de tools, tokens, turnos, sessões e streaming. Expõe histogramas,
+ *   contadores e resumos para dashboards e health checks.
+ *
+ *   src/copilot/observability/metrics.js
  * @see EventBus
  */
 
@@ -52,6 +55,7 @@ import { createHistogram } from './metrics-histogram.js';
 
 /**
  * Cria um MetricsStore.
+ *
  * @returns {MetricsStore}
  */
 export function createMetricsStore() {
@@ -158,6 +162,7 @@ export function createMetricsStore() {
 
     /**
      * Registra um turno do dialog loop concluído.
+     *
      * @param {number} durationMs - Duração total do turn.
      * @param {boolean} success - Se o turn completou com resposta.
      * @returns {void}
@@ -170,6 +175,7 @@ export function createMetricsStore() {
 
     /**
      * Registra um stall detectado pelo dialog watchdog.
+     *
      * @param {number} stalledMs - Tempo em que o dialog ficou parado.
      * @returns {void}
      */
@@ -180,6 +186,7 @@ export function createMetricsStore() {
 
     /**
      * Registra um timeout de turn ou boot do dialog.
+     *
      * @returns {void}
      */
     function recordDialogTimeout() {
@@ -188,6 +195,7 @@ export function createMetricsStore() {
 
     /**
      * Registra uma task concluída ou com falha.
+     *
      * @param {number} durationMs - Duração da task.
      * @param {boolean} success - Se completou com sucesso.
      * @returns {void}
@@ -200,6 +208,7 @@ export function createMetricsStore() {
 
     /**
      * CR-01: Registra intervalo entre chunks de streaming (ms).
+     *
      * @param {number} chunkMs - Intervalo desde o chunk anterior (ms).
      * @returns {void}
      */
@@ -210,6 +219,7 @@ export function createMetricsStore() {
 
     /**
      * CS-02: Registra latência de resposta a question (ms).
+     *
      * @param {number} waitMs - Tempo entre question.pending e question.answered (ms).
      * @returns {void}
      */
@@ -220,6 +230,7 @@ export function createMetricsStore() {
 
     /**
      * Incrementa um contador genérico.
+     *
      * @param {string} name - Nome do contador.
      * @param {number} [delta=1] - Valor a incrementar. Default is `1`
      * @returns {void}
@@ -230,6 +241,7 @@ export function createMetricsStore() {
 
     /**
      * Registra um valor instantâneo (gauge) — sobrescreve o anterior.
+     *
      * @param {string} name - Nome do gauge.
      * @param {number} value - Valor atual.
      * @returns {void}
@@ -240,6 +252,7 @@ export function createMetricsStore() {
 
     /**
      * Retorna todos os gauges registrados.
+     *
      * @returns {Record<string, { value: number; ts: number }>}
      */
     function getGauges() {
@@ -251,6 +264,7 @@ export function createMetricsStore() {
 
     /**
      * Inicia snapshot periódico de métricas em arquivo.
+     *
      * @param {number} [intervalMs] - Intervalo entre snapshots. Default: COPILOT_METRICS_SNAPSHOT_INTERVAL ou 5min.
      * @param {string} [logDir] - Diretório de log. Default: var/logs/copilot/.
      * @returns {void}
@@ -279,6 +293,7 @@ export function createMetricsStore() {
 
     /**
      * Para o snapshot periódico.
+     *
      * @returns {void}
      */
     function stopPeriodicSnapshot() {

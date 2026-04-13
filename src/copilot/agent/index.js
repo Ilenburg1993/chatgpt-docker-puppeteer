@@ -26,7 +26,12 @@
  */
 
 // ── Raiz ─────────────────────────────────────────────────────
-export { AGENT_EVENTS, DIALOG_LOOP_EVENTS, HIGH_FREQUENCY_EVENTS, PR_CONSUMING_EVENTS } from '../events/agent-events.js';
+export {
+    AGENT_EVENTS,
+    DIALOG_LOOP_EVENTS,
+    HIGH_FREQUENCY_EVENTS,
+    PR_CONSUMING_EVENTS,
+} from '../events/agent-events.js';
 export { AlwaysAliveAgent, alwaysAliveAgent, getAgent } from './always-alive.js';
 export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 

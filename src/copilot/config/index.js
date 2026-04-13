@@ -13,6 +13,7 @@
 
 /**
  * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
+ *
  * @type {readonly string[]}
  */
 export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (

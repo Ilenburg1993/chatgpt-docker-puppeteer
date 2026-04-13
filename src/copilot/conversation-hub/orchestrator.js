@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/conversation-hub/orchestrator.js
- *
  * @module copilot/conversation-hub/orchestrator
+ * @file Orquestrador de conversas multi-sessão: gerencia criação, roteamento e ciclo de vida de sessões no hub,
+ *   delegando ao LlmBridgeClient.
+ *
+ *   src/copilot/conversation-hub/orchestrator.js
  * @see EventBus
  * @see module:copilot/conversation-hub/store
  * @see module:copilot/conversation-hub/hub

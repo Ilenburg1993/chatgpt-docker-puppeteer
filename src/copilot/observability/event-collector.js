@@ -1,8 +1,10 @@
 // @ts-check
 /**
- * src/copilot/observability/event-collector.js
- *
  * @module copilot/observability/event-collector
+ * @file Coletor de eventos do SDK: subscreve eventos de sessão, tool calls e interações, persiste em arquivo
+ *   rotacionado com limite de tamanho configurável.
+ *
+ *   src/copilot/observability/event-collector.js
  * @see EventBus
  */
 

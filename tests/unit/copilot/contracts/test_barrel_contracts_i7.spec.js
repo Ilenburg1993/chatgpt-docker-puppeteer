@@ -138,7 +138,7 @@ describe('FI-7 — bridges barrel contract', () => {
 
     it('exports mcp and nerv bridge functions', async () => {
         const barrel = await import('#copilot/bridges');
-        const expected = ['getMcpStatus', 'emitNerv', 'isMounted'];
+        const expected = ['getMcpStatus', 'emitNerv', 'nervEventBusAdapter'];
         for (const name of expected) {
             expect(barrel[name], `missing: ${name}`).toBeDefined();
         }
