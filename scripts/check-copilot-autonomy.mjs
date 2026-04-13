@@ -94,14 +94,20 @@ for (const { name, script } of PM2_ENTRIES) {
     }
 }
 
-// ── Check 4: server/wiring.js existe (agora @deprecated mas ainda presente) ────
+// ── Check 4: server/wiring.js removido ou @deprecated ───────────────────────
 
 const SERVER_WIRING = 'src/copilot/server/wiring.js';
 if (existsSync(resolve(SERVER_WIRING))) {
-    console.log(`✅ Check 4: ${SERVER_WIRING} existe. [@deprecated — orphaned desde Onda 2.7]`);
+    const wiringSrc = readFileSync(resolve(SERVER_WIRING), 'utf-8');
+    if (/@deprecated/.test(wiringSrc)) {
+        console.log(`✅ Check 4: ${SERVER_WIRING} existe mas está @deprecated. [aguardando remoção Onda 3.9]`);
+    } else {
+        console.error(`❌ Check 4 FALHOU — ${SERVER_WIRING} existe sem @deprecated.`);
+        errors++;
+    }
 } else {
-    console.error(`❌ Check 4 FALHOU — ${SERVER_WIRING} não encontrado.`);
-    errors++;
+    // Removido na Onda 3.9 — OK
+    console.log(`✅ Check 4: ${SERVER_WIRING} removido (Onda 3.9 aplicada).`);
 }
 
 // ── Check 5: bootstrap.js tem modo único (sem parâmetros mode/context) ──────

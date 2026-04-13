@@ -35,7 +35,6 @@ import { loadAliasesAsync } from './alias-store.js';
 import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
-import { createInjectServer as _legacyCreateInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 
@@ -177,10 +176,7 @@ export async function startTerminalServer() {
         _serverOpts.orchestrator = conversationHub.orchestrator;
         _serverOpts.store = conversationHub.store;
     }
-    const copilotServerPromise = startCopilotServer(_serverOpts).catch((/** @type {any} */ e) => {
-        log('WARN', `[TerminalServer] startCopilotServer falhou, fallback para legacy: ${e.message}`);
-        return _legacyCreateInjectServer();
-    });
+    const copilotServerPromise = startCopilotServer(_serverOpts);
 
     registerAgentEventListeners(printStandaloneBanner);
     startReflectionLoop();
