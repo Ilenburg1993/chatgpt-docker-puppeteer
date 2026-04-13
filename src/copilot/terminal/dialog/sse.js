@@ -11,7 +11,8 @@
 import { eventFanout } from '#copilot/api';
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/services';
-import { getHubSessionId, getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../state.js';
+import { getHubSessionId } from '../state.js';
+import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../server/sse/state.js';
 
 /** Eventos considerados críticos para clientes em modo ?level=critical. */
 export const CRITICAL_EVENTS = new Set(['dialog.stalled', 'fatal', 'system']);

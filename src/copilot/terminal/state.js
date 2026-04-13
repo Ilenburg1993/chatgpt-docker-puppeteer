@@ -22,7 +22,6 @@ import {
     createEmitter,
     setSharedHubSessionId,
 } from '#copilot/core';
-import { SseReplayBuffer } from '../server/sse/replay-buffer.js';
 
 // ─── Emitter reativo ─────────────────────────────────────────────────────────
 
@@ -67,27 +66,6 @@ const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
 /** Modo planejamento: prefaça mensagens com instrução de plano antes de enviar. @type {boolean} */
 let _planMode = false;
 
-/**
- * Clientes SSE conectados ao endpoint GET /events (todos os eventos).
- *
- * @type {Set<import('node:http').ServerResponse>}
- */
-const _sseClients = new Set();
-
-/**
- * Clientes SSE que pedem apenas eventos críticos (?level=critical) — stalled, fatal, system.
- *
- * @type {Set<import('node:http').ServerResponse>}
- */
-const _sseCriticalClients = new Set();
-
-/**
- * FASE-12.2: Buffer circular de replay SSE do terminal.
- *
- * Permite que clientes reconectando (com Last-Event-ID) recebam os eventos perdidos.
- */
-const _terminalReplayBuffer = new SseReplayBuffer();
-
 // ─── Getters / setters ───────────────────────────────────────────────────────
 
 /** @returns {string | null} */
@@ -131,21 +109,6 @@ export function getRl() {
 /** @param {import('node:readline').Interface | null} value @returns {void} */
 export function setRl(value) {
     _rl = value;
-}
-
-/** @returns {Set<import('node:http').ServerResponse>} */
-export function getSseClients() {
-    return _sseClients;
-}
-
-/** @returns {Set<import('node:http').ServerResponse>} */
-export function getSseCriticalClients() {
-    return _sseCriticalClients;
-}
-
-/** FASE-12.2: @returns {SseReplayBuffer} */
-export function getTerminalReplayBuffer() {
-    return _terminalReplayBuffer;
 }
 
 // ─── Attachment queue ────────────────────────────────────────────────────────

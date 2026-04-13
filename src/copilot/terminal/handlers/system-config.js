@@ -27,7 +27,8 @@ import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { getFileCacheStats } from '../file-context.js';
-import { getBusy, getHubSessionId, getPlanMode, getSseClients, getSseCriticalClients } from '../state.js';
+import { getBusy, getHubSessionId, getPlanMode } from '../state.js';
+import { getSseClients, getSseCriticalClients } from '../../server/sse/state.js';
 
 /**
  * @typedef {import('./shared.js').HandlerResult} HandlerResult

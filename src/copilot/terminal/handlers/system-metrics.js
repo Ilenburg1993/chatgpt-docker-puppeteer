@@ -25,7 +25,8 @@ import {
     getToolStats,
 } from '#copilot/observability';
 import { clearRateLimiters } from '../rate-limiter-state.js';
-import { getInjectHistory, getSseClients } from '../state.js';
+import { getInjectHistory } from '../state.js';
+import { getSseClients } from '../../server/sse/state.js';
 
 /**
  * @typedef {import('./shared.js').HandlerResult} HandlerResult
