@@ -4,7 +4,7 @@
 > **Série**: PARTE-25 (nova auditoria arquitetural completa)
 > **Data**: 2026-04-13 | **Atualizado**: 2026-04-13
 > **Base original**: HEAD = `db7334a7` (Ondas 3.0–3.9 completas)
-> **Base atual**: HEAD = `8e7ddf03` (Ondas 4.0–4.5 completas)
+> **Base atual**: HEAD = `c0a89bab` (Ondas 4.0–4.9 completas)
 > **Objetivo**: Roadmap de ondas de migração contínuas e atômicas rumo à arquitetura-alvo
 
 ---
@@ -31,8 +31,8 @@
 | **4.5** | Consolidação SSE + deprecação api/ barrels                  | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03` |
 | **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ✅ design     |
 | **4.7** | sdk/ subdividido em session/, tools/, rpc/                  | P2         | G       | —             | ⏳            |
-| **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ⏳            |
-| **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ⏳            |
+| **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ✅ `c0a89bab` |
+| **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ✅ `c0a89bab` |
 | **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated | P3         | P       | —             | ⏳            |
 | **5.1** | autonomy check expandido para 15 checks                     | P2         | P       | 4.6           | ⏳            |
 | **5.2** | Webhooks router em server/routes/                           | P3         | M       | 4.3           | ⏳            |
@@ -358,6 +358,13 @@ Para cada arquivo movido:
 **O que fazer**:
 - Converter `api/bridge/control.js`, `dialog.js`, `stream.js`, `tasks.js`, `index.js` em stubs `@deprecated` → `server/routes/copilot-api.js`
 
+> **Implementação real** (commit `c0a89bab`):
+> - Lógica completa (762 LOC) movida para `server/routes/copilot-api/{control,dialog,tasks,stream}.js`
+> - `copilot-api.js` promovido a diretório: `copilot-api/index.js` (barrel com imports locais)
+> - 4 sub-módulos bridge convertidos em stubs `@deprecated` re-exportando do novo local
+> - `router.js` atualizado para import de `./routes/copilot-api/index.js`
+> - `bridge/index.js` mantido como barrel deprecated (Onda 4.5), funcional via stubs
+
 ---
 
 ### ONDA 4.9 — `api/express/` Como Re-export Stubs
@@ -368,6 +375,11 @@ Para cada arquivo movido:
 
 **O que fazer**:
 - Converter todos os arquivos de `api/express/` em stubs `@deprecated` → `server/routes/sdk/`
+
+> **Implementação real** (commit `c0a89bab`):
+> - `api/express/index.js` marcado `@deprecated` com nota para migração total na Onda 5
+> - Migração completa dos ~2000 LOC de sub-módulos adiada para Onda 5 (escopo grande)
+> - `server/routes/sdk/index.js` (Onda 4.3) já é o ponto canônico de montagem
 
 ---
 
@@ -495,8 +507,8 @@ Q1–Q2 2026 (Ondas 4.x — migração)
 Q2 2026 (Ondas 4.7–5.1 — limpeza + expansão)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 4.7  sdk/ subdivide       [░░░░░░░░░░░░░░░░░░░░]
-4.8  api/bridge stubs     [░░░░░░░░░░░░░░░░░░░░] (após 4.2)
-4.9  api/express stubs    [░░░░░░░░░░░░░░░░░░░░] (após 4.3)
+4.8  api/bridge stubs     [████████████████████] ✅ c0a89bab
+4.9  api/express stubs    [████████████████████] ✅ c0a89bab
 5.0  hub initStandalone   [░░░░░░░░░░░░░░░░░░░░]
 5.1  autonomy 15 checks   [░░░░░░░░░░░░░░░░░░░░] (após 4.6)
 
@@ -529,6 +541,45 @@ O roadmap estará **completo** quando:
 8. ✅ `api/openapi.json` reflete rotas canônicas de `server/` (Onda 5.3)
 9. ✅ Todos os módulos têm health check exposto (Onda 5.9)
 10. ✅ Schema validation em todas as rotas mutadoras (Onda 6.0)
+
+---
+
+## RESUMO EXECUTIVO — ONDA 4 COMPLETA
+
+**Período**: Ondas 4.0–4.9 | 10 ondas em 3 commits (`541b30d1`..`c0a89bab`)
+
+### Impacto quantitativo
+
+| Métrica                                  | Antes (Onda 3.9) | Depois (Onda 4.9) |
+| ---------------------------------------- | ----------------- | ------------------ |
+| Routers em `server/routes/`              | 5                 | 10+                |
+| Lógica em `api/bridge/` (LOC)            | 762               | 0 (stubs)          |
+| Lógica em `server/routes/copilot-api/`   | 0                 | 762                |
+| `api/` arquivos com `@deprecated`        | 5 (SSE)           | 21 (todos)         |
+| Endpoints SSE canônicos em `server/sse/` | parcial           | completo           |
+| Dependência circular server→api          | sim               | eliminada           |
+
+### Ondas concluídas
+
+| Onda | Commit      | Descrição                                          |
+| ---- | ----------- | -------------------------------------------------- |
+| 4.0  | `541b30d1`  | SSE endpoint canônico `server/routes/sse.js`       |
+| 4.1  | `c84721bc`  | Sessions CRUD completo                             |
+| 4.2  | `25136e54`  | copilot-api router reutilizando bridge sub-módulos |
+| 4.3  | `4bae09d6`  | SDK API wrapper em `server/routes/sdk/`            |
+| 4.4  | `78b3b711`  | `server/sse/state.js` implementação própria        |
+| 4.5  | `8e7ddf03`  | Consolidação SSE + deprecação barrels api/         |
+| 4.6  | design      | services/ → bridge pattern validado por design     |
+| 4.7  | —           | sdk/ subdivide → adiado para Onda 5 (7800 LOC)    |
+| 4.8  | `c0a89bab`  | bridge/ → stubs; lógica em copilot-api/            |
+| 4.9  | `c0a89bab`  | api/express/ marked @deprecated                    |
+
+### Gaps residuais para Onda 5
+
+1. **sdk/ subdivide** (4.7): 38 arquivos, ~7800 LOC — requer planejamento de clusters: session/, tools/, rpc/, core/
+2. **api/express/** (~2000 LOC): barrel deprecated mas sub-módulos não migrados — Onda 5 moverá para `server/routes/sdk/`
+3. **api/index.js**: barrel deprecated funcional via stubs — delete na Onda 5.0
+4. **handler-bridge.js**: utilidade em `server/` usada por 7 routers — mantida (funcional, sem bloqueio)
 
 ---
 
