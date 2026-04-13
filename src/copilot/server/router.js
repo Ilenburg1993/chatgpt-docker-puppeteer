@@ -9,6 +9,7 @@
  * src/copilot/server/router.js
  */
 
+import { COPILOT_SDK_ENABLED } from '#copilot/config';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { createAgentRouter } from './routes/agent.js';
 import { createConfigRouter } from './routes/config.js';
@@ -18,6 +19,7 @@ import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
 import { createObservabilityRouter } from './routes/observability.js';
 import { createSessionsRouter } from './routes/sessions.js';
+import { createSdkRouter } from './routes/sdk/index.js';
 import { createSseRouter } from './routes/sse.js';
 
 /**
@@ -50,6 +52,7 @@ import { createSseRouter } from './routes/sse.js';
  * - POST /start, /stop, /permissions, /steer, /send, /answer (Onda 4.2)
  * - GET  /stream, /stream/tasks (SSE AlwaysAliveAgent — Onda 4.2)
  * - POST /dialog/start, /dialog/turn, /dialog/stop (Onda 4.2)
+ * - GET  /sdk/* (SDK API — Onda 4.3, ativo quando COPILOT_SDK_ENABLED=true)
  *
  * @param {import('express').Application} app
  * @param {object} [opts]
@@ -81,6 +84,10 @@ export function mountCopilotRoutes(app, opts) {
     app.use(createSseRouter());
     app.use(createSessionsRouter());
     app.use(createCopilotApiRouter());
+    // Onda 4.3: SDK API router — ativado somente quando COPILOT_SDK_ENABLED=true
+    if (COPILOT_SDK_ENABLED) {
+        app.use(createSdkRouter());
+    }
 
     void authMiddleware; // usado implicitamente via createCopilotApp opts
 }
