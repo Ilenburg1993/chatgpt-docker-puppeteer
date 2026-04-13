@@ -34,3 +34,6 @@ export { broadcastGlobal, broadcastToSession, conversationHub, conversationStore
 
 // De #copilot/channel
 export { CHANNEL_VERSION, llmBridgeClient } from '#copilot/channel';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { AGENT_SERVICE, CONVERSATION_SERVICE, DIALOG_SERVICE, SESSION_SERVICE } from './di-tokens.js';

@@ -78,3 +78,6 @@ export { LlmBridgeClient, llmBridgeClient } from './client.js';
  *
  * @typedef {import('#copilot/sdk/types').MessageOptions['attachments']} ChannelAttachment
  */
+
+// ─── DI Tokens ──────────────────────────────────────────────────────────────────
+export { INJECT_SERVER } from './di-tokens.js';

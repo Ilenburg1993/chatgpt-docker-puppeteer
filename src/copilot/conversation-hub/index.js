@@ -12,3 +12,6 @@ export { ConversationHub, conversationHub } from './hub.js';
 export { HubOrchestrator } from './orchestrator.js';
 export { broadcastGlobal, broadcastToSession, getCopilotNamespace, mountCopilotNamespace } from './socket-ns.js';
 export { ConversationStore, conversationStore } from './store.js';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { CONVERSATION_STORE, HUB, SESSION_RPC, SOCKET_NAMESPACE } from './di-tokens.js';

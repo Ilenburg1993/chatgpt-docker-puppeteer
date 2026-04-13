@@ -350,3 +350,6 @@ export {
 
 export { setCustomToolsBuilder } from './custom-tools.js';
 export { setSdkLogger } from './logger.js';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { SDK_LOGGER, TOOLS_BUILDER } from './di-tokens.js';

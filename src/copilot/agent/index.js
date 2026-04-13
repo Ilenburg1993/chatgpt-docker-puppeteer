@@ -42,3 +42,6 @@ export * from './lifecycle/index.js';
 export * from './messaging/index.js';
 export * from './session/index.js';
 export * from './state/index.js';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { ALWAYS_ALIVE_AGENT, DIALOG_ENGINE } from './di-tokens.js';

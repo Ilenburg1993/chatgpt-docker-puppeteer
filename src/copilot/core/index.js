@@ -44,7 +44,7 @@ export {
     activeCount as activeTimerCount,
     cancelAll as cancelAllTimers,
     cancel as cancelTimer,
-    registerTimer,
+    registerTimer
 } from './timer-registry.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ export * from './di-tokens.js';
 export { createContainer, createToken } from './di.js';
 
 // ─── Event Bus ────────────────────────────────────────────────────────────────
-export { EventBus, bridgeEmitter, createEventBus } from './event-bus.js';
+export { bridgeEmitter, createEventBus, EventBus } from './event-bus.js';
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 export {
@@ -61,7 +61,7 @@ export {
     isPrivateIp,
     validateUrl,
     validateUrlString,
-    validateWebhookUrl,
+    validateWebhookUrl
 } from './security/url-validator.js';
 
 // ─── Shared State ─────────────────────────────────────────────────────────────
@@ -74,4 +74,4 @@ export { createCache } from './cache.js';
 export { createMutex, createMutexPool, withMutex } from './mutex.js';
 
 // ─── Emitter ──────────────────────────────────────────────────────────────────
-export { BaseEmitter, createEmitter } from './create-emitter.js';
+export { BaseEmitter, createEmitter } from '../events/create-emitter.js';

@@ -27,3 +27,6 @@
  */
 
 export { activatePlugins, createPluginRegistry, discoverPlugins, PluginRegistry } from './plugin-registry.js';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { CIRCUIT_BREAKER_REGISTRY, PLUGIN_REGISTRY } from './di-tokens.js';

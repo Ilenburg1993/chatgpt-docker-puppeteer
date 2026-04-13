@@ -58,3 +58,9 @@ export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from 
 
 // ─── Event Catalog + Dead-Letter ──────────────────────────────────────────────
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export {
+    ALERTS_MANAGER, ERROR_TRACKER, EVENT_COLLECTOR, HEALTH_MANAGER,
+    METRICS_STORE, OTEL_TRACER, QUOTA_MONITOR,
+} from './di-tokens.js';

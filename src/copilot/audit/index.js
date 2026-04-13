@@ -32,3 +32,6 @@ export { setAuditLogger } from './logger.js';
 
 // Re-export de constantes de eventos de auditoria (SSOT vive em #copilot/events)
 export { AUDIT_LOG } from '#copilot/events';
+
+// ─── DI Tokens ────────────────────────────────────────────────────────────────
+export { AUDIT_BUS, AUDIT_LOGGER, AUDIT_PIPELINE } from './di-tokens.js';
