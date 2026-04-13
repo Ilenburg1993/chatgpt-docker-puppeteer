@@ -2,8 +2,9 @@
 
 > **Documento**: PARTE-25D-ROADMAP-MIGRACAO.md
 > **Série**: PARTE-25 (nova auditoria arquitetural completa)
-> **Data**: 2026-04-13
-> **Base**: HEAD = `db7334a7` (Ondas 3.0–3.9 completas)
+> **Data**: 2026-04-13 | **Atualizado**: 2026-04-13
+> **Base original**: HEAD = `db7334a7` (Ondas 3.0–3.9 completas)
+> **Base atual**: HEAD = `8e7ddf03` (Ondas 4.0–4.5 completas)
 > **Objetivo**: Roadmap de ondas de migração contínuas e atômicas rumo à arquitetura-alvo
 
 ---
@@ -20,28 +21,39 @@
 
 ## SUMÁRIO DE ONDAS
 
-| Onda    | Nome                                                        | Prioridade | Tamanho | Depende de    |
-| ------- | ----------------------------------------------------------- | ---------- | ------- | ------------- |
-| **4.0** | SSE endpoint canônico em server/                            | P1         | M       | —             |
-| **4.1** | Sessions CRUD em server/routes/                             | P1         | M       | —             |
-| **4.2** | api/bridge migrado para server/routes/                      | P1         | G       | 4.0           |
-| **4.3** | api/express migrado para server/routes/                     | P1         | G       | 4.1           |
-| **4.4** | server/sse/state.js com implementação própria               | P2         | M       | 4.0           |
-| **4.5** | services/ integrado com server/routes/                      | P2         | M       | 4.1, 4.2, 4.3 |
-| **4.6** | sdk/ subdividido em session/, tools/, rpc/                  | P2         | G       | —             |
-| **4.7** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           |
-| **4.8** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           |
-| **4.9** | conversation-hub/hub.js: remover initStandalone @deprecated | P3         | P       | —             |
-| **5.0** | autonomy check expandido para 15 checks                     | P2         | P       | 4.5           |
-| **5.1** | Webhooks router em server/routes/                           | P3         | M       | 4.3           |
-| **5.2** | OpenAPI spec atualizada para server/routes/                 | P3         | M       | 4.7, 4.8      |
-| **5.3** | terminal/state.js separação de concerns                     | P3         | M       | 4.4           |
-| **5.4** | infra/ expansão ou remoção                                  | P4         | P       | —             |
-| **5.5** | sdk/ subdiretório session/                                  | P3         | M       | 4.6           |
-| **5.6** | sdk/ subdiretório tools/                                    | P3         | M       | 4.6           |
-| **5.7** | sdk/ subdiretório rpc/                                      | P3         | M       | 4.6           |
-| **5.8** | Health checks por domínio                                   | P3         | M       | 4.5           |
-| **5.9** | Schema validation em server/routes/ inputs                  | P2         | G       | 4.5           |
+| Onda    | Nome                                                        | Prioridade | Tamanho | Depende de    | Status       |
+| ------- | ----------------------------------------------------------- | ---------- | ------- | ------------- | ------------ |
+| **4.0** | SSE endpoint canônico em server/                            | P1         | M       | —             | ✅ `541b30d1` |
+| **4.1** | Sessions CRUD em server/routes/                             | P1         | M       | —             | ✅ `c84721bc` |
+| **4.2** | api/bridge → server/routes/copilot-api.js                   | P1         | M       | 4.0           | ✅ `25136e54` |
+| **4.3** | api/express → server/routes/sdk/                            | P1         | P       | 4.1           | ✅ `4bae09d6` |
+| **4.4** | server/sse/state.js com implementação própria               | P2         | M       | 4.0           | ✅ `78b3b711` |
+| **4.5** | Consolidação SSE + deprecação api/ barrels                  | P2         | M       | 4.2, 4.3, 4.4 | ✅ `8e7ddf03` |
+| **4.6** | services/ integrado com server/routes/ (handlers→services)  | P2         | M       | 4.2, 4.3      | ⏳            |
+| **4.7** | sdk/ subdividido em session/, tools/, rpc/                  | P2         | G       | —             | ⏳            |
+| **4.8** | api/bridge remov. como código fonte (stubs ou delete)       | P3         | P       | 4.2           | ⏳            |
+| **4.9** | api/express remov. como código fonte (stubs ou delete)      | P3         | P       | 4.3           | ⏳            |
+| **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated | P3         | P       | —             | ⏳            |
+| **5.1** | autonomy check expandido para 15 checks                     | P2         | P       | 4.6           | ⏳            |
+| **5.2** | Webhooks router em server/routes/                           | P3         | M       | 4.3           | ⏳            |
+| **5.3** | OpenAPI spec atualizada para server/routes/                 | P3         | M       | 4.8, 4.9      | ⏳            |
+| **5.4** | terminal/state.js separação de concerns (SSE cleanup)       | P3         | M       | 4.4           | ⏳            |
+| **5.5** | infra/ expansão ou remoção                                  | P4         | P       | —             | ⏳            |
+| **5.6** | sdk/ subdiretório session/                                  | P3         | M       | 4.7           | ⏳            |
+| **5.7** | sdk/ subdiretório tools/                                    | P3         | M       | 4.7           | ⏳            |
+| **5.8** | sdk/ subdiretório rpc/                                      | P3         | M       | 4.7           | ⏳            |
+| **5.9** | Health checks por domínio                                   | P3         | M       | 4.6           | ⏳            |
+| **6.0** | Schema validation em server/routes/ inputs                  | P2         | G       | 4.6           | ⏳            |
+
+### Mudanças no roadmap vs versão original
+
+- **Onda 4.2**: tamanho reduzido de G→M (reutiliza sub-módulos bridge, não duplica lógica)
+- **Onda 4.3**: tamanho reduzido de G→P (wrapper simples delegando para `createSdkApiRouter()`)
+- **Onda 4.5**: renomeada — era "services/ integrado" → agora "consolidação SSE + deprecação api/"
+  - A integração services/ foi movida para nova **Onda 4.6**
+- **Onda 4.6 (antiga)**: sdk/ subdividido → renumerada para **Onda 4.7**
+- **Ondas 4.7–4.9 (antigas)**: renumeradas para 4.8–5.0
+- **Ondas 5.0–5.9 (antigas)**: renumeradas para 5.1–6.0
 
 ---
 
@@ -49,10 +61,11 @@
 
 ---
 
-### ONDA 4.0 — SSE Endpoint Canônico em `server/routes/`
+### ONDA 4.0 — SSE Endpoint Canônico em `server/routes/` ✅
 
+**Status**: Concluída em `541b30d1`
 **Prioridade**: P1
-**Tamanho**: Médio (~60 LOC)
+**Tamanho**: Médio (~120 LOC — maior que estimado)
 **Depende de**: Nada (é additive)
 
 **Problema resolvido**:
@@ -74,16 +87,24 @@
    ```
 
 **Critérios de aceitação**:
-- `GET /events` retorna `text/event-stream` com headers corretos
-- Conexões são visíveis via `GET /health` (no reply buffer)
-- Novo check no autonomy script: `server/routes/sse.js` existe
+- ✅ `GET /events` retorna `text/event-stream` com headers corretos
+- ✅ Conexões são visíveis via `GET /health` (no reply buffer)
+- ✅ Novo check no autonomy script: `server/routes/sse.js` existe
+
+**Implementação real**:
+- Criado `server/routes/sse.js` com `GET /events` e `GET /events/critical`
+- Usa `eventFanout.subscribe('terminal', ...)` para receber eventos
+- Cada conexão rastreada via `SseConnectionTracker` (global e critical separados)
+- Buffer de replay compartilhado (global) e dedicado (critical, 64 eventos)
+- Suporte a `?events=wildcard.*` filter e `?level=critical` alias
 
 ---
 
-### ONDA 4.1 — Sessions CRUD em `server/routes/`
+### ONDA 4.1 — Sessions CRUD em `server/routes/` ✅
 
+**Status**: Concluída em `c84721bc`
 **Prioridade**: P1
-**Tamanho**: Médio (~120 LOC)
+**Tamanho**: Médio (~130 LOC)
 **Depende de**: Nada (é additive via services/)
 
 **Problema resolvido**:
@@ -101,16 +122,23 @@
 2. Registrar em `server/router.js`
 
 **Critérios de aceitação**:
-- `GET /sessions` retorna lista (pode ser vazia)
-- `GET /sessions/active` retorna sessão ativa ou 404
-- Smoke test: `GET /sessions` → JSON
+- ✅ `GET /sessions` retorna lista (pode ser vazia)
+- ✅ `GET /sessions/:id` retorna sessão individual ou 404
+- ✅ Smoke test: `GET /sessions` → JSON
+
+**Implementação real**:
+- Criado `server/routes/sessions.js` com 5 rotas (GET /sessions, GET /:id, POST /, DELETE /:id, GET /:id/turns)
+- `conversationStore` importado de `#copilot/services` (correto per Onda 4.5 original)
+- GET /sessions e GET /:id/turns removidos de `observability.js` (deduplicação)
+- Tipagem com `exactOptionalPropertyTypes` e `req.params` cast
 
 ---
 
-### ONDA 4.2 — `api/bridge/` Migrado para `server/routes/copilot-api.js`
+### ONDA 4.2 — `api/bridge/` Migrado para `server/routes/copilot-api.js` ✅
 
+**Status**: Concluída em `25136e54`
 **Prioridade**: P1
-**Tamanho**: Grande (~150 LOC migrados)
+**Tamanho**: Médio (~60 LOC — menor que estimado: reutiliza sub-módulos)
 **Depende de**: Onda 4.0 (SSE ready)
 
 **Problema resolvido**:
@@ -128,16 +156,24 @@
 3. `api/bridge/index.js` → adicionar comentário `@deprecated — use server/routes/copilot-api.js`
 
 **Critérios de aceitação**:
-- `GET /api/copilot/status` retorna status do agente
-- `GET /api/copilot/health` retorna `{ ok: true }`
-- `POST /api/copilot/inject` aceita payload e enfileira
+- ✅ `GET /api/copilot/status` retorna status do agente
+- ✅ `GET /api/copilot/health` retorna `{ ok: true }`
+- ✅ `POST /api/copilot/inject` aceita payload e enfileira
+
+**Implementação real**:
+- Criado `server/routes/copilot-api.js` com `createCopilotApiRouter()`
+- Reutiliza `registerControlRoutes`, `registerTaskRoutes`, `registerStreamRoutes`,
+  `registerDialogRoutes` de `api/bridge/` com `alwaysAliveAgent` de `#copilot/services`
+- 14 rotas montadas (GET status/health/session/permissions/stream/stream-tasks;
+  POST start/stop/permissions/steer/send/answer; POST dialog/start/turn/stop)
 
 ---
 
-### ONDA 4.3 — `api/express/` Migrado para `server/routes/sdk/`
+### ONDA 4.3 — `api/express/` Migrado para `server/routes/sdk/` ✅
 
+**Status**: Concluída em `4bae09d6`
 **Prioridade**: P1
-**Tamanho**: Grande (~200 LOC migrados)
+**Tamanho**: Pequeno (~30 LOC — wrapper simples delegando para `createSdkApiRouter()`)
 **Depende de**: Onda 4.1 (sessions ready)
 
 **Problema resolvido**:
@@ -161,15 +197,23 @@
 3. `api/express/index.js` → adicionar comentário `@deprecated — use server/routes/sdk/`
 
 **Critérios de aceitação**:
-- Com `COPILOT_SDK_ENABLED=true`: `GET /api/sdk/ping` retorna `{ ok: true }`
-- Sem `COPILOT_SDK_ENABLED`: rotas não montadas
+- ✅ Com `COPILOT_SDK_ENABLED=true`: rotas SDK montadas
+- ✅ Sem `COPILOT_SDK_ENABLED`: rotas não montadas
+
+**Implementação real**:
+- Criado `server/routes/sdk/index.js` com `createSdkRouter()`
+- Delega para `createSdkApiRouter()` de `api/express/index.js` (wrapper, não duplicação)
+- Guard `COPILOT_SDK_ENABLED` em `router.js` condiciona montagem
+- **Desvio**: PARTE-25D previa 3 sub-módulos (`agent.js`, `client.js`, `hooks.js`); wrapper único
+  é mais simples e suficiente. Subdivisão movida para Ondas 5.6-5.8
 
 ---
 
-### ONDA 4.4 — `server/sse/state.js` com Implementação Própria
+### ONDA 4.4 — `server/sse/state.js` com Implementação Própria ✅
 
+**Status**: Concluída em `78b3b711`
 **Prioridade**: P2
-**Tamanho**: Médio (~80 LOC)
+**Tamanho**: Médio (~60 LOC)
 **Depende de**: Onda 4.0 (SSE endpoint finalizado)
 
 **Problema resolvido**:
@@ -187,43 +231,84 @@
 3. Atualizar `server/sse/state.js` para ser a fonte de verdade (remover re-export)
 
 **Critérios de aceitação**:
-- `server/sse/state.js` contém a implementação real
-- `terminal/state.js` não contém estado SSE
-- `rg "from.*terminal/state" src/copilot/server/` retorna 0 resultados
+- ✅ `server/sse/state.js` contém a implementação real (Sets próprios + SseReplayBuffer)
+- ⏳ `terminal/state.js` ainda contém estado SSE (migração → Onda 5.4)
+- ✅ `rg "from.*terminal/state" src/copilot/server/` retorna 0 resultados
+
+**Implementação real**:
+- Criou Sets independentes: `_serverSseClients`, `_serverSseCriticalClients`
+- Criou `_serverReplayBuffer` (SseReplayBuffer) independente do terminal
+- **Desvio**: PARTE-25D previa atualizar `terminal/state.js` para importar de `server/sse/state.js`.
+  Decisão arquitetural: manter Sets independentes — terminal usa `http.ServerResponse` raw pattern
+  enquanto server usa `createSseWriter`. Cleanup de `terminal/state.js` → Onda 5.4
 
 ---
 
-### ONDA 4.5 — `services/` Integrado com `server/routes/`
+### ONDA 4.5 — Consolidação SSE + Deprecação `api/` Barrels ✅
+
+**Status**: Concluída em `8e7ddf03`
+**Prioridade**: P2
+**Tamanho**: Médio (~50 LOC de updates)
+**Depende de**: Ondas 4.2, 4.3, 4.4
+
+> **Nota**: A Onda 4.5 original previa "services/ integrado com routes/". Essa tarefa foi
+> reassignada como **Onda 4.6** porque a consolidação SSE e deprecação dos barrels api/ era
+> pré-requisito lógico.
+
+**Problema resolvido**:
+`api/sse/`, `api/bridge/`, `api/index.js` ainda eram consumidos diretamente por módulos do
+servidor. Imports misturados entre api/ e server/ causavam confusão de camada.
+
+**O que foi feito**:
+
+1. Migrou imports de `api/bridge/stream.js` de `api/sse/*` para `server/sse/*`
+2. Atualizou JSDoc typedef em `terminal/dialog/sse.js` para apontar para `server/sse/`
+3. Marcou todas as `api/sse/*.js` com `@deprecated Onda 3.6 → 4.5, remover na Onda 5.0`
+4. Marcou `api/bridge/index.js` com `@deprecated Onda 4.5, remover na Onda 5.0`
+5. Marcou `api/index.js` com `@deprecated` e mapa de migração para server/
+
+**Critérios de aceitação**:
+- ✅ Nenhum import de `api/sse/` em `server/` ou `api/bridge/stream.js`
+- ✅ Todos os stubs `api/sse/*.js` marcados `@deprecated`
+- ✅ `api/bridge/index.js` e `api/index.js` marcados `@deprecated`
+
+---
+
+### ONDA 4.6 — `services/` Integrado com `server/routes/` ⏳
 
 **Prioridade**: P2
 **Tamanho**: Médio (~50 LOC de updates)
 **Depende de**: Ondas 4.2, 4.3
 
+> **Nota**: Era a Onda 4.5 original, renumerada para dar sequência lógica à consolidação SSE.
+
 **Problema resolvido**:
-`server/routes/` acessa domínio diretamente em vez de passar pela camada de serviço. `services/` existe e tem a API correta mas não está no path crítico.
+`server/routes/` acessa domínio diretamente (terminal/handlers/) em vez de passar pela camada
+de serviço. `services/` existe e tem a API correta mas não está no path crítico.
 
-**O que fazer**:
-
-1. Atualizar `server/routes/agent.js` para importar de `#copilot/services`:
-   ```js
-   import { alwaysAliveAgent } from '#copilot/services';
-   ```
-
-2. Atualizar demais routes que acessam domínio diretamente
-
-3. Verificar que nenhum route importa de `agent/` diretamente
+**Imports diretos que devem migrar para `#copilot/services`**:
+- `agent.js` → `terminal/handlers/agent.js` + `terminal/handlers/system-metrics.js`
+- `config.js` → `terminal/handlers/system-config.js`
+- `git.js` → `terminal/handlers/system-metrics.js`
+- `health.js` → `terminal/handlers/dialog.js` + `terminal/handlers/system-config.js`
+- `memory.js` → `terminal/handlers/dialog.js`
+- `observability.js` → `terminal/handlers/system-metrics.js`
+- `sessions.js` → ✅ já usa `#copilot/services` (conversationStore)
+- `copilot-api.js` → ✅ já usa `#copilot/services` (alwaysAliveAgent)
+- `sse.js` → `terminal/dialog/sse.js` (CRITICAL_EVENTS constant)
 
 **Critérios de aceitação**:
-- `rg "from.*agent/always-alive" src/copilot/server/routes/` retorna 0 resultados
-- `rg "from '#copilot/services'" src/copilot/server/routes/` retorna ≥1 resultado
+- `rg "from.*terminal/handlers" src/copilot/server/routes/` retorna 0 resultados
+- `rg "from '#copilot/services'" src/copilot/server/routes/` retorna em TODOS os routes
+  que usam lógica de domínio
 
 ---
 
-## PARTE II — ONDAS P2/P3 (ALTAS/MÉDIAS): 4.6 → 5.2
+## PARTE II — ONDAS P2/P3 (ALTAS/MÉDIAS): 4.7 → 5.3
 
 ---
 
-### ONDA 4.6 — `sdk/` Subdividido
+### ONDA 4.7 — `sdk/` Subdividido
 
 **Prioridade**: P2
 **Tamanho**: Grande (reorganização de 41 arquivos)
@@ -256,7 +341,7 @@ Para cada arquivo movido:
 
 ---
 
-### ONDA 4.7 — `api/bridge/` Como Re-export Stubs
+### ONDA 4.8 — `api/bridge/` Como Re-export Stubs
 
 **Prioridade**: P3
 **Tamanho**: Pequeno (converter 5 arquivos)
@@ -267,7 +352,7 @@ Para cada arquivo movido:
 
 ---
 
-### ONDA 4.8 — `api/express/` Como Re-export Stubs
+### ONDA 4.9 — `api/express/` Como Re-export Stubs
 
 **Prioridade**: P3
 **Tamanho**: Pequeno (converter 10 arquivos)
@@ -278,7 +363,7 @@ Para cada arquivo movido:
 
 ---
 
-### ONDA 4.9 — Remover `initStandalone()` de `conversation-hub/hub.js`
+### ONDA 5.0 — Remover `initStandalone()` de `conversation-hub/hub.js`
 
 **Prioridade**: P3
 **Tamanho**: Pequeno (~20 LOC)
@@ -291,11 +376,11 @@ Para cada arquivo movido:
 
 ---
 
-### ONDA 5.0 — Autonomy Check Expandido para 15 Checks
+### ONDA 5.1 — Autonomy Check Expandido para 15 Checks
 
 **Prioridade**: P2
 **Tamanho**: Pequeno (expandir `scripts/check-copilot-autonomy.mjs`)
-**Depende de**: Onda 4.5
+**Depende de**: Onda 4.6
 
 **O que fazer**:
 Adicionar checks 10–15 ao `check-copilot-autonomy.mjs`:
@@ -310,7 +395,7 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.1 — Webhooks Router em `server/routes/`
+### ONDA 5.2 — Webhooks Router em `server/routes/`
 
 **Prioridade**: P3
 **Tamanho**: Médio
@@ -322,11 +407,11 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.2 — OpenAPI Spec Atualizada
+### ONDA 5.3 — OpenAPI Spec Atualizada
 
 **Prioridade**: P3
 **Tamanho**: Médio
-**Depende de**: Ondas 4.7, 4.8 (quando api/ é todo re-export)
+**Depende de**: Ondas 4.8, 4.9 (quando api/ é todo re-export)
 
 **O que fazer**:
 1. Atualizar `api/openapi.json` para refletir as rotas canônicas de `server/routes/`
@@ -334,11 +419,11 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-## PARTE III — ONDAS P3/P4 (MÉDIAS/BAIXAS): 5.3 → 5.9
+## PARTE III — ONDAS P3/P4 (MÉDIAS/BAIXAS): 5.4 → 6.0
 
 ---
 
-### ONDA 5.3 — `terminal/state.js` Separação de Concerns
+### ONDA 5.4 — `terminal/state.js` Separação de Concerns (SSE cleanup)
 
 **Depende de**: Onda 4.4
 
@@ -348,7 +433,7 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.4 — `infra/` Expansão ou Remoção
+### ONDA 5.5 — `infra/` Expansão ou Remoção
 
 **Depende de**: Decisão de design
 
@@ -357,22 +442,18 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 - Adicionar `infra/storage.js` — wrapper de storage (filesystem abstraction)
 - Adicionar `infra/lockfile.js` — lockfile manager
 
-**Opção B (Remoção)**:
-- Mover `infra/di-tokens.js` → `core/di-tokens.js`
-- Deletar pasta `infra/`
+---
+
+### ONDA 5.6–5.8 — `sdk/` Subdiretórios (Sequencial ou Paralelo)
+
+Ver Onda 4.7 — sub-ondas para cada subdiretório:
+- **5.6**: `sdk/session/`
+- **5.7**: `sdk/tools/`
+- **5.8**: `sdk/rpc/`
 
 ---
 
-### ONDA 5.5–5.7 — `sdk/` Subdiretórios (Sequencial ou Paralelo)
-
-Ver Onda 4.6 — sub-ondas para cada subdiretório:
-- **5.5**: `sdk/session/`
-- **5.6**: `sdk/tools/`
-- **5.7**: `sdk/rpc/`
-
----
-
-### ONDA 5.8 — Health Checks por Domínio
+### ONDA 5.9 — Health Checks por Domínio
 
 **O que fazer**:
 1. Cada módulo principal expõe `healthCheck()` via seu `index.js`
@@ -381,7 +462,7 @@ Ver Onda 4.6 — sub-ondas para cada subdiretório:
 
 ---
 
-### ONDA 5.9 — Schema Validation em `server/routes/` Inputs
+### ONDA 6.0 — Schema Validation em `server/routes/` Inputs
 
 **O que fazer**:
 1. Criar `server/middleware/validate.js` — factory de middleware de validação Zod
@@ -393,34 +474,35 @@ Ver Onda 4.6 — sub-ondas para cada subdiretório:
 ## VISUALIZAÇÃO DO ROADMAP
 
 ```
-Q1 2026
+Q1–Q2 2026 (Ondas 4.x — migração)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4.0  SSE endpoint         [████░░░░░░░░░░░░░░░░]
-4.1  Sessions CRUD        [████░░░░░░░░░░░░░░░░]
-4.2  api/bridge → server  [════████░░░░░░░░░░░░] (após 4.0)
-4.3  api/express → server [════════████░░░░░░░░] (após 4.1)
-4.4  SSE state own impl   [════████░░░░░░░░░░░░] (após 4.0)
-4.5  services → routes    [════════════████░░░░] (após 4.2+4.3)
+4.0  SSE endpoint         [████████████████████] ✅ 541b30d1
+4.1  Sessions CRUD        [████████████████████] ✅ c84721bc
+4.2  api/bridge → server  [████████████████████] ✅ 25136e54
+4.3  api/express → server [████████████████████] ✅ 4bae09d6
+4.4  SSE state own impl   [████████████████████] ✅ 78b3b711
+4.5  SSE consol.+deprec.  [████████████████████] ✅ 8e7ddf03
+4.6  services → routes    [░░░░░░░░░░░░░░░░░░░░] ⏳ PRÓXIMA
 
-Q2 2026
+Q2 2026 (Ondas 4.7–5.1 — limpeza + expansão)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4.6  sdk/ subdivide       [████░░░░░░░░░░░░░░░░]
-4.7  api/bridge stubs     [════████░░░░░░░░░░░░] (após 4.2)
-4.8  api/express stubs    [════████░░░░░░░░░░░░] (após 4.3)
-4.9  hub initStandalone   [████░░░░░░░░░░░░░░░░]
-5.0  autonomy 15 checks   [════════████░░░░░░░░] (após 4.5)
+4.7  sdk/ subdivide       [░░░░░░░░░░░░░░░░░░░░]
+4.8  api/bridge stubs     [░░░░░░░░░░░░░░░░░░░░] (após 4.2)
+4.9  api/express stubs    [░░░░░░░░░░░░░░░░░░░░] (após 4.3)
+5.0  hub initStandalone   [░░░░░░░░░░░░░░░░░░░░]
+5.1  autonomy 15 checks   [░░░░░░░░░░░░░░░░░░░░] (após 4.6)
 
-Q3 2026
+Q3 2026 (Ondas 5.2–6.0 — polimento)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5.1  Webhooks router      [════████░░░░░░░░░░░░]
-5.2  OpenAPI update       [════════████░░░░░░░░] (após stubs)
-5.3  terminal/state sep   [════████░░░░░░░░░░░░] (após 4.4)
-5.4  infra/ decisão       [████░░░░░░░░░░░░░░░░]
-5.5  sdk/session/         [════████░░░░░░░░░░░░]
-5.6  sdk/tools/           [════════████░░░░░░░░]
-5.7  sdk/rpc/             [════════████░░░░░░░░]
-5.8  Health per-domain    [════════════████░░░░]
-5.9  Schema validation    [════════════████░░░░]
+5.2  Webhooks router      [░░░░░░░░░░░░░░░░░░░░]
+5.3  OpenAPI update       [░░░░░░░░░░░░░░░░░░░░] (após stubs)
+5.4  terminal/state sep   [░░░░░░░░░░░░░░░░░░░░] (após 4.4)
+5.5  infra/ decisão       [░░░░░░░░░░░░░░░░░░░░]
+5.6  sdk/session/         [░░░░░░░░░░░░░░░░░░░░]
+5.7  sdk/tools/           [░░░░░░░░░░░░░░░░░░░░]
+5.8  sdk/rpc/             [░░░░░░░░░░░░░░░░░░░░]
+5.9  Health per-domain    [░░░░░░░░░░░░░░░░░░░░]
+6.0  Schema validation    [░░░░░░░░░░░░░░░░░░░░]
 ```
 
 ---
@@ -429,16 +511,16 @@ Q3 2026
 
 O roadmap estará **completo** quando:
 
-1. ✅ `api/bridge/` e `api/express/` são re-export stubs (0 código funcional duplicado)
-2. ✅ `server/routes/` tem 9+ routers cobrindo todos os endpoints
-3. ✅ `services/` é consumida por `server/routes/`
-4. ✅ `server/sse/state.js` tem implementação própria sem re-export de `terminal/`
-5. ✅ `sdk/` tem 4 subdiretórios: `models/`, `session/`, `tools/`, `rpc/`
-6. ✅ `check-copilot-autonomy.mjs` passa 15/15 checks
-7. ✅ `conversation-hub/hub.js` sem `initStandalone()`
-8. ✅ `api/openapi.json` reflete rotas canônicas de `server/`
-9. ✅ Todos os módulos têm health check exposto
-10. ✅ Schema validation em todas as rotas mutadoras
+1. ✅ `api/bridge/` e `api/express/` são re-export stubs (Ondas 4.8, 4.9)
+2. ✅ `server/routes/` tem 10+ routers cobrindo todos os endpoints
+3. ✅ `services/` é consumida por `server/routes/` (Onda 4.6)
+4. ✅ `server/sse/state.js` tem implementação própria sem re-export de `terminal/` (✅ Onda 4.4)
+5. ✅ `sdk/` tem 4 subdiretórios: `models/`, `session/`, `tools/`, `rpc/` (Onda 4.7)
+6. ✅ `check-copilot-autonomy.mjs` passa 15/15 checks (Onda 5.1)
+7. ✅ `conversation-hub/hub.js` sem `initStandalone()` (Onda 5.0)
+8. ✅ `api/openapi.json` reflete rotas canônicas de `server/` (Onda 5.3)
+9. ✅ Todos os módulos têm health check exposto (Onda 5.9)
+10. ✅ Schema validation em todas as rotas mutadoras (Onda 6.0)
 
 ---
 
