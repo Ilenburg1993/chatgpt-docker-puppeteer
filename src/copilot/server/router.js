@@ -16,6 +16,7 @@ import { createGitRouter } from './routes/git.js';
 import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
 import { createObservabilityRouter } from './routes/observability.js';
+import { createSessionsRouter } from './routes/sessions.js';
 import { createSseRouter } from './routes/sse.js';
 
 /**
@@ -42,6 +43,8 @@ import { createSseRouter } from './routes/sse.js';
  * - GET  /gh/issues, /gh/prs, /gh/ci
  * - GET  /events (SSE — Onda 4.0: router canônico server/routes/sse.js)
  * - GET  /events/critical (SSE críticos — Onda 4.0)
+ * - GET  /sessions, GET /sessions/:id, POST /sessions, DELETE /sessions/:id (Onda 4.1)
+ * - GET  /sessions/:id/turns (Onda 4.1)
  *
  * @param {import('express').Application} app
  * @param {object} [opts]
@@ -71,6 +74,7 @@ export function mountCopilotRoutes(app, opts) {
     app.use(createObservabilityRouter());
     app.use(createGitRouter());
     app.use(createSseRouter());
+    app.use(createSessionsRouter());
 
     void authMiddleware; // usado implicitamente via createCopilotApp opts
 }

@@ -4,8 +4,10 @@
  * @file Router Express para rotas de observabilidade do servidor copilot.
  *
  * Rotas: GET /errors, GET /tool-stats, GET /history, GET /audit,
- *   GET /sessions, GET /sessions/:sessionId/turns,
  *   POST /system/reset, GET /metrics (custom: text/plain)
+ *
+ * Nota: GET /sessions e GET /sessions/:sessionId/turns foram movidos para
+ * server/routes/sessions.js na Onda 4.1 (L64.2).
  *
  * Onda 3.1 — L55.5.
  *
@@ -13,10 +15,6 @@
  */
 
 import { Router } from 'express';
-import {
-    handleListSessions,
-    handleListTurns
-} from '../../terminal/handlers/dialog.js';
 import {
     handleGetAudit,
     handleGetErrors,
@@ -61,28 +59,8 @@ export function createObservabilityRouter() {
         })),
     );
 
-    // GET /sessions?limit=&offset=&status=
-    router.get(
-        '/sessions',
-        bridgeHandler(handleListSessions, (req) => ({
-            limit: Number(req.query['limit'] ?? 20),
-            offset: Number(req.query['offset'] ?? 0),
-            ...(req.query['status'] ? { status: String(req.query['status']) } : {}),
-        })),
-    );
-
-    // GET /sessions/:sessionId/turns?limit=&offset=
-    router.get(
-        '/sessions/:sessionId/turns',
-        bridgeHandler(
-            /** @type {import('../handler-bridge.js').CopilotHandler} */ (handleListTurns),
-            (req) => ({
-                sessionId: req.params['sessionId'] ?? '',
-                limit: Number(req.query['limit'] ?? 50),
-                offset: Number(req.query['offset'] ?? 0),
-            }),
-        ),
-    );
+    // GET /sessions?limit=&offset=&status= (movido para sessions.js na Onda 4.1)
+    // GET /sessions/:sessionId/turns?limit=&offset= (movido para sessions.js na Onda 4.1)
 
     // POST /system/reset — emergency reset (limpa rate limiters e error tracker)
     router.post('/system/reset', bridgeHandler(handleSystemReset));
