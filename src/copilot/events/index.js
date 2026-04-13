@@ -243,7 +243,7 @@ export {
 } from './emitter-events.js';
 
 // ─── Re-exports de types/events.js para compatibilidade ──────────────────────
-export { EVENT_NAMES, EVENT_NAMESPACES } from '../types/events.js';
+export { EVENT_NAMES, EVENT_NAMESPACES } from './legacy-events.js';
 
 // ─── Grupos consolidados (para uso em switch/Map) ─────────────────────────────
 

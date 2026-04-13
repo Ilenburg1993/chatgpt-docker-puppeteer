@@ -89,7 +89,9 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
  * Retorna o cache in-process quando disponível. Se o cache estiver frio, dispara readStateAsync() internamente e
  * retorna null (o cache será populado para a próxima chamada).
  *
- * @deprecated F91/F52: Use readStateAsync() em vez desta versão síncrona.
+ * Acesso síncrono ao cache — use em contextos onde `await` não é possível (construtores, getters).
+ * Para hot paths ou primeira leitura, prefira {@link readStateAsync}.
+ *
  * @returns {AliveAgentState | null} Estado em cache ou null se indisponível
  */
 export function readState() {
@@ -105,7 +107,9 @@ export function readState() {
  * F52: Delega para writeStateAsync internamente. Atualiza _stateCache imediatamente para manter consistência síncrona,
  * mas a escrita real em disco é async.
  *
- * @deprecated F69/F52: Use writeStateAsync().
+ * Shim síncrono — atualiza o cache imediatamente e dispara escrita async em background.
+ * Para controle de erro na escrita, prefira {@link writeStateAsync}.
+ *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar
  * @returns {AliveAgentState} Estado completo após a atualização (do cache)
  */
@@ -162,7 +166,9 @@ async function _doWriteState(updates) {
 /**
  * Remove o estado persistido e invalida o cache.
  *
- * @deprecated F91/F52: Use clearStateAsync().
+ * Shim síncrono — invalida cache e dispara remoção async em background.
+ * Para controle de erro na remoção, prefira {@link clearStateAsync}.
+ *
  * @returns {void}
  */
 export function clearState() {

@@ -81,39 +81,29 @@ export function createSnapshot(opts) {
 }
 
 /**
- * Salva um snapshot em disco.
- *
- * @deprecated F52: Use saveSnapshotAsync().
- * @param {SessionSnapshotData} snapshot
- * @returns {string} Caminho do arquivo (a escrita real é async)
- */
-export function saveSnapshot(snapshot) {
-    const filename = `${snapshot.snapshotId}.json`;
-    const filepath = join(SNAPSHOT_DIR, filename);
-    saveSnapshotAsync(snapshot).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.saveSync.fallback'));
-    return filepath;
-}
-
-/**
  * F69: Versão async de saveSnapshot — usa fs/promises.
  *
  * @param {SessionSnapshotData} snapshot
  * @returns {Promise<string>} Caminho do arquivo salvo
  */
 export async function saveSnapshotAsync(snapshot) {
-    return startSpan('copilot.snapshot.save', { extra: { snapshotId: snapshot.snapshotId, reason: snapshot.reason ?? 'manual' } }, async () => {
-        await mkdir(SNAPSHOT_DIR, { recursive: true });
+    return startSpan(
+        'copilot.snapshot.save',
+        { extra: { snapshotId: snapshot.snapshotId, reason: snapshot.reason ?? 'manual' } },
+        async () => {
+            await mkdir(SNAPSHOT_DIR, { recursive: true });
 
-        const filename = `${snapshot.snapshotId}.json`;
-        const filepath = join(SNAPSHOT_DIR, filename);
+            const filename = `${snapshot.snapshotId}.json`;
+            const filepath = join(SNAPSHOT_DIR, filename);
 
-        await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
-        log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
+            await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
+            log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
 
-        await pruneSnapshotsAsync();
+            await pruneSnapshotsAsync();
 
-        return filepath;
-    });
+            return filepath;
+        },
+    );
 }
 
 /**
@@ -125,60 +115,6 @@ export async function saveSnapshotAsync(snapshot) {
  * @property {string} [reason]
  * @property {string} filepath
  */
-
-/**
- * Lista todos os snapshots disponíveis, ordenados do mais recente ao mais antigo.
- *
- * @deprecated F52: Use listSnapshotsAsync().
- * @returns {SnapshotListItem[]} Retorna lista em cache ou vazio (dispara async load)
- */
-export function listSnapshots() {
-    /** @type {SnapshotListItem[]} */
-    const result = [];
-    // F52: retorna vazio sincronamente, callers síncronos devem migrar para async
-    listSnapshotsAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.listSync.fallback'));
-    return result;
-}
-
-/**
- * Carrega um snapshot por ID.
- *
- * @deprecated F52: Use loadSnapshotAsync().
- * @param {string} snapshotId
- * @returns {SessionSnapshotData | null} Sempre null (delega para async)
- */
-export function loadSnapshot(snapshotId) {
-    // F52: retorna null sincronamente, callers devem migrar para async
-    loadSnapshotAsync(snapshotId).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.loadSync.fallback'));
-    return null;
-}
-
-/**
- * Carrega o snapshot mais recente.
- *
- * @deprecated F61 (BUG-A01): Use loadLatestSnapshotAsync().
- * @returns {null} Sempre null — delega para async.
- */
-export function loadLatestSnapshot() {
-    // F61: versão sync é broken (listSnapshots() retorna []). Mantida apenas para compat;
-    // callers devem migrar para loadLatestSnapshotAsync().
-    loadLatestSnapshotAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.loadLatestSync.fallback'));
-    return null;
-}
-
-/**
- * F41.6: Remove snapshots antigos, mantendo apenas os últimos MAX_SNAPSHOTS.
- *
- * @deprecated F52: Use pruneSnapshotsAsync().
- * @param {number} [keep] - Número de snapshots a manter (default: MAX_SNAPSHOTS)
- * @returns {number} Sempre 0 (delega para async)
- */
-export function pruneSnapshots(keep = MAX_SNAPSHOTS) {
-    pruneSnapshotsAsync(keep).catch((/** @type {any} */ e) => logSwallowed(e, 'snapshot.pruneSync.fallback'));
-    return 0;
-}
-
-// ─── F69: Versões Async ──────────────────────────────────────────────────────
 
 /**
  * F69: Versão async de listSnapshots — usa fs/promises.
@@ -231,44 +167,44 @@ export async function listSnapshotsAsync() {
  */
 export async function loadSnapshotAsync(snapshotId) {
     return startSpan('copilot.snapshot.load', { extra: { snapshotId } }, async () => {
-    try {
-        await access(SNAPSHOT_DIR);
-    } catch {
-        return null;
-    }
-
-    const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
-    let fileExists = true;
-    try {
-        await access(filepath);
-    } catch {
-        fileExists = false;
-    }
-    if (!fileExists) {
-        const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
-        if (files.length === 0) return null;
-        const first = files[0];
-        if (!first) return null;
         try {
-            const text = await readFile(join(SNAPSHOT_DIR, first), 'utf8');
-            const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${first}]`);
+            await access(SNAPSHOT_DIR);
+        } catch {
+            return null;
+        }
+
+        const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
+        let fileExists = true;
+        try {
+            await access(filepath);
+        } catch {
+            fileExists = false;
+        }
+        if (!fileExists) {
+            const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
+            if (files.length === 0) return null;
+            const first = files[0];
+            if (!first) return null;
+            try {
+                const text = await readFile(join(SNAPSHOT_DIR, first), 'utf8');
+                const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${first}]`);
+                if (!jsonResult.ok) return null;
+                const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
+                return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
+            } catch {
+                return null;
+            }
+        }
+
+        try {
+            const text = await readFile(filepath, 'utf8');
+            const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
             if (!jsonResult.ok) return null;
             const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
             return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
         } catch {
             return null;
         }
-    }
-
-    try {
-        const text = await readFile(filepath, 'utf8');
-        const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
-        if (!jsonResult.ok) return null;
-        const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
-        return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
-    } catch {
-        return null;
-    }
     }); // startSpan copilot.snapshot.load
 }
 

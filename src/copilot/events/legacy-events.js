@@ -1,10 +1,8 @@
 // @ts-check
 /**
- * src/copilot/types/events.js
+ * src/copilot/events/legacy-events.js
  *
- * @module copilot/types/events
- * @deprecated Use `src/copilot/events/index.js` (SSOT canônico) para constantes de eventos. Este arquivo será removido
- *   em uma release futura.
+ * @module copilot/events/legacy-events
  *
  *   Catálogo de nomes de eventos cross-module do sistema Copilot (legado).
  *

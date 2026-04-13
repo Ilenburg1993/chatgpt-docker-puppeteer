@@ -1,10 +1,10 @@
 // @ts-check
 /**
  * @module copilot/alias-store
- * @see EventBus
  * @file Alias Store — gerencia aliases de comandos do terminal REPL.
  *
  *   Suporta aliases built-in e customizados pelo usuário. Aliases customizados são persistidos em arquivo JSON.
+ * @see EventBus
  */
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
@@ -41,21 +41,11 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 // ---------------------------------------------------------------------------
 
 /**
- * @deprecated F51: Removida. Use loadAliasesAsync(). Shim: delega para loadAliasesAsync() e ignora a Promise
- *   silenciosamente.
- * @returns {void}
- */
-export function loadAliases() {
-    loadAliasesAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'terminal.aliasStore.loadSync'));
-}
-
-/**
- * Salva aliases customizados (apenas os não-builtin) no arquivo JSON.
+ * Salva aliases customizados (fire-and-forget). Delega para {@link _saveCustomAliasesAsync}.
  *
- * @deprecated F128: Use _saveCustomAliasesAsync() em vez desta versão síncrona.
  * @returns {void}
  */
-function saveCustomAliases() {
+function _saveCustomAliases() {
     _saveCustomAliasesAsync().catch((/** @type {any} */ e) => {
         log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
     });
@@ -168,7 +158,7 @@ export function setAlias(name, command) {
         current = (testAliases[current] ?? '').split(' ')[0] ?? '';
     }
     _aliases[key] = command;
-    saveCustomAliases();
+    _saveCustomAliases();
     return { ok: true };
 }
 
@@ -185,7 +175,7 @@ export function removeAlias(name) {
     const key = name.startsWith('/') ? name : `/${name}`;
     if (!(key in _aliases)) return false;
     delete _aliases[key];
-    saveCustomAliases();
+    _saveCustomAliases();
     return true;
 }
 
@@ -196,7 +186,7 @@ export function removeAlias(name) {
  */
 export function resetAliases() {
     _aliases = { ...BUILTIN_ALIASES };
-    saveCustomAliases();
+    _saveCustomAliases();
 }
 
 /**

@@ -2,9 +2,8 @@
 /**
  * src/copilot/agent.js
  *
- * @deprecated Use `terminal/bootstrap.js` como entry point canônico.
- * Este arquivo existe apenas para backwards compat com ecosystem.config.cjs.
- * Delega para bootCopilot() que agora executa sempre modo terminal.
+ * PM2 entry point — referenciado por ecosystem.config.cjs.
+ * Delega para bootCopilot() que executa o modo terminal.
  *
  * @module copilot/agent
  */

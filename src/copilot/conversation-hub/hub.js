@@ -14,6 +14,7 @@
 
 import { SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';
 import {
+    HUB_EVENTS,
     HUB_SESSION_CLOSED,
     HUB_SESSION_CREATED,
     HUB_TURN_COMPLETE,
@@ -23,9 +24,8 @@ import {
 import { log } from '#copilot/observability';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
-import { HUB_EVENTS } from './events.js';
-import { HubOrchestrator } from './orchestrator.js';
 import { mountCopilotNamespace, unmountCopilotNamespace } from '../server/socket/hub-ns.js';
+import { HubOrchestrator } from './orchestrator.js';
 import { conversationStore } from './store.js';
 
 // ─── ConversationHub ──────────────────────────────────────────────────────────

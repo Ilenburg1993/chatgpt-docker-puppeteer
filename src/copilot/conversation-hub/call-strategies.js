@@ -11,7 +11,7 @@
 
 import { SessionError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { HUB_EVENTS } from './events.js';
+import { HUB_EVENTS } from '#copilot/events';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike

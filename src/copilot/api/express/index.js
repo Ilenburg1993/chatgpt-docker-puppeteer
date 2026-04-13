@@ -14,9 +14,6 @@
  * - `routes/webhooks.js` — /webhooks, /webhooks/:id
  *
  * @module copilot/api/sdk-api
- * @deprecated Onda 4.9 — O ponto canônico de montagem é `server/routes/sdk/index.js` (Onda 4.3). A lógica interna
- *   (sub-módulos) será migrada para `server/routes/sdk/` na Onda 5. Este barrel é invocado indiretamente via re-export
- *   do `server/routes/sdk/index.js`.
  * @see EventBus
  */
 
@@ -28,7 +25,7 @@ import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
 import createObservabilityRouter from './observability.js';
 import sessionsRouter from './sessions.js';
-import createWebhooksRouter from './webhooks.js';
+import { webhooksRouter } from '../../server/routes/webhooks.js';
 
 /**
  * Cria o router principal da SDK API com injeção de dependências.
@@ -57,7 +54,7 @@ export default function createSdkApiRouter() {
     router.use('/', createClientRouter(sharedDeps));
     router.use('/', sessionsRouter);
     router.use('/', createAgentRouter(sharedDeps));
-    router.use('/', createWebhooksRouter(sharedDeps));
+    router.use('/', webhooksRouter);
     // P.2: rotas de introspecção de hooks (registry + SSE events)
     router.use('/', hooksRouter);
     // Rotas de observabilidade (metrics, errors, logs, health, log-level)

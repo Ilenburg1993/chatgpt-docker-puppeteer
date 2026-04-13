@@ -3,15 +3,15 @@
  * @module copilot/server/socket/hub-ns
  * @file Namespace Socket.IO /copilot para o servidor copilot dedicado.
  *
- * Move de `conversation-hub/socket-ns.js` para `server/socket/hub-ns.js`.
- * O arquivo original torna-se um re-export no Onda 3.7.
+ *   Move de `conversation-hub/socket-ns.js` para `server/socket/hub-ns.js`. O arquivo original torna-se um re-export no
+ *   Onda 3.7.
  *
- * Esta implementação É IDÊNTICA a `conversation-hub/socket-ns.js` —
- * a separação é arquitetural (transport layer em server/, domain em conversation-hub/).
+ *   Esta implementação É IDÊNTICA a `conversation-hub/socket-ns.js` — a separação é arquitetural (transport layer em
+ *   server/, domain em conversation-hub/).
  *
- * Onda 3.2 — L56.2.
+ *   Onda 3.2 — L56.2.
  *
- * src/copilot/server/socket/hub-ns.js
+ *   src/copilot/server/socket/hub-ns.js
  */
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config';
@@ -20,10 +20,11 @@ import { log } from '#copilot/observability';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '../../config/auth.js';
-import { HUB_EVENTS } from '../../conversation-hub/events.js';
+import { HUB_EVENTS } from '#copilot/events';
 
 /**
  * @typedef {import('socket.io').Namespace} SocketNamespace
+ *
  * @typedef {import('socket.io').Socket} SocketClient
  */
 
@@ -43,6 +44,7 @@ let copilotNamespace = null;
  * Monta o namespace /copilot sobre a instância Socket.io existente.
  *
  * Permite que clientes (dashboard, CLI) se conectem para:
+ *
  * - Observar conversas LLM-A ↔ LLM-B em tempo real
  * - Injetar mensagens como usuário
  * - Receber histórico de uma sessão específica
@@ -267,7 +269,10 @@ function _handleSessionsList(socket, store) {
                 socket.emit(HUB_EVENTS.ERROR_SESSIONS, { reason: `status inválido: "${rawStatus}"` });
                 return;
             }
-            const statusVal = /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus | undefined} */ (rawStatus);
+            const statusVal =
+                /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus | undefined} */ (
+                    rawStatus
+                );
             const sessions = store.listHubSessions({
                 limit: opts?.limit ?? 20,
                 offset: opts?.offset ?? 0,
@@ -332,7 +337,9 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
 
     orchestrator.on(
         HUB_EVENTS.TURN_SENT,
-        (/** @type {{ hubSessionId: string; turnId: number; role: string; content: string; turnNumber: number }} */ data) => {
+        (
+            /** @type {{ hubSessionId: string; turnId: number; role: string; content: string; turnNumber: number }} */ data,
+        ) => {
             ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_SENT, data);
         },
     );
@@ -346,7 +353,17 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
 
     orchestrator.on(
         HUB_EVENTS.TURN_COMPLETE,
-        (/** @type {{ hubSessionId: string; turnId: number; role: string; content: string; structured: any; durationMs: number; turnNumber: number }} */ data) => {
+        (
+            /** @type {{
+    hubSessionId: string;
+    turnId: number;
+    role: string;
+    content: string;
+    structured: any;
+    durationMs: number;
+    turnNumber: number;
+}} */ data,
+        ) => {
             ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_COMPLETE, data);
         },
     );

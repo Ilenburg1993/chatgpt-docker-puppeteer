@@ -151,15 +151,6 @@ export const BUILTIN_HANDLER_MAP = new Map([
 let _registry = new Map();
 
 /**
- * @deprecated F51: Removida. Use loadCustomToolsAsync(). Shim: delega para loadCustomToolsAsync() e ignora a Promise
- *   silenciosamente.
- * @returns {void}
- */
-export function loadCustomTools() {
-    loadCustomToolsAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'sdk.customTools.loadRegistrySync'));
-}
-
-/**
  * F92: Versão async de loadCustomTools — usa fs/promises.
  *
  * @returns {Promise<void>}

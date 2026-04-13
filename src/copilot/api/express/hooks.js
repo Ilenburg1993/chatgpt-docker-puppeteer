@@ -15,7 +15,7 @@
  * @see EventBus
  */
 
-import { SDK_HOOKS, defaultBus } from '#copilot/hooks';
+import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
 import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../server/sse/replay-buffer.js';

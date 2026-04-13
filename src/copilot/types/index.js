@@ -37,4 +37,4 @@ export { createContainer, createToken } from '../core/di.js';
 export { EventBus, createEventBus } from '../core/event-bus.js';
 
 // ─── Event schemas ───────────────────────────────────────────────────────────
-export { EVENT_NAMES, EVENT_NAMESPACES } from './events.js';
+export { EVENT_NAMES, EVENT_NAMESPACES } from '../events/legacy-events.js';

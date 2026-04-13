@@ -77,8 +77,6 @@
     "#copilot/tools/*": "./src/copilot/tools/*.js",
     "#copilot/bridges": "./src/copilot/bridges/index.js",
     "#copilot/bridges/*": "./src/copilot/bridges/*.js",
-    "#copilot/api": "./src/copilot/api/index.js",
-    "#copilot/api/*": "./src/copilot/api/*.js",
     "#copilot/config": "./src/copilot/config/index.js",
     "#copilot/config/*": "./src/copilot/config/*.js",
     "#copilot/terminal/*": "./src/copilot/terminal/*.js",

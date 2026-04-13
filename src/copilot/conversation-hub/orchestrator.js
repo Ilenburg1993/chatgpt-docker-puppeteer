@@ -15,7 +15,7 @@ import { BaseEmitter, SessionError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
-import { HUB_EVENTS } from './events.js';
+import { HUB_EVENTS } from '#copilot/events';
 import { executeSendToLlmB } from './send-pipeline.js';
 
 /**

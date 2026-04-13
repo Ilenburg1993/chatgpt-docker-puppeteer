@@ -30,15 +30,6 @@ const TOOLS_CONFIG_PATH = join(resolve(import.meta.dirname, '../..'), 'tools-con
 let _toolsConfig = { allowlist: null, denylist: [] };
 
 /**
- * @deprecated F51: Removida. Use loadToolsConfigAsync(). Shim: delega para loadToolsConfigAsync() e ignora a Promise
- *   silenciosamente.
- * @returns {void}
- */
-export function loadToolsConfig() {
-    loadToolsConfigAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'sdk.toolsState.loadConfigSync'));
-}
-
-/**
  * F92: Versão async de loadToolsConfig — usa fs/promises.
  *
  * @returns {Promise<void>}

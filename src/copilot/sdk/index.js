@@ -290,13 +290,12 @@ export {
     _resetRegistry as _resetCustomToolsRegistry,
     buildCustomTools,
     getCustomToolDefinitions,
-    loadCustomTools,
     loadCustomToolsAsync,
     registerCustomTool,
     removeCustomTool,
 } from './tools/custom.js';
 
-export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/state.js';
+export { getToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/state.js';
 
 // ─── tools-registry.js — registry de ferramentas por sessão ─
 export {

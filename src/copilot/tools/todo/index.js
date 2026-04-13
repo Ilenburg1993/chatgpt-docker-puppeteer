@@ -17,8 +17,7 @@ export { todoCreateTool, todoDeleteTool, todoSetStatusTool } from './todo-write-
 export { todoListTool, todoSearchTool, todoStatsTool } from './query-tools.js';
 
 // ---------------------------------------------------------------------------
-// Arrays agrupados (compatibilidade com consumidores antigos)
-// @deprecated F33.1: Preferir imports nomeados individuais.
+// Arrays agrupados (usados por tools-bootstrap para registro em categorias)
 // ---------------------------------------------------------------------------
 
 import { todoBulkUpdateTool, todoClearCompletedTool, todoImportTool } from './bulk-tools.js';
