@@ -14,7 +14,7 @@
 O roadmap está organizado em **6 Ondas** de execução, cada uma com **faixas** (`L39`–`L82`). Ondas são dependentes: cada onda só inicia após a anterior estar ≥80% completa.
 
 ```
-ONDA 1 — FOUNDATION CLEANUP     (L39–L46)    ~800 LOC alteradas
+ONDA 1 — FOUNDATION CLEANUP     (L39–L46)    ~800 LOC alteradas    ✅ CONCLUÍDA
 ONDA 2 — AUTONOMY               (L47–L53)    ~1200 LOC alteradas
 ONDA 3 — CYCLE ELIMINATION      (L54–L61)    ~1500 LOC alteradas
 ONDA 4 — GOD MODULE DECOMP      (L62–L70)    ~2000 LOC alteradas
@@ -24,11 +24,13 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ---
 
-## 2. ONDA 1 — Foundation Cleanup
+## 2. ONDA 1 — Foundation Cleanup ✅ CONCLUÍDA
 
 > **Objetivo**: Remover lixo técnico, shims, duplicações e código legado. Base limpa para as ondas seguintes.
+>
+> **Status**: 100% concluída. Commits: `f8b217e4` (L39+L40), `599d8c0e` (L41+L42), `10b831f4` (L43+L44), `2a4850cd` (L45+L46).
 
-### L39 — Remover `core/events.js` (legado)
+### L39 — ✅ Remover `core/events.js` (legado)
 
 | Item             | Detalhe                                                                                                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -38,7 +40,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Acceptance**   | Zero referências a `core/events`. ESLint + tests green                                                                                                                          |
 | **Score impact** | core: 7→7.5                                                                                                                                                                     |
 
-### L40 — Remover 5 shims de compatibilidade
+### L40 — ✅ Remover 5 shims de compatibilidade
 
 | Item             | Detalhe                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,7 +50,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Acceptance**   | Zero shims restantes. Tests green                                                                                                            |
 | **Score impact** | sdk: 8→8.2, hooks: 6→6.2                                                                                                                     |
 
-### L41 — Adicionar JSDoc header a 13 arquivos
+### L41 — ✅ Adicionar JSDoc header a 13 arquivos
 
 | Item             | Detalhe                                                                                                                                                                                                          |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -58,7 +60,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Acceptance**   | Todos os 13 arquivos com `@file` tag. Lint green                                                                                                                                                                 |
 | **Score impact** | global docs: +0.3                                                                                                                                                                                                |
 
-### L42 — Limpar referências a nerv-bridge.js
+### L42 — ✅ Limpar referências a nerv-bridge.js
 
 | Item           | Detalhe                                                                                                                                             |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -66,7 +68,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Grep por `nerv-bridge` excluindo PARTE-23L e PARTE-24*<br>2. Atualizar comentários referentes<br>3. Atualizar `nerv-event-bus-adapter.js` header |
 | **Acceptance** | Zero menções a nerv-bridge em src/                                                                                                                  |
 
-### L43 — Consolidar `core/constants.js` + `core/shared-state.js`
+### L43 — ✅ Consolidar `core/constants.js` + `core/shared-state.js`
 
 | Item           | Detalhe                                                                                                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +76,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Mover constantes de `constants.js` para `config/env.js` ou inline<br>2. Migrar `shared-state.js` para DI token (SHARED_STATE)<br>3. Atualizar consumidores<br>4. Deletar ambos |
 | **Acceptance** | Zero imports de `core/constants` ou `core/shared-state`                                                                                                                           |
 
-### L44 — Merge `core/abort-utils.js` em `core/retry.js`
+### L44 — ✅ Merge `core/abort-utils.js` em `core/retry.js`
 
 | Item           | Detalhe                                                                                                                            |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -82,7 +84,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Copiar export de `abort-utils.js` para `retry.js`<br>2. Atualizar imports<br>3. Deletar `abort-utils.js`<br>4. Atualizar barrel |
 | **Acceptance** | Zero imports de `core/abort-utils`. Tests green                                                                                    |
 
-### L45 — Mover `core/create-emitter.js` para `events/`
+### L45 — ✅ Mover `core/create-emitter.js` para `events/`
 
 | Item           | Detalhe                                                                                                                          |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,7 +92,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Subfases**   | 1. Mover arquivo<br>2. Atualizar imports (#copilot/core/create-emitter → #copilot/events/create-emitter)<br>3. Atualizar barrels |
 | **Acceptance** | Arquivo em events/. Zero imports da localização antiga                                                                           |
 
-### L46 — Enxugar `di-tokens.js` (L0-only)
+### L46 — ✅ Enxugar `di-tokens.js` (L0-only)
 
 | Item             | Detalhe                                                                                                                                                                                                                    |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
