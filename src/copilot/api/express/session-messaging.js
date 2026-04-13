@@ -11,8 +11,8 @@
 import { log } from '#copilot/observability';
 import { createSessionService } from '#copilot/services';
 import { Router } from 'express';
-import { SseReplayBuffer } from '../sse/replay-buffer.js';
-import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../sse/utils.js';
+import { SseReplayBuffer } from '../../server/sse/replay-buffer.js';
+import { createEventFilter, createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../../server/sse/utils.js';
 import {
     rateLimitMiddleware,
     SendMessageBodySchema,

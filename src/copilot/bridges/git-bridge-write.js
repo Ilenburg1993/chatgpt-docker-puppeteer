@@ -18,6 +18,8 @@ const execFileAsync = promisify(execFile);
 
 /** Diretório raiz do projeto para executar git. */
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const GIT_DEFAULT_TIMEOUT_MS = 10_000;
+const GIT_LONG_TIMEOUT_MS = 30_000;
 
 /**
  * Executa git com args a partir da raiz do projeto.
@@ -28,7 +30,7 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
  * @returns {Promise<string>}
  */
 async function runGit(args, opts = {}) {
-    const timeoutMs = opts.timeoutMs ?? 10000;
+    const timeoutMs = opts.timeoutMs ?? GIT_DEFAULT_TIMEOUT_MS;
     const method = args[0] ?? 'unknown';
     const span = startSpanImmediate('copilot.bridge.git', {
         bridge_type: 'git',
@@ -132,7 +134,7 @@ export async function gitCheckout(name) {
  */
 export async function gitPull() {
     try {
-        return await runGit(['pull', '--ff-only'], { timeoutMs: 30000 });
+        return await runGit(['pull', '--ff-only'], { timeoutMs: GIT_LONG_TIMEOUT_MS });
     } catch (err) {
         return err instanceof Error ? err.message : String(err);
     }
@@ -151,7 +153,7 @@ export async function gitPush(opts = {}) {
     const args = ['push', remote];
     if (branch) args.push(branch);
     try {
-        return await runGit(args, { timeoutMs: 30000 });
+        return await runGit(args, { timeoutMs: GIT_LONG_TIMEOUT_MS });
     } catch (err) {
         return err instanceof Error ? err.message : String(err);
     }

@@ -21,6 +21,7 @@ import { withSkipPermission } from './tool-factory.js';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname, '..');
 const HOOKS_STATE = join(ROOT, '.github', 'hooks', 'state');
+const GIT_CMD_TIMEOUT_MS = 5_000;
 
 /**
  * Tool: read_briefing — lê o briefing da sessão Hook System.
@@ -95,17 +96,17 @@ const getWorkspaceInfoTool = createTool({ name: 'get_workspace_info',
             gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
                 cwd,
                 encoding: 'utf8',
-                timeout: 5000,
+                timeout: GIT_CMD_TIMEOUT_MS,
             }).trim();
             gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
                 cwd,
                 encoding: 'utf8',
-                timeout: 5000,
+                timeout: GIT_CMD_TIMEOUT_MS,
             }).trim();
             gitCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
                 cwd,
                 encoding: 'utf8',
-                timeout: 5000,
+                timeout: GIT_CMD_TIMEOUT_MS,
             }).trim();
         } catch (/** @type {any} */ e) {
             logSwallowed(e, 'session-tools.gitInfo');

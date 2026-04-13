@@ -19,6 +19,8 @@ import { withSkipPermission } from '../tool-factory.js';
 const execAsync = promisify(execFile);
 
 const ROOT = new URL('../../../..', import.meta.url).pathname;
+const GIT_CMD_TIMEOUT_MS = 15_000;
+const GIT_PUSH_TIMEOUT_MS = 30_000;
 
 /**
  * F3.8 (LEVE-11): executa `git` com args separados (sem interpolação shell) — seguro para valores fornecidos pelo
@@ -28,7 +30,7 @@ const ROOT = new URL('../../../..', import.meta.url).pathname;
  * @param {number} [timeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeGitArgs(args, timeoutMs = 15000) {
+async function safeGitArgs(args, timeoutMs = GIT_CMD_TIMEOUT_MS) {
     try {
         const { stdout } = await execAsync('git', args, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
@@ -162,7 +164,7 @@ const gitPushTool = createTool({ name: 'git_push',
         const args = ['push'];
         if (setUpstream) args.push('--set-upstream');
         args.push(safeRemote);
-        const r = await safeGitArgs(args, 30000);
+        const r = await safeGitArgs(args, GIT_PUSH_TIMEOUT_MS);
         log('INFO', `[copilot/git_push] remote=${safeRemote} exitCode=${r.exitCode}`);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },

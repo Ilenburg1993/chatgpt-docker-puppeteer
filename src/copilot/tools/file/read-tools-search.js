@@ -13,6 +13,8 @@ import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';
 import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
 
+const RG_TIMEOUT_MS = 30_000;
+
 // ---------------------------------------------------------------------------
 // Tool: search_in_files
 // ---------------------------------------------------------------------------
@@ -92,7 +94,7 @@ const searchInFilesTool = buildTool({
             }
             const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
                 cwd: WORKSPACE_ROOT,
-                timeout: 30000,
+                timeout: RG_TIMEOUT_MS,
                 maxBuffer: MAX_SEARCH_OUTPUT * 4,
             });
             const SENSITIVE_LINE_RE = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;

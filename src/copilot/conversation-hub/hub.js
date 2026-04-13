@@ -25,7 +25,7 @@ import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
 import { HUB_EVENTS } from './events.js';
 import { HubOrchestrator } from './orchestrator.js';
-import { mountCopilotNamespace, unmountCopilotNamespace } from './socket-ns.js';
+import { mountCopilotNamespace, unmountCopilotNamespace } from '../server/socket/hub-ns.js';
 import { conversationStore } from './store.js';
 
 // ─── ConversationHub ──────────────────────────────────────────────────────────
@@ -58,8 +58,8 @@ export class ConversationHub {
     /**
      * Inicializa todos os componentes do hub. É idempotente: chamadas adicionais são no-op.
      *
-     * Se `io` for omitido, inicializa sem Socket.IO (equivalente ao antigo `initStandalone()`).
-     * Socket.IO pode ser conectado posteriormente via {@link attachSocketIO}.
+     * Se `io` for omitido, inicializa sem Socket.IO (equivalente ao antigo `initStandalone()`). Socket.IO pode ser
+     * conectado posteriormente via {@link attachSocketIO}.
      *
      * @param {HubInitOpts} [opts]
      * @returns {Promise<void>}

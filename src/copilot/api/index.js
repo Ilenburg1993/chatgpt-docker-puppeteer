@@ -16,11 +16,3 @@
 
 // Express routers (SDK API) — @deprecated use server/routes/sdk/index.js
 export { default as createSdkApiRouter } from './express/index.js';
-
-// HTTP Bridge — @deprecated use server/routes/copilot-api.js
-export { default as httpBridge } from './bridge/index.js';
-
-// SSE utilities — @deprecated use server/sse/index.js
-export { eventFanout } from './sse/fanout.js';
-export { SseReplayBuffer } from './sse/replay-buffer.js';
-export { SseConnectionTracker, createEventFilter, createSseWriter, standardizeSsePayload } from './sse/utils.js';

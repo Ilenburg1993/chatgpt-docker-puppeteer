@@ -18,6 +18,7 @@ const execFileAsync = promisify(execFile);
 
 /** Diretório raiz do projeto para executar git. */
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const GIT_DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
  * Executa git com args a partir da raiz do projeto.
@@ -28,7 +29,7 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
  * @returns {Promise<string>}
  */
 async function runGit(args, opts = {}) {
-    const timeoutMs = opts.timeoutMs ?? 10000;
+    const timeoutMs = opts.timeoutMs ?? GIT_DEFAULT_TIMEOUT_MS;
     const method = args[0] ?? 'unknown';
     const span = startSpanImmediate('copilot.bridge.git', {
         bridge_type: 'git',

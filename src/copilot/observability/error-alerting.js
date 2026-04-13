@@ -21,6 +21,8 @@ import { log } from './logger.js';
 
 import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 
+const WEBHOOK_TIMEOUT_MS = 5_000;
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
@@ -117,7 +119,7 @@ export function createErrorAlerter(tracker, config = {}) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'copilot_error_alert', ...alert }),
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
         }).catch((/** @type {any} */ err) => {
             log('WARN', `[error-alerting] F39.4: webhook falhou: ${err.message}`);
         });
