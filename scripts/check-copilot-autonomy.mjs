@@ -306,6 +306,28 @@ if (existsSync(resolve(SSE_STATE))) {
     errors++;
 }
 
+// ── Check 16: openapi.json possui >= 80 paths (reflete server/routes/) ──────
+
+const OPENAPI_PATH = 'src/copilot/api/openapi.json';
+if (existsSync(resolve(OPENAPI_PATH))) {
+    try {
+        const openapiSpec = JSON.parse(readFileSync(resolve(OPENAPI_PATH), 'utf-8'));
+        const pathCount = Object.keys(openapiSpec.paths || {}).length;
+        if (pathCount >= 80) {
+            console.log(`✅ Check 16: openapi.json tem ${pathCount} paths (>= 80 esperados).`);
+        } else {
+            console.error(`❌ Check 16 FALHOU — openapi.json tem apenas ${pathCount} paths (esperado >= 80).`);
+            errors++;
+        }
+    } catch (/** @type {any} */ e) {
+        console.error(`❌ Check 16 FALHOU — openapi.json parse error: ${e.message}`);
+        errors++;
+    }
+} else {
+    console.error(`❌ Check 16 FALHOU — ${OPENAPI_PATH} não encontrado.`);
+    errors++;
+}
+
 // ── Resultado ───────────────────────────────────────────────────────────────
 
 if (errors > 0) {
