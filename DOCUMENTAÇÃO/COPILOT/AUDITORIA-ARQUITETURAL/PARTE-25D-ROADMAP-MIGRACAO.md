@@ -452,7 +452,7 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.5 — `infra/` Expansão ou Remoção
+### ONDA 5.5 — `infra/` Expansão ou Remoção - VASTA EXPANSÃO (DECISÃO TOMADA)
 
 **Depende de**: Decisão de design
 

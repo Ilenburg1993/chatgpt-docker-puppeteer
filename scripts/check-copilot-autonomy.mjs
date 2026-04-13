@@ -19,7 +19,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 let errors = 0;
@@ -112,7 +112,6 @@ if (existsSync(resolve(SERVER_WIRING))) {
 
 // ── Check 5: bootstrap.js tem modo único (sem parâmetros mode/context) ──────
 
-const { readFileSync } = await import('node:fs');
 const bootstrapSrc = readFileSync(resolve('src/copilot/bootstrap.js'), 'utf-8');
 const hasModeProp = /\bmode\s*[=:]\s*['"]/.test(bootstrapSrc) || /CopilotBootMode/.test(bootstrapSrc);
 if (hasModeProp) {
@@ -180,6 +179,131 @@ if (existsSync(resolve(SOCKET_NS))) {
 } else {
     // Removido na Onda 3.9 — também OK
     console.log(`✅ Check 9: ${SOCKET_NS} removido (Onda 3.9 aplicada).`);
+}
+
+// ── Check 10: api/sse/*.js são todos re-export stubs ────────────────────────
+
+const API_SSE_DIR = 'src/copilot/api/sse';
+if (existsSync(resolve(API_SSE_DIR))) {
+    const sseFiles = readdirSync(resolve(API_SSE_DIR)).filter((f) => f.endsWith('.js'));
+    let allStubs = true;
+    for (const f of sseFiles) {
+        const src = readFileSync(resolve(API_SSE_DIR, f), 'utf-8');
+        if (!/@deprecated/.test(src)) {
+            console.error(`❌ Check 10 FALHOU — ${API_SSE_DIR}/${f} não está @deprecated.`);
+            allStubs = false;
+            errors++;
+        }
+    }
+    if (allStubs) {
+        console.log(`✅ Check 10: api/sse/ — todos os ${sseFiles.length} arquivos são stubs @deprecated.`);
+    }
+} else {
+    console.log(`✅ Check 10: ${API_SSE_DIR}/ removido (Onda 4.5+ aplicada).`);
+}
+
+// ── Check 11: server/routes/ tem ≥ 8 routers ───────────────────────────────
+
+const ROUTES_DIR = 'src/copilot/server/routes';
+if (existsSync(resolve(ROUTES_DIR))) {
+    const routeFiles = readdirSync(resolve(ROUTES_DIR)).filter((f) => f.endsWith('.js'));
+    if (routeFiles.length >= 8) {
+        console.log(`✅ Check 11: server/routes/ tem ${routeFiles.length} routers (≥ 8).`);
+    } else {
+        console.error(`❌ Check 11 FALHOU — server/routes/ tem apenas ${routeFiles.length} routers (mínimo: 8).`);
+        errors++;
+    }
+} else {
+    console.error(`❌ Check 11 FALHOU — ${ROUTES_DIR} não existe.`);
+    errors++;
+}
+
+// ── Check 12: zero require() em src/copilot/ ───────────────────────────────
+
+let requireOutput = '';
+try {
+    requireOutput = execSync(
+        'rg -n "\\brequire\\s*\\(" src/copilot/ --type js --no-heading -g "!*.spec.js" -g "!*.test.js"',
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+} catch (/** @type {any} */ e) {
+    if (e.status !== 1) throw e;
+}
+
+// Filtrar falsos positivos: comentários e strings contendo "require("
+const realRequires = requireOutput
+    .split('\n')
+    .filter((line) => line.trim())
+    .filter((line) => !/^\s*\/\//.test(line.split(':').slice(2).join(':')))
+    .filter((line) => !/^\s*\*/.test(line.split(':').slice(2).join(':')))
+    .filter((line) => !/require\(\)/.test(line));
+
+if (realRequires.length > 0) {
+    console.error(`❌ Check 12 FALHOU — ${realRequires.length} require() encontrado(s) em src/copilot/:`);
+    for (const r of realRequires.slice(0, 5)) console.error(`   ${r}`);
+    errors++;
+} else {
+    console.log('✅ Check 12: zero require() em src/copilot/ (ESM completo).');
+}
+
+// ── Check 13: módulos copilot têm index.js ──────────────────────────────────
+
+const EXPECTED_MODULES = [
+    'agent', 'api', 'audit', 'bridges', 'channel', 'config',
+    'conversation-hub', 'core', 'db', 'events', 'hooks',
+    'observability', 'plugins', 'sdk', 'server', 'services',
+    'terminal', 'tools', 'types',
+];
+
+const missingBarrels = [];
+for (const mod of EXPECTED_MODULES) {
+    const indexPath = resolve(`src/copilot/${mod}/index.js`);
+    if (!existsSync(indexPath)) {
+        missingBarrels.push(mod);
+    }
+}
+
+if (missingBarrels.length > 0) {
+    console.error(`❌ Check 13 FALHOU — módulos sem index.js: ${missingBarrels.join(', ')}`);
+    errors++;
+} else {
+    console.log(`✅ Check 13: todos os ${EXPECTED_MODULES.length} módulos copilot têm index.js.`);
+}
+
+// ── Check 14: services/ tem importador em server/routes/ ────────────────────
+
+let servicesInRoutes = '';
+try {
+    servicesInRoutes = execSync(
+        'rg -l "#copilot/services" src/copilot/server/routes/ --type js --no-heading',
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+} catch (/** @type {any} */ e) {
+    if (e.status !== 1) throw e;
+}
+
+const routeImporters = servicesInRoutes.split('\n').filter((l) => l.trim());
+if (routeImporters.length >= 1) {
+    console.log(`✅ Check 14: services/ importado por ${routeImporters.length} arquivo(s) em server/routes/.`);
+} else {
+    console.error('❌ Check 14 FALHOU — services/ não é importado por nenhum arquivo em server/routes/.');
+    errors++;
+}
+
+// ── Check 15: server/sse/state.js não re-exporta terminal/state.js ──────────
+
+const SSE_STATE = 'src/copilot/server/sse/state.js';
+if (existsSync(resolve(SSE_STATE))) {
+    const sseStateSrc = readFileSync(resolve(SSE_STATE), 'utf-8');
+    if (/from.*terminal\/state/.test(sseStateSrc)) {
+        console.error(`❌ Check 15 FALHOU — ${SSE_STATE} ainda faz re-export de terminal/state.js.`);
+        errors++;
+    } else {
+        console.log(`✅ Check 15: ${SSE_STATE} é implementação independente (sem re-export terminal/state).`);
+    }
+} else {
+    console.error(`❌ Check 15 FALHOU — ${SSE_STATE} não encontrado.`);
+    errors++;
 }
 
 // ── Resultado ───────────────────────────────────────────────────────────────
