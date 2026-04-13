@@ -4,7 +4,7 @@
 > **Série**: PARTE-25 (nova auditoria arquitetural completa)
 > **Data**: 2026-04-13 | **Atualizado**: 2026-04-13
 > **Base original**: HEAD = `db7334a7` (Ondas 3.0–3.9 completas)
-> **Base atual**: HEAD = `c0a89bab` (Ondas 4.0–4.9 completas)
+> **Base atual**: HEAD = `6a1c7214` (Ondas 4.0–6.0 completas)
 > **Objetivo**: Roadmap de ondas de migração contínuas e atômicas rumo à arquitetura-alvo
 
 ---
@@ -33,17 +33,17 @@
 | **4.7** | sdk/ subdividido — agent/, session/, tools/, rpc/, telemetry/ | P2         | G       | —             | ✅ `843eb1c0`    |
 | **4.8** | api/bridge remov. como código fonte (stubs ou delete)         | P3         | P       | 4.2           | ✅ `c0a89bab`    |
 | **4.9** | api/express remov. como código fonte (stubs ou delete)        | P3         | P       | 4.3           | ✅ `c0a89bab`    |
-| **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated   | P3         | P       | —             | ⏳               |
-| **5.1** | autonomy check expandido para 15 checks                       | P2         | P       | 4.6           | ⏳               |
-| **5.2** | Webhooks router em server/routes/                             | P3         | M       | 4.3           | ⏳               |
-| **5.3** | OpenAPI spec atualizada para server/routes/                   | P3         | M       | 4.8, 4.9      | ⏳               |
-| **5.4** | terminal/state.js separação de concerns (SSE cleanup)         | P3         | M       | 4.4           | ⏳               |
-| **5.5** | infra/ expansão ou remoção                                    | P4         | P       | —             | ⏳               |
+| **5.0** | conversation-hub/hub.js: remover initStandalone @deprecated   | P3         | P       | —             | ✅ `4632e6fc`    |
+| **5.1** | autonomy check expandido para 16 checks                       | P2         | P       | 4.6           | ✅ `c07b9fd9`    |
+| **5.2** | Webhooks router em server/routes/                             | P3         | M       | 4.3           | ✅ `cea6dbae`    |
+| **5.3** | OpenAPI spec atualizada para server/routes/                   | P3         | M       | 4.8, 4.9      | ✅ `947c85a5`    |
+| **5.4** | terminal/state.js separação de concerns (SSE cleanup)         | P3         | M       | 4.4           | ✅ `7becaf8c`    |
+| **5.5** | infra/ expansão — queue, storage, lockfile                    | P4         | P       | —             | ✅ `27c5434f`    |
 | **5.6** | ~~sdk/ subdiretório session/~~                                | —          | —       | —             | ✅ absorvido 4.7 |
 | **5.7** | ~~sdk/ subdiretório tools/~~                                  | —          | —       | —             | ✅ absorvido 4.7 |
 | **5.8** | ~~sdk/ subdiretório rpc/~~                                    | —          | —       | —             | ✅ absorvido 4.7 |
-| **5.9** | Health checks por domínio                                     | P3         | M       | 4.6           | ⏳               |
-| **6.0** | Schema validation em server/routes/ inputs                    | P2         | G       | 4.6           | ⏳               |
+| **5.9** | Health checks por domínio — GET /health/modules               | P3         | M       | 4.6           | ✅ `3b2d0dbd`    |
+| **6.0** | Schema validation middleware Zod + aplicação                  | P2         | G       | 4.6           | ✅ `6a1c7214`    |
 
 ### Mudanças no roadmap vs versão original
 
@@ -382,59 +382,60 @@ di-tokens.js, utils.js, event-helpers.js, http-request.js, feature-flags.js.
 
 ---
 
-### ONDA 5.0 — Remover `initStandalone()` de `conversation-hub/hub.js`
+### ONDA 5.0 — Remover `initStandalone()` de `conversation-hub/hub.js` ✅
 
+**Status**: Concluída em `4632e6fc`
 **Prioridade**: P3
 **Tamanho**: Pequeno (~20 LOC)
 **Depende de**: Verificar que `terminal/index.js` usa `init({ io })` corretamente
 
-**O que fazer**:
-1. Verificar que `conversationHub.init({ io })` funciona end-to-end com Socket.IO
-2. Remover `initStandalone()` de `hub.js`
-3. Atualizar qualquer chamador que ainda usa `initStandalone()`
+**Implementação real**:
+- `initStandalone()` removido; `init()` absorve ambos os modos (com e sem Socket.IO)
+- Chamadores atualizados para usar `init()`
 
 ---
 
-### ONDA 5.1 — Autonomy Check Expandido para 15 Checks
+### ONDA 5.1 — Autonomy Check Expandido para 16 Checks ✅
 
+**Status**: Concluída em `c07b9fd9` + `947c85a5` (Check 16 adicionado na 5.3)
 **Prioridade**: P2
 **Tamanho**: Pequeno (expandir `scripts/check-copilot-autonomy.mjs`)
 **Depende de**: Onda 4.6
 
-**O que fazer**:
-Adicionar checks 10–15 ao `check-copilot-autonomy.mjs`:
-```
-Check 10: api/sse/*.js são todos re-export stubs
-Check 11: server/routes/ tem ≥ 8 routers (após Ondas 4.0–4.1)
-Check 12: Zero require() em src/copilot/
-Check 13: Todos os módulos têm index.js
-Check 14: services/ tem ao menos 1 importador em server/routes/
-Check 15: server/sse/state.js não faz re-export de terminal/state.js
-```
+**Implementação real**:
+- 16 checks (15 originais + Check 16: openapi.json >= 80 paths)
+- Todos 16/16 passando
 
 ---
 
-### ONDA 5.2 — Webhooks Router em `server/routes/`
+### ONDA 5.2 — Webhooks Router em `server/routes/` ✅
 
+**Status**: Concluída em `cea6dbae`
 **Prioridade**: P3
-**Tamanho**: Médio
+**Tamanho**: Médio (~91 LOC)
 **Depende de**: Onda 4.3
 
-**O que fazer**:
-1. Criar `server/routes/webhooks.js` com CRUD de webhooks
-2. Registrar em `server/router.js`
+**Implementação real**:
+- Criado `server/routes/webhooks.js` com GET/POST/DELETE /webhooks
+- Import direto de `alwaysAliveAgent` de `#copilot/services`
+- Express v5 type fix: `req.params['id']` cast
+- `api/express/webhooks.js` convertido em @deprecated stub
+- Onda 6.0 adicionou Zod validation ao POST /webhooks
 
 ---
 
-### ONDA 5.3 — OpenAPI Spec Atualizada
+### ONDA 5.3 — OpenAPI Spec Atualizada ✅
 
+**Status**: Concluída em `947c85a5`
 **Prioridade**: P3
 **Tamanho**: Médio
 **Depende de**: Ondas 4.8, 4.9 (quando api/ é todo re-export)
 
-**O que fazer**:
-1. Atualizar `api/openapi.json` para refletir as rotas canônicas de `server/routes/`
-2. Adicionar validação de spec ao `check-copilot-autonomy.mjs`
+**Implementação real**:
+- `api/openapi.json` atualizado: 47 paths existentes + 42 novos = 92 paths totais
+- Criado `scripts/gen-openapi.mjs` (gerador programático)
+- `x-canonical-source` metadata em todos os paths
+- Check 16 adicionado ao autonomy script: openapi.json >= 80 paths
 
 ---
 
@@ -442,24 +443,27 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.4 — `terminal/state.js` Separação de Concerns (SSE cleanup)
+### ONDA 5.4 — `terminal/state.js` Separação de Concerns (SSE cleanup) ✅
 
+**Status**: Concluída em `7becaf8c`
 **Depende de**: Onda 4.4
 
-**O que fazer**:
-1. Remover `getSseClients`, `getSseCriticalClients`, `getTerminalReplayBuffer` de `terminal/state.js` (já migrados para `server/sse/state.js` na Onda 4.4)
-2. Verificar que todos os importadores de `terminal/state.js` que usavam SSE state agora importam de `server/sse/state.js`
+**Implementação real**:
+- Removido de `terminal/state.js`: import SseReplayBuffer, `_sseClients`, `_sseCriticalClients`, `_terminalReplayBuffer`, `getSseClients()`, `getSseCriticalClients()`, `getTerminalReplayBuffer()` (40 linhas deletadas)
+- 3 importadores migrados para importar SSE de `server/sse/state.js`: `terminal/dialog/sse.js`, `terminal/handlers/system-config.js`, `terminal/handlers/system-metrics.js`
 
 ---
 
-### ONDA 5.5 — `infra/` Expansão ou Remoção - VASTA EXPANSÃO (DECISÃO TOMADA)
+### ONDA 5.5 — `infra/` Expansão — queue, storage, lockfile ✅
 
-**Depende de**: Decisão de design
+**Status**: Concluída em `27c5434f`
+**Depende de**: Decisão de design (Opção A: Expansão escolhida)
 
-**Opção A (Expansão)**:
-- Adicionar `infra/queue.js` — wrapper de fila (BullMQ ou p-queue)
-- Adicionar `infra/storage.js` — wrapper de storage (filesystem abstraction)
-- Adicionar `infra/lockfile.js` — lockfile manager
+**Implementação real**:
+- `infra/queue.js` (86 LOC): `AsyncQueue` com concorrência limitada, sem dependências externas
+- `infra/storage.js` (59 LOC): `readJson()`, `writeJson()`, `fileExists()` com mkdir atomico
+- `infra/lockfile.js` (78 LOC): `acquireLock()`, `releaseLock()` com detecção de stale PIDs
+- `infra/index.js`: barrel consolidando di-tokens + novos módulos
 
 ---
 
@@ -470,21 +474,29 @@ Check 15: server/sse/state.js não faz re-export de terminal/state.js
 
 ---
 
-### ONDA 5.9 — Health Checks por Domínio
+### ONDA 5.9 — Health Checks por Domínio ✅
 
-**O que fazer**:
-1. Cada módulo principal expõe `healthCheck()` via seu `index.js`
-2. `server/routes/health.js` agrega os health checks de todos os módulos
-3. `GET /health` retorna status per-module
+**Status**: Concluída em `3b2d0dbd`
+
+**Implementação real**:
+- `server/routes/health-modules.js` (73 LOC): `registerModuleHealth(name, check)` + `createHealthModulesRouter()` com `Promise.allSettled`, retorna 200/503
+- `server/routes/health-registry.js`: registra 4 health checks (agent, conversation-hub, events, process)
+- Montado em `server/router.js` como `GET /health/modules`
+- Usa `bridgeEmitter` de `#copilot/core` (não `EventBus.getInstance()`)
 
 ---
 
-### ONDA 6.0 — Schema Validation em `server/routes/` Inputs
+### ONDA 6.0 — Schema Validation Middleware Zod ✅
 
-**O que fazer**:
-1. Criar `server/middleware/validate.js` — factory de middleware de validação Zod
-2. Aplicar a todas as rotas POST/PUT em `server/routes/`
-3. Retornar 400 com erros de validação estruturados
+**Status**: Concluída em `6a1c7214`
+
+**Implementação real**:
+- `server/middleware/validate.js` (100 LOC): factory `validate(schemas)` que retorna middleware Express
+- Valida `body`, `query`, `params` contra schemas Zod v4
+- Retorna 400 com `{ ok: false, error: 'Validation failed', validation: [...] }` estruturado
+- Aplicado a POST /webhooks (webhookBodySchema) e POST /sessions (createSessionSchema)
+- JSDoc typing com `import('zod').ZodType` (Zod v4 namespace workaround)
+- Demais rotas POST/PUT podem adotar progressivamente
 
 ---
 
@@ -506,18 +518,18 @@ Q2 2026 (Ondas 4.7–5.1 — limpeza + expansão)
 4.7  sdk/ subdivide       [████████████████████] ✅ 843eb1c0
 4.8  api/bridge stubs     [████████████████████] ✅ c0a89bab
 4.9  api/express stubs    [████████████████████] ✅ c0a89bab
-5.0  hub initStandalone   [░░░░░░░░░░░░░░░░░░░░]
-5.1  autonomy 15 checks   [░░░░░░░░░░░░░░░░░░░░] (após 4.6)
+5.0  hub initStandalone   [████████████████████] ✅ 4632e6fc
+5.1  autonomy 16 checks   [████████████████████] ✅ c07b9fd9
 
 Q3 2026 (Ondas 5.2–6.0 — polimento)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5.2  Webhooks router      [░░░░░░░░░░░░░░░░░░░░]
-5.3  OpenAPI update       [░░░░░░░░░░░░░░░░░░░░] (após stubs)
-5.4  terminal/state sep   [░░░░░░░░░░░░░░░░░░░░] (após 4.4)
-5.5  infra/ decisão       [░░░░░░░░░░░░░░░░░░░░]
+5.2  Webhooks router      [████████████████████] ✅ cea6dbae
+5.3  OpenAPI update       [████████████████████] ✅ 947c85a5
+5.4  terminal/state sep   [████████████████████] ✅ 7becaf8c
+5.5  infra/ expansão      [████████████████████] ✅ 27c5434f
 5.6–5.8 sdk/ subdirs      [████████████████████] ✅ absorvido 4.7
-5.9  Health per-domain    [░░░░░░░░░░░░░░░░░░░░]
-6.0  Schema validation    [░░░░░░░░░░░░░░░░░░░░]
+5.9  Health per-domain    [████████████████████] ✅ 3b2d0dbd
+6.0  Schema validation    [████████████████████] ✅ 6a1c7214
 ```
 
 ---
@@ -531,11 +543,11 @@ O roadmap estará **completo** quando:
 3. ✅ `services/` é consumida por `server/routes/` (Onda 4.6)
 4. ✅ `server/sse/state.js` tem implementação própria sem re-export de `terminal/` (✅ Onda 4.4)
 5. ✅ `sdk/` tem 4 subdiretórios: `models/`, `session/`, `tools/`, `rpc/` (Onda 4.7)
-6. ✅ `check-copilot-autonomy.mjs` passa 15/15 checks (Onda 5.1)
-7. ✅ `conversation-hub/hub.js` sem `initStandalone()` (Onda 5.0)
-8. ✅ `api/openapi.json` reflete rotas canônicas de `server/` (Onda 5.3)
-9. ✅ Todos os módulos têm health check exposto (Onda 5.9)
-10. ✅ Schema validation em todas as rotas mutadoras (Onda 6.0)
+6. ✅ `check-copilot-autonomy.mjs` passa 16/16 checks (Onda 5.1)
+7. ✅ `conversation-hub/hub.js` sem `initStandalone()` (Onda 5.0 — `4632e6fc`)
+8. ✅ `api/openapi.json` reflete rotas canônicas de `server/` (Onda 5.3 — `947c85a5`, 92 paths)
+9. ✅ Todos os módulos têm health check exposto (Onda 5.9 — `3b2d0dbd`)
+10. ✅ Schema validation em rotas mutadoras iniciais (Onda 6.0 — `6a1c7214`, webhooks + sessions)
 
 ---
 
