@@ -1,0 +1,16 @@
+{
+  "checkpoint_id": "checkpoint-1776045385117-b96634",
+  "mission_id": "mission-123",
+  "timestamp": 1776045385117,
+  "step_index": 5,
+  "mission_state": {
+    "id": "mission-123",
+    "status": "RUNNING",
+    "progress": {
+      "current_step": 5
+    }
+  },
+  "metadata": {
+    "created_at": "2026-04-13T01:56:25.117Z"
+  }
+}

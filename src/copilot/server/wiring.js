@@ -2,13 +2,17 @@
 /**
  * src/copilot/server/wiring.js
  *
- * Encapsula TODO o wiring copilot que o server precisa:
+ * @deprecated L53.17 — Este módulo está órfão desde a Onda 2.7.
+ * O copilot é ferramenta DEV-only e boot via terminal:llm-b.
+ * O server de produção não chama mais wireServerCopilot().
+ * Mantido para referência; funcionalidade pode ser reaproveitada
+ * se o terminal precisar de socket.io ou NERV bridge no futuro.
+ *
+ * Funcionalidades originais:
  * - NervEventBusAdapter mount
  * - Inbound NERV commands (SEND_MESSAGE, PAUSE, RESUME, RESTART)
  * - ConversationHub init (socket.io + NERV)
  * - AlwaysAliveAgent autostart (se COPILOT_AGENT_AUTOSTART !== 'false')
- *
- * Chamado por `bootstrap.js` no mode='server' — NÃO executa boot de DI (já feito).
  *
  * @module copilot/server/wiring
  */

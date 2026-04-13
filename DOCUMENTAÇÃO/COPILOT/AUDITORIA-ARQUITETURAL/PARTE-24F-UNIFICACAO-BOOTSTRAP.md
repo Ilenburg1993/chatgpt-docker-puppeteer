@@ -71,7 +71,7 @@ Isso é uma decisão arquitetural correta — não um defeito.
 
 ...deveria ser movido para dentro do `bootCopilot({ mode: 'server' })`, recebendo `io` e `nerv` como parâmetros. Isso é o maior gap de consolidação restante.
 
-#### Q: terminal:llm-b deveria ser o ponto padrão? 
+#### Q: terminal:llm-b deveria ser o ponto padrão?
 
 **A**: Depende do contexto:
 
@@ -272,7 +272,7 @@ await bootCopilot({
      ┌────────────────┼────────────────┐
      │                │                │
   agent.js       terminal/         server/main.js
-  (3 LOC)        bootstrap.js      (5 LOC do 
+  (3 LOC)        bootstrap.js      (5 LOC do
                  (3 LOC)           bootCopilot call)
      │                │                │
      ▼                ▼                ▼

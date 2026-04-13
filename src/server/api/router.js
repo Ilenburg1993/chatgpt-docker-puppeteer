@@ -2,8 +2,7 @@
 import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
-import copilotBridge from '../../copilot/api/bridge/index.js';
-import createSdkApiRouter from '../../copilot/api/express/index.js';
+// L53.16: copilot imports removidos — copilot é ferramenta DEV-only com boot standalone (terminal:llm-b :3009)
 import denyIfDelegated from '../middleware/deny_if_delegated.js';
 import { errorHandler, notFound } from '../middleware/error_handler.js';
 import artifactsController from './controllers/artifacts.js';
@@ -16,8 +15,8 @@ import missionsController from './controllers/missions.js';
 import * as ragController from './controllers/rag.js';
 import resultsController from './controllers/results.js';
 import systemController from './controllers/system.js';
+// L53.16: copilot routes removidos — copilot é ferramenta DEV-only com boot standalone via terminal:llm-b (:3009)
 import tasksController from './controllers/tasks.js';
-import copilotHubRouter from './copilot-hub-router.js';
 
 /**
  * @typedef {{
@@ -322,18 +321,9 @@ async function applyRoutes(app) {
        do sistema sem um tratamento padronizado e rastreável.
     -------------------------------------------------------------------------- */
 
-    /**
-     * DOMÍNIO COPILOT SDK AGENT (Always-Alive Agent Bridge) Namespace: /api/copilot Expõe start/stop/send/answer para
-     * controle do Always-Alive Agent. Habilitado quando COPILOT_SDK_ENABLED=true (ou por padrão em desenvolvimento).
-     */
-    if (process.env.COPILOT_SDK_ENABLED !== 'false') {
-        app.use('/api/copilot', apiLimiter, copilotBridge);
-        log('INFO', '[COPILOT] SDK bridge registrado em /api/copilot');
-        app.use('/api/sdk', apiLimiter, createSdkApiRouter());
-        log('INFO', '[COPILOT] SDK API registrada em /api/sdk');
-        app.use('/api/hub', apiLimiter, copilotHubRouter);
-        log('INFO', '[COPILOT] ConversationHub REST API registrada em /api/hub');
-    }
+    // L53.16: Rotas /api/copilot, /api/sdk, /api/hub removidas.
+    // Copilot é ferramenta DEV-only com boot standalone via terminal:llm-b (:3009).
+    // Todas as APIs copilot são servidas pelo inject server do terminal.
 
     // Captura rotas inexistentes (404)
     app.use(notFound);

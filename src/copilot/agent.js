@@ -2,17 +2,16 @@
 /**
  * src/copilot/agent.js
  *
- * Thin entry point para o processo PM2 "copilot-sdk-agent".
- * Delega toda a inicialização para `bootstrap.js` com mode='agent'.
- *
- * Referenciado em `ecosystem.config.cjs` → `script: './src/copilot/agent.js'`.
+ * @deprecated Use `terminal/bootstrap.js` como entry point canônico.
+ * Este arquivo existe apenas para backwards compat com ecosystem.config.cjs.
+ * Delega para bootCopilot() que agora executa sempre modo terminal.
  *
  * @module copilot/agent
  */
 
 import { bootCopilot } from './bootstrap.js';
 
-bootCopilot({ mode: 'agent' }).catch((/** @type {any} */ err) => {
+bootCopilot().catch((/** @type {any} */ err) => {
     console.error('[copilot/agent] Fatal boot error:', err);
     process.exitCode = 1;
 });

@@ -2,16 +2,16 @@
 /**
  * src/copilot/bootstrap.js — Entry point canônico do módulo copilot.
  *
- * Inicializa o DI container, registra módulos por camada e delega para o modo selecionado:
- * - `terminal` → `terminal/index.js` (Terminal Permanente LLM-B)
- * - `server`   → retorna bridge para Express (rotas /api/copilot/*)
- * - `agent`    → `agent/lifecycle/entry.js` (PM2 copilot-sdk-agent loop)
+ * Modo único: **terminal** (ferramenta de desenvolvimento).
+ *
+ * O copilot é a LLM-B — uma ferramenta de desenvolvimento equivalente ao DevTools.
+ * Não é um addon de produção. Sempre boot via terminal com inject server (:3009).
  *
  * Boot sequence:
  *   Phase 0 — Kernel: container + L0 tokens (already at module load)
  *   Phase 1 — Observability: loggers, error tracker, EventBus
  *   Phase 2 — Late deps: tools builder, audit bus
- *   Phase 3 — Mode-specific delegation
+ *   Phase 3 — Terminal: startTerminalServer()
  *
  * @module copilot/bootstrap
  */
@@ -25,44 +25,25 @@ import { log } from './observability/logger.js';
 let _booted = false;
 
 /**
- * @typedef {'terminal' | 'server' | 'agent'} CopilotBootMode
- */
-
-/**
- * @typedef {object} ServerContext
- * @property {any} [io] Socket.IO server instance (modo server)
- * @property {any} [nerv] NERV event bus instance (modo server)
- */
-
-/**
- * @typedef {object} BootOptions
- * @property {CopilotBootMode} mode Modo de operação.
- * @property {ServerContext} [context] Objetos do server — relevante apenas para mode='server'.
- */
-
-/**
- * Inicializa o módulo copilot com boot sequencial por camadas.
+ * Inicializa o módulo copilot (modo terminal — único modo canônico).
  *
  * Idempotente — chamadas subsequentes são ignoradas com log de aviso.
  *
- * @param {BootOptions} options
  * @returns {Promise<void>}
  */
-export async function bootCopilot({ mode, context }) {
+export async function bootCopilot() {
     if (_booted) {
         log('WARN', '[bootstrap] bootCopilot já executado — ignorando chamada duplicada.');
         return;
     }
     _booted = true;
 
-    log('INFO', `[bootstrap] Iniciando copilot em modo "${mode}"…`);
+    log('INFO', '[bootstrap] Iniciando copilot (modo terminal)…');
 
     // ── Phase 1: Observability ──────────────────────────────────────────
-    // DI tokens L0 (loggers, event bus, error tracking, shutdown handlers)
     bootstrapObservability();
 
     // ── Phase 2: Late deps ──────────────────────────────────────────────
-    // Tools builder + audit bus — requer módulos L2+
     const { buildTool } = await import('./tools/index.js');
     bootstrapLateDeps({ buildTool });
 
@@ -72,20 +53,7 @@ export async function bootCopilot({ mode, context }) {
     const { setAuditBus } = await import('./audit/pipeline-permission.js');
     setAuditBus(defaultBus);
 
-    // ── Phase 3: Mode-specific ──────────────────────────────────────────
-    if (mode === 'terminal') {
-        const { startTerminalServer } = await import('./terminal/index.js');
-        await startTerminalServer();
-    } else if (mode === 'agent') {
-        const { startAgentLoop } = await import('./agent/lifecycle/entry.js');
-        await startAgentLoop();
-    } else if (mode === 'server') {
-        if (context?.io || context?.nerv) {
-            const { wireServerCopilot } = await import('./server/wiring.js');
-            await wireServerCopilot(context);
-        }
-        log('INFO', '[bootstrap] Modo server — copilot integrado.');
-    } else {
-        throw new Error(`[bootstrap] Modo desconhecido: "${mode}". Use 'terminal', 'server' ou 'agent'.`);
-    }
+    // ── Phase 3: Terminal (único modo) ──────────────────────────────────
+    const { startTerminalServer } = await import('./terminal/index.js');
+    await startTerminalServer();
 }

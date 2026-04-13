@@ -9,7 +9,7 @@
 
 import { bootCopilot } from '../bootstrap.js';
 
-bootCopilot({ mode: 'terminal' }).catch((/** @type {any} */ err) => {
+bootCopilot().catch((/** @type {any} */ err) => {
     console.error('[terminal/bootstrap] Falha fatal no boot:', err);
     process.exitCode = 1;
 });

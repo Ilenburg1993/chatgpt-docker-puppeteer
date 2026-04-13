@@ -729,24 +729,9 @@ async function bootstrap(options = {}) {
             log('WARN', `[BOOT] Falha ao injetar MissionManager via options: ${_e.message}`);
         }
 
-        // L49/L51 + L53.11: bootstrap canônico unificado do copilot (DI + NERV + Hub + Agent)
-        if (process.env.COPILOT_SDK_ENABLED !== 'false') {
-            try {
-                const { bootCopilot } = await import('#copilot/bootstrap');
-                const ioInstance = socketHub.getIO?.() ?? /** @type {any} */ (socketHub).io ?? null;
-                await bootCopilot({
-                    mode: 'server',
-                    context: {
-                        io: ioInstance,
-                        nerv: /** @type {any} */ (nerv),
-                    },
-                });
-                log('INFO', '[COPILOT] bootstrap.js executado (mode=server, wiring completo)');
-            } catch (/** @type {any} */ e) {
-                const _e = /** @type {any} */ (e);
-                log('WARN', `[COPILOT] Falha no bootstrap: ${_e.message}`);
-            }
-        }
+        // L53.15: copilot removido do server — copilot é ferramenta de DEV, boot separado via terminal:llm-b
+        // O copilot roda como processo standalone (npm run terminal:llm-b ou PM2 llm-b-terminal).
+        // Para integração com o server, use proxy reverso :3008→:3009 se necessário.
 
         /* --------------------------------------------------------------
            FASE 10 — Reconciler (último)

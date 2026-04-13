@@ -30,13 +30,13 @@ import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
+import { loadAliasesAsync } from './alias-store.js';
 import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
 import { startRepl } from './repl.js';
 import { createInjectServer } from './server.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
-import { loadAliasesAsync } from './alias-store.js';
 
 /**
  * F10.3: Imprime o banner de diagnóstico do modo de operação (standalone vs. conectado ao server).
