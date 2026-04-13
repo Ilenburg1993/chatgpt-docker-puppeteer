@@ -13,5 +13,5 @@
 export {
     getSseClients,
     getSseCriticalClients,
-    getTerminalReplayBuffer,
+    getTerminalReplayBuffer
 } from '../../terminal/state.js';

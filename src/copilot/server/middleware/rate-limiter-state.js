@@ -12,6 +12,5 @@
  */
 
 export {
-    registerClearRateLimiters,
-    clearRateLimiters,
+    clearRateLimiters, registerClearRateLimiters
 } from '../../terminal/rate-limiter-state.js';

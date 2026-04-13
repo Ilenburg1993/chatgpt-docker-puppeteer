@@ -9,11 +9,9 @@
 
 export { EventFanout, eventFanout } from './fanout.js';
 export { SseReplayBuffer } from './replay-buffer.js';
+export { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
 export {
-    SseConnectionTracker,
     createEventFilter,
     createSseWriter,
-    sanitizeSseEvent,
-    standardizeSsePayload,
+    sanitizeSseEvent, SseConnectionTracker, standardizeSsePayload
 } from './utils.js';
-export { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
