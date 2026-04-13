@@ -96,6 +96,8 @@ export class ConversationHub {
      *
      * É idempotente: se `init()` ou `initStandalone()` já foram chamados, é no-op.
      *
+     * @deprecated Onda 3.4 — Prefira `init({ io })` via `startCopilotServer` para ativar Socket.IO.
+     *   Mantido para compatibilidade e fallback até Onda 3.9.
      * @returns {void}
      */
     initStandalone() {
