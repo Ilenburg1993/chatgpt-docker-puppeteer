@@ -14,7 +14,7 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').UserPromptSubmittedHookInput} UserPromptSubmittedHookInput

@@ -43,7 +43,7 @@ export {
     activeCount as activeTimerCount,
     cancelAll as cancelAllTimers,
     cancel as cancelTimer,
-    registerTimer
+    registerTimer,
 } from './timer-registry.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ export * from './di-tokens.js';
 export { createContainer, createToken } from './di.js';
 
 // ─── Event Bus ────────────────────────────────────────────────────────────────
-export { bridgeEmitter, createEventBus, EventBus } from './event-bus.js';
+export { EventBus, bridgeEmitter, createEventBus } from './event-bus.js';
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 export {
@@ -60,7 +60,7 @@ export {
     isPrivateIp,
     validateUrl,
     validateUrlString,
-    validateWebhookUrl
+    validateWebhookUrl,
 } from './security/url-validator.js';
 
 // ─── Shared State ─────────────────────────────────────────────────────────────
@@ -71,3 +71,6 @@ export { createCache } from './cache.js';
 
 // ─── Mutex ────────────────────────────────────────────────────────────────────
 export { createMutex, createMutexPool, withMutex } from './mutex.js';
+
+// ─── Interfaces (AC-5 — Faixa 3.2) ───────────────────────────────────────────
+export {} from './interfaces.js'; // tipagens puras — zero runtime, usado via @typedef JSDoc

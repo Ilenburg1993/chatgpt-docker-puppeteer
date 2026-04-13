@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -46,7 +46,8 @@ async function safeGitArgs(args, timeoutMs = GIT_CMD_TIMEOUT_MS) {
 /**
  * Tool: git_status — mostra o status do repositório.
  */
-const gitStatusTool = createTool({ name: 'git_status',
+const gitStatusTool = createTool({
+    name: 'git_status',
     description: 'Mostra o status atual do repositório Git (arquivos modificados, staged, etc).',
     parameters: z.object({}),
     handler: async () => {
@@ -60,7 +61,8 @@ const gitStatusTool = createTool({ name: 'git_status',
 /**
  * Tool: git_diff — mostra as diferenças dos arquivos modificados.
  */
-const gitDiffTool = createTool({ name: 'git_diff',
+const gitDiffTool = createTool({
+    name: 'git_diff',
     description: 'Mostra o diff dos arquivos modificados. Use para revisar mudanças antes de commitar.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -89,7 +91,8 @@ const gitDiffTool = createTool({ name: 'git_diff',
  * Tool: git_commit — realiza um commit com a mensagem informada. Staged apenas os arquivos especificados (ou todos com
  * --all).
  */
-const gitCommitTool = createTool({ name: 'git_commit',
+const gitCommitTool = createTool({
+    name: 'git_commit',
     description: 'Adiciona arquivos e realiza um commit Git. Por segurança, requer confirmação prévia via ask_user.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -133,7 +136,8 @@ const gitCommitTool = createTool({ name: 'git_commit',
 /**
  * Tool: git_changed_files — lista arquivos alterados vs HEAD.
  */
-const gitChangedFilesTool = createTool({ name: 'git_changed_files',
+const gitChangedFilesTool = createTool({
+    name: 'git_changed_files',
     description: 'Lista arquivos modificados em relação ao último commit.',
     parameters: z.object({}),
     handler: async () => {
@@ -145,7 +149,8 @@ const gitChangedFilesTool = createTool({ name: 'git_changed_files',
 /**
  * Tool: git_push — faz push do branch atual para o origin.
  */
-const gitPushTool = createTool({ name: 'git_push',
+const gitPushTool = createTool({
+    name: 'git_push',
     description: 'Faz push do branch atual para o origin. Não suporta force-push por segurança.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -173,7 +178,8 @@ const gitPushTool = createTool({ name: 'git_push',
 /**
  * Tool: git_create_branch — cria e faz checkout de um novo branch.
  */
-const gitCreateBranchTool = createTool({ name: 'git_create_branch',
+const gitCreateBranchTool = createTool({
+    name: 'git_create_branch',
     description: 'Cria um novo branch Git e faz checkout. Opcional: a partir de um commit/branch base.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -205,7 +211,8 @@ const gitCreateBranchTool = createTool({ name: 'git_create_branch',
 /**
  * Tool: git_log — retorna o log de commits recentes.
  */
-const gitLogTool = createTool({ name: 'git_log',
+const gitLogTool = createTool({
+    name: 'git_log',
     description: 'Retorna o log de commits recentes com hash, autor, data e mensagem.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -231,7 +238,8 @@ const gitLogTool = createTool({ name: 'git_log',
 /**
  * Tool: git_current_branch — retorna o nome do branch atual.
  */
-const gitCurrentBranchTool = createTool({ name: 'git_current_branch',
+const gitCurrentBranchTool = createTool({
+    name: 'git_current_branch',
     description:
         'Retorna o nome do branch Git atual. Útil para confirmar em qual branch está antes de commitar ou pushar.',
     handler: async () => {
@@ -243,7 +251,8 @@ const gitCurrentBranchTool = createTool({ name: 'git_current_branch',
 /**
  * Tool: git_is_dirty — verifica se há arquivos modificados não commitados.
  */
-const gitIsDirtyTool = createTool({ name: 'git_is_dirty',
+const gitIsDirtyTool = createTool({
+    name: 'git_is_dirty',
     description:
         'Verifica se o repositório tem mudanças não commitadas (working tree sujo). Retorna isDirty=true se há arquivos modificados, staged ou untracked.',
     handler: async () => {

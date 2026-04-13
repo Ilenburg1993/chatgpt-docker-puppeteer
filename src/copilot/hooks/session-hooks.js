@@ -18,9 +18,9 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
-import { defaultMetrics, log } from '#copilot/observability';
 import { modelSelector } from '#copilot/sdk';
 import { hostname } from 'node:os';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').SessionLifecycleContext} SessionLifecycleContext
@@ -50,6 +50,7 @@ import { hostname } from 'node:os';
  */
 export function createSessionHooks(ctx) {
     const { emitWebhook, getModel, scheduleFallback, emit, getContextSnapshot } = ctx;
+    const metrics = ctx.metrics ?? null;
 
     /**
      * @param {import('./types.js').SessionStartHookInput} input
@@ -59,7 +60,7 @@ export function createSessionHooks(ctx) {
     async function onSessionStart(input, invocation) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionStart: ${sessionId}`);
-        defaultMetrics.recordSessionStart();
+        metrics?.recordSessionStart();
         // CT-02: registrar no audit ring buffer
         defaultAuditLog.record({ type: 'session.start', sessionId });
         await emitWebhook('session.start', { sessionId });
@@ -89,7 +90,7 @@ export function createSessionHooks(ctx) {
     async function onSessionEnd(_input, invocation) {
         const sessionId = invocation?.sessionId ?? '';
         log('INFO', `[hooks/session-lifecycle] SessionEnd: ${sessionId}`);
-        defaultMetrics.recordSessionEnd();
+        metrics?.recordSessionEnd();
         // CT-02: registrar no audit ring buffer
         defaultAuditLog.record({ type: 'session.end', sessionId });
         await emitWebhook('session.end', { sessionId });

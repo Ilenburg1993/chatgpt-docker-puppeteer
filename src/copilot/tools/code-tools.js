@@ -10,7 +10,7 @@
  * @see module:copilot/tools/tool-factory
  */
 
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';

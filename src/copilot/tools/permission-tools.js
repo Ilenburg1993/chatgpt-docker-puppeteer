@@ -22,7 +22,7 @@
  */
 
 import { ConfigError } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { z } from 'zod';
 import { buildTool } from './tool-factory.js';
 

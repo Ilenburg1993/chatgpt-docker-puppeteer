@@ -244,3 +244,17 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
     }
     return removed;
 }
+
+// ─── IStateStore singleton (Faixa 3.2 — AC-5-03) ────────────────────────────
+
+/**
+ * Adapter sobre as funções de snapshot que implementa a interface `IStateStore`.
+ *
+ * @type {import('../../core/interfaces.js').IStateStore}
+ */
+export const snapshotStore = {
+    createSnapshot: (opts) => /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (createSnapshot(opts))),
+    saveSnapshot: async (snapshot) => { await saveSnapshotAsync(/** @type {any} */ (snapshot)); },
+    loadSnapshot: (id) => id ? loadSnapshotAsync(id) : loadLatestSnapshotAsync(),
+    listSnapshots: () => listSnapshotsAsync(),
+};

@@ -18,7 +18,7 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { createInterface } from 'node:readline';
 
 /**

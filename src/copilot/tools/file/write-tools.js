@@ -9,7 +9,7 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

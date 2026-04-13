@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
 /**

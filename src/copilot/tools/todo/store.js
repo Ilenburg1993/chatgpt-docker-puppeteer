@@ -21,7 +21,7 @@
 
 import { logSwallowed } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SCHEMA_VERSION } from './todo-schema.js';

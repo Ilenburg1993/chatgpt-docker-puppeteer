@@ -9,7 +9,7 @@
  */
 
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import {

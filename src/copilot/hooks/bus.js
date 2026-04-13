@@ -21,7 +21,7 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '#copilot/events';
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').HookBusEvent} HookBusEvent

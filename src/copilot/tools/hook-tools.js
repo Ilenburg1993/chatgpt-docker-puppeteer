@@ -22,7 +22,7 @@
  */
 
 import { getAuditTail } from '#copilot/audit';
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

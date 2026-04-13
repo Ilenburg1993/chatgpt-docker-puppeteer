@@ -13,7 +13,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
 /**

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { SESSION_EVENTS as SE } from '#copilot/sdk';
+import { SESSION_EVENTS as SE } from '#copilot/events';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */

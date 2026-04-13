@@ -12,7 +12,7 @@
  * @internal
  */
 
-import { log } from '#copilot/observability';
+import { defaultMetrics, log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
@@ -58,6 +58,7 @@ export function buildSessionHooks(ctx, host) {
         getModel: () => ctx.model,
         scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
         emit: (event, payload) => host.emit(event, payload),
+        metrics: defaultMetrics,
     });
 
     const hooks = createHooks({

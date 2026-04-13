@@ -110,3 +110,7 @@ export {
 
 // ─── Todo store (acesso direto ao estado persistido) ─────────────────────────
 export { readStore } from './todo/store.js';
+
+// ─── Logger + Metrics injection (Faixa 3.1 — desacopla tools/ de observability/) ─
+export { clearToolsLogger, setToolsLogger } from './logger.js';
+export { clearToolsMetrics, setToolsMetrics } from './metrics-proxy.js';

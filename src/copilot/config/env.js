@@ -198,3 +198,27 @@ export const MAX_QUEUE_SIZE = 100;
 export function getCopilotFallbackModel() {
     return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
 }
+
+// ─── IConfigProvider singleton (Faixa 3.2 — AC-5-06) ────────────────────────
+
+/**
+ * Adapter sobre `process.env` que implementa a interface `IConfigProvider`.
+ *
+ * Permite que consumidores aceitem um contrato estável em vez de acessar `process.env` diretamente,
+ * facilitando substituição em testes.
+ *
+ * @type {import('../core/interfaces.js').IConfigProvider}
+ */
+export const envProvider = {
+    /** @param {string} key */
+    getString: (key) => process.env[key] || undefined,
+    /** @param {string} key @param {number} fallback */
+    getInt: (key, fallback) => envInt(key, fallback),
+    /** @param {string} key */
+    getBool: (key) => {
+        const v = process.env[key];
+        return v === 'true' || v === '1' || v === 'yes';
+    },
+    /** @param {string} key */
+    has: (key) => process.env[key] !== undefined && process.env[key] !== '',
+};

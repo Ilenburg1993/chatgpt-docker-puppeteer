@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').ErrorOccurredHookInput} ErrorOccurredHookInput

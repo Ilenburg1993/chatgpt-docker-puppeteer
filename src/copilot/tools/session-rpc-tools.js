@@ -20,7 +20,7 @@
 
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
 import { TimeoutError } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from './tool-factory.js';

@@ -20,7 +20,8 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { log, recordToolCall } from '#copilot/observability';
+import { log } from '../logger.js';
+import { recordToolCall } from '../metrics-proxy.js';
 import { createTool } from '#copilot/sdk';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';

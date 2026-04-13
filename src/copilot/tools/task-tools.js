@@ -11,7 +11,7 @@
  */
 
 import { SERVER_PORT } from '#copilot/config';
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { createTool } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

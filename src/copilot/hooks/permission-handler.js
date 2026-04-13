@@ -20,7 +20,7 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from '#copilot/observability';
+import { log } from './logger.js';
 import { approveAll } from '#copilot/sdk';
 
 /**

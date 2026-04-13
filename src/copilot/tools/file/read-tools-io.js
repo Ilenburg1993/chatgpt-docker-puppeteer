@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import * as fs from 'node:fs';
 import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';

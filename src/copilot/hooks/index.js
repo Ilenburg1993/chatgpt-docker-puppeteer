@@ -107,3 +107,6 @@ export { createCircuitBreakerHandler, createContextualErrorHandler, createErrorH
 
 // ─── Audit ring buffer (Gap 10) ───────────────────────────────────────────────
 export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditBuffer } from '#copilot/audit';
+
+// ─── Logger injection (Faixa 3.1 — desacopla hooks/ de observability/) ────────
+export { clearHooksLogger, setHooksLogger } from './logger.js';

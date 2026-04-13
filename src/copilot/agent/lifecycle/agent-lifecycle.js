@@ -31,11 +31,10 @@ import {
 } from '#copilot/observability';
 import { CopilotClient, raceEvents } from '#copilot/sdk';
 import { container } from '../../core/di-container.js';
-import { EVENT_BUS } from '../../core/di-tokens.js';
+import { CONVERSATION_STORE, EVENT_BUS } from '../../core/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 
 import { getHubSessionId } from '#copilot/core';
-import { conversationStore } from '../../conversation-hub/store.js';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
 import { setSessionRpc } from '../infra/tools-bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
@@ -167,10 +166,14 @@ export async function agentStart(ctx, host) {
         );
 
         if (isResumed) {
-            void syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
-                getHubSessionId,
-                conversationStore,
-            });
+            /** @type {import('../../conversation-hub/store.js').ConversationStore | null} */
+            const convStore = /** @type {any} */ (container.resolve(CONVERSATION_STORE)) ?? null;
+            if (convStore) {
+                void syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
+                    getHubSessionId,
+                    conversationStore: convStore,
+                });
+            }
         }
 
         host.emit(EMITTER_READY, { sessionId: session.sessionId, isResumed });

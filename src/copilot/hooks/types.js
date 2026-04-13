@@ -286,6 +286,9 @@
  * @property {(fallbackModel: string) => void} scheduleFallback
  * @property {(event: string, payload: object) => void} emit
  * @property {() => object} [getContextSnapshot] - Opcional: retorna snapshot de contexto para additionalContext
+ * @property {{ recordSessionStart: () => void; recordSessionEnd: () => void }} [metrics]
+ *
+ *   - Opcional: coletor de métricas injetado pela camada superior (agent/, server/).
  */
 
 // ─── Tipos do Audit (Gap 10) ──────────────────────────────────────────────────

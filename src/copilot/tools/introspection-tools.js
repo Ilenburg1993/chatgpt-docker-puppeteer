@@ -11,7 +11,8 @@
  */
 
 import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
-import { defaultMetrics, getToolStats, log } from '#copilot/observability';
+import { log } from './logger.js';
+import { getSummary as getMetricsSummary, getToolStats } from './metrics-proxy.js';
 import { createTool } from '#copilot/sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
@@ -201,7 +202,7 @@ const getTelemetryTool = createTool({ name: 'get_telemetry',
         )
     ),
     handler: async (/** @type {{ recent?: number; toolName?: string }} */ { toolName }) => {
-        const summary = defaultMetrics.getSummary();
+        const summary = getMetricsSummary();
         const toolsMap = summary.tools ?? {};
 
         const toolValues = Object.values(toolsMap);

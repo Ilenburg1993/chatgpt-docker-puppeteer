@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../logger.js';
 import { z } from 'zod';
 import { buildTool } from '../tool-factory.js';
 import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';

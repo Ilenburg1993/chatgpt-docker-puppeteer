@@ -43,6 +43,15 @@ import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observer
  * @typedef {object} AgentEventObserverOptions
  * @property {MetricsStore} metrics - Store de métricas a alimentar.
  * @property {ErrorTracker} [errorTracker] - Tracker de erros a alimentar.
+ * @property {{
+ *           record: (
+ *               model: string,
+ *               stats: { latencyMs: number; success: boolean; inputTokens?: number; outputTokens?: number },
+ *           ) => void;
+ *       }
+ *     | null
+ *     | undefined} [modelStatsTracker]
+ *   Tracker de estatísticas de modelo (injetado pelo caller que tem acesso ao sdk/).
  */
 
 /**
@@ -60,7 +69,7 @@ import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observer
  * @param {AgentEventObserverOptions} opts
  * @returns {AgentEventObserver}
  */
-export function createAgentEventObserver({ metrics, errorTracker }) {
+export function createAgentEventObserver({ metrics, errorTracker, modelStatsTracker }) {
     /** @type {{ emitter: import('node:events').EventEmitter; event: string; listener: (...args: any[]) => void }[]} */
     const _emitterRegistrations = [];
 
@@ -154,7 +163,14 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
      */
     function attach(agent) {
         /** @type {import('./observers/context.js').ObserverContext} */
-        const ctx = { metrics, errorTracker: errorTracker ?? null, agent, on: _onEmitter, safe: _safe };
+        const ctx = {
+            metrics,
+            errorTracker: errorTracker ?? null,
+            agent,
+            on: _onEmitter,
+            safe: _safe,
+            modelStatsTracker: modelStatsTracker ?? null,
+        };
 
         attachDialogTaskHandlers(ctx);
         attachSessionAgentHandlers(ctx);
@@ -179,7 +195,14 @@ export function createAgentEventObserver({ metrics, errorTracker }) {
         const dummyAgent = /** @type {import('node:events').EventEmitter} */ (/** @type {unknown} */ ({}));
 
         /** @type {import('./observers/context.js').ObserverContext} */
-        const ctx = { metrics, errorTracker: errorTracker ?? null, agent: dummyAgent, on: busOn, safe: _safe };
+        const ctx = {
+            metrics,
+            errorTracker: errorTracker ?? null,
+            agent: dummyAgent,
+            on: busOn,
+            safe: _safe,
+            modelStatsTracker: modelStatsTracker ?? null,
+        };
 
         attachDialogTaskHandlers(ctx);
         attachSessionAgentHandlers(ctx);

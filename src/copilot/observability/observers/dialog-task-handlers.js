@@ -10,7 +10,6 @@
 
 import { TimeoutError } from '#copilot/core';
 import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
-import { modelStatsTracker } from '#copilot/sdk';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 
@@ -25,6 +24,7 @@ import { startSpanImmediate } from '../otel.js';
  */
 export function attachDialogTaskHandlers(ctx) {
     const { metrics, errorTracker, agent, on, safe } = ctx;
+    const modelStatsTracker = ctx.modelStatsTracker ?? null;
 
     // ── Estado local ──────────────────────────────────────────────────────────
 
@@ -400,7 +400,7 @@ export function attachDialogTaskHandlers(ctx) {
                 const cacheRead = evt?.cacheReadTokens ?? 0;
                 const cacheWrite = evt?.cacheWriteTokens ?? 0;
                 if (model !== 'unknown') {
-                    modelStatsTracker.record(model, {
+                    modelStatsTracker?.record(model, {
                         latencyMs: _lastTurnDurationMs,
                         success: _lastTurnSuccess,
                         inputTokens: input,

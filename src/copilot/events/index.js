@@ -116,7 +116,7 @@ export {
     AGENT_TOOL_EXECUTION_START,
     DIALOG_LOOP_EVENTS,
     HIGH_FREQUENCY_EVENTS,
-    PR_CONSUMING_EVENTS
+    PR_CONSUMING_EVENTS,
 } from './agent-events.js';
 
 export {
@@ -125,7 +125,7 @@ export {
     HOOK_PRE_TOOL_USE,
     HOOK_PROMPT_SUBMITTED,
     HOOK_SESSION_END,
-    HOOK_SESSION_START
+    HOOK_SESSION_START,
 } from './hook-events.js';
 
 export {
@@ -137,7 +137,7 @@ export {
     HUB_TURN_DELTA,
     HUB_TURN_SENT,
     HUB_TURN_USER_PENDING,
-    HUB_USER_INJECTED
+    HUB_USER_INJECTED,
 } from './hub-events.js';
 
 export {
@@ -147,7 +147,7 @@ export {
     AUDIT_QUICK,
     TERMINAL_COMMAND,
     TERMINAL_STARTED,
-    TERMINAL_STOPPED
+    TERMINAL_STOPPED,
 } from './terminal-events.js';
 
 export {
@@ -160,7 +160,7 @@ export {
     HEALTH_DEGRADED,
     HEALTH_RECOVERED,
     SYSTEM_SHUTDOWN_COMPLETE,
-    SYSTEM_SHUTDOWN_STARTED
+    SYSTEM_SHUTDOWN_STARTED,
 } from './system-events.js';
 
 export {
@@ -168,7 +168,7 @@ export {
     SERVICE_SESSION_DISCONNECTED,
     SERVICE_SESSION_MESSAGE,
     SERVICE_SESSION_RESUMED,
-    SERVICE_TOOL_INVOKED
+    SERVICE_TOOL_INVOKED,
 } from './service-events.js';
 
 export {
@@ -178,7 +178,7 @@ export {
     NERV_COMMAND_RESTART,
     NERV_COMMAND_RESUME,
     NERV_COMMAND_SEND_MESSAGE,
-    NERV_COMMAND_TO_EVENTBUS
+    NERV_COMMAND_TO_EVENTBUS,
 } from './nerv-events.js';
 
 // ─── Emitter Events (FAIXA-L19) — internal agent emitter names ───────────────
@@ -239,7 +239,7 @@ export {
     EMITTER_TOOL_EXECUTION_COMPLETE,
     EMITTER_TOOL_EXECUTION_START,
     EMITTER_TURN_END,
-    EMITTER_TURN_START
+    EMITTER_TURN_START,
 } from './emitter-events.js';
 
 // ─── Re-exports de types/events.js para compatibilidade ──────────────────────
@@ -344,3 +344,6 @@ export const AUDIT_EVENTS = /** @type {const} */ ({
 // ─── Emitter Factory & Base Class ─────────────────────────────────────────────
 
 export { BaseEmitter, createEmitter } from './create-emitter.js';
+
+// ─── SDK Session Events (re-export para desacoplar observability/ de sdk/) ────
+export { ALL_EVENT_TYPES, onSessionEvent, onSessionEvents, SESSION_EVENTS } from './sdk-events.js';

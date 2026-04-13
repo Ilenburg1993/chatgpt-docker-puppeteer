@@ -37,8 +37,10 @@ import {
     defaultEventCollector,
     defaultMetrics,
     log,
+    recordToolCall,
+    getToolStats,
 } from '#copilot/observability';
-import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled } from '#copilot/sdk';
+import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
@@ -46,6 +48,8 @@ import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '.
 import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
+import { setHooksLogger } from '#copilot/hooks';
+import { setToolsLogger, setToolsMetrics } from '#copilot/tools';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -114,6 +118,11 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     /** @type {(() => void)[]} */
     const unsubs = [];
 
+    // ── 0. Injetar loggers/métricas nas camadas inferiores (Faixa 3.1) ──
+    setHooksLogger(log);
+    setToolsLogger(log);
+    setToolsMetrics({ getSummary: () => defaultMetrics.getSummary(), getToolStats, recordToolCall });
+
     // ── 1. Wire session events ──
     const sessionUnsubs = wireSessionEvents(session, isResumed, {
         emit: ctx.emit,
@@ -151,6 +160,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     const agentObserver = createAgentEventObserver({
         metrics: defaultMetrics,
         errorTracker: defaultErrorTracker,
+        modelStatsTracker,
     });
     // FAIXA-L14: prefer EventBus over direct agent emitter
     if (options?.eventBus) {
