@@ -120,42 +120,42 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase B1 — Session Events (~10h) ✅
 
-| #    | Subfase                                | Descrição                               | Estimativa |
-| ---- | -------------------------------------- | --------------------------------------- | ---------- |
-| B1.1 | ✅ `session.idle` handler               | Detectar sessão ociosa, emitir para hub | 2h         |
-| B1.2 | ✅ `session.error` handler              | Error categorization + emit para EventBus | 2h         |
-| B1.3 | ✅ `session.warning` handler            | Warning emit + log WARN                 | 1h         |
-| B1.4 | ✅ `session.model_change` handler       | Rastreia mudanças de modelo em runtime  | 2h         |
-| B1.5 | ✅ `session.tools_updated` handler      | Rastreia atualização de tools           | 1h         |
-| B1.6 | ✅ `session.snapshot_rewind` handler    | Snapshot rewind tracking                | 1h         |
-| B1.7 | ✅ Testes para session events           | 8 testes — mock events + verify         | 2h         |
+| #    | Subfase                             | Descrição                                 | Estimativa |
+| ---- | ----------------------------------- | ----------------------------------------- | ---------- |
+| B1.1 | ✅ `session.idle` handler            | Detectar sessão ociosa, emitir para hub   | 2h         |
+| B1.2 | ✅ `session.error` handler           | Error categorization + emit para EventBus | 2h         |
+| B1.3 | ✅ `session.warning` handler         | Warning emit + log WARN                   | 1h         |
+| B1.4 | ✅ `session.model_change` handler    | Rastreia mudanças de modelo em runtime    | 2h         |
+| B1.5 | ✅ `session.tools_updated` handler   | Rastreia atualização de tools             | 1h         |
+| B1.6 | ✅ `session.snapshot_rewind` handler | Snapshot rewind tracking                  | 1h         |
+| B1.7 | ✅ Testes para session events        | 8 testes — mock events + verify           | 2h         |
 
 ### Fase B2 — MCP & OAuth Events (~8h) ✅
 
-| #    | Subfase                               | Descrição                                  | Estimativa |
-| ---- | ------------------------------------- | ------------------------------------------ | ---------- |
-| B2.1 | ✅ `mcp.server_status_changed` handler | Bridge MCP status → EventBus               | 2h         |
-| B2.2 | ✅ `mcp.oauth_required` handler        | OAuth required event emit + log WARN       | 1h         |
-| B2.3 | ✅ `mcp.oauth_completed` handler       | OAuth completed event emit                 | 1h         |
-| B2.4 | ✅ Testes para MCP events              | 5 testes — mock MCP status changes         | 1h         |
+| #    | Subfase                               | Descrição                            | Estimativa |
+| ---- | ------------------------------------- | ------------------------------------ | ---------- |
+| B2.1 | ✅ `mcp.server_status_changed` handler | Bridge MCP status → EventBus         | 2h         |
+| B2.2 | ✅ `mcp.oauth_required` handler        | OAuth required event emit + log WARN | 1h         |
+| B2.3 | ✅ `mcp.oauth_completed` handler       | OAuth completed event emit           | 1h         |
+| B2.4 | ✅ Testes para MCP events              | 5 testes — mock MCP status changes   | 1h         |
 
 ### Fase B3 — Tool Events Avançados (~6h) ✅
 
-| #    | Subfase                         | Descrição                         | Estimativa |
-| ---- | ------------------------------- | --------------------------------- | ---------- |
-| B3.1 | ✅ `tool.progress` handler       | Progress tracking per-tool        | 2h         |
-| B3.2 | ✅ `tool.user_requested` handler | User-requested tool tracking      | 1h         |
-| B3.3 | ✅ Testes                        | 3 testes — tool progress + user   | 1h         |
+| #    | Subfase                         | Descrição                       | Estimativa |
+| ---- | ------------------------------- | ------------------------------- | ---------- |
+| B3.1 | ✅ `tool.progress` handler       | Progress tracking per-tool      | 2h         |
+| B3.2 | ✅ `tool.user_requested` handler | User-requested tool tracking    | 1h         |
+| B3.3 | ✅ Testes                        | 3 testes — tool progress + user | 1h         |
 
 ### Fase B4 — Skill, Command, Permission, Subagent Events (~8h) ✅
 
-| #    | Subfase                               | Descrição                             | Estimativa |
-| ---- | ------------------------------------- | ------------------------------------- | ---------- |
-| B4.1 | ✅ `skill.invoked` handler             | Skill invocation tracking             | 1h         |
-| B4.2 | ✅ `command.*` handlers (3 events)     | execute, queued, completed tracking   | 2h         |
-| B4.3 | ✅ `permission.*` handlers (2 events)  | requested + completed audit trail     | 2h         |
-| B4.4 | ✅ `subagent.*` handlers (5 events)    | started/completed/failed/selected/deselected | 2h |
-| B4.5 | ✅ Testes                              | 9 testes — skill, command, permission, subagent | 2h |
+| #    | Subfase                              | Descrição                                       | Estimativa |
+| ---- | ------------------------------------ | ----------------------------------------------- | ---------- |
+| B4.1 | ✅ `skill.invoked` handler            | Skill invocation tracking                       | 1h         |
+| B4.2 | ✅ `command.*` handlers (3 events)    | execute, queued, completed tracking             | 2h         |
+| B4.3 | ✅ `permission.*` handlers (2 events) | requested + completed audit trail               | 2h         |
+| B4.4 | ✅ `subagent.*` handlers (5 events)   | started/completed/failed/selected/deselected    | 2h         |
+| B4.5 | ✅ Testes                             | 9 testes — skill, command, permission, subagent | 2h         |
 
 ---
 
@@ -167,35 +167,35 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase C1 — SessionConfigBuilder (~8h) ✅
 
-| #    | Subfase                        | Descrição                                                | Estimativa |
-| ---- | ------------------------------ | -------------------------------------------------------- | ---------- |
-| C1.1 | ✅ Criar `SessionConfigBuilder` | Builder fluent tipado em `config/session-config.js` (21+ campos) | 4h  |
-| C1.2 | ✅ Preservar `lifecycle.js`     | `lifecycle.js` mantém buildSessionConfig interno (compat) | 0h        |
-| C1.3 | ✅ Migrar `session-setup.js`    | `buildSessionOptions()` usa SessionConfigBuilder          | 1h         |
-| C1.4 | ✅ Testes do builder            | 26 testes cobrindo todos os campos + WARN + fluent chain  | 1h         |
+| #    | Subfase                        | Descrição                                                        | Estimativa |
+| ---- | ------------------------------ | ---------------------------------------------------------------- | ---------- |
+| C1.1 | ✅ Criar `SessionConfigBuilder` | Builder fluent tipado em `config/session-config.js` (21+ campos) | 4h         |
+| C1.2 | ✅ Preservar `lifecycle.js`     | `lifecycle.js` mantém buildSessionConfig interno (compat)        | 0h         |
+| C1.3 | ✅ Migrar `session-setup.js`    | `buildSessionOptions()` usa SessionConfigBuilder                 | 1h         |
+| C1.4 | ✅ Testes do builder            | 26 testes cobrindo todos os campos + WARN + fluent chain         | 1h         |
 
 ### Fase C2 — Opções Faltantes (~8h) ✅
 
 > Todas as opções já estão suportadas no builder com métodos dedicados. O uso em runtime já existia no
 > codebase (initializer.js, session-setup.js) — o builder as formaliza.
 
-| #    | Subfase                                 | Descrição                                       | Estimativa |
-| ---- | --------------------------------------- | ------------------------------------------------ | ---------- |
-| C2.1 | ✅ `availableTools` / `excludedTools`    | Métodos `.availableTools()` / `.excludedTools()` | 0.5h       |
-| C2.2 | ✅ `skillDirectories` / `disabledSkills` | Métodos `.skillDirectories()` / `.disabledSkills()` | 0.5h    |
-| C2.3 | ✅ `agent` config                        | Método `.agent()` + `.customAgents()`            | 0.5h       |
-| C2.4 | ✅ `onEvent` handler global              | Método `.onEvent()`                              | 0.5h       |
-| C2.5 | ✅ `clientName` / `configDir`            | Métodos `.clientName()` / `.configDir()`         | 0.5h       |
+| #    | Subfase                                 | Descrição                                           | Estimativa |
+| ---- | --------------------------------------- | --------------------------------------------------- | ---------- |
+| C2.1 | ✅ `availableTools` / `excludedTools`    | Métodos `.availableTools()` / `.excludedTools()`    | 0.5h       |
+| C2.2 | ✅ `skillDirectories` / `disabledSkills` | Métodos `.skillDirectories()` / `.disabledSkills()` | 0.5h       |
+| C2.3 | ✅ `agent` config                        | Método `.agent()` + `.customAgents()`               | 0.5h       |
+| C2.4 | ✅ `onEvent` handler global              | Método `.onEvent()`                                 | 0.5h       |
+| C2.5 | ✅ `clientName` / `configDir`            | Métodos `.clientName()` / `.configDir()`            | 0.5h       |
 
 ### Fase C3 — CopilotClientOptions (~4h) ✅
 
-| #    | Subfase                    | Descrição                                             | Estimativa |
-| ---- | -------------------------- | ----------------------------------------------------- | ---------- |
-| C3.1 | ✅ `logLevel` mapping       | `LOG_LEVEL_MAP` em `ClientOptionsBuilder.logLevelFromEnv()` | 0.5h |
-| C3.2 | ✅ `env` passthrough        | `envPassthrough()` filtra COPILOT_/GITHUB_/OTEL_/NODE_ | 1h       |
-| C3.3 | ✅ `onListModels` para BYOK | Método `.onListModels()` no builder                   | 0.5h       |
-| C3.4 | ✅ `githubToken` support    | `.githubToken()` + `.githubTokenFromEnv()`            | 0.5h       |
-| C3.5 | ✅ Testes                   | 16 testes cobrindo ClientOptionsBuilder               | 1h         |
+| #    | Subfase                    | Descrição                                                   | Estimativa |
+| ---- | -------------------------- | ----------------------------------------------------------- | ---------- |
+| C3.1 | ✅ `logLevel` mapping       | `LOG_LEVEL_MAP` em `ClientOptionsBuilder.logLevelFromEnv()` | 0.5h       |
+| C3.2 | ✅ `env` passthrough        | `envPassthrough()` filtra COPILOT_/GITHUB_/OTEL_/NODE_      | 1h         |
+| C3.3 | ✅ `onListModels` para BYOK | Método `.onListModels()` no builder                         | 0.5h       |
+| C3.4 | ✅ `githubToken` support    | `.githubToken()` + `.githubTokenFromEnv()`                  | 0.5h       |
+| C3.5 | ✅ Testes                   | 16 testes cobrindo ClientOptionsBuilder                     | 1h         |
 
 ---
 
@@ -264,25 +264,25 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase E1 — Thin Adapter Migration (~8h) 🟠
 
-| #    | Subfase                                | Descrição                                                              | Estimativa |
-| ---- | -------------------------------------- | ---------------------------------------------------------------------- | ---------- |
+| #    | Subfase                                | Descrição                                                               | Estimativa |
+| ---- | -------------------------------------- | ----------------------------------------------------------------------- | ---------- |
 | E1.1 | ✅ Separar filtering estático           | `tool-filter.js`: extractStaticFilters() → availableTools/excludedTools | 3h         |
 | E1.2 | ✅ Simplificar `buildPreToolUseHandler` | buildDynamicOnlyPreToolUseHandler + isDynamicOnly() fast-path           | 3h         |
-| E1.3 | ✅ Testes de paridade                   | 52 testes cobrindo E1+E2+E3 — paridade verificada                     | 2h         |
+| E1.3 | ✅ Testes de paridade                   | 52 testes cobrindo E1+E2+E3 — paridade verificada                       | 2h         |
 
 ### Fase E2 — Hook Composition Improvement (~4h) 🟡
 
-| #    | Subfase                         | Descrição                                  | Estimativa |
-| ---- | ------------------------------- | ------------------------------------------ | ---------- |
+| #    | Subfase                         | Descrição                                                            | Estimativa |
+| ---- | ------------------------------- | -------------------------------------------------------------------- | ---------- |
 | E2.1 | ✅ Melhorar `composer.js`        | middleware(), loggingMiddleware(), forTools() — composição Koa-style | 2h         |
-| E2.2 | ✅ Adicionar hook `onSessionEnd` | createCleanupHandler() com fail-safe sequencial | 2h         |
+| E2.2 | ✅ Adicionar hook `onSessionEnd` | createCleanupHandler() com fail-safe sequencial                      | 2h         |
 
 ### Fase E3 — Audit & Compliance (~4h) 🟡
 
-| #    | Subfase                   | Descrição                             | Estimativa |
-| ---- | ------------------------- | ------------------------------------- | ---------- |
+| #    | Subfase                   | Descrição                                                  | Estimativa |
+| ---- | ------------------------- | ---------------------------------------------------------- | ---------- |
 | E3.1 | ✅ Audit trail completo    | AuditTrail ring buffer + with*Audit wrappers + query/stats | 2h         |
-| E3.2 | ✅ Dashboard de compliance | GET /compliance e /compliance/stats endpoints | 2h         |
+| E3.2 | ✅ Dashboard de compliance | GET /compliance e /compliance/stats endpoints              | 2h         |
 
 ---
 
@@ -381,6 +381,41 @@ substituição.
 | H2.1 | ⬜ Builder de seção TSServer    | SystemMessage section com type context | 3h         |
 | H2.2 | ⬜ Auto-inject on session start | Hook para injetar automaticamente      | 3h         |
 | H2.3 | ⬜ Testes                       |                                        | 2h         |
+
+---
+
+## FAIXA J — SDK Gateway Enforcement & Cleanup
+
+**Referência**: [08-AUDITORIA-DUPLICATAS-IMPORTS.md](./08-AUDITORIA-DUPLICATAS-IMPORTS.md)
+**Estimativa**: ~12h
+**Risco**: Baixo (refactor mecânico, sem mudança de comportamento)
+
+### Fase J1 — Import Violations Fix (~4h) 🔴
+
+| #    | Subfase                                       | Descrição                                                                | Estimativa |
+| ---- | --------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
+| J1.1 | ⬜ Fix runtime import `config/session-config`   | `@github/copilot-sdk` → `#copilot/sdk` (1 arquivo)                      | 0.5h       |
+| J1.2 | ⬜ Fix JSDoc type refs fora de `sdk/`            | `import('@github/copilot-sdk')` → `import('#copilot/sdk/types.js')` (21 arq) | 2h      |
+| J1.3 | ⬜ ESLint `no-restricted-imports` rule           | Bloquear `@github/copilot-sdk` fora de `src/copilot/sdk/`               | 1h         |
+| J1.4 | ⬜ Testes de regressão                           | Verificar que tudo resolve e TS happy                                    | 0.5h       |
+
+### Fase J2 — Dead Code Removal (~4h) 🟠
+
+| #    | Subfase                                         | Descrição                                                           | Estimativa |
+| ---- | ----------------------------------------------- | ------------------------------------------------------------------- | ---------- |
+| J2.1 | ⬜ Deprecar/remover `createPermissionHandler` (sdk/) | Dead code: toda lógica real é em `hooks/permission-handler.js`      | 1h         |
+| J2.2 | ⬜ Deprecar/remover `createAllowlistPermissionHandler` | Sem callers — barrel export morto                                 | 0.5h       |
+| J2.3 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`  | Subsumido por `SessionConfigBuilder` (Faixa C)                      | 1h         |
+| J2.4 | ⬜ Centralizar `SDK_VERSION` em `sdk/constants.js` | Eliminar 2 `require('.../package.json')` deep imports               | 1h         |
+| J2.5 | ⬜ Testes de regressão                            | Verificar que remoções não quebram nada                              | 0.5h       |
+
+### Fase J3 — Documentation & Prevention (~4h) 🟡
+
+| #    | Subfase                                  | Descrição                                                            | Estimativa |
+| ---- | ---------------------------------------- | -------------------------------------------------------------------- | ---------- |
+| J3.1 | ⬜ Atualizar ADR de camadas               | Documentar regras L1-L7 + canonical paths oficiais                   | 2h         |
+| J3.2 | ⬜ Documentar 3 perfis pre-tool-use       | resolveToolDecision, production onPreToolUse, dynamic-only           | 1h         |
+| J3.3 | ⬜ CI check para novos imports diretos    | Script ou hook de pre-commit que rejeita `@github/copilot-sdk` fora de `sdk/` | 1h |
 
 ---
 
