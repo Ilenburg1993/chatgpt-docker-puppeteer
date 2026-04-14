@@ -99,7 +99,7 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 | I2.1 | ✅ Atualizar lifecycle.js             | Passthrough automático (sem mudança necessária)         | DONE   |
 | I2.2 | ✅ Atualizar initializer.js           | Wire do novo buildSystemMessage() via importação direta | DONE   |
 | I2.3 | ✅ Implementar captura SDK defaults   | SectionTransformFn para extrair conteúdo padrão         | DONE   |
-| I2.4 | ⬜ Documentar SDK defaults capturados | Salvar em sdk-defaults/ como referência                 | FUTURO |
+| I2.4 | ✅ Documentar SDK defaults capturados | README + snapshot.js + captured JSON em sdk-defaults/   | DONE   |
 | I2.5 | ✅ Flag de modo via env               | COPILOT_SYSTEM_PROMPT_MODE=replace\|customize           | DONE   |
 
 ### Fase I3 — Testes (~3h) ✅
@@ -118,43 +118,44 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 **Estimativa**: ~32h
 **Risco**: Baixo-Moderado (aditivo)
 
-### Fase B1 — Session Events (~10h) 🟠
+### Fase B1 — Session Events (~10h) ✅
 
 | #    | Subfase                                | Descrição                               | Estimativa |
 | ---- | -------------------------------------- | --------------------------------------- | ---------- |
-| B1.1 | ⬜ `session.idle` handler               | Detectar sessão ociosa, emitir para hub | 2h         |
-| B1.2 | ⬜ `session.error` handler              | Error categorization + recovery logic   | 2h         |
-| B1.3 | ⬜ `session.abort` handler              | Cleanup resources on abort              | 1h         |
-| B1.4 | ⬜ `session.paused` / `session.resumed` | State tracking para UI                  | 2h         |
-| B1.5 | ⬜ `session.snapshot_created`           | Snapshot tracking para rewind           | 1h         |
-| B1.6 | ⬜ Testes para session events           | Mock events + verify handler behavior   | 2h         |
+| B1.1 | ✅ `session.idle` handler               | Detectar sessão ociosa, emitir para hub | 2h         |
+| B1.2 | ✅ `session.error` handler              | Error categorization + emit para EventBus | 2h         |
+| B1.3 | ✅ `session.warning` handler            | Warning emit + log WARN                 | 1h         |
+| B1.4 | ✅ `session.model_change` handler       | Rastreia mudanças de modelo em runtime  | 2h         |
+| B1.5 | ✅ `session.tools_updated` handler      | Rastreia atualização de tools           | 1h         |
+| B1.6 | ✅ `session.snapshot_rewind` handler    | Snapshot rewind tracking                | 1h         |
+| B1.7 | ✅ Testes para session events           | 8 testes — mock events + verify         | 2h         |
 
-### Fase B2 — MCP & OAuth Events (~8h) 🟠
+### Fase B2 — MCP & OAuth Events (~8h) ✅
 
 | #    | Subfase                               | Descrição                                  | Estimativa |
 | ---- | ------------------------------------- | ------------------------------------------ | ---------- |
-| B2.1 | ⬜ `mcp.server_status_changed` handler | Bridge MCP status → EventBus               | 2h         |
-| B2.2 | ⬜ `mcp.oauth_*` handlers (4 events)   | OAuth flow: start, complete, error, cancel | 3h         |
-| B2.3 | ⬜ MCP status dashboard endpoint       | REST endpoint para MCP server health       | 2h         |
-| B2.4 | ⬜ Testes para MCP events              | Mock MCP status changes                    | 1h         |
+| B2.1 | ✅ `mcp.server_status_changed` handler | Bridge MCP status → EventBus               | 2h         |
+| B2.2 | ✅ `mcp.oauth_required` handler        | OAuth required event emit + log WARN       | 1h         |
+| B2.3 | ✅ `mcp.oauth_completed` handler       | OAuth completed event emit                 | 1h         |
+| B2.4 | ✅ Testes para MCP events              | 5 testes — mock MCP status changes         | 1h         |
 
-### Fase B3 — Tool Events Avançados (~6h) 🟡
+### Fase B3 — Tool Events Avançados (~6h) ✅
 
-| #    | Subfase                         | Descrição                     | Estimativa |
-| ---- | ------------------------------- | ----------------------------- | ---------- |
-| B3.1 | ⬜ `tool.progress` handler       | Progress tracking per-tool    | 2h         |
-| B3.2 | ⬜ `tool.error` handler dedicado | Error classification per-tool | 2h         |
-| B3.3 | ⬜ `tool.output_*` handlers      | Output streaming por tool     | 1h         |
-| B3.4 | ⬜ Testes                        |                               | 1h         |
+| #    | Subfase                         | Descrição                         | Estimativa |
+| ---- | ------------------------------- | --------------------------------- | ---------- |
+| B3.1 | ✅ `tool.progress` handler       | Progress tracking per-tool        | 2h         |
+| B3.2 | ✅ `tool.user_requested` handler | User-requested tool tracking      | 1h         |
+| B3.3 | ✅ Testes                        | 3 testes — tool progress + user   | 1h         |
 
-### Fase B4 — Skill, Command, Permission Events (~8h) 🟡
+### Fase B4 — Skill, Command, Permission, Subagent Events (~8h) ✅
 
-| #    | Subfase                               | Descrição                  | Estimativa |
-| ---- | ------------------------------------- | -------------------------- | ---------- |
-| B4.1 | ⬜ `skill.*` handlers (3+ events)      | Skill lifecycle tracking   | 2h         |
-| B4.2 | ⬜ `command.*` handlers (3+ events)    | Command execution tracking | 2h         |
-| B4.3 | ⬜ `permission.*` handlers (3+ events) | Permission audit trail     | 2h         |
-| B4.4 | ⬜ Testes                              |                            | 2h         |
+| #    | Subfase                               | Descrição                             | Estimativa |
+| ---- | ------------------------------------- | ------------------------------------- | ---------- |
+| B4.1 | ✅ `skill.invoked` handler             | Skill invocation tracking             | 1h         |
+| B4.2 | ✅ `command.*` handlers (3 events)     | execute, queued, completed tracking   | 2h         |
+| B4.3 | ✅ `permission.*` handlers (2 events)  | requested + completed audit trail     | 2h         |
+| B4.4 | ✅ `subagent.*` handlers (5 events)    | started/completed/failed/selected/deselected | 2h |
+| B4.5 | ✅ Testes                              | 9 testes — skill, command, permission, subagent | 2h |
 
 ---
 

@@ -13,11 +13,15 @@
 import {
     wireCatchAll,
     wireCompactionEvents,
+    wireInteractionEvents,
+    wireMcpEvents,
     wireModeAndToolEvents,
     wireSdkResponseEvents,
+    wireSessionLifecycleEvents,
     wireStreamingEvents,
     wireSystemNotificationEvents,
     wireTokenBudgetEvents,
+    wireToolLifecycleEvents,
     wireUsageEvent,
 } from './event-handlers/index.js';
 
@@ -68,6 +72,10 @@ export function wireSessionEvents(session, isResumed, callbacks) {
         ...wireModeAndToolEvents(session, callbacks),
         ...wireSystemNotificationEvents(session, callbacks),
         ...wireSdkResponseEvents(session, callbacks),
+        ...wireSessionLifecycleEvents(session, callbacks),
+        ...wireMcpEvents(session, callbacks),
+        ...wireToolLifecycleEvents(session, callbacks),
+        ...wireInteractionEvents(session, callbacks),
         wireUsageEvent(session, callbacks),
         wireCatchAll(session),
     ];

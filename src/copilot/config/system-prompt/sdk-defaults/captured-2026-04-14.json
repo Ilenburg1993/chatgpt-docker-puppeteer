@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-04-14T10:38:16.127Z",
+  "sdkVersion": ">=0.2.0",
+  "sections": {
+    "identity": {
+      "description": "Agent identity preamble and mode statement",
+      "order": 0
+    },
+    "tone": {
+      "description": "Response style, conciseness rules, output formatting preferences",
+      "order": 1
+    },
+    "tool_efficiency": {
+      "description": "Tool usage patterns, parallel calling, batching guidelines",
+      "order": 2
+    },
+    "environment_context": {
+      "description": "CWD, OS, git root, directory listing, available tools",
+      "order": 3
+    },
+    "code_change_rules": {
+      "description": "Coding rules, linting/testing, ecosystem tools, style",
+      "order": 4
+    },
+    "guidelines": {
+      "description": "Tips, behavioral best practices, behavioral guidelines",
+      "order": 5
+    },
+    "safety": {
+      "description": "Environment limitations, prohibited actions, security policies",
+      "order": 6
+    },
+    "tool_instructions": {
+      "description": "Per-tool usage instructions",
+      "order": 7
+    },
+    "custom_instructions": {
+      "description": "Repository and organization custom instructions",
+      "order": 8
+    },
+    "last_instructions": {
+      "description": "End-of-prompt instructions: parallel tool calling, persistence, task completion",
+      "order": 9
+    }
+  }
+}
