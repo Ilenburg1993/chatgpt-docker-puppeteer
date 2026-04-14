@@ -392,30 +392,113 @@ substituição.
 
 ### Fase J1 — Import Violations Fix (~4h) 🔴
 
-| #    | Subfase                                       | Descrição                                                                | Estimativa |
-| ---- | --------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
-| J1.1 | ⬜ Fix runtime import `config/session-config`   | `@github/copilot-sdk` → `#copilot/sdk` (1 arquivo)                      | 0.5h       |
-| J1.2 | ⬜ Fix JSDoc type refs fora de `sdk/`            | `import('@github/copilot-sdk')` → `import('#copilot/sdk/types.js')` (21 arq) | 2h      |
-| J1.3 | ⬜ ESLint `no-restricted-imports` rule           | Bloquear `@github/copilot-sdk` fora de `src/copilot/sdk/`               | 1h         |
-| J1.4 | ⬜ Testes de regressão                           | Verificar que tudo resolve e TS happy                                    | 0.5h       |
+| #    | Subfase                                      | Descrição                                                                    | Estimativa |
+| ---- | -------------------------------------------- | ---------------------------------------------------------------------------- | ---------- |
+| J1.1 | ⬜ Fix runtime import `config/session-config` | `@github/copilot-sdk` → `#copilot/sdk` (1 arquivo)                           | 0.5h       |
+| J1.2 | ⬜ Fix JSDoc type refs fora de `sdk/`         | `import('@github/copilot-sdk')` → `import('#copilot/sdk/types.js')` (21 arq) | 2h         |
+| J1.3 | ⬜ ESLint `no-restricted-imports` rule        | Bloquear `@github/copilot-sdk` fora de `src/copilot/sdk/`                    | 1h         |
+| J1.4 | ⬜ Testes de regressão                        | Verificar que tudo resolve e TS happy                                        | 0.5h       |
 
 ### Fase J2 — Dead Code Removal (~4h) 🟠
 
-| #    | Subfase                                         | Descrição                                                           | Estimativa |
-| ---- | ----------------------------------------------- | ------------------------------------------------------------------- | ---------- |
-| J2.1 | ⬜ Deprecar/remover `createPermissionHandler` (sdk/) | Dead code: toda lógica real é em `hooks/permission-handler.js`      | 1h         |
-| J2.2 | ⬜ Deprecar/remover `createAllowlistPermissionHandler` | Sem callers — barrel export morto                                 | 0.5h       |
-| J2.3 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`  | Subsumido por `SessionConfigBuilder` (Faixa C)                      | 1h         |
-| J2.4 | ⬜ Centralizar `SDK_VERSION` em `sdk/constants.js` | Eliminar 2 `require('.../package.json')` deep imports               | 1h         |
-| J2.5 | ⬜ Testes de regressão                            | Verificar que remoções não quebram nada                              | 0.5h       |
+| #    | Subfase                                               | Descrição                                                      | Estimativa |
+| ---- | ----------------------------------------------------- | -------------------------------------------------------------- | ---------- |
+| J2.1 | ⬜ Deprecar/remover `createPermissionHandler` (sdk/)   | Dead code: toda lógica real é em `hooks/permission-handler.js` | 1h         |
+| J2.2 | ⬜ Deprecar/remover `createAllowlistPermissionHandler` | Sem callers — barrel export morto                              | 0.5h       |
+| J2.3 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`        | Subsumido por `SessionConfigBuilder` (Faixa C)                 | 1h         |
+| J2.4 | ⬜ Centralizar `SDK_VERSION` em `sdk/constants.js`     | Eliminar 2 `require('.../package.json')` deep imports          | 1h         |
+| J2.5 | ⬜ Testes de regressão                                 | Verificar que remoções não quebram nada                        | 0.5h       |
 
 ### Fase J3 — Documentation & Prevention (~4h) 🟡
 
-| #    | Subfase                                  | Descrição                                                            | Estimativa |
-| ---- | ---------------------------------------- | -------------------------------------------------------------------- | ---------- |
-| J3.1 | ⬜ Atualizar ADR de camadas               | Documentar regras L1-L7 + canonical paths oficiais                   | 2h         |
-| J3.2 | ⬜ Documentar 3 perfis pre-tool-use       | resolveToolDecision, production onPreToolUse, dynamic-only           | 1h         |
-| J3.3 | ⬜ CI check para novos imports diretos    | Script ou hook de pre-commit que rejeita `@github/copilot-sdk` fora de `sdk/` | 1h |
+| #    | Subfase                               | Descrição                                                                     | Estimativa |
+| ---- | ------------------------------------- | ----------------------------------------------------------------------------- | ---------- |
+| J3.1 | ⬜ Atualizar ADR de camadas            | Documentar regras L1-L7 + canonical paths oficiais                            | 2h         |
+| J3.2 | ⬜ Documentar 3 perfis pre-tool-use    | resolveToolDecision, production onPreToolUse, dynamic-only                    | 1h         |
+| J3.3 | ⬜ CI check para novos imports diretos | Script ou hook de pre-commit que rejeita `@github/copilot-sdk` fora de `sdk/` | 1h         |
+
+---
+
+## FAIXA K — Agent Module Refactoring
+
+**Referência**: [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md),
+[10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md),
+[11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md)
+**Estimativa**: ~43h
+**Risco**: Moderado (refactor interno do agent; API pública AlwaysAliveAgent não muda)
+
+> **Relação com Faixa G**: G1 (God Module Decomposition, 16h) focaliza `src/copilot/` em geral.
+> Faixa K é mais granular e focada exclusivamente em `src/copilot/agent/` (~55 arquivos, 8620L).
+> K1 (AgentContext partitioning) e K5 (boot wiring pipeline) substituem G1.1-G1.4 no escopo agent.
+> Recomenda-se executar Faixa K antes de G1 — os artefatos de K reduzem o escopo de G1
+> significativamente.
+
+### Fase K1 — AgentContext Partitioning (~8h) 🔴
+
+| #    | Subfase                                         | Descrição                                           | Estimativa |
+| ---- | ----------------------------------------------- | --------------------------------------------------- | ---------- |
+| K1.1 | ⬜ Definir interfaces SessionState, etc.         | Interfaces tipadas para cada domínio do contexto     | 2h         |
+| K1.2 | ⬜ Refatorar AgentContext para compor sub-estados | Substituir campos planos por objetos particionados   | 3h         |
+| K1.3 | ⬜ Migrar consumidores para sub-estados           | Acessar `ctx.session` em vez de `ctx.client` direto  | 2h         |
+| K1.4 | ⬜ Testes de regressão                            | FSM transitions + construtor + getters               | 1h         |
+
+### Fase K2 — Test Coverage Sprint (~12h) 🔴
+
+| #    | Subfase                                             | Descrição                                  | Estimativa |
+| ---- | --------------------------------------------------- | ------------------------------------------ | ---------- |
+| K2.1 | ⬜ Testes AgentContext FSM                            | Transições válidas/inválidas, setStatus     | 2h         |
+| K2.2 | ⬜ Testes MessageQueue                                | FIFO, abort, drain, size, shift             | 2h         |
+| K2.3 | ⬜ Testes performBootWiring                           | 12 etapas isoladas com mocks               | 3h         |
+| K2.4 | ⬜ Testes agentStop + agentTryReconnect               | Shutdown graceful, reconnect com retry      | 2h         |
+| K2.5 | ⬜ Testes DialogLoopManager pause/resume/recovery     | 3 estratégias + watchdog + boot             | 2h         |
+| K2.6 | ⬜ Testes TaskExecutor retry                          | Retry após reconexão, abort, timeout        | 1h         |
+
+### Fase K3 — Error Handling Centralizado (~4h) 🟠
+
+| #    | Subfase                                 | Descrição                                           | Estimativa |
+| ---- | --------------------------------------- | --------------------------------------------------- | ---------- |
+| K3.1 | ⬜ Criar error-policy.js com classificador | retry/fatal/ignore por tipo de erro               | 2h         |
+| K3.2 | ⬜ Migrar task-executor e queue-processor  | Substituir 5 padrões adhoc pelo classificador      | 1h         |
+| K3.3 | ⬜ Testes de classificação + policy        | Cobertura das 3 categorias                         | 1h         |
+
+### Fase K4 — Background Task Tracker (~3h) 🟠
+
+| #    | Subfase                                           | Descrição                                        | Estimativa |
+| ---- | ------------------------------------------------- | ------------------------------------------------ | ---------- |
+| K4.1 | ⬜ Criar background-tasks.js                       | track(), drain(timeoutMs), pendingCount           | 1h         |
+| K4.2 | ⬜ Migrar void writeStateAsync → bgTasks.track     | Substituir 15+ fire-and-forget                    | 1h         |
+| K4.3 | ⬜ Integrar drain no shutdown + testes              | Garantir que shutdown espera tasks pendentes       | 1h         |
+
+### Fase K5 — Boot Wiring Pipeline (~6h) 🟠
+
+| #    | Subfase                                   | Descrição                                  | Estimativa |
+| ---- | ----------------------------------------- | ------------------------------------------ | ---------- |
+| K5.1 | ⬜ Extrair 12 etapas como funções nomeadas | Cada step com interface uniforme            | 3h         |
+| K5.2 | ⬜ Criar pipeline runner                    | Loop orquestrador com logging por step      | 1h         |
+| K5.3 | ⬜ Testes de cada step isolado              | Mocks + verificação de unsubs               | 2h         |
+
+### Fase K6 — Event Bridge Declarativo (~4h) 🟡
+
+| #    | Subfase                                    | Descrição                                          | Estimativa |
+| ---- | ------------------------------------------ | -------------------------------------------------- | ---------- |
+| K6.1 | ⬜ Criar event-bridge-map.js                | Array de [localEvent, busEvent] como fonte de verdade | 1h       |
+| K6.2 | ⬜ Migrar always-alive.js para usar o mapa  | Substituir ~80 bridges hardcoded                    | 2h         |
+| K6.3 | ⬜ Testes de completude do bridge            | Verificar que todos os eventos estão mapeados       | 1h         |
+
+### Fase K7 — Health Check Formal (~3h) 🟡
+
+| #    | Subfase                              | Descrição                                    | Estimativa |
+| ---- | ------------------------------------ | -------------------------------------------- | ---------- |
+| K7.1 | ⬜ Criar health-check.js              | 5 checks: client, session, dialog, queue, IO | 1.5h       |
+| K7.2 | ⬜ Expor via GET /health + testes     | Endpoint HTTP + testes unitários              | 1.5h       |
+
+### Fase K8 — Lazy Singleton (~3h) 🟡
+
+| #    | Subfase                                    | Descrição                                      | Estimativa |
+| ---- | ------------------------------------------ | ---------------------------------------------- | ---------- |
+| K8.1 | ⬜ Refatorar para lazy init + resetAgent    | getAgent() lazy, resetAgent() para testes       | 1h         |
+| K8.2 | ⬜ Migrar imports diretos para getAgent()   | Deprecation warning em export direto            | 1h         |
+| K8.3 | ⬜ Testes + deprecation warning             | Verificar lazy init e reset                     | 1h         |
 
 ---
 
@@ -477,6 +560,19 @@ substituição.
 | H     | H1 — TSServer Tools           | 🟡 P2       | 8h    |
 | H     | H2 — Context Injection        | 🟡 P2       | 8h    |
 
+### Sprint 6 — Agent Refactoring (Semana 11-13, ~43h)
+
+| Faixa | Fase                             | Prioridade | Horas |
+| ----- | -------------------------------- | ---------- | ----- |
+| K     | K1 — AgentContext Partitioning   | 🔴 P0       | 8h    |
+| K     | K2 — Test Coverage Sprint        | 🔴 P0       | 12h   |
+| K     | K3 — Error Handling Centralizado | 🟠 P1       | 4h    |
+| K     | K4 — Background Task Tracker     | 🟠 P1       | 3h    |
+| K     | K5 — Boot Wiring Pipeline        | 🟠 P1       | 6h    |
+| K     | K6 — Event Bridge Declarativo    | 🟡 P2       | 4h    |
+| K     | K7 — Health Check Formal         | 🟡 P2       | 3h    |
+| K     | K8 — Lazy Singleton              | 🟡 P2       | 3h    |
+
 ---
 
 ## Matriz de Dependências
@@ -500,11 +596,15 @@ D1-D5 (experimental) ─────────┼──► G1 (decompose alway
                                │
                                ▼
                           H1-H2 (tsserver integration)
+                               │
+                               ▼
+                       K1-K8 (agent refactoring) ←── substitui/refina G1 no escopo agent
 ```
 
 **Regra de ouro**: Faixa A (bugs) é pré-requisito para tudo. Faixa I (system prompt modular)
 depende de A1-A2 e é pré-requisito para C1 (builder). Faixa C1 (builder) é pré-requisito para C2,
 E1. Faixa G1 (decomposição) é pré-requisito para G2, G3.
+**Faixa K**: pode iniciar independentemente após Faixa A. K1+K2 (fundação) devem preceder K3-K8.
 
 ---
 
@@ -522,4 +622,9 @@ E1. Faixa G1 (decomposição) é pré-requisito para G2, G3.
 | God module (>300L)               | 1        | 0                      |
 | `Record<string,unknown>` casts   | 5+       | 0                      |
 | Cobertura testes unitários       | ~60%     | 85%                    |
+| Testes agent/ (boot,ctx,queue)   | 0        | 30+ (K2)               |
+| AgentContext campos públicos     | 30+      | 6 sub-estados (K1)     |
+| performBootWiring steps isolados | 0        | 12 (K5)                |
+| Event bridge hardcoded lines     | ~80      | 0 (K6 — declarativo)   |
+| Agent health check endpoint      | 0        | 1 (K7)                 |
 | REST endpoints para experimental | 0        | 19+                    |
