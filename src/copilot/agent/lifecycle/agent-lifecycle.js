@@ -36,7 +36,7 @@ import { logSwallowed } from '../../core/error-handlers.js';
 
 import { getHubSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../config.js';
-import { setSessionRpc } from '../infra/tools-bootstrap.js';
+import { setExperimentalSession, setSessionRpc } from '../infra/tools-bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -297,6 +297,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             ctx.session = null;
             ctx.messagesCache.invalidate();
             setSessionRpc(null);
+            setExperimentalSession(null);
         }
 
         if (ctx.client) {

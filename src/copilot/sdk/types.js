@@ -661,18 +661,21 @@
  */
 
 /**
- * Interface para RPC experimental não-tipado no SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`,
- * `extensions` que ainda não existem nas types do SDK oficial.
+ * Interface para RPC experimental do SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`, `extensions`.
+ * Alinhado com `createSessionRpc()` do SDK gerado.
+ *
+ * Cada namespace usa apenas um subconjunto dos métodos. O typedef é uma união de todos os métodos possíveis para
+ * simplificar o cast — cada função wrapper já valida feature flag e sessão antes de invocar.
  *
  * @typedef {object} ExperimentalRpcNamespace
  * @property {(params?: Record<string, unknown>) => Promise<any>} start
  * @property {(params?: Record<string, unknown>) => Promise<any>} list
+ * @property {(params?: Record<string, unknown>) => Promise<any>} getCurrent
  * @property {(params?: Record<string, unknown>) => Promise<any>} enable
  * @property {(params?: Record<string, unknown>) => Promise<any>} disable
  * @property {(params?: Record<string, unknown>) => Promise<any>} select
  * @property {(params?: Record<string, unknown>) => Promise<any>} deselect
- * @property {(params?: Record<string, unknown>) => Promise<any>} getStatus
- * @property {(params?: Record<string, unknown>) => Promise<any>} stop
+ * @property {(params?: Record<string, unknown>) => Promise<any>} reload
  */
 
 /**

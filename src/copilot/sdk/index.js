@@ -329,23 +329,24 @@ export {
 
 export {
     agentDeselect,
-    agentGetStatus,
+    agentGetCurrent,
     agentList,
+    agentReload,
     agentSelect,
-    agentStop,
     extensionsDisable,
     extensionsEnable,
     extensionsList,
+    extensionsReload,
     fleetStart,
     mcpDisable,
     mcpEnable,
-    mcpGetStatus,
     mcpList,
+    mcpReload,
     pluginsList,
     skillsDisable,
     skillsEnable,
-    skillsGetStatus,
     skillsList,
+    skillsReload,
 } from './rpc/experimental.js';
 
 export { setSdkLogger } from './logger.js';

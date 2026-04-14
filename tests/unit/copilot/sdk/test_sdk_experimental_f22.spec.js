@@ -131,51 +131,60 @@ describe('F22 — F124 runtime: feature-flags API', () => {
 // ─── F118-F123: experimental-rpc.js (source checks) ─────────────────────────
 
 describe('F22 — F118-F123: experimental-rpc.js exports', () => {
-    it('experimental-rpc.js exporta fleetStart (F118)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js exporta fleetStart (F118)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function fleetStart');
     });
 
-    it('experimental-rpc.js exporta agentList, agentSelect, agentDeselect, agentGetStatus, agentStop (F119)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js exporta agentList, agentGetCurrent, agentSelect, agentDeselect, agentReload (F119)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function agentList');
+        expect(src).toContain('export async function agentGetCurrent');
         expect(src).toContain('export async function agentSelect');
         expect(src).toContain('export async function agentDeselect');
-        expect(src).toContain('export async function agentGetStatus');
-        expect(src).toContain('export async function agentStop');
+        expect(src).toContain('export async function agentReload');
     });
 
-    it('experimental-rpc.js exporta skillsList, skillsEnable, skillsDisable, skillsGetStatus (F120)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js NÃO exporta funções fantasmas (agentGetStatus, agentStop, skillsGetStatus, mcpGetStatus)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
+        expect(src).not.toContain('export async function agentGetStatus');
+        expect(src).not.toContain('export async function agentStop');
+        expect(src).not.toContain('export async function skillsGetStatus');
+        expect(src).not.toContain('export async function mcpGetStatus');
+    });
+
+    it('experimental.js exporta skillsList, skillsEnable, skillsDisable, skillsReload (F120)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function skillsList');
         expect(src).toContain('export async function skillsEnable');
         expect(src).toContain('export async function skillsDisable');
-        expect(src).toContain('export async function skillsGetStatus');
+        expect(src).toContain('export async function skillsReload');
     });
 
-    it('experimental-rpc.js exporta mcpList, mcpEnable, mcpDisable, mcpGetStatus (F121)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js exporta mcpList, mcpEnable, mcpDisable, mcpReload (F121)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function mcpList');
         expect(src).toContain('export async function mcpEnable');
         expect(src).toContain('export async function mcpDisable');
-        expect(src).toContain('export async function mcpGetStatus');
+        expect(src).toContain('export async function mcpReload');
     });
 
-    it('experimental-rpc.js exporta pluginsList (F122)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js exporta pluginsList (F122)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function pluginsList');
     });
 
-    it('experimental-rpc.js exporta extensionsList, extensionsEnable, extensionsDisable (F123)', () => {
-        const src = readSource('sdk/experimental-rpc.js');
+    it('experimental.js exporta extensionsList, extensionsEnable, extensionsDisable, extensionsReload (F123)', () => {
+        const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function extensionsList');
         expect(src).toContain('export async function extensionsEnable');
         expect(src).toContain('export async function extensionsDisable');
+        expect(src).toContain('export async function extensionsReload');
     });
 
-    it('experimental-rpc.js importa isExperimentalEnabled de feature-flags.js', () => {
-        const src = readSource('sdk/experimental-rpc.js');
-        expect(src).toContain("from './feature-flags.js'");
+    it('experimental.js importa isExperimentalEnabled de feature-flags.js', () => {
+        const src = readSource('sdk/rpc/experimental.js');
+        expect(src).toContain("from '../feature-flags.js'");
         expect(src).toContain('isExperimentalEnabled');
     });
 });
@@ -185,12 +194,12 @@ describe('F22 — F118-F123: experimental-rpc.js exports', () => {
 describe('F22 — F125: feature flag on/off por subsistema', () => {
     /** @type {typeof import('../../../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
-    /** @type {typeof import('../../../../../../src/copilot/sdk/experimental-rpc.js')} */
+    /** @type {typeof import('../../../../../../src/copilot/sdk/rpc/experimental.js')} */
     let expRpc;
 
     beforeAll(async () => {
         featureFlags = await import('#copilot/sdk/feature-flags.js');
-        expRpc = await import('#copilot/sdk/experimental-rpc.js');
+        expRpc = await import('../../../../src/copilot/sdk/rpc/experimental.js');
     });
 
     afterEach(() => {
@@ -256,13 +265,131 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(result[0].id).toBe('mcp1');
     });
 
-    it('sdk/barrel reexporta fleetStart, agentList, skillsList, mcpList, pluginsList, extensionsList', () => {
+    it('sdk/barrel reexporta funções experimentais alinhadas com SDK', () => {
         const src = readSource('sdk/index.js');
         expect(src).toContain('fleetStart');
         expect(src).toContain('agentList');
+        expect(src).toContain('agentGetCurrent');
+        expect(src).toContain('agentReload');
         expect(src).toContain('skillsList');
+        expect(src).toContain('skillsReload');
         expect(src).toContain('mcpList');
+        expect(src).toContain('mcpReload');
         expect(src).toContain('pluginsList');
         expect(src).toContain('extensionsList');
+        expect(src).toContain('extensionsReload');
+        // Removidas
+        expect(src).not.toContain('agentGetStatus');
+        expect(src).not.toContain('agentStop');
+        expect(src).not.toContain('skillsGetStatus');
+        expect(src).not.toContain('mcpGetStatus');
+    });
+
+    // ─── A3.2: Novos testes runtime para funções adicionadas ─────────────────
+
+    it('agentGetCurrent com flag=true chama session.rpc.agent.getCurrent()', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const getCurrentMock = vi.fn().mockResolvedValue({ id: 'a1', name: 'Agent 1' });
+        const sess = /** @type {any} */ ({ rpc: { agent: { getCurrent: getCurrentMock } } });
+        const result = await expRpc.agentGetCurrent(sess);
+        expect(getCurrentMock).toHaveBeenCalledOnce();
+        expect(result).toEqual({ id: 'a1', name: 'Agent 1' });
+    });
+
+    it('agentReload com flag=true chama session.rpc.agent.reload()', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const reloadMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { agent: { reload: reloadMock } } });
+        await expRpc.agentReload(sess);
+        expect(reloadMock).toHaveBeenCalledOnce();
+    });
+
+    it('skillsReload com flag=true chama session.rpc.skills.reload()', async () => {
+        featureFlags.setExperimentalFlag('skills', true);
+        const reloadMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { skills: { reload: reloadMock } } });
+        await expRpc.skillsReload(sess);
+        expect(reloadMock).toHaveBeenCalledOnce();
+    });
+
+    it('mcpReload com flag=true chama session.rpc.mcp.reload()', async () => {
+        featureFlags.setExperimentalFlag('mcp', true);
+        const reloadMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { mcp: { reload: reloadMock } } });
+        await expRpc.mcpReload(sess);
+        expect(reloadMock).toHaveBeenCalledOnce();
+    });
+
+    it('extensionsReload com flag=true chama session.rpc.extensions.reload()', async () => {
+        featureFlags.setExperimentalFlag('extensions', true);
+        const reloadMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { extensions: { reload: reloadMock } } });
+        await expRpc.extensionsReload(sess);
+        expect(reloadMock).toHaveBeenCalledOnce();
+    });
+
+    it('agentSelect valida agentId não-vazio', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const sess = /** @type {any} */ ({ rpc: { agent: { select: vi.fn() } } });
+        await expect(expRpc.agentSelect(sess, '')).rejects.toThrow(TypeError);
+    });
+
+    it('mcpEnable valida serverId não-vazio', async () => {
+        featureFlags.setExperimentalFlag('mcp', true);
+        const sess = /** @type {any} */ ({ rpc: { mcp: { enable: vi.fn() } } });
+        await expect(expRpc.mcpEnable(sess, '')).rejects.toThrow(TypeError);
+    });
+
+    it('extensionsDisable valida extensionId não-vazio', async () => {
+        featureFlags.setExperimentalFlag('extensions', true);
+        const sess = /** @type {any} */ ({ rpc: { extensions: { disable: vi.fn() } } });
+        await expect(expRpc.extensionsDisable(sess, '')).rejects.toThrow(TypeError);
+    });
+
+    it('assertSession lança TypeError para sessão inválida', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        await expect(expRpc.agentList(/** @type {any} */ (null))).rejects.toThrow(TypeError);
+        await expect(expRpc.agentList(/** @type {any} */ ({}))).rejects.toThrow(TypeError);
+    });
+
+    it('pluginsList com flag=true chama session.rpc.plugins.list()', async () => {
+        featureFlags.setExperimentalFlag('plugins', true);
+        const listMock = vi.fn().mockResolvedValue([{ id: 'p1', name: 'P', version: '1.0', enabled: true }]);
+        const sess = /** @type {any} */ ({ rpc: { plugins: { list: listMock } } });
+        const result = await expRpc.pluginsList(sess);
+        expect(listMock).toHaveBeenCalledOnce();
+        expect(result[0].id).toBe('p1');
+    });
+
+    it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ extensionId })', async () => {
+        featureFlags.setExperimentalFlag('extensions', true);
+        const enableMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { extensions: { enable: enableMock } } });
+        await expRpc.extensionsEnable(sess, 'ext-1');
+        expect(enableMock).toHaveBeenCalledWith({ extensionId: 'ext-1' });
+    });
+
+    it('skillsDisable com flag=true chama session.rpc.skills.disable({ skillId })', async () => {
+        featureFlags.setExperimentalFlag('skills', true);
+        const disableMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { skills: { disable: disableMock } } });
+        await expRpc.skillsDisable(sess, 'skill-1');
+        expect(disableMock).toHaveBeenCalledWith({ skillId: 'skill-1' });
+    });
+
+    it('agentDeselect com flag=true chama session.rpc.agent.deselect()', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const deselectMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { agent: { deselect: deselectMock } } });
+        await expRpc.agentDeselect(sess);
+        expect(deselectMock).toHaveBeenCalledOnce();
+    });
+
+    it('mcpDisable com flag=true chama session.rpc.mcp.disable({ serverId })', async () => {
+        featureFlags.setExperimentalFlag('mcp', true);
+        const disableMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { mcp: { disable: disableMock } } });
+        await expRpc.mcpDisable(sess, 'srv-1');
+        expect(disableMock).toHaveBeenCalledWith({ serverId: 'srv-1' });
     });
 });

@@ -59,16 +59,16 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase A3 — Dead Code Cleanup (~6h) 🟠
 
-| #    | Subfase                      | Descrição                                                                                             | Estimativa     | Ref    |
-| ---- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------- | ------ |
-| A3.1 | ✅ Migrar boot-wiring         | `boot-wiring.js` refatorado: `client.on()` → `onLifecycleEvents()` via `client-events.js`             | 1h             | BUG-04 |
-| A3.2 | ⬜ Wire experimental RPC      | Conectar `experimental.js` → tools (ver Faixa D)                                                      | (contado em D) | BUG-05 |
-| A3.3 | ✅ Audit trail para dead code | Reclassificações documentadas no doc 03. BUG-04→DEBT, BUG-05 DEAD CODE (Faixa D), BUG-11→FALSO POS.   | 0.5h           | —      |
-| A3.4 | ✅ Testes lifecycle + campos  | 16 testes A3 em `test_lifecycle_a1_fixes.spec.js`: boot-wiring imports, 7 campos SessionConfig × 2    | 1h             | —      |
-| A3.5 | ✅ BUG-09 SectionTransformFn  | 3 testes adicionados em `test_sdk_system_message.spec.js`: sync, async, customizeSystemMessage        | 0.5h           | BUG-09 |
-| A3.6 | ✅ BUG-11 catch-all avaliado  | `wireCatchAll()` apenas loga eventos desconhecidos — reclassificado FALSO POSITIVO                    | 0h             | BUG-11 |
-| A3.7 | ✅ BUG-08 JSDoc documentação  | `rpc/session.js:modelSwitchTo()` JSDoc note →preferir `session.setModel()`                            | 0h             | BUG-08 |
-| A3.8 | ✅ BUG-07 All SessionConfig   | 7 novos campos (availableTools,excludedTools,configDir,onEvent,agent,skillDirectories,disabledSkills) | 0.5h           | BUG-07 |
+| #    | Subfase                      | Descrição                                                                                                                                                                  | Estimativa | Ref    |
+| ---- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ |
+| A3.1 | ✅ Migrar boot-wiring         | `boot-wiring.js` refatorado: `client.on()` → `onLifecycleEvents()` via `client-events.js`                                                                                  | 1h         | BUG-04 |
+| A3.2 | ✅ Wire experimental RPC      | Reescrita completa de `experimental.js` (SDK-aligned, 20 funções), criação de `experimental-rpc-tools.js` (20 tools), wiring via `setExperimentalSession()`, 45 testes F22 | 4h         | BUG-05 |
+| A3.3 | ✅ Audit trail para dead code | Reclassificações documentadas no doc 03. BUG-04→DEBT, BUG-05 DEAD CODE (Faixa D), BUG-11→FALSO POS.                                                                        | 0.5h       | —      |
+| A3.4 | ✅ Testes lifecycle + campos  | 16 testes A3 em `test_lifecycle_a1_fixes.spec.js`: boot-wiring imports, 7 campos SessionConfig × 2                                                                         | 1h         | —      |
+| A3.5 | ✅ BUG-09 SectionTransformFn  | 3 testes adicionados em `test_sdk_system_message.spec.js`: sync, async, customizeSystemMessage                                                                             | 0.5h       | BUG-09 |
+| A3.6 | ✅ BUG-11 catch-all avaliado  | `wireCatchAll()` apenas loga eventos desconhecidos — reclassificado FALSO POSITIVO                                                                                         | 0h         | BUG-11 |
+| A3.7 | ✅ BUG-08 JSDoc documentação  | `rpc/session.js:modelSwitchTo()` JSDoc note →preferir `session.setModel()`                                                                                                 | 0h         | BUG-08 |
+| A3.8 | ✅ BUG-07 All SessionConfig   | 7 novos campos (availableTools,excludedTools,configDir,onEvent,agent,skillDirectories,disabledSkills)                                                                      | 0.5h       | BUG-07 |
 
 ---
 

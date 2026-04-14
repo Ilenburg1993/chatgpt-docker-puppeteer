@@ -58,18 +58,18 @@
 
 ---
 
-## BUG-05: Experimental RPC wrappers sem exposição (19 funções orpãs)
+## BUG-05: ~~Experimental RPC wrappers sem exposição (19 funções orpãs)~~ → ✅ CORRIGIDO
 
-- **Tipo**: DEAD CODE | **Severidade**: ALTO
-- **Localização**: `src/copilot/sdk/rpc/experimental.js` (inteiro módulo, ~400 linhas)
-- **Descrição**: O módulo exporta 19 funções para fleet, agents, skills, MCP, plugins, extensions. O barrel `sdk/index.js` re-exporta todas. Porém:
-  1. **Zero tools** em `src/copilot/tools/` usam essas funções
-  2. **Zero routes** em `src/copilot/server/routes/` expõem esses endpoints
-  3. **Zero imports** dessa API existem fora do barrel
-
-  São 400 linhas de código funcional mas inacessível ao usuário final.
-- **Correção**: Criar tools e/ou REST routes para cada subsistema (ver GAP-C01 no doc 02).
-- **Esforço**: G (criação de múltiplas tools + routes)
+- **Tipo**: ~~DEAD CODE~~ → **CORRIGIDO** | **Severidade**: ~~ALTO~~ → N/A
+- **Localização**: `src/copilot/sdk/rpc/experimental.js` + `src/copilot/tools/experimental-rpc-tools.js`
+- **Correção aplicada**:
+  1. **Reescrita completa** de `experimental.js`: removidas 4 funções fantasmas (`agentGetStatus`, `agentStop`, `skillsGetStatus`, `mcpGetStatus`) que chamavam métodos SDK inexistentes; adicionadas 5 funções SDK-aligned (`agentGetCurrent`, `agentReload`, `skillsReload`, `mcpReload`, `extensionsReload`); centralizado acesso RPC via `getRpc()` helper.
+  2. **`ExperimentalRpcNamespace` typedef** atualizado em `types.js` — 8 métodos reais (start, list, getCurrent, enable, disable, select, deselect, reload).
+  3. **Barrel exports** atualizados em `sdk/index.js` — removidas 4 phantom exports, adicionadas 5 novas.
+  4. **Criado `experimental-rpc-tools.js`** em `src/copilot/tools/` — 20 tools LLM-accessible wrapping todas as funções experimentais com `createTool()` + `wrapExp()` (timeout + error handling).
+  5. **Wiring completo**: `setExperimentalSession(session)` injetado via `finalizeSessionInit()` em `session-setup.js`; cleanup em `agent-lifecycle.js`; tools registradas no `TOOL_GROUPS` de `tools-bootstrap.js`.
+  6. **45 testes F22** passando (14 runtime + export checks + barrel alignment + negative phantom check).
+- **Esforço**: Realizado
 
 ---
 
@@ -82,21 +82,15 @@
 
 ---
 
-## BUG-07: `session-setup.js` não passa configurações experimentais
+## BUG-07: ~~`session-setup.js` não passa configurações experimentais~~ → ✅ CORRIGIDO
 
-- **Tipo**: MISALIGNMENT | **Severidade**: MÉDIO
-- **Localização**: `src/copilot/agent/lifecycle/session-setup.js:buildSessionOptions()`
-- **Descrição**: `buildSessionOptions()` constrói as opções de sessão mas não inclui:
-  - `availableTools` / `excludedTools` (SDK filtering nativo)
-  - `skillDirectories` / `disabledSkills`
-  - `agent` (initial agent name)
-  - `onEvent` (early event handler)
-  - `clientName`
-  - `configDir`
-
-  Todas são opções válidas de `SessionConfig` que foram ignoradas.
-- **Correção**: Adicionar passagem dessas opções quando disponíveis no `AgentContext` ou config.
-- **Esforço**: M (múltiplos campos em session-setup + AgentContext)
+- **Tipo**: ~~MISALIGNMENT~~ → **CORRIGIDO** | **Severidade**: ~~MÉDIO~~ → N/A
+- **Localização**: `src/copilot/agent/lifecycle/session-setup.js:buildSessionOptions()` e `src/copilot/sdk/session/lifecycle.js:buildSessionConfig()`
+- **Correção aplicada**:
+  1. `clientName` e `workingDirectory` adicionados a `buildSessionOptions()` (A2.2).
+  2. Campos `skillDirectories`, `disabledSkills`, `agent`, `configDir`, `onEvent`, `availableTools`, `excludedTools` adicionados a `buildSessionConfig()` com passagem condicional (A3: BUG-07).
+  3. Todos os campos têm testes de regressão cobrindo presença quando fornecidos e ausência quando não fornecidos.
+- **Esforço**: Realizado
 
 ---
 
@@ -143,12 +137,11 @@
 
 | Tipo               | Contagem | Severidade Alta | Severidade Média   | Severidade Baixa                          |
 | ------------------ | -------- | --------------- | ------------------ | ----------------------------------------- |
-| ✅ CORRIGIDO        | 3        | 0               | 1 (BUG-03)         | 2 (BUG-06, BUG-10)                        |
+| ✅ CORRIGIDO        | 5        | 1 (BUG-05)      | 2 (BUG-03, BUG-07) | 2 (BUG-06, BUG-10)                        |
 | FALSO POSITIVO     | 2        | 0               | 0                  | 2 (BUG-01, BUG-11)                        |
 | BUG→DEBT           | 3        | 0               | 0                  | 3 (BUG-02→I, BUG-04→refactor, BUG-08→doc) |
-| DEAD CODE          | 1        | 1 (BUG-05)      | 0                  | 0                                         |
-| DEBT               | 2        | 0               | 1 (BUG-07 parcial) | 1 (BUG-09 teste)                          |
-| **TOTAL (ativos)** | **3**    | **1**           | **1**              | **1**                                     |
+| DEBT               | 1        | 0               | 0                  | 1 (BUG-09 teste)                          |
+| **TOTAL (ativos)** | **1**    | **0**           | **0**              | **1**                                     |
 
-**Status**: BUG-03, BUG-06, BUG-10 corrigidos (A1). BUG-07 quase completo (falta só `provider`). BUG-04, BUG-08 reclassificados DEBT. BUG-01, BUG-11 falsos positivos. BUG-09 testes adicionados. Restam 3 itens ativos.
-**Ação prioritária**: BUG-05 (experimental RPC dead code) → Faixa D. BUG-07 restante (`provider` → ProviderConfig) → Faixa C.
+**Status**: BUG-03, BUG-05, BUG-06, BUG-07, BUG-10 corrigidos (A1/A2/A3). BUG-04, BUG-08 reclassificados DEBT. BUG-01, BUG-11 falsos positivos. BUG-09 testes adicionados. Resta 1 item DEBT ativo (BUG-09).
+**Ação prioritária**: BUG-09 (testes de SectionTransformFn) já tem cobertura parcial — low priority.

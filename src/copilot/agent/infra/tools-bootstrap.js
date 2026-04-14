@@ -20,6 +20,7 @@ import { log, wrapWithStats } from '#copilot/observability';
 import { buildCustomTools, registerTools } from '#copilot/sdk';
 import {
     codeTools,
+    experimentalRpcTools,
     fileReadTools,
     fileWriteTools,
     gitTools,
@@ -43,9 +44,9 @@ import {
  * @typedef {import('#copilot/sdk/types').Tool} Tool
  */
 
-// R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc exportados diretamente de tools/index.js
+// R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc, setExperimentalSession exportados diretamente de tools/index.js
 // O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
-export { configureHookTools, setHub, setPermissionAgent, setSessionRpc } from '#copilot/tools';
+export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc } from '#copilot/tools';
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as
@@ -78,6 +79,10 @@ export function bootstrapTools(registry, mcpTools) {
         [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'] }],
         [todoReadTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'read'], readOnly: true }],
         [todoWriteTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'write'] }],
+        [
+            experimentalRpcTools,
+            { category: 'experimental', tags: ['rpc', 'fleet', 'agent', 'skills', 'mcp', 'plugins', 'extensions'] },
+        ],
         [permissionTools, { category: 'permission', tags: ['approval', 'security', 'runtime-control'] }],
     ];
 

@@ -39,6 +39,7 @@
  */
 
 import { codeTools } from './code-tools.js';
+import { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
 import { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
@@ -77,12 +78,14 @@ export const allTools = [
     ...webTools,
     ...todoTools,
     ...permissionTools,
+    ...experimentalRpcTools,
 ];
 
 export {
     buildTool,
     codeTools,
     configureHookTools,
+    experimentalRpcTools,
     fileReadTools,
     fileTools,
     fileWriteTools,
@@ -96,6 +99,7 @@ export {
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,
+    setExperimentalSession,
     setHub,
     setPermissionAgent,
     setSessionRpc,

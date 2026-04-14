@@ -20,7 +20,7 @@ import { buildMcpConfig } from '../../config/mcp-servers.js';
 
 import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
-import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
+import { bootstrapTools, setExperimentalSession, setSessionRpc } from '../infra/tools-bootstrap.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -116,4 +116,5 @@ export function finalizeSessionInit(ctx, session, isResumed) {
     ctx.session = session;
     ctx.isResumed = isResumed;
     setSessionRpc(session.rpc);
+    setExperimentalSession(session);
 }
