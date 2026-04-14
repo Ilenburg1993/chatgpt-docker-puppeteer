@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { createEmitter } from '#copilot/events';
+import { EventEmitter } from 'node:events';
 
 /**
  * @typedef {Object} FanoutEvent
@@ -42,7 +42,7 @@ export class EventFanout {
      * @param {{ processId?: string }} [opts]
      */
     constructor(opts = {}) {
-        this.#emitter = createEmitter();
+        this.#emitter = new EventEmitter();
         this.#emitter.setMaxListeners(100);
         this.#processId = opts.processId ?? `pid-${process.pid}`;
     }

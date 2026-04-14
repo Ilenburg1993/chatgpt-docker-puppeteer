@@ -31,7 +31,8 @@ import {
 } from '#copilot/observability';
 import { CopilotClient, raceEvents } from '#copilot/sdk';
 import { container } from '../../core/di-container.js';
-import { CONVERSATION_STORE, EVENT_BUS } from '../../core/di-tokens.js';
+import { EVENT_BUS } from '../../core/di-tokens.js';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 
 import { getHubSessionId } from '#copilot/core';

@@ -17,7 +17,7 @@
  */
 
 import { container } from './core/di-container.js';
-import { AUDIT_BUS } from './core/di-tokens.js';
+import { AUDIT_BUS } from './audit/di-tokens.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
 

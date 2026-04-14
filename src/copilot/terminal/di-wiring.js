@@ -17,10 +17,10 @@ import { container, wireLegacySetters } from '../core/di-container.js';
 import {
     BRIDGE_AGENT,
     FALLBACK_AGENT,
-    HUB,
     NERV_BRIDGE_AGENT,
     PERMISSION_AGENT,
-} from '../core/di-tokens.js';
+} from '../bridges/di-tokens.js';
+import { HUB } from '../conversation-hub/di-tokens.js';
 import { broadcastSse } from './dialog.js';
 
 /**

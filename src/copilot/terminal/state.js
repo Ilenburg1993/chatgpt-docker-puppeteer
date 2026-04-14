@@ -16,12 +16,8 @@ import {
     TERMINAL_SHOW_THINKING,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
-import { createEmitter } from '#copilot/events';
-import {
-    CopilotError,
-    getHubSessionId as _getCoreHubSessionId,
-    setSharedHubSessionId,
-} from '#copilot/core';
+import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
+import { EventEmitter } from 'node:events';
 
 // ─── Emitter reativo ─────────────────────────────────────────────────────────
 
@@ -32,7 +28,7 @@ import {
  *     import { stateEmitter } from './state.js';
  *     stateEmitter.on('busy:changed', (busy) => console.log('terminal busy:', busy));
  */
-export const stateEmitter = createEmitter();
+export const stateEmitter = new EventEmitter();
 // T-23: setMaxListeners calculado em vez de hardcoded (base 10 + margem p/ hot patches)
 stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
 

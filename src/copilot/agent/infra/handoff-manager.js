@@ -15,7 +15,12 @@
  * @see EventBus
  */
 
-import { BaseEmitter, EMITTER_HANDOFF_ACCEPTED, EMITTER_HANDOFF_RECEIVED, EMITTER_HANDOFF_REJECTED } from '#copilot/events';
+import { EventEmitter } from 'node:events';
+import {
+    EMITTER_HANDOFF_ACCEPTED,
+    EMITTER_HANDOFF_RECEIVED,
+    EMITTER_HANDOFF_REJECTED,
+} from '#copilot/events';
 import { log } from '#copilot/observability';
 
 /**
@@ -39,9 +44,9 @@ import { log } from '#copilot/observability';
 /**
  * Gerencia handoffs de sessão entre agentes.
  *
- * @extends BaseEmitter
+ * @extends EventEmitter
  */
-export class HandoffManager extends BaseEmitter {
+export class HandoffManager extends EventEmitter {
     /** @type {Map<string, HandoffRequest>} */
     #pending = new Map();
 

@@ -13,8 +13,8 @@
 
 import { getCopilotFallbackModel } from '#copilot/config';
 import { SessionError } from '#copilot/core';
+import { EventEmitter } from 'node:events';
 import {
-    BaseEmitter,
     EMITTER_LOOP_CHANGED,
     EMITTER_LOOP_COMPACTION_REQUESTED,
     EMITTER_LOOP_PAUSED,
@@ -67,9 +67,9 @@ import { DialogWatchdog } from './watchdog.js';
 /**
  * Gerenciador do dialog loop — encapsula mutex, watchdog, backpressure, pause/resume e protocolo READY/REPLY.
  *
- * @extends BaseEmitter
+ * @extends EventEmitter
  */
-export class DialogLoopManager extends BaseEmitter {
+export class DialogLoopManager extends EventEmitter {
     /** @type {boolean} */
     #active = false;
 

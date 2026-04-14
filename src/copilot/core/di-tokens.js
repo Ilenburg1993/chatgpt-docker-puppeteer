@@ -50,19 +50,7 @@ export const ROOT_LOGGER = createToken('ROOT_LOGGER');
 export const APP_CONFIG = createToken('APP_CONFIG');
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Re-exports de tokens de camadas superiores (backward compatibility)
+// Re-exports de tokens de camadas superiores removidos — Faixa 3.4 (D2-12)
+// Cada camada exporta seus próprios tokens diretamente via `<modulo>/di-tokens.js`.
+// Exemplo: `import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens.js'`
 // ═══════════════════════════════════════════════════════════════════════════════
-
-export { ALWAYS_ALIVE_AGENT, DIALOG_ENGINE } from '../agent/di-tokens.js';
-export { AUDIT_BUS, AUDIT_LOGGER, AUDIT_PIPELINE } from '../audit/di-tokens.js';
-export { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../bridges/di-tokens.js';
-export { INJECT_SERVER } from '../channel/di-tokens.js';
-export { CONVERSATION_STORE, HUB, SESSION_RPC, SOCKET_NAMESPACE } from '../conversation-hub/di-tokens.js';
-export { CACHE_MANAGER, MISSION_CONTROL, MUTEX_POOL, RATE_LIMITER, TIMER_REGISTRY, WORKER_POOL } from '../infra/di-tokens.js';
-export {
-    ALERTS_MANAGER, ERROR_TRACKER, EVENT_COLLECTOR, HEALTH_MANAGER,
-    METRICS_STORE, OTEL_TRACER, QUOTA_MONITOR
-} from '../observability/di-tokens.js';
-export { CIRCUIT_BREAKER_REGISTRY, PLUGIN_REGISTRY } from '../plugins/di-tokens.js';
-export { SDK_LOGGER, TOOLS_BUILDER } from '../sdk/di-tokens.js';
-export { AGENT_SERVICE, CONVERSATION_SERVICE, DIALOG_SERVICE, SESSION_SERVICE } from '../services/di-tokens.js';

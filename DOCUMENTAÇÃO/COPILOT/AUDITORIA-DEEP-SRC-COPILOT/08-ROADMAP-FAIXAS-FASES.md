@@ -9,13 +9,13 @@
 
 ## STATUS DE EXECUÇÃO
 
-| Faixa       | Status                       | Commit     | Data       |
-| ----------- | ---------------------------- | ---------- | ---------- |
-| **Faixa 0** | ✅ CONCLUÍDA                  | `5ecbceb1` | 2026-06-11 |
-| **Faixa 1** | ✅ VALIDADA (já implementada) | —          | 2026-06-11 |
-| **Faixa 2** | ✅ CONCLUÍDA                  | `8e2006eb` | 2026-06-11 |
-| **Faixa 3** | 🔄 EM PROGRESSO (3.1 ✅ 3.2 ✅ 3.3 ✅) | `edc5eaff` | 2026-06-11 |
-| Faixa 4-5   | ⏳ PENDENTE                   | —          | —          |
+| Faixa       | Status                             | Commit     | Data       |
+| ----------- | ---------------------------------- | ---------- | ---------- |
+| **Faixa 0** | ✅ CONCLUÍDA                        | `5ecbceb1` | 2026-06-11 |
+| **Faixa 1** | ✅ VALIDADA (já implementada)       | —          | 2026-06-11 |
+| **Faixa 2** | ✅ CONCLUÍDA                        | `8e2006eb` | 2026-06-11 |
+| **Faixa 3** | 🔄 EM PROGRESSO (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅) | `edc5eaff` | 2026-06-11 |
+| Faixa 4-5   | ⏳ PENDENTE                         | —          | —          |
 
 ### Notas da Faixa 0
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js
@@ -75,7 +75,7 @@ Todas as 6 sub-fases verificadas e limpas:
   - `IToolRegistry` → `sdk/tools/registry.js` (data-only typedef existente `ToolRegistry`)
   - `IHooksPipeline` → `hooks/factory.js::createHooks()` (retorna `SessionHooks`)
 
-#### Fase 3.3 — God Class Decomposition (EM PROGRESSO)
+#### Fase 3.3 — God Class Decomposition ✅ CONCLUÍDA
 Avaliação detalhada dos 5 sub-items:
 - **3.3.1** (D2-03 — loop-manager.js, 597 LOC): `WatchdogTimer` já extraído para `watchdog.js`, `BackpressureQueue` para `backpressure.js`, `ModelFallbackState` para `model-fallback.js`. Restam `#prMetrics` (~14 linhas, trivial) — **extrair como `PrTracker`**.
 - **3.3.2** (D2-04 — conversation-hub/store.js, 562 LOC): Já decomposto — `store-helpers.js`, `store-memories.js`, `store-queries.js`, `store-sync.js`. A classe restante é CRUD puro sobre SQLite. **RESOLVIDO.**
@@ -280,12 +280,33 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ### Fase 3.4 — Event System Unification
 
-| Sub   | Finding | Ação                                                                              |
-| ----- | ------- | --------------------------------------------------------------------------------- |
-| 3.4.1 | D3-02   | Deprecar `createEventBus`, `createEmitter` — unificar em EventBus + bridgeEmitter |
-| 3.4.2 | AC-3-03 | Split event constants por domínio                                                 |
-| 3.4.3 | U4-16   | Auto-generate event catalog                                                       |
-| 3.4.4 | D2-12   | Eliminar God Barrel `di-tokens.js` — tokens per-module                            |
+| Sub   | Finding | Ação                                                                              | Status |
+| ----- | ------- | --------------------------------------------------------------------------------- | ------ |
+| 3.4.1 | D3-02   | Deprecar `createEventBus`, `createEmitter` — unificar em EventBus + bridgeEmitter | ✅ DONE |
+| 3.4.2 | AC-3-03 | Split event constants por domínio                                                 | ✅ PRÉ-RESOLVIDO |
+| 3.4.3 | U4-16   | Auto-generate event catalog                                                       | ✅ PRÉ-RESOLVIDO |
+| 3.4.4 | D2-12   | Eliminar God Barrel `di-tokens.js` — tokens per-module                            | ✅ DONE |
+| 3.4.5 | —       | Migrar `BaseEmitter` → `EventEmitter` nativo (6 classes)                          | ✅ DONE |
+| 3.4.6 | —       | Documentar naming convention (`:` EventBus vs `.` emitter interno)                | ✅ DONE |
+
+> **Notas Faixa 3.4** (completada nesta sessão):
+>
+> - **3.4.1**: `createEmitter()` e `BaseEmitter` depreciados com `@deprecated` em
+>   `events/create-emitter.js`. Dois consumidores migrados (`infra/sse/fanout.js`, `terminal/state.js`)
+>   para `import { EventEmitter } from 'node:events'`. Seis classes que herdavam `BaseEmitter`
+>   migradas para `EventEmitter` direto (`hooks/bus.js`, `conversation-hub/orchestrator.js`,
+>   `agent/dialog/loop-manager.js`, `agent/always-alive.js`, `agent/infra/handoff-manager.js`,
+>   `config/pinned-files.js`). `createEventBus()` mantido apenas como factory para DI (1 consumer).
+> - **3.4.2**: Já havia 10 domain files (`agent-events.js`, `emitter-events.js`, `hook-events.js`,
+>   `hub-events.js`, `nerv-events.js`, `service-events.js`, `system-events.js`, `terminal-events.js`,
+>   `legacy-events.js`, `sdk-events.js`) com 166 constantes. Nenhuma ação necessária.
+> - **3.4.3**: `observability/event-catalog.js` já gera catálogo dinâmico a partir das constantes SSOT
+>   com dead-letter tracking. Nenhuma ação necessária.
+> - **3.4.4**: Re-exports de tokens de camadas superiores removidos de `core/di-tokens.js`. Zero
+>   consumidores usavam esse path. Cada camada já exporta tokens via `<modulo>/di-tokens.js`.
+> - **3.4.5** (novo): 6 classes migraram de `extends BaseEmitter` para `extends EventEmitter` nativo.
+> - **3.4.6** (novo): Naming convention documentada em `emitter-events.js`: EventBus usa `:`,
+>   emitters internos usam `.`, lifecycle plano usa strings simples. `bridgeEmitter()` faz a ponte.
 
 ### Fase 3.5 — DI Container Enhancement
 

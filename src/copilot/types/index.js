@@ -12,22 +12,12 @@
  * @module copilot/types
  */
 
-// ─── DI Tokens (re-export canônico de core/di-tokens) ────────────────────────
-export {
-    AUDIT_BUS,
-    AUDIT_LOGGER,
-    BRIDGE_AGENT,
-    DB_LOGGER,
-    EVENT_BUS,
-    FALLBACK_AGENT,
-    HUB,
-    NERV_BRIDGE_AGENT,
-    PERMISSION_AGENT,
-    SDK_LOGGER,
-    SESSION_RPC,
-    SHUTDOWN_LOGGER,
-    TOOLS_BUILDER,
-} from '../core/di-tokens.js';
+// ─── DI Tokens — importados dos módulos de origem (Faixa 3.4, D2-12) ─────────
+export { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '../core/di-tokens.js';
+export { AUDIT_BUS, AUDIT_LOGGER } from '../audit/di-tokens.js';
+export { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../bridges/di-tokens.js';
+export { HUB, SESSION_RPC } from '../conversation-hub/di-tokens.js';
+export { SDK_LOGGER, TOOLS_BUILDER } from '../sdk/di-tokens.js';
 
 // ─── DI Container utilities ──────────────────────────────────────────────────
 export { container } from '../core/di-container.js';

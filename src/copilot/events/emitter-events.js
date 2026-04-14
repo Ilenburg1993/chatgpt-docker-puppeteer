@@ -9,6 +9,13 @@
  * nomes _internos_ do emitter pattern do AlwaysAliveAgent. O bridgeEmitter em `always-alive.js` mapeia estes para os
  * SSOT do EventBus.
  *
+ * **Convenção de naming (Faixa 3.4)**:
+ * - Eventos de **EventBus** (cross-module) usam separador `:` → `agent:ready`, `hooks:pre_tool_use`
+ * - Eventos de **EventEmitter** (local/interno) usam separador `.` → `session.keepalive`, `dialog.ready`
+ * - Eventos lifecycle simples (sem namespace) são plain strings → `ready`, `error`, `stopped`
+ *
+ * Essa distinção é intencional: o `bridgeEmitter()` converte `.` local → `:` EventBus automaticamente.
+ *
  * @module copilot/events/emitter-events
  */
 

@@ -12,8 +12,8 @@
  * @see module:copilot/hooks/factory
  */
 
+import { EventEmitter } from 'node:events';
 import {
-    BaseEmitter,
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
     HOOK_PRE_TOOL_USE,
@@ -73,9 +73,9 @@ const HOOK_NAME_TO_EVENTBUS = {
  * - `'session_end'` — ao encerrar uma sessão
  * - `'error_occurred'` — ao ocorrer um erro
  *
- * @extends {BaseEmitter}
+ * @extends {EventEmitter}
  */
-export class HookBus extends BaseEmitter {
+export class HookBus extends EventEmitter {
     /** @type {EventBus | null} */
     #eventBus = null;
 

@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { BaseEmitter } from '#copilot/events';
+import { EventEmitter } from 'node:events';
 import { log } from '#copilot/observability';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
@@ -45,7 +45,7 @@ const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.y
  *
  * @fires PinnedFilesLoader#changed
  */
-export class PinnedFilesLoader extends BaseEmitter {
+export class PinnedFilesLoader extends EventEmitter {
     /** @type {string[]} */
     #dirs;
 

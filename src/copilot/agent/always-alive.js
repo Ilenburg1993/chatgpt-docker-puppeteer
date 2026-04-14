@@ -12,7 +12,7 @@
  */
 
 import { bridgeEmitter, logSwallowed } from '#copilot/core';
-import { BaseEmitter } from '#copilot/events';
+import { EventEmitter } from 'node:events';
 import { defaultMetrics } from '#copilot/observability';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
@@ -72,10 +72,10 @@ import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agen
  *
  * Implementa {@link import('../../core/interfaces.js').IAgent IAgent} (Faixa 3.2 — AC-5-01).
  *
- * @extends BaseEmitter
+ * @extends EventEmitter
  * @see module:copilot/core/interfaces
  */
-export class AlwaysAliveAgent extends BaseEmitter {
+export class AlwaysAliveAgent extends EventEmitter {
     /**
      * F35: AgentContext — contexto compartilhado com todos os módulos internos.
      *
