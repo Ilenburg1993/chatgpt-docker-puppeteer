@@ -9,8 +9,8 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
-import { CONVERSATION_STORE, HUB } from '../../conversation-hub/di-tokens.js';
 import { getHubSessionId } from '../state.js';
 
 /**

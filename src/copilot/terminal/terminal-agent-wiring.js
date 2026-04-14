@@ -9,6 +9,8 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { HUB } from '#copilot/conversation-hub';
 import {
     AGENT_EVENTS,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -24,9 +26,7 @@ import {
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { llmBridgeClient } from '../channel/client.js';
-import { HUB } from '../conversation-hub/di-tokens.js';
 import { container } from '../core/di-container.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog.js';

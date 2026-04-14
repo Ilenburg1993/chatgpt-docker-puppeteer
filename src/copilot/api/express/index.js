@@ -18,11 +18,11 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
+import { METRICS_STORE } from '#copilot/observability';
 import { createSessionService, createToolService } from '#copilot/services';
 import { Router } from 'express';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
-import { METRICS_STORE } from '../../observability/di-tokens.js';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';

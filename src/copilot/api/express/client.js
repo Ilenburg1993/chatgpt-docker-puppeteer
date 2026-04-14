@@ -178,8 +178,8 @@ export default function createClientRouter(deps) {
     /**
      * GET /tools
      *
-     * Lista as ferramentas disponíveis. Se o agente está iniciado, usa o ToolsRegistry rico (com categoria, tags, readOnly,
-     * skipPermission). Caso contrário, usa allTools estático.
+     * Lista as ferramentas disponíveis. Se o agente está iniciado, usa o ToolsRegistry rico (com categoria, tags,
+     * readOnly, skipPermission). Caso contrário, usa allTools estático.
      */
     router.get('/tools', (_req, res) => {
         const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (agent)

@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
-import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 
 /**
  * Handler do comando `/resume`.

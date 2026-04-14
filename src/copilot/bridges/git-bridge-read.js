@@ -9,12 +9,11 @@
  */
 
 import { container } from '#copilot/core';
-import { startSpanImmediate } from '#copilot/observability';
+import { METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { METRICS_STORE } from '../observability/di-tokens.js';
 
 const execFileAsync = promisify(execFile);
 

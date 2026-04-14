@@ -9,13 +9,12 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
 import { container } from '#copilot/core';
-import { getStatsByCategory, getToolStats } from '#copilot/observability';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../../infra/sse/state.js';
-import { ERROR_TRACKER, METRICS_STORE } from '../../observability/di-tokens.js';
 import { clearRateLimiters } from '../rate-limiter-state.js';
 import { getInjectHistory } from '../state.js';
 

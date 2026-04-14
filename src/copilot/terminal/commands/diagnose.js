@@ -18,11 +18,11 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
+import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { getToolStats } from '#copilot/observability';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
-import { CONVERSATION_STORE, HUB } from '../../conversation-hub/di-tokens.js';
 
 /**
  * @typedef {object} DiagnoseContext

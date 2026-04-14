@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
+import { HUB } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
-import { HUB } from '../../conversation-hub/di-tokens.js';
 
 /**
  * @typedef {object} SearchContext

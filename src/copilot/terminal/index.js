@@ -17,17 +17,16 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
-import { bridgeEmitter } from '#copilot/core';
+import { HUB } from '#copilot/conversation-hub';
+import { bridgeEmitter, EVENT_BUS } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
-import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
-import { HUB } from '../conversation-hub/di-tokens.js';
 import { container } from '../core/di-container.js';
-import { EVENT_BUS } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startCopilotServer } from '../server/index.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';

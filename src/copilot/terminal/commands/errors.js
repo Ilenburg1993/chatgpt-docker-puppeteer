@@ -11,7 +11,7 @@
  */
 
 import { container } from '#copilot/core';
-import { ERROR_TRACKER } from '../../observability/di-tokens.js';
+import { ERROR_TRACKER } from '#copilot/observability';
 
 /**
  * @typedef {object} ErrorsContext

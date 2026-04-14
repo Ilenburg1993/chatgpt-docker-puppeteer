@@ -10,12 +10,12 @@
  * @see module:copilot/terminal/dialog
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
 import { container } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
-import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { resolve } from './alias-store.js';

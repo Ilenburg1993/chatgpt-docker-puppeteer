@@ -8,11 +8,10 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
-import { getToolStats } from '#copilot/observability';
+import { ERROR_TRACKER, getToolStats } from '#copilot/observability';
 import { llmBridgeClient } from '#copilot/services';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
-import { ERROR_TRACKER } from '../../observability/di-tokens.js';
 
 /**
  * @typedef {object} MetricsContext

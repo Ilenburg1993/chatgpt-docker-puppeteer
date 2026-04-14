@@ -110,3 +110,6 @@ export { AuditRingBuffer, createAuditPostToolHandler, getAuditTail, globalAuditB
 
 // ─── Logger injection (Faixa 3.1 — desacopla hooks/ de observability/) ────────
 export { clearHooksLogger, setHooksLogger } from './logger.js';
+
+// ─── DI Tokens ───────────────────────────────────────────────────────────────
+export { HOOKS_LOGGER } from './di-tokens.js';

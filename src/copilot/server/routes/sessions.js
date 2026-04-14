@@ -15,10 +15,10 @@
  * @module copilot/server/routes/sessions
  */
 
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
-import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';

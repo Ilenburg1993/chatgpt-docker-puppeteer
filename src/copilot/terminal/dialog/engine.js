@@ -6,11 +6,11 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges';
 import { container } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { llmBridgeClient } from '#copilot/services';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,

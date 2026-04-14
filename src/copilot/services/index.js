@@ -21,7 +21,6 @@ export { ToolService, createToolService } from './tool-service.js';
 
 // De #copilot/agent
 export {
-    alwaysAliveAgent,
     createSnapshot,
     listSnapshotsAsync,
     loadSnapshotAsync,
@@ -30,7 +29,7 @@ export {
 } from '#copilot/agent';
 
 // De #copilot/conversation-hub
-export { broadcastGlobal, broadcastToSession, conversationHub, conversationStore } from '#copilot/conversation-hub';
+export { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
 
 // De #copilot/channel
 export { CHANNEL_VERSION, llmBridgeClient } from '#copilot/channel';

@@ -18,9 +18,9 @@
  * @module copilot/server/routes/copilot-api
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
 import { Router } from 'express';
-import { ALWAYS_ALIVE_AGENT } from '../../../agent/di-tokens.js';
 import { registerControlRoutes } from './control.js';
 import { registerDialogRoutes } from './dialog.js';
 import { registerStreamRoutes } from './stream.js';

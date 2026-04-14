@@ -25,10 +25,9 @@
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, container, withRetry } from '#copilot/core';
-import { log, startSpanImmediate } from '#copilot/observability';
+import { log, METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import net from 'node:net';
-import { METRICS_STORE } from '../observability/di-tokens.js';
 import { buildZodSchema } from './mcp-tool-schema.js';
 
 /**

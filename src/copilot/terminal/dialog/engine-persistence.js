@@ -10,9 +10,9 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
+import { HUB } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { HUB } from '../../conversation-hub/di-tokens.js';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
 const _pendingNotifications = [];

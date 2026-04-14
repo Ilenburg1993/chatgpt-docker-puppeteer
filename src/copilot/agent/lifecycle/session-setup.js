@@ -13,11 +13,10 @@
  */
 
 import { container } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log, METRICS_STORE } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
-import { METRICS_STORE } from '../../observability/di-tokens.js';
 
 import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';

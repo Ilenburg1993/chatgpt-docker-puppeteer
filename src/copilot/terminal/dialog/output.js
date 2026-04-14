@@ -8,9 +8,9 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { container } from '#copilot/core';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 

@@ -10,9 +10,9 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 

@@ -13,14 +13,14 @@
  * @module copilot/bootstrap
  */
 
-import { AUDIT_BUS } from './audit/di-tokens.js';
+import { AUDIT_BUS } from '#copilot/audit';
+import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
+import { HOOKS_LOGGER } from '#copilot/hooks';
+import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
+import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { container } from './core/di-container.js';
-import { EVENT_BUS, SHUTDOWN_LOGGER } from './core/di-tokens.js';
-import { HOOKS_LOGGER } from './hooks/di-tokens.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
-import { SDK_LOGGER, TOOLS_BUILDER } from './sdk/di-tokens.js';
-import { TOOLS_LOGGER, TOOLS_METRICS } from './tools/di-tokens.js';
 
 /** @type {boolean} */
 let _booted = false;

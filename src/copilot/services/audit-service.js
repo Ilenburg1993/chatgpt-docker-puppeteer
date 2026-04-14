@@ -9,8 +9,7 @@
 
 import { AUDIT_LOG, defaultAuditLog, getAuditTail, globalAuditBuffer, isHighRiskTool } from '#copilot/audit';
 import { container, EVENT_BUS } from '#copilot/core';
-import { log } from '#copilot/observability';
-import { ERROR_TRACKER, METRICS_STORE } from '../observability/di-tokens.js';
+import { ERROR_TRACKER, log, METRICS_STORE } from '#copilot/observability';
 
 /**
  * Fachada de auditoria — consolida operações de audit + observability.

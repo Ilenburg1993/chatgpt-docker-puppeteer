@@ -7,10 +7,10 @@
  * @module copilot/services/conversation-service
  */
 
+import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { container, EVENT_BUS } from '#copilot/core';
 import { SERVICE_SESSION_MESSAGE } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { CONVERSATION_STORE, HUB } from '../conversation-hub/di-tokens.js';
 
 /**
  * Fachada de conversação — consolida conversation-hub + channel.

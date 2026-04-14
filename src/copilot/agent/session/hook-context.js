@@ -15,13 +15,12 @@
  */
 
 import { container, logSwallowed } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log, METRICS_STORE } from '#copilot/observability';
 import { readStore as _readTodoStore } from '#copilot/tools';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { safeJsonParse } from '../../core/safe-json.js';
-import { METRICS_STORE } from '../../observability/di-tokens.js';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../config.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────

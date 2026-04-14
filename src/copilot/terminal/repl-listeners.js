@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import {
     EMITTER_ASSISTANT_INTENT,
     EMITTER_QUESTION_PENDING,
@@ -22,7 +23,6 @@ import {
     EMITTER_TOOL_EXECUTION_COMPLETE,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { container } from '../core/di-container.js';
 import { broadcastSse, println } from './dialog.js';
 

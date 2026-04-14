@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { getShowUsage, setShowUsage } from '../state.js';
 
 /**

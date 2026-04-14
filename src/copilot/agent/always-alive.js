@@ -12,8 +12,8 @@
  */
 
 import { bridgeEmitter, container, logSwallowed } from '#copilot/core';
+import { METRICS_STORE } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
-import { METRICS_STORE } from '../observability/di-tokens.js';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 

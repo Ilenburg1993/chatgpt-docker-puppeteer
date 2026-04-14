@@ -15,12 +15,19 @@
  * @see EventBus
  */
 
-import { TimeoutError, bridgeEmitter, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
+import {
+    EVENT_BUS,
+    TimeoutError,
+    bridgeEmitter,
+    container,
+    registerShutdownHandler,
+    runShutdown,
+    withRetry,
+} from '#copilot/core';
 import { defaultBus } from '#copilot/hooks';
-import { log } from '#copilot/observability';
+import { ERROR_TRACKER, log } from '#copilot/observability';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import { CopilotClient } from '#copilot/sdk';
-import { EVENT_BUS } from '../../core/di-tokens.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
     EMITTER_ERROR,
@@ -33,7 +40,6 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../events/index.js';
-import { ERROR_TRACKER } from '../../observability/di-tokens.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
     BOOT_MAX_RETRIES,

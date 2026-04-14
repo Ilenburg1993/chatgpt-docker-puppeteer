@@ -8,11 +8,11 @@
  * @module copilot/terminal/di-wiring
  */
 
-import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
+import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
-import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../bridges/di-tokens.js';
 import { setBridgeAgent } from '../channel/client.js';
-import { CONVERSATION_STORE, HUB } from '../conversation-hub/di-tokens.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
 import { conversationStore } from '../conversation-hub/store.js';

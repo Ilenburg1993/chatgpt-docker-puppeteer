@@ -9,9 +9,12 @@
  * @see module:copilot/terminal/route-table
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
+import { METRICS_STORE } from '#copilot/observability';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
@@ -20,18 +23,12 @@ import {
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
-import {
-    alwaysAliveAgent,
-    conversationHub,
-    conversationStore,
-    setBackgroundCompactionThreshold,
-} from '#copilot/services';
+import { setBackgroundCompactionThreshold } from '#copilot/services';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { getSseClients, getSseCriticalClients } from '../../infra/sse/state.js';
-import { METRICS_STORE } from '../../observability/di-tokens.js';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode } from '../state.js';
 
@@ -47,11 +44,11 @@ import { getBusy, getHubSessionId, getPlanMode } from '../state.js';
  * @returns {HandlerResult}
  */
 export function handleHealth() {
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const snapshot = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot();
     let hubInfo = { initialized: false, activeSessions: 0 };
-    if (conversationHub.isReady) {
+    if (container.resolve(HUB).isReady) {
         try {
-            const activeSessions = conversationStore.countHubSessions({ status: 'active' });
+            const activeSessions = container.resolve(CONVERSATION_STORE).countHubSessions({ status: 'active' });
             hubInfo = { initialized: true, activeSessions };
         } catch {
             hubInfo = { initialized: true, activeSessions: -1 };
@@ -61,13 +58,13 @@ export function handleHealth() {
         status: 200,
         body: {
             ok: true,
-            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-            agentStatus: alwaysAliveAgent.status,
+            dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
+            agentStatus: container.resolve(ALWAYS_ALIVE_AGENT).status,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
             sseClients: getSseClients().size,
-            model: alwaysAliveAgent.model,
-            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            model: container.resolve(ALWAYS_ALIVE_AGENT).model,
+            reasoningEffort: container.resolve(ALWAYS_ALIVE_AGENT).reasoningEffort ?? 'high',
             contextWindow: snapshot.contextWindow,
             cacheStats: { fileContext: getFileCacheStats() },
             hub: hubInfo,
@@ -114,16 +111,16 @@ export function getSseClientSets() {
  * @returns {HandlerResult}
  */
 export function handleGetConfig() {
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const snapshot = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot();
     return {
         status: 200,
         cors: true,
         body: {
             ok: true,
-            model: alwaysAliveAgent.model,
-            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            model: container.resolve(ALWAYS_ALIVE_AGENT).model,
+            reasoningEffort: container.resolve(ALWAYS_ALIVE_AGENT).reasoningEffort ?? 'high',
             planMode: getPlanMode(),
-            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+            dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
             port: LLM_B_TERMINAL_PORT,

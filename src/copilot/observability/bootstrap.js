@@ -13,22 +13,22 @@
  * @module copilot/observability/bootstrap
  */
 
-import { AUDIT_LOGGER } from '../audit/di-tokens.js';
+import { AUDIT_LOGGER } from '#copilot/audit';
+import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
+import { HOOKS_LOGGER } from '#copilot/hooks';
+import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
+import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { setAuditLogger } from '../audit/logger.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
-import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '../core/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
 import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
-import { HOOKS_LOGGER } from '../hooks/di-tokens.js';
 import { setHooksLogger } from '../hooks/logger.js';
-import { SDK_LOGGER, TOOLS_BUILDER } from '../sdk/di-tokens.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
-import { TOOLS_LOGGER, TOOLS_METRICS } from '../tools/di-tokens.js';
 import { setToolsLogger } from '../tools/logger.js';
 import { setToolsMetrics } from '../tools/metrics-proxy.js';
 import { createLogObserver } from './bus-actions/log-observer.js';

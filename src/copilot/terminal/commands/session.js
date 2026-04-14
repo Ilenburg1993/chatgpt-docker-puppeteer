@@ -9,6 +9,8 @@
  * @see EventBus
  */
 
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import {
     createSnapshot,
@@ -17,8 +19,6 @@ import {
     loadSnapshotAsync,
     saveSnapshotAsync,
 } from '#copilot/services';
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
-import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**

@@ -17,7 +17,7 @@ import { container, validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { validate } from '../middleware/validate.js';
 
 /**

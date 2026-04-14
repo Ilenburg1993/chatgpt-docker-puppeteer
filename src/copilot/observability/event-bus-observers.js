@@ -20,8 +20,8 @@
  * @see EventBus
  */
 
+import { EVENT_BUS } from '#copilot/core';
 import { container } from '../core/di-container.js';
-import { EVENT_BUS } from '../core/di-tokens.js';
 import {
     AGENT_DIALOG_LOOP_CHANGED,
     AGENT_DIALOG_STALLED,

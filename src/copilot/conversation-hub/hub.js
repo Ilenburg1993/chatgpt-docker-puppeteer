@@ -12,7 +12,7 @@
  * @see module:copilot/bridges/nerv-event-bus-adapterbus-adapter
  */
 
-import { SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';
+import { EVENT_BUS, SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';
 import {
     HUB_EVENTS,
     HUB_SESSION_CLOSED,
@@ -23,7 +23,6 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { container } from '../core/di-container.js';
-import { EVENT_BUS } from '../core/di-tokens.js';
 import { setCopilotNamespace } from './broadcast.js';
 import { HubOrchestrator } from './orchestrator.js';
 import { conversationStore } from './store.js';

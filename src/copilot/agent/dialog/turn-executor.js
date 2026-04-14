@@ -18,8 +18,7 @@ import {
     EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { log, startSpan } from '#copilot/observability';
-import { METRICS_STORE } from '../../observability/di-tokens.js';
+import { log, METRICS_STORE, startSpan } from '#copilot/observability';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
