@@ -11,6 +11,7 @@
 
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { log } from '#copilot/observability';
+import { globalAuditTrail } from '#copilot/hooks';
 import { CHANNEL_VERSION, createConversationService } from '#copilot/services';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
@@ -75,6 +76,24 @@ export function registerControlRoutes(bridge, agent) {
 
     // GAP-SE-001b (STREAMING-EVENTS-AUDIT Fase 2.2): endpoint de steering (immediate mode)
     bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) => _handleSteer(req, res, agent));
+
+    // E3.2 — Dashboard de compliance: decisões de hooks e estatísticas
+    bridge.get('/compliance', (_req, /** @type {Res} */ res) => {
+        try {
+            const data = globalAuditTrail.toJSON();
+            res.json({ ok: true, ...data });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: toError(e).message });
+        }
+    });
+    bridge.get('/compliance/stats', (_req, /** @type {Res} */ res) => {
+        try {
+            const stats = globalAuditTrail.stats();
+            res.json({ ok: true, ...stats });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: toError(e).message });
+        }
+    });
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────

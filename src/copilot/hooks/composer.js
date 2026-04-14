@@ -193,3 +193,100 @@ export function memoize(handler, keyFn) {
     };
     return /** @type {T} */ (/** @type {unknown} */ (fn));
 }
+
+// ─── Middleware composition (E2.1 — composição declarativa) ──────────────────
+
+/**
+ * @typedef {import('./types.js').PreToolUseHookInput} PreToolUseHookInput
+ *
+ * @typedef {import('./types.js').PreToolUseHookOutput} PreToolUseHookOutput
+ */
+
+/**
+ * Combina middlewares em estilo Koa/Express. Cada middleware recebe `(input, invocation, next)`
+ * e pode modificar o fluxo chamando `next()` ou retornando diretamente.
+ *
+ * @example
+ *     const hook = middleware(
+ *         async (input, inv, next) => {
+ *             console.log('before:', input.toolName);
+ *             const result = await next(input, inv);
+ *             console.log('after:', result);
+ *             return result;
+ *         },
+ *         async (input) => ({ permissionDecision: 'allow' }),
+ *     );
+ *
+ * @template TInput, TOutput
+ * @param {...import('./types.js').HookMiddleware<TInput, TOutput>} middlewares
+ * @returns {(input: TInput, invocation: import('./types.js').InvocationContext) => Promise<TOutput | void>}
+ */
+export function middleware(...middlewares) {
+    /**
+     * @param {TInput} input
+     * @param {import('./types.js').InvocationContext} invocation
+     * @returns {Promise<TOutput | void>}
+     */
+    return function composed(input, invocation) {
+        let index = -1;
+
+        /**
+         * @param {number} i
+         * @param {TInput} inp
+         * @param {import('./types.js').InvocationContext} inv
+         * @returns {Promise<TOutput | void>}
+         */
+        function dispatch(i, inp, inv) {
+            if (i <= index) {
+                return Promise.reject(new Error('[hooks/composer] next() chamado múltiplas vezes'));
+            }
+            index = i;
+            const mw = middlewares[i];
+            if (!mw) return Promise.resolve(undefined);
+            try {
+                return Promise.resolve(
+                    mw(inp, inv, (nextInput, nextInv) => dispatch(i + 1, nextInput, nextInv)),
+                );
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        }
+
+        return dispatch(0, input, invocation);
+    };
+}
+
+/**
+ * Cria um middleware de logging que registra entrada e saída de cada hook call.
+ * Útil para debug e auditoria em pipeline composto.
+ *
+ * @template TInput, TOutput
+ * @param {string} label - Label para identificação nos logs
+ * @returns {import('./types.js').HookMiddleware<TInput, TOutput>}
+ */
+export function loggingMiddleware(label) {
+    return async (input, invocation, next) => {
+        log('DEBUG', `[hooks/composer] ${label} → entrada`);
+        const result = await next(input, invocation);
+        log('DEBUG', `[hooks/composer] ${label} → saída: ${result ? JSON.stringify(result).slice(0, 120) : 'void'}`);
+        return result;
+    };
+}
+
+/**
+ * Cria um middleware que executa o handler apenas para tools específicas.
+ * Para outras tools, chama `next()` diretamente (bypass).
+ *
+ * @param {string[]} toolNames - Nomes de tools para interceptar
+ * @param {import('./types.js').HookMiddleware<PreToolUseHookInput, PreToolUseHookOutput>} mw
+ * @returns {import('./types.js').HookMiddleware<PreToolUseHookInput, PreToolUseHookOutput>}
+ */
+export function forTools(toolNames, mw) {
+    const set = new Set(toolNames.map((t) => t.toLowerCase()));
+    return (input, invocation, next) => {
+        if (set.has(input.toolName?.toLowerCase())) {
+            return mw(input, invocation, next);
+        }
+        return next(input, invocation);
+    };
+}

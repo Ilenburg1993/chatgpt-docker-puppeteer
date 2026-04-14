@@ -56,7 +56,7 @@ export {
 } from './permission-handler.js';
 
 // ─── Session lifecycle (migrado de agent/session-hooks.js) ────────────────────
-export { createSessionHooks } from './session-hooks.js';
+export { createCleanupHandler, createSessionHooks } from './session-hooks.js';
 
 // ─── Prompt transformer (Gap 1) ───────────────────────────────────────────────
 export {
@@ -85,7 +85,7 @@ export { HookBus, attachBus, defaultBus } from './bus.js';
 export { HookRegistry, SDK_HOOKS } from './registry.js';
 
 // ─── Composer (composição de handlers) ───────────────────────────────────────
-export { composeHandlers, conditional, fallback, memoize, pipeline, raceWithTimeout } from './composer.js';
+export { composeHandlers, conditional, fallback, forTools, loggingMiddleware, memoize, middleware, pipeline, raceWithTimeout } from './composer.js';
 
 // ─── Presets standalone (Gap 7) ───────────────────────────────────────────────
 // ARCH-OBS-003 fix: audit preset agora reside em hooks/presets/ (antes: observability/)
@@ -113,3 +113,9 @@ export { clearHooksLogger, setHooksLogger } from './logger.js';
 
 // ─── DI Tokens ───────────────────────────────────────────────────────────────
 export { HOOKS_LOGGER } from './di-tokens.js';
+
+// ─── Tool Filter (Faixa E — filtering estático → SDK nativo) ─────────────────
+export { extractStaticFilters, isDynamicOnly, mergeStaticFilters } from './tool-filter.js';
+
+// ─── Audit Trail (E3.1 — decisões estruturadas de hooks) ─────────────────────
+export { AuditTrail, globalAuditTrail, withErrorAudit, withPostToolAudit, withPreToolAudit } from './audit-trail.js';

@@ -15,6 +15,7 @@
 
 import { log } from './logger.js';
 import { toError } from '../core/error-handlers.js';
+import { isDynamicOnly } from './tool-filter.js';
 
 /**
  * @typedef {import('./types.js').SessionHooks} SessionHooks
@@ -169,6 +170,61 @@ function buildPreToolUseHandler({
 }
 
 /**
+ * E1.2 — Handler simplificado para cenários onde o filtering estático foi extraído
+ * para `availableTools`/`excludedTools` do SDK. Mantém apenas lógica dinâmica:
+ * askHandler, argsModifier e audit logging.
+ *
+ * @param {object} opts
+ * @param {boolean} opts.auditLog
+ * @param {boolean} opts.debugTools
+ * @param {((toolName: string) => Promise<boolean>) | null} opts.askHandler
+ * @param {((toolName: string, args: object) => object | null | undefined) | null} opts.argsModifier
+ * @returns {PreToolUseHandler}
+ */
+function buildDynamicOnlyPreToolUseHandler({ auditLog, debugTools, askHandler, argsModifier }) {
+    const dynamicFn = async (/** @type {PreToolUseHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
+        const toolName = input.toolName ?? 'unknown';
+
+        if (auditLog || debugTools) {
+            log(
+                'DEBUG',
+                `[hooks/factory] onPreToolUse (dynamic): tool='${toolName}' sessionId='${invocation?.sessionId}'`,
+            );
+        }
+
+        // askHandler: aprovação interativa
+        if (askHandler) {
+            let approved = false;
+            try {
+                approved = await askHandler(toolName);
+            } catch (e) {
+                log(
+                    'WARN',
+                    `[hooks/factory] onPermissionAsk lançou erro para '${toolName}': ${toError(e).message} — negando`,
+                );
+            }
+            if (!approved) {
+                return {
+                    permissionDecision: /** @type {'deny'} */ ('deny'),
+                    additionalContext: `Ferramenta '${toolName}' não aprovada pelo usuário.`,
+                };
+            }
+        }
+
+        // argsModifier: transformação de argumentos
+        if (argsModifier) {
+            const modified = argsModifier(toolName, /** @type {object} */ (input.toolArgs) ?? {});
+            if (modified != null) {
+                return { permissionDecision: /** @type {'allow'} */ ('allow'), modifiedArgs: modified };
+            }
+        }
+
+        return { permissionDecision: /** @type {'allow'} */ ('allow') };
+    };
+    return /** @type {PreToolUseHandler} */ (dynamicFn);
+}
+
+/**
  * Constrói o handler `onErrorOccurred` padrão com logging de WARN e estratégia de retry automático.
  *
  * @returns {ErrorOccurredHandler}
@@ -233,6 +289,14 @@ export function createHooks(cfg = {}) {
     // ── onPreToolUse ────────────────────────────────────────────────────────
     if (cfg.onPreToolUse) {
         hooks.onPreToolUse = cfg.onPreToolUse;
+    } else if (isDynamicOnly(cfg)) {
+        // E1.2: sem allowTools/denyTools/denyPatterns → handler simplificado
+        hooks.onPreToolUse = buildDynamicOnlyPreToolUseHandler({
+            auditLog,
+            debugTools,
+            askHandler,
+            argsModifier,
+        });
     } else {
         hooks.onPreToolUse = buildPreToolUseHandler({
             allowTools,

@@ -266,23 +266,23 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 | #    | Subfase                                | Descrição                                                              | Estimativa |
 | ---- | -------------------------------------- | ---------------------------------------------------------------------- | ---------- |
-| E1.1 | ⬜ Separar filtering estático           | Mover whitelist/blacklist estáticas → `availableTools`/`excludedTools` | 3h         |
-| E1.2 | ⬜ Simplificar `buildPreToolUseHandler` | Manter apenas lógica dinâmica (ask, runtime deny)                      | 3h         |
-| E1.3 | ⬜ Testes de paridade                   | Verificar que behavior é idêntico before/after                         | 2h         |
+| E1.1 | ✅ Separar filtering estático           | `tool-filter.js`: extractStaticFilters() → availableTools/excludedTools | 3h         |
+| E1.2 | ✅ Simplificar `buildPreToolUseHandler` | buildDynamicOnlyPreToolUseHandler + isDynamicOnly() fast-path           | 3h         |
+| E1.3 | ✅ Testes de paridade                   | 52 testes cobrindo E1+E2+E3 — paridade verificada                     | 2h         |
 
 ### Fase E2 — Hook Composition Improvement (~4h) 🟡
 
 | #    | Subfase                         | Descrição                                  | Estimativa |
 | ---- | ------------------------------- | ------------------------------------------ | ---------- |
-| E2.1 | ⬜ Melhorar `composer.js`        | Composição mais declarativa                | 2h         |
-| E2.2 | ⬜ Adicionar hook `onSessionEnd` | Hook para cleanup (SDK suporta via events) | 2h         |
+| E2.1 | ✅ Melhorar `composer.js`        | middleware(), loggingMiddleware(), forTools() — composição Koa-style | 2h         |
+| E2.2 | ✅ Adicionar hook `onSessionEnd` | createCleanupHandler() com fail-safe sequencial | 2h         |
 
 ### Fase E3 — Audit & Compliance (~4h) 🟡
 
 | #    | Subfase                   | Descrição                             | Estimativa |
 | ---- | ------------------------- | ------------------------------------- | ---------- |
-| E3.1 | ⬜ Audit trail completo    | Logging de todas as decisões de hooks | 2h         |
-| E3.2 | ⬜ Dashboard de compliance | Endpoint para visualizar decisions    | 2h         |
+| E3.1 | ✅ Audit trail completo    | AuditTrail ring buffer + with*Audit wrappers + query/stats | 2h         |
+| E3.2 | ✅ Dashboard de compliance | GET /compliance e /compliance/stats endpoints | 2h         |
 
 ---
 

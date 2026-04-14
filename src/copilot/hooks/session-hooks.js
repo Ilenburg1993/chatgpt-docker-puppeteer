@@ -138,3 +138,36 @@ export function createSessionHooks(ctx) {
 
     return { onSessionStart, onSessionEnd, onErrorOccurred };
 }
+
+/**
+ * E2.2 — Cria um handler `onSessionEnd` que executa callbacks de cleanup em sequência.
+ * Erros em um cleanup não impedem a execução dos demais (fail-safe).
+ *
+ * @example
+ *     const cleanup = createCleanupHandler([
+ *         async (sessionId) => { await db.close(sessionId); },
+ *         async (sessionId) => { cache.purge(sessionId); },
+ *     ]);
+ *     const hooks = createHooks({ onSessionEnd: cleanup });
+ *
+ * @param {Array<(sessionId: string, reason: string) => void | Promise<void>>} cleanupFns
+ * @param {{ label?: string }} [opts]
+ * @returns {import('./types.js').SessionEndHandler}
+ */
+export function createCleanupHandler(cleanupFns, opts) {
+    const label = opts?.label ?? 'cleanup';
+    return async (input, invocation) => {
+        const sessionId = invocation?.sessionId ?? '';
+        const reason = input?.reason ?? 'unknown';
+        log('DEBUG', `[hooks/session-lifecycle] ${label}: ${cleanupFns.length} handlers para sessionId=${sessionId}`);
+
+        for (const fn of cleanupFns) {
+            try {
+                await fn(sessionId, reason);
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                log('WARN', `[hooks/session-lifecycle] ${label} erro (continuando): ${msg}`);
+            }
+        }
+    };
+}
