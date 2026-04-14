@@ -82,33 +82,33 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 > Controle total do system prompt com modo `replace` como padrão, estrutura modular com 1 arquivo
 > por seção, e troca fácil para `customize` via flag.
 
-### Fase I1 — Estrutura e Migração (~6h) 🔴
+### Fase I1 — Estrutura e Migração (~6h) ✅
 
-| #    | Subfase                                      | Descrição                                               | Estimativa |
-| ---- | -------------------------------------------- | ------------------------------------------------------- | ---------- |
-| I1.1 | ⬜ Criar pasta `config/system-prompt/`        | Estrutura: index.js, mode.js, sections/, sdk-defaults/  | 1h         |
-| I1.2 | ⬜ Migrar 7 constantes existentes             | AGENT_IDENTITY→identity.js, AGENT_TONE→tone.js, etc.    | 1h         |
-| I1.3 | ⬜ Criar 3 seções novas                       | safety.js, tool-instructions.js, custom-instructions.js | 2h         |
-| I1.4 | ⬜ Implementar assembler dual-mode (index.js) | buildSystemMessage() com replace/customize switch       | 1h         |
-| I1.5 | ⬜ Backward compat facade em system-prompt.js | Re-exports para compatibilidade                         | 1h         |
+| #    | Subfase                                      | Descrição                                               | Status |
+| ---- | -------------------------------------------- | ------------------------------------------------------- | ------ |
+| I1.1 | ✅ Criar pasta `config/system-prompt/`        | Estrutura: index.js, mode.js, sections/, sdk-defaults/  | DONE   |
+| I1.2 | ✅ Migrar 7 constantes existentes             | AGENT_IDENTITY→identity.js, AGENT_TONE→tone.js, etc.    | DONE   |
+| I1.3 | ✅ Criar 3 seções novas                       | safety.js, tool-instructions.js, custom-instructions.js | DONE   |
+| I1.4 | ✅ Implementar assembler dual-mode (index.js) | buildSystemMessage() com replace/customize switch       | DONE   |
+| I1.5 | ✅ Backward compat facade em system-prompt.js | Re-exports para compatibilidade                         | DONE   |
 
-### Fase I2 — Integração e Captura (~5h) 🟠
+### Fase I2 — Integração e Captura (~5h) ✅
 
-| #    | Subfase                              | Descrição                                               | Estimativa |
-| ---- | ------------------------------------ | ------------------------------------------------------- | ---------- |
-| I2.1 | ⬜ Atualizar lifecycle.js             | Usar assembler centralizado em vez de construção manual | 1h         |
-| I2.2 | ⬜ Atualizar session-setup.js         | Wire do novo buildSystemMessage()                       | 1h         |
-| I2.3 | ⬜ Implementar captura SDK defaults   | SectionTransformFn para extrair conteúdo padrão         | 1h         |
-| I2.4 | ⬜ Documentar SDK defaults capturados | Salvar em sdk-defaults/ como referência                 | 1h         |
-| I2.5 | ⬜ Flag de modo via env               | COPILOT_SYSTEM_PROMPT_MODE=replace                      | customize  | 1h |
+| #    | Subfase                              | Descrição                                               | Status |
+| ---- | ------------------------------------ | ------------------------------------------------------- | ------ |
+| I2.1 | ✅ Atualizar lifecycle.js             | Passthrough automático (sem mudança necessária)         | DONE   |
+| I2.2 | ✅ Atualizar initializer.js           | Wire do novo buildSystemMessage() via importação direta | DONE   |
+| I2.3 | ✅ Implementar captura SDK defaults   | SectionTransformFn para extrair conteúdo padrão         | DONE   |
+| I2.4 | ⬜ Documentar SDK defaults capturados | Salvar em sdk-defaults/ como referência                 | FUTURO |
+| I2.5 | ✅ Flag de modo via env               | COPILOT_SYSTEM_PROMPT_MODE=replace\|customize           | DONE   |
 
-### Fase I3 — Testes (~3h) 🟠
+### Fase I3 — Testes (~3h) ✅
 
-| #    | Subfase                        | Descrição                                        | Estimativa |
-| ---- | ------------------------------ | ------------------------------------------------ | ---------- |
-| I3.1 | ⬜ Testes unitários por seção   | Cada seção exporta CONTENT válido                | 1h         |
-| I3.2 | ⬜ Teste de assembler dual-mode | replace vs customize produzem output válido      | 1h         |
-| I3.3 | ⬜ Teste de backward compat     | Funções antigas continuam funcionando via facade | 1h         |
+| #    | Subfase                        | Descrição                                        | Status |
+| ---- | ------------------------------ | ------------------------------------------------ | ------ |
+| I3.1 | ✅ Testes unitários por seção   | 10 seções verificadas: CONTENT + ACTION          | DONE   |
+| I3.2 | ✅ Teste de assembler dual-mode | replace vs customize produzem output válido      | DONE   |
+| I3.3 | ✅ Teste de backward compat     | Funções antigas continuam funcionando via facade | DONE   |
 
 ---
 

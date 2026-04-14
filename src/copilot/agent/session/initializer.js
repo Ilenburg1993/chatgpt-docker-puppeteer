@@ -16,9 +16,10 @@
  */
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
-import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig, buildHookContextAppendMessage } from '#copilot/config';
+import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
 import { readStateAsync as _readStateAsync, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
@@ -120,7 +121,9 @@ export async function initOrResumeSession(client, sessionOptions) {
     const injectContext = sessionOptions.injectHookContext !== false;
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
-    const systemMessage = injectContext ? buildHookContextAppendMessage(await buildHookSystemContextSafe()) : undefined;
+    const systemMessage = injectContext
+        ? buildSystemMessage({ extraContext: await buildHookSystemContextSafe() })
+        : buildSystemMessage();
 
     /** @type {Record<string, unknown>} */
     const opts = {

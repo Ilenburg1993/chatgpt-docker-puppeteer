@@ -40,6 +40,15 @@ export {
     buildReplaceSystemMessage,
 } from './system-prompt.js';
 
+// ─── Novo módulo modular de system prompt (Faixa I) ──────────────────────────
+export {
+    SECTIONS as SYSTEM_PROMPT_MODULAR_SECTIONS,
+    buildHookContextMessage,
+    buildSystemMessage,
+    getMode as getSystemPromptMode,
+    setMode as setSystemPromptMode,
+} from './system-prompt/index.js';
+
 export {
     buildCustomAgentsConfig,
     getCustomAgent,

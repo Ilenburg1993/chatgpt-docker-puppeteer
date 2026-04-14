@@ -146,13 +146,13 @@ describe('system-prompt › buildAlwaysAliveSystemMessage', () => {
         const { buildAlwaysAliveSystemMessage } = await import('#copilot/config/system-prompt');
         const msg = buildAlwaysAliveSystemMessage();
         const content = /** @type {any} */ (msg).content;
-        assert.ok(content.includes('# Identidade'), 'Deve conter seção Identidade');
-        assert.ok(content.includes('# Tom e Comunicação'), 'Deve conter seção Tom');
-        assert.ok(content.includes('# Eficiência com Tools'), 'Deve conter seção tools');
-        assert.ok(content.includes('# Contexto do Ambiente'), 'Deve conter seção Contexto');
-        assert.ok(content.includes('# Regras para Mudanças de Código'), 'Deve conter seção Regras');
-        assert.ok(content.includes('# Diretrizes Gerais'), 'Deve conter seção Diretrizes');
-        assert.ok(content.includes('# Instruções Finais do Turno'), 'Deve conter seção de turno');
+        assert.ok(content.includes('# identity'), 'Deve conter seção identity');
+        assert.ok(content.includes('# tone'), 'Deve conter seção tone');
+        assert.ok(content.includes('# tool_efficiency'), 'Deve conter seção tool_efficiency');
+        assert.ok(content.includes('# environment_context'), 'Deve conter seção environment_context');
+        assert.ok(content.includes('# code_change_rules'), 'Deve conter seção code_change_rules');
+        assert.ok(content.includes('# guidelines'), 'Deve conter seção guidelines');
+        assert.ok(content.includes('# last_instructions'), 'Deve conter seção last_instructions');
     });
 
     it('deve incluir extraContext quando fornecido', async () => {
@@ -160,14 +160,14 @@ describe('system-prompt › buildAlwaysAliveSystemMessage', () => {
         const msg = buildAlwaysAliveSystemMessage({ extraContext: 'contexto-especial-xyz' });
         const content = /** @type {any} */ (msg).content;
         assert.ok(content.includes('contexto-especial-xyz'), 'extraContext deve estar no prompt');
-        assert.ok(content.includes('# Contexto Operacional Atual'), 'Deve ter seção extra');
+        assert.ok(content.includes('# operational_context'), 'Deve ter seção operational_context');
     });
 
     it('não deve incluir seção de contexto quando extraContext vazio', async () => {
         const { buildAlwaysAliveSystemMessage } = await import('#copilot/config/system-prompt');
         const msg = buildAlwaysAliveSystemMessage({ extraContext: '' });
         const content = /** @type {any} */ (msg).content;
-        assert.ok(!content.includes('# Contexto Operacional Atual'), 'Não deve ter seção extra vazia');
+        assert.ok(!content.includes('# operational_context'), 'Não deve ter seção operational_context vazia');
     });
 
     it('deve aceitar chamada sem argumentos', async () => {
