@@ -4,11 +4,9 @@
  *
  * FAIXA-L3 — Mapeamento bidirecional EventBus ↔ NERV actionCodes.
  *
- * Centraliza a correspondência entre event types do EventBus (SSOT) e os
- * actionCodes usados pelo NERV bus externo.
+ * Centraliza a correspondência entre event types do EventBus (SSOT) e os actionCodes usados pelo NERV bus externo.
  *
- * O NervEventBusAdapter consome este módulo para relay EventBus → NERV (outbound)
- * e NERV → EventBus (inbound).
+ * O NervEventBusAdapter consome este módulo para relay EventBus → NERV (outbound) e NERV → EventBus (inbound).
  *
  * @module copilot/events/nerv-events
  * @see bridges/nerv-event-bus-adapter.js
@@ -117,8 +115,8 @@ import {
 // ── Outbound: EventBus type → NERV actionCode ───────────────────────────────
 
 /**
- * Mapa de EventBus event types → NERV actionCodes para relay outbound.
- * O NervEventBusAdapter subscreve estes tipos e os encaminha ao NERV.
+ * Mapa de EventBus event types → NERV actionCodes para relay outbound. O NervEventBusAdapter subscreve estes tipos e os
+ * encaminha ao NERV.
  *
  * @type {Readonly<Record<string, string>>}
  */

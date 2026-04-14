@@ -3,11 +3,10 @@
  * @module copilot/server/middleware/request-id
  * @file Middleware de geração e propagação de X-Request-ID.
  *
- * Garante rastreabilidade de cada request. Usa o header existente se presente
- * (máx 64 chars), ou gera um novo no formato `llmb-<timestamp>-<random>`.
- * Onda 3.0 — L54.5.
+ *   Garante rastreabilidade de cada request. Usa o header existente se presente (máx 64 chars), ou gera um novo no
+ *   formato `llmb-<timestamp>-<random>`. Onda 3.0 — L54.5.
  *
- * src/copilot/server/middleware/request-id.js
+ *   src/copilot/server/middleware/request-id.js
  */
 
 /**

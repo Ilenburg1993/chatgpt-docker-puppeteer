@@ -9,22 +9,11 @@
  * @see module:copilot/tools/todo/store
  */
 
-
-import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
+import { log } from '../logger.js';
 import { withSkipPermission } from '../tool-factory.js';
-import {
-    createTask,
-    isOverdue,
-    now,
-    readStore,
-    sanitize,
-    withStore,
-    zId,
-    zPriority,
-} from './store.js';
-
+import { createTask, isOverdue, now, readStore, sanitize, withStore, zId, zPriority } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_get
@@ -34,7 +23,8 @@ import {
  * Tool: todo_get — obtém uma tarefa completa com sua árvore de subtarefas.
  */
 export const todoGetTool = withSkipPermission(
-    createTool({ name: 'todo_get',
+    createTool({
+        name: 'todo_get',
         description:
             'Obtém uma tarefa pelo ID com todos os seus metadados e subtarefas. ' +
             'Retorna a árvore de subtarefas (1 nível de profundidade como objetos completos). ' +
@@ -75,7 +65,6 @@ export const todoGetTool = withSkipPermission(
     }),
 );
 
-
 // ---------------------------------------------------------------------------
 // Tool: todo_update
 // ---------------------------------------------------------------------------
@@ -83,7 +72,8 @@ export const todoGetTool = withSkipPermission(
 /**
  * Tool: todo_update — atualiza qualquer campo de uma tarefa existente.
  */
-export const todoUpdateTool = createTool({ name: 'todo_update',
+export const todoUpdateTool = createTool({
+    name: 'todo_update',
     description:
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
         'alterados (patch parcial). Status segue máquina de estados validada. ' +
@@ -173,7 +163,6 @@ export const todoUpdateTool = createTool({ name: 'todo_update',
     },
 });
 
-
 // ---------------------------------------------------------------------------
 // Tool: todo_add_subtask
 // ---------------------------------------------------------------------------
@@ -181,7 +170,8 @@ export const todoUpdateTool = createTool({ name: 'todo_update',
 /**
  * Tool: todo_add_subtask — adiciona uma nova subtarefa a uma tarefa pai existente.
  */
-export const todoAddSubtaskTool = createTool({ name: 'todo_add_subtask',
+export const todoAddSubtaskTool = createTool({
+    name: 'todo_add_subtask',
     description:
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +
         'Equivale a todo_create com parent_id preenchido, mas com interface mais direta. ' +

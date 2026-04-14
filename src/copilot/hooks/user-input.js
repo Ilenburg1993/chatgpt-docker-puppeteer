@@ -18,8 +18,8 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from './logger.js';
 import { createInterface } from 'node:readline';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').UserInputHandler} UserInputHandler

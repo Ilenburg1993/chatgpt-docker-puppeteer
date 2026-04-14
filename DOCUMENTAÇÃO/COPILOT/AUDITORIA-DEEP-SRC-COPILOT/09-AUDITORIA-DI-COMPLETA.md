@@ -1,8 +1,8 @@
 # Auditoria DI Completa — `src/copilot/`
 
-**Status**: EXECUTADO (Fases A + B + C parcial)  
-**Criado**: 2026-06-12  
-**Atualizado**: 2026-06-12  
+**Status**: EXECUTADO (Fases A + B + C parcial)
+**Criado**: 2026-06-12
+**Atualizado**: 2026-06-12
 **Escopo**: Todo o subsistema `src/copilot/` — container, tokens, singletons, setters, boot flow
 
 ---
@@ -11,26 +11,26 @@
 
 ### 1.1 Números (ANTES)
 
-| Métrica | Valor | Nota |
-|---------|-------|------|
-| Tokens definidos (`createToken`) | **40** | Distribuídos em 10 `di-tokens.js` per-module |
-| Tokens registrados (`container.register`) | **12** | Apenas 30% dos tokens tinham factory |
-| Tokens resolvidos (`container.resolve`) | **13** | Quase todos eram `EVENT_BUS` |
-| Setters legados (`set*`) | **29** | Padrão predominante de injection |
-| Module-level singletons (`export const x = new X()`) | **10** | Instanciados no import |
-| `wireLegacySetters` call sites | **3** | Em `observability/bootstrap`, `terminal/di-wiring` |
+| Métrica                                              | Valor  | Nota                                               |
+| ---------------------------------------------------- | ------ | -------------------------------------------------- |
+| Tokens definidos (`createToken`)                     | **40** | Distribuídos em 10 `di-tokens.js` per-module       |
+| Tokens registrados (`container.register`)            | **12** | Apenas 30% dos tokens tinham factory               |
+| Tokens resolvidos (`container.resolve`)              | **13** | Quase todos eram `EVENT_BUS`                       |
+| Setters legados (`set*`)                             | **29** | Padrão predominante de injection                   |
+| Module-level singletons (`export const x = new X()`) | **10** | Instanciados no import                             |
+| `wireLegacySetters` call sites                       | **3**  | Em `observability/bootstrap`, `terminal/di-wiring` |
 
 ### 1.2 Problemas Identificados
 
-| # | Problema | Severidade | Status |
-|---|----------|------------|--------|
-| P1 | **21 tokens "fantasma"** — definidos sem register/resolve | Médio | ✅ CORRIGIDO |
-| P2 | **Module-level singletons** — 9+ instanciadas no import | Alto | ✅ REGISTRADOS no container |
-| P3 | **3 setters sem DI** — injection direta em boot-wiring.js | Alto | ✅ MIGRADOS para DI |
-| P4 | **boot-wiring.js usava setters diretos** — bypass do container | Médio | ✅ CORRIGIDO |
-| P5 | **CONVERSATION_STORE resolvido mas não registrado** | Alto | ✅ CORRIGIDO |
-| P6 | **Tokens BRIDGE/FALLBACK alias para alwaysAliveAgent** | Baixo | ⏸️ Design intencional |
-| P7 | **Nenhum health check de DI** — sem validação de tokens obrigatórios | Médio | ✅ CORRIGIDO |
+| #   | Problema                                                             | Severidade | Status                     |
+| --- | -------------------------------------------------------------------- | ---------- | -------------------------- |
+| P1  | **21 tokens "fantasma"** — definidos sem register/resolve            | Médio      | ✅ CORRIGIDO                |
+| P2  | **Module-level singletons** — 9+ instanciadas no import              | Alto       | ✅ REGISTRADOS no container |
+| P3  | **3 setters sem DI** — injection direta em boot-wiring.js            | Alto       | ✅ MIGRADOS para DI         |
+| P4  | **boot-wiring.js usava setters diretos** — bypass do container       | Médio      | ✅ CORRIGIDO                |
+| P5  | **CONVERSATION_STORE resolvido mas não registrado**                  | Alto       | ✅ CORRIGIDO                |
+| P6  | **Tokens BRIDGE/FALLBACK alias para alwaysAliveAgent**               | Baixo      | ⏸️ Design intencional       |
+| P7  | **Nenhum health check de DI** — sem validação de tokens obrigatórios | Médio      | ✅ CORRIGIDO                |
 
 ---
 
@@ -38,44 +38,44 @@
 
 ### 2.1 Números (DEPOIS)
 
-| Métrica | Antes | Depois | Δ |
-|---------|-------|--------|---|
-| Tokens definidos | 40 | **21** | −19 (dead tokens removidos) |
-| Tokens registrados | 12 | **20** | +8 |
-| Cobertura (registrados/definidos) | 30% | **95.2%** | +65.2pp |
-| Token não registrado | 28 | **1** (`SESSION_RPC` — dinâmico) | −27 |
-| `validateRequired()` calls | 0 | **2** | +2 |
-| Setters migrados para DI | 8 | **11** | +3 |
+| Métrica                           | Antes | Depois                           | Δ                           |
+| --------------------------------- | ----- | -------------------------------- | --------------------------- |
+| Tokens definidos                  | 40    | **21**                           | −19 (dead tokens removidos) |
+| Tokens registrados                | 12    | **20**                           | +8                          |
+| Cobertura (registrados/definidos) | 30%   | **95.2%**                        | +65.2pp                     |
+| Token não registrado              | 28    | **1** (`SESSION_RPC` — dinâmico) | −27                         |
+| `validateRequired()` calls        | 0     | **2**                            | +2                          |
+| Setters migrados para DI          | 8     | **11**                           | +3                          |
 
 ### 2.2 Tokens Registrados (20/21)
 
-| Token | Módulo de registro | Factory |
-|-------|--------------------|---------|
-| `SHUTDOWN_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `DB_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `SDK_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `AUDIT_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `HOOKS_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `TOOLS_LOGGER` | `observability/bootstrap.js` | `() => log` |
-| `TOOLS_METRICS` | `observability/bootstrap.js` | `() => { getSummary, getToolStats, recordToolCall }` |
-| `METRICS_STORE` | `observability/bootstrap.js` | `() => defaultMetrics` |
-| `ERROR_TRACKER` | `observability/bootstrap.js` | `() => defaultErrorTracker` |
-| `EVENT_COLLECTOR` | `observability/bootstrap.js` | `() => defaultEventCollector` |
-| `EVENT_BUS` | `observability/bootstrap.js` | `() => createEventBus()` |
-| `TOOLS_BUILDER` | `observability/bootstrap.js` | `() => deps.buildTool` |
-| `AUDIT_BUS` | `bootstrap.js` | `() => defaultBus` |
-| `ALWAYS_ALIVE_AGENT` | `terminal/di-wiring.js` | `() => alwaysAliveAgent` |
-| `HUB` | `terminal/di-wiring.js` | `() => conversationHub` |
-| `CONVERSATION_STORE` | `terminal/di-wiring.js` | `() => conversationStore` |
-| `PERMISSION_AGENT` | `terminal/di-wiring.js` | `() => alwaysAliveAgent` |
-| `FALLBACK_AGENT` | `terminal/di-wiring.js` | `() => alwaysAliveAgent` |
-| `BRIDGE_AGENT` | `terminal/di-wiring.js` | `() => alwaysAliveAgent` |
-| `NERV_BRIDGE_AGENT` | `terminal/di-wiring.js` | `() => alwaysAliveAgent` |
+| Token                | Módulo de registro           | Factory                                              |
+| -------------------- | ---------------------------- | ---------------------------------------------------- |
+| `SHUTDOWN_LOGGER`    | `observability/bootstrap.js` | `() => log`                                          |
+| `DB_LOGGER`          | `observability/bootstrap.js` | `() => log`                                          |
+| `SDK_LOGGER`         | `observability/bootstrap.js` | `() => log`                                          |
+| `AUDIT_LOGGER`       | `observability/bootstrap.js` | `() => log`                                          |
+| `HOOKS_LOGGER`       | `observability/bootstrap.js` | `() => log`                                          |
+| `TOOLS_LOGGER`       | `observability/bootstrap.js` | `() => log`                                          |
+| `TOOLS_METRICS`      | `observability/bootstrap.js` | `() => { getSummary, getToolStats, recordToolCall }` |
+| `METRICS_STORE`      | `observability/bootstrap.js` | `() => defaultMetrics`                               |
+| `ERROR_TRACKER`      | `observability/bootstrap.js` | `() => defaultErrorTracker`                          |
+| `EVENT_COLLECTOR`    | `observability/bootstrap.js` | `() => defaultEventCollector`                        |
+| `EVENT_BUS`          | `observability/bootstrap.js` | `() => createEventBus()`                             |
+| `TOOLS_BUILDER`      | `observability/bootstrap.js` | `() => deps.buildTool`                               |
+| `AUDIT_BUS`          | `bootstrap.js`               | `() => defaultBus`                                   |
+| `ALWAYS_ALIVE_AGENT` | `terminal/di-wiring.js`      | `() => alwaysAliveAgent`                             |
+| `HUB`                | `terminal/di-wiring.js`      | `() => conversationHub`                              |
+| `CONVERSATION_STORE` | `terminal/di-wiring.js`      | `() => conversationStore`                            |
+| `PERMISSION_AGENT`   | `terminal/di-wiring.js`      | `() => alwaysAliveAgent`                             |
+| `FALLBACK_AGENT`     | `terminal/di-wiring.js`      | `() => alwaysAliveAgent`                             |
+| `BRIDGE_AGENT`       | `terminal/di-wiring.js`      | `() => alwaysAliveAgent`                             |
+| `NERV_BRIDGE_AGENT`  | `terminal/di-wiring.js`      | `() => alwaysAliveAgent`                             |
 
 ### 2.3 Token Não Registrado (1)
 
-| Token | Razão |
-|-------|-------|
+| Token         | Razão                                                                   |
+| ------------- | ----------------------------------------------------------------------- |
 | `SESSION_RPC` | Dinâmico — set/clear por sessão via `setSessionRpc()`. Não é boot-time. |
 
 ### 2.4 Dead Tokens Removidos (19)

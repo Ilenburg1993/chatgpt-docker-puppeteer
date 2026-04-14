@@ -1,7 +1,6 @@
 // @ts-check
 /**
  * @module copilot/agent/infra/task-executor
- * @see EventBus
  * @file Execução assíncrona de uma tarefa individual do agente.
  *
  *   Extrai o IIFE interno de `AlwaysAliveAgent#processQueue`, tornando a lógica de send/await/reconexão testável de forma
@@ -9,6 +8,7 @@
  *
  *   Por usar callbacks em vez de acessar campos privados diretamente, a função se mantém desacoplada do ciclo de vida do
  *   agente pai.
+ * @see EventBus
  */
 
 import { startSpanImmediate } from '#copilot/observability';

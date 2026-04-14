@@ -65,9 +65,9 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { log } from './logger.js';
 import { createTool } from '#copilot/sdk';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { log } from './logger.js';
 
 /**
  * Opções para `buildTool`.
@@ -142,7 +142,8 @@ export function buildTool({
         }
     );
 
-    return createTool({ name,
+    return createTool({
+        name,
         description,
         ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
         handler: wrappedHandler,
@@ -155,7 +156,7 @@ export function buildTool({
  * Marca uma tool existente como `skipPermission: true` (execução sem aprovação prévia do usuário). Aplicável a tools de
  * leitura, introspecção e operações sem efeito colateral.
  *
- * @template [TArgs=unknown]
+ * @template [TArgs=unknown] Default is `unknown`
  * @param {import('#copilot/sdk/types').Tool<TArgs>} tool - Tool a ser marcada
  * @returns {import('#copilot/sdk/types').Tool<TArgs>} A mesma tool com `skipPermission: true`
  */

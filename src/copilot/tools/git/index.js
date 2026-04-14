@@ -9,11 +9,11 @@
  * @see EventBus
  */
 
-import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { log } from '../logger.js';
 import { withSkipPermission } from '../tool-factory.js';
 
 const execAsync = promisify(execFile);

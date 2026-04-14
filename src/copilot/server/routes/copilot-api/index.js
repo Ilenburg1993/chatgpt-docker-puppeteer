@@ -18,8 +18,9 @@
  * @module copilot/server/routes/copilot-api
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
 import { Router } from 'express';
+import { ALWAYS_ALIVE_AGENT } from '../../../agent/di-tokens.js';
 import { registerControlRoutes } from './control.js';
 import { registerDialogRoutes } from './dialog.js';
 import { registerStreamRoutes } from './stream.js';
@@ -33,10 +34,12 @@ import { registerTaskRoutes } from './tasks.js';
 export function createCopilotApiRouter() {
     const router = Router();
 
-    registerControlRoutes(router, alwaysAliveAgent);
-    registerTaskRoutes(router, alwaysAliveAgent);
-    registerStreamRoutes(router, alwaysAliveAgent);
-    registerDialogRoutes(router, alwaysAliveAgent);
+    const agent = container.resolve(ALWAYS_ALIVE_AGENT);
+
+    registerControlRoutes(router, agent);
+    registerTaskRoutes(router, agent);
+    registerStreamRoutes(router, agent);
+    registerDialogRoutes(router, agent);
 
     return router;
 }

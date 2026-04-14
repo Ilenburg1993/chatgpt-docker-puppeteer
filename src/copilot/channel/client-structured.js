@@ -8,11 +8,7 @@
  * @see EventBus
  */
 
-import {
-    buildStructuredRequest,
-    parseStructuredResponse,
-    serializeStructuredMessage,
-} from '#copilot/core';
+import { buildStructuredRequest, parseStructuredResponse, serializeStructuredMessage } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /**

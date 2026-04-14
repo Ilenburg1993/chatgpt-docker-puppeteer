@@ -9,9 +9,9 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
+import { log } from '../logger.js';
 import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
@@ -21,7 +21,8 @@ import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } 
 /**
  * Tool: todo_bulk_update — atualiza status/prioridade/tags em múltiplas tarefas.
  */
-export const todoBulkUpdateTool = createTool({ name: 'todo_bulk_update',
+export const todoBulkUpdateTool = createTool({
+    name: 'todo_bulk_update',
     description:
         'Atualiza status, prioridade ou tags em múltiplas tarefas simultaneamente. ' +
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
@@ -101,7 +102,8 @@ export const todoBulkUpdateTool = createTool({ name: 'todo_bulk_update',
 /**
  * Tool: todo_clear_completed — remove todas as tarefas concluídas ou canceladas.
  */
-export const todoClearCompletedTool = createTool({ name: 'todo_clear_completed',
+export const todoClearCompletedTool = createTool({
+    name: 'todo_clear_completed',
     description:
         'Remove todas as tarefas com status "done" ou "cancelled" (ou apenas um deles via status_filter). ' +
         'Limpeza periódica para manter o sistema organizado. ' +
@@ -184,7 +186,8 @@ export const todoClearCompletedTool = createTool({ name: 'todo_clear_completed',
 /**
  * Tool: todo_import — importa tarefas de uma lista de objetos JSON.
  */
-export const todoImportTool = createTool({ name: 'todo_import',
+export const todoImportTool = createTool({
+    name: 'todo_import',
     description:
         'Importa múltiplas tarefas de uma vez a partir de um array de objetos. ' +
         'Cada objeto deve ter pelo menos "title". Campos opcionais: description, priority, status, ' +

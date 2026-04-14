@@ -4,9 +4,8 @@ Módulo **L0** de tipos compartilhados cross-module.
 
 ## Propósito
 
-Centraliza typedefs, schemas de eventos e re-exports de tokens DI que são consumidos
-por múltiplos módulos do sistema. Qualquer camada pode importar daqui sem violar a
-hierarquia.
+Centraliza typedefs, schemas de eventos e re-exports de tokens DI que são consumidos por múltiplos
+módulos do sistema. Qualquer camada pode importar daqui sem violar a hierarquia.
 
 ## Estrutura
 

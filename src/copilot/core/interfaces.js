@@ -12,15 +12,12 @@
  *
  *   ## Interfaces exportadas
  *
- *   | Interface         | Implementação canônica                   | Camada         |
- *   | ----------------- | ---------------------------------------- | -------------- |
- *   | IAgent            | `agent/always-alive.js`                  | agent/         |
- *   | IEventBus         | `core/event-bus.js::EventBus`            | core/          |
- *   | IStateStore       | `agent/session/snapshot.js`              | agent/session/ |
- *   | IToolRegistry     | `sdk/tools/registry.js::ToolRegistry`    | sdk/           |
- *   | IHooksPipeline    | `hooks/types.js::SessionHooks`           | hooks/         |
- *   | IConfigProvider   | `config/env.js` (flat constants)         | config/        |
- *   | IMetricsCollector | `observability/metrics.js::MetricsStore` | observability/ |
+ *   | Interface | Implementação canônica | Camada | | ----------------- | ---------------------------------------- |
+ *   -------------- | | IAgent | `agent/always-alive.js` | agent/ | | IEventBus | `core/event-bus.js::EventBus` | core/
+ *   | | IStateStore | `agent/session/snapshot.js` | agent/session/ | | IToolRegistry |
+ *   `sdk/tools/registry.js::ToolRegistry` | sdk/ | | IHooksPipeline | `hooks/types.js::SessionHooks` | hooks/ | |
+ *   IConfigProvider | `config/env.js` (flat constants) | config/ | | IMetricsCollector |
+ *   `observability/metrics.js::MetricsStore` | observability/ |
  *
  *   src/copilot/core/interfaces.js
  */

@@ -2,8 +2,8 @@
 
 **Última atualização**: 2026-04-12 | **FAIXA-2A** | **Fonte**: `src/copilot/events/`
 
-> **SSOT**: Todas as strings de evento devem ser importadas de `#copilot/events`.
-> Strings literais de evento fora deste módulo são violações arquiteturais (C11).
+> **SSOT**: Todas as strings de evento devem ser importadas de `#copilot/events`. Strings literais
+> de evento fora deste módulo são violações arquiteturais (C11).
 
 ---
 
@@ -21,6 +21,7 @@
 ## Agent Events (`events/agent-events.js`)
 
 ### Lifecycle
+
 | Constante             | String                | Emitido por      |
 | --------------------- | --------------------- | ---------------- |
 | `AGENT_READY`         | `agent:ready`         | AlwaysAliveAgent |
@@ -31,31 +32,35 @@
 | `AGENT_EMITTER_ERROR` | `agent:emitter.error` | AlwaysAliveAgent |
 
 ### Session
+
 | Constante                 | String                    | Emitido por      |
 | ------------------------- | ------------------------- | ---------------- |
 | `AGENT_SESSION_KEEPALIVE` | `agent:session:keepalive` | AlwaysAliveAgent |
 | `AGENT_SESSION_FATAL`     | `agent:session.fatal`     | AlwaysAliveAgent |
 
 ### Task
+
 | Constante            | String               | Emitido por      | Consome PR? |
 | -------------------- | -------------------- | ---------------- | ----------- |
-| `AGENT_TASK_STARTED` | `agent:task:started` | task-executor.js | ⚠️ Sim       |
-| `AGENT_TASK_DELTA`   | `agent:task:delta`   | task-executor.js | ⚠️ Sim       |
-| `AGENT_TASK_ERROR`   | `agent:task.error`   | task-executor.js | ⚠️ Sim       |
+| `AGENT_TASK_STARTED` | `agent:task:started` | task-executor.js | ⚠️ Sim      |
+| `AGENT_TASK_DELTA`   | `agent:task:delta`   | task-executor.js | ⚠️ Sim      |
+| `AGENT_TASK_ERROR`   | `agent:task.error`   | task-executor.js | ⚠️ Sim      |
 
 ### Dialog
+
 | Constante                           | String                              | Emitido por     | Consome PR? |
 | ----------------------------------- | ----------------------------------- | --------------- | ----------- |
-| `AGENT_DIALOG_LOOP_CHANGED`         | `agent:dialog:loop:changed`         | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_TURN_TIMEOUT`         | `agent:dialog.turn_timeout`         | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_STALLED`              | `agent:dialog:stalled`              | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_PAUSED`               | `agent:dialog:paused`               | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_RESUMED`              | `agent:dialog:resumed`              | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_STOPPED`              | `agent:dialog:stopped`              | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_REPLY`                | `agent:dialog:reply`                | loop-manager.js | ✅ Não       |
-| `AGENT_DIALOG_COMPACTION_REQUESTED` | `agent:dialog:compaction:requested` | loop-manager.js | ✅ Não       |
+| `AGENT_DIALOG_LOOP_CHANGED`         | `agent:dialog:loop:changed`         | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_TURN_TIMEOUT`         | `agent:dialog.turn_timeout`         | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_STALLED`              | `agent:dialog:stalled`              | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_PAUSED`               | `agent:dialog:paused`               | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_RESUMED`              | `agent:dialog:resumed`              | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_STOPPED`              | `agent:dialog:stopped`              | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_REPLY`                | `agent:dialog:reply`                | loop-manager.js | ✅ Não      |
+| `AGENT_DIALOG_COMPACTION_REQUESTED` | `agent:dialog:compaction:requested` | loop-manager.js | ✅ Não      |
 
 ### Handoff
+
 | Constante                | String                   | Emitido por    |
 | ------------------------ | ------------------------ | -------------- |
 | `AGENT_HANDOFF_RECEIVED` | `agent:handoff:received` | HandoffManager |
@@ -63,7 +68,9 @@
 | `AGENT_HANDOFF_REJECTED` | `agent:handoff:rejected` | HandoffManager |
 
 ### Conjuntos de classificação
-- **`AGENT_EVENTS`**: Array de todas as strings de evento (legado SDK, para loop dinâmico de listeners)
+
+- **`AGENT_EVENTS`**: Array de todas as strings de evento (legado SDK, para loop dinâmico de
+  listeners)
 - **`PR_CONSUMING_EVENTS`**: Set de eventos que consomem Premium Requests
 - **`DIALOG_LOOP_EVENTS`**: Set de eventos do dialog loop (todos free)
 - **`HIGH_FREQUENCY_EVENTS`**: Set de eventos de alta frequência (hot-path)
@@ -99,7 +106,8 @@ Eventos do ConversationHub (socket namespaces, Socket.IO).
 | `HUB_USER_INJECTED`   | `user:injected`   | server→client |
 | `HUB_TURN_DELTA`      | `turn:delta`      | server→client |
 
-Nota: `HUB_EVENTS` é o objeto completo para uso em socket handlers. Constantes individuais são para bridges.
+Nota: `HUB_EVENTS` é o objeto completo para uso em socket handlers. Constantes individuais são para
+bridges.
 
 ---
 
@@ -138,8 +146,8 @@ Eventos de infraestrutura: shutdown, config, health, bridges.
 
 ## Bridge Coverage (FAIXA-2C)
 
-| Emitter           | Arquivo                            | Bridgeado?   | Via                                              |
-| ----------------- | ---------------------------------- | ------------ | ------------------------------------------------ |
+| Emitter           | Arquivo                            | Bridgeado?    | Via                                              |
+| ----------------- | ---------------------------------- | ------------- | ------------------------------------------------ |
 | AlwaysAliveAgent  | `agent/always-alive.js`            | ✅            | `always-alive.js`                                |
 | DialogLoopManager | `agent/dialog/loop-manager.js`     | ✅            | `always-alive.js`                                |
 | HandoffManager    | `agent/infra/handoff-manager.js`   | ✅            | `always-alive.js`                                |
@@ -153,7 +161,7 @@ Eventos de infraestrutura: shutdown, config, health, bridges.
 
 > Status: em andamento. Ver progresso em PARTE-23I.
 
-| Subscriber                    | Esculta         | Status     |
-| ----------------------------- | --------------- | ---------- |
-| observability/event-collector | AGENT_*, HOOK_* | ⏳ pendente |
-| audit-service                 | AUDIT_*         | ⏳ pendente |
+| Subscriber                    | Esculta           | Status      |
+| ----------------------------- | ----------------- | ----------- |
+| observability/event-collector | AGENT*\*, HOOK*\* | ⏳ pendente |
+| audit-service                 | AUDIT\_\*         | ⏳ pendente |

@@ -9,14 +9,14 @@
 
 ## STATUS DE EXECUÇÃO
 
-| Faixa       | Status                                      | Commit     | Data       |
-| ----------- | ------------------------------------------- | ---------- | ---------- |
-| **Faixa 0** | ✅ CONCLUÍDA                                 | `5ecbceb1` | 2026-06-11 |
-| **Faixa 1** | ✅ VALIDADA (já implementada)                | —          | 2026-06-11 |
-| **Faixa 2** | ✅ CONCLUÍDA                                 | `8e2006eb` | 2026-06-11 |
-| **Faixa 3** | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅*) | `72093424` | 2026-06-12 |
-| **DI Overhaul** | ✅ EXECUTADO (Fases A+B+C parcial) | pendente  | 2026-06-12 |
-| Faixa 4-5   | ⏳ PENDENTE                                  | —          | —          |
+| Faixa           | Status                                      | Commit     | Data       |
+| --------------- | ------------------------------------------- | ---------- | ---------- |
+| **Faixa 0**     | ✅ CONCLUÍDA                                 | `5ecbceb1` | 2026-06-11 |
+| **Faixa 1**     | ✅ VALIDADA (já implementada)                | —          | 2026-06-11 |
+| **Faixa 2**     | ✅ CONCLUÍDA                                 | `8e2006eb` | 2026-06-11 |
+| **Faixa 3**     | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅*) | `72093424` | 2026-06-12 |
+| **DI Overhaul** | ✅ EXECUTADO (Fases A+B+C parcial)           | pendente   | 2026-06-12 |
+| Faixa 4-5       | ⏳ PENDENTE                                  | —          | —          |
 
 ### Notas da Faixa 0
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js

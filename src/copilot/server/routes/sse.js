@@ -84,7 +84,7 @@ function _onFanoutEvent(fEvt) {
     // Truncar campo `content` se exceder limite (mesmo comportamento de createSseWriter)
     /** @type {object} */
     let payload = rawPayload;
-    if (typeof /** @type {Record<string, unknown>} */ (rawPayload)['content'] === 'string') {
+    if (typeof (/** @type {Record<string, unknown>} */ (rawPayload)['content']) === 'string') {
         const content = /** @type {{ content: string }} */ (rawPayload).content;
         if (content.length > MAX_SSE_CONTENT_CHARS) {
             payload = { ...rawPayload, content: content.slice(0, MAX_SSE_CONTENT_CHARS) + '\u2026[truncado]' };

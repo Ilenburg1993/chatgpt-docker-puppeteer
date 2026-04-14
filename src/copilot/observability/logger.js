@@ -31,7 +31,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 
 /** Diretório de logs. Default: `var/logs/copilot/` na raiz do projeto (fora de `src/`). */
-export const LOG_DIR = COPILOT_LOG_DIR ? path.resolve(COPILOT_LOG_DIR) : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot');
+export const LOG_DIR = COPILOT_LOG_DIR
+    ? path.resolve(COPILOT_LOG_DIR)
+    : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot');
 
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 const METRICS_FILE = path.join(LOG_DIR, 'metrics.log');

@@ -13,11 +13,11 @@
  * @module copilot/server/routes/webhooks
  */
 
-import { validateUrlString } from '#copilot/core';
+import { container, validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { validate } from '../middleware/validate.js';
 
 /**
@@ -36,7 +36,8 @@ const router = Router();
  * Lista todos os webhooks registrados no agente Always-Alive.
  */
 router.get('/webhooks', (_req, /** @type {Res} */ res) => {
-    const list = alwaysAliveAgent.listWebhooks();
+    const agent = container.resolve(ALWAYS_ALIVE_AGENT);
+    const list = agent.listWebhooks();
     res.json({ ok: true, count: list.length, webhooks: list });
 });
 
@@ -60,7 +61,7 @@ router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req}
         return;
     }
 
-    const result = alwaysAliveAgent.registerWebhook(url);
+    const result = container.resolve(ALWAYS_ALIVE_AGENT).registerWebhook(url);
     res.status(201).json({ ok: true, ...result });
 });
 
@@ -78,7 +79,7 @@ router.delete(
     validate({ params: webhookParamsSchema }),
     (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const id = /** @type {string} */ (req.params['id']);
-        const removed = alwaysAliveAgent.unregisterWebhook(id);
+        const removed = container.resolve(ALWAYS_ALIVE_AGENT).unregisterWebhook(id);
         if (!removed) {
             res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
             return;

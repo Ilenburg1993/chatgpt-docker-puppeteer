@@ -11,12 +11,12 @@
  */
 
 import { logSwallowed } from '#copilot/core';
-import { log } from './logger.js';
 import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname, '..');

@@ -3,20 +3,20 @@
  * @module copilot/server/handler-bridge
  * @file Adaptador entre os handlers copilot e Express.
  *
- * Os handlers existentes em `terminal/handlers/` retornam
- * `{ status: number; body: unknown; cors?: boolean }` — compatíveis com Express
- * mas escritos para o servidor HTTP nativo. Este módulo adapta essas funções
- * para funcionar como RequestHandlers Express normais.
+ *   Os handlers existentes em `terminal/handlers/` retornam `{ status: number; body: unknown; cors?: boolean }` —
+ *   compatíveis com Express mas escritos para o servidor HTTP nativo. Este módulo adapta essas funções para funcionar
+ *   como RequestHandlers Express normais.
  *
- * Onda 3.1 — suporte às rotas (L55.x).
+ *   Onda 3.1 — suporte às rotas (L55.x).
  *
- * src/copilot/server/handler-bridge.js
+ *   src/copilot/server/handler-bridge.js
  */
 
 import { log } from '#copilot/observability';
 
 /**
  * @typedef {{ status: number; body: unknown; cors?: boolean }} HandlerResult
+ *
  * @typedef {(params: any) => HandlerResult | Promise<HandlerResult>} CopilotHandler
  */
 
@@ -29,9 +29,7 @@ import { log } from '#copilot/observability';
 function extractParams(req) {
     return {
         ...req.params,
-        ...Object.fromEntries(
-            Object.entries(req.query).map(([k, v]) => [k, typeof v === 'string' ? v : v]),
-        ),
+        ...Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, typeof v === 'string' ? v : v])),
         body: req.body,
     };
 }
@@ -69,7 +67,7 @@ export function callHandler(handler, req, res, next) {
     }
 
     // Handler assíncrono
-    (/** @type {Promise<HandlerResult>} */ (result))
+    /** @type {Promise<HandlerResult>} */ (result)
         .then((r) => {
             res.status(r.status).json(r.body);
         })
@@ -102,8 +100,6 @@ export function bridgeHandler(handler, paramsExtractor) {
             return;
         }
 
-        (/** @type {Promise<HandlerResult>} */ (result))
-            .then((r) => res.status(r.status).json(r.body))
-            .catch(next);
+        /** @type {Promise<HandlerResult>} */ (result).then((r) => res.status(r.status).json(r.body)).catch(next);
     };
 }

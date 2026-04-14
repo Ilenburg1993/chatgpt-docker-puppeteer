@@ -11,8 +11,9 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
 import { llmBridgeClient } from '#copilot/services';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export function cmdContext({ println }) {
     );
 
     // AA.3: usar dados reais do SDK se disponíveis
-    const sdkContext = alwaysAliveAgent.getStatusSnapshot().contextWindow;
+    const sdkContext = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot().contextWindow;
 
     if (!sdkContext && history.length === 0) {
         println('\x1b[90m  Nenhum histórico em memória ainda. Envie um turno primeiro.\x1b[0m');

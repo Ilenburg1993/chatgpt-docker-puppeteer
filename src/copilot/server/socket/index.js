@@ -3,11 +3,10 @@
  * @module copilot/server/socket
  * @file Factory Socket.IO para o servidor copilot dedicado.
  *
- * Cria e configura o servidor Socket.IO sobre o httpServer Express.
- * Monta o namespace /copilot via mountCopilotNamespace.
- * Onda 3.2 — L56.3.
+ *   Cria e configura o servidor Socket.IO sobre o httpServer Express. Monta o namespace /copilot via
+ *   mountCopilotNamespace. Onda 3.2 — L56.3.
  *
- * src/copilot/server/socket/index.js
+ *   src/copilot/server/socket/index.js
  */
 
 import { log } from '#copilot/observability';
@@ -30,8 +29,8 @@ import { mountCopilotNamespace } from './hub-ns.js';
 /**
  * Cria e configura o servidor Socket.IO sobre o httpServer.
  *
- * Monta o namespace `/copilot` com todos os handlers de eventos.
- * Chamado após criação do httpServer em `startCopilotServer()`.
+ * Monta o namespace `/copilot` com todos os handlers de eventos. Chamado após criação do httpServer em
+ * `startCopilotServer()`.
  *
  * @param {import('node:http').Server} httpServer - Servidor HTTP Node.js
  * @param {import('../../conversation-hub/orchestrator.js').HubOrchestrator} orchestrator

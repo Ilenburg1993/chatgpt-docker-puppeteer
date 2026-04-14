@@ -8,21 +8,10 @@
  * @see EventBus
  */
 
-
-import { log } from '../logger.js';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import {
-    VALID_TRANSITIONS,
-    createTask,
-    now,
-    sanitize,
-    withStore,
-    zId,
-    zPriority,
-    zStatus,
-} from './store.js';
-
+import { log } from '../logger.js';
+import { VALID_TRANSITIONS, createTask, now, sanitize, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_create
@@ -31,7 +20,8 @@ import {
 /**
  * Tool: todo_create — cria uma nova tarefa com metadados ricos.
  */
-export const todoCreateTool = createTool({ name: 'todo_create',
+export const todoCreateTool = createTool({
+    name: 'todo_create',
     description:
         'Cria uma nova tarefa no sistema de gerenciamento profundo. ' +
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
@@ -103,7 +93,6 @@ export const todoCreateTool = createTool({ name: 'todo_create',
     },
 });
 
-
 // ---------------------------------------------------------------------------
 // Tool: todo_set_status
 // ---------------------------------------------------------------------------
@@ -111,7 +100,8 @@ export const todoCreateTool = createTool({ name: 'todo_create',
 /**
  * Tool: todo_set_status — transiciona o status de uma tarefa com validação.
  */
-export const todoSetStatusTool = createTool({ name: 'todo_set_status',
+export const todoSetStatusTool = createTool({
+    name: 'todo_set_status',
     description:
         'Altera o status de uma tarefa seguindo a máquina de estados validada. ' +
         'Transições válidas: todo → in_progress | cancelled | blocked; ' +
@@ -171,7 +161,6 @@ export const todoSetStatusTool = createTool({ name: 'todo_set_status',
         }),
 });
 
-
 // ---------------------------------------------------------------------------
 // Tool: todo_delete
 // ---------------------------------------------------------------------------
@@ -179,7 +168,8 @@ export const todoSetStatusTool = createTool({ name: 'todo_set_status',
 /**
  * Tool: todo_delete — exclui uma tarefa e desvincula do pai.
  */
-export const todoDeleteTool = createTool({ name: 'todo_delete',
+export const todoDeleteTool = createTool({
+    name: 'todo_delete',
     description:
         'Exclui uma tarefa permanentemente. Por padrão, subtarefas são desvinculadas (tornam-se raiz). ' +
         'Com cascade: true, remove também todas as subtarefas recursivamente. ' +
@@ -247,4 +237,3 @@ export const todoDeleteTool = createTool({ name: 'todo_delete',
             };
         }),
 });
-

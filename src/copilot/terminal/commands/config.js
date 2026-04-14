@@ -10,9 +10,9 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
-import { listModels } from '#copilot/sdk';
-import { modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { container } from '#copilot/core';
+import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 
@@ -38,7 +38,7 @@ const VALID_EFFORTS = /** @type {const} */ (['low', 'medium', 'high', 'xhigh']);
  * @returns {Promise<void>}
  */
 export async function cmdModel({ println }, arg) {
-    const current = alwaysAliveAgent.model;
+    const current = container.resolve(ALWAYS_ALIVE_AGENT).model;
 
     if (!arg || arg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
@@ -99,7 +99,7 @@ export async function cmdModel({ println }, arg) {
 
     // Troca de modelo
     const previous = current;
-    alwaysAliveAgent.setModel(trimmed);
+    container.resolve(ALWAYS_ALIVE_AGENT).setModel(trimmed);
     println(`\n  🔄  Modelo trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     println('  \x1b[90mEfetivo no próximo turno. Use /restart para reiniciar o loop com o novo modelo.\x1b[0m\n');
 }
@@ -118,7 +118,7 @@ export async function cmdModel({ println }, arg) {
  * @returns {void}
  */
 export function cmdReasoning({ println }, arg) {
-    const current = alwaysAliveAgent.reasoningEffort ?? 'off';
+    const current = container.resolve(ALWAYS_ALIVE_AGENT).reasoningEffort ?? 'off';
 
     if (!arg || arg.trim() === '') {
         println(`\n  🧠  Reasoning effort: \x1b[36m${current}\x1b[0m`);
@@ -129,7 +129,7 @@ export function cmdReasoning({ println }, arg) {
     const trimmed = arg.trim().toLowerCase();
 
     if (trimmed === 'off' || trimmed === 'none') {
-        alwaysAliveAgent.setReasoningEffort(undefined);
+        container.resolve(ALWAYS_ALIVE_AGENT).setReasoningEffort(undefined);
         println(`\n  🧠  Raciocínio extendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
         return;
     }
@@ -140,7 +140,7 @@ export function cmdReasoning({ println }, arg) {
     }
 
     const previous = current;
-    alwaysAliveAgent.setReasoningEffort(/** @type {ReasoningEffort} */ (trimmed));
+    container.resolve(ALWAYS_ALIVE_AGENT).setReasoningEffort(/** @type {ReasoningEffort} */ (trimmed));
     println(`\n  🧠  Reasoning trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     println('  \x1b[90mEfetivo no próximo turno.\x1b[0m\n');
 }

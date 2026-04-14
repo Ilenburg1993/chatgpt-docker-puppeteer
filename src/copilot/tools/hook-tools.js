@@ -22,13 +22,13 @@
  */
 
 import { getAuditTail } from '#copilot/audit';
-import { log } from './logger.js';
 import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 const execFileAsync = promisify(execFile);
 

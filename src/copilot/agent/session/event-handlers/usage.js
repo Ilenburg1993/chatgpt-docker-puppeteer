@@ -29,14 +29,12 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
         log('INFO', `[AlwaysAlive] PR consumido: model=${model ?? '?'}, cost=${cost ?? '?'}`);
         onPrInfo(prInfo);
         emit('pr.consumed', prInfo);
-        void writeStateAsync(
-            {
-                pendingTurnConsumedPR: true,
-                lastPrConsumedAt: Date.now(),
-                lastPrModel: model ?? '',
-                lastPrCost: cost ?? 0,
-                lastQuotaSnapshots: quotaSnapshots ?? null,
-            },
-        );
+        void writeStateAsync({
+            pendingTurnConsumedPR: true,
+            lastPrConsumedAt: Date.now(),
+            lastPrModel: model ?? '',
+            lastPrCost: cost ?? 0,
+            lastQuotaSnapshots: quotaSnapshots ?? null,
+        });
     });
 }

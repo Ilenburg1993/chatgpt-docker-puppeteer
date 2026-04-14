@@ -16,9 +16,7 @@
       "post": {
         "summary": "POST /agent/answer — responde pergunta pendente",
         "operationId": "post_agent_answer",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -47,9 +45,7 @@
       "post": {
         "summary": "POST /agent/dialog/start — inicia Dialog Loop",
         "operationId": "post_agent_dialog_start",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -78,9 +74,7 @@
       "post": {
         "summary": "POST /agent/dialog/stop — encerra Dialog Loop",
         "operationId": "post_agent_dialog_stop",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -109,9 +103,7 @@
       "post": {
         "summary": "POST /agent/dialog/turn — turno de diálogo",
         "operationId": "post_agent_dialog_turn",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -140,9 +132,7 @@
       "get": {
         "summary": "GET /agent/health — health check do agent",
         "operationId": "get_agent_health",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -162,9 +152,7 @@
       "get": {
         "summary": "GET /agent/info",
         "operationId": "get_agent_info",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -184,9 +172,7 @@
       "get": {
         "summary": "GET /agent/permissions — lista permissões",
         "operationId": "get_agent_permissions",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -204,9 +190,7 @@
       "post": {
         "summary": "POST /agent/permissions — atualiza permissões (admin)",
         "operationId": "post_agent_permissions",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -235,9 +219,7 @@
       "post": {
         "summary": "POST /agent/send — envia mensagem ao agente",
         "operationId": "post_agent_send",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -266,9 +248,7 @@
       "get": {
         "summary": "GET /agent/session — info da sessão ativa",
         "operationId": "get_agent_session",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -288,9 +268,7 @@
       "post": {
         "summary": "POST /agent/start — inicia o agente (admin)",
         "operationId": "post_agent_start",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -319,9 +297,7 @@
       "get": {
         "summary": "GET /agent/state",
         "operationId": "get_agent_state",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -341,9 +317,7 @@
       "get": {
         "summary": "GET /agent/status — snapshot de status",
         "operationId": "get_agent_status",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -363,9 +337,7 @@
       "post": {
         "summary": "POST /agent/steer — steering imediato",
         "operationId": "post_agent_steer",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -394,9 +366,7 @@
       "post": {
         "summary": "POST /agent/stop — para o agente (admin)",
         "operationId": "post_agent_stop",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -425,9 +395,7 @@
       "get": {
         "summary": "GET /agent/stream",
         "operationId": "get_agent_stream",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -447,9 +415,7 @@
       "get": {
         "summary": "GET /agent/stream/tasks — SSE filtrado por tarefas",
         "operationId": "get_agent_stream_tasks",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -469,9 +435,7 @@
       "get": {
         "summary": "GET /agent/telemetry",
         "operationId": "get_agent_telemetry",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -491,9 +455,7 @@
       "post": {
         "summary": "POST /agent/telemetry/clear",
         "operationId": "post_agent_telemetry_clear",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -522,9 +484,7 @@
       "get": {
         "summary": "GET /agent/tools",
         "operationId": "get_agent_tools",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -544,9 +504,7 @@
       "get": {
         "summary": "GET /auth",
         "operationId": "get_auth",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -566,9 +524,7 @@
       "post": {
         "summary": "POST /client/force-stop",
         "operationId": "post_client_force-stop",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -597,9 +553,7 @@
       "post": {
         "summary": "POST /client/start",
         "operationId": "post_client_start",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -628,9 +582,7 @@
       "post": {
         "summary": "POST /client/stop",
         "operationId": "post_client_stop",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -659,9 +611,7 @@
       "get": {
         "summary": "GET /config — configuração atual",
         "operationId": "get_config",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -681,9 +631,7 @@
       "put": {
         "summary": "PUT /config/infinite-session — toggle sessão infinita",
         "operationId": "put_config_infinite_session",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -712,9 +660,7 @@
       "get": {
         "summary": "GET /config/skills — lista skills ativas",
         "operationId": "get_config_skills",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -732,9 +678,7 @@
       "put": {
         "summary": "PUT /config/skills — atualiza skills",
         "operationId": "put_config_skills",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -763,9 +707,7 @@
       "get": {
         "summary": "GET /config/tools — lista tools config",
         "operationId": "get_config_tools",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -783,9 +725,7 @@
       "put": {
         "summary": "PUT /config/tools — atualiza tools config",
         "operationId": "put_config_tools",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -814,9 +754,7 @@
       "get": {
         "summary": "GET /config/tools/custom — lista tools custom",
         "operationId": "get_config_tools_custom",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -834,9 +772,7 @@
       "post": {
         "summary": "POST /config/tools/custom — registra tool custom",
         "operationId": "post_config_tools_custom",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -865,9 +801,7 @@
       "delete": {
         "summary": "DELETE /config/tools/custom/:name — remove tool custom",
         "operationId": "delete_config_tools_custom_name",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "OK",
@@ -897,9 +831,7 @@
       "get": {
         "summary": "GET /context — contexto atual do agent",
         "operationId": "get_context",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -919,9 +851,7 @@
       "post": {
         "summary": "POST /dialog/pause — pausa diálogo",
         "operationId": "post_dialog_pause",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -941,9 +871,7 @@
       "post": {
         "summary": "POST /dialog/resume — retoma diálogo",
         "operationId": "post_dialog_resume",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -963,9 +891,7 @@
       "get": {
         "summary": "GET /errors — lista erros recentes",
         "operationId": "get_errors",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -985,9 +911,7 @@
       "get": {
         "summary": "GET /events — SSE stream de eventos",
         "operationId": "get_events",
-        "tags": [
-          "sse"
-        ],
+        "tags": ["sse"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1007,9 +931,7 @@
       "get": {
         "summary": "GET /events/critical — SSE eventos críticos",
         "operationId": "get_events_critical",
-        "tags": [
-          "sse"
-        ],
+        "tags": ["sse"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1029,9 +951,7 @@
       "get": {
         "summary": "GET /gh/ci — status CI",
         "operationId": "get_gh_ci",
-        "tags": [
-          "git"
-        ],
+        "tags": ["git"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1051,9 +971,7 @@
       "get": {
         "summary": "GET /gh/issues — lista issues",
         "operationId": "get_gh_issues",
-        "tags": [
-          "git"
-        ],
+        "tags": ["git"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1073,9 +991,7 @@
       "get": {
         "summary": "GET /gh/prs — lista pull requests",
         "operationId": "get_gh_prs",
-        "tags": [
-          "git"
-        ],
+        "tags": ["git"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1095,9 +1011,7 @@
       "get": {
         "summary": "GET /git/log — log de commits",
         "operationId": "get_git_log",
-        "tags": [
-          "git"
-        ],
+        "tags": ["git"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1117,9 +1031,7 @@
       "get": {
         "summary": "GET /git/status — status git",
         "operationId": "get_git_status",
-        "tags": [
-          "git"
-        ],
+        "tags": ["git"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1139,9 +1051,7 @@
       "get": {
         "summary": "GET /handoff — lista handoffs pendentes",
         "operationId": "get_handoff",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1161,9 +1071,7 @@
       "post": {
         "summary": "POST /handoff/:id/accept — aceita handoff",
         "operationId": "post_handoff_id_accept",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1202,9 +1110,7 @@
       "post": {
         "summary": "POST /handoff/:id/reject — rejeita handoff",
         "operationId": "post_handoff_id_reject",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1243,9 +1149,7 @@
       "get": {
         "summary": "GET /health — health check geral",
         "operationId": "get_health",
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1265,9 +1169,7 @@
       "get": {
         "summary": "GET /hooks/events",
         "operationId": "get_hooks_events",
-        "tags": [
-          "hooks"
-        ],
+        "tags": ["hooks"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1287,9 +1189,7 @@
       "get": {
         "summary": "GET /hooks/registry",
         "operationId": "get_hooks_registry",
-        "tags": [
-          "hooks"
-        ],
+        "tags": ["hooks"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1309,9 +1209,7 @@
       "get": {
         "summary": "GET /hub-health — health do ConversationHub",
         "operationId": "get_hub_health",
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1331,9 +1229,7 @@
       "post": {
         "summary": "POST /inject — injeta mensagem no agente",
         "operationId": "post_inject",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1362,9 +1258,7 @@
       "get": {
         "summary": "GET /memory — lista memories",
         "operationId": "get_memory",
-        "tags": [
-          "memory"
-        ],
+        "tags": ["memory"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1382,9 +1276,7 @@
       "post": {
         "summary": "POST /memory — armazena memory",
         "operationId": "post_memory",
-        "tags": [
-          "memory"
-        ],
+        "tags": ["memory"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1413,9 +1305,7 @@
       "delete": {
         "summary": "DELETE /memory/:memoryId — remove memory",
         "operationId": "delete_memory_memoryId",
-        "tags": [
-          "memory"
-        ],
+        "tags": ["memory"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1445,9 +1335,7 @@
       "get": {
         "summary": "GET /metrics — métricas Prometheus",
         "operationId": "get_metrics",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1467,9 +1355,7 @@
       "get": {
         "summary": "GET /models",
         "operationId": "get_models",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1489,9 +1375,7 @@
       "get": {
         "summary": "GET /observability/audit",
         "operationId": "get_observability_audit",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1511,9 +1395,7 @@
       "get": {
         "summary": "GET /observability/audit-tail",
         "operationId": "get_observability_audit-tail",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1533,9 +1415,7 @@
       "post": {
         "summary": "POST /observability/audit/flush",
         "operationId": "post_observability_audit_flush",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1564,9 +1444,7 @@
       "get": {
         "summary": "GET /observability/errors",
         "operationId": "get_observability_errors",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1586,9 +1464,7 @@
       "post": {
         "summary": "POST /observability/errors/clear",
         "operationId": "post_observability_errors_clear",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1617,9 +1493,7 @@
       "get": {
         "summary": "GET /observability/errors/stats",
         "operationId": "get_observability_errors_stats",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1639,9 +1513,7 @@
       "get": {
         "summary": "GET /observability/events/catalog",
         "operationId": "get_observability_events_catalog",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1661,9 +1533,7 @@
       "get": {
         "summary": "GET /observability/events/dead-letter",
         "operationId": "get_observability_events_dead-letter",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1683,9 +1553,7 @@
       "get": {
         "summary": "GET /observability/health",
         "operationId": "get_observability_health",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1705,9 +1573,7 @@
       "post": {
         "summary": "POST /observability/log-level",
         "operationId": "post_observability_log-level",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1736,9 +1602,7 @@
       "get": {
         "summary": "GET /observability/logs",
         "operationId": "get_observability_logs",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1758,9 +1622,7 @@
       "get": {
         "summary": "GET /observability/metrics",
         "operationId": "get_observability_metrics",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1780,9 +1642,7 @@
       "get": {
         "summary": "GET /observability/otel-status",
         "operationId": "get_observability_otel-status",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1802,9 +1662,7 @@
       "get": {
         "summary": "GET /observability/quota",
         "operationId": "get_observability_quota",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1824,9 +1682,7 @@
       "get": {
         "summary": "GET /ping",
         "operationId": "get_ping",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1846,9 +1702,7 @@
       "post": {
         "summary": "POST /pipeline — executa pipeline",
         "operationId": "post_pipeline",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1877,9 +1731,7 @@
       "get": {
         "summary": "GET /pr-budget — budget de pull requests",
         "operationId": "get_pr_budget",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1899,9 +1751,7 @@
       "get": {
         "summary": "GET /quota — quota de tokens",
         "operationId": "get_quota",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1921,9 +1771,7 @@
       "get": {
         "summary": "GET /sessions",
         "operationId": "get_sessions",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1941,9 +1789,7 @@
       "post": {
         "summary": "POST /sessions",
         "operationId": "post_sessions",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1972,9 +1818,7 @@
       "get": {
         "summary": "GET /sessions/active",
         "operationId": "get_sessions_active",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -1994,9 +1838,7 @@
       "get": {
         "summary": "GET /sessions/foreground",
         "operationId": "get_sessions_foreground",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2016,9 +1858,7 @@
       "put": {
         "summary": "PUT /sessions/foreground/:id",
         "operationId": "put_sessions_foreground__id",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2057,9 +1897,7 @@
       "get": {
         "summary": "GET /sessions/last",
         "operationId": "get_sessions_last",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2079,9 +1917,7 @@
       "get": {
         "summary": "GET /sessions/:id",
         "operationId": "get_sessions__id",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2109,9 +1945,7 @@
       "delete": {
         "summary": "DELETE /sessions/:id",
         "operationId": "delete_sessions__id",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2141,9 +1975,7 @@
       "post": {
         "summary": "POST /sessions/:id/abort",
         "operationId": "post_sessions__id_abort",
-        "tags": [
-          "session-messaging"
-        ],
+        "tags": ["session-messaging"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2182,9 +2014,7 @@
       "get": {
         "summary": "GET /sessions/:id/compaction-history",
         "operationId": "get_sessions__id_compaction-history",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2214,9 +2044,7 @@
       "post": {
         "summary": "POST /sessions/:id/disconnect",
         "operationId": "post_sessions__id_disconnect",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2255,9 +2083,7 @@
       "get": {
         "summary": "GET /sessions/:id/messages",
         "operationId": "get_sessions__id_messages",
-        "tags": [
-          "session-messaging"
-        ],
+        "tags": ["session-messaging"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2287,9 +2113,7 @@
       "post": {
         "summary": "POST /sessions/:id/model",
         "operationId": "post_sessions__id_model",
-        "tags": [
-          "session-messaging"
-        ],
+        "tags": ["session-messaging"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2328,9 +2152,7 @@
       "post": {
         "summary": "POST /sessions/:id/resume",
         "operationId": "post_sessions__id_resume",
-        "tags": [
-          "session-crud"
-        ],
+        "tags": ["session-crud"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2369,9 +2191,7 @@
       "post": {
         "summary": "POST /sessions/:id/send",
         "operationId": "post_sessions__id_send",
-        "tags": [
-          "session-messaging"
-        ],
+        "tags": ["session-messaging"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2410,9 +2230,7 @@
       "get": {
         "summary": "GET /sessions/:id/stream",
         "operationId": "get_sessions__id_stream",
-        "tags": [
-          "session-messaging"
-        ],
+        "tags": ["session-messaging"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2442,9 +2260,7 @@
       "get": {
         "summary": "GET /status",
         "operationId": "get_status",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2464,9 +2280,7 @@
       "post": {
         "summary": "POST /system/reset — reset do sistema",
         "operationId": "post_system_reset",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2486,9 +2300,7 @@
       "get": {
         "summary": "GET /telemetry",
         "operationId": "get_telemetry",
-        "tags": [
-          "agent"
-        ],
+        "tags": ["agent"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2508,9 +2320,7 @@
       "get": {
         "summary": "GET /tool-stats — estatísticas de tools",
         "operationId": "get_tool_stats",
-        "tags": [
-          "observability"
-        ],
+        "tags": ["observability"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2530,9 +2340,7 @@
       "get": {
         "summary": "GET /tools",
         "operationId": "get_tools",
-        "tags": [
-          "client"
-        ],
+        "tags": ["client"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2552,9 +2360,7 @@
       "get": {
         "summary": "GET /webhooks",
         "operationId": "get_webhooks",
-        "tags": [
-          "webhooks"
-        ],
+        "tags": ["webhooks"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2572,9 +2378,7 @@
       "post": {
         "summary": "POST /webhooks",
         "operationId": "post_webhooks",
-        "tags": [
-          "webhooks"
-        ],
+        "tags": ["webhooks"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2603,9 +2407,7 @@
       "delete": {
         "summary": "DELETE /webhooks/:id",
         "operationId": "delete_webhooks__id",
-        "tags": [
-          "webhooks"
-        ],
+        "tags": ["webhooks"],
         "responses": {
           "200": {
             "description": "OK",
@@ -2635,9 +2437,7 @@
       "get": {
         "summary": "GET /ws/info — info do WebSocket",
         "operationId": "get_ws_info",
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "responses": {
           "200": {
             "description": "OK",

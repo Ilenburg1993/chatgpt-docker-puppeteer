@@ -20,8 +20,8 @@
  * @see module:copilot/hooks/types
  */
 
-import { log } from './logger.js';
 import { approveAll } from '#copilot/sdk';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').PermissionHandler} PermissionHandler

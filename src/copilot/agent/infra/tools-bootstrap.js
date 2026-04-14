@@ -1,7 +1,6 @@
 // @ts-check
 /**
  * @module copilot/agent/infra/tools-bootstrap
- * @see EventBus
  * @file Inicialização de tools do agente — registro por categoria e tags.
  *
  *   Extrai a lógica repetitiva de `registerTools(registry, grupo, opts)` do método `start()` de `AlwaysAliveAgent`,
@@ -12,6 +11,7 @@
  *   ativa. Para desabilitar uma categoria de tools em runtime (ex.: `shellTools`), a sessão precisa ser recriada via
  *   `stop()` + `start()`. Um futuro `unregisterTool(name)` no `ToolRegistry` poderia manter o registro em sincronia,
  *   mas a limitação real está no SDK.
+ * @see EventBus
  * @see module:copilot/tools/tool-factory
  * @see module:copilot/lib/tools-registry
  */

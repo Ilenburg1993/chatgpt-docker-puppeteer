@@ -7,10 +7,10 @@ observabilidade).
 
 ## Subdomínios
 
-| Diretório | Responsabilidade |
-|---|---|
-| `express/` | Rotas Express (agent, client, session-*, webhooks, observability) |
-| `bridge/` | Bridges internos de controle (control, tasks) |
+| Diretório  | Responsabilidade                                                   |
+| ---------- | ------------------------------------------------------------------ |
+| `express/` | Rotas Express (agent, client, session-\*, webhooks, observability) |
+| `bridge/`  | Bridges internos de controle (control, tasks)                      |
 
 ## Regras de importação
 

@@ -3,10 +3,9 @@
  * @module copilot/server/middleware/error-handler
  * @file Middleware de erro global Express para o servidor copilot.
  *
- * Captura erros propagados via `next(err)` e retorna JSON padronizado.
- * Onda 3.0 — L54.3.
+ *   Captura erros propagados via `next(err)` e retorna JSON padronizado. Onda 3.0 — L54.3.
  *
- * src/copilot/server/middleware/error-handler.js
+ *   src/copilot/server/middleware/error-handler.js
  */
 
 import { log } from '#copilot/observability';

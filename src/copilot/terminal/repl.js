@@ -11,10 +11,11 @@
  */
 
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { container } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
-import { alwaysAliveAgent } from '../agent/index.js';
+import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { llmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { resolve } from './alias-store.js';
@@ -61,6 +62,9 @@ import { extractAtReferences } from './file-context.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
+
+/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
+const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 const INJECT_PORT = LLM_B_TERMINAL_PORT;
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
@@ -231,14 +235,14 @@ async function _cmdRestart() {
             clearTimeout(timeout);
             resolveReady();
         };
-        alwaysAliveAgent.once(EMITTER_DIALOG_READY, onReady);
+        getAgent().once(EMITTER_DIALOG_READY, onReady);
         await llmBridgeClient.stopDialogMode();
-        if (!alwaysAliveAgent.dialogLoopActive) {
+        if (!getAgent().dialogLoopActive) {
             await readyPromise;
         } else {
             // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout
             clearTimeout(timeout);
-            alwaysAliveAgent.off('dialog.ready', onReady);
+            getAgent().off('dialog.ready', onReady);
         }
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
@@ -249,7 +253,7 @@ async function _cmdRestart() {
 
 async function _cmdPauseDialogLoop() {
     try {
-        await alwaysAliveAgent.pauseDialogLoop();
+        await getAgent().pauseDialogLoop();
         println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Erro ao pausar: ${e.message}\x1b[0m`);
@@ -258,7 +262,7 @@ async function _cmdPauseDialogLoop() {
 
 async function _cmdDialogResume() {
     try {
-        await alwaysAliveAgent.resumeDialogLoop();
+        await getAgent().resumeDialogLoop();
         println('\x1b[32m  Dialog loop retomado.\x1b[0m');
     } catch (/** @type {any} */ e) {
         println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
@@ -266,7 +270,7 @@ async function _cmdDialogResume() {
 }
 
 function _cmdHandoff() {
-    const mgr = alwaysAliveAgent.getHandoffManager?.();
+    const mgr = getAgent().getHandoffManager?.();
     if (!mgr) {
         println('\x1b[31m  HandoffManager não disponível.\x1b[0m');
         return;
@@ -293,7 +297,7 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     println('[terminal] Encerrando sessão…');
     cleanup();
     try {
-        await alwaysAliveAgent.stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+        await getAgent().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
     } catch (/** @type {any} */ e) {
         logSwallowed(e, 'terminal.repl.stopLoop');
     }

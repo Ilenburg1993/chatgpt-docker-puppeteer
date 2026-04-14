@@ -8,11 +8,11 @@
  * @see EventBus
  */
 
-import { log } from '../logger.js';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
+import { log } from '../logger.js';
 
 export const execFileAsync = promisify(execFile);
 

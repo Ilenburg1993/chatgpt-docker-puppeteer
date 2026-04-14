@@ -35,8 +35,8 @@ let _deps = {
 };
 
 /**
- * Registra as dependências de log e tracking para error-handlers.
- * Deve ser chamado pelo observability bootstrap antes de qualquer uso em runtime.
+ * Registra as dependências de log e tracking para error-handlers. Deve ser chamado pelo observability bootstrap antes
+ * de qualquer uso em runtime.
  *
  * @param {ErrorHandlerDeps} deps
  * @returns {void}

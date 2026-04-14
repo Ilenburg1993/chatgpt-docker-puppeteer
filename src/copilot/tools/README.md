@@ -6,19 +6,19 @@ Cada tool é uma função registrada no SDK que o agente pode chamar durante o d
 
 ## Subdomínios
 
-| Diretório/Arquivo | Responsabilidade |
-|---|---|
-| `file/` | Tools de leitura/escrita de arquivos |
-| `git/` | Tools de operações git |
-| `todo/` | Tools de gestão de TODOs (CRUD, bulk, queries) |
-| `shell/` | Tools de execução de comandos shell |
-| `web-tools.js` | Fetch de URLs (anti-SSRF) |
-| `code-tools.js` | Análise de código |
-| `session-tools.js` | Gestão de sessão |
-| `hook-tools.js` | Interação com hooks |
-| `hub-tools.js` | Interação com conversation hub |
-| `tool-factory.js` | Factory de registro de tools no SDK |
-| `index.js` | Barrel de exportação |
+| Diretório/Arquivo  | Responsabilidade                               |
+| ------------------ | ---------------------------------------------- |
+| `file/`            | Tools de leitura/escrita de arquivos           |
+| `git/`             | Tools de operações git                         |
+| `todo/`            | Tools de gestão de TODOs (CRUD, bulk, queries) |
+| `shell/`           | Tools de execução de comandos shell            |
+| `web-tools.js`     | Fetch de URLs (anti-SSRF)                      |
+| `code-tools.js`    | Análise de código                              |
+| `session-tools.js` | Gestão de sessão                               |
+| `hook-tools.js`    | Interação com hooks                            |
+| `hub-tools.js`     | Interação com conversation hub                 |
+| `tool-factory.js`  | Factory de registro de tools no SDK            |
+| `index.js`         | Barrel de exportação                           |
 
 ## Regras de importação
 

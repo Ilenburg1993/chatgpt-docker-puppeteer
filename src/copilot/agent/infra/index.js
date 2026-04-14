@@ -7,11 +7,11 @@
  */
 
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#copilot/audit';
+export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
 export { HandoffManager } from './handoff-manager.js';
 export { MessageQueue } from './message-queue.js';
 export { PermissionController } from './permission-controller.js';
 export { buildStatusSnapshot } from './status-snapshot.js';
 export { executeTask } from './task-executor.js';
 export { bootstrapTools, configureHookTools, setHub, setPermissionAgent, setSessionRpc } from './tools-bootstrap.js';
-export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
 export { WebhookManager } from './webhook-manager.js';

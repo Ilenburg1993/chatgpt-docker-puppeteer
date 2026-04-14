@@ -12,8 +12,8 @@
 
 import { WEB_SEARCH_DISABLED } from '#copilot/config';
 import { logSwallowed, validateUrl } from '#copilot/core';
-import { log } from './logger.js';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
 
 // ─── SSRF Protection (via lib/url-validator.js) ──────────────────────────────

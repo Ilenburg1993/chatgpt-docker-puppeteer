@@ -3,11 +3,10 @@
  * @module copilot/server/routes/health
  * @file Router Express para rotas de health check do servidor copilot.
  *
- * Rotas auth-exempt (skipAuth): GET /health, GET /hub-health
- * Onda 3.1 — L55.1.
- * Onda 3.4 — L58.3: GET /ws/info (info sobre conexões socket ativas)
+ *   Rotas auth-exempt (skipAuth): GET /health, GET /hub-health Onda 3.1 — L55.1. Onda 3.4 — L58.3: GET /ws/info (info
+ *   sobre conexões socket ativas)
  *
- * src/copilot/server/routes/health.js
+ *   src/copilot/server/routes/health.js
  */
 
 import { Router } from 'express';
@@ -17,8 +16,7 @@ import { callHandler } from '../handler-bridge.js';
 import { getCopilotNamespace } from '../socket/hub-ns.js';
 
 /**
- * Cria o router de health do servidor copilot.
- * Rotas: GET /health, GET /hub-health, GET /ws/info
+ * Cria o router de health do servidor copilot. Rotas: GET /health, GET /hub-health, GET /ws/info
  *
  * @returns {import('express').Router}
  */
@@ -47,7 +45,13 @@ export function createHealthRouter() {
                 });
             })
             .catch(() => {
-                res.json({ ok: true, connected: 0, namespaces: ['/copilot'], socketMounted: true, error: 'namespace query failed' });
+                res.json({
+                    ok: true,
+                    connected: 0,
+                    namespaces: ['/copilot'],
+                    socketMounted: true,
+                    error: 'namespace query failed',
+                });
             });
     });
 

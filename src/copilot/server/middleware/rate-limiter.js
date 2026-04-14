@@ -3,10 +3,10 @@
  * @module copilot/server/middleware/rate-limiter
  * @file Rate limiters em memória para o servidor copilot.
  *
- * Extrai os 3 rate limiters de `terminal/server.js` (L54.2 — Onda 3.0).
- * Disponibiliza middlewares Express prontos para montar por rota.
+ *   Extrai os 3 rate limiters de `terminal/server.js` (L54.2 — Onda 3.0). Disponibiliza middlewares Express prontos para
+ *   montar por rota.
  *
- * src/copilot/server/middleware/rate-limiter.js
+ *   src/copilot/server/middleware/rate-limiter.js
  */
 
 import {
@@ -104,8 +104,7 @@ export function injectRateMiddleware(req, res, next) {
 }
 
 /**
- * Middleware Express: rate limit para endpoints de escrita.
- * A chave inclui o path para isolamento por rota.
+ * Middleware Express: rate limit para endpoints de escrita. A chave inclui o path para isolamento por rota.
  *
  * @param {import('express').Request} req
  * @param {import('express').Response} res

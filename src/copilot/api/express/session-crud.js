@@ -1,6 +1,7 @@
 // @ts-check
 /**
  * src/copilot/api/express/session-crud.js
+ *
  * @module copilot/api/express/session-crud
  * @see EventBus
  */

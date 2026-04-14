@@ -3,11 +3,10 @@
  * @module copilot/server
  * @file Ponto de entrada do servidor copilot dedicado.
  *
- * Onda 3.0 — L54.7: Express app + middleware criados.
- * Onda 3.1 — L55.8: mountCopilotRoutes integrado.
- * Onda 3.2 — L56.4: implementação completa com Express + Socket.IO.
+ *   Onda 3.0 — L54.7: Express app + middleware criados. Onda 3.1 — L55.8: mountCopilotRoutes integrado. Onda 3.2 — L56.4:
+ *   implementação completa com Express + Socket.IO.
  *
- * src/copilot/server/index.js
+ *   src/copilot/server/index.js
  */
 
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';

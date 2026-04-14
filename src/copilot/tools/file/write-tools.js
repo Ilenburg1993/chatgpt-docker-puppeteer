@@ -9,11 +9,11 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { log } from '../logger.js';
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { validatePath } from './shared.js';
 

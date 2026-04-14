@@ -149,8 +149,8 @@ export function createPluginRegistry() {
 /**
  * Descobre e carrega plugins a partir de diretórios convencionais no filesystem.
  *
- * Escaneia por arquivos `*.js` nos subdiretórios `tools/`, `hooks/`, `bridges/`, `services/` dentro de `baseDir`.
- * Cada arquivo deve exportar um default que satisfaça o contrato CopilotPlugin.
+ * Escaneia por arquivos `*.js` nos subdiretórios `tools/`, `hooks/`, `bridges/`, `services/` dentro de `baseDir`. Cada
+ * arquivo deve exportar um default que satisfaça o contrato CopilotPlugin.
  *
  * @param {string} baseDir - Diretório raiz de plugins (ex: `src/copilot/plugins`).
  * @param {PluginRegistry} registry - Registry onde registrar os plugins encontrados.
@@ -199,8 +199,8 @@ export async function discoverPlugins(baseDir, registry) {
 /**
  * Ativa plugins com base em configuração.
  *
- * Recebe um array de nomes (whitelist) e instala apenas os plugins correspondentes no registry.
- * Se `enabledNames` for `undefined` ou `null`, instala todos (comportamento padrão).
+ * Recebe um array de nomes (whitelist) e instala apenas os plugins correspondentes no registry. Se `enabledNames` for
+ * `undefined` ou `null`, instala todos (comportamento padrão).
  *
  * @param {PluginRegistry} registry - Registry com plugins já registrados.
  * @param {import('../core/di.js').Container} container - Container DI.
@@ -210,7 +210,10 @@ export async function discoverPlugins(baseDir, registry) {
 export async function activatePlugins(registry, container, enabledNames) {
     if (!enabledNames) {
         await registry.installAll(container);
-        return registry.list().filter((p) => p.installed).map((p) => p.name);
+        return registry
+            .list()
+            .filter((p) => p.installed)
+            .map((p) => p.name);
     }
     /** @type {string[]} */
     const activated = [];

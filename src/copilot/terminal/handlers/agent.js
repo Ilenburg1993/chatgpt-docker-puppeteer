@@ -9,7 +9,8 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { sendTurn } from '../dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../file-context.js';
 import { recordInjectHistory } from '../state.js';
@@ -27,6 +28,9 @@ import { recordInjectHistory } from '../state.js';
  */
 const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
 
+/** @returns {import('../../agent/always-alive.js').AlwaysAliveAgent} */
+const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
+
 // ─── GET /context ─────────────────────────────────────────────────────────────
 
 /**
@@ -35,7 +39,7 @@ const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
  * @returns {HandlerResult}
  */
 export function handleGetContext() {
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const snapshot = getAgent().getStatusSnapshot();
     const cw = snapshot.contextWindow;
     if (!cw) {
         return {
@@ -240,11 +244,11 @@ export async function handleInject(body) {
  * @returns {Promise<{ status: number; body: object }>}
  */
 export async function handleDialogPause() {
-    if (!alwaysAliveAgent.dialogLoopActive) {
+    if (!getAgent().dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop não está ativo.' } };
     }
     try {
-        await alwaysAliveAgent.pauseDialogLoop();
+        await getAgent().pauseDialogLoop();
         return {
             status: 200,
             body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' },
@@ -260,11 +264,11 @@ export async function handleDialogPause() {
  * @returns {Promise<{ status: number; body: object }>}
  */
 export async function handleDialogResume() {
-    if (alwaysAliveAgent.dialogLoopActive) {
+    if (getAgent().dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop já está ativo.' } };
     }
     try {
-        await alwaysAliveAgent.resumeDialogLoop();
+        await getAgent().resumeDialogLoop();
         return { status: 200, body: { ok: true, message: 'Dialog loop retomado.' } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
@@ -279,7 +283,7 @@ export async function handleDialogResume() {
  * @returns {HandlerResult}
  */
 export function handleGetHandoffs() {
-    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    const handoffMgr = getAgent().getHandoffManager?.();
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }
@@ -300,7 +304,7 @@ export function handleGetHandoffs() {
  * @returns {HandlerResult}
  */
 export function handleAcceptHandoff(params) {
-    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    const handoffMgr = getAgent().getHandoffManager?.();
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }
@@ -320,7 +324,7 @@ export function handleAcceptHandoff(params) {
  * @returns {HandlerResult}
  */
 export function handleRejectHandoff(params, body) {
-    const handoffMgr = alwaysAliveAgent.getHandoffManager?.();
+    const handoffMgr = getAgent().getHandoffManager?.();
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }

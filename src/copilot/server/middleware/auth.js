@@ -3,10 +3,9 @@
  * @module copilot/server/middleware/auth
  * @file Middleware de autenticação por token Bearer para o servidor copilot.
  *
- * Extrai auth de `terminal/server.js` (L54.1 — Onda 3.0).
- * Usa comparação timing-safe para evitar timing attacks.
+ *   Extrai auth de `terminal/server.js` (L54.1 — Onda 3.0). Usa comparação timing-safe para evitar timing attacks.
  *
- * src/copilot/server/middleware/auth.js
+ *   src/copilot/server/middleware/auth.js
  */
 
 import { defaultAuditLog } from '#copilot/audit';
@@ -16,8 +15,8 @@ import { timingSafeEqual } from 'node:crypto';
 /**
  * Cria um middleware Express de autenticação Bearer timing-safe.
  *
- * Se `LLM_B_TERMINAL_TOKEN` não estiver definido, a rota é liberada sem auth.
- * Rotas marcadas com `skipAuth=true` na route-table são whitelistadas antes de chegar aqui.
+ * Se `LLM_B_TERMINAL_TOKEN` não estiver definido, a rota é liberada sem auth. Rotas marcadas com `skipAuth=true` na
+ * route-table são whitelistadas antes de chegar aqui.
  *
  * @param {object} [opts]
  * @param {string} [opts.token] - Token override (para testes). Default: `LLM_B_TERMINAL_TOKEN`.

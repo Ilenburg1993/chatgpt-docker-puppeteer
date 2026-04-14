@@ -17,8 +17,8 @@
  * @see module:copilot/channel/client
  */
 
-import { log } from './logger.js';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
 
 // ─── Injeção de dependência do hub (ARCH-02) ─────────────────────────────────

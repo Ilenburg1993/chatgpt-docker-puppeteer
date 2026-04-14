@@ -2,8 +2,8 @@
 /**
  * src/copilot/config/auth.js — Configuração JWT internalizada.
  *
- * Reproduz a superfície de `src/core/jwt_config.js` dentro de `src/copilot/` para eliminar
- * a dependência externa. O módulo externo continua existindo para consumidores fora de copilot.
+ * Reproduz a superfície de `src/core/jwt_config.js` dentro de `src/copilot/` para eliminar a dependência externa. O
+ * módulo externo continua existindo para consumidores fora de copilot.
  *
  * @module copilot/config/auth
  */
@@ -32,9 +32,7 @@ export function getJwtSecret() {
     }
 
     if (secret.length < 32) {
-        throw new Error(
-            `[AUTH] JWT_SECRET é muito curta (${secret.length} chars). Mínimo: 32 caracteres.`,
-        );
+        throw new Error(`[AUTH] JWT_SECRET é muito curta (${secret.length} chars). Mínimo: 32 caracteres.`);
     }
 
     _cachedSecret = secret;

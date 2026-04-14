@@ -8,8 +8,9 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { container } from '#copilot/core';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -80,8 +81,9 @@ export function println(text) {
 export function printExchange(actor, message, reply, durationMs) {
     const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const secs = (durationMs / 1000).toFixed(1);
-    const model = alwaysAliveAgent.model;
-    const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+    const agent = container.resolve(ALWAYS_ALIVE_AGENT);
+    const model = agent.model;
+    const effort = agent.reasoningEffort ?? 'high';
 
     const secsNum = durationMs / 1000;
     const secsColor =

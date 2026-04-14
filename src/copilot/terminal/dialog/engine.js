@@ -7,8 +7,10 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
+import { container } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { alwaysAliveAgent, llmBridgeClient } from '#copilot/services';
+import { llmBridgeClient } from '#copilot/services';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,
@@ -41,6 +43,9 @@ import {
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
+/** @returns {import('../../agent/always-alive.js').AlwaysAliveAgent} */
+const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
+
 const MAX_TURN_QUEUE_SIZE = 10;
 /** @type {number} */
 let _turnQueueDepth = 0;
@@ -64,10 +69,10 @@ let _ensureDialogLoopInFlight = null;
  * @returns {Promise<void>}
  */
 export function ensureDialogLoop() {
-    if (alwaysAliveAgent.dialogLoopActive) {
+    if (getAgent().dialogLoopActive) {
         return Promise.resolve();
     }
-    if (alwaysAliveAgent.dialogPaused) {
+    if (getAgent().dialogPaused) {
         log('INFO', '[dialog] ensureDialogLoop() ignorado — dialogPaused=true (pausado pelo usuário)');
         return Promise.resolve();
     }
@@ -120,14 +125,14 @@ async function _doEnsureDialogLoop() {
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
-    const status = alwaysAliveAgent.status;
+    const status = getAgent().status;
     if (status === 'stopped') {
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
-        await alwaysAliveAgent.start();
+        await getAgent().start();
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timeout aguardando idle')), 30_000);
             const check = () => {
-                if (alwaysAliveAgent.status === 'idle') {
+                if (getAgent().status === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
                 } else {
@@ -138,7 +143,7 @@ async function _tryStartDialogLoop() {
         });
     }
 
-    if (alwaysAliveAgent.status === 'processing') {
+    if (getAgent().status === 'processing') {
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(
@@ -146,7 +151,7 @@ async function _tryStartDialogLoop() {
                 30_000,
             );
             const check = () => {
-                const s = alwaysAliveAgent.status;
+                const s = getAgent().status;
                 if (s === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
@@ -206,7 +211,7 @@ export function sendTurn(message, actor = 'user') {
  * @returns {Promise<string | null>}
  */
 async function _executeTurn(message, actor) {
-    const ctxState = alwaysAliveAgent.getStatusSnapshot().contextWindow;
+    const ctxState = getAgent().getStatusSnapshot().contextWindow;
     if (ctxState) {
         const u = ctxState.utilization;
         if (u >= 0.95) {
@@ -224,8 +229,8 @@ async function _executeTurn(message, actor) {
     broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
     if (rl) {
-        const model = alwaysAliveAgent.model;
-        const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+        const model = getAgent().model;
+        const effort = getAgent().reasoningEffort ?? 'high';
         process.stdout.write(`  \x1b[90m⏳ aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m…\x1b[0m`);
         rl.setPrompt(PROMPT_WAITING);
     }
@@ -268,8 +273,8 @@ async function _executeTurn(message, actor) {
         }
 
         const showThinking = getShowThinking();
-        const model = alwaysAliveAgent.model;
-        const effort = alwaysAliveAgent.reasoningEffort ?? 'high';
+        const model = getAgent().model;
+        const effort = getAgent().reasoningEffort ?? 'high';
         const displayState = createDisplayState({ model, effort, turnStartTime: t0 });
 
         /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
@@ -303,9 +308,9 @@ async function _executeTurn(message, actor) {
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
 
         if (getShowUsage()) {
-            const snap = alwaysAliveAgent.getStatusSnapshot();
+            const snap = getAgent().getStatusSnapshot();
             const ctxWin = snap?.contextWindow;
-            const prInfo = alwaysAliveAgent.lastPrInfo;
+            const prInfo = getAgent().lastPrInfo;
             if (ctxWin || prInfo) {
                 const parts = [];
                 if (prInfo) {
@@ -335,7 +340,7 @@ async function _executeTurn(message, actor) {
     } catch (/** @type {any} */ e) {
         println(`[erro] ${e.message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${e.message}`);
-        if (!alwaysAliveAgent.dialogLoopActive) {
+        if (!getAgent().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             setTimeout(() => {
                 ensureDialogLoop().catch((/** @type {any} */ restartErr) => {

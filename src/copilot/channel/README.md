@@ -6,12 +6,12 @@ Bridge de mensagens entre o client (LLM-B terminal) e o agente principal.
 
 ## Conteúdo
 
-| Arquivo | Responsabilidade |
-|---|---|
+| Arquivo     | Responsabilidade                                      |
+| ----------- | ----------------------------------------------------- |
 | `client.js` | `LlmBridgeClient` — client de comunicação com o agent |
-| `inject.js` | Injeção de mensagens programáticas no agent loop |
-| `index.js` | Barrel de exportação |
-| `types.js` | Typedefs do módulo |
+| `inject.js` | Injeção de mensagens programáticas no agent loop      |
+| `index.js`  | Barrel de exportação                                  |
+| `types.js`  | Typedefs do módulo                                    |
 
 ## Escopo vs `conversation-hub/`
 

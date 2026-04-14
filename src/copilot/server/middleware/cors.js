@@ -3,11 +3,10 @@
  * @module copilot/server/middleware/cors
  * @file Middleware CORS para o servidor copilot.
  *
- * O servidor faz bind em 127.0.0.1 (loopback only), portanto CORS wildcard
- * é seguro — apenas código local pode alcançar esta porta.
- * Onda 3.0 — L54.4.
+ *   O servidor faz bind em 127.0.0.1 (loopback only), portanto CORS wildcard é seguro — apenas código local pode alcançar
+ *   esta porta. Onda 3.0 — L54.4.
  *
- * src/copilot/server/middleware/cors.js
+ *   src/copilot/server/middleware/cors.js
  */
 
 /**

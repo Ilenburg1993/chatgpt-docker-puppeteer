@@ -1,16 +1,16 @@
 {
-    "snapshotId": "snap-1775802062001-9duow1",
-    "createdAt": 1775802062001,
-    "sessionId": null,
-    "model": "gpt-4o",
-    "status": "idle",
-    "sendCount": 0,
-    "dialogLoopActive": false,
-    "dialogPaused": false,
-    "pendingQuestion": null,
-    "stateSnapshot": {
-        "key": "value"
-    },
-    "prMetrics": null,
-    "reason": "manual"
+  "snapshotId": "snap-1775802062001-9duow1",
+  "createdAt": 1775802062001,
+  "sessionId": null,
+  "model": "gpt-4o",
+  "status": "idle",
+  "sendCount": 0,
+  "dialogLoopActive": false,
+  "dialogPaused": false,
+  "pendingQuestion": null,
+  "stateSnapshot": {
+    "key": "value"
+  },
+  "prMetrics": null,
+  "reason": "manual"
 }

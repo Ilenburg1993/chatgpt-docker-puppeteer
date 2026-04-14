@@ -21,9 +21,9 @@
 
 import { logSwallowed } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
-import { log } from '../logger.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { log } from '../logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
 
 export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPriority, zStatus } from './todo-schema.js';

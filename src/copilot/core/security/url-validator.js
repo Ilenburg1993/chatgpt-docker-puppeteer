@@ -4,8 +4,8 @@
  *
  * SSOT canônico para validação de URLs — anti-SSRF.
  *
- * Unifica `agent/infra/url-validator.js` (throws API, DNS rebinding) e
- * `sdk/url-validator.js` (functional API `{ safe, reason }`).
+ * Unifica `agent/infra/url-validator.js` (throws API, DNS rebinding) e `sdk/url-validator.js` (functional API `{ safe,
+ * reason }`).
  *
  * Prevenção de SSRF alinhada com OWASP A10 (Server-Side Request Forgery).
  *
@@ -65,8 +65,7 @@ export function isPrivateIp(address) {
 }
 
 /**
- * Valida se uma URL parseada é segura para fetch (anti-SSRF).
- * Retorna objeto `{ safe, reason }` — não lança exceção.
+ * Valida se uma URL parseada é segura para fetch (anti-SSRF). Retorna objeto `{ safe, reason }` — não lança exceção.
  *
  * @param {URL} url - URL já parseada
  * @returns {{ safe: boolean; reason?: string }}
@@ -118,8 +117,8 @@ export function validateUrl(url) {
 }
 
 /**
- * Valida uma URL em formato string: parseia e aplica validação anti-SSRF.
- * Retorna objeto `{ safe, reason, parsed }` — não lança exceção.
+ * Valida uma URL em formato string: parseia e aplica validação anti-SSRF. Retorna objeto `{ safe, reason, parsed }` —
+ * não lança exceção.
  *
  * @param {string} urlStr - URL como string
  * @returns {{ safe: boolean; reason?: string; parsed?: URL }}
@@ -137,15 +136,15 @@ export function validateUrlString(urlStr) {
 // ─── API imperativa (lança ConfigError) ─────────────────────────────────────
 
 /**
- * Valida se uma URL de webhook é segura (protocolo HTTP/HTTPS, sem IPs privados/loopback exceto quando
- * explicitamente permitido via `WEBHOOK_ALLOW_PRIVATE_HOSTS=true`).
+ * Valida se uma URL de webhook é segura (protocolo HTTP/HTTPS, sem IPs privados/loopback exceto quando explicitamente
+ * permitido via `WEBHOOK_ALLOW_PRIVATE_HOSTS=true`).
  *
  * G2-SEC-01: prevenção de SSRF básica — bloqueia acesso a RFC-1918 e loopback.
  *
  * @param {string} url
  * @param {{ allowPrivate?: boolean }} [opts]
- * @throws {ConfigError} Se a URL for inválida ou insegura
  * @returns {void}
+ * @throws {ConfigError} Se a URL for inválida ou insegura
  */
 export function validateWebhookUrl(url, opts) {
     let parsed;
@@ -169,8 +168,8 @@ export function validateWebhookUrl(url, opts) {
 }
 
 /**
- * SEC-AGENT-005: Verifica se o IP resolvido para um hostname é privado/loopback. Mitiga DNS rebinding —
- * atacante usa hostname público que resolve para IP interno.
+ * SEC-AGENT-005: Verifica se o IP resolvido para um hostname é privado/loopback. Mitiga DNS rebinding — atacante usa
+ * hostname público que resolve para IP interno.
  *
  * @param {string} hostname
  * @param {{ allowPrivate?: boolean }} [opts]

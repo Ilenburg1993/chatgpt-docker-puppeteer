@@ -22,8 +22,8 @@
  */
 
 import { ConfigError } from '#copilot/core';
-import { log } from './logger.js';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────

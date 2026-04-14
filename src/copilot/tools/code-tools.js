@@ -10,11 +10,11 @@
  * @see module:copilot/tools/tool-factory
  */
 
-import { log } from './logger.js';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 
 const ROOT = new URL('../../..', import.meta.url).pathname;

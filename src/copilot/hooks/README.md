@@ -10,19 +10,19 @@ composível, testável e sem acoplamento com outras partes do workspace.
 ```js
 // API pública completa
 import {
-    SDK_HOOKS,
-    attachBus,
-    createCircuitBreakerHandler,
-    createErrorHandler,
-    createHookBus,
-    createHooks,
-    createPermissionHandler,
-    createProductionHooks,
-    createPromptTransformer,
-    createSessionHooks,
-    fallback,
-    pipeline,
-    raceWithTimeout,
+  SDK_HOOKS,
+  attachBus,
+  createCircuitBreakerHandler,
+  createErrorHandler,
+  createHookBus,
+  createHooks,
+  createPermissionHandler,
+  createProductionHooks,
+  createPromptTransformer,
+  createSessionHooks,
+  fallback,
+  pipeline,
+  raceWithTimeout,
 } from '#copilot/hooks';
 
 // Módulos específicos (aliases granulares)
@@ -240,7 +240,6 @@ valor transformado.
 ### Pipeline com auditoria e timeout
 
 ```js
-
 const hooks = createHooks({
   auditLog: true,
   onUserPromptSubmitted: pipeline(
@@ -254,7 +253,6 @@ const hooks = createHooks({
 ### Observar eventos sem modificar handlers
 
 ```js
-
 const bus = createHookBus();
 bus.on('*', (event) => console.log('[audit]', event.hookName, event.sessionId));
 
@@ -265,7 +263,6 @@ const hooks = attachBus(baseHooks, bus); // transparente: retornos inalterados
 ### Preset de produção completo
 
 ```js
-
 const { hooks, onPermissionRequest } = createProductionHooks({
   toolAllowList: ['read_file', 'list_dir', 'grep_search', 'web_search'],
   toolDenyList: ['run_in_terminal', 'delete_file'],

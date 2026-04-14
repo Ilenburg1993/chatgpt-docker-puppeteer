@@ -11,19 +11,20 @@
  */
 
 import { SERVER_PORT } from '#copilot/config';
-import { log } from './logger.js';
 import { createTool } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { httpRequest } from '../sdk/http-request.js';
+import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
  */
-const getTasksTool = createTool({ name: 'get_tasks',
+const getTasksTool = createTool({
+    name: 'get_tasks',
     description: 'Lista as tarefas mais recentes do sistema. Use para verificar estado atual da fila.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -61,7 +62,8 @@ const getTasksTool = createTool({ name: 'get_tasks',
 /**
  * Tool: add_task — enfileira uma nova tarefa no sistema.
  */
-const addTaskTool = createTool({ name: 'add_task',
+const addTaskTool = createTool({
+    name: 'add_task',
     description: 'Cria e enfileira uma nova tarefa no sistema de missões. A tarefa será executada pelo kernel.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
@@ -106,7 +108,8 @@ const addTaskTool = createTool({ name: 'add_task',
 /**
  * Tool: get_session_state — lê o estado da sessão do hook system.
  */
-const getSessionStateTool = createTool({ name: 'get_session_state',
+const getSessionStateTool = createTool({
+    name: 'get_session_state',
     description: 'Lê o estado da sessão atual do hook system (briefing, tarefas pendentes).',
     parameters: z.object({}),
     handler: async () => {
@@ -135,7 +138,8 @@ const getSessionStateTool = createTool({ name: 'get_session_state',
 /**
  * Tool: get_system_health — verifica saúde geral do sistema.
  */
-const getSystemHealthTool = createTool({ name: 'get_system_health',
+const getSystemHealthTool = createTool({
+    name: 'get_system_health',
     description: 'Verifica a saúde dos serviços principais (API, Chrome, Queue).',
     parameters: z.object({}),
     handler: async () => {

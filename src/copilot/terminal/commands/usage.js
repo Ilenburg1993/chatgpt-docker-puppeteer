@@ -10,7 +10,8 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { getShowUsage, setShowUsage } from '../state.js';
 
 /**
@@ -34,7 +35,7 @@ export function cmdUsage({ println }, arg) {
     const trimmed = (arg ?? '').trim().toLowerCase();
 
     if (trimmed === 'now') {
-        const snap = alwaysAliveAgent.getStatusSnapshot();
+        const snap = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot();
         const ctx = snap?.contextWindow;
         if (ctx) {
             const pct = (ctx.utilization * 100).toFixed(0);
@@ -45,7 +46,7 @@ export function cmdUsage({ println }, arg) {
             println('\n  \x1b[33m⚠️  Dados de context window não disponíveis.\x1b[0m');
         }
 
-        const pr = alwaysAliveAgent.lastPrInfo;
+        const pr = container.resolve(ALWAYS_ALIVE_AGENT).lastPrInfo;
         if (pr) {
             const model = pr.model ?? 'unknown';
             const cost = typeof pr.cost === 'number' ? pr.cost.toFixed(4) : '?';
