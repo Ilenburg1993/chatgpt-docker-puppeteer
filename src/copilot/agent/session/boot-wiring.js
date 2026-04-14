@@ -42,6 +42,7 @@ import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled, mo
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
+import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
 import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
@@ -135,21 +136,35 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     const collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
     unsubs.push(...collectorUnsubs);
 
-    // ── 3. Client lifecycle handlers ──
+    // ── 3. Client lifecycle handlers (via client-events.js tipado) ──
     if (typeof client.on === 'function') {
-        const unsubCreated = client.on(SESSION_LIFECYCLE_EVENTS.CREATED, (evt) => {
-            log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
-            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.CREATED, sessionId: evt?.sessionId });
-        });
-        const unsubDeleted = client.on(SESSION_LIFECYCLE_EVENTS.DELETED, (evt) => {
-            log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
-            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.DELETED, sessionId: evt?.sessionId });
-        });
-        const unsubUpdated = client.on(SESSION_LIFECYCLE_EVENTS.UPDATED, (evt) => {
-            log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
-            ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.UPDATED, sessionId: evt?.sessionId });
-        });
-        unsubs.push(unsubCreated, unsubDeleted, unsubUpdated);
+        const unsubLifecycle = onLifecycleEvents(
+            {
+                [LIFECYCLE_EVENTS.CREATED]: (evt) => {
+                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
+                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                        type: SESSION_LIFECYCLE_EVENTS.CREATED,
+                        sessionId: evt?.sessionId,
+                    });
+                },
+                [LIFECYCLE_EVENTS.DELETED]: (evt) => {
+                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
+                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                        type: SESSION_LIFECYCLE_EVENTS.DELETED,
+                        sessionId: evt?.sessionId,
+                    });
+                },
+                [LIFECYCLE_EVENTS.UPDATED]: (evt) => {
+                    log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
+                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                        type: SESSION_LIFECYCLE_EVENTS.UPDATED,
+                        sessionId: evt?.sessionId,
+                    });
+                },
+            },
+            client,
+        );
+        unsubs.push(unsubLifecycle);
     }
 
     // ── 4. Agent-event-observer ──

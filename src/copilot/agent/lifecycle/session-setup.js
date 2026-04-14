@@ -83,6 +83,8 @@ export function buildSessionHooks(ctx, host) {
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     return {
         model: ctx.model,
+        clientName: 'chatgpt-docker-puppeteer',
+        workingDirectory: process.cwd(),
         onPermissionRequest: ctx.permissions.handler,
         onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
             handleUserInputRequest(input, {

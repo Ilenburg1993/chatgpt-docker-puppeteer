@@ -34,7 +34,7 @@ import {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
-} from '../../../../src/copilot/sdk/system-message.js';
+} from '../../../../src/copilot/sdk/session/system-message.js';
 
 // ─── SYSTEM_PROMPT_SECTIONS re-export ─────────────────────────────────────────
 
@@ -143,6 +143,26 @@ describe('sectionOverride()', () => {
         const fn = (/** @type {string} */ current) => `${current} + transformed`;
         const o = sectionOverride(fn);
         expect(typeof o.action).toBe('function');
+    });
+
+    it('SectionTransformFn produz resultado correto ao ser invocada', () => {
+        const fn = (/** @type {string} */ current) => `PREFIXED: ${current}`;
+        const o = sectionOverride(fn);
+        expect(/** @type {Function} */ (o.action)('original content')).toBe('PREFIXED: original content');
+    });
+
+    it('SectionTransformFn async retorna Promise', async () => {
+        const fn = async (/** @type {string} */ current) => `ASYNC: ${current}`;
+        const o = sectionOverride(fn);
+        const result = await /** @type {Function} */ (o.action)('test');
+        expect(result).toBe('ASYNC: test');
+    });
+
+    it('customizeSystemMessage com SectionTransformFn produz config válida', () => {
+        const fn = (/** @type {string} */ current) => current.toUpperCase();
+        const config = customizeSystemMessage({ guidelines: sectionOverride(fn) });
+        expect(/** @type {any} */ (config).mode).toBe('customize');
+        expect(typeof (/** @type {any} */ (config).sections.guidelines.action)).toBe('function');
     });
 });
 

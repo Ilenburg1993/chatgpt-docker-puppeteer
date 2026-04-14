@@ -18,11 +18,10 @@
 
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { toError } from '../../core/error-handlers.js';
+import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { log } from '../logger.js';
 
 /**
- * @typedef {InstanceType<typeof CopilotClient>} CopilotClientInstance
- *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
@@ -30,6 +29,8 @@ import { log } from '../logger.js';
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
  *
  * @typedef {import('@github/copilot-sdk').Tool[]} ToolList
+ *
+ * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
 
 /**
@@ -48,29 +49,44 @@ import { log } from '../logger.js';
 /**
  * @typedef {Object} SessionCreateOptions
  * @property {string} [model] - Modelo LLM (ex: 'gpt-4.1', 'claude-sonnet-4-5')
- * @property {'low' | 'medium' | 'high'} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
+ * @property {string} [clientName] - Identificador do client no User-Agent do SDK
+ * @property {ReasoningEffortLevel} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
  * @property {PermissionHandler} [onPermissionRequest] - Handler de permissoes (default: approveAll)
- * @property {Function} [onUserInputRequest] - Handler de input interativo do usuario
- * @property {object} [hooks] - SessionHooks: onPreToolUse, onPostToolUse, onSessionStart, etc.
+ * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest] - Handler de input interativo do usuario
+ * @property {SessionConfig['hooks']} [hooks] - SessionHooks: onPreToolUse, onPostToolUse, onSessionStart, etc.
  * @property {ToolList} [tools] - Custom Tools a registrar na sessao
  * @property {InfiniteSessionOptions} [infiniteSessions] - Configuracao de InfiniteSession
  * @property {boolean | object} [systemMessage] - false para desabilitar, objeto para customizar
  * @property {string} [systemMessageContent] - Conteudo a injetar em guidelines.append
  * @property {string} [workingDirectory] - Diretorio de trabalho da sessao
- * @property {object} [mcpServers] - MCP servers para a sessao
- * @property {object[]} [customAgents] - Agentes customizados
+ * @property {Record<string, import('@github/copilot-sdk').MCPServerConfig>} [mcpServers] - MCP servers para a sessao
+ * @property {import('@github/copilot-sdk').CustomAgentConfig[]} [customAgents] - Agentes customizados
  * @property {boolean} [streaming] - Habilitar streaming (default: true)
+ * @property {string[]} [availableTools] - Lista de tools permitidas (overrides excludedTools)
+ * @property {string[]} [excludedTools] - Lista de tools desabilitadas
+ * @property {string} [configDir] - Diretorio de configuracao do SDK
+ * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos do SDK
+ * @property {string} [agent] - Agente customizado a selecionar na sessao
+ * @property {string[]} [skillDirectories] - Diretórios de skills customizadas
+ * @property {string[]} [disabledSkills] - Skills a desabilitar
  */
 
 /**
  * @typedef {Object} SessionResumeOptions
  * @property {PermissionHandler} [onPermissionRequest]
- * @property {Function} [onUserInputRequest]
- * @property {object} [hooks]
+ * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest]
+ * @property {SessionConfig['hooks']} [hooks]
  * @property {ToolList} [tools]
  * @property {boolean | object} [systemMessage]
  * @property {string} [systemMessageContent]
  * @property {boolean} [streaming]
+ * @property {string[]} [availableTools] - Lista de tools permitidas
+ * @property {string[]} [excludedTools] - Lista de tools desabilitadas
+ * @property {string} [configDir] - Diretorio de configuracao
+ * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos
+ * @property {string} [agent] - Agente customizado a selecionar
+ * @property {string[]} [skillDirectories] - Diretórios de skills
+ * @property {string[]} [disabledSkills] - Skills a desabilitar
  * @property {boolean} [disableResume] - RF-PR-06: se true, reconecta sem emitir session.resume (reconexão silenciosa)
  */
 
@@ -113,7 +129,8 @@ function buildSystemMessageConfig(systemMessageOpt, content) {
 function buildInfiniteSessionConfig(opts) {
     return {
         enabled: opts?.enabled ?? true,
-        backgroundCompactionThreshold: opts?.backgroundCompactionThreshold ?? 0.75,
+        backgroundCompactionThreshold:
+            opts?.backgroundCompactionThreshold ?? INFINITE_SESSION_DEFAULTS.BACKGROUND_COMPACTION_THRESHOLD,
         ...(opts?.bufferExhaustionThreshold !== undefined
             ? { bufferExhaustionThreshold: opts.bufferExhaustionThreshold }
             : {}),
@@ -121,58 +138,76 @@ function buildInfiniteSessionConfig(opts) {
 }
 
 /**
- * Monta o SessionConfig minimo para createSession/resumeSession, usando apenas chaves presentes na SessionOptions para
- * evitar violacoes de exactOptionalPropertyTypes.
+ * Monta o SessionConfig para createSession/resumeSession, usando objeto tipado com chaves condicionais.
  *
  * @param {SessionCreateOptions | SessionResumeOptions} opts
  * @param {'create' | 'resume'} mode
- * @returns {Record<string, unknown>}
+ * @returns {import('@github/copilot-sdk').SessionConfig
+ *     | (import('@github/copilot-sdk').SessionConfig & { disableResume?: boolean })}
  */
 function buildSessionConfig(opts, mode) {
-    const cfg = /** @type {Record<string, unknown>} */ ({});
+    if (!opts.onPermissionRequest) {
+        log('WARN', '[lib/session] onPermissionRequest não fornecido — usando approveAll como fallback');
+    }
 
-    cfg['streaming'] = /** @type {Record<string, unknown>} */ (opts)['streaming'] ?? true;
+    /** @type {Partial<import('@github/copilot-sdk').SessionConfig> & { disableResume?: boolean }} */
+    const cfg = {
+        streaming: opts.streaming ?? true,
+        onPermissionRequest: opts.onPermissionRequest ?? approveAll,
+    };
 
     if (mode === 'create') {
         const co = /** @type {SessionCreateOptions} */ (opts);
-        if (co.model !== undefined) cfg['model'] = co.model;
-        if (co.reasoningEffort !== undefined) cfg['reasoningEffort'] = co.reasoningEffort;
-        if (co.workingDirectory !== undefined) cfg['workingDirectory'] = co.workingDirectory;
-        if (co.mcpServers !== undefined) cfg['mcpServers'] = co.mcpServers;
-        if (co.customAgents !== undefined) cfg['customAgents'] = co.customAgents;
+        if (co.model !== undefined) cfg.model = co.model;
+        if (co.clientName !== undefined) cfg.clientName = co.clientName;
+        if (co.reasoningEffort !== undefined) {
+            const valid = /** @type {string[]} */ (Object.values(REASONING_EFFORTS));
+            if (!valid.includes(co.reasoningEffort)) {
+                log(
+                    'WARN',
+                    `[lib/session] reasoningEffort '${co.reasoningEffort}' inválido. Valores aceitos: ${valid.join(', ')}`,
+                );
+            }
+            cfg.reasoningEffort = /** @type {ReasoningEffortLevel} */ (co.reasoningEffort);
+        }
+        if (co.workingDirectory !== undefined) cfg.workingDirectory = co.workingDirectory;
+        if (co.mcpServers !== undefined) cfg.mcpServers = co.mcpServers;
+        if (co.customAgents !== undefined) cfg.customAgents = co.customAgents;
+        if (co.availableTools !== undefined) cfg.availableTools = co.availableTools;
+        if (co.excludedTools !== undefined) cfg.excludedTools = co.excludedTools;
+        if (co.configDir !== undefined) cfg.configDir = co.configDir;
+        if (co.onEvent !== undefined) cfg.onEvent = co.onEvent;
+        if (co.agent !== undefined) cfg.agent = co.agent;
+        if (co.skillDirectories !== undefined) cfg.skillDirectories = co.skillDirectories;
+        if (co.disabledSkills !== undefined) cfg.disabledSkills = co.disabledSkills;
         // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
         // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
         if (co.infiniteSessions !== undefined) {
-            cfg['infiniteSessions'] = buildInfiniteSessionConfig(co.infiniteSessions);
+            cfg.infiniteSessions = buildInfiniteSessionConfig(co.infiniteSessions);
         }
     }
 
-    if (opts.onPermissionRequest !== undefined) cfg['onPermissionRequest'] = opts.onPermissionRequest;
-    else cfg['onPermissionRequest'] = approveAll; // SDK-01: obrigatório no v0.2.0 — default approveAll
-    if (opts.onUserInputRequest !== undefined) cfg['onUserInputRequest'] = opts.onUserInputRequest;
+    if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
 
     // RF-PR-01: compor hooks — onErrorOccurred com retry automático está em buildErrorOccurredHandler() (hooks.js)
     // e é o default de createHooks(). Preservamos hooks do usuário sem sobrescrever.
-    {
-        const userHooks = /** @type {Record<string, unknown>} */ (opts.hooks ?? {});
-        cfg['hooks'] = { ...userHooks };
+    if (opts.hooks !== undefined) {
+        cfg.hooks = /** @type {NonNullable<SessionConfig['hooks']>} */ ({ ...opts.hooks });
     }
 
-    if (opts.tools !== undefined) cfg['tools'] = opts.tools;
+    if (opts.tools !== undefined) cfg.tools = opts.tools;
 
     // RF-PR-06: disableResume — reconexão silenciosa sem emitir session.resume
     if (mode === 'resume') {
         const ro = /** @type {SessionResumeOptions} */ (opts);
-        if (ro.disableResume !== undefined) cfg['disableResume'] = ro.disableResume;
+        if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
     }
 
-    const systemMsg = buildSystemMessageConfig(
-        opts.systemMessage,
-        /** @type {string | undefined} */ (/** @type {Record<string, unknown>} */ (opts)['systemMessageContent']),
-    );
-    if (systemMsg !== undefined) cfg['systemMessage'] = systemMsg;
+    const systemMsg = buildSystemMessageConfig(opts.systemMessage, opts.systemMessageContent);
+    if (systemMsg !== undefined)
+        cfg.systemMessage = /** @type {import('@github/copilot-sdk').SystemMessageConfig} */ (systemMsg);
 
-    return cfg;
+    return /** @type {import('@github/copilot-sdk').SessionConfig} */ (cfg);
 }
 
 // ─── API publica ──────────────────────────────────────────────────────────────
@@ -194,9 +229,7 @@ export async function createSession(client, opts) {
     const config = buildSessionConfig({ ...options, model }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
-    const session = await client.createSession(
-        /** @type {import('@github/copilot-sdk').SessionConfig} */ (/** @type {unknown} */ (config)),
-    );
+    const session = await client.createSession(config);
     log('INFO', `[lib/session] Sessao criada: ${session.sessionId}`);
     return { session, isResumed: false, sessionId: session.sessionId };
 }
@@ -218,10 +251,7 @@ export async function resumeSession(client, sessionId, opts) {
     const config = buildSessionConfig(options, 'resume');
 
     log('INFO', `[lib/session] Retomando sessao: ${sessionId}`);
-    const session = await client.resumeSession(
-        sessionId,
-        /** @type {import('@github/copilot-sdk').SessionConfig} */ (/** @type {unknown} */ (config)),
-    );
+    const session = await client.resumeSession(sessionId, config);
     log('INFO', `[lib/session] Sessao retomada: ${session.sessionId}`);
     return { session, isResumed: true, sessionId: session.sessionId };
 }
