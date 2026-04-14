@@ -14,7 +14,7 @@
 | **Faixa 0** | ✅ CONCLUÍDA                        | `5ecbceb1` | 2026-06-11 |
 | **Faixa 1** | ✅ VALIDADA (já implementada)       | —          | 2026-06-11 |
 | **Faixa 2** | ✅ CONCLUÍDA                        | `8e2006eb` | 2026-06-11 |
-| **Faixa 3** | 🔄 EM PROGRESSO (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅) | `edc5eaff` | 2026-06-11 |
+| **Faixa 3** | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅*) | `72093424` | 2026-06-12 |
 | Faixa 4-5   | ⏳ PENDENTE                         | —          | —          |
 
 ### Notas da Faixa 0
@@ -310,11 +310,23 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ### Fase 3.5 — DI Container Enhancement
 
-| Sub   | Finding | Ação                                                  |
-| ----- | ------- | ----------------------------------------------------- |
-| 3.5.1 | U4-13   | Scoped lifetimes (singleton, transient, scoped)       |
-| 3.5.2 | AC-4-11 | Migrar `alwaysAliveAgent` singleton → DI registration |
-| 3.5.3 | AC-4-12 | Migrar `defaultMetrics` singleton → DI registration   |
+| Sub   | Finding | Ação                                                  | Status |
+| ----- | ------- | ----------------------------------------------------- | ------ |
+| 3.5.1 | U4-13   | Scoped lifetimes (singleton, transient, scoped)       | ✅ PRÉ-RESOLVIDO |
+| 3.5.2 | AC-4-11 | Migrar `alwaysAliveAgent` singleton → DI registration | 🔄 DEFERIDO → Faixa 5 |
+| 3.5.3 | AC-4-12 | Migrar `defaultMetrics` singleton → DI registration   | 🔄 DEFERIDO → Faixa 5 |
+
+> **Notas Faixa 3.5** (avaliada nesta sessão):
+>
+> - **3.5.1**: O container DI (`core/di.js`) **já implementa** os 3 lifecycles: `singleton` (padrão),
+>   `transient`, e `scoped` (via `fork()`). Também suporta `dispose()` com cleanup reverso.
+>   Nenhuma ação necessária.
+> - **3.5.2**: `alwaysAliveAgent` é instanciado como module-level singleton (l.549 `always-alive.js`)
+>   com 155 consumers diretos. Token `ALWAYS_ALIVE_AGENT` existe mas não é usado. Migração exige
+>   refactoring de todos os 155 imports — escopo desproporcional para esta faixa. Deferido para
+>   Faixa 5 (estratégia incremental: registrar no DI + manter export legado como proxy).
+> - **3.5.3**: `defaultMetrics` é singleton module-level em `observability/metrics.js` com 49
+>   consumers. Mesmo padrão — deferido para Faixa 5.
 
 ---
 
