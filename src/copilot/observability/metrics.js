@@ -407,5 +407,11 @@ export function createMetricsStore() {
     };
 }
 
-/** Singleton global de métricas para src/copilot. */
+/**
+ * Singleton global de métricas para src/copilot.
+ *
+ * Implementa {@link import('../core/interfaces.js').IMetricsCollector IMetricsCollector} (Faixa 3.2 — AC-5-07).
+ *
+ * @type {MetricsStore}
+ */
 export const defaultMetrics = createMetricsStore();

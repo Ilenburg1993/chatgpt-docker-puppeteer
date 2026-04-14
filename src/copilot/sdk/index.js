@@ -300,6 +300,7 @@ export { getToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/
 // ─── tools-registry.js — registry de ferramentas por sessão ─
 export {
     createRegistry,
+    createToolRegistryAdapter,
     excludeByNames,
     filterByNames,
     getAllTools,

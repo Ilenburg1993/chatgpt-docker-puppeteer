@@ -257,3 +257,28 @@ export function inspectRegistry(registry) {
 
     return { total: registry.entries.size, categories, names };
 }
+
+// ─── IToolRegistry adapter (Faixa 3.2 — AC-5-04) ────────────────────────────
+
+/**
+ * Cria um adapter OOP sobre o registry funcional, implementando a interface
+ * {@link import('../../core/interfaces.js').IToolRegistry IToolRegistry}.
+ *
+ * @param {ToolRegistry} [inner] - Registry interno. Se omitido, cria um novo vazio.
+ * @returns {import('../../core/interfaces.js').IToolRegistry}
+ */
+export function createToolRegistryAdapter(inner) {
+    const reg = inner ?? createRegistry();
+    return {
+        entries: reg.entries,
+        register: (tool, meta) => registerTool(reg, /** @type {Tool} */ (tool), meta),
+        getByCategory: (category) => getToolsByCategory(reg, category),
+        getByTag: (tag) => getToolsByTag(reg, tag),
+        filter: (names) => createToolRegistryAdapter(filterByNames(reg, names)),
+        list: () => getAllTools(reg),
+        stats: () => {
+            const info = inspectRegistry(reg);
+            return { total: info.total, byCategory: info.categories };
+        },
+    };
+}

@@ -38,6 +38,10 @@
 /**
  * Bus de eventos cross-module. Substitui EventEmitter ad-hoc por um bus centralizado com namespaces, wildcards e
  * middleware.
+ *
+ * Implementa {@link import('./interfaces.js').IEventBus IEventBus} (Faixa 3.2 — AC-5-02).
+ *
+ * @see module:copilot/core/interfaces
  */
 export class EventBus {
     /** @type {Map<string, Set<EventHandler>>} */
@@ -188,7 +192,13 @@ export class EventBus {
     /**
      * Retorna diagnóstico completo do bus em runtime.
      *
-     * @returns {{ listeners: { type: string; count: number }[]; emitted: Record<string, number>; disposed: boolean; middlewareCount: number; totalListeners: number }}
+     * @returns {{
+     *     listeners: { type: string; count: number }[];
+     *     emitted: Record<string, number>;
+     *     disposed: boolean;
+     *     middlewareCount: number;
+     *     totalListeners: number;
+     * }}
      */
     diagnostics() {
         return {
@@ -209,7 +219,7 @@ export class EventBus {
      * @returns {string[]}
      */
     channels() {
-        return Array.from(this.#listeners.keys()).filter(k => (this.#listeners.get(k)?.size ?? 0) > 0);
+        return Array.from(this.#listeners.keys()).filter((k) => (this.#listeners.get(k)?.size ?? 0) > 0);
     }
 
     /**

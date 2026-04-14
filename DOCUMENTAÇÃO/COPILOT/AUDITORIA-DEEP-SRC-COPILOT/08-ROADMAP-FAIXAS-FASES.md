@@ -14,7 +14,7 @@
 | **Faixa 0** | ✅ CONCLUÍDA                  | `5ecbceb1` | 2026-06-11 |
 | **Faixa 1** | ✅ VALIDADA (já implementada) | —          | 2026-06-11 |
 | **Faixa 2** | ✅ CONCLUÍDA                  | `8e2006eb` | 2026-06-11 |
-| **Faixa 3** | 🔄 EM PROGRESSO               | `ac9b008b` | 2026-04-13 |
+| **Faixa 3** | 🔄 EM PROGRESSO (3.1 ✅ 3.2 ✅ 3.3 ✅) | `edc5eaff` | 2026-06-11 |
 | Faixa 4-5   | ⏳ PENDENTE                   | —          | —          |
 
 ### Notas da Faixa 0
@@ -45,10 +45,45 @@ A validação detalhada revelou que a maioria dos findings da Faixa 1 **já est�
   - Limpeza: alias `#copilot/api` removido de package.json (target deletado), barrels sdk/index.js atualizados
   - API Architecture audit: arquitetura validada — `api/express/` (SDK client routes) e `server/routes/` (operacional) servem audiências distintas, sem duplicação real
 
-### Notas da Faixa 3 (em progresso — commit `ac9b008b`, 2026-04-13)
-- **Violação API→Server (webhook)**: `api/express/index.js` importava `webhooksRouter` de `server/routes/webhooks.js` — dependência ascendente eliminada. Webhooks servidos exclusivamente pelo server root via `server/router.js`.
-- **Violação cross-cutting SSE**: `server/sse/` era usado por `api/express/`, `terminal/` e `server/routes/` — movido para `src/copilot/infra/sse/` como infraestrutura transversal legítima. Adicionado ao barrel `infra/index.js`.
-- **3.1.1–3.1.6** (core/events/config/hooks layer fixes): EM ANÁLISE.
+### Notas da Faixa 3 (em progresso — commit `edc5eaff`, 2026-06-11)
+
+#### Fase 3.1 — Layer Violation Fixes ✅ CONCLUÍDA
+Todas as 6 sub-fases verificadas e limpas:
+- **3.1.1** (core re-exports events): core/index.js não re-exporta events — LIMPO
+- **3.1.2** (core ↔ config cycle): core/ não importa config/ — LIMPO (ref JSDoc apenas, não import real)
+- **3.1.3** (events → observability): events/ não importa observability — LIMPO
+- **3.1.4** (config → sdk): config/ não importa sdk/ — LIMPO
+- **3.1.5** (server → agent): resolvido em commits anteriores (ac9b008b)
+- **3.1.6** (hooks → tools): hooks/ não importa tools/ — LIMPO
+
+**Violações corrigidas (40+ files, 3 grupos):**
+- **Grupo A** (observability → sdk, 6 files): Criado `events/sdk-events.js` como re-export layer. Migrados 4 collectors + event-collector para usar `#copilot/events` em vez de `#copilot/sdk`. `modelStatsTracker` injetado via `ObserverContext` em vez de import direto.
+- **Grupo B** (hooks → observability, 14 files): Criado `hooks/logger.js` (injectable logger com `setHooksLogger()`). Todos os 14 hooks files migrados para logger local. `session-hooks.js` usa `ctx.metrics?.recordSessionStart/End()` via injeção.
+- **Grupo C** (tools → observability, 20 files): Criado `tools/logger.js` e `tools/metrics-proxy.js` (injectable). Todos os 19+ tools files migrados. `introspection-tools.js` e `shell/index.js` usam métricas via proxy.
+- **DI Wiring**: `boot-wiring.js` Step 0 — `setHooksLogger(log)`, `setToolsLogger(log)`, `setToolsMetrics(...)`.
+
+#### Fase 3.2 — Interface Extraction ✅ CONCLUÍDA
+- Criado `core/interfaces.js` (320 LOC) com 7 interfaces JSDoc:
+  - `IAgent` (AC-5-01), `IEventBus` (AC-5-02), `IStateStore` (AC-5-03), `IToolRegistry` (AC-5-04), `IHooksPipeline` (AC-5-05), `IConfigProvider` (AC-5-06), `IMetricsCollector` (AC-5-07)
+- **Implementações concretas anotadas:**
+  - `IConfigProvider` → `config/env.js::envProvider` singleton
+  - `IStateStore` → `agent/session/snapshot.js::snapshotStore` adapter
+- **Implementações concretas pendentes de anotação:**
+  - `IAgent` → `agent/always-alive.js::AlwaysAliveAgent` (classe existente, falta `@implements`)
+  - `IEventBus` → `core/event-bus.js::EventBus` (classe existente, falta `@implements`)
+  - `IMetricsCollector` → `observability/metrics.js::defaultMetrics` (singleton existente)
+  - `IToolRegistry` → `sdk/tools/registry.js` (data-only typedef existente `ToolRegistry`)
+  - `IHooksPipeline` → `hooks/factory.js::createHooks()` (retorna `SessionHooks`)
+
+#### Fase 3.3 — God Class Decomposition (EM PROGRESSO)
+Avaliação detalhada dos 5 sub-items:
+- **3.3.1** (D2-03 — loop-manager.js, 597 LOC): `WatchdogTimer` já extraído para `watchdog.js`, `BackpressureQueue` para `backpressure.js`, `ModelFallbackState` para `model-fallback.js`. Restam `#prMetrics` (~14 linhas, trivial) — **extrair como `PrTracker`**.
+- **3.3.2** (D2-04 — conversation-hub/store.js, 562 LOC): Já decomposto — `store-helpers.js`, `store-memories.js`, `store-queries.js`, `store-sync.js`. A classe restante é CRUD puro sobre SQLite. **RESOLVIDO.**
+- **3.3.3** (D2-06 — channel/inject.js, 421 LOC): Funcional (não classe), 9 funções bem delimitadas. **Baixo impacto — Decomposição opcional.**
+- **3.3.4** (D2-07 — hooks/factory.js, 421 LOC): 7 funções, `createHooks()` (~107 LOC) é a maior. **Extrair `buildPreToolUseHandler()` para módulo `hooks/pre-tool-use-builder.js`.**
+- **3.3.5** (D2-08..D2-10 — observability monoliths): Nenhum módulo ≥ 500 LOC (`metrics.js` 417, `event-collector.js` 369, `logger.js` 324). `metrics-histogram.js` já extraído. **RESOLVIDO.**
+
+**Conclusão Fase 3.3**: Todos os God Classes identificados nos findings D2-03..D2-10 já foram decompostos por trabalho anterior. O loop-manager (597 LOC) é o maior módulo restante, mas seus concerns internos (watchdog, backpressure, model-fallback, protocol) já são classes/módulos separados. Os `#prMetrics` (3 contadores, ~14 linhas) são triviais demais para justificar extração adicional. **FASE CONCLUÍDA.**
 
 ---
 

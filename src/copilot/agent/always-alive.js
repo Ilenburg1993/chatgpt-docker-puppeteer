@@ -11,8 +11,8 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { BaseEmitter } from '#copilot/events';
 import { bridgeEmitter, logSwallowed } from '#copilot/core';
+import { BaseEmitter } from '#copilot/events';
 import { defaultMetrics } from '#copilot/observability';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
@@ -70,7 +70,10 @@ import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agen
 /**
  * Always-Alive Agent — instância singleton que gerencia o ciclo de vida completo do agente Copilot SDK neste processo.
  *
+ * Implementa {@link import('../../core/interfaces.js').IAgent IAgent} (Faixa 3.2 — AC-5-01).
+ *
  * @extends BaseEmitter
+ * @see module:copilot/core/interfaces
  */
 export class AlwaysAliveAgent extends BaseEmitter {
     /**
