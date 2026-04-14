@@ -17,16 +17,17 @@
  */
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
-export { audit, getRecentLogs, log, LOG_DIR, logMetric, metric } from './logger.js';
+export { LOG_DIR, audit, getRecentLogs, log, logMetric, metric } from './logger.js';
 
 // ─── Event Collector ──────────────────────────────────────────────────────────
 export {
+    MAX_EVENTS_BYTES,
     attachSdkEventTyped,
     createEventCollector,
     defaultEventCollector,
     getCompactionHistory,
     getLastQuotaSnapshots,
-    initEventCollector, MAX_EVENTS_BYTES
+    initEventCollector,
 } from './event-collector.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ export { attachEventBusObservers, detachEventBusObservers } from './event-bus-ob
 export { createAuditLog, defaultAuditLog } from '#copilot/audit';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
-export { buildTelemetryConfig, DEFAULT_OTEL_FILE, isOtelEnabled, startSpan, startSpanImmediate } from './otel.js';
+export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan, startSpanImmediate } from './otel.js';
 
 // ─── Tool Stats ──────────────────────────────────────────────────────────────
 export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from './tool-stats.js';
@@ -58,7 +59,4 @@ export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from 
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export {
-    ALERTS_MANAGER, ERROR_TRACKER, EVENT_COLLECTOR, HEALTH_MANAGER,
-    METRICS_STORE, OTEL_TRACER, QUOTA_MONITOR
-} from './di-tokens.js';
+export { ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';

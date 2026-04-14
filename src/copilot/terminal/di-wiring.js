@@ -2,25 +2,21 @@
 /**
  * src/copilot/terminal/di-wiring.js
  *
- * Registra dependências DI específicas do modo terminal no container global.
- * Extraído de `terminal/index.js` para manter `startTerminalServer()` focado
- * em orquestração de boot — não em low-level DI registration.
+ * Registra dependências DI específicas do modo terminal no container global. Extraído de `terminal/index.js` para
+ * manter `startTerminalServer()` focado em orquestração de boot — não em low-level DI registration.
  *
  * @module copilot/terminal/di-wiring
  */
 
+import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { alwaysAliveAgent, configureHookTools, setHub, setPermissionAgent } from '../agent/index.js';
+import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '../bridges/di-tokens.js';
 import { setBridgeAgent } from '../channel/client.js';
+import { CONVERSATION_STORE, HUB } from '../conversation-hub/di-tokens.js';
 import { conversationHub } from '../conversation-hub/hub.js';
 import { setFallbackAgent } from '../conversation-hub/orchestrator.js';
+import { conversationStore } from '../conversation-hub/store.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
-import {
-    BRIDGE_AGENT,
-    FALLBACK_AGENT,
-    NERV_BRIDGE_AGENT,
-    PERMISSION_AGENT,
-} from '../bridges/di-tokens.js';
-import { HUB } from '../conversation-hub/di-tokens.js';
 import { broadcastSse } from './dialog.js';
 
 /**
@@ -33,7 +29,9 @@ export function wireTerminalDI() {
     configureHookTools({ broadcastSse });
 
     // DI container — registrar dependências de runtime (agent/tools stack)
+    container.register(ALWAYS_ALIVE_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(HUB, () => conversationHub, 'singleton');
+    container.register(CONVERSATION_STORE, () => conversationStore, 'singleton');
     container.register(PERMISSION_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(FALLBACK_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
@@ -45,5 +43,16 @@ export function wireTerminalDI() {
         { token: PERMISSION_AGENT, setter: setPermissionAgent },
         { token: FALLBACK_AGENT, setter: setFallbackAgent },
         { token: BRIDGE_AGENT, setter: setBridgeAgent },
+    ]);
+
+    // Validação — garante que todos os tokens do terminal stack estão registrados
+    container.validateRequired([
+        ALWAYS_ALIVE_AGENT,
+        HUB,
+        CONVERSATION_STORE,
+        PERMISSION_AGENT,
+        FALLBACK_AGENT,
+        BRIDGE_AGENT,
+        NERV_BRIDGE_AGENT,
     ]);
 }

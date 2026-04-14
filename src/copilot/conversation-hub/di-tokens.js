@@ -15,13 +15,6 @@ import { createToken } from '../core/di.js';
 export const HUB = createToken('HUB');
 
 /**
- * Namespace Socket.IO para comunicação real-time.
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const SOCKET_NAMESPACE = createToken('SOCKET_NAMESPACE');
-
-/**
  * Session RPC facade.
  *
  * @type {import('../core/di.js').Token<unknown>}

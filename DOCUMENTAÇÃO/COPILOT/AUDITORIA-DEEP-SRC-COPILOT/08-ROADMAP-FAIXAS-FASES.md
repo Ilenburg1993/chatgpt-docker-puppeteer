@@ -9,13 +9,14 @@
 
 ## STATUS DE EXECUÇÃO
 
-| Faixa       | Status                             | Commit     | Data       |
-| ----------- | ---------------------------------- | ---------- | ---------- |
-| **Faixa 0** | ✅ CONCLUÍDA                        | `5ecbceb1` | 2026-06-11 |
-| **Faixa 1** | ✅ VALIDADA (já implementada)       | —          | 2026-06-11 |
-| **Faixa 2** | ✅ CONCLUÍDA                        | `8e2006eb` | 2026-06-11 |
+| Faixa       | Status                                      | Commit     | Data       |
+| ----------- | ------------------------------------------- | ---------- | ---------- |
+| **Faixa 0** | ✅ CONCLUÍDA                                 | `5ecbceb1` | 2026-06-11 |
+| **Faixa 1** | ✅ VALIDADA (já implementada)                | —          | 2026-06-11 |
+| **Faixa 2** | ✅ CONCLUÍDA                                 | `8e2006eb` | 2026-06-11 |
 | **Faixa 3** | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅*) | `72093424` | 2026-06-12 |
-| Faixa 4-5   | ⏳ PENDENTE                         | —          | —          |
+| **DI Overhaul** | ✅ EXECUTADO (Fases A+B+C parcial) | pendente  | 2026-06-12 |
+| Faixa 4-5   | ⏳ PENDENTE                                  | —          | —          |
 
 ### Notas da Faixa 0
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js
@@ -84,6 +85,27 @@ Avaliação detalhada dos 5 sub-items:
 - **3.3.5** (D2-08..D2-10 — observability monoliths): Nenhum módulo ≥ 500 LOC (`metrics.js` 417, `event-collector.js` 369, `logger.js` 324). `metrics-histogram.js` já extraído. **RESOLVIDO.**
 
 **Conclusão Fase 3.3**: Todos os God Classes identificados nos findings D2-03..D2-10 já foram decompostos por trabalho anterior. O loop-manager (597 LOC) é o maior módulo restante, mas seus concerns internos (watchdog, backpressure, model-fallback, protocol) já são classes/módulos separados. Os `#prMetrics` (3 contadores, ~14 linhas) são triviais demais para justificar extração adicional. **FASE CONCLUÍDA.**
+
+---
+
+### DI Overhaul — Auditoria e Migração Radical ✅ EXECUTADO
+
+Auditoria completa do sistema DI em `src/copilot/` com migração em 3 fases. Doc completo: `09-AUDITORIA-DI-COMPLETA.md`.
+
+#### Fase A — Foundation ✅
+- **A.1** Dead Token Removal: 21 tokens fantasma removidos de 8 `di-tokens.js` + 7 barrels
+- **A.2** `validateRequired()`: Novo método no container DI (`core/di.js`) + 2 call sites
+- **A.3** Bug P5 fix: `CONVERSATION_STORE` registrado em `wireTerminalDI()`
+- **A.4** Validação centralizada: `bootstrap.js` valida 8 tokens, `di-wiring.js` valida 7 tokens
+
+#### Fase B — Setters → Container ✅
+- 3 novos tokens: `HOOKS_LOGGER`, `TOOLS_LOGGER`, `TOOLS_METRICS`
+- 2 novos `di-tokens.js`: `hooks/di-tokens.js`, `tools/di-tokens.js`
+- `boot-wiring.js` não faz mais injection direta — setters migrados para `wireLegacySetters`
+
+#### Fase C — Singletons → Container (parcial) ✅
+- 4 singletons registrados: `defaultMetrics`→`METRICS_STORE`, `defaultErrorTracker`→`ERROR_TRACKER`, `defaultEventCollector`→`EVENT_COLLECTOR`, `alwaysAliveAgent`→`ALWAYS_ALIVE_AGENT`
+- Cobertura: **21 tokens definidos, 20 registrados (95.2%)**. Único não-registrado: `SESSION_RPC` (dinâmico)
 
 ---
 
@@ -280,14 +302,14 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ### Fase 3.4 — Event System Unification
 
-| Sub   | Finding | Ação                                                                              | Status |
-| ----- | ------- | --------------------------------------------------------------------------------- | ------ |
-| 3.4.1 | D3-02   | Deprecar `createEventBus`, `createEmitter` — unificar em EventBus + bridgeEmitter | ✅ DONE |
+| Sub   | Finding | Ação                                                                              | Status          |
+| ----- | ------- | --------------------------------------------------------------------------------- | --------------- |
+| 3.4.1 | D3-02   | Deprecar `createEventBus`, `createEmitter` — unificar em EventBus + bridgeEmitter | ✅ DONE          |
 | 3.4.2 | AC-3-03 | Split event constants por domínio                                                 | ✅ PRÉ-RESOLVIDO |
 | 3.4.3 | U4-16   | Auto-generate event catalog                                                       | ✅ PRÉ-RESOLVIDO |
-| 3.4.4 | D2-12   | Eliminar God Barrel `di-tokens.js` — tokens per-module                            | ✅ DONE |
-| 3.4.5 | —       | Migrar `BaseEmitter` → `EventEmitter` nativo (6 classes)                          | ✅ DONE |
-| 3.4.6 | —       | Documentar naming convention (`:` EventBus vs `.` emitter interno)                | ✅ DONE |
+| 3.4.4 | D2-12   | Eliminar God Barrel `di-tokens.js` — tokens per-module                            | ✅ DONE          |
+| 3.4.5 | —       | Migrar `BaseEmitter` → `EventEmitter` nativo (6 classes)                          | ✅ DONE          |
+| 3.4.6 | —       | Documentar naming convention (`:` EventBus vs `.` emitter interno)                | ✅ DONE          |
 
 > **Notas Faixa 3.4** (completada nesta sessão):
 >
@@ -310,9 +332,9 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ### Fase 3.5 — DI Container Enhancement
 
-| Sub   | Finding | Ação                                                  | Status |
-| ----- | ------- | ----------------------------------------------------- | ------ |
-| 3.5.1 | U4-13   | Scoped lifetimes (singleton, transient, scoped)       | ✅ PRÉ-RESOLVIDO |
+| Sub   | Finding | Ação                                                  | Status               |
+| ----- | ------- | ----------------------------------------------------- | -------------------- |
+| 3.5.1 | U4-13   | Scoped lifetimes (singleton, transient, scoped)       | ✅ PRÉ-RESOLVIDO      |
 | 3.5.2 | AC-4-11 | Migrar `alwaysAliveAgent` singleton → DI registration | 🔄 DEFERIDO → Faixa 5 |
 | 3.5.3 | AC-4-12 | Migrar `defaultMetrics` singleton → DI registration   | 🔄 DEFERIDO → Faixa 5 |
 

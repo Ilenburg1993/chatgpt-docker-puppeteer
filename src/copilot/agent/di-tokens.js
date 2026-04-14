@@ -8,13 +8,6 @@
 import { createToken } from '../core/di.js';
 
 /**
- * Motor de diálogo (loop-manager de alto nível).
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const DIALOG_ENGINE = createToken('DIALOG_ENGINE');
-
-/**
  * Agente AlwaysAlive (singleton gerenciado por DI).
  *
  * @type {import('../core/di.js').Token<object>}

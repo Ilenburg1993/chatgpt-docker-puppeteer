@@ -13,8 +13,8 @@
 
 export { AuditService, createAuditService } from './audit-service.js';
 export { ConversationService, createConversationService } from './conversation-service.js';
-export { approveAll, createSessionService, pickDefined, SessionService } from './session-service.js';
-export { createToolService, ToolService } from './tool-service.js';
+export { SessionService, approveAll, createSessionService, pickDefined } from './session-service.js';
+export { ToolService, createToolService } from './tool-service.js';
 
 // ── Re-exports de L4 para api/ e terminal/ ────────────────────────────────────
 // Concentrar aqui reduz o fan-out de api/ e terminal/ e cumpre C10.
@@ -26,7 +26,7 @@ export {
     listSnapshotsAsync,
     loadSnapshotAsync,
     saveSnapshotAsync,
-    setBackgroundCompactionThreshold
+    setBackgroundCompactionThreshold,
 } from '#copilot/agent';
 
 // De #copilot/conversation-hub
@@ -34,6 +34,3 @@ export { broadcastGlobal, broadcastToSession, conversationHub, conversationStore
 
 // De #copilot/channel
 export { CHANNEL_VERSION, llmBridgeClient } from '#copilot/channel';
-
-// ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { AGENT_SERVICE, CONVERSATION_SERVICE, DIALOG_SERVICE, SESSION_SERVICE } from './di-tokens.js';

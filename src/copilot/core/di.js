@@ -72,6 +72,7 @@ export function createToken(name) {
  * @property {<T>(token: Token<T>, factory: (c: Container) => T, lifecycle?: Lifecycle) => Container} register
  * @property {<T>(token: Token<T>) => T} resolve
  * @property {<T>(token: Token<T>) => boolean} has
+ * @property {(tokens: ReadonlyArray<Token<any>>) => void} validateRequired
  * @property {() => Container} fork
  * @property {() => void} dispose
  * @property {() => ReadonlyArray<string>} tokens
@@ -224,6 +225,20 @@ export function createContainer(parent) {
          */
         tokens() {
             return [...registrations.values()].map((r) => r.token.name);
+        },
+
+        /**
+         * Valida que todos os tokens obrigatórios estão registrados. Lança `Error` agregado listando os faltantes.
+         *
+         * @param {ReadonlyArray<Token<any>>} required
+         * @throws {Error} Se algum token obrigatório não estiver registrado.
+         */
+        validateRequired(required) {
+            assertNotDisposed();
+            const missing = required.filter((t) => !container.has(t)).map((t) => t.name);
+            if (missing.length > 0) {
+                throw new Error(`DI: missing required tokens: ${missing.join(', ')}`);
+            }
         },
     };
 

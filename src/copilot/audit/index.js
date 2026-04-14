@@ -24,7 +24,7 @@ export {
     globalAuditBuffer,
     isHighRiskTool,
     logToolAudit,
-    setAuditBus
+    setAuditBus,
 } from './pipeline.js';
 
 // Logger proxy (DI)
@@ -34,4 +34,4 @@ export { setAuditLogger } from './logger.js';
 export { AUDIT_LOG } from '#copilot/events';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { AUDIT_BUS, AUDIT_LOGGER, AUDIT_PIPELINE } from './di-tokens.js';
+export { AUDIT_BUS, AUDIT_LOGGER } from './di-tokens.js';

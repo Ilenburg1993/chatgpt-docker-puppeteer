@@ -13,22 +13,31 @@
  * @module copilot/observability/bootstrap
  */
 
-import { setAuditLogger } from '../audit/logger.js';
 import { AUDIT_LOGGER } from '../audit/di-tokens.js';
+import { setAuditLogger } from '../audit/logger.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '../core/di-tokens.js';
-import { SDK_LOGGER, TOOLS_BUILDER } from '../sdk/di-tokens.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
 import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
+import { HOOKS_LOGGER } from '../hooks/di-tokens.js';
+import { setHooksLogger } from '../hooks/logger.js';
+import { SDK_LOGGER, TOOLS_BUILDER } from '../sdk/di-tokens.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
+import { TOOLS_LOGGER, TOOLS_METRICS } from '../tools/di-tokens.js';
+import { setToolsLogger } from '../tools/logger.js';
+import { setToolsMetrics } from '../tools/metrics-proxy.js';
 import { createLogObserver } from './bus-actions/log-observer.js';
+import { ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
+import { defaultEventCollector } from './event-collector.js';
 import { LOG_DIR, log } from './logger.js';
+import { defaultMetrics } from './metrics.js';
+import { getToolStats, recordToolCall } from './tool-stats.js';
 
 /** @type {boolean} */
 let _obsBooted = false;
@@ -57,6 +66,22 @@ export function bootstrapObservability() {
     container.register(DB_LOGGER, () => log, 'singleton');
     container.register(SDK_LOGGER, () => log, 'singleton');
     container.register(AUDIT_LOGGER, () => log, 'singleton');
+    container.register(HOOKS_LOGGER, () => log, 'singleton');
+    container.register(TOOLS_LOGGER, () => log, 'singleton');
+    container.register(
+        TOOLS_METRICS,
+        () => ({
+            getSummary: () => defaultMetrics.getSummary(),
+            getToolStats,
+            recordToolCall,
+        }),
+        'singleton',
+    );
+
+    // Observability singletons — disponíveis via DI para consumers futuros
+    container.register(METRICS_STORE, () => defaultMetrics, 'singleton');
+    container.register(ERROR_TRACKER, () => defaultErrorTracker, 'singleton');
+    container.register(EVENT_COLLECTOR, () => defaultEventCollector, 'singleton');
 
     // Event Bus global — singleton cross-module
     container.register(EVENT_BUS, () => createEventBus(), 'singleton');
@@ -95,6 +120,9 @@ export function bootstrapObservability() {
         { token: DB_LOGGER, setter: setDbLogger },
         { token: SDK_LOGGER, setter: setSdkLogger },
         { token: AUDIT_LOGGER, setter: (/** @type {any} */ fn) => setAuditLogger(fn, LOG_DIR) },
+        { token: HOOKS_LOGGER, setter: setHooksLogger },
+        { token: TOOLS_LOGGER, setter: setToolsLogger },
+        { token: TOOLS_METRICS, setter: setToolsMetrics },
     ]);
 }
 

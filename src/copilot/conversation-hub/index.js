@@ -16,4 +16,4 @@ export { HubOrchestrator } from './orchestrator.js';
 export { ConversationStore, conversationStore } from './store.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { CONVERSATION_STORE, HUB, SESSION_RPC, SOCKET_NAMESPACE } from './di-tokens.js';
+export { CONVERSATION_STORE, HUB, SESSION_RPC } from './di-tokens.js';

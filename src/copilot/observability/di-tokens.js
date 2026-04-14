@@ -27,31 +27,3 @@ export const ERROR_TRACKER = createToken('ERROR_TRACKER');
  * @type {import('../core/di.js').Token<object>}
  */
 export const EVENT_COLLECTOR = createToken('EVENT_COLLECTOR');
-
-/**
- * Gerenciador de alertas e notificações de saúde.
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const ALERTS_MANAGER = createToken('ALERTS_MANAGER');
-
-/**
- * Monitor de quota do SDK (Faixa 25).
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const QUOTA_MONITOR = createToken('QUOTA_MONITOR');
-
-/**
- * Gerenciador de saúde do sistema (health check aggregator).
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const HEALTH_MANAGER = createToken('HEALTH_MANAGER');
-
-/**
- * Tracer OpenTelemetry (noop se OTEL desabilitado).
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const OTEL_TRACER = createToken('OTEL_TRACER');

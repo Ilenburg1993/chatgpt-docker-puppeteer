@@ -4,22 +4,23 @@
  *
  * Modo único: **terminal** (ferramenta de desenvolvimento).
  *
- * O copilot é a LLM-B — uma ferramenta de desenvolvimento equivalente ao DevTools.
- * Não é um addon de produção. Sempre boot via terminal com inject server (:3009).
+ * O copilot é a LLM-B — uma ferramenta de desenvolvimento equivalente ao DevTools. Não é um addon de produção. Sempre
+ * boot via terminal com inject server (:3009).
  *
- * Boot sequence:
- *   Phase 0 — Kernel: container + L0 tokens (already at module load)
- *   Phase 1 — Observability: loggers, error tracker, EventBus
- *   Phase 2 — Late deps: tools builder, audit bus
- *   Phase 3 — Terminal: startTerminalServer()
+ * Boot sequence: Phase 0 — Kernel: container + L0 tokens (already at module load) Phase 1 — Observability: loggers,
+ * error tracker, EventBus Phase 2 — Late deps: tools builder, audit bus Phase 3 — Terminal: startTerminalServer()
  *
  * @module copilot/bootstrap
  */
 
-import { container } from './core/di-container.js';
 import { AUDIT_BUS } from './audit/di-tokens.js';
+import { container } from './core/di-container.js';
+import { EVENT_BUS, SHUTDOWN_LOGGER } from './core/di-tokens.js';
+import { HOOKS_LOGGER } from './hooks/di-tokens.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
+import { SDK_LOGGER, TOOLS_BUILDER } from './sdk/di-tokens.js';
+import { TOOLS_LOGGER, TOOLS_METRICS } from './tools/di-tokens.js';
 
 /** @type {boolean} */
 let _booted = false;
@@ -52,6 +53,18 @@ export async function bootCopilot() {
 
     const { setAuditBus } = await import('./audit/pipeline-permission.js');
     setAuditBus(defaultBus);
+
+    // ── Validation: verify all critical DI tokens are registered ────────
+    container.validateRequired([
+        SHUTDOWN_LOGGER,
+        EVENT_BUS,
+        SDK_LOGGER,
+        TOOLS_BUILDER,
+        AUDIT_BUS,
+        HOOKS_LOGGER,
+        TOOLS_LOGGER,
+        TOOLS_METRICS,
+    ]);
 
     // ── Phase 3: Terminal (único modo) ──────────────────────────────────
     const { startTerminalServer } = await import('./terminal/index.js');

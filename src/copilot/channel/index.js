@@ -13,8 +13,6 @@
  *   standalone que iniciam a sessão SDK diretamente.
  *
  * @module copilot/channel
- * @see EventBus
- *
  * @example
  *     ```js
  *     // Modo HTTP injection (terminal já ativo)
@@ -35,6 +33,8 @@
  *     const result = await bridge.chat('Olá LLM-B!');
  *     await alwaysAliveAgent.stop();
  *     ```;
+ *
+ * @see EventBus
  */
 
 // ─── Versão do protocolo de canal ─────────────────────────────────────────────
@@ -62,7 +62,7 @@ export {
     injectToLlmB,
     subscribeLlmB,
     subscribeLlmBCritical,
-    waitForLlmBReady
+    waitForLlmBReady,
 } from './inject.js';
 
 // ─── SDK Client (modo standalone / em-processo) ────────────────────────────────
@@ -78,6 +78,3 @@ export { LlmBridgeClient, llmBridgeClient } from './client.js';
  *
  * @typedef {import('#copilot/sdk/types').MessageOptions['attachments']} ChannelAttachment
  */
-
-// ─── DI Tokens ──────────────────────────────────────────────────────────────────
-export { INJECT_SERVER } from './di-tokens.js';

@@ -7,8 +7,14 @@
  * @module copilot/infra
  */
 
-export { CACHE_MANAGER, MISSION_CONTROL, MUTEX_POOL, RATE_LIMITER, TIMER_REGISTRY, WORKER_POOL } from './di-tokens.js';
 export { acquireLock, releaseLock } from './lockfile.js';
 export { AsyncQueue } from './queue.js';
-export { EventFanout, eventFanout, getSseClients, getSseCriticalClients, getTerminalReplayBuffer, SseReplayBuffer } from './sse/index.js';
+export {
+    EventFanout,
+    SseReplayBuffer,
+    eventFanout,
+    getSseClients,
+    getSseCriticalClients,
+    getTerminalReplayBuffer,
+} from './sse/index.js';
 export { fileExists, readJson, writeJson } from './storage.js';

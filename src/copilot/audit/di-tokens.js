@@ -22,10 +22,3 @@ export const AUDIT_LOGGER = createToken('AUDIT_LOGGER');
  * }>}
  */
 export const AUDIT_BUS = createToken('AUDIT_BUS');
-
-/**
- * Pipeline de auditoria (ingesta, flush, drain).
- *
- * @type {import('../core/di.js').Token<object>}
- */
-export const AUDIT_PIPELINE = createToken('AUDIT_PIPELINE');
