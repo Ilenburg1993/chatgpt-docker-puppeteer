@@ -58,4 +58,10 @@ export {
     removeCustomAgent,
 } from './custom-agents.js';
 
+// ─── Session Config Builder (Faixa C) ────────────────────────────────────────
+export { SessionConfigBuilder } from './session-config.js';
+
+// ─── Client Options Builder (Faixa C) ────────────────────────────────────────
+export { ClientOptionsBuilder } from './client-options.js';
+
 export { PinnedFilesLoader } from './pinned-files.js';

@@ -13,6 +13,7 @@
  */
 
 import { container } from '#copilot/core';
+import { SessionConfigBuilder } from '#copilot/config';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
@@ -81,11 +82,28 @@ export function buildSessionHooks(ctx, host) {
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
+    const builder = new SessionConfigBuilder()
+        .model(ctx.model)
+        .clientName('chatgpt-docker-puppeteer')
+        .workingDirectory(process.cwd())
+        .onPermissionRequest(ctx.permissions.handler)
+        .tools(tools);
+
+    // hooks e mcpServers usam tipos locais que divergem dos tipos SDK — via merge para bypass de strictness
+    builder.merge(/** @type {Partial<import('@github/copilot-sdk').SessionConfig>} */ (/** @type {unknown} */ ({
+        hooks: busHooks,
+        mcpServers: ctx.mcpBridge ? ctx.mcpBridge.buildConfig() : buildMcpConfig(),
+    })));
+
+    if (ctx.reasoningEffort) {
+        builder.reasoningEffort(ctx.reasoningEffort);
+    }
+
+    const config = builder.build();
+
+    // Campos consumidos por initOrResumeSession (não são SessionConfig SDK)
     return {
-        model: ctx.model,
-        clientName: 'chatgpt-docker-puppeteer',
-        workingDirectory: process.cwd(),
-        onPermissionRequest: ctx.permissions.handler,
+        ...config,
         onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
             handleUserInputRequest(input, {
                 isDialogLoopActive: () => ctx.dialogLoop.active,
@@ -97,10 +115,6 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
                 },
                 emit: (event, payload) => host.emit(event, payload),
             }),
-        hooks: busHooks,
-        tools,
-        mcpServers: ctx.mcpBridge ? ctx.mcpBridge.buildConfig() : buildMcpConfig(),
-        reasoningEffort: ctx.reasoningEffort,
         injectHookContext: true,
     };
 }

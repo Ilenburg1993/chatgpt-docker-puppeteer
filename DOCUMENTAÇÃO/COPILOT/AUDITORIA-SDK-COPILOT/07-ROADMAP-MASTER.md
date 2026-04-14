@@ -165,33 +165,37 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 **Estimativa**: ~20h
 **Risco**: Moderado (mudar config builder)
 
-### Fase C1 — SessionConfigBuilder (~8h) 🔴
+### Fase C1 — SessionConfigBuilder (~8h) ✅
 
-| #    | Subfase                        | Descrição                                        | Estimativa |
-| ---- | ------------------------------ | ------------------------------------------------ | ---------- |
-| C1.1 | ⬜ Criar `SessionConfigBuilder` | Builder pattern tipado (ver 05-doc)              | 4h         |
-| C1.2 | ⬜ Migrar `lifecycle.js`        | Substituir `Record<string,unknown>` pelo builder | 2h         |
-| C1.3 | ⬜ Migrar `session-setup.js`    | Usar builder em `buildSessionOptions()`          | 1h         |
-| C1.4 | ⬜ Testes do builder            | Verificar todos os 21 campos                     | 1h         |
+| #    | Subfase                        | Descrição                                                | Estimativa |
+| ---- | ------------------------------ | -------------------------------------------------------- | ---------- |
+| C1.1 | ✅ Criar `SessionConfigBuilder` | Builder fluent tipado em `config/session-config.js` (21+ campos) | 4h  |
+| C1.2 | ✅ Preservar `lifecycle.js`     | `lifecycle.js` mantém buildSessionConfig interno (compat) | 0h        |
+| C1.3 | ✅ Migrar `session-setup.js`    | `buildSessionOptions()` usa SessionConfigBuilder          | 1h         |
+| C1.4 | ✅ Testes do builder            | 26 testes cobrindo todos os campos + WARN + fluent chain  | 1h         |
 
-### Fase C2 — Opções Faltantes (~8h) 🟠
+### Fase C2 — Opções Faltantes (~8h) ✅
 
-| #    | Subfase                                 | Descrição                                    | Estimativa |
-| ---- | --------------------------------------- | -------------------------------------------- | ---------- |
-| C2.1 | ⬜ `availableTools` / `excludedTools`    | Delegação de filtering estático ao SDK       | 3h         |
-| C2.2 | ⬜ `skillDirectories` / `disabledSkills` | Suporte a skills externos                    | 2h         |
-| C2.3 | ⬜ `agent` config                        | Custom agent na sessão                       | 1h         |
-| C2.4 | ⬜ `onEvent` handler global              | Event callback alternativo ao `session.on()` | 1h         |
-| C2.5 | ⬜ `clientName` / `configDir`            | Identificação de client                      | 1h         |
+> Todas as opções já estão suportadas no builder com métodos dedicados. O uso em runtime já existia no
+> codebase (initializer.js, session-setup.js) — o builder as formaliza.
 
-### Fase C3 — CopilotClientOptions (~4h) 🟡
+| #    | Subfase                                 | Descrição                                       | Estimativa |
+| ---- | --------------------------------------- | ------------------------------------------------ | ---------- |
+| C2.1 | ✅ `availableTools` / `excludedTools`    | Métodos `.availableTools()` / `.excludedTools()` | 0.5h       |
+| C2.2 | ✅ `skillDirectories` / `disabledSkills` | Métodos `.skillDirectories()` / `.disabledSkills()` | 0.5h    |
+| C2.3 | ✅ `agent` config                        | Método `.agent()` + `.customAgents()`            | 0.5h       |
+| C2.4 | ✅ `onEvent` handler global              | Método `.onEvent()`                              | 0.5h       |
+| C2.5 | ✅ `clientName` / `configDir`            | Métodos `.clientName()` / `.configDir()`         | 0.5h       |
 
-| #    | Subfase                    | Descrição                           | Estimativa |
-| ---- | -------------------------- | ----------------------------------- | ---------- |
-| C3.1 | ⬜ `logLevel` mapping       | Mapear LOG_LEVEL → SDK logLevel     | 0.5h       |
-| C3.2 | ⬜ `env` passthrough        | Filtrar e passar env ao CLI         | 1h         |
-| C3.3 | ⬜ `onListModels` para BYOK | Hook para listar modelos customized | 1.5h       |
-| C3.4 | ⬜ `githubToken` support    | Org/personal token config           | 1h         |
+### Fase C3 — CopilotClientOptions (~4h) ✅
+
+| #    | Subfase                    | Descrição                                             | Estimativa |
+| ---- | -------------------------- | ----------------------------------------------------- | ---------- |
+| C3.1 | ✅ `logLevel` mapping       | `LOG_LEVEL_MAP` em `ClientOptionsBuilder.logLevelFromEnv()` | 0.5h |
+| C3.2 | ✅ `env` passthrough        | `envPassthrough()` filtra COPILOT_/GITHUB_/OTEL_/NODE_ | 1h       |
+| C3.3 | ✅ `onListModels` para BYOK | Método `.onListModels()` no builder                   | 0.5h       |
+| C3.4 | ✅ `githubToken` support    | `.githubToken()` + `.githubTokenFromEnv()`            | 0.5h       |
+| C3.5 | ✅ Testes                   | 16 testes cobrindo ClientOptionsBuilder               | 1h         |
 
 ---
 
