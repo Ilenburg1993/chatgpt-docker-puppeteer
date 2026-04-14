@@ -10,7 +10,8 @@
  * @see EventBus
  */
 
-import { defaultErrorTracker } from '#copilot/observability';
+import { container } from '#copilot/core';
+import { ERROR_TRACKER } from '../../observability/di-tokens.js';
 
 /**
  * @typedef {object} ErrorsContext
@@ -28,9 +29,9 @@ import { defaultErrorTracker } from '#copilot/observability';
  * @returns {void}
  */
 export function cmdErrors({ println }, arg) {
-    const stats = defaultErrorTracker.getStats();
+    const stats = container.resolve(ERROR_TRACKER).getStats();
     const limit = Number(arg) || 10;
-    const recent = defaultErrorTracker.getErrors(limit);
+    const recent = container.resolve(ERROR_TRACKER).getErrors(limit);
 
     println(`\n  \x1b[36m❌ Erros rastreados: ${stats.total} total (${stats.buffered} no buffer)\x1b[0m\n`);
 

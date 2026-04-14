@@ -9,7 +9,8 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { conversationHub, conversationStore } from '#copilot/services';
+import { container } from '#copilot/core';
+import { CONVERSATION_STORE, HUB } from '../../conversation-hub/di-tokens.js';
 import { getHubSessionId } from '../state.js';
 
 /**
@@ -38,7 +39,7 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
                 status: /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus} */ (status),
             }),
         };
-        const sessions = conversationStore.listHubSessions(opts);
+        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions(opts);
         return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
@@ -55,12 +56,12 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
  */
 export function handleListTurns({ sessionId, limit = 50, offset = 0 }) {
     try {
-        const turns = conversationStore.readTurns(sessionId, {
+        const turns = container.resolve(CONVERSATION_STORE).readTurns(sessionId, {
             limit: isNaN(limit) ? 50 : limit,
             offset: isNaN(offset) ? 0 : offset,
         });
         // T-26 fix: incluir totalCount para paginação correta no cliente
-        const totalCount = conversationStore.countTurns(sessionId);
+        const totalCount = container.resolve(CONVERSATION_STORE).countTurns(sessionId);
         return { status: 200, cors: true, body: { ok: true, turns, sessionId, totalCount } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
@@ -81,7 +82,7 @@ export function handleStoreMemory(body) {
     }
     try {
         const _hubSessionId = getHubSessionId();
-        const id = conversationStore.storeMemory({
+        const id = container.resolve(CONVERSATION_STORE).storeMemory({
             content: body.content,
             tag: body.tag ?? 'geral',
             ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
@@ -102,7 +103,7 @@ export function handleStoreMemory(body) {
  */
 export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
     try {
-        const memories = conversationStore.recallMemories({
+        const memories = container.resolve(CONVERSATION_STORE).recallMemories({
             ...(tag ? { tag } : {}),
             ...(search ? { search } : {}),
             limit: isNaN(/** @type {number} */ (limit)) ? 20 : /** @type {number} */ (limit),
@@ -123,7 +124,7 @@ export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
  */
 export function handleDeleteMemory({ memoryId }) {
     try {
-        const deleted = conversationStore.deleteMemory(memoryId);
+        const deleted = container.resolve(CONVERSATION_STORE).deleteMemory(memoryId);
         return { status: deleted ? 200 : 404, cors: true, body: { ok: deleted, id: memoryId } };
     } catch (/** @type {any} */ e) {
         return { status: 500, body: { ok: false, error: e.message } };
@@ -139,13 +140,13 @@ export function handleDeleteMemory({ memoryId }) {
  * @returns {HandlerResult}
  */
 export function handleHubHealth() {
-    if (!conversationHub.isReady) {
+    if (!container.resolve(HUB).isReady) {
         return { status: 503, body: { ok: false, error: 'ConversationHub não inicializado' } };
     }
     try {
         // T-08: usar countHubSessions (COUNT(*)) em vez de listHubSessions({limit:1000}).length — O(1) com índice
-        const activeSessions = conversationStore.countHubSessions({ status: 'active' });
-        const totalSessions = conversationStore.countHubSessions();
+        const activeSessions = container.resolve(CONVERSATION_STORE).countHubSessions({ status: 'active' });
+        const totalSessions = container.resolve(CONVERSATION_STORE).countHubSessions();
         return {
             status: 200,
             body: {

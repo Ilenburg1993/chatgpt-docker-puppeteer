@@ -10,8 +10,9 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { conversationHub } from '#copilot/services';
+import { container } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { HUB } from '../../conversation-hub/di-tokens.js';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
 const _pendingNotifications = [];
@@ -26,12 +27,12 @@ let _persistenceFailureCount = 0;
  * @returns {number} Quantidade de notificações drenadas com sucesso
  */
 export function drainPendingNotifications() {
-    if (!conversationHub.isReady || _pendingNotifications.length === 0) return 0;
+    if (!container.resolve(HUB).isReady || _pendingNotifications.length === 0) return 0;
     let drained = 0;
     while (_pendingNotifications.length > 0) {
         const n = /** @type {{ hubSessionId: string; userTurn: any; llmBTurn: any }} */ (_pendingNotifications.shift());
         try {
-            conversationHub.notifyTerminalTurn(n.hubSessionId, n.userTurn, n.llmBTurn);
+            container.resolve(HUB).notifyTerminalTurn(n.hubSessionId, n.userTurn, n.llmBTurn);
             drained++;
         } catch (/** @type {any} */ err) {
             log('WARN', `[dialog] drainPendingNotifications falhou: ${err.message}`);
@@ -65,21 +66,21 @@ export function getPersistenceFailureCount() {
 export async function persistTurnToHub(hubSessionId, message, reply, actor, durationMs) {
     /** @type {'user' | 'llm_a'} */
     const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
-    const msgTurnId = await conversationHub.store.writeTurn(hubSessionId, {
+    const msgTurnId = await container.resolve(HUB).store.writeTurn(hubSessionId, {
         role: senderRole,
         content: message,
     });
-    const replyTurnId = await conversationHub.store.writeTurn(hubSessionId, {
+    const replyTurnId = await container.resolve(HUB).store.writeTurn(hubSessionId, {
         role: 'llm_b',
         content: reply,
         durationMs,
     });
 
-    if (conversationHub.isReady) {
+    if (container.resolve(HUB).isReady) {
         try {
-            const msgTurn = conversationHub.store.getTurn(msgTurnId);
-            const replyTurn = conversationHub.store.getTurn(replyTurnId);
-            conversationHub.notifyTerminalTurn(
+            const msgTurn = container.resolve(HUB).store.getTurn(msgTurnId);
+            const replyTurn = container.resolve(HUB).store.getTurn(replyTurnId);
+            container.resolve(HUB).notifyTerminalTurn(
                 hubSessionId,
                 {
                     turnId: msgTurnId,
@@ -129,8 +130,8 @@ export async function persistTurnToHub(hubSessionId, message, reply, actor, dura
  */
 function _enqueuePendingNotification(hubSessionId, msgTurnId, replyTurnId, senderRole, message, reply, durationMs) {
     if (_pendingNotifications.length >= MAX_PENDING_NOTIFICATIONS) return;
-    const msgTurn = conversationHub.store.getTurn(msgTurnId);
-    const replyTurn = conversationHub.store.getTurn(replyTurnId);
+    const msgTurn = container.resolve(HUB).store.getTurn(msgTurnId);
+    const replyTurn = container.resolve(HUB).store.getTurn(replyTurnId);
     _pendingNotifications.push({
         hubSessionId,
         userTurn: {

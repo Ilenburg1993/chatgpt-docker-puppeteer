@@ -9,15 +9,16 @@
  * @see EventBus
  */
 
+import { container } from '#copilot/core';
 import {
-    alwaysAliveAgent,
     createSnapshot,
     listSnapshotsAsync,
+    llmBridgeClient,
     loadSnapshotAsync,
     saveSnapshotAsync,
 } from '#copilot/services';
-import { llmBridgeClient } from '#copilot/services';
-import { conversationStore } from '#copilot/services';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**
@@ -37,8 +38,8 @@ import { getWorkspaceContext } from '../workspace-context.js';
  * @returns {void}
  */
 export function cmdStatus({ hubSessionId, injectPort, println }) {
-    const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
-    const active = alwaysAliveAgent.dialogLoopActive;
+    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
+    const active = container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive;
     const statusColor =
         snap['status'] === 'waiting_for_input' ? '\x1b[32m' : snap['status'] === 'idle' ? '\x1b[33m' : '\x1b[31m';
     const effort = snap['reasoningEffort'] ?? 'high';
@@ -100,7 +101,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         return;
     }
     try {
-        const turns = conversationStore.readTurns(hubSessionId, { limit: n, offset });
+        const turns = container.resolve(CONVERSATION_STORE).readTurns(hubSessionId, { limit: n, offset });
         if (turns.length === 0) {
             println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
             return;
@@ -129,7 +130,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
  */
 export function cmdDbSessions({ hubSessionId, println }, n = 10) {
     try {
-        const sessions = conversationStore.listHubSessions({ limit: n });
+        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: n });
         if (sessions.length === 0) {
             println('\x1b[90m  /db-sessions: Nenhuma sessão persistida ainda.\x1b[0m');
             return;
@@ -178,8 +179,8 @@ export function cmdCount({ hubSessionId, println }) {
         println('\x1b[33m  Nenhuma hub session ativa.\x1b[0m');
         return;
     }
-    const turns = conversationStore.readTurns(hubSessionId, { limit: 9999 });
-    const mems = conversationStore.recallMemories({ limit: 9999 });
+    const turns = container.resolve(CONVERSATION_STORE).readTurns(hubSessionId, { limit: 9999 });
+    const mems = container.resolve(CONVERSATION_STORE).recallMemories({ limit: 9999 });
     const userCount = turns.filter((t) => t.role === 'user').length;
     const llmbCount = turns.filter((t) => t.role === 'llm_b').length;
     println(`
@@ -212,7 +213,7 @@ export function cmdClear({ println }) {
  * @returns {void}
  */
 export function cmdAnswer({ println }, arg) {
-    const ok = alwaysAliveAgent.answerPendingQuestion(arg);
+    const ok = container.resolve(ALWAYS_ALIVE_AGENT).answerPendingQuestion(arg);
     println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
 }
 
@@ -224,15 +225,15 @@ export function cmdAnswer({ println }, arg) {
  * @returns {Promise<void>}
  */
 export async function cmdSessionSave({ println }, reason) {
-    const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
-    const prm = alwaysAliveAgent.dialogPrMetrics;
+    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
+    const prm = container.resolve(ALWAYS_ALIVE_AGENT).dialogPrMetrics;
 
     const data = createSnapshot({
-        sessionId: alwaysAliveAgent.sessionId ?? null,
+        sessionId: container.resolve(ALWAYS_ALIVE_AGENT).sessionId ?? null,
         model: String(snap['model'] ?? 'unknown'),
         status: String(snap['status'] ?? 'unknown'),
         sendCount: Number(snap['sendCount'] ?? 0),
-        dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
+        dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
         dialogPaused: Boolean(snap['dialogPaused']),
         pendingQuestion: snap['pendingQuestion'] ? String(snap['pendingQuestion']) : null,
         prMetrics: prm ?? null,

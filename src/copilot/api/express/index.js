@@ -18,9 +18,11 @@
  * @see EventBus
  */
 
-import { defaultMetrics } from '#copilot/observability';
-import { alwaysAliveAgent, createSessionService, createToolService } from '#copilot/services';
+import { container } from '#copilot/core';
+import { createSessionService, createToolService } from '#copilot/services';
 import { Router } from 'express';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { METRICS_STORE } from '../../observability/di-tokens.js';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
@@ -42,8 +44,8 @@ export default function createSdkApiRouter() {
 
     // Dependências compartilhadas — resolvidas uma vez na raiz
     const sharedDeps = {
-        agent: alwaysAliveAgent,
-        metrics: defaultMetrics,
+        agent: container.resolve(ALWAYS_ALIVE_AGENT),
+        metrics: container.resolve(METRICS_STORE),
         getClient: () => _sessionService.getClient(),
         getClientState: () => _sessionService.getClientState(),
         stopClient: () => _sessionService.stopClient(),

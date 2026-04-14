@@ -7,24 +7,17 @@
  * Inicializa o AlwaysAliveAgent e mantém o processo ativo, aguardando mensagens via sinais ou via HTTP bridge (montado
  * no dashboard-web :3008).
  *
- * **Boot sequence**: A inicialização de DI (bootstrapObservability, bootstrapLateDeps, AUDIT_BUS)
- * é feita pelo `copilot/bootstrap.js`. Este módulo faz apenas o lifecycle do agent:
- * plugin discovery, event wiring, retry loop, shutdown handlers, IPC.
+ * **Boot sequence**: A inicialização de DI (bootstrapObservability, bootstrapLateDeps, AUDIT_BUS) é feita pelo
+ * `copilot/bootstrap.js`. Este módulo faz apenas o lifecycle do agent: plugin discovery, event wiring, retry loop,
+ * shutdown handlers, IPC.
  *
  * @module copilot/agent/lifecycle/entry
  * @see EventBus
  */
 
-import {
-    TimeoutError,
-    bridgeEmitter,
-    container,
-    registerShutdownHandler,
-    runShutdown,
-    withRetry,
-} from '#copilot/core';
+import { TimeoutError, bridgeEmitter, container, registerShutdownHandler, runShutdown, withRetry } from '#copilot/core';
 import { defaultBus } from '#copilot/hooks';
-import { defaultErrorTracker, log } from '#copilot/observability';
+import { log } from '#copilot/observability';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import { CopilotClient } from '#copilot/sdk';
 import { EVENT_BUS } from '../../core/di-tokens.js';
@@ -40,6 +33,7 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../events/index.js';
+import { ERROR_TRACKER } from '../../observability/di-tokens.js';
 import { alwaysAliveAgent } from '../always-alive.js';
 import {
     BOOT_MAX_RETRIES,
@@ -58,7 +52,6 @@ import { drainStateWrites } from './state-io.js';
  * @returns {Promise<void>}
  */
 export async function startAgentLoop() {
-
     // FAIXA-5A: descobrir e instalar plugins ao iniciar o processo
     {
         const _pluginRegistry = new PluginRegistry();
@@ -149,7 +142,7 @@ export async function startAgentLoop() {
     // ─── Handlers de erros não tratados ──────────────────────────────────────────
     // Delegado ao error-tracker singleton que já implementa trackError + log.
     // Evita duplicação de handlers (FAIXA-0 Quick Win #2).
-    defaultErrorTracker.registerGlobalHandlers();
+    container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
     // ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
     // Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.
@@ -196,7 +189,9 @@ export async function startAgentLoop() {
         const pingClient = new CopilotClient();
         await Promise.race([
             pingClient.ping(),
-            new Promise((_, reject) => setTimeout(() => reject(new TimeoutError('Ping timeout (5s)')), PING_TIMEOUT_MS)),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new TimeoutError('Ping timeout (5s)')), PING_TIMEOUT_MS),
+            ),
         ]);
         log('INFO', '[copilot/agent] CLI conectado — ping OK.');
 

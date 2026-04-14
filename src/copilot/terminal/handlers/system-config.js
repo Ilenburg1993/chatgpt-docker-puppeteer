@@ -11,7 +11,7 @@
 
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
-import { defaultMetrics } from '#copilot/observability';
+import { container } from '#copilot/core';
 import {
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
@@ -31,6 +31,7 @@ import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { getSseClients, getSseCriticalClients } from '../../infra/sse/state.js';
+import { METRICS_STORE } from '../../observability/di-tokens.js';
 import { getFileCacheStats } from '../file-context.js';
 import { getBusy, getHubSessionId, getPlanMode } from '../state.js';
 
@@ -71,7 +72,7 @@ export function handleHealth() {
             cacheStats: { fileContext: getFileCacheStats() },
             hub: hubInfo,
             metrics: (() => {
-                const s = defaultMetrics.getSummary();
+                const s = container.resolve(METRICS_STORE).getSummary();
                 return {
                     tokens: {
                         input: s.tokens.inputTokens,

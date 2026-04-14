@@ -22,10 +22,10 @@ import { bridgeEmitter } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
-import { alwaysAliveAgent } from '../agent/index.js';
+import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
-import { conversationHub } from '../conversation-hub/hub.js';
+import { HUB } from '../conversation-hub/di-tokens.js';
 import { container } from '../core/di-container.js';
 import { EVENT_BUS } from '../core/di-tokens.js';
 import { registerTimer } from '../core/timer-registry.js';
@@ -84,9 +84,9 @@ function startReflectionLoop() {
     log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
 
     const runReflection = () => {
-        if (!alwaysAliveAgent.dialogLoopActive) return;
+        if (!container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive) return;
         // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
-        if (alwaysAliveAgent.queueSize > 0) {
+        if (container.resolve(ALWAYS_ALIVE_AGENT).queueSize > 0) {
             log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
             return;
         }
@@ -156,8 +156,8 @@ export async function startTerminalServer() {
 
     // Criar hub_session permanente (best-effort)
     try {
-        await conversationHub.init();
-        const hubSessionId = conversationHub.store.createHubSession({
+        await container.resolve(HUB).init();
+        const hubSessionId = container.resolve(HUB).store.createHubSession({
             title: 'Terminal Permanente LLM-B',
             metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
         });
@@ -169,12 +169,12 @@ export async function startTerminalServer() {
 
     // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
     // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
-    const _hubReady = conversationHub.isReady;
+    const _hubReady = container.resolve(HUB).isReady;
     /** @type {import('../server/index.js').CopilotServerOptions} */
     const _serverOpts = {};
     if (_hubReady) {
-        _serverOpts.orchestrator = conversationHub.orchestrator;
-        _serverOpts.store = conversationHub.store;
+        _serverOpts.orchestrator = container.resolve(HUB).orchestrator;
+        _serverOpts.store = container.resolve(HUB).store;
     }
     const copilotServerPromise = startCopilotServer(_serverOpts);
 
@@ -207,8 +207,8 @@ export async function startTerminalServer() {
     const copilotServer = await copilotServerPromise;
 
     // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)
-    if (copilotServer.io && conversationHub.isReady) {
-        conversationHub.attachSocketIO(copilotServer.io);
+    if (copilotServer.io && container.resolve(HUB).isReady) {
+        container.resolve(HUB).attachSocketIO(copilotServer.io);
     }
 
     registerShutdownHandler(
@@ -235,8 +235,8 @@ export async function startTerminalServer() {
         })(),
         mcpToolCount: getMcpStatus().toolCount,
         hubSessionId: getHubSessionId(),
-        dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-        model: alwaysAliveAgent.model,
+        dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
+        model: container.resolve(ALWAYS_ALIVE_AGENT).model,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
 

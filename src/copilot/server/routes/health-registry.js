@@ -7,9 +7,9 @@
  * @module copilot/server/routes/health-registry
  */
 
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
-import { bridgeEmitter } from '#copilot/core';
-import { alwaysAliveAgent } from '#copilot/services';
+import { bridgeEmitter, container } from '#copilot/core';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { CONVERSATION_STORE, HUB } from '../../conversation-hub/di-tokens.js';
 import { registerModuleHealth } from './health-modules.js';
 
 /**
@@ -19,22 +19,27 @@ import { registerModuleHealth } from './health-modules.js';
  */
 export function registerCopilotHealthChecks() {
     // ── Agent ────────────────────────────────────────────────────────────────
-    registerModuleHealth('agent', () => ({
-        ok: true,
-        details: {
-            status: alwaysAliveAgent.status,
-            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-            model: alwaysAliveAgent.model,
-        },
-    }));
-
-    // ── ConversationHub ──────────────────────────────────────────────────────
-    registerModuleHealth('conversation-hub', () => {
-        const activeSessions = conversationHub.isReady ? conversationStore.countHubSessions({ status: 'active' }) : 0;
+    registerModuleHealth('agent', () => {
+        const agent = container.resolve(ALWAYS_ALIVE_AGENT);
         return {
             ok: true,
             details: {
-                initialized: conversationHub.isReady,
+                status: agent.status,
+                dialogLoopActive: agent.dialogLoopActive,
+                model: agent.model,
+            },
+        };
+    });
+
+    // ── ConversationHub ──────────────────────────────────────────────────────
+    registerModuleHealth('conversation-hub', () => {
+        const hub = container.resolve(HUB);
+        const store = container.resolve(CONVERSATION_STORE);
+        const activeSessions = hub.isReady ? store.countHubSessions({ status: 'active' }) : 0;
+        return {
+            ok: true,
+            details: {
+                initialized: hub.isReady,
                 activeSessions,
             },
         };

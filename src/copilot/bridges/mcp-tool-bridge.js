@@ -24,10 +24,11 @@
  */
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError, withRetry } from '#copilot/core';
-import { defaultMetrics, log, startSpanImmediate } from '#copilot/observability';
+import { BridgeError, container, withRetry } from '#copilot/core';
+import { log, startSpanImmediate } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import net from 'node:net';
+import { METRICS_STORE } from '../observability/di-tokens.js';
 import { buildZodSchema } from './mcp-tool-schema.js';
 
 /**
@@ -177,15 +178,15 @@ async function rpcCall(method, params) {
         span?.setAttribute('duration_ms', Date.now() - t0);
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });
-        defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
+        container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
         return result;
     } catch (/** @type {any} */ err) {
         span?.setAttribute('duration_ms', Date.now() - t0);
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: err?.message });
         span?.recordException(err);
-        defaultMetrics.recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, false);
-        defaultMetrics.recordCounter('copilot.bridge.errors_total');
+        container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, false);
+        container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
         throw err;
     } finally {
         span?.end();

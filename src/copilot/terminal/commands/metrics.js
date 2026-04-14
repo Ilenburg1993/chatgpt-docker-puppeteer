@@ -8,9 +8,11 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
+import { getToolStats } from '#copilot/observability';
 import { llmBridgeClient } from '#copilot/services';
-import { defaultErrorTracker, getToolStats } from '#copilot/observability';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { ERROR_TRACKER } from '../../observability/di-tokens.js';
 
 /**
  * @typedef {object} MetricsContext
@@ -24,10 +26,10 @@ import { defaultErrorTracker, getToolStats } from '#copilot/observability';
  * @returns {void}
  */
 export function cmdMetrics({ println }) {
-    const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
-    const pr = /** @type {Record<string, unknown> | null} */ (alwaysAliveAgent.lastPrInfo);
+    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
+    const pr = /** @type {Record<string, unknown> | null} */ (container.resolve(ALWAYS_ALIVE_AGENT).lastPrInfo);
     const toolStats = getToolStats();
-    const errorStats = defaultErrorTracker.getStats();
+    const errorStats = container.resolve(ERROR_TRACKER).getStats();
     const turnCount = llmBridgeClient.turnCount;
 
     // ── Session info ─────────────────────────────────────────────────

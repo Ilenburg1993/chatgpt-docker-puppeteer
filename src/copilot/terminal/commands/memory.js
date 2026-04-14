@@ -8,7 +8,8 @@
  * @see EventBus
  */
 
-import { conversationStore } from '#copilot/services';
+import { container } from '#copilot/core';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 
 /**
  * @typedef {object} SessionContext
@@ -31,7 +32,7 @@ export function cmdRemember({ hubSessionId, println }, arg) {
         println('\x1b[90m  Uso: /remember [tag:] conteúdo\x1b[0m');
         return;
     }
-    const id = conversationStore.storeMemory({
+    const id = container.resolve(CONVERSATION_STORE).storeMemory({
         tag,
         content,
         ...(hubSessionId ? { hubSessionId } : {}),
@@ -48,7 +49,7 @@ export function cmdRemember({ hubSessionId, println }, arg) {
  */
 export function cmdRecall({ println }, arg) {
     const isSearch = arg.startsWith('?');
-    const memories = conversationStore.recallMemories({
+    const memories = container.resolve(CONVERSATION_STORE).recallMemories({
         ...(isSearch ? { search: arg.slice(1).trim() } : arg ? { tag: arg } : {}),
         limit: 10,
     });
@@ -77,7 +78,7 @@ export function cmdForget({ println }, arg) {
         println('\x1b[90m  Uso: /forget <id>\x1b[0m');
         return;
     }
-    const deleted = conversationStore.deleteMemory(arg);
+    const deleted = container.resolve(CONVERSATION_STORE).deleteMemory(arg);
     println(
         deleted
             ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m`

@@ -10,7 +10,8 @@
  * @see EventBus
  */
 
-import { conversationStore } from '#copilot/services';
+import { container } from '#copilot/core';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 
 /**
  * Handler do comando `/resume`.
@@ -25,7 +26,7 @@ export async function cmdResume({ println, hubSessionId }, arg) {
     // Sem argumento: lista últimas 5 sessões
     if (!trimmed) {
         try {
-            const sessions = conversationStore.listHubSessions({ limit: 5, offset: 0 });
+            const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: 5, offset: 0 });
             if (sessions.length === 0) {
                 println('\x1b[90m  Nenhuma sessão anterior encontrada.\x1b[0m');
                 return;
@@ -51,14 +52,14 @@ export async function cmdResume({ println, hubSessionId }, arg) {
     // Com sessionId: carrega turnos e retoma
     try {
         // Suporta prefixo de 8+ chars
-        const sessions = conversationStore.listHubSessions({ limit: 100, offset: 0 });
+        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: 100, offset: 0 });
         const target = sessions.find((s) => s.id === trimmed || s.id.startsWith(trimmed));
         if (!target) {
             println(`\x1b[31m  ✗ Sessão não encontrada: ${trimmed}\x1b[0m`);
             return;
         }
 
-        const turns = conversationStore.readTurns(target.id, { limit: 50, offset: 0 });
+        const turns = container.resolve(CONVERSATION_STORE).readTurns(target.id, { limit: 50, offset: 0 });
         if (turns.length === 0) {
             println(`\x1b[90m  Sessão ${target.id.slice(0, 8)}… não tem turnos registrados.\x1b[0m`);
             return;

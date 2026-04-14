@@ -18,10 +18,11 @@
  * @see EventBus
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
 import { getMcpStatus } from '#copilot/bridges';
-import { conversationHub, conversationStore } from '#copilot/services';
+import { container } from '#copilot/core';
 import { getToolStats } from '#copilot/observability';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
+import { CONVERSATION_STORE, HUB } from '../../conversation-hub/di-tokens.js';
 
 /**
  * @typedef {object} DiagnoseContext
@@ -48,7 +49,7 @@ const C = {
  * @returns {Promise<void>}
  */
 export async function cmdDiagnose({ hubSessionId, println }) {
-    const snap = /** @type {Record<string, unknown>} */ (alwaysAliveAgent.getStatusSnapshot());
+    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
     const mcp = getMcpStatus();
     const memMB = Math.round(process.memoryUsage().rss / 1_048_576);
     const uptimeSec = Math.round(process.uptime());
@@ -66,16 +67,16 @@ export async function cmdDiagnose({ hubSessionId, println }) {
 
     // ── Hub ───────────────────────────────────────────────────────────────────
     let hubLine = `${C.grey}sem storage${C.reset}`;
-    if (conversationHub.isReady && hubSessionId) {
+    if (container.resolve(HUB).isReady && hubSessionId) {
         try {
-            const session = conversationStore.getHubSession(hubSessionId);
+            const session = container.resolve(CONVERSATION_STORE).getHubSession(hubSessionId);
             hubLine = session
                 ? `${C.green}✅ sessão ${hubSessionId.slice(0, 8)}…${C.reset}`
                 : `${C.yellow}⚠️  sessão não encontrada no store${C.reset}`;
         } catch {
             hubLine = `${C.red}❌ erro ao consultar store${C.reset}`;
         }
-    } else if (!conversationHub.isReady) {
+    } else if (!container.resolve(HUB).isReady) {
         hubLine = `${C.yellow}⚠️  hub não inicializado${C.reset}`;
     }
 
@@ -134,7 +135,7 @@ ${C.bold}${C.cyan}║             Diagnóstico do Terminal LLM-B (F13.1)        
 ${C.bold}${C.cyan}╠══════════════════════════════════════════════════════════════╣${C.reset}
 ${C.cyan}  AGENTE${C.reset}
     status        ${agentStatusColor}${snap['status']}${C.reset}
-    dialog loop   ${alwaysAliveAgent.dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
+    dialog loop   ${container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
     reasoning     ${C.magenta}${snap['reasoningEffort'] ?? 'high'}${C.reset}
 

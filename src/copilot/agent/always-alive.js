@@ -11,9 +11,9 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { bridgeEmitter, logSwallowed } from '#copilot/core';
-import { defaultMetrics } from '#copilot/observability';
+import { bridgeEmitter, container, logSwallowed } from '#copilot/core';
 import { EventEmitter } from 'node:events';
+import { METRICS_STORE } from '../observability/di-tokens.js';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 
@@ -213,12 +213,13 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Retorna o sumário de métricas da sessão atual (compatibilidade — use defaultMetrics diretamente).
+     * Retorna o sumário de métricas da sessão atual (compatibilidade — use container.resolve(METRICS_STORE)
+     * diretamente).
      *
      * @returns {object}
      */
     get telemetry() {
-        return defaultMetrics.getSummary();
+        return container.resolve(METRICS_STORE).getSummary();
     }
 
     /**

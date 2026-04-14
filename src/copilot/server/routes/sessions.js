@@ -15,9 +15,10 @@
  * @module copilot/server/routes/sessions
  */
 
-import { conversationStore } from '#copilot/services';
+import { container } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';
@@ -59,7 +60,7 @@ export function createSessionsRouter() {
             return;
         }
         try {
-            const sessionField = conversationStore.getHubSession(sessionId);
+            const sessionField = container.resolve(CONVERSATION_STORE).getHubSession(sessionId);
             if (!sessionField) {
                 res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
                 return;
@@ -89,7 +90,7 @@ export function createSessionsRouter() {
                 if (title) hubOpts.title = title;
                 if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
                 if (metadata) hubOpts.metadata = metadata;
-                const id = conversationStore.createHubSession(hubOpts);
+                const id = container.resolve(CONVERSATION_STORE).createHubSession(hubOpts);
                 res.status(201).json({ ok: true, id });
             } catch (/** @type {any} */ e) {
                 res.status(500).json({ ok: false, error: e.message });
@@ -106,12 +107,12 @@ export function createSessionsRouter() {
         (/** @type {Req} */ req, /** @type {Res} */ res) => {
             const sessionId = String(req.params['sessionId'] ?? '');
             try {
-                const existing = conversationStore.getHubSession(sessionId);
+                const existing = container.resolve(CONVERSATION_STORE).getHubSession(sessionId);
                 if (!existing) {
                     res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
                     return;
                 }
-                conversationStore.closeHubSession(sessionId);
+                container.resolve(CONVERSATION_STORE).closeHubSession(sessionId);
                 res.json({ ok: true, closed: sessionId });
             } catch (/** @type {any} */ e) {
                 res.status(500).json({ ok: false, error: e.message });

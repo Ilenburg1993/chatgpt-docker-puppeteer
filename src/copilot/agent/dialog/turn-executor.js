@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { SessionError } from '#copilot/core';
+import { container, SessionError } from '#copilot/core';
 import {
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
@@ -18,7 +18,8 @@ import {
     EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { defaultMetrics, log, startSpan } from '#copilot/observability';
+import { log, startSpan } from '#copilot/observability';
+import { METRICS_STORE } from '../../observability/di-tokens.js';
 import { writeStateAsync } from '../lifecycle/state-io.js';
 
 /**
@@ -99,7 +100,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
         emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
         const durationMs = Date.now() - turnStart;
         emitter.emit(EMITTER_TURN_END, { reply: evt.reply.slice(0, 120), durationMs });
-        defaultMetrics.recordDialogTurn(durationMs, true);
+        container.resolve(METRICS_STORE).recordDialogTurn(durationMs, true);
         resolve(evt.reply);
     };
 

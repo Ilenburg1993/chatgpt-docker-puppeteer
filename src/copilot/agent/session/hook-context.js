@@ -14,13 +14,14 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { logSwallowed } from '#copilot/core';
-import { defaultMetrics, log } from '#copilot/observability';
+import { container, logSwallowed } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { readStore as _readTodoStore } from '#copilot/tools';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { safeJsonParse } from '../../core/safe-json.js';
+import { METRICS_STORE } from '../../observability/di-tokens.js';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../config.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ export async function buildHookSystemContext() {
 
     // F5.2: estado runtime do agente SDK (in-memory, sem I/O de arquivo)
     try {
-        const summary = defaultMetrics.getSummary();
+        const summary = container.resolve(METRICS_STORE).getSummary();
         const uptimeSecs = Math.round(process.uptime());
         // Contagem de TODOs pendentes (best-effort — falha silenciosa)
         let pendingCount = 0;

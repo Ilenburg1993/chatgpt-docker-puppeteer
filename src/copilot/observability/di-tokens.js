@@ -10,20 +10,20 @@ import { createToken } from '../core/di.js';
 /**
  * Repositório de métricas de sessão.
  *
- * @type {import('../core/di.js').Token<object>}
+ * @type {import('../core/di.js').Token<import('./metrics.js').MetricsStore>}
  */
 export const METRICS_STORE = createToken('METRICS_STORE');
 
 /**
  * Tracker de erros (error collector/aggregator).
  *
- * @type {import('../core/di.js').Token<object>}
+ * @type {import('../core/di.js').Token<import('./error-tracker.js').ErrorTracker>}
  */
 export const ERROR_TRACKER = createToken('ERROR_TRACKER');
 
 /**
  * Coletor de eventos de observabilidade.
  *
- * @type {import('../core/di.js').Token<object>}
+ * @type {import('../core/di.js').Token<import('./event-collector.js').EventCollector>}
  */
 export const EVENT_COLLECTOR = createToken('EVENT_COLLECTOR');

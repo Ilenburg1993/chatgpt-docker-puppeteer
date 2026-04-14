@@ -11,15 +11,20 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
-import { defaultErrorTracker, defaultMetrics, getStatsByCategory, getToolStats } from '#copilot/observability';
-import { alwaysAliveAgent } from '#copilot/services';
+import { container } from '#copilot/core';
+import { getStatsByCategory, getToolStats } from '#copilot/observability';
+import { ALWAYS_ALIVE_AGENT } from '../../agent/di-tokens.js';
 import { getSseClients } from '../../infra/sse/state.js';
+import { ERROR_TRACKER, METRICS_STORE } from '../../observability/di-tokens.js';
 import { clearRateLimiters } from '../rate-limiter-state.js';
 import { getInjectHistory } from '../state.js';
 
 /**
  * @typedef {import('./shared.js').HandlerResult} HandlerResult
  */
+
+/** @returns {import('../../agent/always-alive.js').AlwaysAliveAgent} */
+const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 // ─── GET /metrics ─────────────────────────────────────────────────────────────
 
@@ -29,7 +34,7 @@ import { getInjectHistory } from '../state.js';
  * @returns {{ status: number; contentType: string; body: string }}
  */
 export function handleMetrics() {
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const snapshot = getAgent().getStatusSnapshot();
     const statusValue = snapshot.status !== 'stopped' ? 1 : 0;
     const queueSize = snapshot.queueSize ?? 0;
     const sendCount = snapshot.sendCount ?? 0;
@@ -90,8 +95,8 @@ export function handleMetrics() {
         );
     }
 
-    // F4.1: dialog loop e sessão — contadores reais do defaultMetrics
-    const summary = defaultMetrics.getSummary();
+    // F4.1: dialog loop e sessão — contadores reais do container.resolve(METRICS_STORE)
+    const summary = container.resolve(METRICS_STORE).getSummary();
     lines.push(
         '# HELP llmb_dialog_turns_total Total de turns do dialog loop executados',
         '# TYPE llmb_dialog_turns_total counter',
@@ -165,8 +170,8 @@ export function handleMetrics() {
  * @returns {HandlerResult}
  */
 export function handleGetErrors() {
-    const stats = defaultErrorTracker.getStats();
-    const recent = defaultErrorTracker.getErrors(20);
+    const stats = container.resolve(ERROR_TRACKER).getStats();
+    const recent = container.resolve(ERROR_TRACKER).getErrors(20);
     return {
         status: 200,
         cors: true,
@@ -235,7 +240,7 @@ export function handleGetHistory({ limit = 50 } = {}) {
  */
 export function handleSystemReset() {
     clearRateLimiters();
-    defaultErrorTracker.clearErrors();
+    container.resolve(ERROR_TRACKER).clearErrors();
     return { status: 200, body: { ok: true, message: 'Rate limiters e error tracker resetados.' } };
 }
 
@@ -343,15 +348,15 @@ export async function handleGitLog({ n = 20 } = {}) {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetQuota() {
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
-    const prInfo = alwaysAliveAgent.lastPrInfo ?? null;
+    const snapshot = getAgent().getStatusSnapshot();
+    const prInfo = getAgent().lastPrInfo ?? null;
     return {
         status: 200,
         body: {
             ok: true,
             sendCount: snapshot?.sendCount ?? 0,
-            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-            sessionId: alwaysAliveAgent.sessionId ?? null,
+            dialogLoopActive: getAgent().dialogLoopActive,
+            sessionId: getAgent().sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,
             lastPrModel: prInfo?.model ?? null,
             lastPrCost: prInfo?.cost ?? null,
@@ -366,17 +371,17 @@ export function handleGetQuota() {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetPrBudget() {
-    const prMetrics = alwaysAliveAgent.dialogPrMetrics;
-    const prInfo = alwaysAliveAgent.lastPrInfo ?? null;
-    const snapshot = alwaysAliveAgent.getStatusSnapshot();
+    const prMetrics = getAgent().dialogPrMetrics;
+    const prInfo = getAgent().lastPrInfo ?? null;
+    const snapshot = getAgent().getStatusSnapshot();
     return {
         status: 200,
         body: {
             ok: true,
             prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
             sendCount: snapshot?.sendCount ?? 0,
-            dialogLoopActive: alwaysAliveAgent.dialogLoopActive,
-            sessionId: alwaysAliveAgent.sessionId ?? null,
+            dialogLoopActive: getAgent().dialogLoopActive,
+            sessionId: getAgent().sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,
             lastPrModel: prInfo?.model ?? null,
             lastPrCost: prInfo?.cost ?? null,

@@ -24,12 +24,16 @@ import {
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { alwaysAliveAgent } from '../agent/index.js';
+import { ALWAYS_ALIVE_AGENT } from '../agent/di-tokens.js';
 import { llmBridgeClient } from '../channel/client.js';
-import { conversationHub } from '../conversation-hub/hub.js';
+import { HUB } from '../conversation-hub/di-tokens.js';
+import { container } from '../core/di-container.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog.js';
 import { getHubSessionId } from './state.js';
+
+/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
+const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;
@@ -44,19 +48,19 @@ export function registerAgentEventListeners(printBanner) {
     // T-14: guard contra registros duplicados (ex: hot-reload, tests)
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
-    alwaysAliveAgent.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
+    getAgent().on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo).`);
 
         // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
         // 1. Abortar mensagem travada (session.abort — 0 PR)
-        await alwaysAliveAgent.abortCurrentMessage();
+        await getAgent().abortCurrentMessage();
 
         // 2. Aguardar até 5s para o ask_user reaparecer (0 PR se reaparecer)
         const recovered = await new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(false), 5_000);
             const check = () => {
-                if (alwaysAliveAgent.pendingQuestion) {
+                if (getAgent().pendingQuestion) {
                     clearTimeout(timeout);
                     resolve(true);
                 }
@@ -65,7 +69,7 @@ export function registerAgentEventListeners(printBanner) {
             check();
             const interval = setInterval(() => {
                 check();
-                if (alwaysAliveAgent.pendingQuestion) clearInterval(interval);
+                if (getAgent().pendingQuestion) clearInterval(interval);
             }, 500);
             setTimeout(() => clearInterval(interval), 5_100);
         });
@@ -74,7 +78,7 @@ export function registerAgentEventListeners(printBanner) {
             // F52.3: ask_user reapareceu — dialog loop continua sem custo de PR
             println(`\n[watchdog] ✅  Dialog loop recuperado sem consumir PR (ask_user preservado).`);
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
-            alwaysAliveAgent.pingDialogWatchdog();
+            getAgent().pingDialogWatchdog();
             broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: true });
             return;
         }
@@ -86,7 +90,7 @@ export function registerAgentEventListeners(printBanner) {
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {
-                await conversationHub.store.writeTurn(_hubSessionId, {
+                await container.resolve(HUB).store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
@@ -108,28 +112,28 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
-    alwaysAliveAgent.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
+    getAgent().on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         broadcastSse('dialog.reply', {
             content: evt.reply,
             timestamp: Date.now(),
-            model: alwaysAliveAgent.model,
-            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            model: getAgent().model,
+            reasoningEffort: getAgent().reasoningEffort ?? 'high',
         });
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    alwaysAliveAgent.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
+    getAgent().on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
         broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
     });
-    alwaysAliveAgent.on(EMITTER_DIALOG_READY, () => {
+    getAgent().on(EMITTER_DIALOG_READY, () => {
         broadcastSse('dialog.ready', {
             timestamp: Date.now(),
-            model: alwaysAliveAgent.model,
-            reasoningEffort: alwaysAliveAgent.reasoningEffort ?? 'high',
+            model: getAgent().model,
+            reasoningEffort: getAgent().reasoningEffort ?? 'high',
         });
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
-    alwaysAliveAgent.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+    getAgent().on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
@@ -140,7 +144,7 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // T-15: respeitar pausa intencional do usuário — não reiniciar se dialogPaused
-        if (alwaysAliveAgent.dialogPaused) {
+        if (getAgent().dialogPaused) {
             println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
             broadcastSse('dialog.stopped', { reason, paused: true });
@@ -158,7 +162,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AA.4: SSE 'context' event
-    alwaysAliveAgent.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
+    getAgent().on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
             broadcastSse('session.usage', {
@@ -171,7 +175,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AB.4: SSE 'cache.hit'
-    alwaysAliveAgent.on(
+    getAgent().on(
         'session.compaction_complete',
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
             const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
@@ -182,7 +186,7 @@ export function registerAgentEventListeners(printBanner) {
     );
 
     // Persiste reconexões e sessões fatais no Hub
-    alwaysAliveAgent.on(
+    getAgent().on(
         'ready',
         async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
             // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
@@ -192,7 +196,7 @@ export function registerAgentEventListeners(printBanner) {
             const _hubSessionId = getHubSessionId();
             if (!_hubSessionId || !evt.reconected) return;
             try {
-                await conversationHub.store.writeTurn(_hubSessionId, {
+                await container.resolve(HUB).store.writeTurn(_hubSessionId, {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
@@ -201,21 +205,18 @@ export function registerAgentEventListeners(printBanner) {
             }
         },
     );
-    alwaysAliveAgent.on(
-        EMITTER_SESSION_FATAL,
-        async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
-            const _hubSessionId = getHubSessionId();
-            if (!_hubSessionId) return;
-            try {
-                await conversationHub.store.writeTurn(_hubSessionId, {
-                    role: 'user',
-                    content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
-                });
-            } catch (/** @type {any} */ e) {
-                logSwallowed(e, 'terminal.index.fatalWriteTurn');
-            }
-        },
-    );
+    getAgent().on(EMITTER_SESSION_FATAL, async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+        const _hubSessionId = getHubSessionId();
+        if (!_hubSessionId) return;
+        try {
+            await container.resolve(HUB).store.writeTurn(_hubSessionId, {
+                role: 'user',
+                content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
+            });
+        } catch (/** @type {any} */ e) {
+            logSwallowed(e, 'terminal.index.fatalWriteTurn');
+        }
+    });
 
     // ── F36.3: Terminal buffer para task streaming ─────────────────────────
     // Quando task.delta/task.reasoning são emitidos fora do dialog loop, renderiza no terminal.
@@ -250,26 +251,26 @@ export function registerAgentEventListeners(printBanner) {
         }
     };
 
-    alwaysAliveAgent.on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
+    getAgent().on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(chunk);
     });
-    alwaysAliveAgent.on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
+    getAgent().on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
         const text = evt?.text ?? '';
         if (!text) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(`\x1b[2m${text}\x1b[22m`); // dim text para reasoning
     });
-    alwaysAliveAgent.on(EMITTER_TASK_COMPLETED, () => {
+    getAgent().on(EMITTER_TASK_COMPLETED, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[90m└── task complete ───┘\x1b[0m');
             _activeTaskId = null;
         }
     });
-    alwaysAliveAgent.on(EMITTER_TASK_ERROR, () => {
+    getAgent().on(EMITTER_TASK_ERROR, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[31m└── task error ──────┘\x1b[0m');
@@ -298,7 +299,7 @@ export function registerAgentEventListeners(printBanner) {
     ]);
     for (const evt of AGENT_EVENTS) {
         if (!handledEvents.has(evt)) {
-            alwaysAliveAgent.on(evt, (/** @type {unknown} */ data) => {
+            getAgent().on(evt, (/** @type {unknown} */ data) => {
                 broadcastSse(evt, /** @type {object} */ (data ?? {}));
             });
         }

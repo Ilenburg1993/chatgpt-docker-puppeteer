@@ -12,10 +12,12 @@
  * @see EventBus
  */
 
-import { defaultMetrics, log } from '#copilot/observability';
+import { container } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
+import { METRICS_STORE } from '../../observability/di-tokens.js';
 
 import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
@@ -58,7 +60,7 @@ export function buildSessionHooks(ctx, host) {
         getModel: () => ctx.model,
         scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
         emit: (event, payload) => host.emit(event, payload),
-        metrics: defaultMetrics,
+        metrics: container.resolve(METRICS_STORE),
     });
 
     const hooks = createHooks({

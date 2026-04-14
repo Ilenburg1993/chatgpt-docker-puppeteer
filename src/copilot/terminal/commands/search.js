@@ -10,7 +10,8 @@
  * @see EventBus
  */
 
-import { conversationHub } from '#copilot/services';
+import { container } from '#copilot/core';
+import { HUB } from '../../conversation-hub/di-tokens.js';
 
 /**
  * @typedef {object} SearchContext
@@ -33,7 +34,7 @@ export function cmdSearch({ println, hubSessionId }, arg) {
         return;
     }
 
-    if (!conversationHub.isReady || !conversationHub.store) {
+    if (!container.resolve(HUB).isReady || !container.resolve(HUB).store) {
         println('\n  \x1b[31m❌  ConversationHub não está disponível.\x1b[0m\n');
         return;
     }
@@ -42,7 +43,7 @@ export function cmdSearch({ println, hubSessionId }, arg) {
         /** @type {import('../../conversation-hub/store-helpers.js').SearchTurnsOpts} */
         const searchOpts = { query, limit: 10 };
         if (hubSessionId) searchOpts.hubSessionId = hubSessionId;
-        const results = conversationHub.store.searchTurns(searchOpts);
+        const results = container.resolve(HUB).store.searchTurns(searchOpts);
 
         if (!results || results.length === 0) {
             println(`\n  \x1b[33m🔍 Nenhum resultado para "${query}"\x1b[0m\n`);

@@ -7,10 +7,10 @@
  * @module copilot/services/conversation-service
  */
 
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { container, EVENT_BUS } from '#copilot/core';
 import { SERVICE_SESSION_MESSAGE } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { CONVERSATION_STORE, HUB } from '../conversation-hub/di-tokens.js';
 
 /**
  * Fachada de conversação — consolida conversation-hub + channel.
@@ -41,7 +41,7 @@ export class ConversationService {
      * @returns {any}
      */
     getHub() {
-        return conversationHub;
+        return container.resolve(HUB);
     }
 
     /**
@@ -50,7 +50,7 @@ export class ConversationService {
      * @returns {any}
      */
     getStore() {
-        return conversationStore;
+        return container.resolve(CONVERSATION_STORE);
     }
 
     /**
@@ -63,7 +63,7 @@ export class ConversationService {
      */
     sendToLlmB(hubSessionId, message, options) {
         log('DEBUG', `[ConversationService] enviando para LLM-B sessão ${hubSessionId}`);
-        void conversationHub.sendToLlmB(hubSessionId, message, options);
+        void container.resolve(HUB).sendToLlmB(hubSessionId, message, options);
         this.#bus()?.emit({ type: SERVICE_SESSION_MESSAGE });
     }
 
@@ -74,7 +74,7 @@ export class ConversationService {
      * @returns {any}
      */
     createHubSession(opts) {
-        return conversationHub.createSession(opts);
+        return container.resolve(HUB).createSession(opts);
     }
 }
 
