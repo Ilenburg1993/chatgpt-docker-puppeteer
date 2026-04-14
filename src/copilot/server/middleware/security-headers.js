@@ -3,10 +3,9 @@
  * @module copilot/server/middleware/security-headers
  * @file Middleware de security headers para o servidor copilot.
  *
- * Equivalente leve ao `helmet` — define cabeçalhos de segurança sem dependência externa.
- * S-A-09 fix (Faixa 0).
+ *   Equivalente leve ao `helmet` — define cabeçalhos de segurança sem dependência externa. S-A-09 fix (Faixa 0).
  *
- * src/copilot/server/middleware/security-headers.js
+ *   src/copilot/server/middleware/security-headers.js
  */
 
 /**

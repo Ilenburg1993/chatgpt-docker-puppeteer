@@ -3,13 +3,12 @@
  * @module copilot/server/routes/agent
  * @file Router Express para rotas de agente e injeção.
  *
- * Rotas: POST /inject, POST /pipeline, GET /context, GET /quota,
- *   GET /pr-budget, POST /dialog/pause, POST /dialog/resume,
- *   GET /handoff, POST /handoff/:id/accept, POST /handoff/:id/reject
+ *   Rotas: POST /inject, POST /pipeline, GET /context, GET /quota, GET /pr-budget, POST /dialog/pause, POST
+ *   /dialog/resume, GET /handoff, POST /handoff/:id/accept, POST /handoff/:id/reject
  *
- * Onda 3.1 — L55.2.
+ *   Onda 3.1 — L55.2.
  *
- * src/copilot/server/routes/agent.js
+ *   src/copilot/server/routes/agent.js
  */
 
 import { Router } from 'express';
@@ -65,7 +64,12 @@ export function createAgentRouter() {
     router.post('/inject', injectRateMiddleware, validate({ body: injectBodySchema }), bridgeHandler(handleInject));
 
     // POST /pipeline — rate limit write
-    router.post('/pipeline', writeRateMiddleware, validate({ body: pipelineBodySchema }), bridgeHandler(handlePipeline));
+    router.post(
+        '/pipeline',
+        writeRateMiddleware,
+        validate({ body: pipelineBodySchema }),
+        bridgeHandler(handlePipeline),
+    );
 
     // POST /dialog
     router.post('/dialog/pause', bridgeHandler(handleDialogPause));

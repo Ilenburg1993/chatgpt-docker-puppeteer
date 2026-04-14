@@ -3,13 +3,12 @@
  * @module copilot/server/routes/config
  * @file Router Express para rotas de configuração do servidor copilot.
  *
- * Rotas: GET /config, GET /config/skills, GET /config/tools, GET /config/tools/custom,
- *   PUT /config/infinite-session, PUT /config/skills, PUT /config/tools,
- *   POST /config/tools/custom, DELETE /config/tools/custom/:name
+ *   Rotas: GET /config, GET /config/skills, GET /config/tools, GET /config/tools/custom, PUT /config/infinite-session,
+ *   PUT /config/skills, PUT /config/tools, POST /config/tools/custom, DELETE /config/tools/custom/:name
  *
- * Onda 3.1 — L55.3.
+ *   Onda 3.1 — L55.3.
  *
- * src/copilot/server/routes/config.js
+ *   src/copilot/server/routes/config.js
  */
 
 import { Router } from 'express';
@@ -67,7 +66,11 @@ export function createConfigRouter() {
     router.get('/tools/custom', bridgeHandler(handleGetCustomTools));
 
     // PUT
-    router.put('/infinite-session', validate({ body: infiniteSessionBodySchema }), bridgeHandler(handleSetInfiniteSessionConfig));
+    router.put(
+        '/infinite-session',
+        validate({ body: infiniteSessionBodySchema }),
+        bridgeHandler(handleSetInfiniteSessionConfig),
+    );
     router.put('/skills', validate({ body: skillsBodySchema }), bridgeHandler(handleSetSkills));
     router.put('/tools', validate({ body: toolsConfigBodySchema }), bridgeHandler(handleSetToolsConfig));
 

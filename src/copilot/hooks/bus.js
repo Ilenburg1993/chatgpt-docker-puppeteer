@@ -12,7 +12,6 @@
  * @see module:copilot/hooks/factory
  */
 
-import { EventEmitter } from 'node:events';
 import {
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
@@ -21,6 +20,7 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '#copilot/events';
+import { EventEmitter } from 'node:events';
 import { log } from './logger.js';
 
 /**

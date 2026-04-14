@@ -2,8 +2,8 @@
 /**
  * src/copilot/server/routes/health-modules.js — Agregador de health checks por domínio.
  *
- * Onda 5.9: cada módulo principal pode exportar `healthCheck()` via seu barrel.
- * Este router agrega os resultados em GET /health/modules.
+ * Onda 5.9: cada módulo principal pode exportar `healthCheck()` via seu barrel. Este router agrega os resultados em GET
+ * /health/modules.
  *
  * @module copilot/server/routes/health-modules
  */

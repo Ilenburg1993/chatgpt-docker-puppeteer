@@ -67,10 +67,12 @@ export class AsyncQueue {
         while (this.#running < this.#concurrency && this.#queue.length > 0) {
             const task = /** @type {QueueTask<unknown>} */ (this.#queue.shift());
             this.#running++;
-            task.fn().then(task.resolve, task.reject).finally(() => {
-                this.#running--;
-                this.#drain();
-            });
+            task.fn()
+                .then(task.resolve, task.reject)
+                .finally(() => {
+                    this.#running--;
+                    this.#drain();
+                });
         }
     }
 

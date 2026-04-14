@@ -3,11 +3,10 @@
  * @module copilot/server/app
  * @file Factory Express para o servidor copilot dedicado.
  *
- * Cria e configura o app Express com todos os middlewares globais.
- * As rotas são montadas separadamente por `mountCopilotRoutes()` (Onda 3.1).
- * Onda 3.0 — L54.6.
+ *   Cria e configura o app Express com todos os middlewares globais. As rotas são montadas separadamente por
+ *   `mountCopilotRoutes()` (Onda 3.1). Onda 3.0 — L54.6.
  *
- * src/copilot/server/app.js
+ *   src/copilot/server/app.js
  */
 
 import express from 'express';
@@ -30,13 +29,14 @@ import { securityHeadersMiddleware } from './middleware/security-headers.js';
  * Cria e configura o app Express do servidor copilot.
  *
  * Ordem de middlewares:
+ *
  * 1. requestId — gera/propaga X-Request-ID
  * 2. cors — headers CORS + preflight OPTIONS
  * 3. express.json — parse body JSON (2MB max, alinhado com terminal/server.js)
  * 4. auth — verifica Bearer token (pula rotas skipAuth)
  *
- * O error handler é registrado por último (após rotas) em `app.js`.
- * Chame `mountCopilotRoutes(app)` separadamente para adicionar as rotas.
+ * O error handler é registrado por último (após rotas) em `app.js`. Chame `mountCopilotRoutes(app)` separadamente para
+ * adicionar as rotas.
  *
  * @param {CopilotAppOptions} [opts]
  * @returns {import('express').Application}

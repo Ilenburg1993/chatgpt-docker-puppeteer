@@ -100,20 +100,24 @@ export function createSessionsRouter() {
     const sessionParamsSchema = z.object({ sessionId: z.string().min(1) });
 
     // ── DELETE /sessions/:sessionId — fecha session (soft-close) ──────────────
-    router.delete('/sessions/:sessionId', validate({ params: sessionParamsSchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const sessionId = String(req.params['sessionId'] ?? '');
-        try {
-            const existing = conversationStore.getHubSession(sessionId);
-            if (!existing) {
-                res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
-                return;
+    router.delete(
+        '/sessions/:sessionId',
+        validate({ params: sessionParamsSchema }),
+        (/** @type {Req} */ req, /** @type {Res} */ res) => {
+            const sessionId = String(req.params['sessionId'] ?? '');
+            try {
+                const existing = conversationStore.getHubSession(sessionId);
+                if (!existing) {
+                    res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
+                    return;
+                }
+                conversationStore.closeHubSession(sessionId);
+                res.json({ ok: true, closed: sessionId });
+            } catch (/** @type {any} */ e) {
+                res.status(500).json({ ok: false, error: e.message });
             }
-            conversationStore.closeHubSession(sessionId);
-            res.json({ ok: true, closed: sessionId });
-        } catch (/** @type {any} */ e) {
-            res.status(500).json({ ok: false, error: e.message });
-        }
-    });
+        },
+    );
 
     // ── GET /sessions/:sessionId/turns — lista turnos paginados ───────────────
     router.get(

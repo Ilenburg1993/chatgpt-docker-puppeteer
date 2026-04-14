@@ -18,10 +18,10 @@ import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from
 import { logSwallowed } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { setCopilotNamespace } from '../../conversation-hub/broadcast.js';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '../../config/auth.js';
+import { setCopilotNamespace } from '../../conversation-hub/broadcast.js';
 
 /**
  * @typedef {import('socket.io').Namespace} SocketNamespace

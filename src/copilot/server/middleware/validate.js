@@ -11,7 +11,9 @@
 
 /**
  * @typedef {import('express').Request} Req
+ *
  * @typedef {import('express').Response} Res
+ *
  * @typedef {import('express').NextFunction} Next
  */
 
@@ -29,16 +31,16 @@
  *
  * Em caso de erro de validacao, retorna 400 com erros estruturados.
  *
- * @param {ValidationSchemas} schemas
- * @returns {(req: Req, res: Res, next: Next) => void}
- *
  * @example
  *     import { validate } from '../middleware/validate.js';
  *     router.post('/sessions', validate({ body: z.object({ title: z.string().optional() }) }), handler);
+ *
+ * @param {ValidationSchemas} schemas
+ * @returns {(req: Req, res: Res, next: Next) => void}
  */
 export function validate(schemas) {
     return (req, res, next) => {
-        /** @type {Array<{ location: string; issues: Array<{ path: string; message: string }> }>} */
+        /** @type {{ location: string; issues: { path: string; message: string }[] }[]} */
         const errors = [];
 
         if (schemas.body) {
@@ -79,10 +81,10 @@ export function validate(schemas) {
  * Extrai issues de um resultado de safeParse falho.
  *
  * @param {{ error?: unknown }} result
- * @returns {Array<{ path: string; message: string }>}
+ * @returns {{ path: string; message: string }[]}
  */
 function extractIssues(result) {
-    const error = /** @type {{ issues?: Array<{ path?: (string | number)[]; message?: string }> }} */ (result.error);
+    const error = /** @type {{ issues?: { path?: (string | number)[]; message?: string }[] }} */ (result.error);
     if (!error?.issues || !Array.isArray(error.issues)) {
         return [{ path: '', message: String(error) }];
     }

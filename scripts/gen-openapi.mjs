@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Gera o openapi.json atualizado com todas as rotas canônicas de server/routes/.
- * Uso: node scripts/gen-openapi.mjs > src/copilot/api/openapi.json
+ * Gera o openapi.json atualizado com todas as rotas canônicas de server/routes/. Uso: node scripts/gen-openapi.mjs >
+ * src/copilot/api/openapi.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -39,7 +39,10 @@ function queryParam(name, type = 'string') {
 }
 
 function route(method, path, tag, summary, extra = {}) {
-    const opId = `${method}_${path.replace(/^\/api\/copilot\//, '').replace(/[/{}-]+/g, '_').replace(/_$/, '')}`;
+    const opId = `${method}_${path
+        .replace(/^\/api\/copilot\//, '')
+        .replace(/[/{}-]+/g, '_')
+        .replace(/_$/, '')}`;
     const entry = { summary, operationId: opId, tags: [tag], responses: jsonRes() };
     if (extra.body) entry.requestBody = jsonBody();
     if (extra.params) entry.parameters = extra.params;
@@ -56,7 +59,9 @@ route('get', '/api/copilot/agent/session', 'agent', 'GET /agent/session — info
 route('post', '/api/copilot/agent/start', 'agent', 'POST /agent/start — inicia o agente (admin)', { body: true });
 route('post', '/api/copilot/agent/stop', 'agent', 'POST /agent/stop — para o agente (admin)', { body: true });
 route('get', '/api/copilot/agent/permissions', 'agent', 'GET /agent/permissions — lista permissões');
-route('post', '/api/copilot/agent/permissions', 'agent', 'POST /agent/permissions — atualiza permissões (admin)', { body: true });
+route('post', '/api/copilot/agent/permissions', 'agent', 'POST /agent/permissions — atualiza permissões (admin)', {
+    body: true,
+});
 route('post', '/api/copilot/agent/steer', 'agent', 'POST /agent/steer — steering imediato', { body: true });
 
 // ── copilot-api/tasks.js ───────────────────────────────────────────────────────
@@ -67,9 +72,13 @@ route('post', '/api/copilot/agent/answer', 'agent', 'POST /agent/answer — resp
 route('get', '/api/copilot/agent/stream/tasks', 'agent', 'GET /agent/stream/tasks — SSE filtrado por tarefas');
 
 // ── copilot-api/dialog.js ──────────────────────────────────────────────────────
-route('post', '/api/copilot/agent/dialog/start', 'agent', 'POST /agent/dialog/start — inicia Dialog Loop', { body: true });
+route('post', '/api/copilot/agent/dialog/start', 'agent', 'POST /agent/dialog/start — inicia Dialog Loop', {
+    body: true,
+});
 route('post', '/api/copilot/agent/dialog/turn', 'agent', 'POST /agent/dialog/turn — turno de diálogo', { body: true });
-route('post', '/api/copilot/agent/dialog/stop', 'agent', 'POST /agent/dialog/stop — encerra Dialog Loop', { body: true });
+route('post', '/api/copilot/agent/dialog/stop', 'agent', 'POST /agent/dialog/stop — encerra Dialog Loop', {
+    body: true,
+});
 
 // ── routes/agent.js ────────────────────────────────────────────────────────────
 route('get', '/api/copilot/context', 'agent', 'GET /context — contexto atual do agent');
@@ -94,13 +103,27 @@ route('get', '/api/copilot/config', 'config', 'GET /config — configuração at
 route('get', '/api/copilot/config/skills', 'config', 'GET /config/skills — lista skills ativas');
 route('get', '/api/copilot/config/tools', 'config', 'GET /config/tools — lista tools config');
 route('get', '/api/copilot/config/tools/custom', 'config', 'GET /config/tools/custom — lista tools custom');
-route('put', '/api/copilot/config/infinite-session', 'config', 'PUT /config/infinite-session — toggle sessão infinita', { body: true });
+route(
+    'put',
+    '/api/copilot/config/infinite-session',
+    'config',
+    'PUT /config/infinite-session — toggle sessão infinita',
+    { body: true },
+);
 route('put', '/api/copilot/config/skills', 'config', 'PUT /config/skills — atualiza skills', { body: true });
 route('put', '/api/copilot/config/tools', 'config', 'PUT /config/tools — atualiza tools config', { body: true });
-route('post', '/api/copilot/config/tools/custom', 'config', 'POST /config/tools/custom — registra tool custom', { body: true });
-route('delete', '/api/copilot/config/tools/custom/{name}', 'config', 'DELETE /config/tools/custom/:name — remove tool custom', {
-    params: [pathParam('name')],
+route('post', '/api/copilot/config/tools/custom', 'config', 'POST /config/tools/custom — registra tool custom', {
+    body: true,
 });
+route(
+    'delete',
+    '/api/copilot/config/tools/custom/{name}',
+    'config',
+    'DELETE /config/tools/custom/:name — remove tool custom',
+    {
+        params: [pathParam('name')],
+    },
+);
 
 // ── routes/memory.js ───────────────────────────────────────────────────────────
 route('get', '/api/copilot/memory', 'memory', 'GET /memory — lista memories');
@@ -134,8 +157,27 @@ route('get', '/api/copilot/metrics', 'observability', 'GET /metrics — métrica
 // Add x-canonical-source to all paths to indicate source module
 for (const [path, methods] of Object.entries(spec.paths)) {
     let source = 'server/routes/';
-    if (path.includes('/agent/') && !path.includes('/agent/info') && !path.includes('/agent/tools') && !path.includes('/agent/telemetry')) {
-        if (path.includes('/dialog/start') || path.includes('/dialog/turn') || path.includes('/dialog/stop') || path.includes('/stream') || path.includes('/status') || path.includes('/health') || path.includes('/session') || path.includes('/start') || path.includes('/stop') || path.includes('/permissions') || path.includes('/steer') || path.includes('/send') || path.includes('/answer')) {
+    if (
+        path.includes('/agent/') &&
+        !path.includes('/agent/info') &&
+        !path.includes('/agent/tools') &&
+        !path.includes('/agent/telemetry')
+    ) {
+        if (
+            path.includes('/dialog/start') ||
+            path.includes('/dialog/turn') ||
+            path.includes('/dialog/stop') ||
+            path.includes('/stream') ||
+            path.includes('/status') ||
+            path.includes('/health') ||
+            path.includes('/session') ||
+            path.includes('/start') ||
+            path.includes('/stop') ||
+            path.includes('/permissions') ||
+            path.includes('/steer') ||
+            path.includes('/send') ||
+            path.includes('/answer')
+        ) {
             source = 'server/routes/copilot-api/';
         }
     }

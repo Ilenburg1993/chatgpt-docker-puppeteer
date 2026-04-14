@@ -73,15 +73,19 @@ const webhookParamsSchema = z.object({ id: z.string().min(1) });
 /**
  * Remove um webhook previamente registrado.
  */
-router.delete('/webhooks/:id', validate({ params: webhookParamsSchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
-    const id = /** @type {string} */ (req.params['id']);
-    const removed = alwaysAliveAgent.unregisterWebhook(id);
-    if (!removed) {
-        res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
-        return;
-    }
-    res.json({ ok: true, id });
-});
+router.delete(
+    '/webhooks/:id',
+    validate({ params: webhookParamsSchema }),
+    (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const id = /** @type {string} */ (req.params['id']);
+        const removed = alwaysAliveAgent.unregisterWebhook(id);
+        if (!removed) {
+            res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
+            return;
+        }
+        res.json({ ok: true, id });
+    },
+);
 
 export { router as webhooksRouter };
 export default router;

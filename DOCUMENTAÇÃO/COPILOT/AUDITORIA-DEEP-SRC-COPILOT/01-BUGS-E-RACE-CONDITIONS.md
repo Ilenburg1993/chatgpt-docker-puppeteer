@@ -6,13 +6,13 @@
 
 ## SUMÁRIO
 
-| Severidade | Quantidade |
-|---|---|
-| Crítico (C) | 8 |
-| Alto (A) | 24 |
-| Médio (M) | 32 |
-| Baixo (B) | 12 |
-| **Total** | **76** |
+| Severidade  | Quantidade |
+| ----------- | ---------- |
+| Crítico (C) | 8          |
+| Alto (A)    | 24         |
+| Médio (M)   | 32         |
+| Baixo (B)   | 12         |
+| **Total**   | **76**     |
 
 ---
 

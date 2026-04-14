@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, before, after } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import { ConversationHub } from '../../../src/copilot/conversation-hub/hub.js';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';

@@ -7,9 +7,9 @@
  * @module copilot/server/routes/health-registry
  */
 
-import { alwaysAliveAgent } from '#copilot/services';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { bridgeEmitter } from '#copilot/core';
+import { alwaysAliveAgent } from '#copilot/services';
 import { registerModuleHealth } from './health-modules.js';
 
 /**

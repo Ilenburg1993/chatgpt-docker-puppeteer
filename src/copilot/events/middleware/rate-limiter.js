@@ -10,7 +10,6 @@
  * @module copilot/events/middleware/rate-limiter
  */
 
-
 /**
  * @typedef {object} RateLimiterOptions
  * @property {number} [windowMs=1000] - Janela de tempo em ms. Default is `1000`

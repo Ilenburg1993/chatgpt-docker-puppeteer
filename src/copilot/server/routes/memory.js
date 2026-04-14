@@ -3,20 +3,16 @@
  * @module copilot/server/routes/memory
  * @file Router Express para rotas de memória do servidor copilot.
  *
- * Rotas: GET /memory, POST /memory, DELETE /memory/:memoryId
+ *   Rotas: GET /memory, POST /memory, DELETE /memory/:memoryId
  *
- * Onda 3.1 — L55.4.
+ *   Onda 3.1 — L55.4.
  *
- * src/copilot/server/routes/memory.js
+ *   src/copilot/server/routes/memory.js
  */
 
 import { Router } from 'express';
 import { z } from 'zod';
-import {
-    handleDeleteMemory,
-    handleRecallMemories,
-    handleStoreMemory,
-} from '../../terminal/handlers/dialog.js';
+import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../terminal/handlers/dialog.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';

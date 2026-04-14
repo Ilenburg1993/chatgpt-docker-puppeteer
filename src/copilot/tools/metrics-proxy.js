@@ -6,9 +6,8 @@
  *
  * Faixa 3.1 — AC: `tools/ → observability/` layer violation fix.
  *
- * Em vez de importar diretamente de observability/ (camada proibida para tools/), este módulo expõe
- * funções de métricas com implementações injetáveis via `setToolsMetrics()`.
- * Se não injetado, retorna valores no-op / vazios.
+ * Em vez de importar diretamente de observability/ (camada proibida para tools/), este módulo expõe funções de métricas
+ * com implementações injetáveis via `setToolsMetrics()`. Se não injetado, retorna valores no-op / vazios.
  *
  * @module copilot/tools/metrics-proxy
  */

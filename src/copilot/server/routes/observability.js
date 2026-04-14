@@ -3,15 +3,14 @@
  * @module copilot/server/routes/observability
  * @file Router Express para rotas de observabilidade do servidor copilot.
  *
- * Rotas: GET /errors, GET /tool-stats, GET /history, GET /audit,
- *   POST /system/reset, GET /metrics (custom: text/plain)
+ *   Rotas: GET /errors, GET /tool-stats, GET /history, GET /audit, POST /system/reset, GET /metrics (custom: text/plain)
  *
- * Nota: GET /sessions e GET /sessions/:sessionId/turns foram movidos para
- * server/routes/sessions.js na Onda 4.1 (L64.2).
+ *   Nota: GET /sessions e GET /sessions/:sessionId/turns foram movidos para server/routes/sessions.js na Onda 4.1
+ *   (L64.2).
  *
- * Onda 3.1 — L55.5.
+ *   Onda 3.1 — L55.5.
  *
- * src/copilot/server/routes/observability.js
+ *   src/copilot/server/routes/observability.js
  */
 
 import { Router } from 'express';

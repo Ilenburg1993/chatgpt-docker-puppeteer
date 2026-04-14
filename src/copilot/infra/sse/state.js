@@ -4,13 +4,13 @@
  *
  * Estado SSE canônico (movido de server/sse/ para infra/sse/ — infraestrutura compartilhada).
  *
- * Onda 4.4 — L64.5: implementação própria sem re-export de `terminal/state.js`.
- * Elimina a inversão de camada server → terminal identificada na PARTE-25C.
+ * Onda 4.4 — L64.5: implementação própria sem re-export de `terminal/state.js`. Elimina a inversão de camada server →
+ * terminal identificada na PARTE-25C.
  *
- * - `_serverSseClients` / `_serverSseCriticalClients`: Sets de clientes do servidor
- *   (distintos dos Sets raw do terminal em `terminal/state.js`)
- * - `_serverReplayBuffer`: buffer de replay dedicado ao endpoint /events do servidor
- *   (o `createSseWriter` escreve nele automaticamente via replayBuffer.push())
+ * - `_serverSseClients` / `_serverSseCriticalClients`: Sets de clientes do servidor (distintos dos Sets raw do terminal
+ *   em `terminal/state.js`)
+ * - `_serverReplayBuffer`: buffer de replay dedicado ao endpoint /events do servidor (o `createSseWriter` escreve nele
+ *   automaticamente via replayBuffer.push())
  *
  * @module copilot/infra/sse/state
  */
@@ -47,8 +47,8 @@ export function getSseCriticalClients() {
 /**
  * Retorna o buffer de replay SSE do servidor.
  *
- * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (infra/sse/utils.js),
- * que chama replayBuffer.push() automaticamente a cada evento enviado.
+ * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (infra/sse/utils.js), que chama
+ * replayBuffer.push() automaticamente a cada evento enviado.
  *
  * @returns {SseReplayBuffer}
  */

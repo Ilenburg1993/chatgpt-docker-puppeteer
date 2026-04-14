@@ -13,7 +13,6 @@
 
 import { getCopilotFallbackModel } from '#copilot/config';
 import { SessionError } from '#copilot/core';
-import { EventEmitter } from 'node:events';
 import {
     EMITTER_LOOP_CHANGED,
     EMITTER_LOOP_COMPACTION_REQUESTED,
@@ -28,6 +27,7 @@ import {
 } from '#copilot/events';
 import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
+import { EventEmitter } from 'node:events';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
     BOOT_TIMEOUT_MS,

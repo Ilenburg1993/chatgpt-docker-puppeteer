@@ -6,15 +6,15 @@
 
 ## SUMÁRIO
 
-| Categoria | Quantidade |
-|---|---|
-| Node.js 24+ APIs | 12 |
-| Typing Hardening | 14 |
-| Performance | 10 |
-| Architecture | 16 |
-| DX/Developer Experience | 8 |
-| Observability | 8 |
-| **Total** | **68** |
+| Categoria               | Quantidade |
+| ----------------------- | ---------- |
+| Node.js 24+ APIs        | 12         |
+| Typing Hardening        | 14         |
+| Performance             | 10         |
+| Architecture            | 16         |
+| DX/Developer Experience | 8          |
+| Observability           | 8          |
+| **Total**               | **68**     |
 
 ---
 
@@ -214,7 +214,7 @@
 **Status**: Parcialmente existe via `LOG_LEVEL`. Normalizar.
 
 ### U5-06 — Error messages com action hints
-**Fix**: "Session not found: ABC123. Did you mean to create one? Use POST /sessions" 
+**Fix**: "Session not found: ABC123. Did you mean to create one? Use POST /sessions"
 
 ### U5-07 — Config schema documentation gerada automaticamente
 **Fix**: JSDoc → markdown para `config/env.js`.

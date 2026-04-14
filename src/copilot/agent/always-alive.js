@@ -12,8 +12,8 @@
  */
 
 import { bridgeEmitter, logSwallowed } from '#copilot/core';
-import { EventEmitter } from 'node:events';
 import { defaultMetrics } from '#copilot/observability';
+import { EventEmitter } from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 

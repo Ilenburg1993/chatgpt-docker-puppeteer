@@ -47,8 +47,9 @@ export function getAuditTail(n = 20, buffer = globalAuditBuffer) {
 /**
  * Cria um handler `onPostToolUse` que captura entradas no `globalAuditBuffer`.
  *
- * Desde Fase AL, o feed principal é automático via `event-collector.js`.
- * Este handler pode ser usado como hook adicional quando necessário.
+ * Desde Fase AL, o feed principal é automático via `event-collector.js`. Este handler pode ser usado como hook
+ * adicional quando necessário.
+ *
  * @param {((entry: SdkAuditEntry) => void) | null | undefined} [logger]
  * @param {AuditRingBuffer<SdkAuditEntry>} [buffer]
  * @returns {(

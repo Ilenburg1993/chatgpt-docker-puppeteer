@@ -14,8 +14,8 @@ import { dirname } from 'node:path';
 /**
  * Tenta adquirir um lockfile. Retorna `true` se adquirido, `false` se já existe um lock válido.
  *
- * O lockfile contém o PID do processo que o criou. Se o processo dono não estiver mais rodando
- * (stale lock), o lock é removido e re-adquirido automaticamente.
+ * O lockfile contém o PID do processo que o criou. Se o processo dono não estiver mais rodando (stale lock), o lock é
+ * removido e re-adquirido automaticamente.
  *
  * @param {string} lockPath - Caminho absoluto do lockfile.
  * @returns {Promise<boolean>}
@@ -32,7 +32,11 @@ export async function acquireLock(lockPath) {
             unlinkSync(lockPath);
         } catch {
             // arquivo corrompido — remove
-            try { unlinkSync(lockPath); } catch { /* ignore */ }
+            try {
+                unlinkSync(lockPath);
+            } catch {
+                /* ignore */
+            }
         }
     }
 

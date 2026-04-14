@@ -8,8 +8,8 @@
  * SDK.
  *
  * @module copilot/agent/lifecycle/session-setup
- * @see EventBus
  * @internal
+ * @see EventBus
  */
 
 import { defaultMetrics, log } from '#copilot/observability';

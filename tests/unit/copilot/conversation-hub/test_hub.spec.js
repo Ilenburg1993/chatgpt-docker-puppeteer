@@ -2,12 +2,12 @@
 /**
  * tests/unit/copilot/conversation-hub/test_hub.spec.js
  *
- * F165: Testes para hub.js — ConversationHub singleton facade. Testa init() (standalone, sem Socket.io), lifecycle, facade
- * methods, isReady, stop, close.
+ * F165: Testes para hub.js — ConversationHub singleton facade. Testa init() (standalone, sem Socket.io), lifecycle,
+ * facade methods, isReady, stop, close.
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';
 

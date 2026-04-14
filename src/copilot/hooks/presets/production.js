@@ -50,7 +50,8 @@ import { createPromptTransformer } from '../prompt-transformer.js';
  * @property {number} [circuitBreakerMaxRetries] - Máx retries antes de abrir o circuit. Padrão: 3.
  * @property {number} [circuitBreakerResetMs] - Tempo de reset do circuit em ms. Padrão: 60000.
  * @property {(entry: ProductionAuditEntry) => void} [auditSink] - Destino do audit log. Padrão: core/logger.
- * @property {(toolName: string) => boolean} [isToolDisabled] - Predicate para verificar se tool foi desabilitada em runtime. Padrão: sempre false.
+ * @property {(toolName: string) => boolean} [isToolDisabled] - Predicate para verificar se tool foi desabilitada em
+ *   runtime. Padrão: sempre false.
  */
 
 /**

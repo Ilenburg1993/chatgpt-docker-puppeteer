@@ -6,14 +6,14 @@
 
 ## SUMÁRIO
 
-| Categoria | Findings |
-|---|---|
-| Layer Violations | 8 |
-| Circular Dependencies | 6 |
-| God Barrels | 5 |
-| Excessive Coupling | 12 |
-| Missing Abstractions | 7 |
-| **Total** | **38** |
+| Categoria             | Findings |
+| --------------------- | -------- |
+| Layer Violations      | 8        |
+| Circular Dependencies | 6        |
+| God Barrels           | 5        |
+| Excessive Coupling    | 12       |
+| Missing Abstractions  | 7        |
+| **Total**             | **38**   |
 
 ---
 
@@ -44,13 +44,13 @@ types       → []                                                              
 
 ### Métricas Aggregadas
 
-| Métrica | Valor |
-|---|---|
-| Total de arestas (imports inter-módulo) | 95 |
-| Módulos fan-out > 6 | 5 (agent, hooks, services, terminal, server) |
-| Módulos fan-in > 6 | 3 (core=17, events=10, observability=14) |
-| Módulos leaf (0 deps) | 2 (infra, types) |
-| Módulos puros (≤1 dep) | 5 (db, events, sdk, plugins, infra) |
+| Métrica                                 | Valor                                        |
+| --------------------------------------- | -------------------------------------------- |
+| Total de arestas (imports inter-módulo) | 95                                           |
+| Módulos fan-out > 6                     | 5 (agent, hooks, services, terminal, server) |
+| Módulos fan-in > 6                      | 3 (core=17, events=10, observability=14)     |
+| Módulos leaf (0 deps)                   | 2 (infra, types)                             |
+| Módulos puros (≤1 dep)                  | 5 (db, events, sdk, plugins, infra)          |
 
 ---
 

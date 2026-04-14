@@ -6,15 +6,15 @@
 
 ## SUMÁRIO
 
-| Categoria | Quantidade |
-|---|---|
-| Código Morto / Deprecated | 24 |
-| God Classes / God Files | 12 |
-| Anti-patterns | 18 |
-| Hardcoded / Magic Values | 14 |
-| Naming / Convention Gaps | 8 |
-| Build / Config Debt | 6 |
-| **Total** | **82** |
+| Categoria                 | Quantidade |
+| ------------------------- | ---------- |
+| Código Morto / Deprecated | 24         |
+| God Classes / God Files   | 12         |
+| Anti-patterns             | 18         |
+| Hardcoded / Magic Values  | 14         |
+| Naming / Convention Gaps  | 8          |
+| Build / Config Debt       | 6          |
+| **Total**                 | **82**     |
 
 ---
 

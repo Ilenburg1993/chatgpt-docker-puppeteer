@@ -6,11 +6,11 @@
  *
  * Faixa 3.1 — AC: `tools/ → observability/` layer violation fix.
  *
- * Em vez de importar o logger estruturado de observability/ (camada proibida para tools/), este módulo expõe
- * a mesma assinatura `log(level, msg)` via wrapper leve com injeção opcional.
+ * Em vez de importar o logger estruturado de observability/ (camada proibida para tools/), este módulo expõe a mesma
+ * assinatura `log(level, msg)` via wrapper leve com injeção opcional.
  *
- * O logger real pode ser injetado via `setToolsLogger()` por uma camada superior (agent/, server/).
- * Se não injetado, usa `console.*` como fallback.
+ * O logger real pode ser injetado via `setToolsLogger()` por uma camada superior (agent/, server/). Se não injetado,
+ * usa `console.*` como fallback.
  *
  * @module copilot/tools/logger
  */

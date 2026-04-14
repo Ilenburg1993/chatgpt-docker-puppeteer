@@ -33,9 +33,14 @@ import { conversationStore } from './store.js';
 /**
  * @typedef {Object} HubInitOpts
  * @property {import('socket.io').Server} [io] - Instância Socket.io Server (opcional — se omitido, inicia sem realtime)
- * @property {(io: import('socket.io').Server, orchestrator: HubOrchestrator, store: import('./store.js').ConversationStore) => void} [mountFn]
- *   - Função de montagem do namespace Socket.IO (injetada pelo server layer para evitar dependência direta).
- *   Se omitida, socket mounting é responsabilidade do chamador (ex.: createCopilotSocket).
+ * @property {(
+ *     io: import('socket.io').Server,
+ *     orchestrator: HubOrchestrator,
+ *     store: import('./store.js').ConversationStore,
+ * ) => void} [mountFn]
+ *   - Função de montagem do namespace Socket.IO (injetada pelo server layer para evitar dependência direta). Se omitida,
+ *       socket mounting é responsabilidade do chamador (ex.: createCopilotSocket).
+ *
  * @property {{ emitEvent?: (e: { source: string; actionCode: string; payload: unknown; ts: number }) => void }} [nerv]
  *   - Instância NERV bus (opcional, para forwarding de eventos)
  */
@@ -86,7 +91,10 @@ export class ConversationHub {
             if (opts.mountFn) {
                 opts.mountFn(opts.io, this.#orchestrator, conversationStore);
             } else {
-                log('DEBUG', '[ConversationHub] opts.io fornecido sem opts.mountFn — namespace Socket.IO montado externamente (createCopilotSocket).');
+                log(
+                    'DEBUG',
+                    '[ConversationHub] opts.io fornecido sem opts.mountFn — namespace Socket.IO montado externamente (createCopilotSocket).',
+                );
             }
         }
 
@@ -111,12 +119,17 @@ export class ConversationHub {
      * @throws {SessionError} Se hub não inicializado
      */
     /**
-     * Conecta Socket.IO ao hub já inicializado via função de montagem injetável.
-     * Permite iniciar sem io e fazer upgrade depois (ex.: terminal standalone → full).
+     * Conecta Socket.IO ao hub já inicializado via função de montagem injetável. Permite iniciar sem io e fazer upgrade
+     * depois (ex.: terminal standalone → full).
      *
      * @param {import('socket.io').Server} io
-     * @param {(io: import('socket.io').Server, orchestrator: HubOrchestrator, store: import('./store.js').ConversationStore) => void} [mountFn]
+     * @param {(
+     *     io: import('socket.io').Server,
+     *     orchestrator: HubOrchestrator,
+     *     store: import('./store.js').ConversationStore,
+     * ) => void} [mountFn]
      *   - Função de montagem injetada pelo server layer. Se omitida, namespace já deve estar montado.
+     *
      * @returns {void}
      * @throws {SessionError} Se hub não inicializado
      */

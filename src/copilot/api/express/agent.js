@@ -136,8 +136,8 @@ export default function createAgentRouter(deps) {
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Retorna o resumo de telemetria do agente (sessões, erros, latências). Alias /telemetry mantido para compatibilidade
-     * retroativa (UPG-N08/GAP-N14).
+     * Retorna o resumo de telemetria do agente (sessões, erros, latências). Alias /telemetry mantido para
+     * compatibilidade retroativa (UPG-N08/GAP-N14).
      *
      * @param {import('express').Request} _req
      * @param {import('express').Response} res

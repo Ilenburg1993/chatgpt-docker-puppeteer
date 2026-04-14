@@ -204,8 +204,8 @@ export function getCopilotFallbackModel() {
 /**
  * Adapter sobre `process.env` que implementa a interface `IConfigProvider`.
  *
- * Permite que consumidores aceitem um contrato estável em vez de acessar `process.env` diretamente,
- * facilitando substituição em testes.
+ * Permite que consumidores aceitem um contrato estável em vez de acessar `process.env` diretamente, facilitando
+ * substituição em testes.
  *
  * @type {import('../core/interfaces.js').IConfigProvider}
  */

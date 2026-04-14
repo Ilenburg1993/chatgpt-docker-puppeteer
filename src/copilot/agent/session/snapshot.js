@@ -254,7 +254,9 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
  */
 export const snapshotStore = {
     createSnapshot: (opts) => /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (createSnapshot(opts))),
-    saveSnapshot: async (snapshot) => { await saveSnapshotAsync(/** @type {any} */ (snapshot)); },
-    loadSnapshot: (id) => id ? loadSnapshotAsync(id) : loadLatestSnapshotAsync(),
+    saveSnapshot: async (snapshot) => {
+        await saveSnapshotAsync(/** @type {any} */ (snapshot));
+    },
+    loadSnapshot: (id) => (id ? loadSnapshotAsync(id) : loadLatestSnapshotAsync()),
     listSnapshots: () => listSnapshotsAsync(),
 };

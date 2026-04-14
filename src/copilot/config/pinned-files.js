@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
-import { EventEmitter } from 'node:events';
 import { log } from '#copilot/observability';
+import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';

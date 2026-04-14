@@ -4,14 +4,15 @@
  * scripts/check-copilot-autonomy.mjs
  *
  * Smoke test: garante que:
+ *
  * 1. Nenhum arquivo em src/copilot/ importa de fora do módulo copilot
  * 2. Os entry points de boot existem e exportam corretamente
  * 3. PM2 entry points resolvem para arquivos existentes
  * 4. Arquivos de wiring e agent.js existem (mesmo que deprecated)
  * 5. bootstrap.js implementa modo único (sem parâmetro mode/context)
  *
- * Arquitetura Onda 2.7: copilot é ferramenta DEV-only.
- * Boot canônico: terminal/bootstrap.js → bootCopilot() → startTerminalServer()
+ * Arquitetura Onda 2.7: copilot é ferramenta DEV-only. Boot canônico: terminal/bootstrap.js → bootCopilot() →
+ * startTerminalServer()
  *
  * Exit code 0 = tudo ok. Exit code 1 = problemas encontrados.
  *
@@ -26,23 +27,16 @@ let errors = 0;
 
 // ── Check 1: zero imports externos proibidos ────────────────────────────────
 
-const FORBIDDEN_PATTERNS = [
-    '#core/',
-    '#nerv/',
-    '#infra/',
-    '#driver/',
-    '#kernel/',
-    '#server/',
-];
+const FORBIDDEN_PATTERNS = ['#core/', '#nerv/', '#infra/', '#driver/', '#kernel/', '#server/'];
 
 const pattern = FORBIDDEN_PATTERNS.map((p) => `from '${p}`).join('|');
 
 let output = '';
 try {
-    output = execSync(
-        `rg -n "${pattern}" src/copilot/ --type js --no-heading`,
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    output = execSync(`rg -n "${pattern}" src/copilot/ --type js --no-heading`, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
 } catch (/** @type {any} */ e) {
     if (e.status !== 1) throw e;
     // status 1 = no matches = good
@@ -127,7 +121,11 @@ if (hasModeProp) {
 const SERVER_INDEX = 'src/copilot/server/index.js';
 if (existsSync(resolve(SERVER_INDEX))) {
     const serverSrc = readFileSync(resolve(SERVER_INDEX), 'utf-8');
-    if (/export.*startCopilotServer|export function startCopilotServer|export async function startCopilotServer/.test(serverSrc)) {
+    if (
+        /export.*startCopilotServer|export function startCopilotServer|export async function startCopilotServer/.test(
+            serverSrc,
+        )
+    ) {
         console.log(`✅ Check 6: ${SERVER_INDEX} exporta startCopilotServer.`);
     } else {
         console.error(`❌ Check 6 FALHOU — ${SERVER_INDEX} não exporta startCopilotServer.`);
@@ -249,10 +247,25 @@ if (realRequires.length > 0) {
 // ── Check 13: módulos copilot têm index.js ──────────────────────────────────
 
 const EXPECTED_MODULES = [
-    'agent', 'api', 'audit', 'bridges', 'channel', 'config',
-    'conversation-hub', 'core', 'db', 'events', 'hooks',
-    'observability', 'plugins', 'sdk', 'server', 'services',
-    'terminal', 'tools', 'types',
+    'agent',
+    'api',
+    'audit',
+    'bridges',
+    'channel',
+    'config',
+    'conversation-hub',
+    'core',
+    'db',
+    'events',
+    'hooks',
+    'observability',
+    'plugins',
+    'sdk',
+    'server',
+    'services',
+    'terminal',
+    'tools',
+    'types',
 ];
 
 const missingBarrels = [];
@@ -274,10 +287,10 @@ if (missingBarrels.length > 0) {
 
 let servicesInRoutes = '';
 try {
-    servicesInRoutes = execSync(
-        'rg -l "#copilot/services" src/copilot/server/routes/ --type js --no-heading',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    servicesInRoutes = execSync('rg -l "#copilot/services" src/copilot/server/routes/ --type js --no-heading', {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
 } catch (/** @type {any} */ e) {
     if (e.status !== 1) throw e;
 }

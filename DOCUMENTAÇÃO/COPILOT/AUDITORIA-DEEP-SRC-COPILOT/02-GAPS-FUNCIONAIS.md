@@ -6,15 +6,15 @@
 
 ## SUMÁRIO
 
-| Categoria | Quantidade |
-|---|---|
-| Validation/Input | 18 |
-| Error Handling | 14 |
-| Observability | 12 |
-| API/Protocol | 10 |
-| State Management | 8 |
-| Documentation | 6 |
-| **Total** | **68** |
+| Categoria        | Quantidade |
+| ---------------- | ---------- |
+| Validation/Input | 18         |
+| Error Handling   | 14         |
+| Observability    | 12         |
+| API/Protocol     | 10         |
+| State Management | 8          |
+| Documentation    | 6          |
+| **Total**        | **68**     |
 
 ---
 

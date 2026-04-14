@@ -12,9 +12,9 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { EventEmitter } from 'node:events';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { EventEmitter } from 'node:events';
 import { LlmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { executeSendToLlmB } from './send-pipeline.js';

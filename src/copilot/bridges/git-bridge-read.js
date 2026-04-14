@@ -291,4 +291,3 @@ export function formatBranch(branches) {
         })
         .join('\n');
 }
-

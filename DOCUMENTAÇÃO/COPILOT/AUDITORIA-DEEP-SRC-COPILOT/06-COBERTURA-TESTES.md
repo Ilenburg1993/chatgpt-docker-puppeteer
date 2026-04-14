@@ -6,29 +6,29 @@
 
 ## SUMÁRIO GERAL
 
-| Módulo | Arquivos Prod | Testes | Ratio | Status |
-|---|---|---|---|---|
-| agent | 57 | 15 | 26% | ⚠️ Crítico |
-| api | 21 | 6 | 29% | ⚠️ Crítico |
-| audit | 9 | 2 | 22% | ⚠️ Crítico |
-| bridges | 13 | 7 | 54% | ⚠️ Médio |
-| channel | 8 | 2 | 25% | ⚠️ Crítico |
-| config | 7 | 6 | 86% | ✅ Bom |
-| conversation-hub | 13 | 6 | 46% | ⚠️ Médio |
-| core | 19 | 10 | 53% | ⚠️ Médio |
-| db | 3 | 2 | 67% | ✅ Razoável |
-| events | 18 | 4 | 22% | ⚠️ Crítico |
-| hooks | 20 | 8 | 40% | ⚠️ Médio |
-| infra | 5 | 1 | 20% | ⚠️ Crítico |
-| observability | 32 | 15 | 47% | ⚠️ Médio |
-| plugins | 3 | 0 | 0% | 🔴 Zero |
-| sdk | 41 | 41 | 100% | ✅ Excelente |
-| server | 35 | 4 | 11% | 🔴 Crítico |
-| services | 6 | 2 | 33% | ⚠️ Crítico |
-| terminal | 47 | 25 | 53% | ⚠️ Médio |
-| tools | 28 | 20 | 71% | ✅ Bom |
-| types | 2 | 3 | 150% | ✅ Excelente |
-| **TOTAL** | **387** | **179** | **46%** | ⚠️ |
+| Módulo           | Arquivos Prod | Testes  | Ratio   | Status      |
+| ---------------- | ------------- | ------- | ------- | ----------- |
+| agent            | 57            | 15      | 26%     | ⚠️ Crítico   |
+| api              | 21            | 6       | 29%     | ⚠️ Crítico   |
+| audit            | 9             | 2       | 22%     | ⚠️ Crítico   |
+| bridges          | 13            | 7       | 54%     | ⚠️ Médio     |
+| channel          | 8             | 2       | 25%     | ⚠️ Crítico   |
+| config           | 7             | 6       | 86%     | ✅ Bom       |
+| conversation-hub | 13            | 6       | 46%     | ⚠️ Médio     |
+| core             | 19            | 10      | 53%     | ⚠️ Médio     |
+| db               | 3             | 2       | 67%     | ✅ Razoável  |
+| events           | 18            | 4       | 22%     | ⚠️ Crítico   |
+| hooks            | 20            | 8       | 40%     | ⚠️ Médio     |
+| infra            | 5             | 1       | 20%     | ⚠️ Crítico   |
+| observability    | 32            | 15      | 47%     | ⚠️ Médio     |
+| plugins          | 3             | 0       | 0%      | 🔴 Zero      |
+| sdk              | 41            | 41      | 100%    | ✅ Excelente |
+| server           | 35            | 4       | 11%     | 🔴 Crítico   |
+| services         | 6             | 2       | 33%     | ⚠️ Crítico   |
+| terminal         | 47            | 25      | 53%     | ⚠️ Médio     |
+| tools            | 28            | 20      | 71%     | ✅ Bom       |
+| types            | 2             | 3       | 150%    | ✅ Excelente |
+| **TOTAL**        | **387**       | **179** | **46%** | ⚠️           |
 
 > Nota: O count de testes é por nome de arquivo de teste, não por test case. Ratio > 100% indica múltiplos test files por módulo.
 
@@ -163,18 +163,18 @@
 
 ## PRIORIDADE DE TESTES (TOP-10 MÓDULOS)
 
-| Prioridade | Módulo | Justificativa |
-|---|---|---|
-| P0 | server/ | Exposure pública, 0 testes HTTP |
-| P0 | agent/ (core) | Business logic central, bugs C-01..C-06 |
-| P1 | infra/ | Primitives usados por todos |
-| P1 | channel/ | Entry point principal (inject) |
-| P1 | plugins/ | Código dinâmico sem safety net |
-| P2 | hooks/ | Security hooks sem validation tests |
-| P2 | events/ | Central bus, 80+ types |
-| P2 | audit/ | Sistema de auditoria não auditado |
-| P3 | services/ | Lifecycle management |
-| P3 | conversation-hub/ | Persistence layer |
+| Prioridade | Módulo            | Justificativa                           |
+| ---------- | ----------------- | --------------------------------------- |
+| P0         | server/           | Exposure pública, 0 testes HTTP         |
+| P0         | agent/ (core)     | Business logic central, bugs C-01..C-06 |
+| P1         | infra/            | Primitives usados por todos             |
+| P1         | channel/          | Entry point principal (inject)          |
+| P1         | plugins/          | Código dinâmico sem safety net          |
+| P2         | hooks/            | Security hooks sem validation tests     |
+| P2         | events/           | Central bus, 80+ types                  |
+| P2         | audit/            | Sistema de auditoria não auditado       |
+| P3         | services/         | Lifecycle management                    |
+| P3         | conversation-hub/ | Persistence layer                       |
 
 ---
 

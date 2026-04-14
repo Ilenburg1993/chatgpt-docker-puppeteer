@@ -10,8 +10,8 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { log } from '#copilot/observability';
 import { HUB_EVENTS } from '#copilot/events';
+import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike

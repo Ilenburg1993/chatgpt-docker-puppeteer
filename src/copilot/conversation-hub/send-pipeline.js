@@ -9,9 +9,9 @@
  */
 
 import { SessionError } from '#copilot/core';
+import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
-import { HUB_EVENTS } from '#copilot/events';
 
 /**
  * @typedef {Object} SendPipelineDeps
