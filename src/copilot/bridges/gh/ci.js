@@ -61,14 +61,16 @@ export async function listRuns(opts = {}) {
  */
 export async function viewRun(runId) {
     try {
-        return await runGhJson([
-            'run',
-            'view',
-            String(runId),
-            '--json',
-            'name,status,conclusion,jobs,url,event,headBranch,createdAt',
-            ...repoArgs(),
-        ]);
+        return /** @type {object | null} */ (
+            await runGhJson([
+                'run',
+                'view',
+                String(runId),
+                '--json',
+                'name,status,conclusion,jobs,url,event,headBranch,createdAt',
+                ...repoArgs(),
+            ])
+        );
     } catch {
         return null;
     }

@@ -11,6 +11,7 @@
 import { llmBridgeClient } from '#copilot/services';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {object} ExportContext
@@ -50,7 +51,7 @@ export async function cmdExport({ println }, arg) {
         await writeFile(filePath, lines.join('\n'), 'utf-8');
         println(`  \x1b[32m✅ Exportado: ${filePath}\x1b[0m`);
         println(`  \x1b[90m${hist.length} mensagens salvas como Markdown.\x1b[0m`);
-    } catch (/** @type {any} */ e) {
-        println(`  \x1b[31m❌ Erro ao exportar: ${e?.message ?? e}\x1b[0m`);
+    } catch (e) {
+        println(`  \x1b[31m❌ Erro ao exportar: ${toError(e).message ?? e}\x1b[0m`);
     }
 }

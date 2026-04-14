@@ -70,7 +70,7 @@ export class TurnQueue {
         const prev = this.#mutex;
         /** @type {Promise<T>} */
         const next = prev.then(fn);
-        this.#mutex = next.then(() => {}).catch((/** @type {any} */ e) => logSwallowed(e, 'agent.backpressure.mutex'));
+        this.#mutex = next.then(() => {}).catch((e) => logSwallowed(e, 'agent.backpressure.mutex'));
         const myGen = ++this.#gen;
         void next.finally(() => {
             this.#depth--;

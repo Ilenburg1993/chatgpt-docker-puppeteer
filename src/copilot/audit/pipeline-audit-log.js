@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed, registerShutdownHandler } from '#copilot/core';
+import { logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -159,11 +159,11 @@ export function createAuditLog(opts = {}) {
                 try {
                     const { size } = await stat(toolAuditFile);
                     if (size >= MAX_TOOL_AUDIT_BYTES) await rename(toolAuditFile, toolAuditRotate);
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     logSwallowed(e, 'audit.pipeline.statToolAudit');
                 }
                 await appendFile(toolAuditFile, batch.join(''), 'utf8');
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'audit.pipeline.flushToolAudit');
             }
         });
@@ -179,7 +179,7 @@ export function createAuditLog(opts = {}) {
         if (
             last &&
             last.type === entry.type &&
-            /** @type {any} */ (last).data?.toolName === /** @type {any} */ (entry).data?.toolName &&
+            last.data?.['toolName'] === entry.data?.['toolName'] &&
             entry.type !== 'tool.start' &&
             entry.type !== 'tool.complete' &&
             now - new Date(last.ts).getTime() < 1000
@@ -211,8 +211,8 @@ export function createAuditLog(opts = {}) {
             await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
             const lines = _buffer.map((e) => JSON.stringify(e)).join('\n') + '\n';
             await appendFile(auditFile, lines, 'utf8');
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[audit/pipeline] flush failed: ${err?.message ?? err}`);
+        } catch (err) {
+            log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
         }
     }
 

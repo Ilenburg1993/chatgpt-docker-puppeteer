@@ -40,7 +40,10 @@ export { defineTool };
  * @property {string} name - Nome único da ferramenta (snake_case)
  * @property {string} description - Descrição legível para o modelo
  * @property {any} [parameters] - Zod schema (ZodTypeAny/ZodSchema) ou JSON Schema plano (Record<string, unknown>)
- * @property {import('@github/copilot-sdk').ToolHandler<T> | ((...args: any[]) => any)} handler - Callback executor
+ * @property {import('@github/copilot-sdk').ToolHandler<T>
+ *     | ((args: T, invocation?: unknown) => Promise<unknown> | unknown)} handler
+ *   - Callback executor
+ *
  * @property {boolean} [skipPermission=false] - Pular verificação de permissão (default: false). Default is `false`
  * @property {boolean} [overridesBuiltInTool=false] - Sobrescreve tool nativa do SDK. Default is `false`
  */

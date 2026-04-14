@@ -82,7 +82,7 @@ function assertClient(client) {
     if (!client || typeof client !== 'object') {
         throw new Error('[sdk/client-events] client is required');
     }
-    if (typeof (/** @type {any} */ (client).on) !== 'function') {
+    if (typeof /** @type {Record<string, unknown>} */ (client).on !== 'function') {
         throw new Error('[sdk/client-events] client must have an .on() method');
     }
 }
@@ -124,7 +124,10 @@ export function onLifecycleEvent(eventType, handler, client) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/client-events] handler must be a function');
     }
-    return /** @type {any} */ (c).on(eventType, handler);
+    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(
+        eventType,
+        handler,
+    );
 }
 
 /**
@@ -147,7 +150,7 @@ export function onAllLifecycleEvents(handler, client) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/client-events] handler must be a function');
     }
-    return /** @type {any} */ (c).on(handler);
+    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(handler);
 }
 
 /**
@@ -182,7 +185,10 @@ export function onLifecycleEvents(handlerMap, client) {
         if (typeof handler !== 'function') {
             throw new Error(`[sdk/client-events] handler for '${eventType}' must be a function`);
         }
-        const unsub = /** @type {any} */ (c).on(eventType, handler);
+        const unsub = /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(
+            eventType,
+            handler,
+        );
         unsubscribers.push(unsub);
     }
 

@@ -18,7 +18,7 @@
 
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { toError, logSwallowed } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
@@ -172,7 +172,7 @@ export async function loadCustomToolsAsync() {
         const items = result.data;
         _registry = new Map(items.map((item) => [item.name, item]));
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'sdk.customTools.loadRegistry');
     }
 }
@@ -187,8 +187,8 @@ async function _persistCustomToolsAsync() {
         const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
         await writeFile(tmpPath, JSON.stringify([..._registry.values()], null, 2), 'utf8');
         await rename(tmpPath, CUSTOM_TOOLS_PATH);
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json (async): ${err.message}`);
+    } catch (err) {
+        log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json (async): ${toError(err).message}`);
     }
 }
 

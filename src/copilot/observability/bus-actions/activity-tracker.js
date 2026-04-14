@@ -47,7 +47,7 @@ export function createActivityTracker({ bus, trackTypes }) {
 
     for (const type of types) {
         unsubs.push(
-            bus.on(type, (/** @type {any} */ evt) => {
+            bus.on(type, (evt) => {
                 lastActivity = evt?.timestamp ?? Date.now();
                 lastEventType = type;
                 eventCount++;

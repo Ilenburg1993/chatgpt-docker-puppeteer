@@ -29,11 +29,16 @@ import { log } from '#copilot/observability';
  *
  * @param {BridgeAgentLike} agent
  * @param {{ onReady?: () => void; onReply?: (reply: string) => void; onStopped?: () => void }} opts
- * @returns {{ replyHandler: ((evt: { reply?: string }) => void) | null; cleanup: () => void }}
+ * @returns {{ replyHandler: ((evt: unknown) => void) | null; cleanup: () => void }}
  */
 export function registerDialogListeners(agent, opts) {
     const { onReady, onReply, onStopped } = opts;
-    const replyHandler = onReply ? (/** @type {{ reply?: string }} */ evt) => onReply(evt.reply ?? '') : null;
+    const replyHandler = onReply
+        ? (/** @type {unknown} */ rawEvt) => {
+              const evt = /** @type {{ reply?: string }} */ (rawEvt);
+              onReply(evt.reply ?? '');
+          }
+        : null;
 
     if (onReady) agent.once(EMITTER_DIALOG_READY, onReady);
     if (replyHandler) agent.on(EMITTER_DIALOG_REPLY, replyHandler);
@@ -88,14 +93,16 @@ export async function dialogTurn(agent, message, opts = {}) {
     const { timeout = 60_000, onDelta, onReasoning } = opts;
 
     const onDeltaTemp = onDelta
-        ? (/** @type {{ chunk?: string }} */ evt) => {
+        ? (/** @type {unknown} */ rawEvt) => {
+              const evt = /** @type {{ chunk?: string }} */ (rawEvt);
               if (evt.chunk) onDelta(evt.chunk);
           }
         : null;
     if (onDeltaTemp) agent.on(EMITTER_TASK_DELTA, onDeltaTemp);
 
     const onReasoningTemp = onReasoning
-        ? (/** @type {{ chunk?: string; reasoningId?: string | null }} */ evt) => {
+        ? (/** @type {unknown} */ rawEvt) => {
+              const evt = /** @type {{ chunk?: string; reasoningId?: string | null }} */ (rawEvt);
               if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
           }
         : null;

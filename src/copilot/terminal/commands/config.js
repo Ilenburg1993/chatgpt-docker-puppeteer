@@ -11,7 +11,7 @@
  */
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
@@ -91,8 +91,8 @@ export async function cmdModel({ println }, arg) {
                 println(`    \x1b[33m${m.id}\x1b[0m${activeMarker}${reasoning}${vision}`);
             }
             println('');
-        } catch (/** @type {any} */ e) {
-            println(`  \x1b[31m[erro] Não foi possível listar modelos: ${e.message}\x1b[0m\n`);
+        } catch (e) {
+            println(`  \x1b[31m[erro] Não foi possível listar modelos: ${toError(e).message}\x1b[0m\n`);
         }
         return;
     }

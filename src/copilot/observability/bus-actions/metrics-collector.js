@@ -8,6 +8,7 @@
  * @module copilot/observability/bus-actions/metrics-collector
  */
 
+import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 
 /**
@@ -30,8 +31,8 @@ export function createMetricsCollector({ bus, metrics }) {
             bus.on(type, (/** @type {any} */ evt) => {
                 try {
                     fn(evt);
-                } catch (/** @type {any} */ e) {
-                    log('WARN', `[metrics-collector] erro em ${type}: ${e?.message}`);
+                } catch (e) {
+                    log('WARN', `[metrics-collector] erro em ${type}: ${toError(e).message}`);
                 }
             }),
         );

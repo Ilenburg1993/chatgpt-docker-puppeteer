@@ -9,6 +9,7 @@
  */
 
 import { Router } from 'express';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {object} ModuleHealthResult
@@ -54,8 +55,8 @@ export function createHealthModulesRouter() {
                 const result = await entry.check();
                 results[entry.name] = result;
                 if (!result.ok) allOk = false;
-            } catch (/** @type {any} */ e) {
-                results[entry.name] = { ok: false, error: e.message };
+            } catch (e) {
+                results[entry.name] = { ok: false, error: toError(e).message };
                 allOk = false;
             }
         });

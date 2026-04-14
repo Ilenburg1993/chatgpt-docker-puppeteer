@@ -12,7 +12,7 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../../infra/sse/state.js';
 import { clearRateLimiters } from '../rate-limiter-state.js';
@@ -194,8 +194,8 @@ export async function handleGetAudit({ summary: wantSummary = 0, limit = 50, ses
     try {
         const historical = await defaultAuditLog.getAuditSummary(sessionId, limit);
         return { status: 200, cors: true, body: { ok: true, entries, historical } };
-    } catch (/** @type {any} */ e) {
-        return { status: 200, cors: true, body: { ok: true, entries, historicalError: e.message } };
+    } catch (e) {
+        return { status: 200, cors: true, body: { ok: true, entries, historicalError: toError(e).message } };
     }
 }
 
@@ -263,8 +263,8 @@ export async function handleGhIssues({ state = 'open', limit = 15, page = 1 } = 
             cors: true,
             body: { ok: true, issues: result.items, hasMore: result.hasMore, page: result.page },
         };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -286,8 +286,8 @@ export async function handleGhPrs({ state = 'open', limit = 15, page = 1 } = {})
             cors: true,
             body: { ok: true, prs: result.items, hasMore: result.hasMore, page: result.page },
         };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -305,8 +305,8 @@ export async function handleGhCi({ limit = 15, page = 1 } = {}) {
             cors: true,
             body: { ok: true, runs: result.items, hasMore: result.hasMore, page: result.page },
         };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -319,8 +319,8 @@ export async function handleGitStatus() {
     try {
         const entries = await gitStatus();
         return { status: 200, cors: true, body: { ok: true, entries } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -334,8 +334,8 @@ export async function handleGitLog({ n = 20 } = {}) {
     try {
         const entries = await gitLog({ n });
         return { status: 200, cors: true, body: { ok: true, entries } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 

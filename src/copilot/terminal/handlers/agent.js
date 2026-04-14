@@ -10,7 +10,7 @@
  */
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { sendTurn } from '../dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../file-context.js';
 import { recordInjectHistory } from '../state.js';
@@ -174,10 +174,10 @@ export async function handleInject(body) {
         try {
             const ctxs = await Promise.all(contextFiles.map(readFileContext));
             enrichedMessage = embedMultiple(ctxs, message);
-        } catch (/** @type {any} */ embedErr) {
+        } catch (embedErr) {
             return {
                 status: 400,
-                body: { ok: false, error: `Falha ao processar context_files: ${embedErr.message}` },
+                body: { ok: false, error: `Falha ao processar context_files: ${toError(embedErr).message}` },
             };
         }
     }
@@ -188,8 +188,11 @@ export async function handleInject(body) {
         try {
             // T-07: capturar erros de attachment individualmente para não mascarar falhas
             embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
-        } catch (/** @type {any} */ attErr) {
-            return { status: 400, body: { ok: false, error: `Falha ao processar attachments: ${attErr.message}` } };
+        } catch (attErr) {
+            return {
+                status: 400,
+                body: { ok: false, error: `Falha ao processar attachments: ${toError(attErr).message}` },
+            };
         }
         const validParts = embedParts.filter(/** @type {(s: string | null) => s is string} */ (s) => s !== null);
         if (validParts.length > 0) {
@@ -223,7 +226,7 @@ export async function handleInject(body) {
             status: reply !== null ? 200 : 409,
             body: { ok: reply !== null, reply: reply ?? null, durationMs, from },
         };
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         recordInjectHistory({
             ts: t0,
             from,
@@ -232,7 +235,7 @@ export async function handleInject(body) {
             durationMs: Date.now() - t0,
             ok: false,
         });
-        return { status: 500, body: { ok: false, error: e.message } };
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -253,8 +256,8 @@ export async function handleDialogPause() {
             status: 200,
             body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' },
         };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -270,8 +273,8 @@ export async function handleDialogResume() {
     try {
         await getAgent().resumeDialogLoop();
         return { status: 200, body: { ok: true, message: 'Dialog loop retomado.' } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 

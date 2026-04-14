@@ -50,7 +50,7 @@ export async function withRetry(fn, opts = {}) {
 
         try {
             return await fn();
-        } catch (/** @type {any} */ error) {
+        } catch (error) {
             lastError = error;
 
             if (attempt >= maxAttempts || !shouldRetry(error, attempt)) {

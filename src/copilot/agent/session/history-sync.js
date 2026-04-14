@@ -11,6 +11,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
@@ -63,9 +64,9 @@ export async function syncSdkHistory(session, emit, deps) {
             );
             emit('session.history_synced', { hubSessionId, sessionId: session.sessionId, synced, skipped });
         }
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${err.message}`);
-        emit('session.history_synced', { ok: false, error: err.message });
+    } catch (err) {
+        log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${toError(err).message}`);
+        emit('session.history_synced', { ok: false, error: toError(err).message });
     }
 }
 

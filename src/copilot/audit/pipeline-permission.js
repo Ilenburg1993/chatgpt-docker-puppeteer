@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core';
 import { approveAll } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -116,7 +116,7 @@ export function logToolAudit(entry) {
             }
             await appendFile(TOOL_PERMISSIONS_LOG, line, 'utf8');
             _permLogBytes += lineBytes;
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'audit.pipeline.logPermission');
         }
     })();
@@ -146,8 +146,11 @@ export function buildAuditingPermissionHandler(baseHandler) {
             if (baseHandler) {
                 try {
                     result = await baseHandler(request, invocation);
-                } catch (/** @type {any} */ err) {
-                    log('WARN', `[ToolAudit] baseHandler lançou exceção (fallback approveAll): ${err?.message}`);
+                } catch (err) {
+                    log(
+                        'WARN',
+                        `[ToolAudit] baseHandler lançou exceção (fallback approveAll): ${toError(err).message}`,
+                    );
                     result = await approveAll(request, invocation);
                 }
             } else {
@@ -157,10 +160,7 @@ export function buildAuditingPermissionHandler(baseHandler) {
             const decision = result?.kind === 'approved' ? 'approved' : 'denied';
             logToolAudit({ tool: toolName, decision, highRisk });
 
-            const sessionId =
-                typeof (/** @type {any} */ (invocation)?.sessionId) === 'string'
-                    ? /** @type {any} */ (invocation).sessionId
-                    : '';
+            const sessionId = typeof invocation?.sessionId === 'string' ? invocation.sessionId : '';
             _bus?.emitHook('permission_request', sessionId, { toolName, highRisk }, { decision });
 
             if (highRisk && decision === 'approved') {

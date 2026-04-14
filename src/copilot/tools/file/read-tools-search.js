@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { toError, toExecError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
@@ -110,11 +111,12 @@ const searchInFilesTool = buildTool({
                 output: filteredOutput,
                 truncated: stdout.length >= MAX_SEARCH_OUTPUT,
             };
-        } catch (/** @type {any} */ err) {
-            if ((err.code === 1 || err.status === 1) && !err.stderr) {
+        } catch (err) {
+            const ex = toExecError(err);
+            if ((ex.code === 1 || ex.status === 1) && !ex.stderr) {
                 return { success: true, pattern, searchPath: resolved, output: '', matchCount: 0 };
             }
-            return { success: false, error: err.stderr ?? err.message };
+            return { success: false, error: ex.stderr ?? ex.message };
         }
     },
 });
@@ -166,8 +168,8 @@ const diffFilesTool = buildTool({
                 diff,
                 identical: diff.trim() === '',
             };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });

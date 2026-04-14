@@ -14,6 +14,7 @@
  */
 
 import { log } from './logger.js';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./types.js').SessionHooks} SessionHooks
@@ -115,10 +116,10 @@ function buildPreToolUseHandler({
                 let approved = false;
                 try {
                     approved = await askHandler(toolName);
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     log(
                         'WARN',
-                        `[hooks/factory] onPermissionAsk lançou erro para '${toolName}': ${e.message} — negando`,
+                        `[hooks/factory] onPermissionAsk lançou erro para '${toolName}': ${toError(e).message} — negando`,
                     );
                 }
                 if (!approved) {

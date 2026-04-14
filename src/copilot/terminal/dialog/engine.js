@@ -8,7 +8,7 @@
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { llmBridgeClient } from '#copilot/services';
 import { embedMultiple, readFileContext } from '../file-context.js';
@@ -98,12 +98,12 @@ async function _doEnsureDialogLoop() {
         try {
             await _tryStartDialogLoop();
             return;
-        } catch (/** @type {any} */ err) {
+        } catch (err) {
             attempt++;
             if (attempt > MAX_RETRIES) {
-                log('ERROR', `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${err.message}`);
+                log('ERROR', `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${toError(err).message}`);
                 emitNerv('copilot:dialog:boot_failed', {
-                    error: err.message,
+                    error: toError(err).message,
                     attempts: MAX_RETRIES,
                     severity: 'error',
                 });
@@ -112,7 +112,7 @@ async function _doEnsureDialogLoop() {
             const delay = 2000 * 2 ** (attempt - 1);
             log(
                 'WARN',
-                `[dialog] ensureDialogLoop falhou (tentativa ${attempt}/${MAX_RETRIES}) — retry em ${delay}ms: ${err.message}`,
+                `[dialog] ensureDialogLoop falhou (tentativa ${attempt}/${MAX_RETRIES}) — retry em ${delay}ms: ${toError(err).message}`,
             );
             await new Promise((r) => setTimeout(r, delay));
         }
@@ -244,8 +244,8 @@ async function _executeTurn(message, actor) {
             const ctxs = await Promise.all(queue.map(readFileContext));
             enrichedMessage = embedMultiple(ctxs, enrichedMessage);
             println(`\x1b[90m  📎 ${ctxs.length} arquivo(s) embutido(s): ${ctxs.map((c) => c.path).join(', ')}\x1b[0m`);
-        } catch (/** @type {any} */ embedErr) {
-            println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${embedErr.message}\x1b[0m`);
+        } catch (embedErr) {
+            println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${toError(embedErr).message}\x1b[0m`);
         }
     }
 
@@ -331,19 +331,19 @@ async function _executeTurn(message, actor) {
         if (_hubSessionId) {
             try {
                 await persistTurnToHub(_hubSessionId, message, reply, actor, durationMs);
-            } catch (/** @type {any} */ hubErr) {
-                log('WARN', `[TerminalServer] Hub writeTurn falhou: ${hubErr.message}`);
+            } catch (hubErr) {
+                log('WARN', `[TerminalServer] Hub writeTurn falhou: ${toError(hubErr).message}`);
             }
         }
 
         return reply;
-    } catch (/** @type {any} */ e) {
-        println(`[erro] ${e.message}`);
-        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${e.message}`);
+    } catch (e) {
+        println(`[erro] ${toError(e).message}`);
+        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
         if (!getAgent().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             setTimeout(() => {
-                ensureDialogLoop().catch((/** @type {any} */ restartErr) => {
+                ensureDialogLoop().catch((restartErr) => {
                     log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop: ${restartErr.message}`);
                 });
             }, 2_000);

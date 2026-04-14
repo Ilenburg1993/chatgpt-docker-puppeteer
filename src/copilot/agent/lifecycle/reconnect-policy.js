@@ -11,17 +11,23 @@
  * @see EventBus
  */
 
-import { isFatalError } from '#copilot/core';
+import { isFatalError, toError } from '#copilot/core';
 import { log, startSpan } from '#copilot/observability';
 
 /**
  * @typedef {Object} ReconnectCallbacks
- * @property {(event: string, payload?: any) => void} emit - Emite eventos no host
- * @property {(client: any) => Promise<{ session: any; isResumed: boolean }>} initSession - Reinicializa a sessão SDK
+ * @property {(event: string, payload?: unknown) => void} emit - Emite eventos no host
+ * @property {(
+ *     client: import('#copilot/sdk/types').CopilotClient,
+ * ) => Promise<{ session: import('@github/copilot-sdk').CopilotSession; isResumed: boolean }>} initSession
+ *   - Reinicializa a sessão SDK
+ *
  * @property {{ active: boolean; notifyReconnect: () => void }} dialogLoop - Handle do dialog loop
  * @property {(unsubs: (() => void)[]) => void} clearSessionEventUnsubs - Limpa os unsubscribers da sessão anterior
- * @property {(client: any) => void} [updateClient] - F42.5: atualiza referência do client no host após criar novo
- * @property {() => any} [createClient] - F42.5: factory para criar novo CopilotClient
+ * @property {(client: import('#copilot/sdk/types').CopilotClient) => void} [updateClient] - F42.5: atualiza referência
+ *   do client no host após criar novo
+ * @property {() => import('#copilot/sdk/types').CopilotClient} [createClient] - F42.5: factory para criar novo
+ *   CopilotClient
  */
 
 /**
@@ -79,10 +85,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     if (typeof client.stop === 'function') {
                         try {
                             await client.stop();
-                        } catch (/** @type {any} */ stopErr) {
+                        } catch (stopErr) {
                             log(
                                 'WARN',
-                                `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${stopErr.message}`,
+                                `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${toError(stopErr).message}`,
                             );
                         }
                     }
@@ -104,10 +110,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     if (typeof activeClient.ping === 'function') {
                         try {
                             await activeClient.ping();
-                        } catch (/** @type {any} */ pingErr) {
+                        } catch (pingErr) {
                             log(
                                 'WARN',
-                                `[AlwaysAlive] ping() pós-reconexão falhou: ${pingErr.message} — tentativa descartada`,
+                                `[AlwaysAlive] ping() pós-reconexão falhou: ${toError(pingErr).message} — tentativa descartada`,
                             );
                             throw pingErr; // força retry na próxima iteração
                         }
@@ -137,8 +143,8 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         );
                     }
                     return true;
-                } catch (/** @type {any} */ reconnectError) {
-                    log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
+                } catch (reconnectError) {
+                    log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${toError(reconnectError).message}`);
                     // F149: se o erro é fatal (CircuitOpenError, SESSION_FATAL, etc.), não vale insistir
                     if (isFatalError(reconnectError)) {
                         log('ERROR', '[AlwaysAlive] Erro fatal detectado durante reconexão — abortando retry loop.');

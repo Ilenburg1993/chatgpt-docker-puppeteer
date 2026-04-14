@@ -11,6 +11,7 @@
 
 import { log } from './logger.js';
 import { AuditRingBuffer } from './ring-buffer.js';
+import { toError } from '../core/error-handlers.js';
 
 /** @param {string} key @param {number} def @returns {number} */
 const envInt = (key, def) => {
@@ -73,8 +74,8 @@ export function createAuditPostToolHandler(logger, buffer = globalAuditBuffer) {
         if (logger) {
             try {
                 logger(entry);
-            } catch (/** @type {any} */ err) {
-                log('WARN', `[audit/pipeline] logger externo lançou exceção: ${err?.message}`);
+            } catch (err) {
+                log('WARN', `[audit/pipeline] logger externo lançou exceção: ${toError(err).message}`);
             }
         }
 

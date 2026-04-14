@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { ToolError } from '#copilot/core';
+import { toError, ToolError } from '#copilot/core';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
@@ -259,7 +259,7 @@ export async function readDirectoryContext(dirPath) {
             const ctx = { path: filePath, content, size, lang: detectLang(filePath) };
             ctxs.push(ctx);
             totalBytes += size;
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'terminal.fileContext.readFile');
         }
     }
@@ -306,8 +306,8 @@ export async function attachmentToEmbed(att) {
         try {
             const ctx = await readFileContext(att.path);
             return buildBlock(ctx);
-        } catch (/** @type {any} */ e) {
-            return `*(Arquivo \`${att.path}\` não pôde ser lido: ${e.message})*`;
+        } catch (e) {
+            return `*(Arquivo \`${att.path}\` não pôde ser lido: ${toError(e).message})*`;
         }
     }
 
@@ -316,8 +316,8 @@ export async function attachmentToEmbed(att) {
             const ctxs = await readDirectoryContext(att.path);
             if (ctxs.length === 0) return `*(Diretório \`${att.path}\` está vazio ou sem arquivos legíveis)*`;
             return `Contexto de diretório: \`${att.path}\`\n\n` + ctxs.map(buildBlock).join('\n\n');
-        } catch (/** @type {any} */ e) {
-            return `*(Diretório \`${att.path}\` não pôde ser lido: ${e.message})*`;
+        } catch (e) {
+            return `*(Diretório \`${att.path}\` não pôde ser lido: ${toError(e).message})*`;
         }
     }
 

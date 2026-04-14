@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { validatePath } from './shared.js';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * Escrita atômica: grava em arquivo temporário e renomeia (evita corrupção se crash durante write).
@@ -71,8 +72,8 @@ const writeFileContentTool = buildTool({
                 path: resolved,
                 bytesWritten: buf.length,
             };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -130,8 +131,8 @@ const createFileTool = buildTool({
                 path: resolved,
                 bytesWritten: (content ?? '').length,
             };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -163,8 +164,8 @@ const deleteFileTool = buildTool({
             }
             await fs.unlink(resolved);
             return { success: true, path: resolved, deleted: true };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -209,8 +210,8 @@ const copyFileTool = buildTool({
             await fs.copyFile(src.resolved, dst.resolved);
             const stats = await fs.stat(dst.resolved);
             return { success: true, source: src.resolved, destination: dst.resolved, bytesWritten: stats.size };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -254,8 +255,8 @@ const moveFileTool = buildTool({
             await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
             await fs.rename(src.resolved, dst.resolved);
             return { success: true, source: src.resolved, destination: dst.resolved };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -291,8 +292,8 @@ const patchFileTool = buildTool({
         let content;
         try {
             content = await fs.readFile(v.resolved, 'utf8');
-        } catch (/** @type {any} */ e) {
-            return { success: false, error: `Erro ao ler arquivo: ${e.message}` };
+        } catch (e) {
+            return { success: false, error: `Erro ao ler arquivo: ${toError(e).message}` };
         }
 
         const occurrences = content.split(old_string).length - 1;
@@ -313,8 +314,8 @@ const patchFileTool = buildTool({
             await atomicWrite(v.resolved, updated, 'utf8');
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
             return { success: true, path: v.resolved };
-        } catch (/** @type {any} */ e) {
-            return { success: false, error: `Erro ao escrever arquivo: ${e.message}` };
+        } catch (e) {
+            return { success: false, error: `Erro ao escrever arquivo: ${toError(e).message}` };
         }
     },
 });

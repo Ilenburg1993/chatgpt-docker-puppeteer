@@ -32,7 +32,7 @@
 export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 /** @typedef {import('../events/agent-events.js').AgentEventName} AgentEventName */
 export * as ErrorCodes from './error-codes.js';
-export { isFatalError, isTransientError, logSwallowed, wrapAsync } from './error-handlers.js';
+export { isFatalError, isTransientError, logSwallowed, toError, toExecError, wrapAsync } from './error-handlers.js';
 export * from './errors.js';
 export { withRetry, withTimeout } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';

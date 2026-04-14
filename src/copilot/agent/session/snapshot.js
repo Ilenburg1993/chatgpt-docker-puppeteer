@@ -151,7 +151,7 @@ export async function listSnapshotsAsync() {
                 reason: data.reason,
                 filepath,
             });
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'snapshot.listAsync.parseFile');
         }
     }
@@ -238,7 +238,7 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
                 await rm(snap.filepath, { force: true });
                 removed++;
             }
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'snapshot.pruneAsync.rmFile');
         }
     }
@@ -255,7 +255,7 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
 export const snapshotStore = {
     createSnapshot: (opts) => /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (createSnapshot(opts))),
     saveSnapshot: async (snapshot) => {
-        await saveSnapshotAsync(/** @type {any} */ (snapshot));
+        await saveSnapshotAsync(/** @type {SessionSnapshotData} */ (/** @type {unknown} */ (snapshot)));
     },
     loadSnapshot: (id) => (id ? loadSnapshotAsync(id) : loadLatestSnapshotAsync()),
     listSnapshots: () => listSnapshotsAsync(),

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { CopilotError } from '#copilot/core';
+import { toError, CopilotError } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /**
@@ -79,12 +79,12 @@ function sanitizeErrorMessage(message) {
 export async function withErrorHandler(prefix, req, res, fn) {
     try {
         await fn();
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         const status = resolveHttpStatus(e);
         const code = resolveErrorCode(e);
-        log('ERROR', `[${prefix}] ${req.method} ${req.path} → ${status} ${code}: ${e.message}`);
+        log('ERROR', `[${prefix}] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
         if (!res.headersSent) {
-            res.status(status).json({ ok: false, error: sanitizeErrorMessage(e.message), code, status });
+            res.status(status).json({ ok: false, error: sanitizeErrorMessage(toError(e).message), code, status });
         }
     }
 }

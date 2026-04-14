@@ -20,7 +20,7 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
 import { HUB } from '#copilot/conversation-hub';
-import { bridgeEmitter, EVENT_BUS } from '#copilot/core';
+import { bridgeEmitter, EVENT_BUS, toError } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
@@ -93,7 +93,7 @@ function startReflectionLoop() {
         sendTurn(
             '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
             'llm-a',
-        ).catch((/** @type {any} */ e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
+        ).catch((e) => log('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
     };
 
     // T-20: armazenar referência em variável de módulo para permitir cancelamento no graceful shutdown
@@ -123,7 +123,7 @@ export async function startTerminalServer() {
         resolve(_root, '.github', 'skills'),
         resolve(_root, '.github', 'instructions'),
     ]);
-    await pinnedLoader.start().catch((/** @type {any} */ e) => {
+    await pinnedLoader.start().catch((e) => {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
 
@@ -162,8 +162,8 @@ export async function startTerminalServer() {
         });
         setHubSessionId(hubSessionId);
         log('INFO', `[TerminalServer] Hub session criada: ${hubSessionId}`);
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${toError(e).message}`);
     }
 
     // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
@@ -241,6 +241,7 @@ export async function startTerminalServer() {
 
     // Extrair httpServer compatível com startRepl (aceita http.Server)
     // CopilotServer tem .httpServer; o fallback legacy retorna http.Server diretamente
-    const httpServerForRepl = /** @type {any} */ (copilotServer).httpServer ?? copilotServer;
+    const httpServerForRepl =
+        /** @type {{ httpServer?: import('node:http').Server }} */ (copilotServer).httpServer ?? copilotServer;
     await startRepl(/** @type {import('node:http').Server} */ (httpServerForRepl));
 }

@@ -288,7 +288,7 @@ export class DialogLoopManager extends EventEmitter {
         });
 
         // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
-        bootPromise.catch((/** @type {any} */ e) => {
+        bootPromise.catch((e) => {
             if (e?.message?.includes('Boot timeout') || e?.code === 'DIALOG_TIMEOUT') {
                 this.emit(EMITTER_LOOP_TURN_TIMEOUT, { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
                 log(
@@ -428,7 +428,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#resuming = true;
         try {
-            await writeStateAsync({ dialogPaused: false }).catch((/** @type {any} */ e) =>
+            await writeStateAsync({ dialogPaused: false }).catch((e) =>
                 log('WARN', `[DialogLoopManager] writeState dialogPaused=false: ${e.message}`),
             );
 
@@ -474,7 +474,7 @@ export class DialogLoopManager extends EventEmitter {
             this.#watchdog?.stop();
             this.#watchdog = null;
             this.#active = false;
-            await writeStateAsync({ dialogLoopActive: false }).catch((/** @type {any} */ e) =>
+            await writeStateAsync({ dialogLoopActive: false }).catch((e) =>
                 logSwallowed(e, 'agent.loopManager.writeState'),
             );
             await this.start();
@@ -586,7 +586,7 @@ export class DialogLoopManager extends EventEmitter {
             message,
             { timeout, ...(signal !== undefined && { signal }) },
             {
-                host: this.#host,
+                host: /** @type {import('./turn-executor.js').TurnHost} */ (/** @type {unknown} */ (this.#host)),
                 sendCountRef: this.#sendCountRef,
             },
         );

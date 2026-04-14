@@ -50,6 +50,84 @@ export function getErrorHandlerDeps() {
     return _deps;
 }
 
+// ─── toError ──────────────────────────────────────────────────────────────────
+
+/**
+ * Erro normalizado com `.code` opcional (compatível com `NodeJS.ErrnoException`).
+ *
+ * @typedef {Error & { code?: string | number }} NormalizedError
+ */
+
+/**
+ * Normaliza um valor desconhecido capturado em `catch` para {@link NormalizedError}. Útil para acessar `.message`,
+ * `.stack`, `.code` de forma segura sem recorrer a `@type {any}`.
+ *
+ * @param {unknown} value - Valor capturado (pode ser string, objeto, etc.).
+ * @returns {NormalizedError} Instância de Error garantida (com `.code` quando presente).
+ */
+export function toError(value) {
+    if (value instanceof Error) {
+        return /** @type {NormalizedError} */ (value);
+    }
+    if (typeof value === 'string') return /** @type {NormalizedError} */ (new Error(value));
+    if (typeof value === 'object' && value !== null && 'message' in value) {
+        const err = /** @type {NormalizedError} */ (
+            new Error(String(/** @type {{ message: unknown }} */ (value).message))
+        );
+        if ('stack' in value) err.stack = String(/** @type {{ stack: unknown }} */ (value).stack);
+        if ('code' in value) err.code = /** @type {string | number} */ (/** @type {{ code: unknown }} */ (value).code);
+        return err;
+    }
+    return /** @type {NormalizedError} */ (new Error(String(value)));
+}
+
+// ─── ExecError ────────────────────────────────────────────────────────────────
+
+/**
+ * Shape para erros de `child_process.exec/execFile` que incluem `stdout`, `stderr`, `code` e `status`.
+ *
+ * @typedef {object} ExecError
+ * @property {string} message
+ * @property {string | undefined} [stdout]
+ * @property {string | undefined} [stderr]
+ * @property {number | string | undefined} [code]
+ * @property {number | undefined} [status]
+ * @property {string | undefined} [stack]
+ */
+
+/**
+ * Normaliza um valor desconhecido capturado em `catch` de `child_process.exec` para `ExecError`. Preserva `.stdout`,
+ * `.stderr`, `.code`, `.status`.
+ *
+ * @param {unknown} value - Valor capturado.
+ * @returns {ExecError}
+ */
+export function toExecError(value) {
+    if (value instanceof Error) {
+        const v = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (value));
+        return {
+            message: value.message,
+            stdout: typeof v.stdout === 'string' ? v.stdout : undefined,
+            stderr: typeof v.stderr === 'string' ? v.stderr : undefined,
+            code: typeof v.code === 'number' || typeof v.code === 'string' ? v.code : undefined,
+            status: typeof v.status === 'number' ? v.status : undefined,
+            stack: value.stack,
+        };
+    }
+    if (typeof value === 'object' && value !== null) {
+        const v = /** @type {Record<string, unknown>} */ (value);
+        return {
+            message: typeof v.message === 'string' ? v.message : String(value),
+            stdout: typeof v.stdout === 'string' ? v.stdout : undefined,
+            stderr: typeof v.stderr === 'string' ? v.stderr : undefined,
+            code: typeof v.code === 'number' || typeof v.code === 'string' ? v.code : undefined,
+            status: typeof v.status === 'number' ? v.status : undefined,
+            stack: typeof v.stack === 'string' ? v.stack : undefined,
+        };
+    }
+    return { message: String(value) };
+}
+
 // ─── logSwallowed ─────────────────────────────────────────────────────────────
 
 /**
@@ -107,7 +185,7 @@ export function isFatalError(err) {
     if (err instanceof CircuitOpenError) return true;
     if (err instanceof CopilotError && typeof err.code === 'string' && FATAL_CODES.has(err.code)) return true;
     if (err instanceof Error) {
-        const code = /** @type {any} */ (err).code;
+        const code = /** @type {Error & { code?: string }} */ (err).code;
         if (typeof code === 'string' && FATAL_CODES.has(code)) return true;
     }
     return false;
@@ -144,9 +222,11 @@ const TRANSIENT_HTTP_CODES = new Set([429, 502, 503, 504]);
 export function isTransientError(err) {
     if (err instanceof BridgeError) return true;
     if (err instanceof Error) {
-        const code = /** @type {any} */ (err).code;
+        const code = /** @type {Error & { code?: string }} */ (err).code;
         if (typeof code === 'string' && TRANSIENT_CODES.has(code)) return true;
-        const status = /** @type {any} */ (err).status ?? /** @type {any} */ (err).statusCode;
+        const status =
+            /** @type {Error & { status?: number; statusCode?: number }} */ (err).status ??
+            /** @type {Error & { status?: number; statusCode?: number }} */ (err).statusCode;
         if (typeof status === 'number' && TRANSIENT_HTTP_CODES.has(status)) return true;
     }
     return false;

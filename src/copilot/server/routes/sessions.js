@@ -16,7 +16,7 @@
  */
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
@@ -66,8 +66,8 @@ export function createSessionsRouter() {
                 return;
             }
             res.json({ ok: true, session: sessionField });
-        } catch (/** @type {any} */ e) {
-            res.status(500).json({ ok: false, error: e.message });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: toError(e).message });
         }
     });
 
@@ -92,8 +92,8 @@ export function createSessionsRouter() {
                 if (metadata) hubOpts.metadata = metadata;
                 const id = container.resolve(CONVERSATION_STORE).createHubSession(hubOpts);
                 res.status(201).json({ ok: true, id });
-            } catch (/** @type {any} */ e) {
-                res.status(500).json({ ok: false, error: e.message });
+            } catch (e) {
+                res.status(500).json({ ok: false, error: toError(e).message });
             }
         },
     );
@@ -114,8 +114,8 @@ export function createSessionsRouter() {
                 }
                 container.resolve(CONVERSATION_STORE).closeHubSession(sessionId);
                 res.json({ ok: true, closed: sessionId });
-            } catch (/** @type {any} */ e) {
-                res.status(500).json({ ok: false, error: e.message });
+            } catch (e) {
+                res.status(500).json({ ok: false, error: toError(e).message });
             }
         },
     );

@@ -12,6 +12,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { toError } from '../core/error-handlers.js';
 
 // ─── Typedefs (re-exportadas por store.js) ────────────────────────────────────
 
@@ -100,8 +101,8 @@ export function initTurnsFts(db) {
             `);
             log('INFO', '[ConversationStore] UPG-PROP-06: copilot_turns_fts populado.');
         }
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[ConversationStore] UPG-PROP-06: falha ao inicializar turns FTS5: ${err.message}`);
+    } catch (err) {
+        log('WARN', `[ConversationStore] UPG-PROP-06: falha ao inicializar turns FTS5: ${toError(err).message}`);
     }
 }
 

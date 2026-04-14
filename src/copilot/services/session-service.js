@@ -71,7 +71,7 @@ export class SessionService {
     /**
      * Obtém o CopilotClient singleton.
      *
-     * @returns {Promise<any>}
+     * @returns {Promise<import('@github/copilot-sdk').CopilotClient>}
      */
     async getClient() {
         return getClient();
@@ -80,8 +80,8 @@ export class SessionService {
     /**
      * Cria uma nova sessão SDK.
      *
-     * @param {any} config - SessionConfig completo do SDK.
-     * @returns {Promise<any>}
+     * @param {import('@github/copilot-sdk').SessionConfig} config - SessionConfig completo do SDK.
+     * @returns {Promise<import('@github/copilot-sdk').CopilotSession>}
      */
     async createSession(config) {
         log('INFO', `[SessionService] criando sessão com model=${config.model ?? 'default'}`);
@@ -94,7 +94,7 @@ export class SessionService {
      * Obtém sessão por ID.
      *
      * @param {string} sessionId
-     * @returns {any}
+     * @returns {import('../sdk/session/client.js').SessionEntry | undefined}
      */
     getSession(sessionId) {
         return getClientSession(sessionId);
@@ -116,8 +116,8 @@ export class SessionService {
      * Retoma uma sessão existente.
      *
      * @param {string} sessionId
-     * @param {any} [config] - ResumeSessionConfig do SDK.
-     * @returns {Promise<any>}
+     * @param {import('@github/copilot-sdk').ResumeSessionConfig} config - ResumeSessionConfig do SDK.
+     * @returns {Promise<import('@github/copilot-sdk').CopilotSession>}
      */
     async resumeSession(sessionId, config) {
         log('INFO', `[SessionService] retomando sessão ${sessionId}`);
@@ -129,8 +129,8 @@ export class SessionService {
     /**
      * Lista sessões no disco com filtro opcional.
      *
-     * @param {any} [filter]
-     * @returns {Promise<any[]>}
+     * @param {import('@github/copilot-sdk').SessionListFilter} [filter]
+     * @returns {Promise<import('@github/copilot-sdk').SessionMetadata[]>}
      */
     async listSessions(filter) {
         const client = await getClient();
@@ -172,7 +172,7 @@ export class SessionService {
     /**
      * Obtém o estado atual do CopilotClient.
      *
-     * @returns {any}
+     * @returns {import('../sdk/session/client.js').ConnectionState | 'not_started'}
      */
     getClientState() {
         return getClientState();

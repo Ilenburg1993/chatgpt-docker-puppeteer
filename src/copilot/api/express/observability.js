@@ -97,7 +97,7 @@ export default function createObservabilityRouter(deps) {
             try {
                 agentSnapshot = agent.getStatusSnapshot();
                 agentAvailable = true;
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'api.observability.getAgent');
             }
 
@@ -272,7 +272,7 @@ export default function createObservabilityRouter(deps) {
             const type = typeof req.query['type'] === 'string' ? req.query['type'] : undefined;
             let entries = auditService.getDefaultLog().getLast(n);
             if (type) {
-                entries = entries.filter((/** @type {any} */ e) => e.type === type);
+                entries = entries.filter((e) => e.type === type);
             }
             res.json({ ok: true, entries, count: entries.length });
         }),
@@ -297,10 +297,10 @@ export default function createObservabilityRouter(deps) {
             const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
             let entries = auditService.getTail(n);
             if (sessionId) {
-                entries = entries.filter((e) => /** @type {any} */ (e).sessionId === sessionId);
+                entries = entries.filter((e) => e.sessionId === sessionId);
             }
             if (tool) {
-                entries = entries.filter((e) => /** @type {any} */ (e).toolName === tool);
+                entries = entries.filter((e) => e.data?.['toolName'] === tool);
             }
             res.json({ ok: true, entries, count: entries.length });
         }),

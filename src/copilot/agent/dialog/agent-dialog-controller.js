@@ -144,7 +144,8 @@ export function ensureDialogLoopAttached(ctx, host) {
     wireDialogLoopEvents(ctx.dialogLoop, (event, payload) => host.emit(event, payload));
 
     // F31.3/F31.4: Proxy token_budget_warning → DLM
-    host.on('session.token_budget_warning', (/** @type {any} */ evt) => {
+    host.on('session.token_budget_warning', (rawEvt) => {
+        const evt = /** @type {{ ratio?: number; currentTokens?: number; tokenLimit?: number }} */ (rawEvt);
         const ratio = typeof evt?.ratio === 'number' ? evt.ratio : 0;
         const currentTokens = typeof evt?.currentTokens === 'number' ? evt.currentTokens : 0;
         const tokenLimit = typeof evt?.tokenLimit === 'number' ? evt.tokenLimit : 0;
@@ -152,7 +153,8 @@ export function ensureDialogLoopAttached(ctx, host) {
     });
 
     // F31.3: Reset compaction flag
-    host.on('session.compaction_complete', (/** @type {any} */ evt) => {
+    host.on('session.compaction_complete', (rawEvt) => {
+        const evt = /** @type {{ success?: boolean }} */ (rawEvt);
         if (evt?.success) ctx.dialogLoop.resetCompactionFlag();
     });
 }

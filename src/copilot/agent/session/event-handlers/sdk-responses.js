@@ -15,11 +15,11 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireSdkResponseEvents(session, { emit }) {
     return [
-        session.on(SESSION_EVENTS.ASSISTANT_INTENT, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_INTENT, (evt) => {
             const { intent } = evt?.data ?? {};
             emit('assistant.intent', { intent: intent ?? 'unknown', ts: Date.now() });
         }),
-        session.on(SESSION_EVENTS.ASSISTANT_REASONING, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_REASONING, (evt) => {
             const { reasoningId, content } = evt?.data ?? {};
             const len = typeof content === 'string' ? content.length : 0;
             emit('assistant.reasoning_complete', {
@@ -28,100 +28,105 @@ export function wireSdkResponseEvents(session, { emit }) {
                 ts: Date.now(),
             });
         }),
-        session.on(SESSION_EVENTS.ASSISTANT_TURN_START, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_TURN_START, (evt) => {
             const { turnId } = evt?.data ?? {};
             emit('assistant.turn_start', { turnId: turnId ?? null, ts: Date.now() });
             log('DEBUG', `[session-event-wirer] assistant.turn_start turnId=${turnId ?? '?'}`);
         }),
-        session.on(SESSION_EVENTS.ASSISTANT_TURN_END, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ASSISTANT_TURN_END, (evt) => {
             const { turnId } = evt?.data ?? {};
             emit('assistant.turn_end', { turnId: turnId ?? null, ts: Date.now() });
             log('DEBUG', `[session-event-wirer] assistant.turn_end turnId=${turnId ?? '?'}`);
         }),
-        session.on(SESSION_EVENTS.SESSION_ERROR, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_ERROR, (evt) => {
             const data = evt?.data ?? {};
             const errorType = /** @type {string} */ (data['errorType'] ?? 'unknown');
             const message = /** @type {string} */ (data['message'] ?? 'Unknown error');
             emit('session.error', { errorType, message, ts: Date.now() });
             log('ERROR', `[session-event-wirer] session.error type=${errorType}: ${message}`);
         }),
-        session.on(SESSION_EVENTS.SESSION_SHUTDOWN, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_SHUTDOWN, (evt) => {
             const data = evt?.data ?? {};
             emit('session.shutdown', { ...data, ts: Date.now() });
             log('INFO', `[session-event-wirer] session.shutdown type=${data['shutdownType'] ?? '?'}`);
         }),
-        session.on(SESSION_EVENTS.SESSION_TASK_COMPLETE, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_TASK_COMPLETE, (evt) => {
             const { summary } = evt?.data ?? {};
             emit('session.task_complete', { summary: summary ?? null, ts: Date.now() });
             log('INFO', `[session-event-wirer] session.task_complete`);
         }),
-        session.on(SESSION_EVENTS.SESSION_TITLE_CHANGED, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_TITLE_CHANGED, (evt) => {
             const { title } = evt?.data ?? {};
             emit('session.title_changed', { title: title ?? '', ts: Date.now() });
             log('DEBUG', `[session-event-wirer] session.title_changed: "${title ?? ''}"`);
         }),
-        session.on(SESSION_EVENTS.SESSION_CONTEXT_CHANGED, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_CONTEXT_CHANGED, (evt) => {
             emit('session.context_changed', evt?.data ?? {});
             log('DEBUG', `[session-event-wirer] session.context_changed propagado para AGENT EventEmitter`);
         }),
-        session.on(SESSION_EVENTS.ABORT, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ABORT, (evt) => {
             emit('abort', { reason: evt?.data?.['reason'] ?? 'user_initiated', ts: Date.now() });
             log('INFO', '[session-event-wirer] abort propagado para AGENT EventEmitter');
         }),
-        session.on(SESSION_EVENTS.SUBAGENT_STARTED, (/** @type {any} */ evt) => {
-            const { agentName, agentId } = evt?.data ?? {};
-            emit('subagent.started', { agentName, agentId, ts: Date.now() });
+        session.on(SESSION_EVENTS.SUBAGENT_STARTED, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            emit('subagent.started', { agentName: d.agentName, agentId: d.agentId, ts: Date.now() });
         }),
-        session.on(SESSION_EVENTS.SUBAGENT_COMPLETED, (/** @type {any} */ evt) => {
-            const { agentName, agentId } = evt?.data ?? {};
-            emit('subagent.completed', { agentName, agentId, ts: Date.now() });
+        session.on(SESSION_EVENTS.SUBAGENT_COMPLETED, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            emit('subagent.completed', { agentName: d.agentName, agentId: d.agentId, ts: Date.now() });
         }),
-        session.on(SESSION_EVENTS.SUBAGENT_FAILED, (/** @type {any} */ evt) => {
-            const { agentName, agentId, error } = evt?.data ?? {};
-            emit('subagent.failed', { agentName, agentId, error: error ?? 'unknown', ts: Date.now() });
+        session.on(SESSION_EVENTS.SUBAGENT_FAILED, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            emit('subagent.failed', {
+                agentName: d.agentName,
+                agentId: d.agentId,
+                error: d.error ?? 'unknown',
+                ts: Date.now(),
+            });
         }),
-        session.on(SESSION_EVENTS.ELICITATION_REQUESTED, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.ELICITATION_REQUESTED, (evt) => {
             const { requestId, schema, title, description } = evt?.data ?? {};
             emit('elicitation.pending', { requestId, schema, title, description, ts: Date.now() });
             log('INFO', `[session-event-wirer] elicitation.pending requestId=${requestId ?? '?'}`);
         }),
-        session.on(SESSION_EVENTS.SESSION_TRUNCATION, (/** @type {any} */ evt) => {
-            const { messageTruncatedCount, tokensTruncated, reason } = evt?.data ?? {};
+        session.on(SESSION_EVENTS.SESSION_TRUNCATION, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             emit('session.truncation', {
-                messageTruncatedCount: messageTruncatedCount ?? 0,
-                tokensTruncated: tokensTruncated ?? 0,
-                reason: reason ?? 'unknown',
+                messageTruncatedCount: d.messageTruncatedCount ?? d.messagesRemovedDuringTruncation ?? 0,
+                tokensTruncated: d.tokensTruncated ?? d.tokensRemovedDuringTruncation ?? 0,
+                reason: d.reason ?? d.performedBy ?? 'unknown',
                 ts: Date.now(),
             });
             log(
                 'WARN',
-                `[session-event-wirer] session.truncation: ${messageTruncatedCount ?? '?'} msgs, ${tokensTruncated ?? '?'} tokens (reason: ${reason ?? '?'})`,
+                `[session-event-wirer] session.truncation: ${d.messageTruncatedCount ?? d.messagesRemovedDuringTruncation ?? '?'} msgs, ${d.tokensTruncated ?? d.tokensRemovedDuringTruncation ?? '?'} tokens (reason: ${d.reason ?? d.performedBy ?? '?'})`,
             );
         }),
-        session.on(SESSION_EVENTS.SESSION_SNAPSHOT_REWIND, (/** @type {any} */ evt) => {
-            const { snapshotId, reason } = evt?.data ?? {};
+        session.on(SESSION_EVENTS.SESSION_SNAPSHOT_REWIND, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             emit('session.snapshot_rewind', {
-                snapshotId: snapshotId ?? 'unknown',
-                reason: reason ?? 'unknown',
+                snapshotId: d.snapshotId ?? d.upToEventId ?? 'unknown',
+                reason: d.reason ?? 'unknown',
                 ts: Date.now(),
             });
             log(
                 'INFO',
-                `[session-event-wirer] session.snapshot_rewind: snapshot=${snapshotId ?? '?'}, reason=${reason ?? '?'}`,
+                `[session-event-wirer] session.snapshot_rewind: snapshot=${d.snapshotId ?? d.upToEventId ?? '?'}, reason=${d.reason ?? '?'}`,
             );
         }),
-        session.on(SESSION_EVENTS.SESSION_HANDOFF, (/** @type {any} */ evt) => {
-            const { fromAgent, toAgent, reason, context } = evt?.data ?? {};
+        session.on(SESSION_EVENTS.SESSION_HANDOFF, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             emit('session.handoff', {
-                fromAgent: fromAgent ?? 'unknown',
-                toAgent: toAgent ?? 'unknown',
-                reason: reason ?? undefined,
-                context: context ?? undefined,
+                fromAgent: d.fromAgent ?? 'unknown',
+                toAgent: d.toAgent ?? 'unknown',
+                reason: d.reason ?? undefined,
+                context: d.context ?? undefined,
                 ts: Date.now(),
             });
             log(
                 'INFO',
-                `[session-event-wirer] session.handoff: ${fromAgent ?? '?'} → ${toAgent ?? '?'} (reason: ${reason ?? '?'})`,
+                `[session-event-wirer] session.handoff: ${d.fromAgent ?? '?'} → ${d.toAgent ?? '?'} (reason: ${d.reason ?? '?'})`,
             );
         }),
     ];

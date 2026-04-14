@@ -10,7 +10,7 @@
  */
 
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { getHubSessionId } from '../state.js';
 
 /**
@@ -41,8 +41,8 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
         };
         const sessions = container.resolve(CONVERSATION_STORE).listHubSessions(opts);
         return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -51,20 +51,22 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
 /**
  * Retorna os turnos de uma sessão específica.
  *
- * @param {{ sessionId: string; limit?: number; offset?: number }} params
+ * @param {Record<string, unknown>} params
  * @returns {HandlerResult}
  */
-export function handleListTurns({ sessionId, limit = 50, offset = 0 }) {
+export function handleListTurns(params) {
+    const sessionId = typeof params['sessionId'] === 'string' ? params['sessionId'] : '';
+    const rawLimit = params['limit'];
+    const rawOffset = params['offset'];
+    const limit = typeof rawLimit === 'number' && !isNaN(rawLimit) ? rawLimit : 50;
+    const offset = typeof rawOffset === 'number' && !isNaN(rawOffset) ? rawOffset : 0;
     try {
-        const turns = container.resolve(CONVERSATION_STORE).readTurns(sessionId, {
-            limit: isNaN(limit) ? 50 : limit,
-            offset: isNaN(offset) ? 0 : offset,
-        });
+        const turns = container.resolve(CONVERSATION_STORE).readTurns(sessionId, { limit, offset });
         // T-26 fix: incluir totalCount para paginação correta no cliente
         const totalCount = container.resolve(CONVERSATION_STORE).countTurns(sessionId);
         return { status: 200, cors: true, body: { ok: true, turns, sessionId, totalCount } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -88,8 +90,8 @@ export function handleStoreMemory(body) {
             ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
         });
         return { status: 201, body: { ok: true, id } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -109,8 +111,8 @@ export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
             limit: isNaN(/** @type {number} */ (limit)) ? 20 : /** @type {number} */ (limit),
         });
         return { status: 200, cors: true, body: { ok: true, memories } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -126,8 +128,8 @@ export function handleDeleteMemory({ memoryId }) {
     try {
         const deleted = container.resolve(CONVERSATION_STORE).deleteMemory(memoryId);
         return { status: deleted ? 200 : 404, cors: true, body: { ok: deleted, id: memoryId } };
-    } catch (/** @type {any} */ e) {
-        return { status: 500, body: { ok: false, error: e.message } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
     }
 }
 
@@ -156,7 +158,7 @@ export function handleHubHealth() {
                 totalSessions,
             },
         };
-    } catch (/** @type {any} */ e) {
-        return { status: 503, body: { ok: false, error: e?.message ?? String(e), dbResponsive: false } };
+    } catch (e) {
+        return { status: 503, body: { ok: false, error: toError(e).message ?? String(e), dbResponsive: false } };
     }
 }

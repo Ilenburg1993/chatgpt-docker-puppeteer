@@ -122,7 +122,7 @@ export class EventBus {
         }
 
         /** @type {BaseEvent} */
-        const event = /** @type {any} */ (rawEvent);
+        const event = /** @type {BaseEvent} */ (/** @type {unknown} */ (rawEvent));
 
         // Increment counter
         this.#counters.set(event.type, (this.#counters.get(event.type) ?? 0) + 1);

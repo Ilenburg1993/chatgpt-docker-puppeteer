@@ -48,7 +48,7 @@ const _agentReplayBuffer = new SseReplayBuffer();
  * @typedef {object} AgentRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
- * @property {() => Promise<any>} getClient - Factory do SDK client.
+ * @property {() => Promise<import('@github/copilot-sdk').CopilotClient>} getClient - Factory do SDK client.
  */
 
 /**
@@ -219,7 +219,7 @@ export default function createAgentRouter(deps) {
             );
 
             // Inscreve nos eventos de ciclo de vida do client
-            const unsubscribe = client.on((/** @type {any} */ event) => {
+            const unsubscribe = client.on((event) => {
                 const type = /** @type {string} */ (event?.type ?? 'lifecycle');
                 if (!eventFilter || eventFilter(type)) sse.send('lifecycle', standardizeSsePayload(event));
             });

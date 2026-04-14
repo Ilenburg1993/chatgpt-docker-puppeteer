@@ -135,7 +135,12 @@
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
  * @property {(
  *     message: string,
- *     opts?: { timeoutMs?: number; attachments?: any; signal?: AbortSignal; taskId?: string },
+ *     opts?: {
+ *         timeoutMs?: number;
+ *         attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+ *         signal?: AbortSignal;
+ *         taskId?: string;
+ *     },
  * ) => Promise<unknown>} sendMessage
  *   - Envia mensagem ao agente
  *
@@ -161,8 +166,8 @@
  *     | undefined} setPermissionMode
  *   - Define o modo de permissão
  *
- * @property {(event: string, listener: (...args: any[]) => void) => any} on - Inscreve listener para um evento
- * @property {(event: string, listener: (...args: any[]) => void) => any} off - Remove listener de um evento
+ * @property {(event: string, listener: (...args: any[]) => void) => void} on - Inscreve listener para um evento
+ * @property {(event: string, listener: (...args: any[]) => void) => void} off - Remove listener de um evento
  * @property {() => Record<string, number>} listenerDiagnostics - Retorna diagnóstico de listeners por evento
  * @property {((n: number) => void) | undefined} setMaxListeners - Define o número máximo de listeners
  * @property {((prompt: string) => Promise<string>) | undefined} steerMessage - Envia mensagem em modo steering

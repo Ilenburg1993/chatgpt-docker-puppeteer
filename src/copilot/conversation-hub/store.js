@@ -16,7 +16,7 @@
  * @see module:copilot/db/sqlite
  */
 
-import { SessionError, logSwallowed } from '#copilot/core';
+import { SessionError, logSwallowed, toError } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import { log } from '#copilot/observability';
 import { v4 as uuidv4 } from 'uuid';
@@ -89,13 +89,13 @@ export class ConversationStore {
                     try {
                         db.pragma('wal_checkpoint(PASSIVE)');
                         _checkpointErrors = 0; // resetar contador em sucesso
-                    } catch (/** @type {any} */ err) {
+                    } catch (err) {
                         _checkpointErrors++;
                         // GAP-Q07 fix: emitir warning após 10 erros consecutivos
                         if (_checkpointErrors >= 10) {
                             log(
                                 'WARN',
-                                `[ConversationStore] WAL checkpoint falhou ${_checkpointErrors}x consecutivas: ${err.message}`,
+                                `[ConversationStore] WAL checkpoint falhou ${_checkpointErrors}x consecutivas: ${toError(err).message}`,
                             );
                         }
                     }
@@ -104,8 +104,8 @@ export class ConversationStore {
             ); // a cada 5 minutos
             checkpointTimer.unref?.(); // não impede o processo de sair
             this.#checkpointTimer = checkpointTimer; // ARCH-04 (fix): manter referência
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[ConversationStore] Falha ao inicializar tabelas: ${err.message}`);
+        } catch (err) {
+            log('ERROR', `[ConversationStore] Falha ao inicializar tabelas: ${toError(err).message}`);
             throw err;
         }
     }
@@ -246,8 +246,8 @@ export class ConversationStore {
         /** @type {Record<string, unknown>} */
         let existing = {};
         try {
-            existing = JSON.parse(/** @type {any} */ (row).metadata ?? '{}') ?? {};
-        } catch (/** @type {any} */ e) {
+            existing = JSON.parse(/** @type {{ metadata?: string | null }} */ (row).metadata ?? '{}') ?? {};
+        } catch (e) {
             logSwallowed(e, 'hub.store.parseMetadata');
         }
         const merged = {
@@ -382,8 +382,9 @@ export class ConversationStore {
         for (let attempt = 0; attempt < WRITE_MAX_RETRIES; attempt++) {
             try {
                 return doWrite();
-            } catch (/** @type {any} */ err) {
-                const isConstraint = err?.code === 'SQLITE_CONSTRAINT_UNIQUE' || err?.code === 'SQLITE_CONSTRAINT';
+            } catch (err) {
+                const isConstraint =
+                    toError(err).code === 'SQLITE_CONSTRAINT_UNIQUE' || toError(err).code === 'SQLITE_CONSTRAINT';
                 if (!isConstraint || attempt === WRITE_MAX_RETRIES - 1) throw err;
                 log(
                     'WARN',

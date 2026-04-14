@@ -11,6 +11,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { startSpanImmediate } from '#copilot/observability';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../config.js';
 
@@ -130,16 +131,16 @@ export async function executeTask(session, task, callbacks) {
         setStatus('idle');
         emit('task.completed', { taskId: task.id, response: text, responseLen: text.length, durationMs });
         task.resolve(text);
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         // G1-BUG-03 (fix): AbortError não é erro de rede/sessão — não deve acionar reconexão.
         if (e instanceof DOMException && e.name === 'AbortError') {
             setStatus('idle');
             emit('task.error', { taskId: task.id, error: 'AbortError' });
-            task.reject(e);
+            task.reject(toError(e));
             return;
         }
         // Tenta reconectar com backoff exponencial se parecer erro de rede/sessão
-        const recovered = await tryReconnect(e);
+        const recovered = await tryReconnect(toError(e));
         if (recovered) {
             // Limita reintentos transparentes para evitar loop infinito em falhas repetidas.
             task.attempts = (task.attempts ?? 0) + 1;
@@ -159,8 +160,8 @@ export async function executeTask(session, task, callbacks) {
             }
         } else {
             setStatus('idle');
-            emit('task.error', { taskId: task.id, error: e.message });
-            task.reject(e);
+            emit('task.error', { taskId: task.id, error: toError(e).message });
+            task.reject(toError(e));
         }
     } finally {
         // SDK-06 (fix): garantir que os listeners são removidos em qualquer caminho de execução

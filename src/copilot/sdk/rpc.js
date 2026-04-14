@@ -39,14 +39,20 @@ export {
 } from './rpc/session.js';
 
 export {
+    agentDeselect,
+    agentList,
+    agentSelect,
     commandsHandlePending,
     compactionCompact,
+    compactionCompactTyped,
     permissionsHandlePending,
     shellExec,
     shellKill,
     toolsHandlePendingCall,
     uiElicitation,
 } from './rpc/ops.js';
+
+import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from './rpc/ops.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -80,6 +86,14 @@ export {
  *
  *
  * @typedef {{ success: boolean }} HandleResult
+ *
+ * @typedef {{ name: string; displayName: string; description: string }} AgentInfo
+ *
+ * @typedef {{ agents: AgentInfo[] }} AgentListResult
+ *
+ * @typedef {{ agent: AgentInfo }} AgentSelectResult
+ *
+ * @typedef {{}} AgentDeselectResult
  */
 
 // ─── Validação interna ────────────────────────────────────────────────────────
@@ -124,29 +138,46 @@ function assertSession(session, caller) {
  *         message: string,
  *         options?: { level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string },
  *     ) => Promise<LogResult>;
+ *     agent: {
+ *         list: () => Promise<AgentListResult>;
+ *         select: (name: string) => Promise<AgentSelectResult>;
+ *         deselect: () => Promise<AgentDeselectResult>;
+ *     };
+ *     compaction: {
+ *         compact: () => Promise<CompactionResult>;
+ *     };
  * }}
  */
 export function createSessionRpcFacade(session) {
     assertSession(session, 'createSessionRpcFacade');
     return {
         model: {
-            getCurrent: () => modelGetCurrent(session),
-            switchTo: (modelId, options) => modelSwitchTo(session, modelId, options),
+            getCurrent: () => /** @type {Promise<ModelCurrentResult>} */ (modelGetCurrent(session)),
+            switchTo: (modelId, options) =>
+                /** @type {Promise<ModelSwitchResult>} */ (modelSwitchTo(session, modelId, options)),
         },
         mode: {
-            get: () => modeGet(session),
-            set: (mode) => modeSet(session, mode),
+            get: () => /** @type {Promise<ModeResult>} */ (modeGet(session)),
+            set: (mode) => /** @type {Promise<ModeResult>} */ (modeSet(session, mode)),
         },
         plan: {
-            read: () => planRead(session),
+            read: () => /** @type {Promise<PlanReadResult>} */ (planRead(session)),
             update: (content) => planUpdate(session, content),
             delete: () => planDelete(session),
         },
         workspace: {
-            listFiles: () => workspaceListFiles(session),
-            readFile: (path) => workspaceReadFile(session, path),
+            listFiles: () => /** @type {Promise<WorkspaceListResult>} */ (workspaceListFiles(session)),
+            readFile: (path) => /** @type {Promise<WorkspaceReadResult>} */ (workspaceReadFile(session, path)),
             createFile: (path, content) => workspaceCreateFile(session, path, content),
         },
-        log: (message, options) => sessionLog(session, message, options),
+        log: (message, options) => /** @type {Promise<LogResult>} */ (sessionLog(session, message, options)),
+        agent: {
+            list: () => /** @type {Promise<AgentListResult>} */ (agentList(session)),
+            select: (name) => /** @type {Promise<AgentSelectResult>} */ (agentSelect(session, name)),
+            deselect: () => /** @type {Promise<AgentDeselectResult>} */ (agentDeselect(session)),
+        },
+        compaction: {
+            compact: () => /** @type {Promise<CompactionResult>} */ (compactionCompactTyped(session)),
+        },
     };
 }

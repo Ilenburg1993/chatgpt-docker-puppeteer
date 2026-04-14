@@ -10,7 +10,7 @@ import { createToken } from '../core/di.js';
 /**
  * Logger injetável para o módulo tools.
  *
- * @type {import('../core/di.js').Token<Function>}
+ * @type {import('../core/di.js').Token<import('../core/di-tokens.js').CopilotLogger>}
  */
 export const TOOLS_LOGGER = createToken('TOOLS_LOGGER');
 

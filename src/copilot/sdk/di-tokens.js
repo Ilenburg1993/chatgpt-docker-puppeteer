@@ -10,13 +10,13 @@ import { createToken } from '../core/di.js';
 /**
  * Logger do SDK (proxy para observability/logger).
  *
- * @type {import('../core/di.js').Token<Function>}
+ * @type {import('../core/di.js').Token<import('../core/di-tokens.js').CopilotLogger>}
  */
 export const SDK_LOGGER = createToken('SDK_LOGGER');
 
 /**
  * Factory de custom tools (injeta builder externo).
  *
- * @type {import('../core/di.js').Token<Function>}
+ * @type {import('../core/di.js').Token<import('./tools/custom.js').BuildToolFn>}
  */
 export const TOOLS_BUILDER = createToken('TOOLS_BUILDER');

@@ -38,7 +38,7 @@ export { KNOWN_SDK_EVENTS } from './event-handlers/catch-all.js';
  * Callbacks repassados pelo AlwaysAliveAgent para que o wirer possa notificá-lo sem acoplamento.
  *
  * @typedef {Object} SessionWirerCallbacks
- * @property {(event: string, payload?: any) => void} emit
+ * @property {(event: string, payload?: unknown) => void} emit
  * @property {() => import('../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath
  * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState

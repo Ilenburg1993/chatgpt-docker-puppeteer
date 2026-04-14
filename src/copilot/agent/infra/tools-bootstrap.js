@@ -61,7 +61,7 @@ export function bootstrapTools(registry, mcpTools) {
      * local à função para evitar TDZ com módulos que exportam via inicialização lazy. Adicionar um novo grupo aqui é
      * suficiente — não há necessidade de duplicar no spread de `allTools`.
      *
-     * @type {[import('#copilot/sdk/types').Tool[], Record<string, any>][]} }
+     * @type {[import('#copilot/sdk/types').Tool[], Record<string, unknown>][]} }
      */
     const TOOL_GROUPS = [
         [taskTools, { category: 'task', tags: ['queue', 'state'] }],

@@ -18,7 +18,7 @@ import { log } from '../logger.js';
  * @typedef {object} TraceEntry
  * @property {string} type
  * @property {number} timestamp
- * @property {string} [correlationId]
+ * @property {string | undefined} [correlationId]
  */
 
 /**
@@ -41,7 +41,7 @@ export function createCorrelationTracer({ bus, maxTraces = 500 }) {
 
     // Subscribe to wildcard to capture all events
     unsubs.push(
-        bus.on('*', (/** @type {any} */ evt) => {
+        bus.on('*', (evt) => {
             const entry = {
                 type: evt?.type ?? 'unknown',
                 timestamp: evt?.timestamp ?? Date.now(),

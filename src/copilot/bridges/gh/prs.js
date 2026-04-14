@@ -32,7 +32,7 @@ import { calcFetchLimit, fmtDate, repoArgs, runGh, runGhJson, slicePage } from '
  * @property {{ login: string }} author
  * @property {string} url
  * @property {boolean} isDraft
- * @property {any[]} statusCheckRollup
+ * @property {Record<string, unknown>[]} statusCheckRollup
  */
 
 /**
@@ -76,14 +76,16 @@ export async function listPrs(opts = {}) {
  */
 export async function viewPr(number) {
     try {
-        return await runGhJson([
-            'pr',
-            'view',
-            String(number),
-            '--json',
-            'number,title,body,state,headRefName,author,isDraft,url,statusCheckRollup,reviews,mergeable',
-            ...repoArgs(),
-        ]);
+        return /** @type {PrDetail | null} */ (
+            await runGhJson([
+                'pr',
+                'view',
+                String(number),
+                '--json',
+                'number,title,body,state,headRefName,author,isDraft,url,statusCheckRollup,reviews,mergeable',
+                ...repoArgs(),
+            ])
+        );
     } catch {
         return null;
     }

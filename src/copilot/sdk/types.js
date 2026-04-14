@@ -638,6 +638,57 @@
  * @typedef {{ logId?: string; [k: string]: unknown }} LogResult
  */
 
+// ─── Loose-typed SDK interfaces ───────────────────────────────────────────────
+// Interfaces com assinaturas relaxadas para permitir chamadas com `string`
+// em vez de literal unions (necessário em wrappers dinâmicos).
+
+/**
+ * Interface loose-typed para `CopilotSession.on()`. Permite `.on(eventType: string, handler)` sem exigir literal
+ * `SessionEventType`.
+ *
+ * @typedef {object} SessionEventSubscriber
+ * @property {((eventType: string, handler: (event: SessionEvent) => void) => () => void) &
+ *     ((handler: (event: SessionEvent) => void) => () => void)} on
+ */
+
+/**
+ * Interface loose-typed para `CopilotClient.on()`. Permite `.on(eventType: string, handler)` sem exigir literal
+ * `SessionLifecycleEventType`.
+ *
+ * @typedef {object} ClientEventSubscriber
+ * @property {((eventType: string, handler: (event: SessionLifecycleEvent) => void) => () => void) &
+ *     ((handler: (event: SessionLifecycleEvent) => void) => () => void)} on
+ */
+
+/**
+ * Interface para RPC experimental não-tipado no SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`,
+ * `extensions` que ainda não existem nas types do SDK oficial.
+ *
+ * @typedef {object} ExperimentalRpcNamespace
+ * @property {(params?: Record<string, unknown>) => Promise<any>} start
+ * @property {(params?: Record<string, unknown>) => Promise<any>} list
+ * @property {(params?: Record<string, unknown>) => Promise<any>} enable
+ * @property {(params?: Record<string, unknown>) => Promise<any>} disable
+ * @property {(params?: Record<string, unknown>) => Promise<any>} select
+ * @property {(params?: Record<string, unknown>) => Promise<any>} deselect
+ * @property {(params?: Record<string, unknown>) => Promise<any>} getStatus
+ * @property {(params?: Record<string, unknown>) => Promise<any>} stop
+ */
+
+/**
+ * Sessão com surface de RPC experimental.
+ *
+ * @typedef {object} ExperimentalSession
+ * @property {{
+ *     fleet: ExperimentalRpcNamespace;
+ *     agent: ExperimentalRpcNamespace;
+ *     skills: ExperimentalRpcNamespace;
+ *     mcp: ExperimentalRpcNamespace;
+ *     plugins: ExperimentalRpcNamespace;
+ *     extensions: ExperimentalRpcNamespace;
+ * }} rpc
+ */
+
 // ─── Runtime re-exports (non-type) ───────────────────────────────────────────
 // Nota: defineTool, approveAll, SYSTEM_PROMPT_SECTIONS são runtime values.
 // Re-exportados aqui para conveniência; consumers de runtime DEVEM usar

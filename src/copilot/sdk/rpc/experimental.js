@@ -22,7 +22,7 @@ import { isExperimentalEnabled } from '../feature-flags.js';
  * @returns {asserts session is CopilotSession}
  */
 function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || typeof (/** @type {any} */ (session).rpc) !== 'object') {
+    if (!session || typeof session !== 'object' || typeof (/** @type {Record<string, unknown>} */ (session)).rpc !== 'object') {
         throw new TypeError(`[sdk/experimental-rpc/${caller}] CopilotSession inválida ou não conectada.`);
     }
 }
@@ -59,7 +59,7 @@ function throwNotEnabled(feature, method) {
 export async function fleetStart(session, options) {
     if (!isExperimentalEnabled('fleet')) throwNotEnabled('fleet', 'fleet.start');
     assertSession(session, 'fleet.start');
-    return /** @type {any} */ (session).rpc.fleet.start(options ?? {});
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.fleet.start(options ?? {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -79,7 +79,7 @@ export async function fleetStart(session, options) {
 export async function agentList(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.list');
     assertSession(session, 'agent.list');
-    return /** @type {any} */ (session).rpc.agent.list();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.agent.list();
 }
 
 /**
@@ -95,7 +95,7 @@ export async function agentSelect(session, agentId) {
     if (typeof agentId !== 'string' || agentId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/agent.select] agentId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.agent.select({ agentId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.agent.select({ agentId });
 }
 
 /**
@@ -107,7 +107,7 @@ export async function agentSelect(session, agentId) {
 export async function agentDeselect(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.deselect');
     assertSession(session, 'agent.deselect');
-    return /** @type {any} */ (session).rpc.agent.deselect();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.agent.deselect();
 }
 
 /**
@@ -123,7 +123,7 @@ export async function agentGetStatus(session, agentId) {
     if (typeof agentId !== 'string' || agentId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/agent.getStatus] agentId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.agent.getStatus({ agentId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.agent.getStatus({ agentId });
 }
 
 /**
@@ -139,7 +139,7 @@ export async function agentStop(session, agentId) {
     if (typeof agentId !== 'string' || agentId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/agent.stop] agentId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.agent.stop({ agentId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.agent.stop({ agentId });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -159,7 +159,7 @@ export async function agentStop(session, agentId) {
 export async function skillsList(session) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.list');
     assertSession(session, 'skills.list');
-    return /** @type {any} */ (session).rpc.skills.list();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.skills.list();
 }
 
 /**
@@ -175,7 +175,7 @@ export async function skillsEnable(session, skillId) {
     if (typeof skillId !== 'string' || skillId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.enable] skillId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.skills.enable({ skillId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.skills.enable({ skillId });
 }
 
 /**
@@ -191,7 +191,7 @@ export async function skillsDisable(session, skillId) {
     if (typeof skillId !== 'string' || skillId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.disable] skillId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.skills.disable({ skillId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.skills.disable({ skillId });
 }
 
 /**
@@ -207,7 +207,7 @@ export async function skillsGetStatus(session, skillId) {
     if (typeof skillId !== 'string' || skillId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.getStatus] skillId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.skills.getStatus({ skillId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.skills.getStatus({ skillId });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -227,7 +227,7 @@ export async function skillsGetStatus(session, skillId) {
 export async function mcpList(session) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.list');
     assertSession(session, 'mcp.list');
-    return /** @type {any} */ (session).rpc.mcp.list();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.mcp.list();
 }
 
 /**
@@ -243,7 +243,7 @@ export async function mcpEnable(session, serverId) {
     if (typeof serverId !== 'string' || serverId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.enable] serverId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.mcp.enable({ serverId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.mcp.enable({ serverId });
 }
 
 /**
@@ -259,7 +259,7 @@ export async function mcpDisable(session, serverId) {
     if (typeof serverId !== 'string' || serverId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.disable] serverId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.mcp.disable({ serverId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.mcp.disable({ serverId });
 }
 
 /**
@@ -275,7 +275,7 @@ export async function mcpGetStatus(session, serverId) {
     if (typeof serverId !== 'string' || serverId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.getStatus] serverId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.mcp.getStatus({ serverId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.mcp.getStatus({ serverId });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -295,7 +295,7 @@ export async function mcpGetStatus(session, serverId) {
 export async function pluginsList(session) {
     if (!isExperimentalEnabled('plugins')) throwNotEnabled('plugins', 'plugins.list');
     assertSession(session, 'plugins.list');
-    return /** @type {any} */ (session).rpc.plugins.list();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.plugins.list();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -315,7 +315,7 @@ export async function pluginsList(session) {
 export async function extensionsList(session) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.list');
     assertSession(session, 'extensions.list');
-    return /** @type {any} */ (session).rpc.extensions.list();
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.extensions.list();
 }
 
 /**
@@ -331,7 +331,7 @@ export async function extensionsEnable(session, extensionId) {
     if (typeof extensionId !== 'string' || extensionId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.enable] extensionId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.extensions.enable({ extensionId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.extensions.enable({ extensionId });
 }
 
 /**
@@ -347,5 +347,5 @@ export async function extensionsDisable(session, extensionId) {
     if (typeof extensionId !== 'string' || extensionId.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.disable] extensionId deve ser string não-vazia.');
     }
-    return /** @type {any} */ (session).rpc.extensions.disable({ extensionId });
+    return /** @type {import("../types.js").ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc.extensions.disable({ extensionId });
 }

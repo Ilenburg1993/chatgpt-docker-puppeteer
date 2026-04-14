@@ -30,7 +30,7 @@ import { chatStructured as _chatStructured } from './client-structured.js';
  * @property {(bootPrompt?: string) => Promise<void>} startDialogLoop
  * @property {(message: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn
  * @property {Function} stopDialogLoop
- * @property {(answer: string) => any} answerPendingQuestion
+ * @property {(answer: string) => boolean} answerPendingQuestion
  * @property {(event: string, listener: (...args: any[]) => void) => void} on
  * @property {(event: string, listener: (...args: any[]) => void) => void} once
  * @property {(event: string, listener: (...args: any[]) => void) => void} off
@@ -197,7 +197,7 @@ export class LlmBridgeClient {
                 if (onDelta) {
                     try {
                         onDelta(evt.chunk ?? '', evt.taskId);
-                    } catch (/** @type {any} */ e) {
+                    } catch (e) {
                         logSwallowed(e, 'channel.client.onDelta');
                     }
                 }
@@ -208,7 +208,7 @@ export class LlmBridgeClient {
             if (onQuestion) {
                 try {
                     onQuestion(evt);
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     logSwallowed(e, 'channel.client.onQuestion');
                 }
             }
@@ -327,7 +327,7 @@ export class LlmBridgeClient {
             const slot = i % slots.length;
             /** @type {Promise<ChatResult | { error: string; response: null; taskId: string; durationMs: number }>} */
             const next = (slots[slot] ?? Promise.resolve()).then(() =>
-                this.chat(msg, chatOpts).catch((/** @type {any} */ err) => ({
+                this.chat(msg, chatOpts).catch((err) => ({
                     error: err.message,
                     response: /** @type {null} */ (null),
                     taskId: '',

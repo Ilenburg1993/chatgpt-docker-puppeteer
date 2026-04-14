@@ -99,7 +99,7 @@ async function _flushOnExit() {
     try {
         await mkdir(LOGS_DIR, { recursive: true });
         await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'event-collector.flush');
     }
 }
@@ -132,11 +132,11 @@ function scheduleFlush() {
                 if (size >= MAX_EVENTS_BYTES) {
                     await rename(EVENTS_FILE, EVENTS_FILE + '.1');
                 }
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'event-collector.stat');
             }
             await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'event-collector.persist');
         }
     });
@@ -361,7 +361,7 @@ export { MAX_EVENTS_BYTES };
  *
  * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa.
  * @param {string} eventType - Tipo de evento (e.g., 'assistant.message').
- * @param {(event: any) => void} handler - Handler do evento.
+ * @param {(event: unknown) => void} handler - Handler do evento.
  * @returns {() => void} Função de unsubscribe.
  */
 export function attachSdkEventTyped(session, eventType, handler) {

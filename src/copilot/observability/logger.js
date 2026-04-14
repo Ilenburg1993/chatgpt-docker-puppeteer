@@ -18,6 +18,7 @@ import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '#c
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { toError } from '../core/error-handlers.js';
 
 // ─── Paths isolados ───────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const MAX_ARCHIVES = COPILOT_LOG_MAX_ARCHIVES;
 
 try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-} catch (/** @type {any} */ _) {
+} catch (_) {
     // Ignorar: pode já existir ou não ter permissão (fallback para console)
 }
 
@@ -79,13 +80,13 @@ function cleanOldFiles(prefix) {
             files.slice(MAX_ARCHIVES).forEach((f) => {
                 try {
                     fs.unlinkSync(path.join(LOG_DIR, f.name));
-                } catch (/** @type {any} */ _) {
+                } catch (_) {
                     // Ignorar erros de limpeza
                 }
             });
         }
-    } catch (/** @type {any} */ e) {
-        console.error(`[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? e.message : String(e)}`);
+    } catch (e) {
+        console.error(`[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? toError(e).message : String(e)}`);
     }
 }
 
@@ -108,8 +109,8 @@ function rotateFile(filePath, prefix, maxSize) {
             fs.renameSync(filePath, archivePath);
             cleanOldFiles(prefix);
         }
-    } catch (/** @type {any} */ e) {
-        console.error(`[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? e.message : String(e)}`);
+    } catch (e) {
+        console.error(`[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? toError(e).message : String(e)}`);
     }
 }
 
@@ -190,7 +191,7 @@ function log(level, msg, metaOrTaskId = '-') {
     } else if (typeof msg === 'object') {
         try {
             content = JSON.stringify(msg);
-        } catch (/** @type {any} */ _) {
+        } catch (_) {
             content = String(msg);
         }
     }
@@ -217,7 +218,7 @@ function log(level, msg, metaOrTaskId = '-') {
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
         try {
             fs.appendFileSync(LOG_FILE, `${jsonLine}\n`, 'utf-8');
-        } catch (/** @type {any} */ _) {
+        } catch (_) {
             // Silencioso — console.log já logou
         }
     } else {
@@ -229,7 +230,7 @@ function log(level, msg, metaOrTaskId = '-') {
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
         try {
             fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
-        } catch (/** @type {any} */ _) {
+        } catch (_) {
             // Silencioso — console.log já logou
         }
     }
@@ -285,7 +286,7 @@ function audit(action, details) {
     const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(details)}\n`;
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch (/** @type {any} */ _) {
+    } catch (_) {
         console.error(`[copilot/logger] [CRITICAL_AUDIT_FAIL] ${entry}`);
     }
 }
@@ -304,7 +305,7 @@ function metric(name, payload) {
     try {
         const entry = JSON.stringify({ ts: new Date().toISOString(), metric: name, ...(payload ?? {}) });
         fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
-    } catch (/** @type {any} */ _) {
+    } catch (_) {
         // Silencioso — métricas não são críticas
     }
 }

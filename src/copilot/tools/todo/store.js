@@ -131,7 +131,7 @@ async function _readStoreRaw() {
         for (const row of rows) {
             try {
                 tasks[row.id] = JSON.parse(row.data);
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'todo.store.parseRow');
             }
         }

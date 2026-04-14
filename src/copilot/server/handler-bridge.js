@@ -17,7 +17,7 @@ import { log } from '#copilot/observability';
 /**
  * @typedef {{ status: number; body: unknown; cors?: boolean }} HandlerResult
  *
- * @typedef {(params: any) => HandlerResult | Promise<HandlerResult>} CopilotHandler
+ * @typedef {(params: Record<string, unknown>) => HandlerResult | Promise<HandlerResult>} CopilotHandler
  */
 
 /**
@@ -56,7 +56,7 @@ export function callHandler(handler, req, res, next) {
     }
 
     // Handler síncrono
-    if (!result || typeof (/** @type {any} */ (result).then) !== 'function') {
+    if (!result || typeof /** @type {{ then?: unknown }} */ (result).then !== 'function') {
         const r = /** @type {HandlerResult} */ (result);
         try {
             res.status(r.status).json(r.body);
@@ -94,7 +94,7 @@ export function bridgeHandler(handler, paramsExtractor) {
             return;
         }
 
-        if (!result || typeof (/** @type {any} */ (result).then) !== 'function') {
+        if (!result || typeof /** @type {{ then?: unknown }} */ (result).then !== 'function') {
             const r = /** @type {HandlerResult} */ (result);
             res.status(r.status).json(r.body);
             return;

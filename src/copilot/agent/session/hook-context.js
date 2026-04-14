@@ -14,7 +14,7 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { container, logSwallowed } from '#copilot/core';
+import { container, logSwallowed, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { readStore as _readTodoStore } from '#copilot/tools';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
@@ -94,8 +94,8 @@ export async function buildHookSystemContext() {
             content = await readFile(BRIEFING_FILE, 'utf8');
         }
         parts.push('## Contexto da Sessão (Hook System)\n\n' + content);
-    } catch (/** @type {any} */ e) {
-        log('DEBUG', `[hook-context] briefing indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
+    } catch (e) {
+        log('DEBUG', `[hook-context] briefing indisponível: ${toError(e).code ?? toError(e).message ?? 'unknown'}`);
     }
 
     try {
@@ -143,8 +143,8 @@ export async function buildHookSystemContext() {
                 'Não inicie task_complete sem chamar vscode_askQuestions antes.',
             ].join('\n'),
         );
-    } catch (/** @type {any} */ e) {
-        log('DEBUG', `[hook-context] session.json indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
+    } catch (e) {
+        log('DEBUG', `[hook-context] session.json indisponível: ${toError(e).code ?? toError(e).message ?? 'unknown'}`);
     }
 
     // F5.3: skills disponíveis no diretório .github/skills/
@@ -158,8 +158,8 @@ export async function buildHookSystemContext() {
         if (skillNames.length > 0) {
             parts.push('\n## Skills Disponíveis\n\n' + skillNames.map((s) => `- \`${s}\``).join('\n'));
         }
-    } catch (/** @type {any} */ e) {
-        log('DEBUG', `[hook-context] skills indisponíveis: ${e?.code ?? e?.message ?? 'unknown'}`);
+    } catch (e) {
+        log('DEBUG', `[hook-context] skills indisponíveis: ${toError(e).code ?? toError(e).message ?? 'unknown'}`);
     }
 
     // F5.2: estado runtime do agente SDK (in-memory, sem I/O de arquivo)
@@ -173,7 +173,7 @@ export async function buildHookSystemContext() {
             pendingCount = Object.values(todoStore.tasks).filter(
                 (t) => t.status === 'todo' || t.status === 'in_progress',
             ).length;
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'hookContext.readTodoStore');
         }
         parts.push(
@@ -185,8 +185,11 @@ export async function buildHookSystemContext() {
                 `- TODOs ativos (todo/in_progress): ${pendingCount}`,
             ].join('\n'),
         );
-    } catch (/** @type {any} */ e) {
-        log('DEBUG', `[hook-context] estado runtime indisponível: ${e?.code ?? e?.message ?? 'unknown'}`);
+    } catch (e) {
+        log(
+            'DEBUG',
+            `[hook-context] estado runtime indisponível: ${toError(e).code ?? toError(e).message ?? 'unknown'}`,
+        );
     }
 
     return parts.join('\n\n');

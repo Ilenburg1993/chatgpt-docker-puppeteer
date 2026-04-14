@@ -15,7 +15,7 @@
  */
 
 import { COPILOT_HUB_SOCKET_AUTH_REQUIRED, DASHBOARD_SOCKET_AUTH_REQUIRED } from '#copilot/config';
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import jwt from 'jsonwebtoken';
@@ -121,8 +121,11 @@ function _createInjectRateLimiter() {
 function _setupAuthMiddleware(ns) {
     try {
         getJwtSecret();
-    } catch (/** @type {any} */ secretErr) {
-        log('ERROR', `[hub-ns/copilot] JWT_SECRET inválido: ${secretErr.message}. Namespace bloqueado (fail-closed).`);
+    } catch (secretErr) {
+        log(
+            'ERROR',
+            `[hub-ns/copilot] JWT_SECRET inválido: ${toError(secretErr).message}. Namespace bloqueado (fail-closed).`,
+        );
         // S-C-01 fix: fail-closed — rejeitar todas as conexões em vez de desabilitar auth
         ns.use((_socket, next) => {
             next(new Error('COPILOT_NS: Servidor sem JWT_SECRET configurado. Conexões bloqueadas.'));
@@ -143,8 +146,8 @@ function _setupAuthMiddleware(ns) {
             /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
                 /** @type {{ sub?: string }} */ (payload).sub;
             next();
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[hub-ns/copilot] Auth falhou (IP: ${socket.handshake.address}): ${err.message}`);
+        } catch (err) {
+            log('WARN', `[hub-ns/copilot] Auth falhou (IP: ${socket.handshake.address}): ${toError(err).message}`);
             next(new Error('COPILOT_NS: Token inválido ou expirado.'));
         }
     });
@@ -251,9 +254,9 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
             });
             socket.emit(HUB_EVENTS.INJECT_ACK, { hubSession: data.hubSession, turnId });
             log('INFO', `[hub-ns] Mensagem injetada pelo usuário na sessão ${data.hubSession}.`);
-        } catch (/** @type {any} */ err) {
-            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: err.message ?? String(err) });
-            log('ERROR', `[hub-ns] Erro ao injetar mensagem: ${err.message ?? String(err)}`);
+        } catch (err) {
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: toError(err).message ?? String(err) });
+            log('ERROR', `[hub-ns] Erro ao injetar mensagem: ${toError(err).message ?? String(err)}`);
         }
     });
 }
@@ -288,8 +291,8 @@ function _handleSessionsList(socket, store) {
                 updated_at: s.updated_at,
             }));
             socket.emit(HUB_EVENTS.SESSIONS_LIST_RESULT, { sessions: publicSessions });
-        } catch (/** @type {any} */ err) {
-            socket.emit(HUB_EVENTS.ERROR_SESSIONS, { reason: err.message });
+        } catch (err) {
+            socket.emit(HUB_EVENTS.ERROR_SESSIONS, { reason: toError(err).message });
         }
     });
 }
@@ -314,8 +317,8 @@ function _handleTurnsHistory(socket, store) {
                     ...(data.after !== undefined && { after: data.after }),
                 });
                 socket.emit(HUB_EVENTS.TURNS_HISTORY_RESULT, { hubSession: data.hubSession, turns });
-            } catch (/** @type {any} */ err) {
-                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: err.message });
+            } catch (err) {
+                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: toError(err).message });
             }
         },
     );
@@ -362,7 +365,7 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
              *     turnId: number;
              *     role: string;
              *     content: string;
-             *     structured: any;
+             *     structured: Record<string, unknown> | null;
              *     durationMs: number;
              *     turnNumber: number;
              * }}
@@ -406,7 +409,7 @@ export function unmountCopilotNamespace() {
     try {
         copilotNamespace.disconnectSockets(true);
         copilotNamespace.removeAllListeners();
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'hub.socketNs.unmount');
     }
     copilotNamespace = null;

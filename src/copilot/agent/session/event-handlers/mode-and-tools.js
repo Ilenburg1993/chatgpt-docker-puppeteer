@@ -15,7 +15,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireModeAndToolEvents(session, { emit }) {
     return [
-        session.on(SESSION_EVENTS.SESSION_MODE_CHANGED, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_MODE_CHANGED, (evt) => {
             log('INFO', `[AlwaysAlive] Modo mudou: ${evt?.data?.['previousMode']} → ${evt?.data?.['newMode']}`);
             emit('session.mode_changed', evt?.data ?? {});
         }),

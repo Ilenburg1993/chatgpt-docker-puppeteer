@@ -202,7 +202,7 @@ router.get('/sessions/:id', (req, res) => {
 
         // Busca todas as sessões no disco e filtra pela ID solicitada
         const all = await sessionService.listSessions();
-        const meta = all.find((/** @type {any} */ s) => s.sessionId === id);
+        const meta = all.find((s) => s.sessionId === id);
 
         const entry = sessionService.getSession(id);
 

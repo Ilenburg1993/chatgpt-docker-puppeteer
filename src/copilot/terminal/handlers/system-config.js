@@ -320,11 +320,11 @@ export async function handleRegisterCustomTool(rawBody) {
 /**
  * DELETE /config/tools/custom/:name — remove uma custom tool pelo nome.
  *
- * @param {{ name: string } | string} nameOrParams
+ * @param {Record<string, unknown>} params
  * @returns {Promise<HandlerResult>}
  */
-export async function handleDeleteCustomTool(nameOrParams) {
-    const name = typeof nameOrParams === 'string' ? nameOrParams : nameOrParams?.name;
+export async function handleDeleteCustomTool(params) {
+    const name = typeof params['name'] === 'string' ? params['name'] : undefined;
     if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
     const result = await removeCustomTool(name);
     if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };

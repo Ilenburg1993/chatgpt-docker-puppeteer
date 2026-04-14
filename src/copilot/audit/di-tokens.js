@@ -10,7 +10,7 @@ import { createToken } from '../core/di.js';
 /**
  * Logger do audit pipeline.
  *
- * @type {import('../core/di.js').Token<Function>}
+ * @type {import('../core/di.js').Token<import('../core/di-tokens.js').CopilotLogger>}
  */
 export const AUDIT_LOGGER = createToken('AUDIT_LOGGER');
 

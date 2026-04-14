@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { toError } from './error-handlers.js';
 import { ValidationError } from './errors.js';
 
 /**
@@ -21,10 +22,10 @@ import { ValidationError } from './errors.js';
 export function safeJsonParse(raw, context) {
     try {
         return { ok: true, data: /** @type {T} */ (JSON.parse(raw)) };
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         const msg = context
-            ? `[safeJsonParse] Falha ao parsear JSON (${context}): ${e.message}`
-            : `[safeJsonParse] Falha ao parsear JSON: ${e.message}`;
+            ? `[safeJsonParse] Falha ao parsear JSON (${context}): ${toError(e).message}`
+            : `[safeJsonParse] Falha ao parsear JSON: ${toError(e).message}`;
         return { ok: false, error: new ValidationError(msg, 'JSON_PARSE_ERROR') };
     }
 }

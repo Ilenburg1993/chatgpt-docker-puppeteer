@@ -46,7 +46,7 @@ let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
  * @returns {void}
  */
 function _saveCustomAliases() {
-    _saveCustomAliasesAsync().catch((/** @type {any} */ e) => {
+    _saveCustomAliasesAsync().catch((e) => {
         log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
     });
 }
@@ -91,7 +91,7 @@ async function _saveCustomAliasesAsync() {
     }
     try {
         await writeFile(ALIASES_FILE, JSON.stringify(custom, null, 2));
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'terminal.aliasStore.write');
     }
 }

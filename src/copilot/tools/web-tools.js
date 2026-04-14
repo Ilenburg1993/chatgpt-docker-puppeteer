@@ -11,7 +11,7 @@
  */
 
 import { WEB_SEARCH_DISABLED } from '#copilot/config';
-import { logSwallowed, validateUrl } from '#copilot/core';
+import { toError, logSwallowed, validateUrl } from '#copilot/core';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
@@ -171,8 +171,8 @@ const webFetchTool = buildTool({
                 length: text.length,
                 content: text,
             };
-        } catch (/** @type {any} */ e) {
-            const msg = e?.name === 'AbortError' ? `Timeout após ${timeout}ms` : (e?.message ?? String(e));
+        } catch (e) {
+            const msg = toError(e).name === 'AbortError' ? `Timeout após ${timeout}ms` : (toError(e).message ?? String(e));
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
             return { success: false, error: msg };
         }
@@ -297,11 +297,11 @@ const webSearchTool = buildTool({
                     `[copilot/web_search] DDG JSON API retornou 0 resultados para query="${query}" — usando HTML scraping`,
                 );
             }
-        } catch (/** @type {any} */ e) {
-            if (e?.name === 'AbortError') {
+        } catch (e) {
+            if (toError(e).name === 'AbortError') {
                 return { success: false, error: 'Timeout (15s)' };
             }
-            log('WARN', `[copilot/web_search] DDG JSON API falhou (${e?.message ?? e}) — usando HTML scraping`);
+            log('WARN', `[copilot/web_search] DDG JSON API falhou (${toError(e).message ?? e}) — usando HTML scraping`);
         }
 
         // Fallback: HTML scraping DDG Lite
@@ -355,7 +355,7 @@ const webSearchTool = buildTool({
                 try {
                     const u = new URL(rawUrl.startsWith('/') ? `https://html.duckduckgo.com${rawUrl}` : rawUrl);
                     finalUrl = u.searchParams.get('uddg') ?? rawUrl;
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     logSwallowed(e, 'web-tools.parseUrl');
                 }
 
@@ -383,8 +383,8 @@ const webSearchTool = buildTool({
             });
             log('INFO', `[copilot/web_search] query="${query}" → ${safeHtmlResults.length} resultados`);
             return { success: true, query, results: safeHtmlResults };
-        } catch (/** @type {any} */ e) {
-            const msg = e?.name === 'AbortError' ? 'Timeout (15s)' : (e?.message ?? String(e));
+        } catch (e) {
+            const msg = toError(e).name === 'AbortError' ? 'Timeout (15s)' : (toError(e).message ?? String(e));
             log('WARN', `[copilot/web_search] Erro: ${msg}`);
             return { success: false, error: msg };
         }

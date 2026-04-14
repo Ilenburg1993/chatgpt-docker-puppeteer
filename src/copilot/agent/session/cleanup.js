@@ -15,6 +15,7 @@
 import { log, startSpan } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../config.js';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -114,9 +115,9 @@ export async function cleanupStaleSessions(client, options = {}) {
                     'INFO',
                     `[SessionCleanup] Concluído: ${result.deleted}/${result.total} sessões removidas, ${result.kept} mantidas.`,
                 );
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[SessionCleanup] Erro ao listar sessões: ${e.message}`);
-                result.errors.push(e.message);
+            } catch (e) {
+                log('WARN', `[SessionCleanup] Erro ao listar sessões: ${toError(e).message}`);
+                result.errors.push(toError(e).message);
             }
 
             return result;

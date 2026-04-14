@@ -20,8 +20,8 @@ import { log } from '#copilot/observability';
 
 /**
  * @typedef {object} NervInstance
- * @property {(envelope: any) => Promise<void>} emitEvent
- * @property {((actionCode: string, handler: (envelope: any) => void) => () => void) | undefined} [onEvent]
+ * @property {(envelope: Record<string, unknown>) => Promise<void>} emitEvent
+ * @property {((actionCode: string, handler: (envelope: Record<string, unknown>) => void) => () => void) | undefined} [onEvent]
  */
 
 export class NervEventBusAdapter {
@@ -130,7 +130,7 @@ export class NervEventBusAdapter {
             payload: { ...payload },
             timestamp: Date.now(),
         };
-        Promise.resolve(this.#nerv.emitEvent(envelope)).catch((/** @type {any} */ e) => {
+        Promise.resolve(this.#nerv.emitEvent(envelope)).catch((e) => {
             log('WARN', `[nerv-adapter] Falha ao emitir ${actionCode}: ${e?.message ?? String(e)}`);
         });
     }
@@ -156,20 +156,21 @@ export class NervEventBusAdapter {
         const bus = this.#bus;
         if (!nerv || !bus || typeof nerv.onEvent !== 'function') return;
 
-        this.#inboundUnsub = nerv.onEvent('COPILOT_COMMAND', (/** @type {any} */ envelope) => {
-            const command = envelope?.payload?.command;
+        this.#inboundUnsub = nerv.onEvent('COPILOT_COMMAND', (envelope) => {
+            const payload = /** @type {Record<string, unknown> | undefined} */ (envelope?.['payload']);
+            const command = payload?.['command'];
             if (typeof command !== 'string') {
                 log('WARN', '[nerv-adapter:inbound] Comando sem string command.');
                 return;
             }
 
             // Emite evento genérico de recebimento
-            bus.emit({ type: NERV_COMMAND_RECEIVED, command, payload: envelope.payload });
+            bus.emit({ type: NERV_COMMAND_RECEIVED, command, payload });
 
             // Emite evento específico se mapeado
             const busType = NERV_COMMAND_TO_EVENTBUS[command];
             if (busType) {
-                bus.emit({ type: busType, ...envelope.payload });
+                bus.emit({ type: busType, ...payload });
             } else {
                 log('WARN', `[nerv-adapter:inbound] Comando não mapeado: ${command}`);
             }

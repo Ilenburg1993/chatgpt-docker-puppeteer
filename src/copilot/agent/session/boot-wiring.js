@@ -40,7 +40,7 @@ import {
 } from '#copilot/observability';
 import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
 import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
 import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
@@ -79,7 +79,12 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
- * @property {({ startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null)
+ * @property {({
+ *           startAutoReconnect: (
+ *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
+ *               intervalMs: number,
+ *           ) => () => void;
+ *       } | null)
  *     | undefined} mcpBridge
  *   — Ponte MCP injetável (F69)
  */
@@ -132,15 +137,15 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
 
     // ── 3. Client lifecycle handlers ──
     if (typeof client.on === 'function') {
-        const unsubCreated = client.on(SESSION_LIFECYCLE_EVENTS.CREATED, (/** @type {any} */ evt) => {
+        const unsubCreated = client.on(SESSION_LIFECYCLE_EVENTS.CREATED, (evt) => {
             log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
             ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.CREATED, sessionId: evt?.sessionId });
         });
-        const unsubDeleted = client.on(SESSION_LIFECYCLE_EVENTS.DELETED, (/** @type {any} */ evt) => {
+        const unsubDeleted = client.on(SESSION_LIFECYCLE_EVENTS.DELETED, (evt) => {
             log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
             ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.DELETED, sessionId: evt?.sessionId });
         });
-        const unsubUpdated = client.on(SESSION_LIFECYCLE_EVENTS.UPDATED, (/** @type {any} */ evt) => {
+        const unsubUpdated = client.on(SESSION_LIFECYCLE_EVENTS.UPDATED, (evt) => {
             log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
             ctx.emit(EMITTER_SDK_LIFECYCLE, { type: SESSION_LIFECYCLE_EVENTS.UPDATED, sessionId: evt?.sessionId });
         });
@@ -168,7 +173,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
                 ctx.emit(EMITTER_SESSION_CLEANUP, result);
             }
         })
-        .catch((/** @type {any} */ e) => logSwallowed(e, 'agent.bootWiring.cleanup'));
+        .catch((e) => logSwallowed(e, 'agent.bootWiring.cleanup'));
 
     // ── 6. Dialog loop resume após boot recovery ──
     if (isResumed) {
@@ -195,7 +200,12 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
     // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
     const _ctxAny = /**
      * @type {{
-     *     mcpBridge?: { startAutoReconnect: (onTools: (tools: any[]) => void, intervalMs: number) => () => void } | null;
+     *     mcpBridge?: {
+     *         startAutoReconnect: (
+     *             onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
+     *             intervalMs: number,
+     *         ) => () => void;
+     *     } | null;
      * }}
      */ (/** @type {unknown} */ (ctx));
     const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
@@ -237,7 +247,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
             },
         });
         quotaMonitor.start();
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'agent.bootWiring.quotaMonitor');
     }
 
@@ -269,7 +279,7 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
         const answer = evt.answer;
         import('../../tools/hook-tools.js')
             .then(({ resolveUserInput }) => resolveUserInput(answer))
-            .catch((/** @type {any} */ e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
+            .catch((e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
     });
 
     return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
@@ -291,12 +301,15 @@ function scheduleDialogBootRecovery(ctx) {
             await ctx.resumeDialogLoop();
             log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
             ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] F53: Boot recovery falhou (${e.message}) — fallback para startDialogLoop.`);
+        } catch (e) {
+            log(
+                'WARN',
+                `[AlwaysAlive] F53: Boot recovery falhou (${toError(e).message}) — fallback para startDialogLoop.`,
+            );
             try {
                 await ctx.startDialogLoop();
-            } catch (/** @type {any} */ e2) {
-                log('WARN', `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${e2.message}`);
+            } catch (e2) {
+                log('WARN', `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${toError(e2).message}`);
             }
         }
     }, BOOT_RECOVERY_DELAY_MS);

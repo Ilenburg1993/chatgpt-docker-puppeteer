@@ -13,6 +13,7 @@ import { createTool } from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { toExecError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 import { withSkipPermission } from '../tool-factory.js';
 
@@ -34,11 +35,12 @@ async function safeGitArgs(args, timeoutMs = GIT_CMD_TIMEOUT_MS) {
     try {
         const { stdout } = await execAsync('git', args, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
+        const ex = toExecError(e);
         return {
-            stdout: (e.stdout ?? '').slice(0, 2000),
-            exitCode: e.code ?? 1,
-            error: (e.stderr ?? e.message ?? '').slice(0, 1000),
+            stdout: (ex.stdout ?? '').slice(0, 2000),
+            exitCode: typeof ex.code === 'number' ? ex.code : 1,
+            error: (ex.stderr ?? ex.message ?? '').slice(0, 1000),
         };
     }
 }

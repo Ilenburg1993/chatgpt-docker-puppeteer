@@ -38,7 +38,7 @@ export class ConversationService {
     /**
      * Obtém o ConversationHub singleton.
      *
-     * @returns {any}
+     * @returns {import('../conversation-hub/hub.js').ConversationHub}
      */
     getHub() {
         return container.resolve(HUB);
@@ -47,7 +47,7 @@ export class ConversationService {
     /**
      * Obtém o ConversationStore singleton.
      *
-     * @returns {any}
+     * @returns {import('../conversation-hub/store.js').ConversationStore}
      */
     getStore() {
         return container.resolve(CONVERSATION_STORE);
@@ -71,7 +71,7 @@ export class ConversationService {
      * Cria sessão no hub.
      *
      * @param {object} [opts]
-     * @returns {any}
+     * @returns {string} hubSessionId
      */
     createHubSession(opts) {
         return container.resolve(HUB).createSession(opts);

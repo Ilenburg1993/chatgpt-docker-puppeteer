@@ -10,7 +10,7 @@
  * @see module:copilot/always-alive
  */
 
-import { logSwallowed } from '#copilot/core';
+import { toError, logSwallowed } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
@@ -66,15 +66,15 @@ const writePendingTaskTool = createTool({
             let existing = '# Tarefas Pendentes\n\n';
             try {
                 existing = await readFile(p, 'utf8');
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'session-tools.readPendingTasks');
             }
             const entry = `\n## [${(priority ?? 'medium').toUpperCase()}] ${title}\n${description ? `\n${description}\n` : ''}_Adicionado pelo SDK Agent em ${new Date().toISOString()}_\n`;
             await writeFile(p, existing + entry, 'utf8');
             log('INFO', `[copilot/write_pending_task] Tarefa adicionada: ${title}`);
             return { success: true, title };
-        } catch (/** @type {any} */ e) {
-            return { success: false, error: e.message };
+        } catch (e) {
+            return { success: false, error: toError(e).message };
         }
     },
 });
@@ -111,7 +111,7 @@ const getWorkspaceInfoTool = createTool({
                 encoding: 'utf8',
                 timeout: GIT_CMD_TIMEOUT_MS,
             }).trim();
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'session-tools.gitInfo');
         }
 

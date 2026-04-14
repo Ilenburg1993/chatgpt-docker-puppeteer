@@ -200,7 +200,7 @@ export function createProductionHooks(opts = {}) {
         if (toolResult && typeof toolResult === 'object') {
             const resultSize =
                 'content' in toolResult
-                    ? String(/** @type {any} */ (toolResult).content).length
+                    ? String(/** @type {{ content: unknown }} */ (toolResult).content).length
                     : JSON.stringify(toolResult).length;
             if (resultSize > 50_000) {
                 return {

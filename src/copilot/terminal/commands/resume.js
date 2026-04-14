@@ -11,7 +11,7 @@
  */
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 
 /**
  * Handler do comando `/resume`.
@@ -43,8 +43,8 @@ export async function cmdResume({ println, hubSessionId }, arg) {
             println('');
             println('\x1b[90m  Use /resume <id> (primeiros 8 chars ou completo) para retomar.\x1b[0m');
             println('');
-        } catch (/** @type {any} */ e) {
-            println(`\x1b[31m  ✗ Erro ao listar sessões: ${e.message}\x1b[0m`);
+        } catch (e) {
+            println(`\x1b[31m  ✗ Erro ao listar sessões: ${toError(e).message}\x1b[0m`);
         }
         return;
     }
@@ -81,7 +81,7 @@ export async function cmdResume({ println, hubSessionId }, arg) {
         // Import dinâmico para evitar ciclo
         const { sendTurn } = await import('../dialog.js');
         await sendTurn(summaryPrompt, 'user');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  ✗ Erro ao retomar sessão: ${e.message}\x1b[0m`);
+    } catch (e) {
+        println(`\x1b[31m  ✗ Erro ao retomar sessão: ${toError(e).message}\x1b[0m`);
     }
 }

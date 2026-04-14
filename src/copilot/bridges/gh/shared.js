@@ -43,7 +43,7 @@ export async function runGh(args, opts = {}) {
  *
  * @param {string[]} args
  * @param {object} [opts]
- * @returns {Promise<any>} Resultado de JSON.parse da saída do `gh` CLI (tipo dinâmico por natureza)
+ * @returns {Promise<unknown>} Resultado de JSON.parse da saída do `gh` CLI (tipo dinâmico por natureza)
  */
 export async function runGhJson(args, opts = {}) {
     const raw = await runGh(args, opts);

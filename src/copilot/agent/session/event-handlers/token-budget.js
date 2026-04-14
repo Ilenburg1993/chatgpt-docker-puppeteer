@@ -13,7 +13,7 @@ import { CONTEXT_UTIL_WARN_THRESHOLD } from '../../config.js';
  * @param {{ currentTokens: number; tokenLimit: number }} usageData
  * @param {boolean} isResumed
  * @param {boolean} firstCheck
- * @param {(event: string, payload?: any) => void} emit
+ * @param {(event: string, payload?: unknown) => void} emit
  */
 function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed, firstCheck, emit) {
     const ratio = Math.round((currentTokens / tokenLimit) * 100);
@@ -41,7 +41,7 @@ function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed
 export function wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {
     let firstUsageChecked = false;
     return [
-        session.on(SESSION_EVENTS.SESSION_USAGE_INFO, (/** @type {any} */ evt) => {
+        session.on(SESSION_EVENTS.SESSION_USAGE_INFO, (evt) => {
             const data = evt?.data ?? {};
             emit('session.usage', data);
             const currentTokens = /** @type {number} */ (data['currentTokens'] ?? 0);

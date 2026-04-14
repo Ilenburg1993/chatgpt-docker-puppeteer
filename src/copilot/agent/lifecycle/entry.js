@@ -15,8 +15,7 @@
  * @see EventBus
  */
 
-import {
-    EVENT_BUS,
+import { toError, EVENT_BUS,
     TimeoutError,
     bridgeEmitter,
     container,
@@ -62,7 +61,7 @@ export async function startAgentLoop() {
     {
         const _pluginRegistry = new PluginRegistry();
         const _pluginsDir = new URL('../../plugins', import.meta.url).pathname;
-        discoverPlugins(_pluginsDir, _pluginRegistry).catch((/** @type {any} */ e) => {
+        discoverPlugins(_pluginsDir, _pluginRegistry).catch((e) => {
             log('WARN', `[copilot/agent] Plugin discovery falhou (não crítico): ${e?.message ?? e}`);
         });
     }
@@ -104,7 +103,7 @@ export async function startAgentLoop() {
                 },
             );
             log('INFO', '[copilot/agent] Agente ativo e aguardando mensagens via HTTP bridge.');
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             log('ERROR', `[copilot/agent] Máximo de tentativas atingido (${BOOT_MAX_RETRIES}). Encerrando processo.`);
             process.exitCode = 1;
             process.exit(1);
@@ -127,8 +126,8 @@ export async function startAgentLoop() {
             try {
                 await alwaysAliveAgent.stop();
                 log('INFO', '[copilot/agent] Agente parado.');
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[copilot/agent] Erro no shutdown: ${e.message}`);
+            } catch (e) {
+                log('WARN', `[copilot/agent] Erro no shutdown: ${toError(e).message}`);
             }
         },
         0,
@@ -162,7 +161,7 @@ export async function startAgentLoop() {
                 process.send?.({ ok: true, status: alwaysAliveAgent.status });
             } else if (cmd === 'stop') {
                 log('INFO', '[copilot/agent] IPC stop recebido — encerrando...');
-                shutdown('IPC:stop').catch((/** @type {any} */ e) => logSwallowed(e, 'agent.entry.ipcShutdown'));
+                shutdown('IPC:stop').catch((e) => logSwallowed(e, 'agent.entry.ipcShutdown'));
             } else {
                 process.send?.({ ok: false, error: `Comando desconhecido: ${cmd}` });
             }
@@ -213,14 +212,14 @@ export async function startAgentLoop() {
             } else {
                 log('INFO', '[copilot/agent] Autenticação Copilot OK.');
             }
-        } catch (/** @type {any} */ authErr) {
-            log('DEBUG', `[copilot/agent] Verificação de auth ignorada: ${authErr?.message ?? authErr}`);
+        } catch (authErr) {
+            log('DEBUG', `[copilot/agent] Verificação de auth ignorada: ${toError(authErr).message ?? authErr}`);
         }
 
         // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
-        pingClient.stop().catch((/** @type {any} */ e) => logSwallowed(e, 'agent.entry.pingStop'));
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${e.message}`);
+        pingClient.stop().catch((e) => logSwallowed(e, 'agent.entry.pingStop'));
+    } catch (e) {
+        log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${toError(e).message}`);
         // Continuar de qualquer forma — startWithRetry() tratará a falha
     }
 
@@ -238,15 +237,15 @@ export async function startAgentLoop() {
             } else {
                 log('INFO', `[copilot/agent] Modelo '${COPILOT_MODEL}' validado na lista de modelos.`);
             }
-        } catch (/** @type {any} */ e) {
-            log('DEBUG', `[copilot/agent] Validação de modelo ignorada: ${e?.message ?? e}`);
+        } catch (e) {
+            log('DEBUG', `[copilot/agent] Validação de modelo ignorada: ${toError(e).message ?? e}`);
         }
     }
 
     // Captura Promise para garantir que rejeições assíncronas não fiquem silenciosas.
     const _startPromise = startWithRetry();
-    _startPromise.catch((/** @type {any} */ e) => {
-        log('ERROR', `[copilot/agent] startWithRetry() rejeitou: ${e.message}`);
+    _startPromise.catch((e) => {
+        log('ERROR', `[copilot/agent] startWithRetry() rejeitou: ${toError(e).message}`);
         process.exitCode = 1;
     });
 }

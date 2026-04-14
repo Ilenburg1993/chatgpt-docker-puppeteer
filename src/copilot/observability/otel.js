@@ -30,6 +30,7 @@ import {
 } from '#copilot/config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { toError } from '../core/error-handlers.js';
 
 const __otel_dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__otel_dirname, '..', '..', '..');
@@ -195,16 +196,19 @@ export async function startSpan(name, attrs, fn) {
                 );
             }
         }
-        const ctx = trace.setSpan(context.active(), /** @type {any} */ (span));
+        const ctx = trace.setSpan(
+            context.active(),
+            /** @type {import('@opentelemetry/api').Span} */ (/** @type {unknown} */ (span)),
+        );
         const start = Date.now();
         try {
             const result = await context.with(ctx, fn);
             span.setAttribute('duration_ms', Date.now() - start);
             span.setStatus({ code: /** SpanStatusCode.OK */ 1 });
             return result;
-        } catch (/** @type {any} */ err) {
+        } catch (err) {
             span.setAttribute('duration_ms', Date.now() - start);
-            span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: err.message });
+            span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: toError(err).message });
             span.recordException(err);
             throw err;
         } finally {

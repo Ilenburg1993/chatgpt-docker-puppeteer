@@ -11,7 +11,7 @@
  */
 
 import { HUB } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 
 /**
  * @typedef {object} SearchContext
@@ -59,7 +59,7 @@ export function cmdSearch({ println, hubSessionId }, arg) {
             println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${role}\x1b[0m: ${preview}`);
         }
         println('');
-    } catch (/** @type {any} */ e) {
-        println(`\n  \x1b[31m❌ Erro na busca: ${e.message}\x1b[0m\n`);
+    } catch (e) {
+        println(`\n  \x1b[31m❌ Erro na busca: ${toError(e).message}\x1b[0m\n`);
     }
 }

@@ -13,6 +13,7 @@ import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { CHANNEL_VERSION, createConversationService } from '#copilot/services';
 import { createRequire } from 'node:module';
+import { toError } from '../../../core/error-handlers.js';
 
 const conversationService = createConversationService();
 
@@ -128,8 +129,8 @@ function _handleHealth(res, agent) {
         try {
             store.db.prepare('SELECT 1').get();
             return { ok: true };
-        } catch (/** @type {any} */ e) {
-            return { ok: false, error: String(e?.message ?? 'unknown') };
+        } catch (e) {
+            return { ok: false, error: String(toError(e).message ?? 'unknown') };
         }
     })();
 
@@ -184,9 +185,9 @@ async function _handleStart(res, agent) {
         }
         await agent.start();
         return void res.json({ ok: true, sessionId: agent.sessionId, status: agent.status });
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[copilot-api/control/start] ${e.message}`);
-        return void res.status(500).json({ ok: false, error: e.message });
+    } catch (e) {
+        log('ERROR', `[copilot-api/control/start] ${toError(e).message}`);
+        return void res.status(500).json({ ok: false, error: toError(e).message });
     }
 }
 
@@ -202,9 +203,9 @@ async function _handleStop(res, agent) {
         }
         await agent.stop();
         return void res.json({ ok: true, message: 'Agente parado.' });
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[copilot-api/control/stop] ${e.message}`);
-        return void res.status(500).json({ ok: false, error: e.message });
+    } catch (e) {
+        log('ERROR', `[copilot-api/control/stop] ${toError(e).message}`);
+        return void res.status(500).json({ ok: false, error: toError(e).message });
     }
 }
 
@@ -245,9 +246,9 @@ function _handleSetPermissions(req, res, agent) {
         const after = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : mode;
         log('INFO', `[copilot-api/control/permissions] modo: ${before} → ${after}`);
         return void res.json({ ok: true, before, after });
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[copilot-api/control/permissions] ${e.message}`);
-        return void res.status(500).json({ ok: false, error: e.message });
+    } catch (e) {
+        log('ERROR', `[copilot-api/control/permissions] ${toError(e).message}`);
+        return void res.status(500).json({ ok: false, error: toError(e).message });
     }
 }
 
@@ -269,8 +270,8 @@ async function _handleSteer(req, res, agent) {
     try {
         const messageId = await agent.steerMessage(message);
         return void res.json({ ok: true, messageId });
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[copilot-api/control/steer] ${e.message}`);
-        return void res.status(500).json({ ok: false, error: e.message });
+    } catch (e) {
+        log('ERROR', `[copilot-api/control/steer] ${toError(e).message}`);
+        return void res.status(500).json({ ok: false, error: toError(e).message });
     }
 }

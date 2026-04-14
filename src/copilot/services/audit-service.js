@@ -38,19 +38,23 @@ export class AuditService {
      * Obtém as últimas N entradas do audit log.
      *
      * @param {number} [count=50] Default is `50`
-     * @returns {any[]}
+     * @returns {import('../audit/pipeline-audit-log.js').AuditEntry[]}
      */
     getTail(count = 50) {
-        return getAuditTail(count);
+        return /** @type {import('../audit/pipeline-audit-log.js').AuditEntry[]} */ (
+            /** @type {unknown} */ (getAuditTail(count))
+        );
     }
 
     /**
      * Obtém o audit log padrão.
      *
-     * @returns {any}
+     * @returns {import('../audit/pipeline-audit-log.js').AuditLog}
      */
     getDefaultLog() {
-        return defaultAuditLog;
+        return /** @type {import('../audit/pipeline-audit-log.js').AuditLog} */ (
+            /** @type {unknown} */ (defaultAuditLog)
+        );
     }
 
     /**
@@ -66,7 +70,9 @@ export class AuditService {
     /**
      * Obtém o global audit buffer.
      *
-     * @returns {any}
+     * @returns {import('../audit/ring-buffer.js').AuditRingBuffer<
+     *     import('../audit/pipeline-sdk-buffer.js').SdkAuditEntry
+     * >}
      */
     getBuffer() {
         return globalAuditBuffer;
@@ -75,7 +81,7 @@ export class AuditService {
     /**
      * Obtém o error tracker.
      *
-     * @returns {any}
+     * @returns {import('../observability/error-tracker.js').ErrorTracker}
      */
     getErrorTracker() {
         return container.resolve(ERROR_TRACKER);
@@ -84,7 +90,7 @@ export class AuditService {
     /**
      * Obtém a store de métricas.
      *
-     * @returns {any}
+     * @returns {import('../observability/metrics.js').MetricsStore}
      */
     getMetrics() {
         return container.resolve(METRICS_STORE);

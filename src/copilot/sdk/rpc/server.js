@@ -100,7 +100,7 @@ export async function ping(client, message) {
     if (message) params['message'] = message;
 
     appLog('DEBUG', `[sdk/server-rpc] ping: message='${message ?? ''}'`);
-    return client.rpc.ping(/** @type {any} */ (params));
+    return client.rpc.ping(/** @type {{ message?: string }} */ (params));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -137,7 +137,7 @@ export async function toolsList(client, options) {
     if (options?.model) params['model'] = options.model;
 
     appLog('DEBUG', `[sdk/server-rpc] tools.list: model='${options?.model ?? 'all'}'`);
-    return client.rpc.tools.list(/** @type {any} */ (params));
+    return client.rpc.tools.list(/** @type {{ model?: string }} */ (params));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

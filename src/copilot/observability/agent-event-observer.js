@@ -32,6 +32,7 @@ import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { EMITTER_TO_BUS_TYPE } from './observers/event-name-map.js';
 import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observers/index.js';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
@@ -112,7 +113,7 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
                 );
                 return;
             }
-            const unsub = bus.on(busType, (/** @type {any} */ evt) => listener(evt));
+            const unsub = bus.on(busType, (evt) => listener(evt));
             _busUnsubscribers.push(unsub);
         };
     }
@@ -126,8 +127,8 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
         return (...args) => {
             try {
                 fn(...args);
-            } catch (/** @type {any} */ err) {
-                log('WARN', `[agent-event-observer] erro no handler ${context}: ${err?.message ?? err}`);
+            } catch (err) {
+                log('WARN', `[agent-event-observer] erro no handler ${context}: ${toError(err).message ?? err}`);
             }
         };
     }

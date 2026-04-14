@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /**
@@ -26,8 +26,8 @@ export async function abortCurrentMessage(ctx) {
     try {
         await ctx.session.abort();
         log('INFO', '[AlwaysAlive] Mensagem SDK abortada via session.abort().');
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[AlwaysAlive] session.abort() falhou: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[AlwaysAlive] session.abort() falhou: ${toError(e).message}`);
     }
 }
 
@@ -53,7 +53,7 @@ export async function sessionLog(ctx, message, options) {
     if (!ctx.session || typeof ctx.session.log !== 'function') return;
     try {
         await ctx.session.log(message, options);
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'agent.sessionLog');
     }
 }

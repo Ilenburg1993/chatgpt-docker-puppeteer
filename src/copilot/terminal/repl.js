@@ -12,7 +12,7 @@
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
@@ -244,9 +244,9 @@ async function _cmdRestart() {
             clearTimeout(timeout);
             getAgent().off('dialog.ready', onReady);
         }
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  Falha no restart: ${e.message}\x1b[0m`);
-        await ensureDialogLoop().catch((/** @type {any} */ e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
+    } catch (e) {
+        println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);
+        await ensureDialogLoop().catch((e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
     }
     println('\x1b[32m  Dialog loop reiniciado.\x1b[0m');
 }
@@ -255,8 +255,8 @@ async function _cmdPauseDialogLoop() {
     try {
         await getAgent().pauseDialogLoop();
         println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  Erro ao pausar: ${e.message}\x1b[0m`);
+    } catch (e) {
+        println(`\x1b[31m  Erro ao pausar: ${toError(e).message}\x1b[0m`);
     }
 }
 
@@ -264,8 +264,8 @@ async function _cmdDialogResume() {
     try {
         await getAgent().resumeDialogLoop();
         println('\x1b[32m  Dialog loop retomado.\x1b[0m');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  Erro ao retomar: ${e.message}\x1b[0m`);
+    } catch (e) {
+        println(`\x1b[31m  Erro ao retomar: ${toError(e).message}\x1b[0m`);
     }
 }
 
@@ -298,7 +298,7 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     cleanup();
     try {
         await getAgent().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'terminal.repl.stopLoop');
     }
     rl.close();
@@ -355,9 +355,9 @@ export async function startRepl(injectServer) {
 
     try {
         await ensureDialogLoop();
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  [erro de boot] ${e.message}\x1b[0m`);
-        log('ERROR', `[TerminalServer] Boot error: ${e.message}`);
+    } catch (e) {
+        println(`\x1b[31m  [erro de boot] ${toError(e).message}\x1b[0m`);
+        log('ERROR', `[TerminalServer] Boot error: ${toError(e).message}`);
     }
 
     rl.prompt();

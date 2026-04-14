@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { MAX_CONTENT_BYTES, MAX_LIST_ENTRIES, WORKSPACE_ROOT, validatePath } from './shared.js';
+import { toError } from '../../core/error-handlers.js';
 
 // ---------------------------------------------------------------------------
 // Tool: read_file_content
@@ -102,8 +103,8 @@ const readFileContentTool = buildTool({
                 content: truncated ? slice.slice(0, MAX_CONTENT_BYTES) + '\n[... conteúdo truncado ...]' : slice,
                 truncated,
             };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -215,8 +216,8 @@ const listDirectoryTool = buildTool({
                 truncated: entries.length >= MAX_LIST_ENTRIES,
                 entries,
             };
-        } catch (/** @type {any} */ err) {
-            return { success: false, error: err.message };
+        } catch (err) {
+            return { success: false, error: toError(err).message };
         }
     },
 });

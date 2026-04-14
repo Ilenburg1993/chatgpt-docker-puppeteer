@@ -102,7 +102,9 @@ export function buildZodSchema(inputSchema, parentRequired, key) {
         /** @type {Record<string, import('zod').ZodType>} */
         const shape = {};
 
-        for (const [k, prop] of Object.entries(/** @type {Record<string, any>} */ (schema.properties))) {
+        for (const [k, prop] of Object.entries(
+            /** @type {Record<string, Record<string, unknown>>} */ (schema.properties),
+        )) {
             shape[k] = buildZodSchema(prop, required, k);
         }
 

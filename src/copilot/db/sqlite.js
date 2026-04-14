@@ -20,7 +20,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { ConfigError, registerShutdownHandler } from '#copilot/core';
+import { toError, ConfigError, registerShutdownHandler } from '#copilot/core';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -155,8 +155,8 @@ function getCopilotDb() {
         const dir = path.dirname(dbPath);
         try {
             fs.mkdirSync(dir, { recursive: true });
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[CopilotDB] Failed to create directory: ${dir} — ${err?.message ?? String(err)}`);
+        } catch (err) {
+            log('ERROR', `[CopilotDB] Failed to create directory: ${dir} — ${toError(err).message ?? String(err)}`);
             throw err;
         }
     }
@@ -180,8 +180,8 @@ function closeCopilotDb() {
     if (!copilotDb) return;
     try {
         copilotDb.close();
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[CopilotDB] Failed to close: ${err?.message ?? String(err)}`);
+    } catch (err) {
+        log('WARN', `[CopilotDB] Failed to close: ${toError(err).message ?? String(err)}`);
     } finally {
         copilotDb = null;
     }
@@ -200,7 +200,7 @@ function registerExitHandler() {
         if (copilotDb) {
             try {
                 copilotDb.close();
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'db.sqlite.close');
             }
             copilotDb = null;

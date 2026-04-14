@@ -8,6 +8,7 @@
  */
 
 import { log } from '../logger.js';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
@@ -37,11 +38,11 @@ export function createErrorAlerterAction({ bus, onAlert }) {
 
     for (const pattern of errorPatterns) {
         unsubs.push(
-            bus.on(pattern, (/** @type {any} */ evt) => {
+            bus.on(pattern, (evt) => {
                 try {
                     alertFn(evt);
-                } catch (/** @type {any} */ e) {
-                    log('WARN', `[error-alerter] erro ao processar alerta: ${e?.message}`);
+                } catch (e) {
+                    log('WARN', `[error-alerter] erro ao processar alerta: ${toError(e).message}`);
                 }
             }),
         );

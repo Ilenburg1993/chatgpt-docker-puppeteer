@@ -72,7 +72,7 @@ export function createToken(name) {
  * @property {<T>(token: Token<T>, factory: (c: Container) => T, lifecycle?: Lifecycle) => Container} register
  * @property {<T>(token: Token<T>) => T} resolve
  * @property {<T>(token: Token<T>) => boolean} has
- * @property {(tokens: ReadonlyArray<Token<any>>) => void} validateRequired
+ * @property {(tokens: ReadonlyArray<Token<unknown>>) => void} validateRequired
  * @property {() => Container} fork
  * @property {() => void} dispose
  * @property {() => ReadonlyArray<string>} tokens
@@ -230,7 +230,7 @@ export function createContainer(parent) {
         /**
          * Valida que todos os tokens obrigatórios estão registrados. Lança `Error` agregado listando os faltantes.
          *
-         * @param {ReadonlyArray<Token<any>>} required
+         * @param {ReadonlyArray<Token<unknown>>} required
          * @throws {Error} Se algum token obrigatório não estiver registrado.
          */
         validateRequired(required) {
@@ -245,8 +245,9 @@ export function createContainer(parent) {
     /**
      * Resolve uma Registration respeitando lifecycle.
      *
-     * @param {Registration<any>} reg
-     * @returns {any}
+     * @template T
+     * @param {Registration<T>} reg
+     * @returns {T}
      */
     function _resolveRegistration(reg) {
         const { lifecycle, token } = reg;

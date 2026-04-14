@@ -19,7 +19,7 @@
  */
 
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
-import { TimeoutError } from '#copilot/core';
+import { TimeoutError, toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { log } from './logger.js';
@@ -30,7 +30,7 @@ import { withSkipPermission } from './tool-factory.js';
 /**
  * Handle RPC ativo da sessão corrente. Injetado via setSessionRpc() após inicialização.
  *
- * @type {{ call?: Function } | null}
+ * @type {ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> | null}
  */
 let _rpc = null;
 
@@ -42,7 +42,7 @@ let _rpc = null;
  * @returns {void}
  */
 export function setSessionRpc(rpc) {
-    _rpc = /** @type {{ call?: Function } | null} */ (rpc);
+    _rpc = /** @type {ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> | null} */ (rpc);
     log('DEBUG', `[session-rpc-tools] RPC ${rpc ? 'registrado' : 'removido'}.`);
 }
 
@@ -51,7 +51,8 @@ export function setSessionRpc(rpc) {
 /**
  * Verifica se o RPC está disponível ou retorna um erro padronizado.
  *
- * @returns {{ ok: true; rpc: { call?: Function } } | { ok: false; error: string }}
+ * @returns {{ ok: true; rpc: ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> }
+ *     | { ok: false; error: string }}
  */
 function getRpc() {
     if (!_rpc) return { ok: false, error: 'Sessão SDK não disponível. Agent não inicializado ou em reconexão.' };
@@ -70,7 +71,8 @@ const RPC_TIMEOUT_MS = COPILOT_RPC_TIMEOUT_MS;
  *
  * @template T
  * @param {string} toolName - Nome do tool para logging
- * @param {(rpc: any) => Promise<T>} fn - Função que recebe o handle RPC e executa a operação
+ * @param {(rpc: ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade>) => Promise<T>} fn - Função que
+ *   recebe o handle RPC e executa a operação
  * @returns {Promise<T | { error: string }>}
  */
 async function wrapRpc(toolName, fn) {
@@ -85,9 +87,9 @@ async function wrapRpc(toolName, fn) {
             ),
         ]);
         return /** @type {T} */ (result);
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[${toolName}] ${e.message}`);
-        return { error: e.message };
+    } catch (e) {
+        log('ERROR', `[${toolName}] ${toError(e).message}`);
+        return { error: toError(e).message };
     }
 }
 
@@ -135,7 +137,7 @@ const sessionModeSetTool = createTool({
     ),
     handler: async (/** @type {{ mode: 'interactive' | 'plan' | 'autopilot' }} */ { mode }) =>
         wrapRpc('session_mode_set', async (rpc) => {
-            const result = await rpc.mode.set({ mode });
+            const result = await rpc.mode.set(mode);
             log('INFO', `[session_mode_set] mode→${result.mode}`);
             return result;
         }),
@@ -157,7 +159,7 @@ const sessionPlanReadTool = createTool({
     handler: async () =>
         wrapRpc('session_plan_read', async (rpc) => {
             const result = await rpc.plan.read();
-            log('INFO', `[session_plan_read] exists=${result.exists} path=${result.filePath ?? 'null'}`);
+            log('INFO', `[session_plan_read] exists=${result.exists} path=${result.path ?? 'null'}`);
             return result;
         }),
 });
@@ -182,7 +184,7 @@ const sessionPlanUpdateTool = createTool({
     ),
     handler: async (/** @type {{ content: string }} */ { content }) =>
         wrapRpc('session_plan_update', async (rpc) => {
-            const result = await rpc.plan.update({ content });
+            const result = await rpc.plan.update(content);
             log('INFO', `[session_plan_update] atualizado (${content.length} chars)`);
             return result;
         }),
@@ -255,7 +257,7 @@ const sessionAgentSelectTool = createTool({
                 log('INFO', '[session_agent_select] agente deselecionado (padrão)');
                 return { selected: null };
             }
-            const result = await rpc.agent.select({ name });
+            const result = await rpc.agent.select(name);
             log('INFO', `[session_agent_select] selecionado: ${result.agent.name}`);
             return result;
         }),
@@ -281,7 +283,7 @@ const sessionCompactTool = createTool({
             const result = await rpc.compaction.compact();
             log(
                 'INFO',
-                `[session_compact] success=${result.success} freed=${result.tokensFreed ?? 0} msgs=${result.messagesRemoved ?? 0}`,
+                `[session_compact] success=${result.success} freed=${result.tokensRemoved ?? 0} msgs=${result.messagesRemoved ?? 0}`,
             );
             return result;
         }),

@@ -134,9 +134,9 @@ export class AgentContext {
      * F69: Injeção de dependências MCP — permite override em testes e desacoplamento de camadas.
      *
      * @type {{
-     *     buildTools: () => Promise<any[]>;
+     *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
      *     buildConfig: () => Record<string, unknown>;
-     *     startAutoReconnect: (onTools: (tools: any[]) => void) => () => void;
+     *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
      * } | null}
      */
     mcpBridge = null;

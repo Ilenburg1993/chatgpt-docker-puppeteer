@@ -59,7 +59,7 @@ export function createJsonlWriter(opts) {
                 }
                 await appendFile(filePath, data, 'utf8');
                 _sizeBytes += dataBytes;
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'audit.jsonlWriter.write');
             }
         });

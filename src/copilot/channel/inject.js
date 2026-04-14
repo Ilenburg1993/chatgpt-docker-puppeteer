@@ -11,7 +11,7 @@
  */
 
 import { LLM_B_TERMINAL_PORT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError } from '#copilot/core';
+import { toError, BridgeError } from '#copilot/core';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
@@ -199,9 +199,9 @@ export async function injectToLlmB(message, opts = {}) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await _doInjectToLlmB(message, opts);
-        } catch (/** @type {any} */ err) {
-            const isBusy = err?.code === 'LLM_B_BUSY';
-            const isBootingUp = retryOn503 && err?.code === 'LLM_B_UNAVAILABLE';
+        } catch (err) {
+            const isBusy = toError(err).code === 'LLM_B_BUSY';
+            const isBootingUp = retryOn503 && toError(err).code === 'LLM_B_UNAVAILABLE';
             if ((isBusy || isBootingUp) && attempt < maxRetries) {
                 // F11.2: backoff exponencial (base, 2×, 4×, ...) em vez de linear
                 const waitMs = retryDelayMs * Math.pow(2, attempt);
@@ -239,7 +239,7 @@ async function _doInjectToLlmB(message, opts) {
     let body;
     try {
         ({ statusCode, body } = await httpRequest('POST', '/inject', payload, port, timeoutMs));
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         // F11.3: registrar erro de transporte no tool-stats
         recordToolCall('channel.inject', Date.now() - _startMs, false);
         throw e;

@@ -205,7 +205,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
 
     // Registra handler no SDK para encaminhar eventos
-    const unsubscribe = entry.session.on((/** @type {any} */ event) => {
+    const unsubscribe = entry.session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
         const type = /** @type {string} */ (event?.type ?? '');
         if (!eventFilter || eventFilter(type)) sse.send('message', standardizeSsePayload(event));
     });

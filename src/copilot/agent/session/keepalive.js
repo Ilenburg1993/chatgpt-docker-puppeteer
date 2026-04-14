@@ -13,6 +13,7 @@
 
 import { log } from '#copilot/observability';
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../config.js';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {Object} SessionKeepaliveOptions
@@ -135,8 +136,8 @@ export class SessionKeepalive {
                 log('DEBUG', `[SessionKeepalive] Ping keepalive (0 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
                 onKeepalive?.(Date.now());
                 return;
-            } catch (/** @type {any} */ pingErr) {
-                log('WARN', `[SessionKeepalive] Ping keepalive falhou: ${pingErr.message} — tentando session.send()`);
+            } catch (pingErr) {
+                log('WARN', `[SessionKeepalive] Ping keepalive falhou: ${toError(pingErr).message} — tentando session.send()`);
             }
         }
 
@@ -149,8 +150,8 @@ export class SessionKeepalive {
             this.#lastActivityAt = Date.now();
             log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
             onKeepalive?.(Date.now());
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[SessionKeepalive] Heartbeat falhou: ${e.message}`);
+        } catch (e) {
+            log('WARN', `[SessionKeepalive] Heartbeat falhou: ${toError(e).message}`);
         }
     }
 }

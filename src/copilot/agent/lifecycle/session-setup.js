@@ -32,7 +32,7 @@ import { bootstrapTools, setSessionRpc } from '../infra/tools-bootstrap.js';
  * Prepara tools para a sessão: MCP bridge + registry + bootstrap.
  *
  * @param {AgentContext} ctx
- * @returns {Promise<{ tools: any[] }>}
+ * @returns {Promise<{ tools: import('#copilot/sdk/types').Tool[] }>}
  */
 export async function buildSessionTools(ctx) {
     ctx.messagesCache.invalidate();
@@ -77,8 +77,8 @@ export function buildSessionHooks(ctx, host) {
  *
  * @param {AgentContext} ctx
  * @param {LifecycleHost} host
- * @param {{ tools: any[]; busHooks: ReturnType<typeof attachBus> }} prepared
- * @returns {Record<string, any>}
+ * @param {{ tools: import('#copilot/sdk/types').Tool[]; busHooks: ReturnType<typeof attachBus> }} prepared
+ * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     return {

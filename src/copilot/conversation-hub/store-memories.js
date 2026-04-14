@@ -68,11 +68,13 @@ export function recallMemories(db, opts = {}) {
                  LIMIT ?`,
             )
             .all(ftsQuery, ...tagArg, ...sessionArg, limit);
-        return /** @type {any[]} */ (rows);
+        return /** @type {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]} */ (
+            rows
+        );
     }
 
     if (opts.tag) {
-        return /** @type {any[]} */ (
+        return /** @type {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]} */ (
             db
                 .prepare(
                     `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories
@@ -83,7 +85,7 @@ export function recallMemories(db, opts = {}) {
         );
     }
 
-    return /** @type {any[]} */ (
+    return /** @type {{ id: string; tag: string; content: string; created_at: number; hub_session_id: string | null }[]} */ (
         db
             .prepare(
                 `SELECT id, tag, content, created_at, hub_session_id FROM copilot_memories

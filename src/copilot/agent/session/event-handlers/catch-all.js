@@ -92,8 +92,9 @@ export const KNOWN_SDK_EVENTS = new Set([
  * @returns {() => void}
  */
 export function wireCatchAll(session) {
-    return session.on((/** @type {any} */ evt) => {
-        const kind = /** @type {string} */ (evt?.kind ?? evt?.type ?? 'unknown');
+    return session.on((evt) => {
+        const e = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+        const kind = /** @type {string} */ (e.kind ?? e.type ?? 'unknown');
         if (KNOWN_SDK_EVENTS.has(kind)) return;
         log('WARN', `[AlwaysAlive] Evento SDK desconhecido: kind=${kind} — SDK pode ter sido atualizado`);
     });

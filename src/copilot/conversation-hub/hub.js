@@ -276,11 +276,11 @@ export class ConversationHub {
                 for (const session of activeSessions) {
                     try {
                         this.#orchestrator.closeSession(session.id);
-                    } catch (/** @type {any} */ e) {
+                    } catch (e) {
                         logSwallowed(e, 'hub.closeSession');
                     }
                 }
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'hub.listSessionsOnShutdown');
             }
         }
@@ -332,7 +332,7 @@ export class ConversationHub {
                     payload,
                     ts: Date.now(),
                 });
-            } catch (/** @type {any} */ _err) {
+            } catch (_err) {
                 // NERV indisponível — ignorar silenciosamente
             }
         };

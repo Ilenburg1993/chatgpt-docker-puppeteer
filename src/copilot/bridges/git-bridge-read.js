@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import { METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
@@ -49,11 +49,11 @@ async function runGit(args, opts = {}) {
         span?.setStatus({ code: 1 });
         container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, true);
         return stdout.trim();
-    } catch (/** @type {any} */ err) {
+    } catch (err) {
         const elapsed = Date.now() - t0;
         span?.setAttribute('duration_ms', elapsed);
         span?.setAttribute('status_code', 2);
-        span?.setStatus({ code: 2, message: err.message });
+        span?.setStatus({ code: 2, message: toError(err).message });
         span?.recordException(err);
         container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, false);
         container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');

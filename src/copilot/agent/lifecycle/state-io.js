@@ -14,7 +14,7 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { logSwallowed } from '#copilot/core';
+import { toError, logSwallowed } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -97,7 +97,7 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
 export function readState() {
     if (_stateCache !== null) return _stateCache;
     // F52: em vez de readFileSync, dispara async load e retorna null
-    readStateAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.readState.asyncFallback'));
+    readStateAsync().catch((e) => logSwallowed(e, 'stateIo.readState.asyncFallback'));
     return null;
 }
 
@@ -118,7 +118,7 @@ export function writeState(updates) {
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     _stateCache = next;
     // Dispara escrita async via mutex serial
-    writeStateAsync(updates).catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.writeState.asyncFallback'));
+    writeStateAsync(updates).catch((e) => logSwallowed(e, 'stateIo.writeState.asyncFallback'));
     return next;
 }
 
@@ -138,7 +138,7 @@ export function writeState(updates) {
 export async function writeStateAsync(updates) {
     _writeQueue = _writeQueue
         .then(() => _doWriteState(updates))
-        .catch((/** @type {any} */ err) => {
+        .catch((err) => {
             log('WARN', `[PersistentSession] writeStateAsync retry após falha: ${err?.message ?? err}`);
             return _doWriteState(updates);
         });
@@ -175,7 +175,7 @@ export function clearState() {
     _stateCache = null;
     _stateDirReady = false;
     _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
-    clearStateAsync().catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
+    clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }
 
 /**
@@ -199,7 +199,7 @@ export async function readStateAsync() {
             log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
             try {
                 await rm(STATE_FILE, { force: true });
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'stateIo.readStateAsync.rmCorrupt');
             }
             return null;
@@ -211,11 +211,11 @@ export async function readStateAsync() {
         }
         _stateCache = /** @type {AliveAgentState} */ (result.data);
         return _stateCache;
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[PersistentSession] Estado corrompido (${e.message}) — removendo arquivo e reiniciando.`);
+    } catch (e) {
+        log('WARN', `[PersistentSession] Estado corrompido (${toError(e).message}) — removendo arquivo e reiniciando.`);
         try {
             await rm(STATE_FILE, { force: true });
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'stateIo.readStateAsync.rmCorruptOuter');
         }
         return null;
@@ -233,7 +233,7 @@ export async function clearStateAsync() {
     try {
         await rm(STATE_FILE, { force: true });
         log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'stateIo.clearStateAsync.rm');
     }
     _stateCache = null;
@@ -250,7 +250,7 @@ export async function clearStateAsync() {
  */
 export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
     await Promise.race([
-        _writeQueue.then(() => undefined).catch((/** @type {any} */ e) => logSwallowed(e, 'stateIo.drainWrites')),
+        _writeQueue.then(() => undefined).catch((e) => logSwallowed(e, 'stateIo.drainWrites')),
         new Promise((resolve) => setTimeout(resolve, timeoutMs)),
     ]);
 }
@@ -265,7 +265,7 @@ export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
  * @returns {void}
  */
 export function persistState(data, tag) {
-    writeStateAsync(data).catch((/** @type {any} */ e) => log('WARN', `${tag}: ${e.message}`));
+    writeStateAsync(data).catch((e) => log('WARN', `${tag}: ${e.message}`));
 }
 
 // ─── Helpers privados ─────────────────────────────────────────────────────────

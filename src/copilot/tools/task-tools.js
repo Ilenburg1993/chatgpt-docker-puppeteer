@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { httpRequest } from '../sdk/http-request.js';
 import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
@@ -52,9 +53,9 @@ const getTasksTool = createTool({
                 tasks: data?.data?.tasks ?? data?.tasks ?? [],
                 total: data?.data?.total ?? data?.total ?? 0,
             };
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[copilot/get_tasks] Falha ao consultar tarefas: ${e.message}`);
-            return { tasks: [], total: 0, error: e.message };
+        } catch (e) {
+            log('WARN', `[copilot/get_tasks] Falha ao consultar tarefas: ${toError(e).message}`);
+            return { tasks: [], total: 0, error: toError(e).message };
         }
     },
 });
@@ -98,9 +99,9 @@ const addTaskTool = createTool({
             const data = JSON.parse(resBody);
             log('INFO', `[copilot/add_task] Tarefa criada: ${data?.data?.id ?? JSON.stringify(data)}`);
             return { success: true, task: data?.data ?? data };
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[copilot/add_task] Falha ao criar tarefa: ${e.message}`);
-            return { success: false, error: e.message };
+        } catch (e) {
+            log('WARN', `[copilot/add_task] Falha ao criar tarefa: ${toError(e).message}`);
+            return { success: false, error: toError(e).message };
         }
     },
 });
@@ -129,8 +130,8 @@ const getSessionStateTool = createTool({
                 }
             }
             return result;
-        } catch (/** @type {any} */ e) {
-            return { error: e.message };
+        } catch (e) {
+            return { error: toError(e).message };
         }
     },
 });
@@ -148,8 +149,8 @@ const getSystemHealthTool = createTool({
             const { statusCode, body } = await httpRequest('GET', `http://127.0.0.1:${port}/api/health`);
             if (statusCode !== 200) return { healthy: false, error: `HTTP ${statusCode}` };
             return JSON.parse(body);
-        } catch (/** @type {any} */ e) {
-            return { healthy: false, error: e.message };
+        } catch (e) {
+            return { healthy: false, error: toError(e).message };
         }
     },
 });

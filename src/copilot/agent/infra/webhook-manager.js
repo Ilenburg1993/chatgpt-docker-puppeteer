@@ -9,7 +9,7 @@
  */
 
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config';
-import { ConfigError, checkResolvedIp, validateWebhookUrl } from '#copilot/core';
+import { toError, ConfigError, checkResolvedIp, validateWebhookUrl } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config.js';
 
@@ -161,8 +161,8 @@ export class WebhookManager {
                     try {
                         const hostname = new URL(url).hostname;
                         await WebhookManager.#checkResolvedIp(hostname);
-                    } catch (/** @type {any} */ e) {
-                        log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${e.message}`);
+                    } catch (e) {
+                        log('WARN', `[WebhookManager] ${id} bloqueado (DNS rebinding): ${toError(e).message}`);
                         return;
                     }
                 }
@@ -215,14 +215,14 @@ export class WebhookManager {
                 } else {
                     log('WARN', `[WebhookManager] ${id} HTTP ${resp.status} de ${url} após ${maxRetries} retries`);
                 }
-            } catch (/** @type {any} */ e) {
-                const reason = e.name === 'AbortError' ? 'timeout' : 'network';
+            } catch (e) {
+                const reason = toError(e).name === 'AbortError' ? 'timeout' : 'network';
                 if (attempt < maxRetries) {
                     log('DEBUG', `[WebhookManager] ${id} ${reason} — retry ${attempt + 1}/${maxRetries}`);
                 } else {
                     log(
                         'WARN',
-                        `[WebhookManager] ${id} falhou (${reason}) ao notificar ${url} após ${maxRetries} retries: ${e.message}`,
+                        `[WebhookManager] ${id} falhou (${reason}) ao notificar ${url} após ${maxRetries} retries: ${toError(e).message}`,
                     );
                 }
             } finally {

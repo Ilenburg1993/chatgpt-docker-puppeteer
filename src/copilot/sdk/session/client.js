@@ -12,7 +12,7 @@
 
 import { CopilotClient } from '@github/copilot-sdk';
 import { CircuitBreaker } from '../../core/circuit-breaker.js';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { toError, logSwallowed } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
@@ -177,8 +177,8 @@ export async function forceStopClient() {
         } else {
             await _client.stop();
         }
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[lib/sdk-client] Erro no forceStop: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[lib/sdk-client] Erro no forceStop: ${toError(e).message}`);
     }
     _client = null;
 }
@@ -284,8 +284,8 @@ export async function disconnectClientSession(sessionId) {
     }
     try {
         await entry.session.disconnect();
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${toError(e).message}`);
     }
     _sessions.delete(sessionId);
     log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
@@ -302,7 +302,7 @@ export async function deleteClientSession(sessionId) {
     if (entry) {
         try {
             await entry.session.disconnect();
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'sdk.client.disconnect');
         }
         _sessions.delete(sessionId);

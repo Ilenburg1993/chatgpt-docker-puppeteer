@@ -10,6 +10,7 @@
 
 import { log } from '#copilot/observability';
 import { z } from 'zod';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -81,10 +82,10 @@ export function validateModel(model) {
 export async function withErrorHandler(req, res, fn) {
     try {
         await fn();
-    } catch (/** @type {any} */ e) {
-        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${e.message}`);
+    } catch (e) {
+        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${toError(e).message}`);
         if (!res.headersSent) {
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: toError(e).message });
         }
     }
 }

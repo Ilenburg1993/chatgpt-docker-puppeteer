@@ -18,6 +18,7 @@
  */
 
 import { z } from 'zod';
+import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
 
@@ -67,7 +68,7 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
             .optional()
             .describe('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
     }),
-    handler: async (/** @type {{ title?: string; metadata?: Record<string, any> }} */ { title, metadata }) => {
+    handler: async (/** @type {{ title?: string; metadata?: Record<string, unknown> }} */ { title, metadata }) => {
         try {
             const hub = requireHub();
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
@@ -81,9 +82,9 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
                 hubSessionId,
                 message: `Hub session criada: ${hubSessionId}. Use este ID em hub_send_message.`,
             };
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[hub_create_session] Erro: ${err.message}`);
-            return { success: false, error: err.message };
+        } catch (err) {
+            log('ERROR', `[hub_create_session] Erro: ${toError(err).message}`);
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -190,9 +191,9 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
                 response: result.content,
                 structured: result.structured ?? null,
             };
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[hub_send_message] Erro: ${err.message}`);
-            return { success: false, error: err.message };
+        } catch (err) {
+            log('ERROR', `[hub_send_message] Erro: ${toError(err).message}`);
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -227,9 +228,9 @@ As mensagens são marcadas como lidas após esta chamada.`,
                     createdAt: m.created_at,
                 })),
             };
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[hub_poll_user_messages] Erro: ${err.message}`);
-            return { success: false, error: err.message };
+        } catch (err) {
+            log('ERROR', `[hub_poll_user_messages] Erro: ${toError(err).message}`);
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -279,9 +280,9 @@ Retorna turns ordenados por número de turno (mais antigos primeiro).`,
                     createdAt: t.created_at,
                 })),
             };
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[hub_read_history] Erro: ${err.message}`);
-            return { success: false, error: err.message };
+        } catch (err) {
+            log('ERROR', `[hub_read_history] Erro: ${toError(err).message}`);
+            return { success: false, error: toError(err).message };
         }
     },
 });
@@ -320,9 +321,9 @@ const hubListSessionsTool = buildTool({
                     updatedAt: s.updated_at,
                 })),
             };
-        } catch (/** @type {any} */ err) {
-            log('ERROR', `[hub_list_sessions] Erro: ${err.message}`);
-            return { success: false, error: err.message };
+        } catch (err) {
+            log('ERROR', `[hub_list_sessions] Erro: ${toError(err).message}`);
+            return { success: false, error: toError(err).message };
         }
     },
 });

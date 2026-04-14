@@ -539,7 +539,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     [Symbol.dispose]() {
         // fire-and-forget: Symbol.dispose não suporta await
-        this.stop().catch((/** @type {any} */ e) => logSwallowed(e, 'AlwaysAliveAgent.Symbol.dispose'));
+        this.stop().catch((e) => logSwallowed(e, 'AlwaysAliveAgent.Symbol.dispose'));
     }
 }
 /**
@@ -735,10 +735,14 @@ try {
             'handoff.rejected': AGENT_HANDOFF_REJECTED,
         });
     }
-} catch (/** @type {any} */ _busWiringErr) {
+} catch (_busWiringErr) {
     // EventBus not available yet — expected during early bootstrap
     // C-06 fix: log non-MODULE_NOT_FOUND errors for visibility
-    if (_busWiringErr?.code !== 'ERR_MODULE_NOT_FOUND' && _busWiringErr?.code !== 'MODULE_NOT_FOUND') {
+    const code =
+        _busWiringErr instanceof Error
+            ? /** @type {{ code?: string }} */ (/** @type {unknown} */ (_busWiringErr)).code
+            : undefined;
+    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') {
         logSwallowed(_busWiringErr, 'AlwaysAliveAgent.eventBusWiring');
     }
 }

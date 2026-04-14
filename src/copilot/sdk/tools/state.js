@@ -14,7 +14,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { toError, logSwallowed } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { ToolsConfigSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
@@ -54,7 +54,7 @@ export async function loadToolsConfigAsync() {
         } else {
             log('WARN', '[tools-state] tools-config.json schema inválido — mantendo defaults.');
         }
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         logSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }
@@ -67,8 +67,8 @@ export async function loadToolsConfigAsync() {
 async function _persistToolsConfigAsync() {
     try {
         await writeFile(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
-    } catch (/** @type {any} */ err) {
-        log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${err.message}`);
+    } catch (err) {
+        log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${toError(err).message}`);
     }
 }
 

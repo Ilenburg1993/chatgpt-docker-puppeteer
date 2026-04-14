@@ -281,7 +281,7 @@ export function createMetricsStore() {
                     await _mkdir(resolvedDir, { recursive: true });
                     const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
                     await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     logSwallowed(e, 'metrics.snapshot');
                 }
             })();

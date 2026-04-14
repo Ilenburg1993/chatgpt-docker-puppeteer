@@ -11,7 +11,7 @@
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { toError, container } from '#copilot/core';
 import {
     createSnapshot,
     listSnapshotsAsync,
@@ -116,8 +116,8 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
             println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
         }
         println('  ─────────────────────────────────────────────────\n');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  /db-history erro: ${e.message}\x1b[0m`);
+    } catch (e) {
+        println(`\x1b[31m  /db-history erro: ${toError(e).message}\x1b[0m`);
     }
 }
 
@@ -147,8 +147,8 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
             );
         }
         println('  ──────────────────────────────────────────────────────────────\n');
-    } catch (/** @type {any} */ e) {
-        println(`\x1b[31m  /db-sessions erro: ${e.message}\x1b[0m`);
+    } catch (e) {
+        println(`\x1b[31m  /db-sessions erro: ${toError(e).message}\x1b[0m`);
     }
 }
 

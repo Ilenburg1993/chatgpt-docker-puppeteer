@@ -9,6 +9,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./index.js').CopilotPlugin} CopilotPlugin
@@ -188,8 +189,8 @@ export async function discoverPlugins(baseDir, registry) {
                 } else {
                     log('WARN', `[discoverPlugins] ${filePath}: módulo não exporta plugin válido, ignorando`);
                 }
-            } catch (/** @type {any} */ err) {
-                log('ERROR', `[discoverPlugins] falha ao carregar ${filePath}: ${err?.message ?? err}`);
+            } catch (err) {
+                log('ERROR', `[discoverPlugins] falha ao carregar ${filePath}: ${toError(err).message ?? err}`);
             }
         }
     }

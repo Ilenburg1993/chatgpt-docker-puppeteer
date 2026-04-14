@@ -81,15 +81,12 @@ function validateConfig(config) {
  * @returns {ProviderConfig}
  */
 export function openaiProvider({ baseUrl, apiKey, bearerToken, wireApi }) {
-    return validateConfig(
-        /** @type {any} */ ({
-            type: PROVIDER_TYPES.OPENAI,
-            baseUrl,
-            ...(apiKey !== undefined && { apiKey }),
-            ...(bearerToken !== undefined && { bearerToken }),
-            ...(wireApi !== undefined && { wireApi }),
-        }),
-    );
+    /** @type {ProviderConfig} */
+    const config = { type: PROVIDER_TYPES.OPENAI, baseUrl };
+    if (apiKey !== undefined) config.apiKey = apiKey;
+    if (bearerToken !== undefined) config.bearerToken = bearerToken;
+    if (wireApi !== undefined) config.wireApi = wireApi;
+    return validateConfig(config);
 }
 
 /**
@@ -114,13 +111,10 @@ export function openaiProvider({ baseUrl, apiKey, bearerToken, wireApi }) {
  */
 export function azureProvider({ baseUrl, apiKey, bearerToken, wireApi, apiVersion }) {
     /** @type {ProviderConfig} */
-    const config = /** @type {any} */ ({
-        type: PROVIDER_TYPES.AZURE,
-        baseUrl,
-        ...(apiKey !== undefined && { apiKey }),
-        ...(bearerToken !== undefined && { bearerToken }),
-        ...(wireApi !== undefined && { wireApi }),
-    });
+    const config = { type: PROVIDER_TYPES.AZURE, baseUrl };
+    if (apiKey !== undefined) config.apiKey = apiKey;
+    if (bearerToken !== undefined) config.bearerToken = bearerToken;
+    if (wireApi !== undefined) config.wireApi = wireApi;
     if (apiVersion !== undefined) {
         config.azure = { apiVersion };
     }
@@ -145,14 +139,11 @@ export function azureProvider({ baseUrl, apiKey, bearerToken, wireApi, apiVersio
  * @returns {ProviderConfig}
  */
 export function anthropicProvider({ baseUrl, apiKey, bearerToken }) {
-    return validateConfig(
-        /** @type {any} */ ({
-            type: PROVIDER_TYPES.ANTHROPIC,
-            baseUrl,
-            ...(apiKey !== undefined && { apiKey }),
-            ...(bearerToken !== undefined && { bearerToken }),
-        }),
-    );
+    /** @type {ProviderConfig} */
+    const config = { type: PROVIDER_TYPES.ANTHROPIC, baseUrl };
+    if (apiKey !== undefined) config.apiKey = apiKey;
+    if (bearerToken !== undefined) config.bearerToken = bearerToken;
+    return validateConfig(config);
 }
 
 /**
@@ -173,5 +164,5 @@ export function validateProviderConfig(config) {
  * @returns {boolean}
  */
 export function isValidProviderType(type) {
-    return new Set(Object.values(PROVIDER_TYPES)).has(/** @type {any} */ (type));
+    return new Set(Object.values(PROVIDER_TYPES)).has(/** @type {ProviderType} */ (type));
 }

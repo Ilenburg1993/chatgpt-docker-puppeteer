@@ -13,7 +13,7 @@
  */
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { EVENT_BUS, SessionError } from '#copilot/core';
+import { EVENT_BUS, SessionError, toError } from '#copilot/core';
 import {
     EMITTER_BEFORE_STOP,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -167,7 +167,7 @@ export async function agentStart(ctx, host) {
 
         if (isResumed) {
             /** @type {import('../../conversation-hub/store.js').ConversationStore | null} */
-            const convStore = /** @type {any} */ (container.resolve(CONVERSATION_STORE)) ?? null;
+            const convStore = container.resolve(CONVERSATION_STORE) ?? null;
             if (convStore) {
                 void syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
                     getHubSessionId,
@@ -177,9 +177,9 @@ export async function agentStart(ctx, host) {
         }
 
         host.emit(EMITTER_READY, { sessionId: session.sessionId, isResumed });
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
         ctx.setStatus('stopped', host);
-        log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${e.message}`);
+        log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${toError(e).message}`);
         host.emit(EMITTER_ERROR, e);
         throw e;
     }
@@ -204,7 +204,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
 
         if (ctx.status === 'starting') {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-            await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((/** @type {any} */ e) =>
+            await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((e) =>
                 logSwallowed(e, 'agent.lifecycle.stopBootWait'),
             );
         }
@@ -247,12 +247,12 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 reason: 'auto-shutdown',
             });
             await saveSnapshotAsync(snap);
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${e.message}`);
+        } catch (e) {
+            log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${toError(e).message}`);
         }
 
-        await writeStateAsync({ sendCount: ctx.sendCount, gracefulShutdown: true }).catch((/** @type {any} */ e) =>
-            log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${e.message}`),
+        await writeStateAsync({ sendCount: ctx.sendCount, gracefulShutdown: true }).catch((e) =>
+            log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${toError(e).message}`),
         );
 
         if (ctx.metricsTimer) {
@@ -291,8 +291,8 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         if (ctx.session) {
             try {
                 await ctx.session.disconnect();
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${e.message}`);
+            } catch (e) {
+                log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
             ctx.session = null;
             ctx.messagesCache.invalidate();
@@ -305,11 +305,11 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 if (stopErrors.length > 0) {
                     log(
                         'WARN',
-                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => e.message).join('; ')}`,
+                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => toError(e).message).join('; ')}`,
                     );
                 }
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${e.message}`);
+            } catch (e) {
+                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${toError(e).message}`);
             }
             ctx.client = null;
         }

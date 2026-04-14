@@ -48,7 +48,10 @@ async function handleIssue(println, args) {
         const stateArg = args[2] ?? 'open';
         const label = args[3];
         println('\x1b[90m  Buscando issues…\x1b[0m');
-        const issueResult = await listIssues({ state: /** @type {any} */ (stateArg), label }).catch(() => ({
+        const issueResult = await listIssues({
+            state: /** @type {'open' | 'closed' | 'all'} */ (stateArg),
+            label,
+        }).catch(() => ({
             items: [],
             hasMore: false,
             page: 1,
@@ -136,12 +139,14 @@ async function handlePr(println, args) {
     if (action === 'list' || action === 'ls') {
         const stateArg = args[2] ?? 'open';
         println('\x1b[90m  Buscando PRs…\x1b[0m');
-        const prResult = await listPrs({ state: /** @type {any} */ (stateArg) }).catch(() => ({
-            items: [],
-            hasMore: false,
-            page: 1,
-            perPage: 15,
-        }));
+        const prResult = await listPrs({ state: /** @type {'open' | 'closed' | 'merged' | 'all'} */ (stateArg) }).catch(
+            () => ({
+                items: [],
+                hasMore: false,
+                page: 1,
+                perPage: 15,
+            }),
+        );
         const prs = prResult.items;
         if (!prs.length) {
             println('\x1b[90m  Nenhum PR encontrado.\x1b[0m');
@@ -228,7 +233,7 @@ async function handleRun(println, args) {
     const runId = action;
     if (runId && runId !== 'list') {
         println('\x1b[90m  Buscando run…\x1b[0m');
-        const run = /** @type {any} */ (await viewRun(runId).catch(() => null));
+        const run = /** @type {Record<string, unknown> | null} */ (await viewRun(runId).catch(() => null));
         if (!run) {
             println(`\x1b[31m  Run "${runId}" não encontrado.\x1b[0m`);
             return;
@@ -277,7 +282,7 @@ async function handleSearch(println, args) {
         return;
     }
     println(`\n  \x1b[36mResultados para:\x1b[0m "${query}"`);
-    for (const r of /** @type {any[]} */ (results)) {
+    for (const r of /** @type {Record<string, unknown>[]} */ (results)) {
         const typeLabel = r.isPullRequest ? '\x1b[34mPR\x1b[0m' : '\x1b[36missue\x1b[0m';
         println(`  ${typeLabel}  #${r.number}  ${r.title}  \x1b[90m[${r.state}]\x1b[0m`);
     }

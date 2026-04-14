@@ -58,7 +58,7 @@ function assertSession(session) {
     if (!session || typeof session !== 'object') {
         throw new Error('[sdk/events] session is required');
     }
-    if (typeof (/** @type {any} */ (session).on) !== 'function') {
+    if (typeof (/** @type {Record<string, unknown>} */ (session).on) !== 'function') {
         throw new Error('[sdk/events] session must have an .on() method');
     }
 }
@@ -123,7 +123,10 @@ export function onSessionEvent(session, eventType, handler) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/events] handler must be a function');
     }
-    return /** @type {any} */ (session).on(eventType, handler);
+    return /** @type {import('../types.js').SessionEventSubscriber} */ (/** @type {unknown} */ (session)).on(
+        eventType,
+        handler,
+    );
 }
 
 /**
@@ -161,7 +164,10 @@ export function onSessionEvents(session, handlerMap) {
         if (typeof handler !== 'function') {
             throw new Error(`[sdk/events] handler for '${eventType}' must be a function`);
         }
-        const unsub = /** @type {any} */ (session).on(eventType, handler);
+        const unsub = /** @type {import('../types.js').SessionEventSubscriber} */ (/** @type {unknown} */ (session)).on(
+            eventType,
+            handler,
+        );
         unsubscribers.push(unsub);
     }
 
@@ -191,7 +197,7 @@ export function onAllSessionEvents(session, handler) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/events] handler must be a function');
     }
-    return /** @type {any} */ (session).on(handler);
+    return /** @type {import('../types.js').SessionEventSubscriber} */ (/** @type {unknown} */ (session)).on(handler);
 }
 
 /**
@@ -212,7 +218,7 @@ export function getEventPayload(event) {
     if (!event || typeof event !== 'object') {
         throw new Error('[sdk/events] event must be a non-null object');
     }
-    return /** @type {any} */ (event).data;
+    return /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).data;
 }
 
 /**
@@ -225,7 +231,7 @@ export function getEventType(event) {
     if (!event || typeof event !== 'object') {
         throw new Error('[sdk/events] event must be a non-null object');
     }
-    return /** @type {any} */ (event).type;
+    return /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).type);
 }
 
 /**
@@ -254,7 +260,11 @@ export function createEventFilter(allowedTypes, handler) {
     }
     const allowSet = new Set(allowedTypes);
     return /** @param {SessionEvent} event */ (event) => {
-        if (allowSet.has(/** @type {any} */ (event).type)) {
+        if (
+            allowSet.has(
+                /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).type),
+            )
+        ) {
             handler(event);
         }
     };

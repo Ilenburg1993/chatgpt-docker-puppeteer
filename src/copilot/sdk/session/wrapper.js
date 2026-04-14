@@ -10,6 +10,7 @@
  * @see module:copilot/sdk/session
  */
 
+import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 
 /**
@@ -138,14 +139,14 @@ export async function runSessionLifecycle({ create, use, options }) {
 
     try {
         await use(session);
-    } catch (/** @type {any} */ e) {
-        error = e;
+    } catch (e) {
+        error = toError(e);
         if (opts.abortOnError !== false) {
             try {
                 await abortSession(session);
                 aborted = true;
-            } catch (/** @type {any} */ abortErr) {
-                log('WARN', `[session-lifecycle] abort após erro falhou: ${abortErr.message}`);
+            } catch (abortErr) {
+                log('WARN', `[session-lifecycle] abort após erro falhou: ${toError(abortErr).message}`);
             }
         }
     } finally {
@@ -155,8 +156,8 @@ export async function runSessionLifecycle({ create, use, options }) {
             } else {
                 await session.disconnect();
             }
-        } catch (/** @type {any} */ cleanupErr) {
-            log('WARN', `[session-lifecycle] cleanup falhou: ${cleanupErr.message}`);
+        } catch (cleanupErr) {
+            log('WARN', `[session-lifecycle] cleanup falhou: ${toError(cleanupErr).message}`);
         }
     }
 

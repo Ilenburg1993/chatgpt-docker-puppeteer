@@ -10,6 +10,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * Retorna o ID do modelo atual configurado no contexto.
@@ -36,8 +37,8 @@ export function setModel(ctx, modelId) {
     if (sdkSession && typeof sdkSession.setModel === 'function') {
         try {
             sdkSession.setModel(modelId);
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${e.message}`);
+        } catch (e) {
+            log('WARN', `[AlwaysAlive] setModel live falhou (SDK version?): ${toError(e).message}`);
         }
     }
 }
@@ -52,8 +53,8 @@ export async function listAvailableModels(ctx) {
     if (!ctx.client) return [];
     try {
         return await ctx.client.listModels();
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[AlwaysAlive] listModels() falhou: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[AlwaysAlive] listModels() falhou: ${toError(e).message}`);
         return [];
     }
 }

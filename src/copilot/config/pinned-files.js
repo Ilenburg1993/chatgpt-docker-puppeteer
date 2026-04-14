@@ -138,7 +138,7 @@ export class PinnedFilesLoader extends EventEmitter {
         let entries;
         try {
             entries = await readdir(dir);
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'config.pinnedFiles.readdir');
             return;
         }
@@ -150,7 +150,7 @@ export class PinnedFilesLoader extends EventEmitter {
                 const info = await stat(filePath);
                 if (!info.isFile()) continue;
                 await this.#loadFile(filePath);
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'config.pinnedFiles.stat');
             }
         }
@@ -166,7 +166,7 @@ export class PinnedFilesLoader extends EventEmitter {
         try {
             const content = await readFile(filePath, 'utf8');
             this.#files.set(filePath, { path: filePath, content, loadedAt: Date.now() });
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'config.pinnedFiles.loadFile');
         }
     }
@@ -217,7 +217,7 @@ export class PinnedFilesLoader extends EventEmitter {
                             );
                             this.#watchers.set(subPath, subWatcher);
                         }
-                    } catch (/** @type {any} */ e) {
+                    } catch (e) {
                         logSwallowed(e, 'config.pinnedFiles.watchSubdirs');
                     }
                 }
@@ -271,7 +271,7 @@ export class PinnedFilesLoader extends EventEmitter {
                 /** @type {PinnedFileChangedEvent} */
                 const event = { file: filePath, content, type };
                 this.emit('changed', event);
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'config.pinnedFiles.reloadFile');
             }
         }, DEBOUNCE_MS);

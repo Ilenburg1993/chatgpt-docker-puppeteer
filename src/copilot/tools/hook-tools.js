@@ -30,6 +30,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
+import { toError } from '../core/error-handlers.js';
 const execFileAsync = promisify(execFile);
 
 /**
@@ -186,9 +187,9 @@ const hookGetAuditTailTool = buildTool({
                 `[hook-tools/get_audit_tail] Retornando ${entries.length} entradas do audit.jsonl (compliance).`,
             );
             return { entries, total: entries.length, source: 'compliance' };
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[hook-tools/get_audit_tail] Erro ao ler audit.jsonl: ${e.message}`);
-            return { entries: [], total: 0, source: 'none', error: e.message };
+        } catch (e) {
+            log('WARN', `[hook-tools/get_audit_tail] Erro ao ler audit.jsonl: ${toError(e).message}`);
+            return { entries: [], total: 0, source: 'none', error: toError(e).message };
         }
     },
 });
@@ -324,9 +325,9 @@ const hookGetPendingTasksTool = buildTool({
             const content = await readFile(pendingPath, 'utf8');
             log('INFO', `[hook-tools/get_pending_tasks] pending-tasks.md lido (${content.length} chars).`);
             return { content, exists: true };
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[hook-tools/get_pending_tasks] Erro: ${e.message}`);
-            return { content: '', exists: false, error: e.message };
+        } catch (e) {
+            log('WARN', `[hook-tools/get_pending_tasks] Erro: ${toError(e).message}`);
+            return { content: '', exists: false, error: toError(e).message };
         }
     },
 });

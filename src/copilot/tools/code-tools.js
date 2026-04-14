@@ -14,6 +14,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { toExecError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 
@@ -50,11 +51,12 @@ async function safeExec(argv, timeoutMs = 60_000) {
             maxBuffer: 4 * 1024 * 1024,
         });
         return { stdout: stdout.slice(0, 4000), exitCode: 0 };
-    } catch (/** @type {any} */ e) {
+    } catch (e) {
+        const ex = toExecError(e);
         return {
-            stdout: (e.stdout ?? '').slice(0, 2000),
-            exitCode: typeof e.code === 'number' ? e.code : (e.status ?? 1),
-            error: (e.stderr ?? e.message ?? '').slice(0, 2000),
+            stdout: (ex.stdout ?? '').slice(0, 2000),
+            exitCode: typeof ex.code === 'number' ? ex.code : (ex.status ?? 1),
+            error: (ex.stderr ?? ex.message ?? '').slice(0, 2000),
         };
     }
 }

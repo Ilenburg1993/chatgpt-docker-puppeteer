@@ -15,7 +15,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireSystemNotificationEvents(session, { emit }) {
     return [
-        session.on(SESSION_EVENTS.SYSTEM_NOTIFICATION, (/** @type {any} */ event) => {
+        session.on(SESSION_EVENTS.SYSTEM_NOTIFICATION, (event) => {
             const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.['kind']);
             if (!kind?.type) return;
 

@@ -33,6 +33,28 @@ import { writeStateAsync } from '../lifecycle/state-io.js';
  */
 
 /**
+ * Subconjunto do host necessário pelos executores de turno.
+ *
+ * @typedef {{
+ *     getPendingQuestion: () => unknown;
+ *     answerPendingQuestion: (message: string) => boolean;
+ *     getSessionId?: () => string | null;
+ *     getModel?: () => string;
+ * }} TurnHost
+ */
+
+/**
+ * Cria um listener que aceita `unknown` e faz cast para o tipo esperado.
+ *
+ * @template T
+ * @param {(evt: T) => void} fn
+ * @returns {(evt: unknown) => void}
+ */
+function castListener(fn) {
+    return (evt) => fn(/** @type {T} */ (evt));
+}
+
+/**
  * Emite `turn_start`, incrementa o contador e persiste estado pendente.
  *
  * @param {TurnEmitter} emitter
@@ -57,7 +79,7 @@ export function emitTurnStart(emitter, message, counter) {
  *
  * @param {TurnEmitter} emitter
  * @param {{
- *     host: any;
+ *     host: TurnHost;
  *     turnStart: number;
  *     timeout: number;
  *     message: string;
@@ -68,8 +90,8 @@ export function emitTurnStart(emitter, message, counter) {
  * }} opts
  * @returns {{
  *     timeoutHandle: ReturnType<typeof setTimeout>;
- *     onReplyOuter: (evt: { reply: string }) => void;
- *     onStopOuter: (evt: { authorized?: boolean; reason?: string }) => void;
+ *     onReplyOuter: (evt: unknown) => void;
+ *     onStopOuter: (evt: unknown) => void;
  * }}
  */
 export function buildTurnResolutionListeners(emitter, opts) {
@@ -77,8 +99,8 @@ export function buildTurnResolutionListeners(emitter, opts) {
 
     /**
      * @type {{
-     *     reply: (evt: { reply: string }) => void;
-     *     stop: (evt: { authorized?: boolean; reason?: string }) => void;
+     *     reply: (evt: unknown) => void;
+     *     stop: (evt: unknown) => void;
      * }}
      */
     const handlers = {
@@ -94,28 +116,34 @@ export function buildTurnResolutionListeners(emitter, opts) {
         reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
     }, timeout);
 
-    handlers.reply = (/** @type {{ reply: string }} */ evt) => {
-        clearTimeout(timeoutHandle);
-        emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
-        const durationMs = Date.now() - turnStart;
-        emitter.emit(EMITTER_TURN_END, { reply: evt.reply.slice(0, 120), durationMs });
-        container.resolve(METRICS_STORE).recordDialogTurn(durationMs, true);
-        resolve(evt.reply);
-    };
+    handlers.reply = castListener(
+        /** @param {{ reply: string }} evt */
+        (evt) => {
+            clearTimeout(timeoutHandle);
+            emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
+            const durationMs = Date.now() - turnStart;
+            emitter.emit(EMITTER_TURN_END, { reply: evt.reply.slice(0, 120), durationMs });
+            container.resolve(METRICS_STORE).recordDialogTurn(durationMs, true);
+            resolve(evt.reply);
+        },
+    );
 
-    handlers.stop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt) => {
-        clearTimeout(timeoutHandle);
-        emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
-        if (stopEvt?.authorized) {
-            reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-        } else {
-            log(
-                'INFO',
-                `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
-            );
-            waitForRestartAndReplyFn(opts.message, timeout, stopEvt?.reason).then(resolve).catch(reject);
-        }
-    };
+    handlers.stop = castListener(
+        /** @param {{ authorized?: boolean; reason?: string }} stopEvt */
+        (stopEvt) => {
+            clearTimeout(timeoutHandle);
+            emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
+            if (stopEvt?.authorized) {
+                reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
+            } else {
+                log(
+                    'INFO',
+                    `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
+                );
+                waitForRestartAndReplyFn(opts.message, timeout, stopEvt?.reason).then(resolve).catch(reject);
+            }
+        },
+    );
 
     return { timeoutHandle, onReplyOuter: handlers.reply, onStopOuter: handlers.stop };
 }
@@ -125,13 +153,13 @@ export function buildTurnResolutionListeners(emitter, opts) {
  *
  * @param {TurnEmitter} emitter
  * @param {{
- *     host: any;
+ *     host: TurnHost;
  *     message: string;
  *     timeout: number;
  *     timeoutHandle: ReturnType<typeof setTimeout>;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
- *     onReplyOuter: (evt: { reply: string }) => void;
- *     onStopOuter: (evt: { authorized?: boolean; reason?: string }) => void;
+ *     onReplyOuter: (evt: unknown) => void;
+ *     onStopOuter: (evt: unknown) => void;
  *     resolve: (v: string) => void;
  *     reject: (e: unknown) => void;
  *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
@@ -166,20 +194,26 @@ export function dispatchTurnToHost(emitter, opts) {
                 emitter.off(EMITTER_LOOP_STOPPED, onStop);
                 reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
             }, timeout);
-            const onReply = (/** @type {{ reply: string }} */ evt) => {
-                clearTimeout(newTimeout);
-                emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                resolve(evt.reply);
-            };
-            const onStop = (/** @type {{ authorized?: boolean; reason?: string }} */ stopEvt2) => {
-                clearTimeout(newTimeout);
-                emitter.off(EMITTER_LOOP_REPLY, onReply);
-                if (stopEvt2?.authorized) {
-                    reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-                } else {
-                    waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
-                }
-            };
+            const onReply = castListener(
+                /** @param {{ reply: string }} evt */
+                (evt) => {
+                    clearTimeout(newTimeout);
+                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
+                    resolve(evt.reply);
+                },
+            );
+            const onStop = castListener(
+                /** @param {{ authorized?: boolean; reason?: string }} stopEvt2 */
+                (stopEvt2) => {
+                    clearTimeout(newTimeout);
+                    emitter.off(EMITTER_LOOP_REPLY, onReply);
+                    if (stopEvt2?.authorized) {
+                        reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
+                    } else {
+                        waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
+                    }
+                },
+            );
             emitter.once(EMITTER_LOOP_REPLY, onReply);
             emitter.once(EMITTER_LOOP_STOPPED, onStop);
             host.answerPendingQuestion(message);
@@ -198,7 +232,7 @@ export function dispatchTurnToHost(emitter, opts) {
  * Aguarda restart (dialog.ready) e reenvia mensagem.
  *
  * @param {TurnEmitter} emitter
- * @param {any} host
+ * @param {TurnHost} host
  * @param {string} message
  * @param {number} timeout
  * @param {string} [stopReason]
@@ -244,7 +278,8 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
             clearTimeout(retryTimeout);
             onRetryPending = () => {
                 host.answerPendingQuestion(message);
-                const onRetryStopped = (/** @type {{ reason?: string }} */ stoppedEvt) => {
+                const onRetryStopped = (/** @type {unknown} */ rawEvt) => {
+                    const stoppedEvt = /** @type {{ reason?: string }} */ (rawEvt);
                     emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
                     reject(
                         new SessionError(
@@ -253,8 +288,9 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                         ),
                     );
                 };
-                /** @type {(evt: { reply: string }) => void} */
-                const onRetryReply = (retryEvt) => {
+                /** @type {(evt: unknown) => void} */
+                const onRetryReply = (rawEvt) => {
+                    const retryEvt = /** @type {{ reply: string }} */ (rawEvt);
                     emitter.off(EMITTER_LOOP_STOPPED, onRetryStopped);
                     resolve(retryEvt.reply);
                 };
@@ -278,7 +314,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
  * @param {string} message
  * @param {{ timeout: number; signal?: AbortSignal }} opts
  * @param {{
- *     host: any;
+ *     host: TurnHost;
  *     sendCountRef: { sendCount: number };
  * }} ctx
  * @returns {Promise<string>}
@@ -301,9 +337,9 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
     return startSpan(
         'copilot.dialog.send_turn',
         {
-            sessionId: host.getSessionId() ?? '',
+            sessionId: host.getSessionId?.() ?? '',
             actor: 'user',
-            model: host.getModel(),
+            model: host.getModel?.() ?? '',
             extra: { turnNumber: sendCountRef.sendCount },
         },
         () =>

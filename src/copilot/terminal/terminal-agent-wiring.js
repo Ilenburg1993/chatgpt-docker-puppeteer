@@ -94,17 +94,17 @@ export function registerAgentEventListeners(printBanner) {
                     role: 'user',
                     content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
                 });
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'terminal.index.watchdogWriteTurn');
             }
         }
         // DL-PERM-06: stopDialogMode() usará reason='watchdog_restart', que o handler de
         // 'dialog.stopped' capturará e chamará ensureDialogLoop(). Não chamar ensureDialogLoop()
         // aqui diretamente para evitar duplo restart.
-        llmBridgeClient.stopDialogMode().catch((/** @type {any} */ e) => {
+        llmBridgeClient.stopDialogMode().catch((e) => {
             log('ERROR', `[TerminalServer] Falha ao parar dialog loop no watchdog: ${e.message}`);
             // Fallback: se stopDialogMode() falhar, tentar reiniciar diretamente
-            ensureDialogLoop().catch((/** @type {any} */ e2) =>
+            ensureDialogLoop().catch((e2) =>
                 log('ERROR', `[TerminalServer] Falha no fallback de restart após watchdog: ${e2.message}`),
             );
         });
@@ -156,7 +156,7 @@ export function registerAgentEventListeners(printBanner) {
         println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
         log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
         broadcastSse('dialog.stopped', { reason, restarting: true });
-        ensureDialogLoop().catch((/** @type {any} */ e) =>
+        ensureDialogLoop().catch((e) =>
             log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
         );
     });
@@ -200,7 +200,7 @@ export function registerAgentEventListeners(printBanner) {
                     role: 'user',
                     content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
                 });
-            } catch (/** @type {any} */ e) {
+            } catch (e) {
                 logSwallowed(e, 'terminal.index.reconnectWriteTurn');
             }
         },
@@ -213,7 +213,7 @@ export function registerAgentEventListeners(printBanner) {
                 role: 'user',
                 content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
             });
-        } catch (/** @type {any} */ e) {
+        } catch (e) {
             logSwallowed(e, 'terminal.index.fatalWriteTurn');
         }
     });

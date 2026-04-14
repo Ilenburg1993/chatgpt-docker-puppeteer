@@ -11,7 +11,7 @@
  * @see module:copilot/always-alive
  */
 
-import { SessionError } from '#copilot/core';
+import { toError, SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
@@ -140,8 +140,8 @@ export class HubOrchestrator extends EventEmitter {
             if (activeSessions.length > 0) {
                 log('INFO', `[HubOrchestrator] ${activeSessions.length} sessão(ões) ativa(s) restaurada(s) da DB.`);
             }
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[HubOrchestrator] Falha ao restaurar turn counters: ${err.message}`);
+        } catch (err) {
+            log('WARN', `[HubOrchestrator] Falha ao restaurar turn counters: ${toError(err).message}`);
         }
 
         log('DEBUG', '[HubOrchestrator] Inicializado com LlmBridgeClient.');
@@ -256,7 +256,7 @@ export class HubOrchestrator extends EventEmitter {
         });
 
         // Cauda sem valor — quando completa (ok ou erro), limpa o mapa se ninguém mais se encadeou
-        const tail = next.then(() => {}).catch((/** @type {any} */ e) => logSwallowed(e, 'hub.orchestrator.tail'));
+        const tail = next.then(() => {}).catch((e) => logSwallowed(e, 'hub.orchestrator.tail'));
         // F6.5: só inserir no mapa se a sessão ainda não foi fechada
         if (!this.#closedSessions.has(hubSessionId)) {
             this.#inflightBySession.set(hubSessionId, tail);
@@ -266,7 +266,7 @@ export class HubOrchestrator extends EventEmitter {
             if (this.#inflightBySession.get(hubSessionId) === tail) {
                 this.#inflightBySession.delete(hubSessionId);
             }
-        }).catch((/** @type {any} */ e) => logSwallowed(e, 'hub.orchestrator.inflightCleanup'));
+        }).catch((e) => logSwallowed(e, 'hub.orchestrator.inflightCleanup'));
 
         return next;
     }

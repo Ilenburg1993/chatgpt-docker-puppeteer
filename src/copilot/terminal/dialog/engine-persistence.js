@@ -11,7 +11,7 @@
 
 import { emitNerv } from '#copilot/bridges';
 import { HUB } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
@@ -30,12 +30,16 @@ export function drainPendingNotifications() {
     if (!container.resolve(HUB).isReady || _pendingNotifications.length === 0) return 0;
     let drained = 0;
     while (_pendingNotifications.length > 0) {
-        const n = /** @type {{ hubSessionId: string; userTurn: any; llmBTurn: any }} */ (_pendingNotifications.shift());
+        const n = /** @type {{
+    hubSessionId: string;
+    userTurn: { turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string };
+    llmBTurn: { turnId: number; content: string; turnNumber: number; durationMs: number };
+}} */ (_pendingNotifications.shift());
         try {
             container.resolve(HUB).notifyTerminalTurn(n.hubSessionId, n.userTurn, n.llmBTurn);
             drained++;
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[dialog] drainPendingNotifications falhou: ${err.message}`);
+        } catch (err) {
+            log('WARN', `[dialog] drainPendingNotifications falhou: ${toError(err).message}`);
             _pendingNotifications.unshift(n);
             break;
         }
@@ -95,9 +99,9 @@ export async function persistTurnToHub(hubSessionId, message, reply, actor, dura
                     durationMs,
                 },
             );
-        } catch (/** @type {any} */ hubErr) {
+        } catch (hubErr) {
             _persistenceFailureCount++;
-            log('DEBUG', `[dialog] notifyTerminalTurn falhou (enfileirado): ${hubErr.message}`);
+            log('DEBUG', `[dialog] notifyTerminalTurn falhou (enfileirado): ${toError(hubErr).message}`);
             _enqueuePendingNotification(hubSessionId, msgTurnId, replyTurnId, senderRole, message, reply, durationMs);
         }
     } else {

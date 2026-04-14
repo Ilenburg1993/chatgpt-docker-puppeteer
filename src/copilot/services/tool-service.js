@@ -38,8 +38,9 @@ export class ToolService {
     /**
      * Constroi a ferramenta configurada para uso em sessão.
      *
-     * @param {any} [options] - Opções de construção de tool.
-     * @returns {any}
+     * @param {import('../tools/tool-factory.js').BuildToolOptions<Record<string, unknown>>} options - Opções de
+     *   construção de tool.
+     * @returns {import('#copilot/sdk/types').Tool<Record<string, unknown>>}
      */
     buildTool(options) {
         log('DEBUG', '[ToolService] construindo ferramenta');
@@ -51,7 +52,7 @@ export class ToolService {
     /**
      * Lista todas as ferramentas registradas.
      *
-     * @returns {any[]}
+     * @returns {import('#copilot/sdk/types').Tool[]}
      */
     listAll() {
         return allTools;

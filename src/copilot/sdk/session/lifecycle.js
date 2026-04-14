@@ -17,6 +17,7 @@
  */
 
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 
 /**
@@ -153,7 +154,7 @@ function buildSessionConfig(opts, mode) {
     // RF-PR-01: compor hooks — onErrorOccurred com retry automático está em buildErrorOccurredHandler() (hooks.js)
     // e é o default de createHooks(). Preservamos hooks do usuário sem sobrescrever.
     {
-        const userHooks = /** @type {Record<string, any>} */ (opts.hooks ?? {});
+        const userHooks = /** @type {Record<string, unknown>} */ (opts.hooks ?? {});
         cfg['hooks'] = { ...userHooks };
     }
 
@@ -239,8 +240,11 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
         try {
             const result = await resumeSession(client, existingSessionId, opts);
             return result;
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[lib/session] Falha ao retomar '${existingSessionId}': ${e.message}. Criando nova sessao.`);
+        } catch (e) {
+            log(
+                'WARN',
+                `[lib/session] Falha ao retomar '${existingSessionId}': ${toError(e).message}. Criando nova sessao.`,
+            );
         }
     }
     return createSession(client, opts);

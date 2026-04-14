@@ -22,6 +22,7 @@ import {
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
 import { log } from './logger.js';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./types.js').HookBusEvent} HookBusEvent
@@ -120,8 +121,8 @@ export class HookBus extends EventEmitter {
             if (busType && this.#eventBus) {
                 this.#eventBus.emit({ type: busType, hookName, sessionId, timestamp: event.timestamp, input, output });
             }
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[hooks/bus] listener erro em '${hookName}': ${e.message}`);
+        } catch (e) {
+            log('WARN', `[hooks/bus] listener erro em '${hookName}': ${toError(e).message}`);
         }
     }
 }

@@ -11,6 +11,7 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { toExecError } from '../../core/error-handlers.js';
 import { safeEnv } from './sandbox.js';
 
 const execFileAsync = promisify(execFile);
@@ -89,11 +90,12 @@ export async function runProcess(file, args, { cwd, timeoutMs }) {
             stderr: truncateOutput(stderr || ''),
             durationMs: Date.now() - start,
         };
-    } catch (/** @type {any} */ err) {
+    } catch (err) {
+        const ex = toExecError(err);
         return {
-            exitCode: typeof err.code === 'number' ? err.code : 1,
-            stdout: truncateOutput(err.stdout || ''),
-            stderr: truncateOutput(err.stderr || err.message || ''),
+            exitCode: typeof ex.code === 'number' ? ex.code : 1,
+            stdout: truncateOutput(ex.stdout || ''),
+            stderr: truncateOutput(ex.stderr || ex.message || ''),
             durationMs: Date.now() - start,
         };
     }

@@ -20,7 +20,7 @@
  * @see EventBus
  */
 
-import { EVENT_BUS } from '#copilot/core';
+import { toError, EVENT_BUS } from '#copilot/core';
 import { container } from '../core/di-container.js';
 import {
     AGENT_DIALOG_LOOP_CHANGED,
@@ -56,8 +56,8 @@ function safe(fn, context) {
     return () => {
         try {
             fn();
-        } catch (/** @type {any} */ err) {
-            log('WARN', `[event-bus-observers] erro no handler ${context}: ${err?.message ?? err}`);
+        } catch (err) {
+            log('WARN', `[event-bus-observers] erro no handler ${context}: ${toError(err).message ?? err}`);
         }
     };
 }

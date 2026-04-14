@@ -28,7 +28,7 @@ export const container = createContainer();
  * correspondentes, eliminando scatter de setter calls pelo codebase.
  *
  * @param {import('./di.js').Container} c - Container com tokens já registrados.
- * @param {{ token: import('./di.js').Token<any>; setter: (value: any) => void }[]} mapping
+ * @param {{ token: import('./di.js').Token<unknown>; setter: (value: any) => void }[]} mapping
  * @returns {number} Quantidade de setters invocados.
  */
 export function wireLegacySetters(c, mapping) {

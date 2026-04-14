@@ -51,7 +51,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
     });
     try {
         ctx.messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
-    } catch (/** @type {any} */ err) {
+    } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
         return;
     }

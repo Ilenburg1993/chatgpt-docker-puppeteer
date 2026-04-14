@@ -33,7 +33,9 @@ export { fmtDate, runIcon } from './shared.js';
  */
 export async function getDefaultRepo() {
     try {
-        const data = await runGhJson(['repo', 'view', '--json', 'nameWithOwner', ...repoArgs()]);
+        const data = /** @type {{ nameWithOwner?: string } | null} */ (
+            await runGhJson(['repo', 'view', '--json', 'nameWithOwner', ...repoArgs()])
+        );
         return data?.nameWithOwner ?? '';
     } catch {
         return '';
@@ -76,7 +78,7 @@ export async function rawApi(endpoint, opts = {}) {
         }
     }
     try {
-        return await runGhJson(args);
+        return /** @type {Record<string, unknown> | null} */ (await runGhJson(args));
     } catch {
         return null;
     }
@@ -92,7 +94,7 @@ export async function rawApi(endpoint, opts = {}) {
 export async function listReleases(opts = {}) {
     const { limit = 10 } = opts;
     try {
-        return (
+        return /** @type {object[]} */ (
             (await runGhJson([
                 'release',
                 'list',
@@ -116,14 +118,9 @@ export async function listReleases(opts = {}) {
  */
 export async function viewRelease(tag) {
     try {
-        return await runGhJson([
-            'release',
-            'view',
-            tag,
-            '--json',
-            'tagName,name,body,publishedAt,assets',
-            ...repoArgs(),
-        ]);
+        return /** @type {object | null} */ (
+            await runGhJson(['release', 'view', tag, '--json', 'tagName,name,body,publishedAt,assets', ...repoArgs()])
+        );
     } catch {
         return null;
     }
@@ -140,7 +137,7 @@ export async function viewRelease(tag) {
 export async function searchCode(query, opts = {}) {
     const { limit = 10 } = opts;
     try {
-        return (
+        return /** @type {object[]} */ (
             (await runGhJson([
                 'search',
                 'code',
@@ -164,10 +161,11 @@ export async function searchCode(query, opts = {}) {
  */
 export function formatReleaseList(releases) {
     if (!releases.length) return '  (nenhuma release encontrada)';
-    const lines = /** @type {any[]} */ (releases).map((r) => {
-        const pre = r.isPrerelease ? ' [pre]' : '';
-        const date = fmtDate(r.publishedAt);
-        return `  ${r.tagName}${pre}  ${r.name ?? ''}  ${date}`;
+    const lines = releases.map((r) => {
+        const release = /** @type {Record<string, unknown>} */ (r);
+        const pre = release['isPrerelease'] ? ' [pre]' : '';
+        const date = fmtDate(/** @type {string} */ (release['publishedAt'] ?? ''));
+        return `  ${String(release['tagName'] ?? '')}${pre}  ${String(release['name'] ?? '')}  ${date}`;
     });
     return lines.join('\n');
 }

@@ -24,7 +24,7 @@
  */
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError, container, withRetry } from '#copilot/core';
+import { BridgeError, container, toError, withRetry } from '#copilot/core';
 import { log, METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { createTool } from '#copilot/sdk';
 import net from 'node:net';
@@ -162,14 +162,19 @@ async function rpcCall(method, params) {
             {
                 maxAttempts: 3,
                 baseDelayMs: 200,
-                shouldRetry: (/** @type {any} */ e) => {
+                shouldRetry: (e) => {
+                    const err = toError(e);
                     const isNetworkError =
-                        e?.code === 'ECONNRESET' || e?.code === 'ECONNREFUSED' || e?.name === 'TimeoutError';
-                    const isServerError = e instanceof BridgeError && e.message.includes('HTTP 5');
+                        err?.code === 'ECONNRESET' || err?.code === 'ECONNREFUSED' || err?.name === 'TimeoutError';
+                    const isServerError =
+                        e instanceof BridgeError && /** @type {BridgeError} */ (e).message.includes('HTTP 5');
                     return isNetworkError || isServerError;
                 },
-                onRetry: (/** @type {any} */ e, attempt) => {
-                    log('WARN', `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt}/3): ${e?.message}`);
+                onRetry: (e, attempt) => {
+                    log(
+                        'WARN',
+                        `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt}/3): ${toError(e)?.message}`,
+                    );
                 },
             },
         );
@@ -179,10 +184,10 @@ async function rpcCall(method, params) {
         span?.setStatus({ code: 1 });
         container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
         return result;
-    } catch (/** @type {any} */ err) {
+    } catch (err) {
         span?.setAttribute('duration_ms', Date.now() - t0);
         span?.setAttribute('status_code', 2);
-        span?.setStatus({ code: 2, message: err?.message });
+        span?.setStatus({ code: 2, message: toError(err).message });
         span?.recordException(err);
         container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, false);
         container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
@@ -203,8 +208,8 @@ export async function listMcpTools() {
         const result = /** @type {{ tools?: McpToolMeta[] }} */ (await rpcCall('tools/list', {}));
         const tools = /** @type {McpToolMeta[]} */ (result?.tools ?? []);
         return tools.filter((t) => t && typeof t.name === 'string');
-    } catch (/** @type {any} */ e) {
-        log('WARN', `[mcp-tool-bridge] Falha ao listar tools MCP: ${e.message}`);
+    } catch (e) {
+        log('WARN', `[mcp-tool-bridge] Falha ao listar tools MCP: ${toError(e).message}`);
         return [];
     }
 }
@@ -244,9 +249,9 @@ function createSdkToolFromMcp(mcpTool) {
                         .join('\n');
                 }
                 return JSON.stringify(result, null, 2);
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${e.message}`);
-                return `Erro ao executar ${mcpTool.name}: ${e.message}`;
+            } catch (e) {
+                log('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${toError(e).message}`);
+                return `Erro ao executar ${mcpTool.name}: ${toError(e).message}`;
             }
         },
     });
@@ -307,21 +312,21 @@ export async function buildMcpTools() {
             circuitOpen: false,
             latencyMs: Date.now() - _t0mcp,
         };
-    } catch (/** @type {any} */ err) {
+    } catch (err) {
         _mcpCircuitOpen = true;
         _mcpCircuitOpenAt = Date.now();
         _bootAttemptCount = 0; // F3.2 (BUG-MOD-02): resetar ao abrir circuit para evitar backoff acumulado
         _mcpHealth = {
             available: false,
             lastCheckMs: Date.now(),
-            lastError: err.message,
+            lastError: toError(err).message,
             toolCount: 0,
             circuitOpen: true,
             latencyMs: null,
         };
         log(
             'WARN',
-            `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${err.message}`,
+            `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${toError(err).message}`,
         );
         return [];
     }
@@ -404,8 +409,8 @@ export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) 
                     // Circuit fechou mas sem tools — avançar backoff
                     _stepIndex = Math.min(_stepIndex + 1, BACKOFF_MULTIPLIERS.length - 1);
                 }
-            } catch (/** @type {any} */ err) {
-                const msg = err instanceof Error ? err.message : String(err);
+            } catch (err) {
+                const msg = err instanceof Error ? toError(err).message : String(err);
                 log('DEBUG', `[mcp-auto-reconnect] Falha na tentativa de reconnect: ${msg}`);
                 _stepIndex = Math.min(_stepIndex + 1, BACKOFF_MULTIPLIERS.length - 1);
             }

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { SessionError } from '#copilot/core';
+import { toError, SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
@@ -133,18 +133,18 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
         } else {
             llmBResponse = await callViaSimpleChat(bridge, messageContent, ctx);
         }
-    } catch (/** @type {any} */ err) {
-        const errMsg = `[HubOrchestrator] Erro na resposta de LLM-B: ${err.message}`;
+    } catch (err) {
+        const errMsg = `[HubOrchestrator] Erro na resposta de LLM-B: ${toError(err).message}`;
         log('ERROR', errMsg);
         emit('error', { hubSessionId, message: errMsg, error: err });
 
         await store.writeTurn(hubSessionId, {
             role: 'llm_b',
-            content: `[ERRO] ${err.message}`,
+            content: `[ERRO] ${toError(err).message}`,
             ...(sdkSessionId !== undefined && { sdkSessionId }),
             model: modelLabel,
             durationMs: Date.now() - startTime,
-            metadata: { error: true, errorMessage: err.message },
+            metadata: { error: true, errorMessage: toError(err).message },
         });
 
         throw err;

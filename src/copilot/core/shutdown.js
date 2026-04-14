@@ -1,4 +1,5 @@
 // @ts-check
+import { toError } from './error-handlers.js';
 /**
  * src/copilot/core/shutdown.js
  *
@@ -83,8 +84,8 @@ export async function runShutdown(reason = 'unknown') {
                 ),
             ]);
             _log('INFO', `  ✓ ${handler.name}`);
-        } catch (/** @type {any} */ err) {
-            _log('WARN', `  ✗ ${handler.name}: ${err?.message ?? err}`);
+        } catch (err) {
+            _log('WARN', `  ✗ ${handler.name}: ${toError(err).message ?? err}`);
         }
     }
 

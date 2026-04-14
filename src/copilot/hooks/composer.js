@@ -12,6 +12,7 @@
  */
 
 import { log } from './logger.js';
+import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./types.js').PreToolUseHandler} PreToolUseHandler
@@ -79,8 +80,8 @@ export function pipeline(...handlers) {
                 if (result && typeof result === 'object') {
                     merged = { ...merged, ...result };
                 }
-            } catch (/** @type {any} */ e) {
-                log('WARN', `[hooks/composer] pipeline handler erro (continuando): ${e.message}`);
+            } catch (e) {
+                log('WARN', `[hooks/composer] pipeline handler erro (continuando): ${toError(e).message}`);
             }
         }
         return Object.keys(merged).length > 0 ? merged : undefined;
@@ -103,8 +104,8 @@ export function fallback(primary, fallbackFn) {
     const fn = async (/** @type {unknown} */ input, /** @type {InvocationContext} */ invocation) => {
         try {
             return await primary(input, invocation);
-        } catch (/** @type {any} */ e) {
-            log('WARN', `[hooks/composer] handler primário falhou (usando fallback): ${e.message}`);
+        } catch (e) {
+            log('WARN', `[hooks/composer] handler primário falhou (usando fallback): ${toError(e).message}`);
             return fallbackFn(input, invocation);
         }
     };

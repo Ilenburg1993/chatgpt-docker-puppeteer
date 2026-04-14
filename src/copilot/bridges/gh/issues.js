@@ -76,14 +76,16 @@ export async function listIssues(opts = {}) {
  */
 export async function viewIssue(number) {
     try {
-        return await runGhJson([
-            'issue',
-            'view',
-            String(number),
-            '--json',
-            'number,title,body,state,labels,author,comments,url,createdAt',
-            ...repoArgs(),
-        ]);
+        return /** @type {IssueDetail | null} */ (
+            await runGhJson([
+                'issue',
+                'view',
+                String(number),
+                '--json',
+                'number,title,body,state,labels,author,comments,url,createdAt',
+                ...repoArgs(),
+            ])
+        );
     } catch {
         return null;
     }
@@ -105,7 +107,7 @@ export async function createIssue(title, body, opts = {}) {
     for (const l of labels) args.push('--label', l);
     for (const a of assignees) args.push('--assignee', a);
     try {
-        return await runGhJson(args);
+        return /** @type {{ url: string } | null} */ (await runGhJson(args));
     } catch {
         return null;
     }
@@ -154,17 +156,19 @@ export async function commentIssue(number, body) {
 export async function searchIssues(query, opts = {}) {
     const { limit = 15 } = opts;
     try {
-        return (
-            (await runGhJson([
-                'search',
-                'issues',
-                query,
-                '--json',
-                'number,title,repository,state,url,author,createdAt',
-                '--limit',
-                String(limit),
-                ...repoArgs(),
-            ])) ?? []
+        return /** @type {object[]} */ (
+            /** @type {unknown} */ (
+                (await runGhJson([
+                    'search',
+                    'issues',
+                    query,
+                    '--json',
+                    'number,title,repository,state,url,author,createdAt',
+                    '--limit',
+                    String(limit),
+                    ...repoArgs(),
+                ])) ?? []
+            )
         );
     } catch {
         return [];

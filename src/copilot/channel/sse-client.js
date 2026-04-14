@@ -93,7 +93,7 @@ export function subscribeSse(path, port, onEvent) {
                             try {
                                 const data = JSON.parse(dataLines.join('\n'));
                                 onEvent({ type: currentEvent || 'message', data });
-                            } catch (/** @type {any} */ e) {
+                            } catch (e) {
                                 logSwallowed(e, 'channel.sseClient.parseJson');
                             }
                         }

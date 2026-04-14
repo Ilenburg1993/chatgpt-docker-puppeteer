@@ -26,6 +26,7 @@ import {
     HUB_SESSION_CREATED,
 } from '../../events/index.js';
 import { log } from '../logger.js';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
@@ -51,8 +52,8 @@ export function createLogObserver({ bus }) {
             bus.on(type, () => {
                 try {
                     log(level, `[log-observer] ${label} via EventBus`);
-                } catch (/** @type {any} */ e) {
-                    log('WARN', `[log-observer] erro em ${type}: ${e?.message}`);
+                } catch (e) {
+                    log('WARN', `[log-observer] erro em ${type}: ${toError(e).message}`);
                 }
             }),
         );

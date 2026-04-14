@@ -11,6 +11,7 @@
 
 import { log } from '#copilot/observability';
 import { randomUUID } from 'node:crypto';
+import { toError } from '../../../core/error-handlers.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -68,9 +69,9 @@ export function registerTaskRoutes(bridge, agent) {
                     });
                     clearTimeout(timeoutHandle);
                     return res.json({ ok: true, response: raceResult });
-                } catch (/** @type {any} */ e) {
+                } catch (e) {
                     clearTimeout(timeoutHandle);
-                    if (e?.name === 'AbortError' || e?.code === 'ABORT_ERR') {
+                    if (toError(e).name === 'AbortError' || toError(e).code === 'ABORT_ERR') {
                         return res.status(504).json({ ok: false, error: `Timeout após ${timeoutMs}ms` });
                     }
                     throw e;
@@ -99,25 +100,25 @@ export function registerTaskRoutes(bridge, agent) {
             const earlyCatch = await Promise.race([
                 sendPromise.then(
                     () => null,
-                    (/** @type {any} */ e) => e,
+                    (e) => e,
                 ),
                 Promise.resolve(null),
             ]);
             if (earlyCatch !== null) {
-                const errMsg = /** @type {any} */ (earlyCatch).message ?? String(earlyCatch);
+                const errMsg = toError(earlyCatch).message;
                 if (String(errMsg).includes('QUEUE_FULL') || String(errMsg).includes('Fila cheia')) {
                     return res.status(429).json({ ok: false, error: errMsg });
                 }
                 return res.status(500).json({ ok: false, error: errMsg });
             }
             // Erros tardios apenas logados
-            sendPromise.catch((/** @type {any} */ e) => {
+            sendPromise.catch((e) => {
                 log('WARN', `[copilot-api/tasks/send] Tarefa assíncrona falhou: ${e.message}`);
             });
             return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
-        } catch (/** @type {any} */ e) {
-            log('ERROR', `[copilot-api/tasks/send] ${e.message}`);
-            return res.status(500).json({ ok: false, error: e.message });
+        } catch (e) {
+            log('ERROR', `[copilot-api/tasks/send] ${toError(e).message}`);
+            return res.status(500).json({ ok: false, error: toError(e).message });
         }
     });
 

@@ -119,7 +119,10 @@ export function bootstrapObservability() {
         { token: SHUTDOWN_LOGGER, setter: setShutdownLogger },
         { token: DB_LOGGER, setter: setDbLogger },
         { token: SDK_LOGGER, setter: setSdkLogger },
-        { token: AUDIT_LOGGER, setter: (/** @type {any} */ fn) => setAuditLogger(fn, LOG_DIR) },
+        {
+            token: AUDIT_LOGGER,
+            setter: (fn) => setAuditLogger(/** @type {Parameters<typeof setAuditLogger>[0]} */ (fn), LOG_DIR),
+        },
         { token: HOOKS_LOGGER, setter: setHooksLogger },
         { token: TOOLS_LOGGER, setter: setToolsLogger },
         { token: TOOLS_METRICS, setter: setToolsMetrics },
@@ -138,7 +141,10 @@ export function bootstrapLateDeps(deps) {
         container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
         // K-5: wiring centralizado
         wireLegacySetters(container, [
-            { token: TOOLS_BUILDER, setter: (/** @type {any} */ fn) => setCustomToolsBuilder(fn) },
+            {
+                token: TOOLS_BUILDER,
+                setter: (fn) => setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (fn)),
+            },
         ]);
     }
 }
