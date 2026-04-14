@@ -12,8 +12,8 @@
  * @see EventBus
  */
 
-import { container } from '#copilot/core';
 import { SessionConfigBuilder } from '#copilot/config';
+import { container } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
@@ -90,10 +90,14 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .tools(tools);
 
     // hooks e mcpServers usam tipos locais que divergem dos tipos SDK — via merge para bypass de strictness
-    builder.merge(/** @type {Partial<import('@github/copilot-sdk').SessionConfig>} */ (/** @type {unknown} */ ({
-        hooks: busHooks,
-        mcpServers: ctx.mcpBridge ? ctx.mcpBridge.buildConfig() : buildMcpConfig(),
-    })));
+    builder.merge(
+        /** @type {Partial<import('@github/copilot-sdk').SessionConfig>} */ (
+            /** @type {unknown} */ ({
+                hooks: busHooks,
+                mcpServers: ctx.mcpBridge ? ctx.mcpBridge.buildConfig() : buildMcpConfig(),
+            })
+        ),
+    );
 
     if (ctx.reasoningEffort) {
         builder.reasoningEffort(ctx.reasoningEffort);

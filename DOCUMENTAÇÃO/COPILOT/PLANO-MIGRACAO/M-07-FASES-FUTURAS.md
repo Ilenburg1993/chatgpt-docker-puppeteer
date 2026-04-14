@@ -26,13 +26,13 @@ Este documento cataloga cada faixa futura com:
 
 ## 2. Mapa de Faixas Futuras
 
-| Faixa | Nome | Horas | Pré-req | Prioridade |
-|-------|------|-------|---------|------------|
-| D | Experimental RPC Extension | 30h | M-02 | Alta |
-| F | Observabilidade SDK + Telemetry | 16h | M-06 | Média |
-| G2 | Conversation Hub Lifecycle | 10h | M-03 | Média |
-| H | TSServer Integration | 16h | M-04 | Baixa |
-| J3 | SDK Documentation | 6h | M-04 | Baixa |
+| Faixa | Nome                            | Horas | Pré-req | Prioridade |
+| ----- | ------------------------------- | ----- | ------- | ---------- |
+| D     | Experimental RPC Extension      | 30h   | M-02    | Alta       |
+| F     | Observabilidade SDK + Telemetry | 16h   | M-06    | Média      |
+| G2    | Conversation Hub Lifecycle      | 10h   | M-03    | Média      |
+| H     | TSServer Integration            | 16h   | M-04    | Baixa      |
+| J3    | SDK Documentation               | 6h    | M-04    | Baixa      |
 
 **Total**: ~78h
 
@@ -45,13 +45,13 @@ Este documento cataloga cada faixa futura com:
 A Faixa A3.2 implementou 20 tools experimentais em `sdk/rpc/experimental.js` (371L).
 A Faixa D expande com 5 conjuntos adicionais:
 
-| Subfase | Ferramentas | Horas |
-|---------|-------------|-------|
-| D1 | Skills RPC (5 ferramentas) | 6h |
-| D2 | MCP RPC (6 ferramentas) | 8h |
-| D3 | Agent Orchestration RPC (4 ferramentas) | 6h |
-| D4 | Extensions RPC (3 ferramentas) | 4h |
-| D5 | Fleet Management RPC (4 ferramentas) | 6h |
+| Subfase | Ferramentas                             | Horas |
+| ------- | --------------------------------------- | ----- |
+| D1      | Skills RPC (5 ferramentas)              | 6h    |
+| D2      | MCP RPC (6 ferramentas)                 | 8h    |
+| D3      | Agent Orchestration RPC (4 ferramentas) | 6h    |
+| D4      | Extensions RPC (3 ferramentas)          | 4h    |
+| D5      | Fleet Management RPC (4 ferramentas)    | 6h    |
 
 ### Pré-requisitos
 
@@ -60,18 +60,18 @@ A Faixa D expande com 5 conjuntos adicionais:
 
 ### Arquivos a criar/modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `sdk/rpc/skills.js` | CRIAR: Skills RPC server |
-| `sdk/rpc/mcp.js` | CRIAR: MCP RPC server |
-| `sdk/rpc/orchestration.js` | CRIAR: Orchestration RPC server |
-| `sdk/rpc/extensions.js` | CRIAR: Extensions RPC server |
-| `sdk/rpc/fleet.js` | CRIAR: Fleet Management RPC server |
-| `tools/skill-tools.js` | CRIAR: 5 LLM tools para Skills |
-| `tools/mcp-tools.js` | CRIAR: 6 LLM tools para MCP |
-| `tools/orchestration-tools.js` | CRIAR: 4 LLM tools |
-| `tools/extension-tools.js` | CRIAR: 3 LLM tools |
-| `tools/fleet-tools.js` | CRIAR: 4 LLM tools |
+| Arquivo                        | Ação                               |
+| ------------------------------ | ---------------------------------- |
+| `sdk/rpc/skills.js`            | CRIAR: Skills RPC server           |
+| `sdk/rpc/mcp.js`               | CRIAR: MCP RPC server              |
+| `sdk/rpc/orchestration.js`     | CRIAR: Orchestration RPC server    |
+| `sdk/rpc/extensions.js`        | CRIAR: Extensions RPC server       |
+| `sdk/rpc/fleet.js`             | CRIAR: Fleet Management RPC server |
+| `tools/skill-tools.js`         | CRIAR: 5 LLM tools para Skills     |
+| `tools/mcp-tools.js`           | CRIAR: 6 LLM tools para MCP        |
+| `tools/orchestration-tools.js` | CRIAR: 4 LLM tools                 |
+| `tools/extension-tools.js`     | CRIAR: 3 LLM tools                 |
+| `tools/fleet-tools.js`         | CRIAR: 4 LLM tools                 |
 
 ### Risco
 
@@ -88,12 +88,12 @@ Após M-06 (error pipeline), a observability está limpa mas ainda faltam:
 2. OTEL export configurável (stdout, Jaeger, OTLP)
 3. Dashboards de quota via `/health/quotas`
 
-| Subfase | Escopo | Horas |
-|---------|--------|-------|
-| F1 | Client telemetry middleware | 4h |
-| F2 | OTEL exporter configurável | 6h |
-| F3 | Quota dashboard endpoints | 4h |
-| F4 | Métricas de tool performance | 2h |
+| Subfase | Escopo                       | Horas |
+| ------- | ---------------------------- | ----- |
+| F1      | Client telemetry middleware  | 4h    |
+| F2      | OTEL exporter configurável   | 6h    |
+| F3      | Quota dashboard endpoints    | 4h    |
+| F4      | Métricas de tool performance | 2h    |
 
 ### Pré-requisitos
 
@@ -102,12 +102,12 @@ Após M-06 (error pipeline), a observability está limpa mas ainda faltam:
 
 ### Arquivos a criar/modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `sdk/telemetry/client-telemetry.js` | CRIAR: interceptor de requests |
-| `sdk/telemetry/otel-exporter.js` | CRIAR: configuração dinâmica de exporters |
-| `server/routes/health.js` | ATUALIZAR: adicionar /health/quotas |
-| `observability/metrics.js` | ATUALIZAR: integrar com OTEL exporter |
+| Arquivo                             | Ação                                      |
+| ----------------------------------- | ----------------------------------------- |
+| `sdk/telemetry/client-telemetry.js` | CRIAR: interceptor de requests            |
+| `sdk/telemetry/otel-exporter.js`    | CRIAR: configuração dinâmica de exporters |
+| `server/routes/health.js`           | ATUALIZAR: adicionar /health/quotas       |
+| `observability/metrics.js`          | ATUALIZAR: integrar com OTEL exporter     |
 
 ### Risco
 
@@ -124,11 +124,11 @@ O `conversation-hub/` (12 arquivos, 2.217L) gerencia conversas mas não tem life
 - `store.js` (563L) cresce sem limites
 - Não há replay/recovery de conversas após restart
 
-| Subfase | Escopo | Horas |
-|---------|--------|-------|
-| G2.1 | TTL para conversas (cleanup automático) | 3h |
-| G2.2 | Store compaction (SQLite vacuum + archive) | 3h |
-| G2.3 | Conversation replay após restart | 4h |
+| Subfase | Escopo                                     | Horas |
+| ------- | ------------------------------------------ | ----- |
+| G2.1    | TTL para conversas (cleanup automático)    | 3h    |
+| G2.2    | Store compaction (SQLite vacuum + archive) | 3h    |
+| G2.3    | Conversation replay após restart           | 4h    |
 
 ### Pré-requisitos
 
@@ -137,12 +137,12 @@ O `conversation-hub/` (12 arquivos, 2.217L) gerencia conversas mas não tem life
 
 ### Arquivos a criar/modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `conversation-hub/lifecycle.js` | CRIAR: TTL manager + cleanup |
+| Arquivo                                | Ação                             |
+| -------------------------------------- | -------------------------------- |
+| `conversation-hub/lifecycle.js`        | CRIAR: TTL manager + cleanup     |
 | `conversation-hub/store-compaction.js` | CRIAR: vacuum + archive strategy |
-| `conversation-hub/store.js` | ATUALIZAR: integrar lifecycle |
-| `conversation-hub/orchestrator.js` | ATUALIZAR: replay on restart |
+| `conversation-hub/store.js`            | ATUALIZAR: integrar lifecycle    |
+| `conversation-hub/orchestrator.js`     | ATUALIZAR: replay on restart     |
 
 ### Risco
 
@@ -157,10 +157,10 @@ O `conversation-hub/` (12 arquivos, 2.217L) gerencia conversas mas não tem life
 O TSServer (TypeScript Language Server) é uma ferramenta valiosa para fornecer
 contexto de código ao agente. Atualmente não há integração formal.
 
-| Subfase | Escopo | Horas |
-|---------|--------|-------|
-| H1 | TSServer tools (5 ferramentas: hover, completion, definition, references, diagnostics) | 10h |
-| H2 | Context injection (injetar info do TSServer no system prompt) | 6h |
+| Subfase | Escopo                                                                                 | Horas |
+| ------- | -------------------------------------------------------------------------------------- | ----- |
+| H1      | TSServer tools (5 ferramentas: hover, completion, definition, references, diagnostics) | 10h   |
+| H2      | Context injection (injetar info do TSServer no system prompt)                          | 6h    |
 
 ### Pré-requisitos
 
@@ -169,14 +169,14 @@ contexto de código ao agente. Atualmente não há integração formal.
 
 ### Arquivos a criar
 
-| Arquivo | Ação |
-|---------|------|
-| `tools/tsserver/hover.js` | CRIAR |
-| `tools/tsserver/completion.js` | CRIAR |
-| `tools/tsserver/definition.js` | CRIAR |
-| `tools/tsserver/references.js` | CRIAR |
-| `tools/tsserver/diagnostics.js` | CRIAR |
-| `tools/tsserver/index.js` | CRIAR: barrel |
+| Arquivo                                             | Ação                   |
+| --------------------------------------------------- | ---------------------- |
+| `tools/tsserver/hover.js`                           | CRIAR                  |
+| `tools/tsserver/completion.js`                      | CRIAR                  |
+| `tools/tsserver/definition.js`                      | CRIAR                  |
+| `tools/tsserver/references.js`                      | CRIAR                  |
+| `tools/tsserver/diagnostics.js`                     | CRIAR                  |
+| `tools/tsserver/index.js`                           | CRIAR: barrel          |
 | `config/system-prompt/sections/tsserver-context.js` | CRIAR: seção de prompt |
 
 ### Risco
@@ -192,10 +192,10 @@ contexto de código ao agente. Atualmente não há integração formal.
 Após M-04 (SDK stateless) e M-07 (documentation), o SDK wrapper precisa de
 documentação atualizada:
 
-| Subfase | Escopo | Horas |
-|---------|--------|-------|
-| J3.1 | Documentação de API pública do SDK wrapper | 3h |
-| J3.2 | Guia de migração para consumers | 3h |
+| Subfase | Escopo                                     | Horas |
+| ------- | ------------------------------------------ | ----- |
+| J3.1    | Documentação de API pública do SDK wrapper | 3h    |
+| J3.2    | Guia de migração para consumers            | 3h    |
 
 ### Pré-requisitos
 
@@ -203,10 +203,10 @@ documentação atualizada:
 
 ### Arquivos a criar
 
-| Arquivo | Ação |
-|---------|------|
+| Arquivo                                   | Ação                     |
+| ----------------------------------------- | ------------------------ |
 | `DOCUMENTAÇÃO/COPILOT/SDK-WRAPPER-API.md` | CRIAR: referência de API |
-| `DOCUMENTAÇÃO/COPILOT/MIGRATION-GUIDE.md` | CRIAR: guia de migração |
+| `DOCUMENTAÇÃO/COPILOT/MIGRATION-GUIDE.md` | CRIAR: guia de migração  |
 
 ### Risco
 
@@ -241,21 +241,21 @@ M-06 ──→ F (Telemetry)
 
 ## 9. Tabela Consolidada de Todas as Fases
 
-| Fase | Doc | Faixas | Horas | Status |
-|------|-----|--------|-------|--------|
-| Cleanup | M-02 | L1, J2, G4, C4 | 12h | ⬜ |
-| Agent Refactor | M-03 | K1-K8, L2 | 59h | ⬜ |
-| SDK Stateless | M-04 | L3, J1 | 14h | ⬜ |
-| Event Unification | M-05 | L4, G3, K6 | 16h | ⬜ |
-| Obs + Errors | M-06 | L5, K3, F(p) | 12h | ⬜ |
-| **Subtotal estrutural** | | | **113h** | |
-| RPC Extension | (futuro) | D | 30h | ⬜ |
-| Telemetry | (futuro) | F | 16h | ⬜ |
-| Hub Lifecycle | (futuro) | G2 | 10h | ⬜ |
-| TSServer | (futuro) | H | 16h | ⬜ |
-| Documentation | (futuro) | J3 | 6h | ⬜ |
-| **Subtotal features** | | | **78h** | |
-| **TOTAL GERAL** | | | **191h** | |
+| Fase                    | Doc      | Faixas         | Horas    | Status |
+| ----------------------- | -------- | -------------- | -------- | ------ |
+| Cleanup                 | M-02     | L1, J2, G4, C4 | 12h      | ⬜      |
+| Agent Refactor          | M-03     | K1-K8, L2      | 59h      | ⬜      |
+| SDK Stateless           | M-04     | L3, J1         | 14h      | ⬜      |
+| Event Unification       | M-05     | L4, G3, K6     | 16h      | ⬜      |
+| Obs + Errors            | M-06     | L5, K3, F(p)   | 12h      | ⬜      |
+| **Subtotal estrutural** |          |                | **113h** |        |
+| RPC Extension           | (futuro) | D              | 30h      | ⬜      |
+| Telemetry               | (futuro) | F              | 16h      | ⬜      |
+| Hub Lifecycle           | (futuro) | G2             | 10h      | ⬜      |
+| TSServer                | (futuro) | H              | 16h      | ⬜      |
+| Documentation           | (futuro) | J3             | 6h       | ⬜      |
+| **Subtotal features**   |          |                | **78h**  |        |
+| **TOTAL GERAL**         |          |                | **191h** |        |
 
 ---
 

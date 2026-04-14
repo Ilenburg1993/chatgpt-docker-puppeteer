@@ -18,16 +18,16 @@ esta fase reestrutura o interior do agent para ficar abaixo de 5.000L.
 
 ### Métricas antes → depois
 
-| Métrica | Antes (pós M-02) | Depois |
-|---------|-------------------|--------|
-| agent/ linhas | ~8.000 | ~4.000 |
-| agent/ arquivos | ~57 | ~35 |
-| Event handlers em agent/ | 12 | 0 (movidos para event-handlers/) |
-| Testes agent/ | ~0 | 30+ |
-| AgentContext campos públicos | 30+ | 6 sub-estados |
-| Boot wiring steps isolados | 0 | 12 |
-| Message chain depth | 7 | 4 |
-| Event bridge hardcoded | ~80 | 0 (declarativo) |
+| Métrica                      | Antes (pós M-02) | Depois                           |
+| ---------------------------- | ---------------- | -------------------------------- |
+| agent/ linhas                | ~8.000           | ~4.000                           |
+| agent/ arquivos              | ~57              | ~35                              |
+| Event handlers em agent/     | 12               | 0 (movidos para event-handlers/) |
+| Testes agent/                | ~0               | 30+                              |
+| AgentContext campos públicos | 30+              | 6 sub-estados                    |
+| Boot wiring steps isolados   | 0                | 12                               |
+| Message chain depth          | 7                | 4                                |
+| Event bridge hardcoded       | ~80              | 0 (declarativo)                  |
 
 ### Problemas resolvidos
 
@@ -42,20 +42,20 @@ esta fase reestrutura o interior do agent para ficar abaixo de 5.000L.
 Esta fase é grande (~59h) e se divide em 8 subfases executáveis independentemente
 (exceto K2 que depende de K1):
 
-| # | Subfase | Horas | Depende de |
-|---|---------|-------|------------|
-| K1 | AgentContext Partitioning | 8h | — |
-| K2 | Test Coverage Sprint | 12h | K1 |
-| L2.1 | Mover event-handlers para event-handlers/ | 4h | — |
-| L2.3+L2.4 | Simplificar message chain | 5h | — |
-| K5 | Boot Wiring Pipeline | 6h | — |
-| K3 | Error Handling Centralizado | 4h | K5 |
-| K4 | Background Task Tracker | 3h | — |
-| K6 | Event Bridge Declarativo | 4h | — |
-| K7 | Health Check Formal | 3h | K1 |
-| K8 | Lazy Singleton | 3h | — |
-| L2.5 | Testes de regressão finais | 3h | Todos |
-| — | Commit | 1h | Todos |
+| #         | Subfase                                   | Horas | Depende de |
+| --------- | ----------------------------------------- | ----- | ---------- |
+| K1        | AgentContext Partitioning                 | 8h    | —          |
+| K2        | Test Coverage Sprint                      | 12h   | K1         |
+| L2.1      | Mover event-handlers para event-handlers/ | 4h    | —          |
+| L2.3+L2.4 | Simplificar message chain                 | 5h    | —          |
+| K5        | Boot Wiring Pipeline                      | 6h    | —          |
+| K3        | Error Handling Centralizado               | 4h    | K5         |
+| K4        | Background Task Tracker                   | 3h    | —          |
+| K6        | Event Bridge Declarativo                  | 4h    | —          |
+| K7        | Health Check Formal                       | 3h    | K1         |
+| K8        | Lazy Singleton                            | 3h    | —          |
+| L2.5      | Testes de regressão finais                | 3h    | Todos      |
+| —         | Commit                                    | 1h    | Todos      |
 
 ---
 
@@ -535,10 +535,10 @@ git push origin main
 
 ## 5. Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| AgentContext refactor quebra runtime | Média | Alto | Getters compat em P02, testes em P04 |
-| Merge de executors perde edge cases | Média | Alto | Testes extensivos em P08/P10 |
-| Boot pipeline altera ordem | Baixa | Alto | P07 testa sequência |
-| Event bridge incompleto | Média | Médio | P28 verifica completude via SDK events |
-| Import circular após mover handlers | Baixa | Médio | npm run lint detecta |
+| Risco                                | Probabilidade | Impacto | Mitigação                              |
+| ------------------------------------ | ------------- | ------- | -------------------------------------- |
+| AgentContext refactor quebra runtime | Média         | Alto    | Getters compat em P02, testes em P04   |
+| Merge de executors perde edge cases  | Média         | Alto    | Testes extensivos em P08/P10           |
+| Boot pipeline altera ordem           | Baixa         | Alto    | P07 testa sequência                    |
+| Event bridge incompleto              | Média         | Médio   | P28 verifica completude via SDK events |
+| Import circular após mover handlers  | Baixa         | Médio   | npm run lint detecta                   |

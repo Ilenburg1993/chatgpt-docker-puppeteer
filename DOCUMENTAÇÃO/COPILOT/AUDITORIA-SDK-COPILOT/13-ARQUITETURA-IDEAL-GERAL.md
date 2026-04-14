@@ -240,17 +240,17 @@ DEPOIS (4 níveis):
 
 ## 5. Impacto Estimado (antes → depois)
 
-| Métrica | Atual | Ideal | Redução |
-|---------|-------|-------|---------|
-| Total de arquivos | 408 | ~300 | ~25% |
-| Total de linhas | ~62k | ~45k | ~27% |
-| Módulos toplevel | 21 | 14 | -7 |
-| `agent/` linhas | 8.620 | ~4.000 | -54% |
-| `sdk/` linhas | 8.096 | ~5.000 | -38% |
-| `observability/` linhas | 5.757 | ~3.500 | -39% |
-| Event buses | 3 | 1 | -67% |
-| Send message chain | 7 | 4 | -43% |
-| Duplicações funcionais | 7 | 0 | -100% |
+| Métrica                 | Atual | Ideal  | Redução |
+| ----------------------- | ----- | ------ | ------- |
+| Total de arquivos       | 408   | ~300   | ~25%    |
+| Total de linhas         | ~62k  | ~45k   | ~27%    |
+| Módulos toplevel        | 21    | 14     | -7      |
+| `agent/` linhas         | 8.620 | ~4.000 | -54%    |
+| `sdk/` linhas           | 8.096 | ~5.000 | -38%    |
+| `observability/` linhas | 5.757 | ~3.500 | -39%    |
+| Event buses             | 3     | 1      | -67%    |
+| Send message chain      | 7     | 4      | -43%    |
+| Duplicações funcionais  | 7     | 0      | -100%   |
 
 ### Módulos removidos:
 - `api/` → consolidado em `server/`
@@ -272,80 +272,80 @@ DEPOIS (4 níveis):
 
 ### Fase L1 — Quick Wins (8h) 🔴
 
-| # | Ação | Risco | Estimativa |
-|---|------|-------|------------|
-| L1.1 | Remover `api/` — merge endpoints em `server/routes/` | Baixo | 3h |
-| L1.2 | Remover `services/` — inline em consumers | Baixo | 2h |
-| L1.3 | Mover `agent/config.js` → `config/agent.js` | Baixo | 1h |
-| L1.4 | Mover `sdk/agent/contracts` → `types/contracts/` | Baixo | 1h |
-| L1.5 | Deprecar `sdk/config.js::buildSessionConfig` | Baixo | 1h |
+| #    | Ação                                                 | Risco | Estimativa |
+| ---- | ---------------------------------------------------- | ----- | ---------- |
+| L1.1 | Remover `api/` — merge endpoints em `server/routes/` | Baixo | 3h         |
+| L1.2 | Remover `services/` — inline em consumers            | Baixo | 2h         |
+| L1.3 | Mover `agent/config.js` → `config/agent.js`          | Baixo | 1h         |
+| L1.4 | Mover `sdk/agent/contracts` → `types/contracts/`     | Baixo | 1h         |
+| L1.5 | Deprecar `sdk/config.js::buildSessionConfig`         | Baixo | 1h         |
 
 ### Fase L2 — Agent Slimming (16h) 🟠
 
-| # | Ação | Risco | Estimativa |
-|---|------|-------|------------|
-| L2.1 | Mover `agent/session/event-handlers/` → `event-handlers/` | Moderado | 4h |
-| L2.2 | Mover `agent/infra/` itens para módulos corretos (C4) | Moderado | 4h |
-| L2.3 | Merge `agent-messaging.js` + `queue-processor.js` | Moderado | 2h |
-| L2.4 | Merge `task-executor.js` + `turn-executor.js` | Moderado | 3h |
-| L2.5 | Testes de regressão | — | 3h |
+| #    | Ação                                                      | Risco    | Estimativa |
+| ---- | --------------------------------------------------------- | -------- | ---------- |
+| L2.1 | Mover `agent/session/event-handlers/` → `event-handlers/` | Moderado | 4h         |
+| L2.2 | Mover `agent/infra/` itens para módulos corretos (C4)     | Moderado | 4h         |
+| L2.3 | Merge `agent-messaging.js` + `queue-processor.js`         | Moderado | 2h         |
+| L2.4 | Merge `task-executor.js` + `turn-executor.js`             | Moderado | 3h         |
+| L2.5 | Testes de regressão                                       | —        | 3h         |
 
 ### Fase L3 — SDK Stateless (10h) 🟠
 
-| # | Ação | Risco | Estimativa |
-|---|------|-------|------------|
-| L3.1 | Extrair session registry de `sdk/session/client.js` | Alto | 4h |
-| L3.2 | Mover `sdk/agent/agents.js` → `config/custom-agents.js` | Baixo | 2h |
-| L3.3 | Eliminar `sdk/config.js` (subsumido por SessionConfigBuilder) | Moderado | 2h |
-| L3.4 | Testes de regressão | — | 2h |
+| #    | Ação                                                          | Risco    | Estimativa |
+| ---- | ------------------------------------------------------------- | -------- | ---------- |
+| L3.1 | Extrair session registry de `sdk/session/client.js`           | Alto     | 4h         |
+| L3.2 | Mover `sdk/agent/agents.js` → `config/custom-agents.js`       | Baixo    | 2h         |
+| L3.3 | Eliminar `sdk/config.js` (subsumido por SessionConfigBuilder) | Moderado | 2h         |
+| L3.4 | Testes de regressão                                           | —        | 2h         |
 
 ### Fase L4 — Event Bus Unification (12h) 🟠
 
-| # | Ação | Risco | Estimativa |
-|---|------|-------|------------|
-| L4.1 | HookBus → EventBus com namespace `hook:*` | Alto | 4h |
-| L4.2 | SDK event bridge automático via registry | Alto | 4h |
-| L4.3 | Consolidar observability collectors/bus-actions → observers | Moderado | 2h |
-| L4.4 | Testes de regressão | — | 2h |
+| #    | Ação                                                        | Risco    | Estimativa |
+| ---- | ----------------------------------------------------------- | -------- | ---------- |
+| L4.1 | HookBus → EventBus com namespace `hook:*`                   | Alto     | 4h         |
+| L4.2 | SDK event bridge automático via registry                    | Alto     | 4h         |
+| L4.3 | Consolidar observability collectors/bus-actions → observers | Moderado | 2h         |
+| L4.4 | Testes de regressão                                         | —        | 2h         |
 
 ### Fase L5 — Error Pipeline + Observability Trim (8h) 🟡
 
-| # | Ação | Risco | Estimativa |
-|---|------|-------|------------|
-| L5.1 | Unificar error-tracker + error-alerting → error-pipeline.js | Baixo | 3h |
-| L5.2 | Remover event-catalog.js dead-letter (unused defensive code) | Baixo | 1h |
-| L5.3 | Consolidar collectors + bus-actions → observers | Baixo | 2h |
-| L5.4 | Testes de regressão | — | 2h |
+| #    | Ação                                                         | Risco | Estimativa |
+| ---- | ------------------------------------------------------------ | ----- | ---------- |
+| L5.1 | Unificar error-tracker + error-alerting → error-pipeline.js  | Baixo | 3h         |
+| L5.2 | Remover event-catalog.js dead-letter (unused defensive code) | Baixo | 1h         |
+| L5.3 | Consolidar collectors + bus-actions → observers              | Baixo | 2h         |
+| L5.4 | Testes de regressão                                          | —     | 2h         |
 
 ---
 
 ## 7. Resumo de Estimativas — Faixa L
 
-| Fase | Nome | Prioridade | Horas |
-|------|------|-----------|-------|
-| L1 | Quick Wins | 🔴 P0 | 8h |
-| L2 | Agent Slimming | 🟠 P1 | 16h |
-| L3 | SDK Stateless | 🟠 P1 | 10h |
-| L4 | Event Bus Unification | 🟠 P1 | 12h |
-| L5 | Error Pipeline + Obs Trim | 🟡 P2 | 8h |
-| **Total** | | | **54h** |
+| Fase      | Nome                      | Prioridade | Horas   |
+| --------- | ------------------------- | ---------- | ------- |
+| L1        | Quick Wins                | 🔴 P0       | 8h      |
+| L2        | Agent Slimming            | 🟠 P1       | 16h     |
+| L3        | SDK Stateless             | 🟠 P1       | 10h     |
+| L4        | Event Bus Unification     | 🟠 P1       | 12h     |
+| L5        | Error Pipeline + Obs Trim | 🟡 P2       | 8h      |
+| **Total** |                           |            | **54h** |
 
 ### Relação com Faixas Anteriores
 
-| Faixa Anterior | Status | Relação com Faixa L |
-|---------------|--------|---------------------|
-| Faixa G (Arch Refactoring, 46h) | Planejada | **L subsume G1, G3, G4**. G2 (Hub lifecycle) mantém-se independente |
-| Faixa J (SDK Gateway, 12h) | Planejada | **L3 subsume J2** (dead code). J1+J3 mantêm-se |
-| Faixa K (Agent Refactoring, 43h) | Planejada | **L2 complementa K**. Executar K1+K2 primeiro, depois L2 |
+| Faixa Anterior                   | Status    | Relação com Faixa L                                                 |
+| -------------------------------- | --------- | ------------------------------------------------------------------- |
+| Faixa G (Arch Refactoring, 46h)  | Planejada | **L subsume G1, G3, G4**. G2 (Hub lifecycle) mantém-se independente |
+| Faixa J (SDK Gateway, 12h)       | Planejada | **L3 subsume J2** (dead code). J1+J3 mantêm-se                      |
+| Faixa K (Agent Refactoring, 43h) | Planejada | **L2 complementa K**. Executar K1+K2 primeiro, depois L2            |
 
 ### Sprint Sugerido
 
-| Sprint | Fases | Horas | Pré-requisito |
-|--------|-------|-------|---------------|
-| L-Sprint 1 | L1 (Quick wins) | 8h | Nenhum |
-| L-Sprint 2 | L2 (Agent slim) + K1 (AgentContext) | 24h | L1 |
-| L-Sprint 3 | L3 (SDK stateless) + L4 (Event bus) | 22h | L2 |
-| L-Sprint 4 | L5 (Error + Obs) | 8h | L4 |
+| Sprint     | Fases                               | Horas | Pré-requisito |
+| ---------- | ----------------------------------- | ----- | ------------- |
+| L-Sprint 1 | L1 (Quick wins)                     | 8h    | Nenhum        |
+| L-Sprint 2 | L2 (Agent slim) + K1 (AgentContext) | 24h   | L1            |
+| L-Sprint 3 | L3 (SDK stateless) + L4 (Event bus) | 22h   | L2            |
+| L-Sprint 4 | L5 (Error + Obs)                    | 8h    | L4            |
 
 ---
 

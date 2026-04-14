@@ -25,14 +25,14 @@ arquitetura de camadas do sistema.
 
 ### Números-chave
 
-| Métrica | Valor |
-|---------|-------|
-| Total de arquivos | ~55 |
-| Total de linhas | ~8620 |
-| Subdiretórios | 8 (`dialog/`, `facades/`, `infra/`, `lifecycle/`, `messaging/`, `session/`, `session/event-handlers/`, `state/`) |
-| Eventos bridgeados | ~80 agent → EventBus |
-| Event handlers SDK | 12 módulos especializados |
-| Host interfaces (JSDoc) | 5 (`LifecycleHost`, `DialogHost`, `MessagingHost`, `StateHost`, `IAlwaysAliveAgent`) |
+| Métrica                 | Valor                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Total de arquivos       | ~55                                                                                                              |
+| Total de linhas         | ~8620                                                                                                            |
+| Subdiretórios           | 8 (`dialog/`, `facades/`, `infra/`, `lifecycle/`, `messaging/`, `session/`, `session/event-handlers/`, `state/`) |
+| Eventos bridgeados      | ~80 agent → EventBus                                                                                             |
+| Event handlers SDK      | 12 módulos especializados                                                                                        |
+| Host interfaces (JSDoc) | 5 (`LifecycleHost`, `DialogHost`, `MessagingHost`, `StateHost`, `IAlwaysAliveAgent`)                             |
 
 ---
 
@@ -40,97 +40,97 @@ arquitetura de camadas do sistema.
 
 ### 2.1 Root (`agent/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `always-alive.js` | 759 | Classe singleton `AlwaysAliveAgent` — fachada pública, bridge de eventos |
-| `agent-context.js` | 254 | `AgentContext` — estado compartilhado entre todos os módulos internos |
-| `config.js` | 205 | Configuração centralizada (re-exporta de `#copilot/config` com nomes semânticos) |
-| `types.js` | 176 | Typedefs centralizados (AgentStatus, PendingQuestion, AgentTask, etc.) |
-| `queue-processor.js` | 67 | Processa próxima task da fila quando idle |
-| `di-tokens.js` | ~20 | Tokens DI para o agente |
-| `index.js` | ~100 | Barrel exports |
+| Arquivo              | Linhas | Função                                                                           |
+| -------------------- | ------ | -------------------------------------------------------------------------------- |
+| `always-alive.js`    | 759    | Classe singleton `AlwaysAliveAgent` — fachada pública, bridge de eventos         |
+| `agent-context.js`   | 254    | `AgentContext` — estado compartilhado entre todos os módulos internos            |
+| `config.js`          | 205    | Configuração centralizada (re-exporta de `#copilot/config` com nomes semânticos) |
+| `types.js`           | 176    | Typedefs centralizados (AgentStatus, PendingQuestion, AgentTask, etc.)           |
+| `queue-processor.js` | 67     | Processa próxima task da fila quando idle                                        |
+| `di-tokens.js`       | ~20    | Tokens DI para o agente                                                          |
+| `index.js`           | ~100   | Barrel exports                                                                   |
 
 ### 2.2 Dialog (`agent/dialog/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `loop-manager.js` | 597 | `DialogLoopManager` — mutex, watchdog, backpressure, pause/resume, boot |
-| `turn-executor.js` | 391 | Execução de turno individual com spans OTEL e protocol parsing |
-| `agent-dialog-controller.js` | ~100 | Funções extraídas: `dialogStart`, `dialogStop`, `dialogResume`, `ensureDialogLoopAttached` |
-| `protocol.js` | ~120 | `DialogProtocol` — classificação READY/REPLY/STOPPED/QUESTION |
-| `watchdog.js` | ~120 | `DialogWatchdog` — detecção de inatividade com thresholds adaptativos |
-| `backpressure.js` | ~100 | `TurnQueue` — mutex promise-chain + limite de profundidade |
-| `model-fallback.js` | ~80 | `ModelFallbackState` — fallback de modelo entre restarts |
-| `user-input-handler.js` | ~80 | Handler de ask_user do SDK com integração dialog loop |
-| `event-wiring.js` | ~60 | `wireDialogLoopEvents` — wiring de eventos do DLM no host |
+| Arquivo                      | Linhas | Função                                                                                     |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `loop-manager.js`            | 597    | `DialogLoopManager` — mutex, watchdog, backpressure, pause/resume, boot                    |
+| `turn-executor.js`           | 391    | Execução de turno individual com spans OTEL e protocol parsing                             |
+| `agent-dialog-controller.js` | ~100   | Funções extraídas: `dialogStart`, `dialogStop`, `dialogResume`, `ensureDialogLoopAttached` |
+| `protocol.js`                | ~120   | `DialogProtocol` — classificação READY/REPLY/STOPPED/QUESTION                              |
+| `watchdog.js`                | ~120   | `DialogWatchdog` — detecção de inatividade com thresholds adaptativos                      |
+| `backpressure.js`            | ~100   | `TurnQueue` — mutex promise-chain + limite de profundidade                                 |
+| `model-fallback.js`          | ~80    | `ModelFallbackState` — fallback de modelo entre restarts                                   |
+| `user-input-handler.js`      | ~80    | Handler de ask_user do SDK com integração dialog loop                                      |
+| `event-wiring.js`            | ~60    | `wireDialogLoopEvents` — wiring de eventos do DLM no host                                  |
 
 ### 2.3 Lifecycle (`agent/lifecycle/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `agent-lifecycle.js` | 359 | `agentStart`, `agentStop`, `agentTryReconnect`, `initSession` |
-| `entry.js` | 251 | `startAgentLoop` — bootstrap PM2, retry, shutdown handlers, IPC |
-| `state-io.js` | 288 | Leitura/escrita de estado persistido em JSON (sync + async) |
-| `reconnect-policy.js` | ~150 | `tryReconnect` — backoff exponencial + jitter |
-| `session-setup.js` | ~120 | `buildSessionTools`, `buildSessionHooks`, `buildSessionOptions`, `finalizeSessionInit` |
+| Arquivo               | Linhas | Função                                                                                 |
+| --------------------- | ------ | -------------------------------------------------------------------------------------- |
+| `agent-lifecycle.js`  | 359    | `agentStart`, `agentStop`, `agentTryReconnect`, `initSession`                          |
+| `entry.js`            | 251    | `startAgentLoop` — bootstrap PM2, retry, shutdown handlers, IPC                        |
+| `state-io.js`         | 288    | Leitura/escrita de estado persistido em JSON (sync + async)                            |
+| `reconnect-policy.js` | ~150   | `tryReconnect` — backoff exponencial + jitter                                          |
+| `session-setup.js`    | ~120   | `buildSessionTools`, `buildSessionHooks`, `buildSessionOptions`, `finalizeSessionInit` |
 
 ### 2.4 Session (`agent/session/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `boot-wiring.js` | 331 | `performBootWiring` — 12 etapas de wiring pós-init |
-| `snapshot.js` | 262 | `createSnapshot`, `saveSnapshotAsync` — snapshots de estado |
-| `hook-context.js` | 219 | `buildHookSystemContext` — injeção de session-briefing no system message |
-| `initializer.js` | 196 | `initOrResumeSession` — criação/retomada persistente de sessão |
-| `keepalive.js` | 157 | `SessionKeepalive` — pings periódicos para manter sessão viva |
-| `rotation.js` | ~100 | `shouldRotateSession` — decisão de rotação por idade/tokens/compactions |
-| `cleanup.js` | 126 | `cleanupStaleSessions` — limpeza assíncrona de sessões órfãs |
-| `history-sync.js` | 119 | `syncSdkHistory`, `SessionMessagesCache` — sync de histórico |
-| `event-wirer.js` | ~90 | `wireSessionEvents` — orquestrador dos 12 event handlers |
+| Arquivo           | Linhas | Função                                                                   |
+| ----------------- | ------ | ------------------------------------------------------------------------ |
+| `boot-wiring.js`  | 331    | `performBootWiring` — 12 etapas de wiring pós-init                       |
+| `snapshot.js`     | 262    | `createSnapshot`, `saveSnapshotAsync` — snapshots de estado              |
+| `hook-context.js` | 219    | `buildHookSystemContext` — injeção de session-briefing no system message |
+| `initializer.js`  | 196    | `initOrResumeSession` — criação/retomada persistente de sessão           |
+| `keepalive.js`    | 157    | `SessionKeepalive` — pings periódicos para manter sessão viva            |
+| `rotation.js`     | ~100   | `shouldRotateSession` — decisão de rotação por idade/tokens/compactions  |
+| `cleanup.js`      | 126    | `cleanupStaleSessions` — limpeza assíncrona de sessões órfãs             |
+| `history-sync.js` | 119    | `syncSdkHistory`, `SessionMessagesCache` — sync de histórico             |
+| `event-wirer.js`  | ~90    | `wireSessionEvents` — orquestrador dos 12 event handlers                 |
 
 ### 2.5 Event Handlers (`agent/session/event-handlers/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `catch-all.js` | 101 | `wireCatchAll` — log de eventos SDK não tratados |
-| `sdk-responses.js` | 133 | `wireSdkResponseEvents` — intent, reasoning, turns, subagents |
-| `interaction-events.js` | 115 | `wireInteractionEvents` — skill, command, permission, subagent |
-| `session-lifecycle.js` | 68 | `wireSessionLifecycleEvents` — idle, error, warning, model_change |
-| `system-notifications.js` | 69 | `wireSystemNotificationEvents` — system.notification |
-| `token-budget.js` | 56 | `wireTokenBudgetEvents` — usage_info + warning heuristics |
-| `mcp-events.js` | 55 | `wireMcpEvents` — MCP server status, OAuth |
-| `compaction.js` | 50 | `wireCompactionEvents` — compaction start/complete |
-| `tool-lifecycle.js` | 39 | `wireToolLifecycleEvents` — tool execution progress |
-| `streaming.js` | 38 | `wireStreamingEvents` — reasoning delta, message delta |
-| `mode-and-tools.js` | 23 | `wireModeAndToolEvents` — session mode changed |
-| `usage.js` | ~30 | `wireUsageEvent` — session.usage |
+| Arquivo                   | Linhas | Função                                                            |
+| ------------------------- | ------ | ----------------------------------------------------------------- |
+| `catch-all.js`            | 101    | `wireCatchAll` — log de eventos SDK não tratados                  |
+| `sdk-responses.js`        | 133    | `wireSdkResponseEvents` — intent, reasoning, turns, subagents     |
+| `interaction-events.js`   | 115    | `wireInteractionEvents` — skill, command, permission, subagent    |
+| `session-lifecycle.js`    | 68     | `wireSessionLifecycleEvents` — idle, error, warning, model_change |
+| `system-notifications.js` | 69     | `wireSystemNotificationEvents` — system.notification              |
+| `token-budget.js`         | 56     | `wireTokenBudgetEvents` — usage_info + warning heuristics         |
+| `mcp-events.js`           | 55     | `wireMcpEvents` — MCP server status, OAuth                        |
+| `compaction.js`           | 50     | `wireCompactionEvents` — compaction start/complete                |
+| `tool-lifecycle.js`       | 39     | `wireToolLifecycleEvents` — tool execution progress               |
+| `streaming.js`            | 38     | `wireStreamingEvents` — reasoning delta, message delta            |
+| `mode-and-tools.js`       | 23     | `wireModeAndToolEvents` — session mode changed                    |
+| `usage.js`                | ~30    | `wireUsageEvent` — session.usage                                  |
 
 ### 2.6 Infra (`agent/infra/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `webhook-manager.js` | 233 | `WebhookManager` — registro/dispatch de webhooks com retry |
-| `message-queue.js` | 213 | `MessageQueue` — fila FIFO com abort via AbortSignal |
-| `task-executor.js` | 179 | `executeTask` — send/await com streaming, spans OTEL, reconexão |
-| `handoff-manager.js` | 159 | `HandoffManager` — handoff entre agentes (experimental fleet) |
-| `permission-controller.js` | 156 | `PermissionController` — runtime mode switching |
-| `tools-bootstrap.js` | 137 | `setSessionRpc`, `setExperimentalSession` — bootstrap de tools |
-| `status-snapshot.js` | ~100 | `buildStatusSnapshot` — montagem do snapshot de status |
+| Arquivo                    | Linhas | Função                                                          |
+| -------------------------- | ------ | --------------------------------------------------------------- |
+| `webhook-manager.js`       | 233    | `WebhookManager` — registro/dispatch de webhooks com retry      |
+| `message-queue.js`         | 213    | `MessageQueue` — fila FIFO com abort via AbortSignal            |
+| `task-executor.js`         | 179    | `executeTask` — send/await com streaming, spans OTEL, reconexão |
+| `handoff-manager.js`       | 159    | `HandoffManager` — handoff entre agentes (experimental fleet)   |
+| `permission-controller.js` | 156    | `PermissionController` — runtime mode switching                 |
+| `tools-bootstrap.js`       | 137    | `setSessionRpc`, `setExperimentalSession` — bootstrap de tools  |
+| `status-snapshot.js`       | ~100   | `buildStatusSnapshot` — montagem do snapshot de status          |
 
 ### 2.7 Facades (`agent/facades/`)
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `agent-model-config.js` | ~80 | `getModel`, `setModel`, `listAvailableModels`, `getReasoningEffort`, `setReasoningEffort` |
-| `agent-session-ops.js` | ~80 | `abortCurrentMessage`, `pingDialogWatchdog`, `sessionLog`, `getSessionMessages` |
-| `agent-webhook-ops.js` | ~50 | `registerWebhook`, `unregisterWebhook`, `listWebhooks` |
+| Arquivo                 | Linhas | Função                                                                                    |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------- |
+| `agent-model-config.js` | ~80    | `getModel`, `setModel`, `listAvailableModels`, `getReasoningEffort`, `setReasoningEffort` |
+| `agent-session-ops.js`  | ~80    | `abortCurrentMessage`, `pingDialogWatchdog`, `sessionLog`, `getSessionMessages`           |
+| `agent-webhook-ops.js`  | ~50    | `registerWebhook`, `unregisterWebhook`, `listWebhooks`                                    |
 
 ### 2.8 Messaging e State
 
-| Arquivo | Linhas | Função |
-|---------|--------|--------|
-| `messaging/agent-messaging.js` | ~180 | `enqueueTask`, `sendMessage`, `sendMessageDialogBoot`, `steerMessage`, `answerPendingQuestion` |
-| `state/agent-state.js` | ~80 | `getStatusSnapshot`, `listenerDiagnostics` |
+| Arquivo                        | Linhas | Função                                                                                         |
+| ------------------------------ | ------ | ---------------------------------------------------------------------------------------------- |
+| `messaging/agent-messaging.js` | ~180   | `enqueueTask`, `sendMessage`, `sendMessageDialogBoot`, `steerMessage`, `answerPendingQuestion` |
+| `state/agent-state.js`         | ~80    | `getStatusSnapshot`, `listenerDiagnostics`                                                     |
 
 ---
 

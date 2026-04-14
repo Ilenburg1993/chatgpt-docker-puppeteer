@@ -248,7 +248,7 @@ export function middleware(...middlewares) {
                     mw(inp, inv, (nextInput, nextInv) => dispatch(i + 1, nextInput, nextInv)),
                 );
             } catch (e) {
-                return Promise.reject(e);
+                return Promise.reject(e instanceof Error ? e : new Error(String(e)));
             }
         }
 

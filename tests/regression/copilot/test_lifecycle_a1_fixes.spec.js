@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck -- regression test with mocks
 /**
  * Testes de regressão — Fase A1 (BUG-03, BUG-06, BUG-10)

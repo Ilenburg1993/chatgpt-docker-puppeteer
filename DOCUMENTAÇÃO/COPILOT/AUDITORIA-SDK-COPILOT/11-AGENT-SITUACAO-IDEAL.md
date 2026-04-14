@@ -53,17 +53,17 @@ superfície de acoplamento.
 
 ### Gaps identificados (doc 10, seção 6.2)
 
-| Prioridade | Módulo | Testes Necessários |
-|------------|--------|--------------------|
-| 🔴 P0 | `agent-context.js` | FSM transições, setStatus, construtor |
-| 🔴 P0 | `infra/message-queue.js` | FIFO, abort, drain, size, shift |
-| 🔴 P0 | `session/boot-wiring.js` | 12 etapas isoladas com mocks |
-| 🟠 P1 | `lifecycle/agent-lifecycle.js` | agentStop, reconnect, initSession |
-| 🟠 P1 | `dialog/loop-manager.js` | pause, resume, boot recovery, force deactivate |
-| 🟠 P1 | `infra/task-executor.js` | retry após reconexão, abort, timeout |
-| 🟡 P2 | `infra/permission-controller.js` | mode switching approve_all/selective |
-| 🟡 P2 | `infra/webhook-manager.js` | register, dispatch, retry |
-| 🟡 P2 | `lifecycle/entry.js` | IPC, shutdown handlers |
+| Prioridade | Módulo                           | Testes Necessários                             |
+| ---------- | -------------------------------- | ---------------------------------------------- |
+| 🔴 P0       | `agent-context.js`               | FSM transições, setStatus, construtor          |
+| 🔴 P0       | `infra/message-queue.js`         | FIFO, abort, drain, size, shift                |
+| 🔴 P0       | `session/boot-wiring.js`         | 12 etapas isoladas com mocks                   |
+| 🟠 P1       | `lifecycle/agent-lifecycle.js`   | agentStop, reconnect, initSession              |
+| 🟠 P1       | `dialog/loop-manager.js`         | pause, resume, boot recovery, force deactivate |
+| 🟠 P1       | `infra/task-executor.js`         | retry após reconexão, abort, timeout           |
+| 🟡 P2       | `infra/permission-controller.js` | mode switching approve_all/selective           |
+| 🟡 P2       | `infra/webhook-manager.js`       | register, dispatch, retry                      |
+| 🟡 P2       | `lifecycle/entry.js`             | IPC, shutdown handlers                         |
 
 **Estimativa**: 12h | **Prioridade**: 🔴
 
@@ -345,91 +345,91 @@ A migração pode ser feita incrementalmente com deprecation warning.
 
 ### Fase K1 — AgentContext Partitioning (8h) 🔴
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K1.1 | Definir interfaces SessionState, LifecycleState, etc. | 2h |
-| K1.2 | Refatorar AgentContext para compor sub-estados | 3h |
-| K1.3 | Migrar consumidores para acessar via sub-estado | 2h |
-| K1.4 | Testes de regressão | 1h |
+| #    | Subfase                                               | Estimativa |
+| ---- | ----------------------------------------------------- | ---------- |
+| K1.1 | Definir interfaces SessionState, LifecycleState, etc. | 2h         |
+| K1.2 | Refatorar AgentContext para compor sub-estados        | 3h         |
+| K1.3 | Migrar consumidores para acessar via sub-estado       | 2h         |
+| K1.4 | Testes de regressão                                   | 1h         |
 
 ### Fase K2 — Test Coverage Sprint (12h) 🔴
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K2.1 | Testes AgentContext FSM | 2h |
-| K2.2 | Testes MessageQueue (FIFO, abort, drain) | 2h |
-| K2.3 | Testes performBootWiring (12 etapas mockadas) | 3h |
-| K2.4 | Testes agentStop + agentTryReconnect | 2h |
-| K2.5 | Testes DialogLoopManager pause/resume/recovery | 2h |
-| K2.6 | Testes TaskExecutor retry | 1h |
+| #    | Subfase                                        | Estimativa |
+| ---- | ---------------------------------------------- | ---------- |
+| K2.1 | Testes AgentContext FSM                        | 2h         |
+| K2.2 | Testes MessageQueue (FIFO, abort, drain)       | 2h         |
+| K2.3 | Testes performBootWiring (12 etapas mockadas)  | 3h         |
+| K2.4 | Testes agentStop + agentTryReconnect           | 2h         |
+| K2.5 | Testes DialogLoopManager pause/resume/recovery | 2h         |
+| K2.6 | Testes TaskExecutor retry                      | 1h         |
 
 ### Fase K3 — Error Handling Centralizado (4h) 🟠
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K3.1 | Criar error-policy.js com classificador | 2h |
-| K3.2 | Migrar task-executor e queue-processor | 1h |
-| K3.3 | Testes de classificação + policy | 1h |
+| #    | Subfase                                 | Estimativa |
+| ---- | --------------------------------------- | ---------- |
+| K3.1 | Criar error-policy.js com classificador | 2h         |
+| K3.2 | Migrar task-executor e queue-processor  | 1h         |
+| K3.3 | Testes de classificação + policy        | 1h         |
 
 ### Fase K4 — Background Task Tracker (3h) 🟠
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K4.1 | Criar background-tasks.js | 1h |
-| K4.2 | Migrar void writeStateAsync → bgTasks.track | 1h |
-| K4.3 | Integrar drain no shutdown + testes | 1h |
+| #    | Subfase                                     | Estimativa |
+| ---- | ------------------------------------------- | ---------- |
+| K4.1 | Criar background-tasks.js                   | 1h         |
+| K4.2 | Migrar void writeStateAsync → bgTasks.track | 1h         |
+| K4.3 | Integrar drain no shutdown + testes         | 1h         |
 
 ### Fase K5 — Boot Wiring Pipeline (6h) 🟠
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K5.1 | Extrair 12 etapas como funções nomeadas | 3h |
-| K5.2 | Criar pipeline runner | 1h |
-| K5.3 | Testes de cada step isolado | 2h |
+| #    | Subfase                                 | Estimativa |
+| ---- | --------------------------------------- | ---------- |
+| K5.1 | Extrair 12 etapas como funções nomeadas | 3h         |
+| K5.2 | Criar pipeline runner                   | 1h         |
+| K5.3 | Testes de cada step isolado             | 2h         |
 
 ### Fase K6 — Event Bridge Declarativo (4h) 🟡
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K6.1 | Criar event-bridge-map.js | 1h |
-| K6.2 | Migrar always-alive.js para usar o mapa | 2h |
-| K6.3 | Testes de completude do bridge | 1h |
+| #    | Subfase                                 | Estimativa |
+| ---- | --------------------------------------- | ---------- |
+| K6.1 | Criar event-bridge-map.js               | 1h         |
+| K6.2 | Migrar always-alive.js para usar o mapa | 2h         |
+| K6.3 | Testes de completude do bridge          | 1h         |
 
 ### Fase K7 — Health Check (3h) 🟡
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K7.1 | Criar health-check.js | 1.5h |
-| K7.2 | Expor via GET /health + testes | 1.5h |
+| #    | Subfase                        | Estimativa |
+| ---- | ------------------------------ | ---------- |
+| K7.1 | Criar health-check.js          | 1.5h       |
+| K7.2 | Expor via GET /health + testes | 1.5h       |
 
 ### Fase K8 — Lazy Singleton (3h) 🟡
 
-| # | Subfase | Estimativa |
-|---|---------|------------|
-| K8.1 | Refatorar para lazy init + resetAgent | 1h |
-| K8.2 | Migrar imports diretos para getAgent() | 1h |
-| K8.3 | Testes + deprecation warning | 1h |
+| #    | Subfase                                | Estimativa |
+| ---- | -------------------------------------- | ---------- |
+| K8.1 | Refatorar para lazy init + resetAgent  | 1h         |
+| K8.2 | Migrar imports diretos para getAgent() | 1h         |
+| K8.3 | Testes + deprecation warning           | 1h         |
 
 ---
 
 ## 12. Resumo de Estimativas
 
-| Fase | Nome | Prioridade | Horas |
-|------|------|-----------|-------|
-| K1 | AgentContext Partitioning | 🔴 P0 | 8h |
-| K2 | Test Coverage Sprint | 🔴 P0 | 12h |
-| K3 | Error Handling Centralizado | 🟠 P1 | 4h |
-| K4 | Background Task Tracker | 🟠 P1 | 3h |
-| K5 | Boot Wiring Pipeline | 🟠 P1 | 6h |
-| K6 | Event Bridge Declarativo | 🟡 P2 | 4h |
-| K7 | Health Check Formal | 🟡 P2 | 3h |
-| K8 | Lazy Singleton | 🟡 P2 | 3h |
-| **Total** | | | **43h** |
+| Fase      | Nome                        | Prioridade | Horas   |
+| --------- | --------------------------- | ---------- | ------- |
+| K1        | AgentContext Partitioning   | 🔴 P0       | 8h      |
+| K2        | Test Coverage Sprint        | 🔴 P0       | 12h     |
+| K3        | Error Handling Centralizado | 🟠 P1       | 4h      |
+| K4        | Background Task Tracker     | 🟠 P1       | 3h      |
+| K5        | Boot Wiring Pipeline        | 🟠 P1       | 6h      |
+| K6        | Event Bridge Declarativo    | 🟡 P2       | 4h      |
+| K7        | Health Check Formal         | 🟡 P2       | 3h      |
+| K8        | Lazy Singleton              | 🟡 P2       | 3h      |
+| **Total** |                             |            | **43h** |
 
 ### Sprint Sugerido
 
-| Sprint | Fases | Horas | Foco |
-|--------|-------|-------|------|
-| K-Sprint 1 | K1 + K2 | 20h | Fundação: estado + testes |
-| K-Sprint 2 | K3 + K4 + K5 | 13h | Patterns: erros + boot |
-| K-Sprint 3 | K6 + K7 + K8 | 10h | Polish: events + health + DX |
+| Sprint     | Fases        | Horas | Foco                         |
+| ---------- | ------------ | ----- | ---------------------------- |
+| K-Sprint 1 | K1 + K2      | 20h   | Fundação: estado + testes    |
+| K-Sprint 2 | K3 + K4 + K5 | 13h   | Patterns: erros + boot       |
+| K-Sprint 3 | K6 + K7 + K8 | 10h   | Polish: events + health + DX |

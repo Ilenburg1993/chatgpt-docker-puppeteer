@@ -15,10 +15,10 @@ import { toError, container } from '#copilot/core';
 import {
     createSnapshot,
     listSnapshotsAsync,
-    llmBridgeClient,
     loadSnapshotAsync,
     saveSnapshotAsync,
-} from '#copilot/services';
+} from '#copilot/agent';
+import { llmBridgeClient } from '#copilot/channel';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**

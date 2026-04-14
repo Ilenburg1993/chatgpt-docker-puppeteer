@@ -26,12 +26,12 @@ O módulo `sdk/` (41 arquivos, 8.096L) deveria ser uma **camada fina e stateless
 
 ### Métricas antes → depois
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| sdk/ linhas | 8.096 | ~7.200 |
-| sdk/ arquivos | 41 | 36 |
-| Estado mutável em sdk/ | 3 (client, sessions, config-cache) | 0 |
-| Consumer de sdk/config.js | ~5 | 0 (deprecated/removido) |
+| Métrica                   | Antes                              | Depois                  |
+| ------------------------- | ---------------------------------- | ----------------------- |
+| sdk/ linhas               | 8.096                              | ~7.200                  |
+| sdk/ arquivos             | 41                                 | 36                      |
+| Estado mutável em sdk/    | 3 (client, sessions, config-cache) | 0                       |
+| Consumer de sdk/config.js | ~5                                 | 0 (deprecated/removido) |
 
 ### Problemas resolvidos
 
@@ -45,11 +45,11 @@ O módulo `sdk/` (41 arquivos, 8.096L) deveria ser uma **camada fina e stateless
 
 ### Grupo A: Extrair session registry de `sdk/session/client.js` (C5)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `sdk/session/client.js` | 386 | REFATORAR: remover `_sessions` Map |
-| `conversation-hub/store.js` | 563 | ATUALIZAR: receber ownership do session registry |
-| `sdk/session/lifecycle.js` | 335 | ATUALIZAR: parar de acessar registry interno |
+| Arquivo                     | Linhas | Ação                                             |
+| --------------------------- | ------ | ------------------------------------------------ |
+| `sdk/session/client.js`     | 386    | REFATORAR: remover `_sessions` Map               |
+| `conversation-hub/store.js` | 563    | ATUALIZAR: receber ownership do session registry |
+| `sdk/session/lifecycle.js`  | 335    | ATUALIZAR: parar de acessar registry interno     |
 
 **Conceito**: Hoje `client.js` mantém `_sessions = new Map()` com sessões ativas.
 Essa responsabilidade passa para `conversation-hub/` (L4) ou um novo
@@ -57,9 +57,9 @@ Essa responsabilidade passa para `conversation-hub/` (L4) ou um novo
 
 ### Grupo B: Eliminar `sdk/config.js` (1 arquivo, -150L)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `sdk/config.js` | 150 | DELETAR (após M-02 P09 deprecated) |
+| Arquivo         | Linhas | Ação                               |
+| --------------- | ------ | ---------------------------------- |
+| `sdk/config.js` | 150    | DELETAR (após M-02 P09 deprecated) |
 
 **Consumers a migrar** (usar `SessionConfigBuilder` de `#copilot/config`):
 
@@ -69,19 +69,19 @@ grep -rn "from.*sdk/config\|from.*#copilot/sdk.*config\|buildSessionConfig" src/
 
 ### Grupo C: Mover `sdk/agent/agents.js` → `config/custom-agents.js` (C6)
 
-| Origem | Destino | Linhas | Ação |
-|--------|---------|--------|------|
-| `sdk/agent/agents.js` | `config/custom-agents.js` | 268 | MOVER (se `config/custom-agents.js` já existe → MERGE) |
+| Origem                | Destino                   | Linhas | Ação                                                   |
+| --------------------- | ------------------------- | ------ | ------------------------------------------------------ |
+| `sdk/agent/agents.js` | `config/custom-agents.js` | 268    | MOVER (se `config/custom-agents.js` já existe → MERGE) |
 
 **Nota**: `config/custom-agents.js` (326L) já existe. O conteúdo de `sdk/agent/agents.js` (268L)
 pode ser duplicado ou complementar. Avaliar e consolidar.
 
 ### Grupo D: Alinhar import map de `sdk/` (J1)
 
-| Arquivo | Ação |
-|---------|------|
+| Arquivo        | Ação                                                |
+| -------------- | --------------------------------------------------- |
 | `sdk/index.js` | ATUALIZAR: remover re-exports de config.js e agent/ |
-| `package.json` | ATUALIZAR: verificar `#copilot/sdk` import map |
+| `package.json` | ATUALIZAR: verificar `#copilot/sdk` import map      |
 
 ---
 
@@ -260,10 +260,10 @@ git push origin main
 
 ## 5. Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| Session registry extraction quebra lifecycle | Alta | Alto | P02 opção B (DI) mantém compatibilidade; testes P08 |
-| sdk/config.js tem consumers não detectados | Baixa | Médio | grep exaustivo em P03 |
-| Race condition no registry compartilhado | Média | Alto | SessionRegistry usa Map (síncrono no event loop) |
-| agents.js tem lógica que não existe em custom-agents.js | Média | Médio | Diff manual em P04 |
-| Runtime errors por barrel changes | Baixa | Alto | P08 regressão completa |
+| Risco                                                   | Probabilidade | Impacto | Mitigação                                           |
+| ------------------------------------------------------- | ------------- | ------- | --------------------------------------------------- |
+| Session registry extraction quebra lifecycle            | Alta          | Alto    | P02 opção B (DI) mantém compatibilidade; testes P08 |
+| sdk/config.js tem consumers não detectados              | Baixa         | Médio   | grep exaustivo em P03                               |
+| Race condition no registry compartilhado                | Média         | Alto    | SessionRegistry usa Map (síncrono no event loop)    |
+| agents.js tem lógica que não existe em custom-agents.js | Média         | Médio   | Diff manual em P04                                  |
+| Runtime errors por barrel changes                       | Baixa         | Alto    | P08 regressão completa                              |

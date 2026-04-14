@@ -2,10 +2,8 @@
 /**
  * tests/unit/copilot/hooks/test_faixa_e_hooks_optimization.spec.js
  *
- * Faixa E: Testes para Hooks Optimization.
- * E1 — Tool filter extraction + dynamic-only handler
- * E2 — Middleware composition + cleanup
- * E3 — Audit trail + compliance
+ * Faixa E: Testes para Hooks Optimization. E1 — Tool filter extraction + dynamic-only handler E2 — Middleware
+ * composition + cleanup E3 — Audit trail + compliance
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -201,10 +199,7 @@ describe('E1 — mergeStaticFilters', () => {
 describe('E1.2 — createHooks dynamic-only path', () => {
     it('permite todas as tools quando sem listas estáticas', async () => {
         const hooks = createHooks({ auditLog: true });
-        const result = await hooks.onPreToolUse?.(
-            { toolName: 'any_tool', toolArgs: {}, timestamp: 0, cwd: '/' },
-            INV,
-        );
+        const result = await hooks.onPreToolUse?.({ toolName: 'any_tool', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
 
@@ -212,10 +207,7 @@ describe('E1.2 — createHooks dynamic-only path', () => {
         const hooks = createHooks({
             onPermissionAsk: async () => false,
         });
-        const result = await hooks.onPreToolUse?.(
-            { toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' },
-            INV,
-        );
+        const result = await hooks.onPreToolUse?.({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 
@@ -233,19 +225,13 @@ describe('E1.2 — createHooks dynamic-only path', () => {
 
     it('static path: denyTools nega tool listada', async () => {
         const hooks = createHooks({ denyTools: ['rm_rf'] });
-        const result = await hooks.onPreToolUse?.(
-            { toolName: 'rm_rf', toolArgs: {}, timestamp: 0, cwd: '/' },
-            INV,
-        );
+        const result = await hooks.onPreToolUse?.({ toolName: 'rm_rf', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 
     it('static path: allowTools nega tool não listada', async () => {
         const hooks = createHooks({ allowTools: ['read_file'] });
-        const result = await hooks.onPreToolUse?.(
-            { toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' },
-            INV,
-        );
+        const result = await hooks.onPreToolUse?.({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 });
@@ -303,10 +289,7 @@ describe('E2.1 — middleware composition', () => {
 
 describe('E2.1 — loggingMiddleware', () => {
     it('não altera o resultado', async () => {
-        const hook = middleware(
-            loggingMiddleware('test'),
-            async () => ({ permissionDecision: 'allow' }),
-        );
+        const hook = middleware(loggingMiddleware('test'), async () => ({ permissionDecision: 'allow' }));
         const result = await hook({ toolName: 'x' }, INV);
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
@@ -318,10 +301,7 @@ describe('E2.1 — forTools', () => {
             return { permissionDecision: 'deny' };
         });
 
-        const hook = middleware(
-            forTools(['shell'], spy),
-            async () => ({ permissionDecision: 'allow' }),
-        );
+        const hook = middleware(forTools(['shell'], spy), async () => ({ permissionDecision: 'allow' }));
 
         // shell → spy intercepta
         const r1 = await hook({ toolName: 'shell', toolArgs: {} }, INV);
@@ -373,7 +353,9 @@ describe('E2.1 — existing composers still work', () => {
 
     it('fallback: usa fallback em caso de erro', async () => {
         const h = fallback(
-            async () => { throw new Error('boom'); },
+            async () => {
+                throw new Error('boom');
+            },
             async () => ({ fallback: true }),
         );
         expect(await h({}, INV)).toEqual({ fallback: true });
@@ -403,14 +385,15 @@ describe('E2.2 — createCleanupHandler', () => {
         /** @type {string[]} */
         const calls = [];
         const handler = createCleanupHandler([
-            async (sid) => { calls.push(`clean1:${sid}`); },
-            async (sid) => { calls.push(`clean2:${sid}`); },
+            async (sid) => {
+                calls.push(`clean1:${sid}`);
+            },
+            async (sid) => {
+                calls.push(`clean2:${sid}`);
+            },
         ]);
 
-        await handler(
-            { reason: 'shutdown', timestamp: 0, cwd: '/' },
-            { sessionId: 'abc' },
-        );
+        await handler({ reason: 'shutdown', timestamp: 0, cwd: '/' }, { sessionId: 'abc' });
         expect(calls).toEqual(['clean1:abc', 'clean2:abc']);
     });
 
@@ -418,22 +401,21 @@ describe('E2.2 — createCleanupHandler', () => {
         /** @type {string[]} */
         const calls = [];
         const handler = createCleanupHandler([
-            async () => { throw new Error('falha'); },
-            async (sid) => { calls.push(`ok:${sid}`); },
+            async () => {
+                throw new Error('falha');
+            },
+            async (sid) => {
+                calls.push(`ok:${sid}`);
+            },
         ]);
 
-        await handler(
-            { reason: 'error', timestamp: 0, cwd: '/' },
-            { sessionId: 'x' },
-        );
+        await handler({ reason: 'error', timestamp: 0, cwd: '/' }, { sessionId: 'x' });
         expect(calls).toEqual(['ok:x']);
     });
 
     it('funciona com 0 cleanups', async () => {
         const handler = createCleanupHandler([]);
-        await expect(
-            handler({ reason: 'done', timestamp: 0, cwd: '/' }, { sessionId: 'z' }),
-        ).resolves.toBeUndefined();
+        await expect(handler({ reason: 'done', timestamp: 0, cwd: '/' }, { sessionId: 'z' })).resolves.toBeUndefined();
     });
 });
 
@@ -544,14 +526,13 @@ describe('E3.1 — AuditTrail', () => {
 });
 
 describe('E3.1 — withPreToolAudit', () => {
-    afterEach(() => { globalAuditTrail.clear(); });
+    afterEach(() => {
+        globalAuditTrail.clear();
+    });
 
     it('registra decisão allow no trail', async () => {
         const trail = new AuditTrail();
-        const handler = withPreToolAudit(
-            async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }),
-            trail,
-        );
+        const handler = withPreToolAudit(async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }), trail);
         await handler({ toolName: 'read', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(trail.size).toBe(1);
         const [d] = trail.tail();
@@ -589,10 +570,7 @@ describe('E3.1 — withPreToolAudit', () => {
 describe('E3.1 — withPostToolAudit', () => {
     it('registra enrich quando additionalContext presente', async () => {
         const trail = new AuditTrail();
-        const handler = withPostToolAudit(
-            async () => ({ additionalContext: 'extra info' }),
-            trail,
-        );
+        const handler = withPostToolAudit(async () => ({ additionalContext: 'extra info' }), trail);
         await handler({ toolName: 'test', toolArgs: {}, toolResult: 'ok', timestamp: 0, cwd: '/' }, INV);
         const [d] = trail.tail();
         expect(d.decision).toBe('enrich');
@@ -630,16 +608,16 @@ describe('E3.1 — withErrorAudit', () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe('E3.2 — globalAuditTrail', () => {
-    afterEach(() => { globalAuditTrail.clear(); });
+    afterEach(() => {
+        globalAuditTrail.clear();
+    });
 
     it('é uma instância de AuditTrail', () => {
         expect(globalAuditTrail).toBeInstanceOf(AuditTrail);
     });
 
     it('withPreToolAudit usa globalAuditTrail por default', async () => {
-        const handler = withPreToolAudit(
-            async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }),
-        );
+        const handler = withPreToolAudit(async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }));
         await handler({ toolName: 'read', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(globalAuditTrail.size).toBe(1);
     });

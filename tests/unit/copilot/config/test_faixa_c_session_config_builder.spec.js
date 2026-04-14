@@ -54,8 +54,8 @@ vi.mock(
 
 // ─── Imports ────────────────────────────────────────────────────────────────
 
-import { SessionConfigBuilder } from '../../../../src/copilot/config/session-config.js';
 import { ClientOptionsBuilder } from '../../../../src/copilot/config/client-options.js';
+import { SessionConfigBuilder } from '../../../../src/copilot/config/session-config.js';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // C1 — SessionConfigBuilder
@@ -71,10 +71,7 @@ describe('SessionConfigBuilder', () => {
 
     it('build() emite WARN quando onPermissionRequest não fornecido', () => {
         new SessionConfigBuilder().build();
-        expect(mocks.log).toHaveBeenCalledWith(
-            'WARN',
-            expect.stringContaining('onPermissionRequest não fornecido'),
-        );
+        expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('onPermissionRequest não fornecido'));
     });
 
     it('model() define o modelo', () => {
@@ -173,10 +170,7 @@ describe('SessionConfigBuilder', () => {
     it('reasoningEffort() com valor inválido emite WARN', () => {
         mocks.log.mockClear();
         new SessionConfigBuilder().reasoningEffort(/** @type {any} */ ('invalid')).build();
-        expect(mocks.log).toHaveBeenCalledWith(
-            'WARN',
-            expect.stringContaining("'invalid' inválido"),
-        );
+        expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining("'invalid' inválido"));
     });
 
     it('onPermissionRequest() define handler explícito', () => {
@@ -220,10 +214,7 @@ describe('SessionConfigBuilder', () => {
     });
 
     it('buildForResume() inclui disableResume', () => {
-        const config = new SessionConfigBuilder()
-            .model('gpt-4.1')
-            .disableResume(true)
-            .buildForResume();
+        const config = new SessionConfigBuilder().model('gpt-4.1').disableResume(true).buildForResume();
         expect(config.disableResume).toBe(true);
     });
 
@@ -377,29 +368,19 @@ describe('ClientOptionsBuilder', () => {
     });
 
     it('merge() aplica overrides', () => {
-        const opts = new ClientOptionsBuilder()
-            .logLevel('info')
-            .merge({ logLevel: 'debug', autoStart: false })
-            .build();
+        const opts = new ClientOptionsBuilder().logLevel('info').merge({ logLevel: 'debug', autoStart: false }).build();
         expect(opts.logLevel).toBe('debug');
         expect(opts.autoStart).toBe(false);
     });
 
     it('port() e useStdio() são mutuamente exclusivos (builder aceita ambos)', () => {
-        const opts = new ClientOptionsBuilder()
-            .port(8080)
-            .useStdio(false)
-            .build();
+        const opts = new ClientOptionsBuilder().port(8080).useStdio(false).build();
         expect(opts.port).toBe(8080);
         expect(opts.useStdio).toBe(false);
     });
 
     it('encadeamento fluent funciona', () => {
-        const opts = new ClientOptionsBuilder()
-            .cliUrl('localhost:9000')
-            .logLevel('info')
-            .autoStart(true)
-            .build();
+        const opts = new ClientOptionsBuilder().cliUrl('localhost:9000').logLevel('info').autoStart(true).build();
         expect(opts.cliUrl).toBe('localhost:9000');
         expect(opts.logLevel).toBe('info');
         expect(opts.autoStart).toBe(true);

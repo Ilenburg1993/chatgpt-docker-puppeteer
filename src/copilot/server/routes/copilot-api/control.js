@@ -12,7 +12,8 @@
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { globalAuditTrail } from '#copilot/hooks';
-import { CHANNEL_VERSION, createConversationService } from '#copilot/services';
+import { CHANNEL_VERSION } from '#copilot/channel';
+import { createConversationService } from '../../../services/conversation-service.js';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
 

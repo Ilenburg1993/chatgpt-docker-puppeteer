@@ -4,8 +4,8 @@
  *
  * E3.1 — Audit trail completo de todas as decisões de hooks.
  *
- * Registra cada decisão de hook (permissão, modificação, erro) em um buffer estruturado
- * com suporte a consulta, filtragem e exportação para compliance dashboard.
+ * Registra cada decisão de hook (permissão, modificação, erro) em um buffer estruturado com suporte a consulta,
+ * filtragem e exportação para compliance dashboard.
  *
  * @module copilot/hooks/audit-trail
  * @see EventBus
@@ -76,9 +76,9 @@ export class AuditTrail {
         log(
             'DEBUG',
             `[hooks/audit-trail] ${decision.hookName}: ${decision.decision}` +
-            (decision.toolName ? ` tool=${decision.toolName}` : '') +
-            (decision.reason ? ` reason=${decision.reason}` : '') +
-            ` session=${decision.sessionId}`,
+                (decision.toolName ? ` tool=${decision.toolName}` : '') +
+                (decision.reason ? ` reason=${decision.reason}` : '') +
+                ` session=${decision.sessionId}`,
         );
     }
 
@@ -103,7 +103,13 @@ export class AuditTrail {
     /**
      * Filtra decisões por critérios.
      *
-     * @param {{ hookName?: string; decision?: DecisionType; sessionId?: string; toolName?: string; since?: number }} filter
+     * @param {{
+     *     hookName?: string;
+     *     decision?: DecisionType;
+     *     sessionId?: string;
+     *     toolName?: string;
+     *     since?: number;
+     * }} filter
      * @returns {AuditDecision[]}
      */
     query(filter) {

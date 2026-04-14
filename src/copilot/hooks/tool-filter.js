@@ -4,12 +4,12 @@
  *
  * E1.1 — Separação de filtering estático para `availableTools`/`excludedTools` do SDK.
  *
- * Antes da Faixa E, o sistema usava hooks `onPreToolUse` para aplicar allowlists/blocklists
- * estáticas. O SDK suporta nativamente `availableTools` e `excludedTools` em `SessionConfig`,
- * que são mais eficientes (filtrados antes de a tool ser oferecida ao modelo).
+ * Antes da Faixa E, o sistema usava hooks `onPreToolUse` para aplicar allowlists/blocklists estáticas. O SDK suporta
+ * nativamente `availableTools` e `excludedTools` em `SessionConfig`, que são mais eficientes (filtrados antes de a tool
+ * ser oferecida ao modelo).
  *
- * Este módulo extrai as listas estáticas de `HooksConfig` e as converte para os campos SDK
- * nativos, deixando apenas lógica dinâmica (ask, runtime deny, argsModifier) nos hooks.
+ * Este módulo extrai as listas estáticas de `HooksConfig` e as converte para os campos SDK nativos, deixando apenas
+ * lógica dinâmica (ask, runtime deny, argsModifier) nos hooks.
  *
  * @module copilot/hooks/tool-filter
  * @see EventBus
@@ -31,10 +31,11 @@ import { log } from './logger.js';
  */
 
 /**
- * Extrai filtros estáticos (allowTools/denyTools) de um `HooksConfig` e os converte
- * para os campos nativos do SDK (`availableTools`/`excludedTools`).
+ * Extrai filtros estáticos (allowTools/denyTools) de um `HooksConfig` e os converte para os campos nativos do SDK
+ * (`availableTools`/`excludedTools`).
  *
  * Regras de conversão:
+ *
  * - `allowTools` → `availableTools` (whitelist SDK, precedência sobre excludedTools)
  * - `denyTools` → `excludedTools` (blacklist SDK)
  * - `denyPatterns` **não** são extraídos (regex não é suportado pelo SDK — permanece nos hooks)
@@ -76,8 +77,8 @@ export function extractStaticFilters(config) {
 }
 
 /**
- * Verifica se um HooksConfig possui apenas lógica dinâmica (sem listas estáticas de allow/deny).
- * Útil para determinar se o onPreToolUse pode ser simplificado.
+ * Verifica se um HooksConfig possui apenas lógica dinâmica (sem listas estáticas de allow/deny). Útil para determinar
+ * se o onPreToolUse pode ser simplificado.
  *
  * @param {HooksConfig} config
  * @returns {boolean} true se config não tem allowTools, denyTools nem denyPatterns
@@ -90,8 +91,8 @@ export function isDynamicOnly(config) {
 }
 
 /**
- * Combina dois conjuntos de filtros estáticos (merge aditivo).
- * Usado quando múltiplas fontes contribuem para o filtering (ex: preset + runtime config).
+ * Combina dois conjuntos de filtros estáticos (merge aditivo). Usado quando múltiplas fontes contribuem para o
+ * filtering (ex: preset + runtime config).
  *
  * @param {StaticFilterResult} a
  * @param {StaticFilterResult} b

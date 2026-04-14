@@ -23,7 +23,7 @@ import {
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
-import { setBackgroundCompactionThreshold } from '#copilot/services';
+import { setBackgroundCompactionThreshold } from '#copilot/agent';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

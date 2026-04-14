@@ -515,50 +515,50 @@ substituição.
 
 ### Fase L1 — Quick Wins (~8h) 🔴
 
-| #    | Subfase                                              | Descrição                                               | Estimativa |
-| ---- | ---------------------------------------------------- | ------------------------------------------------------- | ---------- |
-| L1.1 | ⬜ Remover `api/` — merge endpoints em server/routes/ | Eliminar 10 arquivos, 1937L de duplicação funcional      | 3h         |
-| L1.2 | ⬜ Remover `services/` — inline em consumers          | Eliminar 6 arquivos, 547L de indireção sem valor         | 2h         |
-| L1.3 | ⬜ Mover `agent/config.js` → `config/agent.js`        | Config do agente fica em L2 onde pertence               | 1h         |
-| L1.4 | ⬜ Mover `sdk/agent/contracts` → `types/contracts/`   | Contracts são tipos, não implementação SDK               | 1h         |
-| L1.5 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`        | Subsumido por SessionConfigBuilder (Faixa C)            | 1h         |
+| #    | Subfase                                              | Descrição                                           | Estimativa |
+| ---- | ---------------------------------------------------- | --------------------------------------------------- | ---------- |
+| L1.1 | ⬜ Remover `api/` — merge endpoints em server/routes/ | Eliminar 10 arquivos, 1937L de duplicação funcional | 3h         |
+| L1.2 | ⬜ Remover `services/` — inline em consumers          | Eliminar 6 arquivos, 547L de indireção sem valor    | 2h         |
+| L1.3 | ⬜ Mover `agent/config.js` → `config/agent.js`        | Config do agente fica em L2 onde pertence           | 1h         |
+| L1.4 | ⬜ Mover `sdk/agent/contracts` → `types/contracts/`   | Contracts são tipos, não implementação SDK          | 1h         |
+| L1.5 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`       | Subsumido por SessionConfigBuilder (Faixa C)        | 1h         |
 
 ### Fase L2 — Agent Slimming (~16h) 🟠
 
-| #    | Subfase                                                    | Descrição                                              | Estimativa |
-| ---- | ---------------------------------------------------------- | ------------------------------------------------------ | ---------- |
-| L2.1 | ⬜ Mover `agent/session/event-handlers/` → `event-handlers/` | 12 handlers de eventos SDK genéricos vão para L3      | 4h         |
-| L2.2 | ⬜ Mover itens de `agent/infra/` para módulos corretos       | webhook→infra, perms→hooks, tools→tools, snap→obs     | 4h         |
-| L2.3 | ⬜ Merge `agent-messaging.js` + `queue-processor.js`         | 2 thin wrappers → 1 queue-sender                      | 2h         |
-| L2.4 | ⬜ Merge `task-executor.js` + `turn-executor.js`             | execute+OTEL é 1 responsabilidade                     | 3h         |
-| L2.5 | ⬜ Testes de regressão                                       | Validar que agent funciona após reorganização          | 3h         |
+| #    | Subfase                                                     | Descrição                                         | Estimativa |
+| ---- | ----------------------------------------------------------- | ------------------------------------------------- | ---------- |
+| L2.1 | ⬜ Mover `agent/session/event-handlers/` → `event-handlers/` | 12 handlers de eventos SDK genéricos vão para L3  | 4h         |
+| L2.2 | ⬜ Mover itens de `agent/infra/` para módulos corretos       | webhook→infra, perms→hooks, tools→tools, snap→obs | 4h         |
+| L2.3 | ⬜ Merge `agent-messaging.js` + `queue-processor.js`         | 2 thin wrappers → 1 queue-sender                  | 2h         |
+| L2.4 | ⬜ Merge `task-executor.js` + `turn-executor.js`             | execute+OTEL é 1 responsabilidade                 | 3h         |
+| L2.5 | ⬜ Testes de regressão                                       | Validar que agent funciona após reorganização     | 3h         |
 
 ### Fase L3 — SDK Stateless (~10h) 🟠
 
-| #    | Subfase                                                      | Descrição                                              | Estimativa |
-| ---- | ------------------------------------------------------------ | ------------------------------------------------------ | ---------- |
-| L3.1 | ⬜ Extrair session registry de `sdk/session/client.js`        | _client + _sessions → agent/ ou conversation-hub/     | 4h         |
-| L3.2 | ⬜ Mover `sdk/agent/agents.js` → `config/custom-agents.js`   | Factory de CustomAgentConfig pertence à config         | 2h         |
-| L3.3 | ⬜ Eliminar `sdk/config.js` (subsumido por builders)          | Dependentes migram para #copilot/config                | 2h         |
-| L3.4 | ⬜ Testes de regressão                                        | SDK stateless + consumers migrados                     | 2h         |
+| #    | Subfase                                                   | Descrição                                         | Estimativa |
+| ---- | --------------------------------------------------------- | ------------------------------------------------- | ---------- |
+| L3.1 | ⬜ Extrair session registry de `sdk/session/client.js`     | _client + _sessions → agent/ ou conversation-hub/ | 4h         |
+| L3.2 | ⬜ Mover `sdk/agent/agents.js` → `config/custom-agents.js` | Factory de CustomAgentConfig pertence à config    | 2h         |
+| L3.3 | ⬜ Eliminar `sdk/config.js` (subsumido por builders)       | Dependentes migram para #copilot/config           | 2h         |
+| L3.4 | ⬜ Testes de regressão                                     | SDK stateless + consumers migrados                | 2h         |
 
 ### Fase L4 — Event Bus Unification (~12h) 🟠
 
-| #    | Subfase                                                    | Descrição                                              | Estimativa |
-| ---- | ---------------------------------------------------------- | ------------------------------------------------------ | ---------- |
-| L4.1 | ⬜ HookBus → EventBus com namespace `hook:*`               | Eliminar bus separado para hooks                       | 4h         |
-| L4.2 | ⬜ SDK event bridge automático via registry                  | Eliminar bridge manual de ~80 eventos                  | 4h         |
-| L4.3 | ⬜ Consolidar obs. collectors/bus-actions → observers         | Eliminar 3 subsistemas paralelos                       | 2h         |
-| L4.4 | ⬜ Testes de regressão                                       | 1 bus, 0 bridges manuais                               | 2h         |
+| #    | Subfase                                              | Descrição                             | Estimativa |
+| ---- | ---------------------------------------------------- | ------------------------------------- | ---------- |
+| L4.1 | ⬜ HookBus → EventBus com namespace `hook:*`          | Eliminar bus separado para hooks      | 4h         |
+| L4.2 | ⬜ SDK event bridge automático via registry           | Eliminar bridge manual de ~80 eventos | 4h         |
+| L4.3 | ⬜ Consolidar obs. collectors/bus-actions → observers | Eliminar 3 subsistemas paralelos      | 2h         |
+| L4.4 | ⬜ Testes de regressão                                | 1 bus, 0 bridges manuais              | 2h         |
 
 ### Fase L5 — Error Pipeline + Observability Trim (~8h) 🟡
 
-| #    | Subfase                                                      | Descrição                                             | Estimativa |
-| ---- | ------------------------------------------------------------ | ----------------------------------------------------- | ---------- |
-| L5.1 | ⬜ Unificar error-tracker + error-alerting → error-pipeline   | 3 módulos → 1 pipeline: track → evaluate → alert     | 3h         |
-| L5.2 | ⬜ Remover event-catalog.js dead-letter                       | Defensive code não usado em produção                  | 1h         |
-| L5.3 | ⬜ Consolidar collectors + bus-actions → observers             | Unificar subscriptions duplicadas                     | 2h         |
-| L5.4 | ⬜ Testes de regressão                                        | Pipeline de erros + observability consolidada          | 2h         |
+| #    | Subfase                                                    | Descrição                                        | Estimativa |
+| ---- | ---------------------------------------------------------- | ------------------------------------------------ | ---------- |
+| L5.1 | ⬜ Unificar error-tracker + error-alerting → error-pipeline | 3 módulos → 1 pipeline: track → evaluate → alert | 3h         |
+| L5.2 | ⬜ Remover event-catalog.js dead-letter                     | Defensive code não usado em produção             | 1h         |
+| L5.3 | ⬜ Consolidar collectors + bus-actions → observers          | Unificar subscriptions duplicadas                | 2h         |
+| L5.4 | ⬜ Testes de regressão                                      | Pipeline de erros + observability consolidada    | 2h         |
 
 ---
 
@@ -635,13 +635,13 @@ substituição.
 
 ### Sprint 7 — Architectural Consolidation (Semana 14-17, ~54h)
 
-| Faixa | Fase                               | Prioridade | Horas |
-| ----- | ---------------------------------- | ---------- | ----- |
-| L     | L1 — Quick Wins                    | 🔴 P0       | 8h    |
-| L     | L2 — Agent Slimming               | 🟠 P1       | 16h   |
-| L     | L3 — SDK Stateless                 | 🟠 P1       | 10h   |
-| L     | L4 — Event Bus Unification         | 🟠 P1       | 12h   |
-| L     | L5 — Error Pipeline + Obs Trim     | 🟡 P2       | 8h    |
+| Faixa | Fase                           | Prioridade | Horas |
+| ----- | ------------------------------ | ---------- | ----- |
+| L     | L1 — Quick Wins                | 🔴 P0       | 8h    |
+| L     | L2 — Agent Slimming            | 🟠 P1       | 16h   |
+| L     | L3 — SDK Stateless             | 🟠 P1       | 10h   |
+| L     | L4 — Event Bus Unification     | 🟠 P1       | 12h   |
+| L     | L5 — Error Pipeline + Obs Trim | 🟡 P2       | 8h    |
 
 ---
 
@@ -706,5 +706,5 @@ requerem L2. L5 requer L4.
 | Total de linhas src/copilot      | ~62k     | ~45k (L1-L5)           |
 | Event buses                      | 3        | 1 (L4)                 |
 | Send message chain depth         | 7        | 4 (L2)                 |
-| Duplicações funcionais           | 7        | 0 (L1-L3)             |
+| Duplicações funcionais           | 7        | 0 (L1-L3)              |
 | REST endpoints para experimental | 0        | 19+                    |

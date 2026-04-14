@@ -9,7 +9,7 @@
  */
 
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
-import { broadcastGlobal, broadcastToSession } from '#copilot/services';
+import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
 import { eventFanout } from '../../infra/sse/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { getHubSessionId } from '../state.js';

@@ -9,20 +9,29 @@
  * @see EventBus
  */
 
-import { approveAll } from '@github/copilot-sdk';
-import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '#copilot/sdk';
 import { log } from '#copilot/observability';
+import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '#copilot/sdk';
+import { approveAll } from '@github/copilot-sdk';
 
 /**
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ *
  * @typedef {import('@github/copilot-sdk').Tool} Tool
+ *
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
+ *
  * @typedef {import('@github/copilot-sdk').MCPServerConfig} MCPServerConfig
+ *
  * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
+ *
  * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').SessionEventHandler} SessionEventHandler
+ *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
 
@@ -327,9 +336,7 @@ export class SessionConfigBuilder {
      */
     buildForResume() {
         const full = this.build();
-        const resume = /** @type {ResumeSessionConfig & { disableResume?: boolean }} */ (
-            /** @type {unknown} */ (full)
-        );
+        const resume = /** @type {ResumeSessionConfig & { disableResume?: boolean }} */ (/** @type {unknown} */ (full));
         if (this.#config.disableResume !== undefined) {
             resume.disableResume = this.#config.disableResume;
         }

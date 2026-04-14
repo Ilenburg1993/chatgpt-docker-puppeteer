@@ -17,12 +17,12 @@ refatorações mais profundas das fases 2-5.
 
 ### Métricas antes → depois
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Módulos toplevel | 21 | 18 (-3) |
-| Arquivos | 408 | ~385 (-23) |
-| Linhas | ~62k | ~59.5k (-2.5k) |
-| Duplicações funcionais | 7 | 4 (-3) |
+| Métrica                | Antes | Depois         |
+| ---------------------- | ----- | -------------- |
+| Módulos toplevel       | 21    | 18 (-3)        |
+| Arquivos               | 408   | ~385 (-23)     |
+| Linhas                 | ~62k  | ~59.5k (-2.5k) |
+| Duplicações funcionais | 7     | 4 (-3)         |
 
 ### Problemas resolvidos
 
@@ -36,70 +36,70 @@ refatorações mais profundas das fases 2-5.
 
 ### Grupo A: Eliminar `api/` (10 arquivos, -1.937L)
 
-| Arquivo | Linhas | Ação | Destino |
-|---------|--------|------|---------|
-| `api/express/agent.js` | 235 | DELETAR | Funcionalidade já existe em `server/routes/agent.js` |
-| `api/express/client.js` | 222 | DELETAR | Funcionalidade já existe em `server/routes/copilot-api/control.js` |
-| `api/express/hooks.js` | 120 | AVALIAR | Se endpoints únicos, migrar para `server/routes/`; senão deletar |
-| `api/express/index.js` | 65 | DELETAR | Setup Express duplicado |
-| `api/express/middleware.js` | 90 | DELETAR | `server/middleware/` é canônico |
-| `api/express/observability.js` | 336 | AVALIAR | Migrar endpoints únicos para `server/routes/observability.js` |
-| `api/express/session-crud.js` | 350 | DELETAR | `server/routes/sessions.js` + `server/routes/copilot-api/` cobrem |
-| `api/express/session-messaging.js` | 300 | DELETAR | `server/routes/copilot-api/dialog.js` cobre |
-| `api/express/session-middleware.js` | 161 | DELETAR | `server/middleware/` é canônico |
-| `api/express/sessions.js` | 58 | DELETAR | Barrel desnecessário |
+| Arquivo                             | Linhas | Ação    | Destino                                                            |
+| ----------------------------------- | ------ | ------- | ------------------------------------------------------------------ |
+| `api/express/agent.js`              | 235    | DELETAR | Funcionalidade já existe em `server/routes/agent.js`               |
+| `api/express/client.js`             | 222    | DELETAR | Funcionalidade já existe em `server/routes/copilot-api/control.js` |
+| `api/express/hooks.js`              | 120    | AVALIAR | Se endpoints únicos, migrar para `server/routes/`; senão deletar   |
+| `api/express/index.js`              | 65     | DELETAR | Setup Express duplicado                                            |
+| `api/express/middleware.js`         | 90     | DELETAR | `server/middleware/` é canônico                                    |
+| `api/express/observability.js`      | 336    | AVALIAR | Migrar endpoints únicos para `server/routes/observability.js`      |
+| `api/express/session-crud.js`       | 350    | DELETAR | `server/routes/sessions.js` + `server/routes/copilot-api/` cobrem  |
+| `api/express/session-messaging.js`  | 300    | DELETAR | `server/routes/copilot-api/dialog.js` cobre                        |
+| `api/express/session-middleware.js` | 161    | DELETAR | `server/middleware/` é canônico                                    |
+| `api/express/sessions.js`           | 58     | DELETAR | Barrel desnecessário                                               |
 
 ### Grupo B: Eliminar `services/` (6 arquivos, -547L)
 
-| Arquivo | Linhas | Ação | Migração de consumers |
-|---------|--------|------|----------------------|
-| `services/audit-service.js` | 118 | DELETAR | 1 consumer (`api/express/observability.js`) — será deletado junto |
-| `services/conversation-service.js` | 88 | DELETAR | 1 consumer (`server/routes/copilot-api/control.js`) → importar de `#copilot/conversation-hub` |
-| `services/di-tokens.js` | 9 | DELETAR | Nenhum consumer externo |
-| `services/index.js` | 35 | DELETAR | Re-exports migram para consumers diretos |
-| `services/session-service.js` | 209 | DELETAR | 3 consumers (`api/express/` — serão deletados) |
-| `services/tool-service.js` | 88 | DELETAR | 1 consumer (`api/express/index.js` — será deletado) |
+| Arquivo                            | Linhas | Ação    | Migração de consumers                                                                         |
+| ---------------------------------- | ------ | ------- | --------------------------------------------------------------------------------------------- |
+| `services/audit-service.js`        | 118    | DELETAR | 1 consumer (`api/express/observability.js`) — será deletado junto                             |
+| `services/conversation-service.js` | 88     | DELETAR | 1 consumer (`server/routes/copilot-api/control.js`) → importar de `#copilot/conversation-hub` |
+| `services/di-tokens.js`            | 9      | DELETAR | Nenhum consumer externo                                                                       |
+| `services/index.js`                | 35     | DELETAR | Re-exports migram para consumers diretos                                                      |
+| `services/session-service.js`      | 209    | DELETAR | 3 consumers (`api/express/` — serão deletados)                                                |
+| `services/tool-service.js`         | 88     | DELETAR | 1 consumer (`api/express/index.js` — será deletado)                                           |
 
 **Consumers de re-exports de `services/index.js`** que precisam ser atualizados:
 
-| Consumer | Import atual | Import novo |
-|----------|-------------|-------------|
-| `server/routes/copilot-api/control.js` | `from '#copilot/services'` → `CHANNEL_VERSION, createConversationService` | `from '#copilot/channel'` + `from '#copilot/conversation-hub'` |
-| `terminal/dialog/sse.js` | `from '#copilot/services'` → `broadcastGlobal, broadcastToSession` | `from '#copilot/conversation-hub'` |
-| `terminal/dialog/engine.js` | `from '#copilot/services'` → `llmBridgeClient` | `from '#copilot/channel'` |
-| `terminal/handlers/system-config.js` | `from '#copilot/services'` → `setBackgroundCompactionThreshold` | `from '#copilot/agent'` |
-| `terminal/commands/context.js` | `from '#copilot/services'` → `llmBridgeClient` | `from '#copilot/channel'` |
-| `terminal/commands/export.js` | `from '#copilot/services'` → `llmBridgeClient` | `from '#copilot/channel'` |
-| `terminal/commands/metrics.js` | `from '#copilot/services'` → `llmBridgeClient` | `from '#copilot/channel'` |
-| `terminal/commands/session.js` | `from '#copilot/services'` | `from '#copilot/agent'` + `from '#copilot/channel'` (ver exports usados) |
+| Consumer                               | Import atual                                                              | Import novo                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `server/routes/copilot-api/control.js` | `from '#copilot/services'` → `CHANNEL_VERSION, createConversationService` | `from '#copilot/channel'` + `from '#copilot/conversation-hub'`           |
+| `terminal/dialog/sse.js`               | `from '#copilot/services'` → `broadcastGlobal, broadcastToSession`        | `from '#copilot/conversation-hub'`                                       |
+| `terminal/dialog/engine.js`            | `from '#copilot/services'` → `llmBridgeClient`                            | `from '#copilot/channel'`                                                |
+| `terminal/handlers/system-config.js`   | `from '#copilot/services'` → `setBackgroundCompactionThreshold`           | `from '#copilot/agent'`                                                  |
+| `terminal/commands/context.js`         | `from '#copilot/services'` → `llmBridgeClient`                            | `from '#copilot/channel'`                                                |
+| `terminal/commands/export.js`          | `from '#copilot/services'` → `llmBridgeClient`                            | `from '#copilot/channel'`                                                |
+| `terminal/commands/metrics.js`         | `from '#copilot/services'` → `llmBridgeClient`                            | `from '#copilot/channel'`                                                |
+| `terminal/commands/session.js`         | `from '#copilot/services'`                                                | `from '#copilot/agent'` + `from '#copilot/channel'` (ver exports usados) |
 
 ### Grupo C: Mover `agent/config.js` → `config/agent.js` (1 arquivo)
 
-| Origem | Destino | Linhas | Ação |
-|--------|---------|--------|------|
-| `agent/config.js` | `config/agent.js` | 205 | MOVER + atualizar imports |
+| Origem            | Destino           | Linhas | Ação                      |
+| ----------------- | ----------------- | ------ | ------------------------- |
+| `agent/config.js` | `config/agent.js` | 205    | MOVER + atualizar imports |
 
 ### Grupo D: Mover contratos de `sdk/agent/` → `types/contracts/` (3 arquivos)
 
-| Origem | Destino | Linhas | Ação |
-|--------|---------|--------|------|
-| `sdk/agent/contract.js` | `types/contracts/contract.js` | 77 | MOVER |
-| `sdk/agent/bridge-contract.js` | `types/contracts/bridge-contract.js` | 56 | MOVER |
-| `sdk/agent/channel-contract.js` | `types/contracts/channel-contract.js` | 56 | MOVER |
+| Origem                          | Destino                               | Linhas | Ação  |
+| ------------------------------- | ------------------------------------- | ------ | ----- |
+| `sdk/agent/contract.js`         | `types/contracts/contract.js`         | 77     | MOVER |
+| `sdk/agent/bridge-contract.js`  | `types/contracts/bridge-contract.js`  | 56     | MOVER |
+| `sdk/agent/channel-contract.js` | `types/contracts/channel-contract.js` | 56     | MOVER |
 
 ### Grupo E: Mover itens de `agent/infra/` para módulos corretos (4 arquivos)
 
-| Origem | Destino | Linhas | Ação |
-|--------|---------|--------|------|
-| `agent/infra/webhook-manager.js` | `infra/webhooks.js` | 233 | MOVER |
-| `agent/infra/permission-controller.js` | `hooks/permission-controller.js` | 156 | MOVER |
-| `agent/infra/tools-bootstrap.js` | `tools/bootstrap.js` | 137 | MOVER |
-| `agent/infra/status-snapshot.js` | `observability/snapshots.js` | 103 | MOVER |
+| Origem                                 | Destino                          | Linhas | Ação  |
+| -------------------------------------- | -------------------------------- | ------ | ----- |
+| `agent/infra/webhook-manager.js`       | `infra/webhooks.js`              | 233    | MOVER |
+| `agent/infra/permission-controller.js` | `hooks/permission-controller.js` | 156    | MOVER |
+| `agent/infra/tools-bootstrap.js`       | `tools/bootstrap.js`             | 137    | MOVER |
+| `agent/infra/status-snapshot.js`       | `observability/snapshots.js`     | 103    | MOVER |
 
 ### Grupo F: Deprecar `sdk/config.js::buildSessionConfig` (1 arquivo)
 
-| Arquivo | Ação |
-|---------|------|
+| Arquivo         | Ação                                                |
+| --------------- | --------------------------------------------------- |
 | `sdk/config.js` | Adicionar `@deprecated` JSDoc + log WARN na chamada |
 
 ---
@@ -397,9 +397,9 @@ git push origin main
 
 ### Testes novos a criar
 
-| Teste | Descrição |
-|-------|-----------|
-| `test_cleanup_no_orphan_imports.spec.js` | Verificar que 0 imports apontam para módulos deletados |
+| Teste                                       | Descrição                                                   |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `test_cleanup_no_orphan_imports.spec.js`    | Verificar que 0 imports apontam para módulos deletados      |
 | (opcional) Integração de endpoints migrados | Se endpoints de `api/` tinham testes, migrar para `server/` |
 
 ---
@@ -423,10 +423,10 @@ git push origin main
 
 ## 6. Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| Endpoints de api/ que não existem em server/ | Média | Alto | P01 audita antes de deletar |
-| Tests que importam de #copilot/services | Baixa | Médio | Grep antes de deletar |
-| Circular imports após mover arquivos | Baixa | Médio | `npm run lint` detecta |
-| package.json import maps desatualizados | Média | Alto | P10 verifica explicitamente |
-| Runtime errors em imports movidos | Baixa | Alto | P11 testes de regressão completos |
+| Risco                                        | Probabilidade | Impacto | Mitigação                         |
+| -------------------------------------------- | ------------- | ------- | --------------------------------- |
+| Endpoints de api/ que não existem em server/ | Média         | Alto    | P01 audita antes de deletar       |
+| Tests que importam de #copilot/services      | Baixa         | Médio   | Grep antes de deletar             |
+| Circular imports após mover arquivos         | Baixa         | Médio   | `npm run lint` detecta            |
+| package.json import maps desatualizados      | Média         | Alto    | P10 verifica explicitamente       |
+| Runtime errors em imports movidos            | Baixa         | Alto    | P11 testes de regressão completos |

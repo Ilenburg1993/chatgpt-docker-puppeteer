@@ -10,29 +10,29 @@
 
 ## 1. Inventário Quantitativo
 
-| Módulo | Arquivos | Linhas | Camada | Responsabilidade |
-|--------|----------|--------|--------|-----------------|
-| `agent/` | 61 | 8.620 | L5 | Agente always-alive, dialog, lifecycle |
-| `sdk/` | 41 | 8.096 | L1 | Wrapper @github/copilot-sdk |
-| `terminal/` | 47 | 7.111 | L6 | REPL interativo, comandos, dialog |
-| `tools/` | 32 | 6.928 | L3 | Custom Tools para o SDK |
-| `observability/` | 32 | 5.757 | Cross | Logs, métricas, OTEL, error tracking |
-| `hooks/` | 24 | 4.456 | L3 | Permissões, interceptors, presets |
-| `core/` | 20 | 3.146 | L0 | Erros, retry, DI, EventBus, schemas |
-| `server/` | 31 | 3.223 | L6 | Express HTTP + Socket.IO |
-| `events/` | 20 | 2.299 | L0 | Constantes de eventos, schemas, middleware |
-| `config/` | 23 | 2.349 | L2 | Env, system prompt, session/client config |
-| `conversation-hub/` | 12 | 2.217 | L4 | Hub multi-sessão, store SQLite |
-| `bridges/` | 13 | 2.171 | L2 | Git, GitHub CLI, MCP, NERV |
-| `api/` | 10 | 1.937 | L6 | Express route handlers (legacy) |
-| `channel/` | 8 | 1.437 | L4 | LLM-A ↔ LLM-B communication |
-| `audit/` | 9 | 906 | Cross | Pipeline de auditoria, ring buffer |
-| `infra/` | 10 | 790 | L0 | Queue, storage, lockfile, SSE |
-| `services/` | 6 | 547 | L4 | Fachadas de alto nível |
-| `db/` | 3 | 437 | L0 | SQLite + migrations |
-| `plugins/` | 3 | 268 | L4 | Plugin registry (embrionário) |
-| `types/` | 1 | 30 | L0 | Barrel de tipos |
-| **Total** | **408** | **~62k** | | |
+| Módulo              | Arquivos | Linhas   | Camada | Responsabilidade                           |
+| ------------------- | -------- | -------- | ------ | ------------------------------------------ |
+| `agent/`            | 61       | 8.620    | L5     | Agente always-alive, dialog, lifecycle     |
+| `sdk/`              | 41       | 8.096    | L1     | Wrapper @github/copilot-sdk                |
+| `terminal/`         | 47       | 7.111    | L6     | REPL interativo, comandos, dialog          |
+| `tools/`            | 32       | 6.928    | L3     | Custom Tools para o SDK                    |
+| `observability/`    | 32       | 5.757    | Cross  | Logs, métricas, OTEL, error tracking       |
+| `hooks/`            | 24       | 4.456    | L3     | Permissões, interceptors, presets          |
+| `core/`             | 20       | 3.146    | L0     | Erros, retry, DI, EventBus, schemas        |
+| `server/`           | 31       | 3.223    | L6     | Express HTTP + Socket.IO                   |
+| `events/`           | 20       | 2.299    | L0     | Constantes de eventos, schemas, middleware |
+| `config/`           | 23       | 2.349    | L2     | Env, system prompt, session/client config  |
+| `conversation-hub/` | 12       | 2.217    | L4     | Hub multi-sessão, store SQLite             |
+| `bridges/`          | 13       | 2.171    | L2     | Git, GitHub CLI, MCP, NERV                 |
+| `api/`              | 10       | 1.937    | L6     | Express route handlers (legacy)            |
+| `channel/`          | 8        | 1.437    | L4     | LLM-A ↔ LLM-B communication                |
+| `audit/`            | 9        | 906      | Cross  | Pipeline de auditoria, ring buffer         |
+| `infra/`            | 10       | 790      | L0     | Queue, storage, lockfile, SSE              |
+| `services/`         | 6        | 547      | L4     | Fachadas de alto nível                     |
+| `db/`               | 3        | 437      | L0     | SQLite + migrations                        |
+| `plugins/`          | 3        | 268      | L4     | Plugin registry (embrionário)              |
+| `types/`            | 1        | 30       | L0     | Barrel de tipos                            |
+| **Total**           | **408**  | **~62k** |        |                                            |
 
 ### Concentração de código
 
@@ -90,29 +90,29 @@ Cross-cutting
 
 O codebase tem **7 pares de conceitos duplicados ou sobrepostos**:
 
-| # | Conceito | Módulo A | Módulo B | Diagnóstico |
-|---|----------|----------|----------|-------------|
-| D1 | Error handling | `core/error-handlers.js` (classificação, retry, toError) | `hooks/error-handler.js` (onErrorOccurred SDK) | **Complementar**, mas confuso. São camadas diferentes (L0 vs L3) mas o nome sugere duplicação. Faltam cross-references. |
-| D2 | Error tracking | `observability/error-tracker.js` (ring buffer + stats) | `observability/error-alerting.js` (threshold alertas) | **Complementar**: tracker coleta, alerting consome. Mas `bus-actions/error-alerter.js` é um TERCEIRO ponto de tratamento de erro. 3 módulos para resolver 1 problema. |
-| D3 | Session config | `sdk/config.js` (defaults, merge de SessionConfig) | `config/session-config.js` (SessionConfigBuilder) | **Sobreposição real**. Ambos constroem SessionConfig com defaults. `sdk/config.js` é legacy; `config/session-config.js` (Faixa C) é o novo builder. sdk/config.js deveria ser deprecado. |
-| D4 | Session lifecycle | `sdk/session/lifecycle.js` (create/resume/delete puro) | `agent/session/initializer.js` (create com wiring de hooks/tools) | **Complementar**, mas a cadeia é longa: agent→initializer→sdk/lifecycle→@github/copilot-sdk. Um nível intermediário desnecessário? |
-| D5 | Event handlers | `agent/session/event-handlers/` (12 arquivos, ~700L) | `observability/collectors/` (6 arquivos, ~500L) | **Duplicação operacional**: ambos escutam os mesmos eventos SDK da sessão. Agents reagem (dialog, reconnect), obs. coleta (métricas, logs). Mesma fonte de dados duplicada em 2 registrations. |
-| D6 | Infra | `agent/infra/` (8 files: queue, executor, perms, webhook) | `infra/` (root: queue, storage, lockfile, SSE) | **Nome confuso**: `agent/infra/` é lógica do agente (task-executor, message-queue), `infra/` é infraestrutura genérica (file I/O, SSE). Mesma pasta, significados diferentes. |
-| D7 | API routes | `api/express/` (10 files, 1937L) | `server/routes/` + `server/routes/copilot-api/` | **Duplicação funcional real**. Ambos expõem endpoints HTTP Express para o mesmo agente. `api/` parece ser versão anterior, `server/` a versão atual com middleware e auth. |
+| #   | Conceito          | Módulo A                                                  | Módulo B                                                          | Diagnóstico                                                                                                                                                                                    |
+| --- | ----------------- | --------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Error handling    | `core/error-handlers.js` (classificação, retry, toError)  | `hooks/error-handler.js` (onErrorOccurred SDK)                    | **Complementar**, mas confuso. São camadas diferentes (L0 vs L3) mas o nome sugere duplicação. Faltam cross-references.                                                                        |
+| D2  | Error tracking    | `observability/error-tracker.js` (ring buffer + stats)    | `observability/error-alerting.js` (threshold alertas)             | **Complementar**: tracker coleta, alerting consome. Mas `bus-actions/error-alerter.js` é um TERCEIRO ponto de tratamento de erro. 3 módulos para resolver 1 problema.                          |
+| D3  | Session config    | `sdk/config.js` (defaults, merge de SessionConfig)        | `config/session-config.js` (SessionConfigBuilder)                 | **Sobreposição real**. Ambos constroem SessionConfig com defaults. `sdk/config.js` é legacy; `config/session-config.js` (Faixa C) é o novo builder. sdk/config.js deveria ser deprecado.       |
+| D4  | Session lifecycle | `sdk/session/lifecycle.js` (create/resume/delete puro)    | `agent/session/initializer.js` (create com wiring de hooks/tools) | **Complementar**, mas a cadeia é longa: agent→initializer→sdk/lifecycle→@github/copilot-sdk. Um nível intermediário desnecessário?                                                             |
+| D5  | Event handlers    | `agent/session/event-handlers/` (12 arquivos, ~700L)      | `observability/collectors/` (6 arquivos, ~500L)                   | **Duplicação operacional**: ambos escutam os mesmos eventos SDK da sessão. Agents reagem (dialog, reconnect), obs. coleta (métricas, logs). Mesma fonte de dados duplicada em 2 registrations. |
+| D6  | Infra             | `agent/infra/` (8 files: queue, executor, perms, webhook) | `infra/` (root: queue, storage, lockfile, SSE)                    | **Nome confuso**: `agent/infra/` é lógica do agente (task-executor, message-queue), `infra/` é infraestrutura genérica (file I/O, SSE). Mesma pasta, significados diferentes.                  |
+| D7  | API routes        | `api/express/` (10 files, 1937L)                          | `server/routes/` + `server/routes/copilot-api/`                   | **Duplicação funcional real**. Ambos expõem endpoints HTTP Express para o mesmo agente. `api/` parece ser versão anterior, `server/` a versão atual com middleware e auth.                     |
 
 ### 3.2 🔴 `agent/` é Desproporcionalmente Grande
 
 O módulo `agent/` (8.620L, 61 arquivos) contém responsabilidades que deveriam estar em outras camadas:
 
-| Responsabilidade no agent/ | Deveria estar em | Razão |
-|---------------------------|------------------|-------|
-| `agent/infra/webhook-manager.js` | `infra/` ou `bridges/` | Webhooks são infraestrutura, não agente |
-| `agent/infra/tools-bootstrap.js` | `tools/` | Bootstrap de tools pertence à camada de tools |
-| `agent/infra/permission-controller.js` | `hooks/` | Permission switching é concern de hooks |
-| `agent/session/event-handlers/` (12 files) | `events/handlers/` | Event handling é cross-cutting, não agente |
-| `agent/config.js` | `config/` | Config do agente deveria ser parte de config geral |
-| `agent/infra/status-snapshot.js` | `observability/` | Snapshots de status são observability |
-| `agent/infra/handoff-manager.js` | `orchestrator/` ou `plugins/` | Handoff é orquestração, não infra do agente |
+| Responsabilidade no agent/                 | Deveria estar em              | Razão                                              |
+| ------------------------------------------ | ----------------------------- | -------------------------------------------------- |
+| `agent/infra/webhook-manager.js`           | `infra/` ou `bridges/`        | Webhooks são infraestrutura, não agente            |
+| `agent/infra/tools-bootstrap.js`           | `tools/`                      | Bootstrap de tools pertence à camada de tools      |
+| `agent/infra/permission-controller.js`     | `hooks/`                      | Permission switching é concern de hooks            |
+| `agent/session/event-handlers/` (12 files) | `events/handlers/`            | Event handling é cross-cutting, não agente         |
+| `agent/config.js`                          | `config/`                     | Config do agente deveria ser parte de config geral |
+| `agent/infra/status-snapshot.js`           | `observability/`              | Snapshots de status são observability              |
+| `agent/infra/handoff-manager.js`           | `orchestrator/` ou `plugins/` | Handoff é orquestração, não infra do agente        |
 
 **Impacto**: O agent/ absorve funcionalidade como um god module. Novos features são adicionados nele
 por conveniência (proximidade com AgentContext), não por design.
@@ -213,12 +213,12 @@ e `#copilot/channel`. É basicamente um barrel extra com 4 wrappers finos:
 
 ### 4.1 Layer Violations (import direction)
 
-| Violação | De | Para | Tipo |
-|---------|-----|------|------|
-| V1 | `config/session-config.js` | `@github/copilot-sdk` (direto) | L2→L0 bypass L1. Deveria importar de `#copilot/sdk` |
-| V2 | `sdk/session/lifecycle.js` | `@github/copilot-sdk` (direto) | OK — sdk/ é o único que deve importar SDK nativo |
-| V3 | `agent/session/boot-wiring.js` | `../../sdk/session/client-events.js` (path relativo) | L5→L1 via path relativo em vez de alias `#copilot/sdk` |
-| V4 | `config/system-prompt/*.js` | `#copilot/sdk` | L2→L1 OK (acesso a constantes SDK) |
+| Violação | De                             | Para                                                 | Tipo                                                   |
+| -------- | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------ |
+| V1       | `config/session-config.js`     | `@github/copilot-sdk` (direto)                       | L2→L0 bypass L1. Deveria importar de `#copilot/sdk`    |
+| V2       | `sdk/session/lifecycle.js`     | `@github/copilot-sdk` (direto)                       | OK — sdk/ é o único que deve importar SDK nativo       |
+| V3       | `agent/session/boot-wiring.js` | `../../sdk/session/client-events.js` (path relativo) | L5→L1 via path relativo em vez de alias `#copilot/sdk` |
+| V4       | `config/system-prompt/*.js`    | `#copilot/sdk`                                       | L2→L1 OK (acesso a constantes SDK)                     |
 
 ### 4.2 Import Pattern Analysis
 
@@ -244,16 +244,16 @@ sdk/ importa de:
 
 ### 5.1 Tokens Registrados
 
-| Módulo | Tokens | Descrição |
-|--------|--------|-----------|
-| `core/` | SHUTDOWN_LOGGER, DB_LOGGER, EVENT_BUS | Infra base |
-| `sdk/` | SDK_LOGGER, TOOLS_BUILDER | Logger e factory |
-| `hooks/` | HOOKS_LOGGER | Logger |
-| `audit/` | AUDIT_LOGGER, AUDIT_BUS | Logger e bus |
-| `agent/` | ALWAYS_ALIVE_AGENT | Agent singleton |
-| `bridges/` | BRIDGE_AGENT, FALLBACK_AGENT, PERMISSION_AGENT, NERV_BRIDGE_AGENT | 4 refs ao mesmo tipo |
-| `conversation-hub/` | HUB, SESSION_RPC, CONVERSATION_STORE | Hub central |
-| `services/` | (vazio — tokens especulativos removidos) | — |
+| Módulo              | Tokens                                                            | Descrição            |
+| ------------------- | ----------------------------------------------------------------- | -------------------- |
+| `core/`             | SHUTDOWN_LOGGER, DB_LOGGER, EVENT_BUS                             | Infra base           |
+| `sdk/`              | SDK_LOGGER, TOOLS_BUILDER                                         | Logger e factory     |
+| `hooks/`            | HOOKS_LOGGER                                                      | Logger               |
+| `audit/`            | AUDIT_LOGGER, AUDIT_BUS                                           | Logger e bus         |
+| `agent/`            | ALWAYS_ALIVE_AGENT                                                | Agent singleton      |
+| `bridges/`          | BRIDGE_AGENT, FALLBACK_AGENT, PERMISSION_AGENT, NERV_BRIDGE_AGENT | 4 refs ao mesmo tipo |
+| `conversation-hub/` | HUB, SESSION_RPC, CONVERSATION_STORE                              | Hub central          |
+| `services/`         | (vazio — tokens especulativos removidos)                          | —                    |
 
 **Observações**:
 - `bridges/di-tokens.js` declara 4 tokens que são **todos** do tipo `AlwaysAliveAgent`. Isso sugere
@@ -331,18 +331,18 @@ entre eles. Um evento pode fluir: SDK→handler→emit EventBus→bus-action→e
 
 ## 9. Métricas de Saúde
 
-| Métrica | Valor Atual | Ideal |
-|---------|-------------|-------|
-| Total de arquivos | 408 | ~200 (após consolidação) |
-| Total de linhas | ~62k | ~40k (após remoção dead code + consolidação) |
-| God modules (>600L) | 3 (always-alive, sdk/index, loop-manager) | 0 |
-| Módulos >5000L | 4 (agent, sdk, terminal, tools) | 2 (terminal, tools — UI-heavy) |
-| Duplicação funcional | 7 pares identificados | 0 |
-| Layer violations | 2 | 0 |
-| DI tokens vs singletons | 11 vs ~20 | 25+ vs 0 |
-| Buses de eventos | 3 | 1 (unificado) |
-| Níveis de indireção (send msg) | 7 | 4 |
-| Módulos sem consumer | ~2 (api/, services/) | 0 |
+| Métrica                        | Valor Atual                               | Ideal                                        |
+| ------------------------------ | ----------------------------------------- | -------------------------------------------- |
+| Total de arquivos              | 408                                       | ~200 (após consolidação)                     |
+| Total de linhas                | ~62k                                      | ~40k (após remoção dead code + consolidação) |
+| God modules (>600L)            | 3 (always-alive, sdk/index, loop-manager) | 0                                            |
+| Módulos >5000L                 | 4 (agent, sdk, terminal, tools)           | 2 (terminal, tools — UI-heavy)               |
+| Duplicação funcional           | 7 pares identificados                     | 0                                            |
+| Layer violations               | 2                                         | 0                                            |
+| DI tokens vs singletons        | 11 vs ~20                                 | 25+ vs 0                                     |
+| Buses de eventos               | 3                                         | 1 (unificado)                                |
+| Níveis de indireção (send msg) | 7                                         | 4                                            |
+| Módulos sem consumer           | ~2 (api/, services/)                      | 0                                            |
 
 ---
 

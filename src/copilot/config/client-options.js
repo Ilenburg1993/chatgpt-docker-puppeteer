@@ -2,8 +2,8 @@
 /**
  * src/copilot/config/client-options.js
  *
- * Builder tipado para `CopilotClientOptions` do `@github/copilot-sdk`. Centraliza a construção de opções do client
- * com suporte a logLevel mapping, env passthrough, BYOK onListModels e githubToken.
+ * Builder tipado para `CopilotClientOptions` do `@github/copilot-sdk`. Centraliza a construção de opções do client com
+ * suporte a logLevel mapping, env passthrough, BYOK onListModels e githubToken.
  *
  * @module copilot/config/client-options
  * @see EventBus
@@ -13,6 +13,7 @@ import { log } from '#copilot/observability';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
+ *
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
  */
 
@@ -126,8 +127,8 @@ export class ClientOptionsBuilder {
     // ─── Environment ──────────────────────────────────────────────────────
 
     /**
-     * Passa variáveis de ambiente filtradas ao CLI process.
-     * Inclui apenas as chaves especificadas + variáveis COPILOT_* e GITHUB_*.
+     * Passa variáveis de ambiente filtradas ao CLI process. Inclui apenas as chaves especificadas + variáveis COPILOT_*
+     * e GITHUB_*.
      *
      * @param {string[]} [extraKeys] - Chaves adicionais a incluir além de COPILOT_* e GITHUB_*
      * @returns {this}

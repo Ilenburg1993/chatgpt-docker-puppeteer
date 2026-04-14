@@ -10,7 +10,7 @@
 
 import { log } from '#copilot/observability';
 import { z } from 'zod';
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '../../../core/error-handlers.js';
 
 /**
  * @typedef {import('express').Request} Req

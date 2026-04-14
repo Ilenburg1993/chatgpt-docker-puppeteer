@@ -103,14 +103,14 @@ manual e propensa a erros.
 
 ### 3.2 🟠 Error Handling Inconsistente
 
-| Módulo | Padrão de Error Handling |
-|--------|--------------------------|
-| `lifecycle/agent-lifecycle.js` | `try/catch` com `toError()`, re-throw |
-| `session/boot-wiring.js` | `void .catch()` (fire-and-forget) em 4 operações |
-| `dialog/loop-manager.js` | `.catch()` com log + deactivate |
-| `infra/task-executor.js` | `try/catch/finally` completo com retry |
-| `session/initializer.js` | `await` com throw direto |
-| `queue-processor.js` | `void executeTask()` — erros resolvidos internamente |
+| Módulo                         | Padrão de Error Handling                             |
+| ------------------------------ | ---------------------------------------------------- |
+| `lifecycle/agent-lifecycle.js` | `try/catch` com `toError()`, re-throw                |
+| `session/boot-wiring.js`       | `void .catch()` (fire-and-forget) em 4 operações     |
+| `dialog/loop-manager.js`       | `.catch()` com log + deactivate                      |
+| `infra/task-executor.js`       | `try/catch/finally` completo com retry               |
+| `session/initializer.js`       | `await` com throw direto                             |
+| `queue-processor.js`           | `void executeTask()` — erros resolvidos internamente |
 
 Não há padrão centralizado para erro recuperável vs. fatal.
 
@@ -214,20 +214,20 @@ documentação de protocolo nem testes.
 
 ### 6.2 Gaps de Testes
 
-| Módulo | Cobertura Estimada | Gap |
-|--------|--------------------|-----|
-| `always-alive.js` | Parcial | Bridge de eventos sem testes |
-| `agent-context.js` | Nenhuma | FSM de status, setStatus |
-| `dialog/loop-manager.js` | Parcial | pause/resume/boot recovery |
-| `dialog/turn-executor.js` | Parcial | Protocolo READY/REPLY parsing |
-| `session/boot-wiring.js` | Nenhuma | 12 etapas sem testes unitários |
-| `lifecycle/agent-lifecycle.js` | Parcial | agentStop, agentTryReconnect |
-| `lifecycle/entry.js` | Nenhuma | startAgentLoop, IPC |
-| `session/initializer.js` | Parcial | Rotação, validação de sessionId |
-| `infra/task-executor.js` | Parcial | Retry após reconexão |
-| `infra/message-queue.js` | Nenhuma | FIFO, abort, drain |
-| `infra/webhook-manager.js` | Nenhuma | Retry, dispatch |
-| `infra/permission-controller.js` | Nenhuma | Mode switching |
+| Módulo                           | Cobertura Estimada | Gap                             |
+| -------------------------------- | ------------------ | ------------------------------- |
+| `always-alive.js`                | Parcial            | Bridge de eventos sem testes    |
+| `agent-context.js`               | Nenhuma            | FSM de status, setStatus        |
+| `dialog/loop-manager.js`         | Parcial            | pause/resume/boot recovery      |
+| `dialog/turn-executor.js`        | Parcial            | Protocolo READY/REPLY parsing   |
+| `session/boot-wiring.js`         | Nenhuma            | 12 etapas sem testes unitários  |
+| `lifecycle/agent-lifecycle.js`   | Parcial            | agentStop, agentTryReconnect    |
+| `lifecycle/entry.js`             | Nenhuma            | startAgentLoop, IPC             |
+| `session/initializer.js`         | Parcial            | Rotação, validação de sessionId |
+| `infra/task-executor.js`         | Parcial            | Retry após reconexão            |
+| `infra/message-queue.js`         | Nenhuma            | FIFO, abort, drain              |
+| `infra/webhook-manager.js`       | Nenhuma            | Retry, dispatch                 |
+| `infra/permission-controller.js` | Nenhuma            | Mode switching                  |
 
 ---
 
@@ -247,15 +247,15 @@ documentação de protocolo nem testes.
 
 ## 8. Dívida Técnica Priorizada
 
-| # | Severidade | Item | Impacto | Estimativa |
-|---|------------|------|---------|------------|
-| D1 | 🔴 | AgentContext god object | Testabilidade, invariantes | 8h |
-| D2 | 🔴 | Ausência de testes: boot-wiring, agent-context, message-queue | Confiabilidade | 12h |
-| D3 | 🟠 | Error handling inconsistente | Debugging, reliability | 4h |
-| D4 | 🟠 | Async fire-and-forget sem tracking | Erros silenciosos | 3h |
-| D5 | 🟠 | Host interface bypasses (JSDoc cast) | Type safety | 4h |
-| D6 | 🟠 | performBootWiring god function | Testabilidade | 6h |
-| D7 | 🟡 | Bridge de eventos hardcoded em always-alive.js | Manutenibilidade | 4h |
-| D8 | 🟡 | Singleton com side effects no import | Testabilidade | 3h |
-| D9 | 🟡 | Falta de health check formal | Operabilidade | 3h |
-| **Total** | | | | **~47h** |
+| #         | Severidade | Item                                                          | Impacto                    | Estimativa |
+| --------- | ---------- | ------------------------------------------------------------- | -------------------------- | ---------- |
+| D1        | 🔴          | AgentContext god object                                       | Testabilidade, invariantes | 8h         |
+| D2        | 🔴          | Ausência de testes: boot-wiring, agent-context, message-queue | Confiabilidade             | 12h        |
+| D3        | 🟠          | Error handling inconsistente                                  | Debugging, reliability     | 4h         |
+| D4        | 🟠          | Async fire-and-forget sem tracking                            | Erros silenciosos          | 3h         |
+| D5        | 🟠          | Host interface bypasses (JSDoc cast)                          | Type safety                | 4h         |
+| D6        | 🟠          | performBootWiring god function                                | Testabilidade              | 6h         |
+| D7        | 🟡          | Bridge de eventos hardcoded em always-alive.js                | Manutenibilidade           | 4h         |
+| D8        | 🟡          | Singleton com side effects no import                          | Testabilidade              | 3h         |
+| D9        | 🟡          | Falta de health check formal                                  | Operabilidade              | 3h         |
+| **Total** |            |                                                               |                            | **~47h**   |

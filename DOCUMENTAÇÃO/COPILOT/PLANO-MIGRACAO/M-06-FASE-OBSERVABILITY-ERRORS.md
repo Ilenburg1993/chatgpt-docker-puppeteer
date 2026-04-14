@@ -32,13 +32,13 @@ O módulo `observability/` (32 arquivos, 5.757L) é super-engenheirado:
 
 ### Métricas antes → depois
 
-| Métrica | Antes (pós M-05) | Depois |
-|---------|-------------------|--------|
-| observability/ arquivos | ~27 | ~19 |
-| observability/ linhas | ~4.800 | ~3.500 |
-| Error handling modules | 3 | 1 (error-pipeline.js) |
-| bus-actions/ | 6 | 0 (consolidado em observers/) |
-| Dead code (event-catalog) | 130L | 0 |
+| Métrica                   | Antes (pós M-05) | Depois                        |
+| ------------------------- | ---------------- | ----------------------------- |
+| observability/ arquivos   | ~27              | ~19                           |
+| observability/ linhas     | ~4.800           | ~3.500                        |
+| Error handling modules    | 3                | 1 (error-pipeline.js)         |
+| bus-actions/              | 6                | 0 (consolidado em observers/) |
+| Dead code (event-catalog) | 130L             | 0                             |
 
 ### Problemas resolvidos
 
@@ -53,11 +53,11 @@ O módulo `observability/` (32 arquivos, 5.757L) é super-engenheirado:
 
 ### Grupo A: Consolidar Error Pipeline (C9)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `observability/error-tracker.js` | 233 | MERGE → `observability/error-pipeline.js` |
-| `observability/error-alerting.js` | 242 | MERGE → `observability/error-pipeline.js` |
-| `bus-actions/error-alerter.js` | ~80 | DELETAR (lógica movida para error-pipeline) |
+| Arquivo                           | Linhas | Ação                                        |
+| --------------------------------- | ------ | ------------------------------------------- |
+| `observability/error-tracker.js`  | 233    | MERGE → `observability/error-pipeline.js`   |
+| `observability/error-alerting.js` | 242    | MERGE → `observability/error-pipeline.js`   |
+| `bus-actions/error-alerter.js`    | ~80    | DELETAR (lógica movida para error-pipeline) |
 
 **Target**: `observability/error-pipeline.js` (~350L):
 ```javascript
@@ -80,27 +80,27 @@ export class ErrorPipeline {
 
 ### Grupo B: Eliminar bus-actions/ (C11)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `bus-actions/error-alerter.js` | ~80 | DELETAR (lógica para error-pipeline) |
-| `bus-actions/index.js` | ~15 | DELETAR |
-| `bus-actions/metric-action.js` | ~100 | DELETAR (subsumido por observers/) |
-| `bus-actions/notification-action.js` | ~100 | AVALIAR: se exclusivo → mover para observers/ |
-| `bus-actions/state-action.js` | ~100 | AVALIAR: se exclusivo → mover para observers/ |
-| `bus-actions/tool-action.js` | ~100 | DELETAR (subsumido por tool-stats.js) |
+| Arquivo                              | Linhas | Ação                                          |
+| ------------------------------------ | ------ | --------------------------------------------- |
+| `bus-actions/error-alerter.js`       | ~80    | DELETAR (lógica para error-pipeline)          |
+| `bus-actions/index.js`               | ~15    | DELETAR                                       |
+| `bus-actions/metric-action.js`       | ~100   | DELETAR (subsumido por observers/)            |
+| `bus-actions/notification-action.js` | ~100   | AVALIAR: se exclusivo → mover para observers/ |
+| `bus-actions/state-action.js`        | ~100   | AVALIAR: se exclusivo → mover para observers/ |
+| `bus-actions/tool-action.js`         | ~100   | DELETAR (subsumido por tool-stats.js)         |
 
 ### Grupo C: Remover dead code
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `observability/event-catalog.js` | 130 | DELETAR (dead-letter queue nunca consumida) |
+| Arquivo                          | Linhas | Ação                                        |
+| -------------------------------- | ------ | ------------------------------------------- |
+| `observability/event-catalog.js` | 130    | DELETAR (dead-letter queue nunca consumida) |
 
 ### Grupo D: Health endpoints (K7 complemento)
 
-| Arquivo | Ação |
-|---------|------|
+| Arquivo                   | Ação                                                                |
+| ------------------------- | ------------------------------------------------------------------- |
 | `server/routes/health.js` | ATUALIZAR: adicionar `/health/errors` com ErrorPipeline.getAlerts() |
-| `sdk/telemetry/health.js` | ATUALIZAR: integrar com ErrorPipeline |
+| `sdk/telemetry/health.js` | ATUALIZAR: integrar com ErrorPipeline                               |
 
 ---
 
@@ -236,9 +236,9 @@ git push origin main
 
 ## 5. Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| Consumers de error-tracker com API diferente | Média | Médio | Grep exaustivo P01 + adapter se necessário |
-| bus-actions tem lógica exclusiva não percebida | Baixa | Médio | Leitura completa em P04 antes de deletar |
-| ErrorPipeline ring buffer perde dados em restart | Baixa | Baixo | Já era assim com ErrorTracker |
-| Dead-letter queue era usada por algum monitor | Muito Baixa | Baixo | Grep em P05 confirma |
+| Risco                                            | Probabilidade | Impacto | Mitigação                                  |
+| ------------------------------------------------ | ------------- | ------- | ------------------------------------------ |
+| Consumers de error-tracker com API diferente     | Média         | Médio   | Grep exaustivo P01 + adapter se necessário |
+| bus-actions tem lógica exclusiva não percebida   | Baixa         | Médio   | Leitura completa em P04 antes de deletar   |
+| ErrorPipeline ring buffer perde dados em restart | Baixa         | Baixo   | Já era assim com ErrorTracker              |
+| Dead-letter queue era usada por algum monitor    | Muito Baixa   | Baixo   | Grep em P05 confirma                       |

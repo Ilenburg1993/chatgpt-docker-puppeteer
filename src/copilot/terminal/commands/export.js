@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { llmBridgeClient } from '#copilot/services';
+import { llmBridgeClient } from '#copilot/channel';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';

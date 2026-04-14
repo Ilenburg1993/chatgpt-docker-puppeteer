@@ -13,11 +13,11 @@
 
 O sistema de eventos atual é tripartido:
 
-| Bus | Localização | Função | Listeners |
-|-----|-------------|--------|-----------|
-| **EventBus** | `core/event-bus.js` | Hub global do domínio copilot | ~50 |
-| **HookBus** | `hooks/bus.js` | Permissões e hooks | ~20 |
-| **SDK Events** | `@github/copilot-sdk` session | Eventos nativos do SDK | ~30 |
+| Bus            | Localização                   | Função                        | Listeners |
+| -------------- | ----------------------------- | ----------------------------- | --------- |
+| **EventBus**   | `core/event-bus.js`           | Hub global do domínio copilot | ~50       |
+| **HookBus**    | `hooks/bus.js`                | Permissões e hooks            | ~20       |
+| **SDK Events** | `@github/copilot-sdk` session | Eventos nativos do SDK        | ~30       |
 
 **Problemas**:
 1. **P5 (🟠)**: 3 buses = 3 mental models, 3 subscription patterns, 3 event naming conventions
@@ -37,13 +37,13 @@ O sistema de eventos atual é tripartido:
 
 ### Métricas antes → depois
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Event buses independentes | 3 | 1 |
-| Bridge manual (linhas) | ~80 | 0 (automático) |
-| Event naming conventions | 3 | 1 (namespace:event) |
-| Listeners sem schema | ~100 | 0 |
-| Duplicate listeners (D5) | ~15 | 0 |
+| Métrica                   | Antes | Depois              |
+| ------------------------- | ----- | ------------------- |
+| Event buses independentes | 3     | 1                   |
+| Bridge manual (linhas)    | ~80   | 0 (automático)      |
+| Event naming conventions  | 3     | 1 (namespace:event) |
+| Listeners sem schema      | ~100  | 0                   |
+| Duplicate listeners (D5)  | ~15   | 0                   |
 
 ---
 
@@ -51,43 +51,43 @@ O sistema de eventos atual é tripartido:
 
 ### Grupo A: Event Bus Core (3 arquivos)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `core/event-bus.js` | 345 | REFATORAR: adicionar namespace support + typed emit |
-| `hooks/bus.js` | 230 | REFATORAR: converter para adapter do EventBus |
-| `bridges/nerv-event-bus-adapter.js` | 197 | ATUALIZAR: alinhar com novo namespace |
+| Arquivo                             | Linhas | Ação                                                |
+| ----------------------------------- | ------ | --------------------------------------------------- |
+| `core/event-bus.js`                 | 345    | REFATORAR: adicionar namespace support + typed emit |
+| `hooks/bus.js`                      | 230    | REFATORAR: converter para adapter do EventBus       |
+| `bridges/nerv-event-bus-adapter.js` | 197    | ATUALIZAR: alinhar com novo namespace               |
 
 ### Grupo B: Event Bridge (2-5 arquivos)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `agent/event-bridge-map.js` | (novo M-03) | ATUALIZAR: adicionar namespace `sdk:` |
-| `agent/always-alive.js` | ~500 | ATUALIZAR: usar bridge automático |
-| `sdk/session/events.js` | 271 | REFATORAR: emitir via EventBus com `sdk:` prefix |
-| `sdk/session/client-events.js` | 255 | REFATORAR: emitir via EventBus com `sdk:` prefix |
+| Arquivo                        | Linhas      | Ação                                             |
+| ------------------------------ | ----------- | ------------------------------------------------ |
+| `agent/event-bridge-map.js`    | (novo M-03) | ATUALIZAR: adicionar namespace `sdk:`            |
+| `agent/always-alive.js`        | ~500        | ATUALIZAR: usar bridge automático                |
+| `sdk/session/events.js`        | 271         | REFATORAR: emitir via EventBus com `sdk:` prefix |
+| `sdk/session/client-events.js` | 255         | REFATORAR: emitir via EventBus com `sdk:` prefix |
 
 ### Grupo C: Collectors vs Event Handlers — Eliminar sobreposição (D5)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `event-handlers/catch-all.js` | 101 | MANTER (handler de domínio) |
-| `observability/collectors/session-collector.js` | ~200 | AVALIAR: se duplica catch-all, MERGE |
-| `observability/collectors/tool-collector.js` | ~200 | AVALIAR: se duplica tool-lifecycle handler |
-| `observability/collectors/error-collector.js` | ~200 | AVALIAR: se duplica catch-all error handling |
-| `observability/collectors/performance-collector.js` | ~200 | MANTER (métricas exclusivas) |
-| `observability/collectors/usage-collector.js` | ~200 | AVALIAR: se duplica usage handler |
+| Arquivo                                             | Linhas | Ação                                         |
+| --------------------------------------------------- | ------ | -------------------------------------------- |
+| `event-handlers/catch-all.js`                       | 101    | MANTER (handler de domínio)                  |
+| `observability/collectors/session-collector.js`     | ~200   | AVALIAR: se duplica catch-all, MERGE         |
+| `observability/collectors/tool-collector.js`        | ~200   | AVALIAR: se duplica tool-lifecycle handler   |
+| `observability/collectors/error-collector.js`       | ~200   | AVALIAR: se duplica catch-all error handling |
+| `observability/collectors/performance-collector.js` | ~200   | MANTER (métricas exclusivas)                 |
+| `observability/collectors/usage-collector.js`       | ~200   | AVALIAR: se duplica usage handler            |
 
 ### Grupo D: Event Constants — Consolidar (20 arquivos em events/)
 
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `events/agent-events.js` | 362 | MANTER (com namespace prefix) |
-| `events/hub-events.js` | 70 | MANTER (com namespace prefix) |
-| `events/hook-events.js` | 24 | MANTER (com namespace prefix) |
-| `events/sdk-events.js` | 15 | MANTER (com `sdk:` prefix) |
-| `events/legacy-events.js` | 151 | **AVALIAR**: deprecar ou migrar |
-| `events/nerv-events.js` | 270 | MANTER |
-| `events/index.js` | 349 | ATUALIZAR: barrel com namespaces |
+| Arquivo                   | Linhas | Ação                             |
+| ------------------------- | ------ | -------------------------------- |
+| `events/agent-events.js`  | 362    | MANTER (com namespace prefix)    |
+| `events/hub-events.js`    | 70     | MANTER (com namespace prefix)    |
+| `events/hook-events.js`   | 24     | MANTER (com namespace prefix)    |
+| `events/sdk-events.js`    | 15     | MANTER (com `sdk:` prefix)       |
+| `events/legacy-events.js` | 151    | **AVALIAR**: deprecar ou migrar  |
+| `events/nerv-events.js`   | 270    | MANTER                           |
+| `events/index.js`         | 349    | ATUALIZAR: barrel com namespaces |
 
 ---
 
@@ -267,10 +267,10 @@ git push origin main
 
 ## 5. Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| EventBus namespace quebra listeners existentes | Média | Alto | API aditiva (backward compat) |
-| HookBus adapter perde eventos | Média | Alto | Testes de paridade antes/depois |
-| SDK bridge duplica emissões | Média | Médio | Verificar todos os .on() sites |
-| Collectors eliminados tinham lógica exclusiva | Baixa | Médio | Diff manual em P04 |
-| Event validator bloqueia por engano | Baixa | Baixo | Modo warn (não bloqueia) |
+| Risco                                          | Probabilidade | Impacto | Mitigação                       |
+| ---------------------------------------------- | ------------- | ------- | ------------------------------- |
+| EventBus namespace quebra listeners existentes | Média         | Alto    | API aditiva (backward compat)   |
+| HookBus adapter perde eventos                  | Média         | Alto    | Testes de paridade antes/depois |
+| SDK bridge duplica emissões                    | Média         | Médio   | Verificar todos os .on() sites  |
+| Collectors eliminados tinham lógica exclusiva  | Baixa         | Médio   | Diff manual em P04              |
+| Event validator bloqueia por engano            | Baixa         | Baixo   | Modo warn (não bloqueia)        |

@@ -10,7 +10,7 @@ import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges';
 import { toError, container } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { llmBridgeClient } from '#copilot/services';
+import { llmBridgeClient } from '#copilot/channel';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,
