@@ -8,8 +8,8 @@
 
 import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { getCompactionHistory, log } from '#copilot/observability';
-import { approveAll, createSessionService, pickDefined } from '../../../services/session-service.js';
 import { Router } from 'express';
+import { approveAll, createSessionService, pickDefined } from '../../../services/session-service.js';
 import {
     CreateSessionBodySchema,
     rateLimitMiddleware,

@@ -43,7 +43,7 @@ import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
 import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
-import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../config.js';
+import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
 import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';

@@ -17,7 +17,7 @@ import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/hooks';
 import { log } from '#copilot/observability';
 import { approveAll } from '#copilot/sdk';
-import { PERMISSION_MODE } from '../config.js';
+import { PERMISSION_MODE } from '../../config/agent.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

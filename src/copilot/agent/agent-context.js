@@ -18,7 +18,7 @@
 import { EMITTER_PERMISSION_MODE_CHANGED, EMITTER_PROCESS_QUEUE, EMITTER_STATUS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
-import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from './config.js';
+import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';

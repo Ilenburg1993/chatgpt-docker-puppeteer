@@ -21,7 +21,7 @@ import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { safeJsonParse } from '../../core/safe-json.js';
-import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../config.js';
+import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../../config/agent.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 

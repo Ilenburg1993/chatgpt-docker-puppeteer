@@ -9,13 +9,13 @@
  * @module copilot/server/routes/copilot-api/control
  */
 
-import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
-import { log } from '#copilot/observability';
-import { globalAuditTrail } from '#copilot/hooks';
 import { CHANNEL_VERSION } from '#copilot/channel';
-import { createConversationService } from '../../../services/conversation-service.js';
+import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
+import { globalAuditTrail } from '#copilot/hooks';
+import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
+import { createConversationService } from '../../../services/conversation-service.js';
 
 const conversationService = createConversationService();
 

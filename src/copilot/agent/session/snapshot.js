@@ -17,7 +17,7 @@ import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promise
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
-import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../config.js';
+import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/agent.js';
 import { readState } from '../lifecycle/state-io.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');

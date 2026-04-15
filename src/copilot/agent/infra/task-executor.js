@@ -13,7 +13,7 @@
 
 import { toError } from '#copilot/core';
 import { startSpanImmediate } from '#copilot/observability';
-import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../config.js';
+import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
 
 /**
  * @typedef {object} TaskExecutorCallbacks

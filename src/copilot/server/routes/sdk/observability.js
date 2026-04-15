@@ -33,9 +33,9 @@ import {
     isOtelEnabled,
     log,
 } from '#copilot/observability';
-import { createAuditService } from '../../../services/audit-service.js';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
+import { createAuditService } from '../../../services/audit-service.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 const auditService = createAuditService();

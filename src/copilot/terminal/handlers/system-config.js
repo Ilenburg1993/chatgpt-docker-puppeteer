@@ -9,7 +9,7 @@
  * @see module:copilot/terminal/route-table
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { ALWAYS_ALIVE_AGENT, setBackgroundCompactionThreshold } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
@@ -23,7 +23,6 @@ import {
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
-import { setBackgroundCompactionThreshold } from '#copilot/agent';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

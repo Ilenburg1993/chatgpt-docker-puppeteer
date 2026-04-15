@@ -8,9 +8,9 @@
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges';
-import { toError, container } from '#copilot/core';
-import { log } from '#copilot/observability';
 import { llmBridgeClient } from '#copilot/channel';
+import { container, toError } from '#copilot/core';
+import { log } from '#copilot/observability';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     clearAttachments,
@@ -101,7 +101,10 @@ async function _doEnsureDialogLoop() {
         } catch (err) {
             attempt++;
             if (attempt > MAX_RETRIES) {
-                log('ERROR', `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${toError(err).message}`);
+                log(
+                    'ERROR',
+                    `[dialog] ensureDialogLoop falhou após ${MAX_RETRIES} tentativas: ${toError(err).message}`,
+                );
                 emitNerv('copilot:dialog:boot_failed', {
                     error: toError(err).message,
                     attempts: MAX_RETRIES,

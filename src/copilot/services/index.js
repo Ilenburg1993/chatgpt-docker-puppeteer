@@ -4,8 +4,7 @@
  *
  * Barrel canônico do módulo `services/` — fachadas de alto nível para subsistemas.
  *
- * Consumido via imports diretos (`../../../services/audit-service.js` etc.)
- * pelos sub-routers em `server/routes/sdk/`.
+ * Consumido via imports diretos (`../../../services/audit-service.js` etc.) pelos sub-routers em `server/routes/sdk/`.
  *
  * @module copilot/services
  */

@@ -12,7 +12,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../config.js';
+import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
 
 /**

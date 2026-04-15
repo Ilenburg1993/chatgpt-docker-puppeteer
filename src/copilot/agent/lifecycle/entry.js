@@ -46,7 +46,7 @@ import {
     DRAIN_WRITES_TIMEOUT_MS,
     PING_TIMEOUT_MS,
     RESTART_DELAY_MS,
-} from '../config.js';
+} from '../../config/agent.js';
 import { drainStateWrites } from './state-io.js';
 
 /**

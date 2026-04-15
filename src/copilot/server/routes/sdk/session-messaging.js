@@ -9,7 +9,6 @@
  */
 
 import { log } from '#copilot/observability';
-import { createSessionService } from '../../../services/session-service.js';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import {
@@ -18,6 +17,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { createSessionService } from '../../../services/session-service.js';
 import {
     rateLimitMiddleware,
     SendMessageBodySchema,

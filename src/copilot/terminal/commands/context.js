@@ -12,8 +12,8 @@
  */
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
 import { llmBridgeClient } from '#copilot/channel';
+import { container } from '#copilot/core';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 // ─── Estimativa de tokens ─────────────────────────────────────────────────────

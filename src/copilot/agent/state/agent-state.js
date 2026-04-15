@@ -12,7 +12,7 @@
  */
 
 import { AGENT_EVENTS } from '#copilot/events';
-import { STATUS_SNAPSHOT_TTL_MS } from '../config.js';
+import { STATUS_SNAPSHOT_TTL_MS } from '../../config/agent.js';
 import { buildStatusSnapshot } from '../infra/status-snapshot.js';
 import { readState } from '../lifecycle/state-io.js';
 

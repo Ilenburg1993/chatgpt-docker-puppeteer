@@ -17,7 +17,7 @@ import { EventEmitter } from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 
-import { MAX_LISTENERS } from './config.js';
+import { MAX_LISTENERS } from '../config/agent.js';
 import {
     ensureDialogLoopAttached as dialogEnsureAttached,
     dialogResume,

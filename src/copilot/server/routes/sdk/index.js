@@ -5,6 +5,7 @@
  * Router canônico da SDK API — monta sub-routers modulares do GitHub Copilot SDK sob /sdk.
  *
  * Rotas expostas (com prefixo /sdk):
+ *
  * - GET /sdk/ping, /sdk/status, /sdk/auth, /sdk/models, /sdk/tools, /sdk/client/*
  * - GET /sdk/sessions, /sdk/sessions/active, /sdk/sessions/last, /sdk/sessions/:id e sub-rotas
  * - GET /sdk/agent/info, /sdk/agent/tools, /sdk/agent/telemetry, /sdk/agent/state, /sdk/agent/stream
@@ -19,9 +20,9 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
+import { Router } from 'express';
 import { createSessionService } from '../../../services/session-service.js';
 import { createToolService } from '../../../services/tool-service.js';
-import { Router } from 'express';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
@@ -31,8 +32,7 @@ import sessionsRouter from './sessions.js';
 /**
  * Cria o router principal da SDK API com injeção de dependências.
  *
- * Os sub-routers recebem dependências explícitas em vez de importar singletons,
- * facilitando testes e desacoplamento.
+ * Os sub-routers recebem dependências explícitas em vez de importar singletons, facilitando testes e desacoplamento.
  *
  * @returns {import('express').Router}
  */

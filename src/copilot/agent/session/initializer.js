@@ -20,7 +20,7 @@ import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config
 import { log } from '#copilot/observability';
 import { getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
-import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../config.js';
+import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../../config/agent.js';
 import { readStateAsync as _readStateAsync, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
 

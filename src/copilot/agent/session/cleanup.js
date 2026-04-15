@@ -14,7 +14,7 @@
 
 import { log, startSpan } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk';
-import { SESSION_MAX_AGE_MS } from '../config.js';
+import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
 
 /**

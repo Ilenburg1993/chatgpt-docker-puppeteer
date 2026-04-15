@@ -9,16 +9,16 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { toError, container } from '#copilot/core';
 import {
+    ALWAYS_ALIVE_AGENT,
     createSnapshot,
     listSnapshotsAsync,
     loadSnapshotAsync,
     saveSnapshotAsync,
 } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel';
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
+import { container, toError } from '#copilot/core';
 import { getWorkspaceContext } from '../workspace-context.js';
 
 /**

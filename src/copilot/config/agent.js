@@ -1,13 +1,11 @@
 // @ts-check
 /**
- * src/copilot/agent/config.js
+ * src/copilot/config/agent.js
  *
  * Configuração centralizada do agente. Importa variáveis base de `config/env.js` (SSOT) e re-exporta com nomes
  * semânticos para o subsistema agent/. Constantes derivadas (não-env) permanecem aqui.
  *
- * Módulos internos do agent/ devem importar daqui em vez de ler `process.env` diretamente.
- *
- * @module copilot/agent/config
+ * @module copilot/config/agent
  * @see EventBus
  */
 

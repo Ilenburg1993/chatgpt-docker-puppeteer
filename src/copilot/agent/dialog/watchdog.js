@@ -10,7 +10,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { WATCHDOG_THRESHOLDS } from '../config.js';
+import { WATCHDOG_THRESHOLDS } from '../../config/agent.js';
 
 /**
  * @typedef {Object} DialogWatchdogOptions

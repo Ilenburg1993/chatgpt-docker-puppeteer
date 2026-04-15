@@ -11,8 +11,8 @@
  * @see module:copilot/hooks/factory
  */
 
-import { log } from './logger.js';
 import { toError } from '../core/error-handlers.js';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').PreToolUseHandler} PreToolUseHandler
@@ -203,8 +203,8 @@ export function memoize(handler, keyFn) {
  */
 
 /**
- * Combina middlewares em estilo Koa/Express. Cada middleware recebe `(input, invocation, next)`
- * e pode modificar o fluxo chamando `next()` ou retornando diretamente.
+ * Combina middlewares em estilo Koa/Express. Cada middleware recebe `(input, invocation, next)` e pode modificar o
+ * fluxo chamando `next()` ou retornando diretamente.
  *
  * @example
  *     const hook = middleware(
@@ -244,9 +244,7 @@ export function middleware(...middlewares) {
             const mw = middlewares[i];
             if (!mw) return Promise.resolve(undefined);
             try {
-                return Promise.resolve(
-                    mw(inp, inv, (nextInput, nextInv) => dispatch(i + 1, nextInput, nextInv)),
-                );
+                return Promise.resolve(mw(inp, inv, (nextInput, nextInv) => dispatch(i + 1, nextInput, nextInv)));
             } catch (e) {
                 return Promise.reject(e instanceof Error ? e : new Error(String(e)));
             }
@@ -257,8 +255,8 @@ export function middleware(...middlewares) {
 }
 
 /**
- * Cria um middleware de logging que registra entrada e saída de cada hook call.
- * Útil para debug e auditoria em pipeline composto.
+ * Cria um middleware de logging que registra entrada e saída de cada hook call. Útil para debug e auditoria em pipeline
+ * composto.
  *
  * @template TInput, TOutput
  * @param {string} label - Label para identificação nos logs
@@ -274,8 +272,8 @@ export function loggingMiddleware(label) {
 }
 
 /**
- * Cria um middleware que executa o handler apenas para tools específicas.
- * Para outras tools, chama `next()` diretamente (bypass).
+ * Cria um middleware que executa o handler apenas para tools específicas. Para outras tools, chama `next()` diretamente
+ * (bypass).
  *
  * @param {string[]} toolNames - Nomes de tools para interceptar
  * @param {import('./types.js').HookMiddleware<PreToolUseHookInput, PreToolUseHookOutput>} mw

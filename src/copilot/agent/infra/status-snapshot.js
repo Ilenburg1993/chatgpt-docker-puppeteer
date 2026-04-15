@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { STARVATION_THRESHOLD_MS } from '../config.js';
+import { STARVATION_THRESHOLD_MS } from '../../config/agent.js';
 
 /**
  * @typedef {import('../types.js').AgentStatusSnapshot} AgentStatusSnapshot

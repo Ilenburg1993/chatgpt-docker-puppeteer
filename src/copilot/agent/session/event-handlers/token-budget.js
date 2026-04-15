@@ -7,7 +7,7 @@
 
 import { log } from '#copilot/observability';
 import { SESSION_EVENTS } from '#copilot/sdk';
-import { CONTEXT_UTIL_WARN_THRESHOLD } from '../../config.js';
+import { CONTEXT_UTIL_WARN_THRESHOLD } from '../../../config/agent.js';
 
 /**
  * @param {{ currentTokens: number; tokenLimit: number }} usageData

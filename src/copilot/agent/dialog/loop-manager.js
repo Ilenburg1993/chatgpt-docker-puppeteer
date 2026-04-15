@@ -36,7 +36,7 @@ import {
     RESUME_QUESTION_WAIT_MS,
     WATCHDOG_INTERVAL_MS,
     WATCHDOG_STALL_MS,
-} from '../config.js';
+} from '../../config/agent.js';
 import { readState, readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { TurnQueue } from './backpressure.js';
 import { ModelFallbackState } from './model-fallback.js';

@@ -85,11 +85,17 @@ export function getProjectDefaults() {
  * Campos do tipo array (tools, availableTools, excludedTools, customAgents, skillDirectories, disabledSkills) são
  * SUBSTITUÍDOS (não concatenados). Campos objeto (infiniteSessions, systemMessage, provider) fazem shallow merge.
  *
+ * @deprecated Use SessionConfigBuilder de `#copilot/config/session-config` em vez desta função. Será removida na M-04.
  * @param {Partial<SessionConfig>} [input={}] - Overrides de maior prioridade. Default is `{}`
  * @param {Partial<SessionConfig>} [defaults={}] - Overrides intermediários. Default is `{}`
  * @returns {SessionConfig}
  */
+let _buildSessionConfigWarned = false;
 export function buildSessionConfig(input = {}, defaults = {}) {
+    if (!_buildSessionConfigWarned) {
+        console.warn('[DEPRECATED] buildSessionConfig — use SessionConfigBuilder from #copilot/config/session-config');
+        _buildSessionConfigWarned = true;
+    }
     const base = getProjectDefaults();
 
     /** @type {Record<string, unknown>} */

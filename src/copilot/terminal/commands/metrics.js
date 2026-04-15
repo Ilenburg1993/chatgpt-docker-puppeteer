@@ -9,9 +9,9 @@
  */
 
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { llmBridgeClient } from '#copilot/channel';
 import { container } from '#copilot/core';
 import { ERROR_TRACKER, getToolStats } from '#copilot/observability';
-import { llmBridgeClient } from '#copilot/channel';
 
 /**
  * @typedef {object} MetricsContext
