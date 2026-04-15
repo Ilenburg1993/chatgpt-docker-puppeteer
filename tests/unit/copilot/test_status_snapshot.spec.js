@@ -9,11 +9,11 @@
 import assert from 'node:assert/strict';
 import { describe, it, before } from 'node:test';
 
-/** @type {typeof import('#copilot/agent/infra/status-snapshot').buildStatusSnapshot} */
+/** @type {typeof import('#copilot/observability/snapshots').buildStatusSnapshot} */
 let buildStatusSnapshot;
 
 before(async () => {
-    ({ buildStatusSnapshot } = await import('#copilot/agent/infra/status-snapshot'));
+    ({ buildStatusSnapshot } = await import('#copilot/observability/snapshots'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ before(async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('buildStatusSnapshot() › campos obrigatórios', () => {
-    /** @returns {import('#copilot/agent/infra/status-snapshot').SnapshotParams} */
+    /** @returns {import('#copilot/observability/snapshots').SnapshotParams} */
     const baseParams = () => ({
         status: 'idle',
         sessionId: null,

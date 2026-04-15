@@ -179,7 +179,7 @@ describe('F178 — Pipeline zero-bypass dos módulos mais críticos', () => {
 
     const CRITICAL_FILES = [
         { path: 'src/copilot/tools/tool-factory.js', label: 'tool-factory' },
-        { path: 'src/copilot/agent/infra/tools-bootstrap.js', label: 'tools-bootstrap' },
+        { path: 'src/copilot/tools/bootstrap.js', label: 'tools-bootstrap' },
         { path: 'src/copilot/api/express/client.js', label: 'api/client' },
         { path: 'src/copilot/api/express/session-messaging.js', label: 'api/session-messaging' },
         { path: 'src/copilot/agent/dialog/loop-manager.js', label: 'loop-manager' },

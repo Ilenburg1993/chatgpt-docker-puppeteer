@@ -19,11 +19,11 @@ import { EMITTER_PERMISSION_MODE_CHANGED, EMITTER_PROCESS_QUEUE, EMITTER_STATUS 
 import { log } from '#copilot/observability';
 import { createRegistry } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
+import { PermissionController } from '../hooks/permission-controller.js';
+import { WebhookManager } from '../infra/webhooks.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
-import { PermissionController } from './infra/permission-controller.js';
-import { WebhookManager } from './infra/webhook-manager.js';
 import { SessionMessagesCache } from './session/history-sync.js';
 import { SessionKeepalive } from './session/keepalive.js';
 

@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * src/copilot/agent/infra/permission-controller.js
+ * src/copilot/hooks/permission-controller.js
  *
  * Controlador de modo de permissão SDK em runtime. Encapsula a lógica de troca de `PermissionHandler` entre os modos
  * `approve_all`, `audit_only` e `selective` — sem reiniciar o agente.
  *
  * Extrai responsabilidade de `always-alive.js` para isolar o ciclo de vida da permissão.
  *
- * @module copilot/agent/infra/permission-controller
+ * @module copilot/hooks/permission-controller
  * @see EventBus
  * @see module:copilot/hooks/permission
  * @see module:copilot/tools/permission-tools
@@ -17,7 +17,7 @@ import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config';
 import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/hooks';
 import { log } from '#copilot/observability';
 import { approveAll } from '#copilot/sdk';
-import { PERMISSION_MODE } from '../../config/agent.js';
+import { PERMISSION_MODE } from '../config/agent.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

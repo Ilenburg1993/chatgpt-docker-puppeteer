@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/agent/infra/webhook-manager
+ * @module copilot/infra/webhooks
  * @file WebhookManager — gerencia webhooks de notificação de eventos do agente.
  *
  *   Encapsula o registro, remoção e disparo de webhooks HTTP(S), extraído de `always-alive.js` para facilitar testes e
@@ -9,9 +9,9 @@
  */
 
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config';
-import { toError, ConfigError, checkResolvedIp, validateWebhookUrl } from '#copilot/core';
+import { ConfigError, checkResolvedIp, toError, validateWebhookUrl } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../../config/agent.js';
+import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '../config/agent.js';
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry

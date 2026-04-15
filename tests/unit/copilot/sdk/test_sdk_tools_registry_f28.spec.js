@@ -55,12 +55,12 @@ const ROOT = '/workspaces/chatgpt-docker-puppeteer';
 
 describe('F133 — tools-bootstrap não importa sdk/tools-registry diretamente', () => {
     it('tools-bootstrap.js não contém import de #copilot/sdk/tools-registry', () => {
-        const src = readFileSync(join(ROOT, 'src/copilot/agent/infra/tools-bootstrap.js'), 'utf8');
+        const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
         expect(src).not.toContain("from '#copilot/sdk/tools-registry'");
     });
 
     it('tools-bootstrap.js contém import de registerTools vindo de #copilot/sdk', () => {
-        const src = readFileSync(join(ROOT, 'src/copilot/agent/infra/tools-bootstrap.js'), 'utf8');
+        const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
         expect(src).toContain("registerTools } from '#copilot/sdk'");
     });
 });

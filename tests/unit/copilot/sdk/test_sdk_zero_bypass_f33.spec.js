@@ -166,7 +166,7 @@ describe('F168 — api/express/ sem bypass direto de SDK', () => {
 
 describe('F169 — agent/ sem bypass direto de SDK', () => {
     const AGENT_FILES = [
-        'src/copilot/agent/infra/tools-bootstrap.js',
+        'src/copilot/tools/bootstrap.js',
         'src/copilot/agent/dialog/loop-manager.js',
         'src/copilot/agent/lifecycle/agent-lifecycle.js',
         'src/copilot/agent/session/initializer.js',

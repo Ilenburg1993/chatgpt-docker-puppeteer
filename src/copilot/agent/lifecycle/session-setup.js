@@ -20,8 +20,8 @@ import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
 
 import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
+import { bootstrapTools, setExperimentalSession, setSessionRpc } from '../../tools/bootstrap.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
-import { bootstrapTools, setExperimentalSession, setSessionRpc } from '../infra/tools-bootstrap.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

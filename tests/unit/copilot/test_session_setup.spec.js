@@ -25,7 +25,7 @@ vi.mock('#copilot/hooks/session-hooks', () => ({
         onErrorOccurred: vi.fn(),
     })),
 }));
-vi.mock('../../../src/copilot/agent/infra/tools-bootstrap.js', () => ({
+vi.mock('../../../src/copilot/tools/bootstrap.js', () => ({
     bootstrapTools: vi.fn((_registry, mcpTools) => ['tool1', 'tool2', ...mcpTools]),
     setSessionRpc: vi.fn(),
 }));
@@ -33,7 +33,6 @@ vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
-import { setSessionRpc } from '../../../src/copilot/agent/infra/tools-bootstrap.js';
 import {
     buildSessionHooks,
     buildSessionOptions,
@@ -41,6 +40,7 @@ import {
     finalizeSessionInit,
 } from '../../../src/copilot/agent/lifecycle/session-setup.js';
 import { buildMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
+import { setSessionRpc } from '../../../src/copilot/tools/bootstrap.js';
 
 describe('session-setup (F63)', () => {
     /** @type {any} */

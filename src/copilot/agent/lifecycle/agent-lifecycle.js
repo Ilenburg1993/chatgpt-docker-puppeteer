@@ -36,7 +36,7 @@ import { logSwallowed } from '../../core/error-handlers.js';
 
 import { getHubSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
-import { setExperimentalSession, setSessionRpc } from '../infra/tools-bootstrap.js';
+import { setExperimentalSession, setSessionRpc } from '../../tools/bootstrap.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,

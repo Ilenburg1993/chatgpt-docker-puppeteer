@@ -283,13 +283,13 @@ describe('F44 — buildHookSystemContextSafe', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F44 — WebhookManager', () => {
-    /** @type {import('#copilot/agent/infra/webhook-manager').WebhookManager} */
+    /** @type {import('#copilot/infra/webhooks').WebhookManager} */
     let wm;
 
     beforeEach(async () => {
         vi.clearAllMocks();
         mocks.validateWebhookUrl.mockImplementation(() => {});
-        const mod = await import('#copilot/agent/infra/webhook-manager');
+        const mod = await import('#copilot/infra/webhooks');
         wm = new mod.WebhookManager();
     });
 

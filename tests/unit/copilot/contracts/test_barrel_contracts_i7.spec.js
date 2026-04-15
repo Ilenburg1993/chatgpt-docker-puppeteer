@@ -166,7 +166,7 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
     const INTENTIONAL_ALIASES = new Set(['#copilot/config/custom-tools-registry', '#copilot/config/tools-state']);
 
     /** Arquivos com exceção explícita (usa alias intencional) */
-    const ALLOWED_FILES = new Set(['agent/infra/tools-bootstrap.js', 'sdk/models/helpers.js']);
+    const ALLOWED_FILES = new Set(['tools/bootstrap.js', 'sdk/models/helpers.js']);
 
     it('no prohibited deep imports in src/copilot/ JS files', async () => {
         const copilotDir = join(process.cwd(), 'src', 'copilot');

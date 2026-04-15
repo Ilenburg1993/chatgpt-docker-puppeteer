@@ -1,26 +1,26 @@
 // @ts-check
 /**
- * src/copilot/agent/infra/status-snapshot.js
+ * src/copilot/observability/snapshots.js
  *
  * Função pura para construir o snapshot de status do AlwaysAliveAgent.
  *
  * Recebe um objeto `params` com todos os dados necessários, sem acesso a estado mutable, o que facilita o teste
  * unitário e desacopla a lógica de construção do snapshot do agente.
  *
- * @module copilot/agent/infra/status-snapshot
+ * @module copilot/observability/snapshots
  * @see EventBus
  */
 
-import { STARVATION_THRESHOLD_MS } from '../../config/agent.js';
+import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
 
 /**
- * @typedef {import('../types.js').AgentStatusSnapshot} AgentStatusSnapshot
+ * @typedef {import('../agent/types.js').AgentStatusSnapshot} AgentStatusSnapshot
  *
- * @typedef {import('../types.js').AgentStatus} AgentStatus
+ * @typedef {import('../agent/types.js').AgentStatus} AgentStatus
  *
- * @typedef {import('../types.js').AgentTask} AgentTask
+ * @typedef {import('../agent/types.js').AgentTask} AgentTask
  *
- * @typedef {import('../types.js').PendingQuestion} PendingQuestion
+ * @typedef {import('../agent/types.js').PendingQuestion} PendingQuestion
  */
 
 /**

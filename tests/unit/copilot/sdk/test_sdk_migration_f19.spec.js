@@ -54,7 +54,7 @@ const ALL_NON_SDK_JS = collectJsFiles(SRC_COPILOT).filter((f) => !f.startsWith('
 const F19_MIGRATED = [
     'config/system-prompt.js',
     'api/express/session-crud.js',
-    'agent/infra/permission-controller.js',
+    'hooks/permission-controller.js',
     'hooks/permission-handler.js',
     'agent/lifecycle/agent-lifecycle.js',
     'agent/lifecycle/entry.js',
@@ -114,7 +114,7 @@ describe('F19 — Zero imports diretos de @github/copilot-sdk fora de sdk/', () 
 describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
     describe('Arquivos com approveAll', () => {
         // session-crud.js importa approveAll de #copilot/services (re-export); config/session-config.js e audit/pipeline.js não usam mais approveAll
-        const approveAllFiles = ['agent/infra/permission-controller.js', 'hooks/permission-handler.js'];
+        const approveAllFiles = ['hooks/permission-controller.js', 'hooks/permission-handler.js'];
 
         for (const file of approveAllFiles) {
             it(`${file}: approveAll importado de #copilot/sdk`, () => {
