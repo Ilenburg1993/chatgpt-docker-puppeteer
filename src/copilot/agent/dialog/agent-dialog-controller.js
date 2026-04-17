@@ -16,6 +16,13 @@ import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../config/agent.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
+import {
+    assertEmitterHost,
+    normalizeCompactionComplete,
+    normalizeTokenBudgetWarning,
+    trySetLiveSessionModel,
+} from '../runtime-contracts.js';
 import { wireDialogLoopEvents } from './loop-manager.js';
 
 /**
@@ -23,6 +30,58 @@ import { wireDialogLoopEvents } from './loop-manager.js';
  */
 
 /** @typedef {import('../types.js').DialogHost} DialogHost */
+
+/**
+ * @param {'retry' | 'fatal' | 'ignore'} disposition
+ * @returns {'WARN' | 'ERROR' | 'INFO'}
+ */
+function toDialogPolicyLevel(disposition) {
+    if (disposition === 'fatal') return 'ERROR';
+    if (disposition === 'ignore') return 'INFO';
+    return 'WARN';
+}
+
+/**
+ * @param {string} label
+ * @param {() => Promise<void>} operation
+ * @returns {Promise<void>}
+ */
+async function runDialogOperationWithPolicy(label, operation) {
+    const result = await withAgentErrorPolicy(operation, {
+        onError: (error, disposition) => {
+            log(
+                toDialogPolicyLevel(disposition),
+                `[DialogController] ${label} falhou (${disposition}): ${error.message}`,
+            );
+        },
+    });
+    if (!result.ok) {
+        throw result.error;
+    }
+}
+
+/**
+ * Reinicia o keepalive quando houver sessão viva e o dialog loop não estiver ativo.
+ *
+ * @param {AgentContext} ctx
+ * @param {DialogHost} host
+ * @returns {void}
+ */
+function startKeepaliveIfPossible(ctx, host) {
+    if (ctx.status === 'stopped' || !ctx.session) {
+        return;
+    }
+    ctx.keepalive.start({
+        getSession: () => ctx.session,
+        getClient: () => ctx.client,
+        isIdle: () => ctx.status === 'idle',
+        isDialogLoopActive: () => ctx.dialogLoop.active,
+        onKeepalive: (/** @type {number} */ ts) => {
+            container.resolve(METRICS_STORE).recordKeepalivePing();
+            host.emit(EMITTER_SESSION_KEEPALIVE, { ts });
+        },
+    });
+}
 
 /**
  * Inicia o dialog loop com validações de estado e health check de contexto.
@@ -33,15 +92,15 @@ import { wireDialogLoopEvents } from './loop-manager.js';
  * @returns {Promise<void>}
  */
 export async function dialogStart(ctx, host, bootPrompt) {
-    if (ctx.runtimeState.status !== 'idle') {
+    if (ctx.status !== 'idle') {
         throw new SessionError(
-            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.runtimeState.status}'`,
+            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.status}'`,
             'INVALID_STATE',
         );
     }
     // F44.1 (GAP-SD-08): health check pre-boot
-    if (ctx.sessionState.contextState) {
-        const utilization = ctx.sessionState.contextState.utilization ?? 0;
+    if (ctx.contextState) {
+        const utilization = ctx.contextState.utilization ?? 0;
         if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
             throw new SessionError(
                 `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
@@ -57,8 +116,13 @@ export async function dialogStart(ctx, host, bootPrompt) {
     }
     ensureDialogLoopAttached(ctx, host);
     // F42.2: pausar keepalive enquanto dialog loop está ativo
-    ctx.keepalive.stop();
-    await ctx.dialogLoop.start(bootPrompt);
+    ctx.keepalive.stop('dialog_loop_active');
+    try {
+        await runDialogOperationWithPolicy('dialog.start', () => ctx.dialogLoop.start(bootPrompt));
+    } catch (error) {
+        startKeepaliveIfPossible(ctx, host);
+        throw error;
+    }
     host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: true, ts: Date.now() });
 }
 
@@ -75,20 +139,9 @@ export async function dialogStart(ctx, host, bootPrompt) {
  * @returns {Promise<void>}
  */
 export async function dialogStop(ctx, host, opts) {
-    await ctx.dialogLoop.stop(opts);
+    await runDialogOperationWithPolicy('dialog.stop', () => ctx.dialogLoop.stop(opts));
     // F42.2: reiniciar keepalive quando dialog loop para
-    if (ctx.runtimeState.status !== 'stopped' && ctx.sessionState.session) {
-        ctx.keepalive.start({
-            getSession: () => ctx.sessionState.session,
-            getClient: () => ctx.ioState.client,
-            isIdle: () => ctx.runtimeState.status === 'idle',
-            isDialogLoopActive: () => ctx.dialogLoop.active,
-            onKeepalive: (/** @type {number} */ ts) => {
-                container.resolve(METRICS_STORE).recordKeepalivePing();
-                host.emit(EMITTER_SESSION_KEEPALIVE, { ts });
-            },
-        });
-    }
+    startKeepaliveIfPossible(ctx, host);
 }
 
 /**
@@ -98,13 +151,13 @@ export async function dialogStop(ctx, host, opts) {
  * @returns {Promise<void>}
  */
 export async function dialogResume(ctx) {
-    if (ctx.runtimeState.status !== 'idle' && ctx.runtimeState.status !== 'waiting_for_input') {
+    if (ctx.status !== 'idle' && ctx.status !== 'waiting_for_input') {
         throw new SessionError(
-            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.runtimeState.status}'`,
+            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.status}'`,
             'INVALID_STATE',
         );
     }
-    await ctx.dialogLoop.resume();
+    await runDialogOperationWithPolicy('dialog.resume', () => ctx.dialogLoop.resume());
 }
 
 /**
@@ -115,47 +168,36 @@ export async function dialogResume(ctx) {
  * @param {DialogHost} host
  */
 export function ensureDialogLoopAttached(ctx, host) {
+    const emitterHost = assertEmitterHost(host, 'DialogHost');
+
     /** @type {import('./loop-manager.js').AgentHost} */
     const agentHost = {
         sendMessage: (msg, opts) => host.sendMessage(msg, opts),
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),
         answerPendingQuestion: (answer) => host.answerPendingQuestion(answer),
         getSessionId: () => host.sessionId,
-        getModel: () => ctx.configState.model,
+        getModel: () => ctx.model,
         setModel: (modelId) => {
-            ctx.configState.model = modelId;
-            // F72: propagar ao SDK se sessão estiver ativa (mesma lógica do always-alive.setModel)
-            const sdkSess = /** @type {{ setModel?: (id: string) => void }} */ (ctx.sessionState.session);
-            if (sdkSess && typeof sdkSess.setModel === 'function') {
-                try {
-                    sdkSess.setModel(modelId);
-                } catch (_) {
-                    /* SDK opcional */
-                }
-            }
+            ctx.setModel(modelId);
+            trySetLiveSessionModel(ctx.session, modelId, 'AlwaysAlive');
         },
-        getPendingQuestion: () => ctx.dialogState.pendingQuestion,
+        getPendingQuestion: () => ctx.pendingQuestion,
         trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
     };
     // Sempre atualiza host — necessário após reconexão.
     ctx.dialogLoop.attach(agentHost);
     // Wiring de eventos: somente na primeira vez.
-    if (ctx.dialogState.dialogLoopAttached) return;
-    ctx.dialogState.dialogLoopAttached = true;
+    if (ctx.dialogLoopAttached) return;
+    ctx.setDialogLoopAttached(true);
     wireDialogLoopEvents(ctx.dialogLoop, (event, payload) => host.emit(event, payload));
 
     // F31.3/F31.4: Proxy token_budget_warning → DLM
-    host.on('session.token_budget_warning', (rawEvt) => {
-        const evt = /** @type {{ ratio?: number; currentTokens?: number; tokenLimit?: number }} */ (rawEvt);
-        const ratio = typeof evt?.ratio === 'number' ? evt.ratio : 0;
-        const currentTokens = typeof evt?.currentTokens === 'number' ? evt.currentTokens : 0;
-        const tokenLimit = typeof evt?.tokenLimit === 'number' ? evt.tokenLimit : 0;
-        ctx.dialogLoop.handleTokenBudget({ currentTokens, tokenLimit, ratio });
+    emitterHost.on('session.token_budget_warning', (rawEvt) => {
+        ctx.dialogLoop.handleTokenBudget(normalizeTokenBudgetWarning(rawEvt));
     });
 
     // F31.3: Reset compaction flag
-    host.on('session.compaction_complete', (rawEvt) => {
-        const evt = /** @type {{ success?: boolean }} */ (rawEvt);
-        if (evt?.success) ctx.dialogLoop.resetCompactionFlag();
+    emitterHost.on('session.compaction_complete', (rawEvt) => {
+        if (normalizeCompactionComplete(rawEvt).success) ctx.dialogLoop.resetCompactionFlag();
     });
 }

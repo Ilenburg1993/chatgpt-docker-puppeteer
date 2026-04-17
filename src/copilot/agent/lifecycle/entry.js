@@ -15,18 +15,27 @@
  * @see EventBus
  */
 
-import { toError, EVENT_BUS,
+import {
+    EVENT_BUS,
     TimeoutError,
     bridgeEmitter,
     container,
     registerShutdownHandler,
     runShutdown,
+    toError,
     withRetry,
 } from '#copilot/core';
 import { defaultBus } from '#copilot/hooks';
 import { ERROR_TRACKER, log } from '#copilot/observability';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import { CopilotClient } from '#copilot/sdk';
+import {
+    BOOT_MAX_RETRIES,
+    COPILOT_MODEL,
+    DRAIN_WRITES_TIMEOUT_MS,
+    PING_TIMEOUT_MS,
+    RESTART_DELAY_MS,
+} from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
     EMITTER_ERROR,
@@ -39,14 +48,7 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../events/index.js';
-import { alwaysAliveAgent } from '../always-alive.js';
-import {
-    BOOT_MAX_RETRIES,
-    COPILOT_MODEL,
-    DRAIN_WRITES_TIMEOUT_MS,
-    PING_TIMEOUT_MS,
-    RESTART_DELAY_MS,
-} from '../../config/agent.js';
+import { getAgent } from '../always-alive.js';
 import { drainStateWrites } from './state-io.js';
 
 /**
@@ -57,6 +59,8 @@ import { drainStateWrites } from './state-io.js';
  * @returns {Promise<void>}
  */
 export async function startAgentLoop() {
+    const agent = getAgent();
+
     // FAIXA-5A: descobrir e instalar plugins ao iniciar o processo
     {
         const _pluginRegistry = new PluginRegistry();
@@ -88,14 +92,14 @@ export async function startAgentLoop() {
         try {
             await withRetry(
                 async () => {
-                    await alwaysAliveAgent.start();
+                    await agent.start();
                 },
                 {
                     maxAttempts: BOOT_MAX_RETRIES,
                     baseDelayMs: RESTART_DELAY_MS,
                     maxDelayMs: RESTART_DELAY_MS * 4,
                     jitter: true,
-                    onRetry: (/** @type {unknown} */ err, /** @type {number} */ attempt) => {
+                    onRetry: (err, attempt) => {
                         const msg = err instanceof Error ? err.message : String(err);
                         log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${msg}`);
                         log('INFO', `[copilot/agent] Tentando novamente em ~${RESTART_DELAY_MS}ms...`);
@@ -124,7 +128,7 @@ export async function startAgentLoop() {
         'agent.stop',
         async () => {
             try {
-                await alwaysAliveAgent.stop();
+                await agent.stop();
                 log('INFO', '[copilot/agent] Agente parado.');
             } catch (e) {
                 log('WARN', `[copilot/agent] Erro no shutdown: ${toError(e).message}`);
@@ -158,7 +162,7 @@ export async function startAgentLoop() {
             if (cmd === 'ping') {
                 process.send?.({ ok: true, pong: true });
             } else if (cmd === 'status') {
-                process.send?.({ ok: true, status: alwaysAliveAgent.status });
+                process.send?.({ ok: true, status: agent.status });
             } else if (cmd === 'stop') {
                 log('INFO', '[copilot/agent] IPC stop recebido — encerrando...');
                 shutdown('IPC:stop').catch((e) => logSwallowed(e, 'agent.entry.ipcShutdown'));
@@ -169,16 +173,16 @@ export async function startAgentLoop() {
     }
 
     // Logar status periódico (evita PM2 matar o processo por inatividade)
-    alwaysAliveAgent.on(EMITTER_STATUS, (status) => {
+    agent.on(EMITTER_STATUS, (status) => {
         log('INFO', `[copilot/agent] Status: ${status}`);
     });
 
-    alwaysAliveAgent.on(EMITTER_ERROR, (err) => {
+    agent.on(EMITTER_ERROR, (err) => {
         log('ERROR', `[copilot/agent] Erro do agente: ${err.message}`);
     });
 
     // `session.fatal` indica que a sessão está irrecuperável. Encerrar o processo permite ao PM2 reiniciar imediatamente.
-    alwaysAliveAgent.on(EMITTER_SESSION_FATAL, (/** @type {Record<string, unknown>} */ evt) => {
+    agent.on(EMITTER_SESSION_FATAL, (/** @type {Record<string, unknown>} */ evt) => {
         const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
         log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
         void runShutdown('session.fatal').finally(() => {

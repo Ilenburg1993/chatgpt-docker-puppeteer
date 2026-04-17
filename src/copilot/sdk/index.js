@@ -47,12 +47,16 @@ export {
     getClientSession,
     getClientState,
     getClientStatus,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
+    getServerRpc,
     incrementSessionMessageCount,
     listActiveClientSessions,
     listAllClientSessions,
     listAvailableModels,
     pingClient,
     resumeClientSession,
+    setForegroundClientSessionId,
     stopClient,
 } from './session/client.js';
 

@@ -23,6 +23,54 @@ import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
 import { createPromptTransformer } from '../prompt-transformer.js';
 
+const SENSITIVE_TOOL_NAMES = new Set([
+    'run_shell_command',
+    'run_node_script',
+    'run_npm_script',
+    'shell.exec',
+    'shell.exec_command',
+]);
+
+const PERMANENT_DENY_ARG_PATTERNS = [
+    /\brm\s+-rf\b/i,
+    /:\(\)\s*\{\s*:\|:&\s*\};:/,
+    /\bmkfs(?:\.[a-z0-9_+-]+)?\b/i,
+    /\bdd\s+if=/i,
+    /\bshutdown\b/i,
+    /\breboot\b/i,
+    /\bcurl\b[^\n|]{0,400}\|\s*(?:sh|bash)\b/i,
+    /\bwget\b[^\n|]{0,400}\|\s*(?:sh|bash)\b/i,
+];
+
+/**
+ * @param {unknown} toolArgs
+ * @returns {string}
+ */
+function _stringifyToolArgs(toolArgs) {
+    if (typeof toolArgs === 'string') return toolArgs;
+    try {
+        return JSON.stringify(toolArgs);
+    } catch {
+        return String(toolArgs ?? '');
+    }
+}
+
+/**
+ * Retorna o pattern destrutivo encontrado em toolArgs, quando aplicável.
+ *
+ * @param {string} toolName
+ * @param {unknown} toolArgs
+ * @returns {string | null}
+ */
+function _matchPermanentDenyPattern(toolName, toolArgs) {
+    if (!SENSITIVE_TOOL_NAMES.has(toolName)) return null;
+    const serializedArgs = _stringifyToolArgs(toolArgs);
+    for (const pattern of PERMANENT_DENY_ARG_PATTERNS) {
+        if (pattern.test(serializedArgs)) return pattern.source;
+    }
+    return null;
+}
+
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
  *
@@ -92,6 +140,14 @@ export function createProductionHooks(opts = {}) {
         isToolDisabled = () => false,
     } = opts;
 
+    if (toolAllowList.length === 0) {
+        console.warn('[preset/production] toolAllowList vazia — onPreToolUse ficará permissivo (allow-all).');
+    }
+
+    if (piiPatterns.length === 0) {
+        console.warn('[preset/production] piiPatterns vazio — prompts não terão redação de PII por padrão.');
+    }
+
     /**
      * @param {ProductionAuditEntry} entry
      */
@@ -130,10 +186,13 @@ export function createProductionHooks(opts = {}) {
     /**
      * @param {PreToolUseHookInput} input
      * @param {InvocationContext} invocation
-     * @returns {{ permissionDecision: 'allow' | 'deny' | 'ask' }}
+     * @returns {import('../types.js').PreToolUseHookOutput}
      */
     function onPreToolUse(input, invocation) {
-        const { toolName } = input;
+        const { toolName, toolArgs } = input;
+        const explicitlyAllowed = toolAllowList.includes(toolName);
+        const isSensitiveTool = SENSITIVE_TOOL_NAMES.has(toolName);
+        const matchedPermanentDenyPattern = _matchPermanentDenyPattern(toolName, toolArgs);
 
         audit({ ts: Date.now(), hookName: 'onPreToolUse', sessionId: invocation?.sessionId, toolName });
         emitBus({
@@ -164,6 +223,37 @@ export function createProductionHooks(opts = {}) {
                 decision: 'deny',
             });
             return { permissionDecision: 'deny' };
+        }
+
+        if (matchedPermanentDenyPattern) {
+            audit({
+                ts: Date.now(),
+                hookName: 'onPreToolUse',
+                sessionId: invocation?.sessionId,
+                toolName,
+                decision: 'deny',
+                meta: {
+                    reason: 'permanent_dangerous_pattern',
+                    pattern: matchedPermanentDenyPattern,
+                },
+            });
+            return {
+                permissionDecision: 'deny',
+                additionalContext:
+                    '[production] Execução bloqueada por regra permanente: comando com assinatura destrutiva detectada.',
+            };
+        }
+
+        if (isSensitiveTool && !explicitlyAllowed) {
+            audit({
+                ts: Date.now(),
+                hookName: 'onPreToolUse',
+                sessionId: invocation?.sessionId,
+                toolName,
+                decision: 'ask',
+                meta: { reason: 'sensitive_tool_default_guard' },
+            });
+            return { permissionDecision: 'ask' };
         }
 
         if (toolAllowList.length > 0 && !toolAllowList.includes(toolName)) {

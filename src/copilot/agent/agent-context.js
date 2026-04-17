@@ -48,6 +48,10 @@ import { SessionKeepalive } from './session/keepalive.js';
  * @typedef {import('./types.js').AgentRuntimeState} AgentRuntimeState
  *
  * @typedef {import('./types.js').AgentIOState} AgentIOState
+ *
+ * @typedef {import('./types.js').AgentBootReport} AgentBootReport
+ *
+ * @typedef {{ emit: (event: string | symbol, payload?: unknown) => boolean }} StatusEmitterLike
  */
 
 /**
@@ -143,6 +147,7 @@ export class AgentContext {
             mcpReconnectCancel: null,
             quotaMonitor: null,
             agentObserver: null,
+            lastBootReport: null,
         };
 
         // Compat grep-based contract: quotaMonitor = null
@@ -154,9 +159,7 @@ export class AgentContext {
         // Instanciar managers com callbacks para o emitter
         this.messageQueue = new MessageQueue({
             onEnqueue: () => emitter.emit(EMITTER_PROCESS_QUEUE),
-            onChanged: () => {
-                this.metricsState.statusSnapshotCache = null;
-            },
+            onChanged: () => this.invalidateStatusSnapshot(),
         });
 
         this.dialogLoop = new DialogLoopManager();
@@ -187,7 +190,11 @@ export class AgentContext {
 
     /** @param {CopilotClient | null} value */
     set client(value) {
-        this.ioState.client = value;
+        if (value === null) {
+            this.clearClient();
+            return;
+        }
+        this.setClient(value);
     }
 
     /** @returns {CopilotSession | null} */
@@ -197,7 +204,11 @@ export class AgentContext {
 
     /** @param {CopilotSession | null} value */
     set session(value) {
-        this.sessionState.session = value;
+        if (value === null) {
+            this.clearSession();
+            return;
+        }
+        this.setSession(value);
     }
 
     /** @returns {boolean} */
@@ -207,7 +218,7 @@ export class AgentContext {
 
     /** @param {boolean} value */
     set isReconnecting(value) {
-        this.sessionState.isReconnecting = value;
+        this.setReconnectState(value);
     }
 
     /** @returns {(() => void)[]} */
@@ -217,7 +228,7 @@ export class AgentContext {
 
     /** @param {(() => void)[]} value */
     set sessionEventUnsubscribers(value) {
-        this.sessionState.sessionEventUnsubscribers = value;
+        this.setSessionEventUnsubscribers(value);
     }
 
     /** @returns {AgentStatus} */
@@ -237,7 +248,7 @@ export class AgentContext {
 
     /** @param {boolean} value */
     set isResumed(value) {
-        this.sessionState.isResumed = value;
+        this.setIsResumed(value);
     }
 
     /** @returns {number} */
@@ -247,7 +258,7 @@ export class AgentContext {
 
     /** @param {number} value */
     set sendCount(value) {
-        this.metricsState.sendCount = value;
+        this.setSendCount(value);
     }
 
     /** @returns {PendingQuestion | null} */
@@ -257,7 +268,11 @@ export class AgentContext {
 
     /** @param {PendingQuestion | null} value */
     set pendingQuestion(value) {
-        this.dialogState.pendingQuestion = value;
+        if (value === null) {
+            this.clearPendingQuestion();
+            return;
+        }
+        this.setPendingQuestion(value);
     }
 
     /** @returns {{ snapshot: import('./types.js').AgentStatusSnapshot; at: number } | null} */
@@ -287,7 +302,7 @@ export class AgentContext {
 
     /** @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} value */
     set reasoningEffort(value) {
-        this.configState.reasoningEffort = value;
+        this.setReasoningEffort(value);
     }
 
     /** @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} */
@@ -297,7 +312,7 @@ export class AgentContext {
 
     /** @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} value */
     set lastPrInfo(value) {
-        this.metricsState.lastPrInfo = value;
+        this.setLastPrInfo(value);
     }
 
     /** @returns {{ tokens: number; tokenLimit: number; utilization: number } | null} */
@@ -307,7 +322,7 @@ export class AgentContext {
 
     /** @param {{ tokens: number; tokenLimit: number; utilization: number } | null} value */
     set contextState(value) {
-        this.sessionState.contextState = value;
+        this.setContextState(value);
     }
 
     /** @returns {string | null} */
@@ -317,7 +332,7 @@ export class AgentContext {
 
     /** @param {string | null} value */
     set lastCheckpointPath(value) {
-        this.sessionState.lastCheckpointPath = value;
+        this.setLastCheckpointPath(value);
     }
 
     /** @returns {ReturnType<typeof setInterval> | null} */
@@ -327,7 +342,11 @@ export class AgentContext {
 
     /** @param {ReturnType<typeof setInterval> | null} value */
     set metricsTimer(value) {
-        this.runtimeState.metricsTimer = value;
+        if (value === null) {
+            this.clearMetricsTimer();
+            return;
+        }
+        this.setMetricsTimer(value);
     }
 
     /** @returns {(() => void) | null} */
@@ -337,7 +356,11 @@ export class AgentContext {
 
     /** @param {(() => void) | null} value */
     set mcpReconnectCancel(value) {
-        this.runtimeState.mcpReconnectCancel = value;
+        if (value === null) {
+            this.clearMcpReconnectCancel();
+            return;
+        }
+        this.setMcpReconnectCancel(value);
     }
 
     /**
@@ -371,7 +394,11 @@ export class AgentContext {
 
     /** @param {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} value */
     set quotaMonitor(value) {
-        this.runtimeState.quotaMonitor = value;
+        if (value === null) {
+            this.clearQuotaMonitor();
+            return;
+        }
+        this.setQuotaMonitor(value);
     }
 
     /** @returns {boolean} */
@@ -381,7 +408,7 @@ export class AgentContext {
 
     /** @param {boolean} value */
     set dialogLoopAttached(value) {
-        this.dialogState.dialogLoopAttached = value;
+        this.setDialogLoopAttached(value);
     }
 
     /** @returns {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} */
@@ -391,7 +418,418 @@ export class AgentContext {
 
     /** @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} value */
     set agentObserver(value) {
-        this.runtimeState.agentObserver = value;
+        if (value === null) {
+            this.clearAgentObserver();
+            return;
+        }
+        this.setAgentObserver(value);
+    }
+
+    /** @returns {AgentBootReport | null} */
+    get bootReport() {
+        return this.runtimeState.lastBootReport;
+    }
+
+    /** @param {AgentBootReport | null} value */
+    set bootReport(value) {
+        this.setBootReport(value);
+    }
+
+    /**
+     * Atualiza o cliente SDK ativo.
+     *
+     * @param {CopilotClient} client
+     * @returns {void}
+     */
+    setClient(client) {
+        this.ioState.client = client;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Remove o cliente SDK ativo.
+     *
+     * @returns {void}
+     */
+    clearClient() {
+        if (this.ioState.client === null) {
+            return;
+        }
+        this.ioState.client = null;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza a sessão SDK ativa.
+     *
+     * @param {CopilotSession} session
+     * @returns {void}
+     */
+    setSession(session) {
+        this.sessionState.session = session;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Remove a sessão SDK ativa.
+     *
+     * @returns {void}
+     */
+    clearSession() {
+        if (this.sessionState.session === null) {
+            return;
+        }
+        this.sessionState.session = null;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza a flag de sessão retomada.
+     *
+     * @param {boolean} isResumed
+     * @returns {void}
+     */
+    setIsResumed(isResumed) {
+        this.sessionState.isResumed = isResumed;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza a flag de reconexão em andamento.
+     *
+     * @param {boolean} isReconnecting
+     * @returns {void}
+     */
+    setReconnectState(isReconnecting) {
+        this.sessionState.isReconnecting = isReconnecting;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Substitui a lista de unsubscribers da sessão por uma cópia defensiva.
+     *
+     * @param {(() => void)[]} unsubs
+     * @returns {void}
+     */
+    setSessionEventUnsubscribers(unsubs) {
+        this.sessionState.sessionEventUnsubscribers = [...unsubs];
+    }
+
+    /**
+     * Limpa a lista de unsubscribers da sessão atual.
+     *
+     * @returns {void}
+     */
+    clearSessionEventUnsubscribers() {
+        if (this.sessionState.sessionEventUnsubscribers.length === 0) {
+            return;
+        }
+        this.sessionState.sessionEventUnsubscribers = [];
+    }
+
+    /**
+     * Define o contador absoluto de envios.
+     *
+     * @param {number} sendCount
+     * @returns {void}
+     */
+    setSendCount(sendCount) {
+        this.metricsState.sendCount = sendCount;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza o último snapshot de consumo de PR/quota conhecido.
+     *
+     * @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} info
+     * @returns {void}
+     */
+    setLastPrInfo(info) {
+        this.metricsState.lastPrInfo = info ? { ...info } : null;
+    }
+
+    /**
+     * Atualiza o estado de wiring do dialog loop.
+     *
+     * @param {boolean} attached
+     * @returns {void}
+     */
+    setDialogLoopAttached(attached) {
+        this.dialogState.dialogLoopAttached = attached;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza o contexto de uso da janela de contexto.
+     *
+     * @param {{ tokens: number; tokenLimit: number; utilization: number } | null} state
+     * @returns {void}
+     */
+    setContextState(state) {
+        this.sessionState.contextState = state;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza o último checkpoint persistido pelo SDK.
+     *
+     * @param {string | null} path
+     * @returns {void}
+     */
+    setLastCheckpointPath(path) {
+        this.sessionState.lastCheckpointPath = path;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Registra o último relatório de boot conhecido.
+     *
+     * @param {AgentBootReport | null} report
+     * @returns {void}
+     */
+    setBootReport(report) {
+        this.runtimeState.lastBootReport = report;
+    }
+
+    /**
+     * Atualiza o timer periódico de métricas do runtime.
+     *
+     * @param {ReturnType<typeof setInterval>} timer
+     * @returns {void}
+     */
+    setMetricsTimer(timer) {
+        this.runtimeState.metricsTimer = timer;
+    }
+
+    /**
+     * Limpa a referência do timer periódico de métricas.
+     *
+     * @returns {void}
+     */
+    clearMetricsTimer() {
+        this.runtimeState.metricsTimer = null;
+    }
+
+    /**
+     * Atualiza o cancel handler do auto-reconnect MCP.
+     *
+     * @param {() => void} cancel
+     * @returns {void}
+     */
+    setMcpReconnectCancel(cancel) {
+        this.runtimeState.mcpReconnectCancel = cancel;
+    }
+
+    /**
+     * Limpa a referência do cancel handler do auto-reconnect MCP.
+     *
+     * @returns {void}
+     */
+    clearMcpReconnectCancel() {
+        this.runtimeState.mcpReconnectCancel = null;
+    }
+
+    /**
+     * Atualiza o observer do agente usado pelo boot/lifecycle.
+     *
+     * @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void }} observer
+     * @returns {void}
+     */
+    setAgentObserver(observer) {
+        this.runtimeState.agentObserver = observer;
+    }
+
+    /**
+     * Limpa a referência do observer do agente.
+     *
+     * @returns {void}
+     */
+    clearAgentObserver() {
+        this.runtimeState.agentObserver = null;
+    }
+
+    /**
+     * Atualiza o quota monitor acoplado ao runtime.
+     *
+     * @param {import('#copilot/sdk/quota-monitor').QuotaMonitor} quotaMonitor
+     * @returns {void}
+     */
+    setQuotaMonitor(quotaMonitor) {
+        this.runtimeState.quotaMonitor = quotaMonitor;
+    }
+
+    /**
+     * Limpa a referência do quota monitor acoplado ao runtime.
+     *
+     * @returns {void}
+     */
+    clearQuotaMonitor() {
+        this.runtimeState.quotaMonitor = null;
+    }
+
+    /**
+     * Atualiza o modelo configurado no agent.
+     *
+     * @param {string} model
+     * @returns {void}
+     */
+    setModel(model) {
+        this.configState.model = model;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza o nível de reasoning configurado.
+     *
+     * @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} reasoningEffort
+     * @returns {void}
+     */
+    setReasoningEffort(reasoningEffort) {
+        this.configState.reasoningEffort = reasoningEffort;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza o cache de snapshot de status com valor já construído.
+     *
+     * @param {import('./types.js').AgentStatusSnapshot} snapshot
+     * @returns {void}
+     */
+    cacheStatusSnapshot(snapshot) {
+        this.metricsState.statusSnapshotCache = { snapshot, at: Date.now() };
+    }
+
+    /**
+     * Invalida o cache do snapshot público de status.
+     *
+     * Centraliza a mutação para reduzir writes diretos em `metricsState.statusSnapshotCache` nos módulos quentes.
+     *
+     * @returns {void}
+     */
+    invalidateStatusSnapshot() {
+        this.metricsState.statusSnapshotCache = null;
+    }
+
+    /**
+     * Incrementa o contador de envios do agente e invalida o snapshot cacheado.
+     *
+     * @returns {number} Novo valor do contador.
+     */
+    incrementSendCount() {
+        this.metricsState.sendCount += 1;
+        this.invalidateStatusSnapshot();
+        return this.metricsState.sendCount;
+    }
+
+    /**
+     * Atualiza a pergunta pendente do SDK e invalida o snapshot cacheado.
+     *
+     * @param {PendingQuestion | null} question
+     * @returns {void}
+     */
+    setPendingQuestion(question) {
+        this.dialogState.pendingQuestion = question;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Limpa a pergunta pendente atual, preservando idempotência.
+     *
+     * @returns {void}
+     */
+    clearPendingQuestion() {
+        if (this.dialogState.pendingQuestion === null) {
+            return;
+        }
+        this.dialogState.pendingQuestion = null;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Resolve e limpa a pergunta pendente atual de forma semântica.
+     *
+     * @param {string} answer
+     * @returns {boolean} `true` quando havia pergunta pendente para resolver.
+     */
+    resolvePendingQuestion(answer) {
+        const question = this.dialogState.pendingQuestion;
+        if (question === null) {
+            return false;
+        }
+        question.resolve(answer);
+        this.clearPendingQuestion();
+        return true;
+    }
+
+    /**
+     * Retorna labels de tarefas em background ainda pendentes.
+     *
+     * @param {number} [limit=5] Default is `5`
+     * @returns {string[]}
+     */
+    getBackgroundPendingLabels(limit = 5) {
+        return this.backgroundTasks.getPendingLabels?.(limit) ?? [];
+    }
+
+    /**
+     * Indica se existe um client SDK ativo acoplado ao agent.
+     *
+     * @returns {boolean}
+     */
+    hasClient() {
+        return this.ioState.client !== null;
+    }
+
+    /**
+     * Indica se existe uma sessão SDK ativa acoplada ao agent.
+     *
+     * @returns {boolean}
+     */
+    hasActiveSession() {
+        return this.sessionState.session !== null;
+    }
+
+    /**
+     * Indica se há pergunta pendente do SDK aguardando resposta.
+     *
+     * @returns {boolean}
+     */
+    hasPendingQuestion() {
+        return this.dialogState.pendingQuestion !== null;
+    }
+
+    /**
+     * Retorna a quantidade atual de tarefas fire-and-forget ainda pendentes.
+     *
+     * @returns {number}
+     */
+    getBackgroundPendingCount() {
+        return this.backgroundTasks.pendingCount;
+    }
+
+    /**
+     * Retorna uma cópia rasa do último snapshot de PR/quota conhecido.
+     *
+     * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
+     */
+    getLastPrInfoSnapshot() {
+        return this.metricsState.lastPrInfo ? { ...this.metricsState.lastPrInfo } : null;
+    }
+
+    /**
+     * Retorna uma cópia defensiva do último boot report conhecido.
+     *
+     * @returns {AgentBootReport | null}
+     */
+    getBootReportSnapshot() {
+        const report = this.runtimeState.lastBootReport;
+        if (report === null) {
+            return null;
+        }
+        return {
+            ...report,
+            steps: report.steps.map((step) => ({ ...step })),
+        };
     }
 
     // ─── Status FSM ─────────────────────────────────────────────────────
@@ -417,7 +855,7 @@ export class AgentContext {
      * rollout).
      *
      * @param {AgentStatus} status
-     * @param {import('node:events').EventEmitter} emitter
+     * @param {StatusEmitterLike} emitter
      */
     setStatus(status, emitter) {
         const allowed = AgentContext.STATUS_TRANSITIONS[this.status];
@@ -425,7 +863,7 @@ export class AgentContext {
             log('WARN', `[AgentContext] Transição de status inválida: ${this.status} → ${status}`);
         }
         this.status = status;
-        this.statusSnapshotCache = null;
+        this.invalidateStatusSnapshot();
         emitter.emit(EMITTER_STATUS, status);
     }
 }

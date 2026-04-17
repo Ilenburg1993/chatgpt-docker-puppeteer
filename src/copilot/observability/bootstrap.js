@@ -31,9 +31,9 @@ import { setSdkLogger } from '../sdk/logger.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
 import { setToolsLogger } from '../tools/logger.js';
 import { setToolsMetrics } from '../tools/metrics-proxy.js';
-import { createLogObserver } from './bus-actions/log-observer.js';
 import { ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
+import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './event-bus-runtime.js';
 import { defaultEventCollector } from './event-collector.js';
 import { LOG_DIR, log } from './logger.js';
 import { defaultMetrics } from './metrics.js';
@@ -93,8 +93,8 @@ export function bootstrapObservability() {
     // FAIXA-L6: middleware pipeline (enricher → validator → rate-limiter)
     if (bus) registerBuiltinMiddleware(bus);
 
-    // FAIXA-L23: log-observer via bus-action (substitui o antigo event-bus-observers.js)
-    if (bus) createLogObserver({ bus });
+    // Runtime canônico de observabilidade sobre EventBus.
+    if (bus) attachObservabilityBusRuntime({ bus, metrics: defaultMetrics });
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
     registerShutdownHandler(
@@ -112,6 +112,14 @@ export function bootstrapObservability() {
             defaultErrorTracker.destroy();
         },
         45,
+    );
+
+    registerShutdownHandler(
+        'observability.busRuntime.detach',
+        async () => {
+            detachObservabilityBusRuntime();
+        },
+        46,
     );
 
     // K-5: wiring centralizado — resolve tokens e invoca setters legados

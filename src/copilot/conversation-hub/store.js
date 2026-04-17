@@ -62,6 +62,14 @@ export class ConversationStore {
     #checkpointTimer = null;
 
     /**
+     * Serializa escritas de turns por hub_session no nível do processo JS, reduzindo interleavings entre `sendToLlmB()`
+     * e `injectUserMessage()` antes mesmo de chegar ao SQLite.
+     *
+     * @type {Map<string, Promise<void>>}
+     */
+    #writeTailsBySession = new Map();
+
+    /**
      * Inicializa as tabelas (idempotente — CREATE TABLE IF NOT EXISTS). Deve ser chamado uma vez antes de usar qualquer
      * outro método.
      *
@@ -137,6 +145,7 @@ export class ConversationStore {
             clearInterval(this.#checkpointTimer);
             this.#checkpointTimer = null;
         }
+        this.#writeTailsBySession.clear();
         this.#initialized = false;
         this.#db = null;
     }
@@ -325,79 +334,105 @@ export class ConversationStore {
     async writeTurn(hubSessionId, opts) {
         const db = this.#getDb();
 
-        // BUG-01 (fix): UNIQUE constraint (hub_session_id, turn_number) protege contra insert duplicado.
-        // Em cenário com SQLite WAL mode e dois writers simultâneos, o segundo recebe SQLITE_CONSTRAINT
-        // e faz retry automaticamente, relendo o MAX(turn_number) para obter o valor correto.
-        const doWrite = db.transaction(() => {
-            // Calcular o próximo turn_number para esta sessão
-            const maxTurn = /** @type {{ max_turn: number | null }} */ (
-                db
-                    .prepare(
-                        `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
-                    )
-                    .get(hubSessionId)
-            );
-            const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
-
-            // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
-            const userRead = opts.role === 'user' ? 0 : 1;
-
-            const result = db
-                .prepare(
-                    `INSERT INTO copilot_conversation_turns
-                     (hub_session_id, sdk_session_id, role, content, structured, tools_used,
-                      turn_number, created_at, duration_ms, model, user_read, metadata)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                )
-                .run(
-                    hubSessionId,
-                    opts.sdkSessionId ?? null,
-                    opts.role,
-                    opts.content,
-                    opts.structured
-                        ? typeof opts.structured === 'string'
-                            ? opts.structured
-                            : JSON.stringify(opts.structured)
-                        : null,
-                    opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
-                    turnNumber,
-                    Date.now(),
-                    opts.durationMs ?? null,
-                    opts.model ?? null,
-                    userRead,
-                    opts.metadata ? JSON.stringify(opts.metadata) : null,
+        return this.#enqueueTurnWrite(hubSessionId, async () => {
+            // BUG-01 (fix): UNIQUE constraint (hub_session_id, turn_number) protege contra insert duplicado.
+            // Em cenário com SQLite WAL mode e dois writers simultâneos, o segundo recebe SQLITE_CONSTRAINT
+            // e faz retry automaticamente, relendo o MAX(turn_number) para obter o valor correto.
+            const doWrite = db.transaction(() => {
+                // Calcular o próximo turn_number para esta sessão
+                const maxTurn = /** @type {{ max_turn: number | null }} */ (
+                    db
+                        .prepare(
+                            `SELECT MAX(turn_number) as max_turn FROM copilot_conversation_turns WHERE hub_session_id = ?`,
+                        )
+                        .get(hubSessionId)
                 );
+                const turnNumber = (maxTurn?.max_turn ?? 0) + 1;
 
-            // Atualizar updated_at da session
-            db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(Date.now(), hubSessionId);
+                // user_read: mensagens do usuário começam como "não lidas" (0) para que LLM-A as processe
+                const userRead = opts.role === 'user' ? 0 : 1;
 
-            return Number(result.lastInsertRowid);
+                const result = db
+                    .prepare(
+                        `INSERT INTO copilot_conversation_turns
+                         (hub_session_id, sdk_session_id, role, content, structured, tools_used,
+                          turn_number, created_at, duration_ms, model, user_read, metadata)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    )
+                    .run(
+                        hubSessionId,
+                        opts.sdkSessionId ?? null,
+                        opts.role,
+                        opts.content,
+                        opts.structured
+                            ? typeof opts.structured === 'string'
+                                ? opts.structured
+                                : JSON.stringify(opts.structured)
+                            : null,
+                        opts.toolsUsed ? JSON.stringify(opts.toolsUsed) : null,
+                        turnNumber,
+                        Date.now(),
+                        opts.durationMs ?? null,
+                        opts.model ?? null,
+                        userRead,
+                        opts.metadata ? JSON.stringify(opts.metadata) : null,
+                    );
+
+                // Atualizar updated_at da session
+                db.prepare(`UPDATE copilot_hub_sessions SET updated_at = ? WHERE id = ?`).run(Date.now(), hubSessionId);
+
+                return Number(result.lastInsertRowid);
+            });
+
+            // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
+            // BUG-C02 (fix): substituído Atomics.wait() (bloqueava event loop) por sleep async
+            const WRITE_MAX_RETRIES = 3;
+            const RETRY_DELAYS_MS = [5, 15, 40];
+            const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+            for (let attempt = 0; attempt < WRITE_MAX_RETRIES; attempt++) {
+                try {
+                    return doWrite();
+                } catch (err) {
+                    const isConstraint =
+                        toError(err).code === 'SQLITE_CONSTRAINT_UNIQUE' || toError(err).code === 'SQLITE_CONSTRAINT';
+                    if (!isConstraint || attempt === WRITE_MAX_RETRIES - 1) throw err;
+                    log(
+                        'WARN',
+                        `[ConversationStore] writeTurn conflict (attempt=${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt] ?? 5}ms...`,
+                    );
+                    await sleep(RETRY_DELAYS_MS[attempt] ?? 5);
+                }
+            }
+            /* c8 ignore next */
+            throw new SessionError(
+                '[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)',
+                'STORE_WRITE_FAILED',
+            );
+        });
+    }
+
+    /**
+     * Encadeia mutações de turns por sessão para reduzir interleaving entre múltiplos writers do processo.
+     *
+     * @template T
+     * @param {string} hubSessionId
+     * @param {() => Promise<T>} operation
+     * @returns {Promise<T>}
+     */
+    #enqueueTurnWrite(hubSessionId, operation) {
+        const prev = this.#writeTailsBySession.get(hubSessionId) ?? Promise.resolve();
+        const next = prev.then(operation);
+        const tail = next.then(() => undefined).catch(() => undefined);
+
+        this.#writeTailsBySession.set(hubSessionId, tail);
+
+        void tail.finally(() => {
+            if (this.#writeTailsBySession.get(hubSessionId) === tail) {
+                this.#writeTailsBySession.delete(hubSessionId);
+            }
         });
 
-        // Retry com backoff para conflicts de UNIQUE constraint (race condition WAL)
-        // BUG-C02 (fix): substituído Atomics.wait() (bloqueava event loop) por sleep async
-        const WRITE_MAX_RETRIES = 3;
-        const RETRY_DELAYS_MS = [5, 15, 40];
-        const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
-        for (let attempt = 0; attempt < WRITE_MAX_RETRIES; attempt++) {
-            try {
-                return doWrite();
-            } catch (err) {
-                const isConstraint =
-                    toError(err).code === 'SQLITE_CONSTRAINT_UNIQUE' || toError(err).code === 'SQLITE_CONSTRAINT';
-                if (!isConstraint || attempt === WRITE_MAX_RETRIES - 1) throw err;
-                log(
-                    'WARN',
-                    `[ConversationStore] writeTurn conflict (attempt=${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt] ?? 5}ms...`,
-                );
-                await sleep(RETRY_DELAYS_MS[attempt] ?? 5);
-            }
-        }
-        /* c8 ignore next */
-        throw new SessionError(
-            '[ConversationStore] writeTurn: todos os retries esgotados sem sucesso (SQLITE_CONSTRAINT)',
-            'STORE_WRITE_FAILED',
-        );
+        return next;
     }
 
     /**

@@ -10,6 +10,7 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { bridgeEmitter, container } from '#copilot/core';
+import { getObservabilityBusDiagnostics } from '#copilot/observability';
 import { buildAgentModuleHealth } from './agent-health.js';
 import { registerModuleHealth } from './health-modules.js';
 
@@ -44,6 +45,22 @@ export function registerCopilotHealthChecks() {
         ok: !!bridgeEmitter,
         details: { bridgeEmitterAvailable: !!bridgeEmitter },
     }));
+
+    // ── Observability ───────────────────────────────────────────────────────
+    registerModuleHealth('observability', () => {
+        const diagnostics = getObservabilityBusDiagnostics();
+        const health = diagnostics.health;
+        return {
+            ok: diagnostics.attached && health?.status !== 'critical',
+            details: {
+                attached: diagnostics.attached,
+                actions: diagnostics.actions,
+                health,
+                activity: diagnostics.activity,
+                recentTraceCount: diagnostics.recentTraceCount,
+            },
+        };
+    });
 
     // ── Process ──────────────────────────────────────────────────────────────
     registerModuleHealth('process', () => ({

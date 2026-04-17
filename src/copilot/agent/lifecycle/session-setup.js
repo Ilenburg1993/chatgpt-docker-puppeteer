@@ -27,6 +27,8 @@ import { handleUserInputRequest } from '../dialog/user-input-handler.js';
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
  *
  * @typedef {import('../types.js').LifecycleHost} LifecycleHost
+ *
+ * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
  */
 
 /**
@@ -53,7 +55,7 @@ export async function buildSessionTools(ctx) {
  *
  * @param {AgentContext} ctx
  * @param {LifecycleHost} host
- * @returns {{ busHooks: ReturnType<typeof attachBus> }}
+ * @returns {{ busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']> }}
  */
 export function buildSessionHooks(ctx, host) {
     const configState = ctx.configState ?? ctx;
@@ -91,12 +93,17 @@ export function buildSessionHooks(ctx, host) {
  *
  * @param {AgentContext} ctx
  * @param {LifecycleHost} host
- * @param {{ tools: import('#copilot/sdk/types').Tool[]; busHooks: ReturnType<typeof attachBus> }} prepared
+ * @param {{
+ *     tools: import('#copilot/sdk/types').Tool[];
+ *     busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>;
+ * }} prepared
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const configState = ctx.configState ?? ctx;
-    const dialogState = ctx.dialogState ?? ctx;
+    const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
+        configState.mcpBridge ? configState.mcpBridge.buildConfig() : buildMcpConfig()
+    );
     const builder = new SessionConfigBuilder()
         .model(configState.model)
         .clientName('chatgpt-docker-puppeteer')
@@ -104,45 +111,38 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .onPermissionRequest(ctx.permissions.handler)
         .tools(tools);
 
-    // hooks e mcpServers usam tipos locais que divergem dos tipos SDK — via merge para bypass de strictness
-    builder.merge(
-        /** @type {Partial<import('@github/copilot-sdk').SessionConfig>} */ (
-            /** @type {unknown} */ ({
-                hooks: busHooks,
-                mcpServers: configState.mcpBridge ? configState.mcpBridge.buildConfig() : buildMcpConfig(),
-            })
-        ),
-    );
+    builder.hooks(busHooks);
+    if (mcpConfig) {
+        builder.mcpServers(mcpConfig);
+    }
 
     if (configState.reasoningEffort) {
-        try {
-            builder.reasoningEffort(configState.reasoningEffort);
-        } catch {
-            builder.merge(
-                /** @type {Partial<import('@github/copilot-sdk').SessionConfig>} */ (
-                    /** @type {unknown} */ ({ reasoningEffort: configState.reasoningEffort })
-                ),
-            );
-        }
+        builder.reasoningEffort(configState.reasoningEffort);
     }
+
+    builder.onUserInputRequest((input) =>
+        handleUserInputRequest(
+            {
+                question: input.question,
+                ...(input.choices !== undefined && { choices: input.choices }),
+                allowFreeform: input.allowFreeform === true,
+            },
+            {
+                isDialogLoopActive: () => ctx.dialogLoop.active,
+                handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
+                setStatus: (s) => ctx.setStatus(s, host),
+                setPendingQuestion: (pq) => ctx.setPendingQuestion(pq),
+                trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
+                emit: (event, payload) => host.emit(event, payload),
+            },
+        ),
+    );
 
     const config = builder.build();
 
     // Campos consumidos por initOrResumeSession (não são SessionConfig SDK)
     return {
         ...config,
-        onUserInputRequest: (/** @type {{ question: string; choices?: string[]; allowFreeform: boolean }} */ input) =>
-            handleUserInputRequest(input, {
-                isDialogLoopActive: () => ctx.dialogLoop.active,
-                handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
-                setStatus: (s) =>
-                    ctx.setStatus(s, /** @type {import('node:events').EventEmitter} */ (/** @type {unknown} */ (host))),
-                setPendingQuestion: (pq) => {
-                    dialogState.pendingQuestion = pq;
-                },
-                trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
-                emit: (event, payload) => host.emit(event, payload),
-            }),
         injectHookContext: true,
     };
 }
@@ -155,9 +155,8 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
  * @param {boolean} isResumed
  */
 export function finalizeSessionInit(ctx, session, isResumed) {
-    const sessionState = ctx.sessionState ?? ctx;
-    sessionState.session = session;
-    sessionState.isResumed = isResumed;
+    ctx.setSession(session);
+    ctx.setIsResumed(isResumed);
     bootstrapRuntime.setSessionRpc(session.rpc);
     try {
         const maybeSetExperimentalSession = bootstrapRuntime.setExperimentalSession;

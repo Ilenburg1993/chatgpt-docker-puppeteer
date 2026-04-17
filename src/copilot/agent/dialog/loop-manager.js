@@ -36,7 +36,7 @@ import {
     WATCHDOG_STALL_MS,
 } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
-import { readState, readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 import { TurnQueue } from './backpressure.js';
 import { ModelFallbackState } from './model-fallback.js';
 import { DialogProtocol } from './protocol.js';
@@ -56,7 +56,11 @@ import { DialogWatchdog } from './watchdog.js';
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage - Envia mensagem ao SDK
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
  *   prompt sem passar pelo guard do dialog loop — uso exclusivo do DialogLoopManager
- * @property {(answer: string) => void} answerPendingQuestion - Responde à pergunta pendente
+ * @property {(answer: string) => boolean} answerPendingQuestion - Responde à pergunta pendente
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [on] - Interface mínima de
+ *   EventEmitter para aguardar `question.pending` no host real.
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [once]
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [off]
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
  * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
@@ -243,10 +247,13 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = true;
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
-        void this.#trackBackgroundTask(writeStateAsync({ dialogLoopActive: true }), {
-            label: 'dialog.state.active',
-            description: 'Persist dialogLoopActive=true',
-        });
+        void this.#trackPersistedState(
+            { dialogLoopActive: true },
+            {
+                label: 'dialog.state.active',
+                description: 'Persist dialogLoopActive=true',
+            },
+        );
 
         // F68.2: Span OTEL para o ciclo completo do dialog loop (start → stop)
         this.#loopSpan = startSpanImmediate('copilot.dialog.loop', {
@@ -282,7 +289,7 @@ export class DialogLoopManager extends EventEmitter {
                 : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
                       host.sendMessage(msg, { ...opts, timeoutMs: LONG_TASK_TIMEOUT_MS });
 
-        bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS }).catch((/** @type {Error} */ e) => {
+        Promise.resolve(bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS })).catch((/** @type {Error} */ e) => {
             if (this.#active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
@@ -306,10 +313,13 @@ export class DialogLoopManager extends EventEmitter {
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
         // F42.4: persistir prMetrics após boot bem-sucedido
-        void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
-            label: 'dialog.prMetrics.boot',
-            description: 'Persist dialog loop PR metrics after boot',
-        });
+        void this.#trackPersistedState(
+            { prMetrics: { ...this.#prMetrics } },
+            {
+                label: 'dialog.prMetrics.boot',
+                description: 'Persist dialog loop PR metrics after boot',
+            },
+        );
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -391,10 +401,13 @@ export class DialogLoopManager extends EventEmitter {
         this.#active = false;
         this.#stopping = false;
         this.#endLoopSpan(true);
-        void this.#trackBackgroundTask(writeStateAsync({ dialogLoopActive: false }), {
-            label: 'dialog.state.inactive',
-            description: 'Persist dialogLoopActive=false',
-        });
+        void this.#trackPersistedState(
+            { dialogLoopActive: false },
+            {
+                label: 'dialog.state.inactive',
+                description: 'Persist dialogLoopActive=false',
+            },
+        );
         this.#watchdog?.stop();
         this.emit('stopped', { reason, authorized: true });
     }
@@ -410,8 +423,9 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', '[DialogLoopManager] pause() com loop inativo — ignorado.');
             return;
         }
-        await writeStateAsync({ dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true }).catch(
-            (/** @type {Error} */ e) => log('WARN', `[DialogLoopManager] writeState dialogPaused: ${e.message}`),
+        await this.#persistStateNow(
+            { dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true },
+            'dialog.state.pause',
         );
         // F31: pausar watchdog durante pause para evitar falsos-positivos de stall
         this.#watchdog?.stop();
@@ -438,9 +452,7 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#resuming = true;
         try {
-            await writeStateAsync({ dialogPaused: false }).catch((e) =>
-                log('WARN', `[DialogLoopManager] writeState dialogPaused=false: ${e.message}`),
-            );
+            await this.#persistStateNow({ dialogPaused: false }, 'dialog.state.resume');
 
             // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
             if (this.#host?.getPendingQuestion()) {
@@ -450,10 +462,13 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume
-                void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
-                    label: 'dialog.prMetrics.resume_zero_pr',
-                    description: 'Persist dialog loop PR metrics after zero-PR resume',
-                });
+                void this.#trackPersistedState(
+                    { prMetrics: { ...this.#prMetrics } },
+                    {
+                        label: 'dialog.prMetrics.resume_zero_pr',
+                        description: 'Persist dialog loop PR metrics after zero-PR resume',
+                    },
+                );
                 this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
@@ -461,8 +476,7 @@ export class DialogLoopManager extends EventEmitter {
             // Estratégia A (async): aguardar ask_user preservado (0 PR)
             // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
             // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
-            const hostEmitter = /** @type {import('events').EventEmitter} */ (/** @type {unknown} */ (this.#host));
-            const pendingTarget = typeof hostEmitter?.on === 'function' ? hostEmitter : this;
+            const pendingTarget = isEventEmitterTarget(this.#host) ? this.#host : this;
             const preserved = await waitForEvent(pendingTarget, 'question.pending', {
                 timeoutMs: RESUME_QUESTION_WAIT_MS,
             })
@@ -476,10 +490,13 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume zero-PR
-                void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
-                    label: 'dialog.prMetrics.resume_preserved',
-                    description: 'Persist dialog loop PR metrics after preserved resume',
-                });
+                void this.#trackPersistedState(
+                    { prMetrics: { ...this.#prMetrics } },
+                    {
+                        label: 'dialog.prMetrics.resume_preserved',
+                        description: 'Persist dialog loop PR metrics after preserved resume',
+                    },
+                );
                 this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
@@ -490,17 +507,24 @@ export class DialogLoopManager extends EventEmitter {
             this.#watchdog?.stop();
             this.#watchdog = null;
             this.#active = false;
-            await writeStateAsync({ dialogLoopActive: false }).catch((e) =>
-                logSwallowed(e, 'agent.loopManager.writeState'),
+            const deactivated = await persistStateWithPolicy(
+                { dialogLoopActive: false },
+                { label: 'dialog.state.resume_restart' },
             );
+            if (!deactivated.ok) {
+                logSwallowed(deactivated.error, 'agent.loopManager.writeState');
+            }
             await this.start();
             // F41B.8: contabilizar resume com PR
             this.#prMetrics.resumesWithPR++;
             // F42.4: persistir prMetrics após resume com PR
-            void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
-                label: 'dialog.prMetrics.resume_with_pr',
-                description: 'Persist dialog loop PR metrics after PR-consuming resume',
-            });
+            void this.#trackPersistedState(
+                { prMetrics: { ...this.#prMetrics } },
+                {
+                    label: 'dialog.prMetrics.resume_with_pr',
+                    description: 'Persist dialog loop PR metrics after PR-consuming resume',
+                },
+            );
             this.emit(EMITTER_LOOP_RESUMED, { prConsumed: true });
         } finally {
             this.#resuming = false;
@@ -600,12 +624,16 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<string>}
      */
     #executeTurn(message, { timeout, signal }) {
+        const host = this.#host;
+        if (!host) {
+            return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
+        }
         return executeTurnImpl(
             this,
             message,
             { timeout, ...(signal !== undefined && { signal }) },
             {
-                host: /** @type {import('./turn-executor.js').TurnHost} */ (/** @type {unknown} */ (this.#host)),
+                host,
                 sendCountRef: this.#sendCountRef,
             },
         );
@@ -625,6 +653,51 @@ export class DialogLoopManager extends EventEmitter {
             (error) => logSwallowed(error, `agent.loopManager.${meta.label ?? 'background'}`),
         );
     }
+
+    /**
+     * Persiste snapshot parcial do dialog loop como tarefa de background, usando a policy canônica do agent.
+     *
+     * @param {Record<string, unknown>} data
+     * @param {{ label?: string; description?: string }} meta
+     * @returns {Promise<void>}
+     */
+    #trackPersistedState(data, meta) {
+        const policyOpts = meta.label !== undefined ? { label: meta.label } : {};
+        return this.#trackBackgroundTask(
+            persistStateWithPolicy(data, policyOpts).then((result) => {
+                if (!result.ok) {
+                    const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
+                    throw failure.error;
+                }
+                return undefined;
+            }),
+            meta,
+        );
+    }
+
+    /**
+     * Persiste estado imediatamente sem derrubar o runtime do dialog loop se houver falha de I/O.
+     *
+     * @param {Record<string, unknown>} data
+     * @param {string} label
+     * @returns {Promise<boolean>}
+     */
+    async #persistStateNow(data, label) {
+        const result = await persistStateWithPolicy(data, { label });
+        if (!result.ok) {
+            log('WARN', `[DialogLoopManager] ${label} falhou: ${result.error.message}`);
+            return false;
+        }
+        return true;
+    }
+}
+
+/**
+ * @param {AgentHost | DialogLoopManager | null | undefined} candidate
+ * @returns {candidate is EventEmitter}
+ */
+function isEventEmitterTarget(candidate) {
+    return candidate instanceof EventEmitter;
 }
 
 // F61: wireDialogLoopEvents extraído para event-wiring.js — re-exportado para compatibilidade

@@ -15,6 +15,36 @@
 const BACKGROUND_PENDING_WARN_THRESHOLD = 8;
 
 /**
+ * @param {{
+ *     runtimeOperational: boolean;
+ *     clientAvailable: boolean;
+ *     sessionActive: boolean;
+ *     dialogOk: boolean;
+ *     queueOk: boolean;
+ *     ioOk: boolean;
+ *     keepaliveOk: boolean;
+ *     backgroundOk: boolean;
+ *     bootOk: boolean;
+ *     bootNeedsAttention: boolean;
+ *     quotaOk: boolean;
+ * }} state
+ * @returns {import('./types.js').AgentRecommendedAction}
+ */
+function selectRecommendedAction(state) {
+    if (!state.runtimeOperational) return 'restart_agent';
+    if (!state.clientAvailable) return 'recreate_client';
+    if (!state.sessionActive) return 'recreate_session';
+    if (!state.dialogOk) return 'reattach_dialog';
+    if (!state.ioOk) return 'resolve_pending_question';
+    if (!state.keepaliveOk) return 'restart_keepalive';
+    if (!state.bootOk || state.bootNeedsAttention) return 'inspect_boot_report';
+    if (!state.quotaOk) return 'restart_quota_monitor';
+    if (!state.backgroundOk) return 'drain_background_tasks';
+    if (!state.queueOk) return 'inspect_queue_starvation';
+    return 'none';
+}
+
+/**
  * Monta um snapshot de health do agente a partir do contexto interno e do snapshot público de status.
  *
  * - `healthy`/`ok` indica se o agente segue operacional para chamadas externas.
@@ -30,44 +60,109 @@ export function getAgentHealthSnapshot(ctx, host) {
     const runtimeOperational =
         snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
 
-    const clientAvailable = ctx.ioState.client !== null;
-    const sessionActive = ctx.sessionState.session !== null && Boolean(snap.sessionId);
+    const clientAvailable = ctx.hasClient();
+    const sessionActive = ctx.hasActiveSession() && Boolean(snap.sessionId);
     const dialogActive = ctx.dialogLoop.active;
-    const dialogAttached = ctx.dialogState.dialogLoopAttached;
+    const dialogAttached = ctx.dialogLoopAttached;
     const dialogOk = !dialogActive || dialogAttached;
     const queueOk = !snap.starvationAlert;
-    const hasPendingQuestion = ctx.dialogState.pendingQuestion !== null;
+    const hasPendingQuestion = ctx.hasPendingQuestion();
     const waitingForInput = snap.status === 'waiting_for_input';
     const ioOk = !hasPendingQuestion || waitingForInput || dialogActive;
     const keepaliveRunning = ctx.keepalive.running;
     const keepaliveOk = !sessionActive || keepaliveRunning;
-    const backgroundPendingCount = ctx.backgroundTasks.pendingCount;
+    const backgroundPendingCount = ctx.getBackgroundPendingCount();
+    const backgroundPendingLabels = ctx.getBackgroundPendingLabels(5);
     const backgroundOk = backgroundPendingCount < BACKGROUND_PENDING_WARN_THRESHOLD;
+    const bootReport = ctx.getBootReportSnapshot();
+    const failedBootSteps = bootReport?.failedCount ?? 0;
+    const degradedBootSteps = bootReport?.degradedCount ?? 0;
+    const bootOk = bootReport === null || bootReport.ok;
+    const bootNeedsAttention = degradedBootSteps > 0;
     const quotaMonitorRunning = ctx.quotaMonitor !== null;
     const quotaConfigured = clientAvailable || sessionActive;
     const quotaOk = !quotaConfigured || quotaMonitorRunning;
 
+    /** @type {import('./types.js').AgentHealthRiskFlag[]} */
+    const riskFlags = [];
+
     /** @type {string[]} */
     const issues = [];
-    if (!runtimeOperational) issues.push(`runtime.not_operational.${snap.status}`);
-    if (!clientAvailable) issues.push('client.unavailable');
-    if (!sessionActive) issues.push('session.inactive');
-    if (!dialogOk) issues.push('dialog.detached_while_active');
-    if (!queueOk) issues.push('queue.starvation');
-    if (!ioOk) issues.push('io.pending_question_mismatch');
-    if (!keepaliveOk) issues.push('io.keepalive_stopped');
-    if (!backgroundOk) issues.push('background.backlog_high');
-    if (!quotaOk) issues.push('quota.monitor_missing');
+    if (!runtimeOperational) {
+        issues.push(`runtime.not_operational.${snap.status}`);
+        riskFlags.push('runtime.stopped');
+    }
+    if (!clientAvailable) {
+        issues.push('client.unavailable');
+        riskFlags.push('client.missing');
+    }
+    if (!sessionActive) {
+        issues.push('session.inactive');
+        riskFlags.push('session.missing');
+    }
+    if (!dialogOk) {
+        issues.push('dialog.detached_while_active');
+        riskFlags.push('dialog.detached');
+    }
+    if (!queueOk) {
+        issues.push('queue.starvation');
+        riskFlags.push('queue.starvation');
+    }
+    if (!ioOk) {
+        issues.push('io.pending_question_mismatch');
+        riskFlags.push('io.pending_question_drift');
+    }
+    if (!keepaliveOk) {
+        issues.push('io.keepalive_stopped');
+        riskFlags.push('io.keepalive_stopped');
+    }
+    if (!backgroundOk) {
+        issues.push('background.backlog_high');
+        riskFlags.push('background.backlog_high');
+    }
+    if (!bootOk) {
+        issues.push('boot.steps_failed');
+        riskFlags.push('boot.failed');
+    } else if (bootNeedsAttention) {
+        issues.push('boot.steps_degraded');
+        riskFlags.push('boot.degraded');
+    }
+    if (!quotaOk) {
+        issues.push('quota.monitor_missing');
+        riskFlags.push('quota.monitor_missing');
+    }
 
     /** @type {import('./types.js').AgentHealthStatus} */
     let status = 'healthy';
     if (!runtimeOperational || !clientAvailable || !sessionActive) {
         status = 'unhealthy';
-    } else if (!dialogOk || !queueOk || !ioOk || !keepaliveOk || !backgroundOk || !quotaOk) {
+    } else if (
+        !dialogOk ||
+        !queueOk ||
+        !ioOk ||
+        !keepaliveOk ||
+        !backgroundOk ||
+        !bootOk ||
+        bootNeedsAttention ||
+        !quotaOk
+    ) {
         status = 'degraded';
     }
 
     const ok = status !== 'unhealthy';
+    const recommendedAction = selectRecommendedAction({
+        runtimeOperational,
+        clientAvailable,
+        sessionActive,
+        dialogOk,
+        queueOk,
+        ioOk,
+        keepaliveOk,
+        backgroundOk,
+        bootOk,
+        bootNeedsAttention,
+        quotaOk,
+    });
 
     return {
         ok,
@@ -83,8 +178,12 @@ export function getAgentHealthSnapshot(ctx, host) {
         oldestTaskWaitMs: snap.oldestTaskWaitMs,
         starvationAlert: snap.starvationAlert,
         backgroundPendingCount,
+        backgroundPendingLabels,
+        riskFlags,
+        recommendedAction,
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
+        bootReport,
         checks: {
             runtime: {
                 ok: runtimeOperational,
@@ -123,6 +222,14 @@ export function getAgentHealthSnapshot(ctx, host) {
                 ok: backgroundOk,
                 pendingCount: backgroundPendingCount,
                 warnThreshold: BACKGROUND_PENDING_WARN_THRESHOLD,
+                labels: backgroundPendingLabels,
+            },
+            boot: {
+                ok: bootOk && !bootNeedsAttention,
+                reportAvailable: bootReport !== null,
+                failedSteps: failedBootSteps,
+                degradedSteps: degradedBootSteps,
+                lastCompletedAt: bootReport?.completedAt ?? null,
             },
             quota: {
                 ok: quotaOk,

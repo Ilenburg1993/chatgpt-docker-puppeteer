@@ -12,6 +12,22 @@ import { isFatalError, toError } from '#copilot/core';
 
 /** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
 
+/** @template T @typedef {T | Promise<T>} Awaitable */
+
+/**
+ * @template T
+ * @typedef {{ ok: true; value: T }} AgentPolicySuccess
+ */
+
+/**
+ * @typedef {{ ok: false; error: Error; disposition: AgentErrorDisposition }} AgentPolicyFailure
+ */
+
+/**
+ * @template T
+ * @typedef {AgentPolicySuccess<T> | AgentPolicyFailure} AgentPolicyResult
+ */
+
 /**
  * Classifica um erro do subsistema `agent` em três categorias operacionais:
  *
@@ -47,4 +63,31 @@ export function classifyAgentError(error) {
  */
 export function shouldRetryAgentError(error) {
     return classifyAgentError(error) === 'retry';
+}
+
+/**
+ * Executa uma operação síncrona ou assíncrona sob a política canônica de classificação de erros do `agent`.
+ *
+ * Diferente de um `try/catch` ad hoc, esta função sempre normaliza o erro, aplica a classificação centralizada e
+ * devolve um resultado explícito (`ok=true|false`). Isso permite que `messaging`, `reconnect-policy` e futuros módulos
+ * compartilhem a mesma semântica sem duplicar boilerplate.
+ *
+ * @template T
+ * @param {() => Awaitable<T>} fn
+ * @param {{
+ *     classify?: (error: unknown) => AgentErrorDisposition;
+ *     onError?: (error: Error, disposition: AgentErrorDisposition) => void | Promise<void>;
+ * }} [opts]
+ * @returns {Promise<AgentPolicyResult<T>>}
+ */
+export async function withAgentErrorPolicy(fn, opts = {}) {
+    const classify = opts.classify ?? classifyAgentError;
+    try {
+        return { ok: true, value: await Promise.resolve(fn()) };
+    } catch (error) {
+        const normalized = toError(error);
+        const disposition = classify(normalized);
+        await opts.onError?.(normalized, disposition);
+        return { ok: false, error: normalized, disposition };
+    }
 }

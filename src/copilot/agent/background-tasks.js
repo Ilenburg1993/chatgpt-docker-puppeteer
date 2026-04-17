@@ -38,6 +38,9 @@ export class BackgroundTasks {
     /** @type {Set<Promise<void>>} */
     #tasks = new Set();
 
+    /** @type {Map<Promise<void>, { label: string; description: string }>} */
+    #metaByTask = new Map();
+
     /** @type {number} */
     #sequence = 0;
 
@@ -65,6 +68,16 @@ export class BackgroundTasks {
     }
 
     /**
+     * Retorna labels das tarefas ainda pendentes.
+     *
+     * @param {number} [limit=5] Default is `5`
+     * @returns {string[]}
+     */
+    getPendingLabels(limit = 5) {
+        return [...this.#metaByTask.values()].slice(0, Math.max(0, limit)).map((meta) => meta.label);
+    }
+
+    /**
      * Registra uma promise em background e garante limpeza/telemetria na conclusão.
      *
      * A promise retornada nunca rejeita; erros são logados como swallowed e expostos no callback `onCompleted`.
@@ -89,6 +102,7 @@ export class BackgroundTasks {
             )
             .then(({ status, error }) => {
                 this.#tasks.delete(tracked);
+                this.#metaByTask.delete(tracked);
                 this.#onCompleted?.({
                     label,
                     description,
@@ -104,6 +118,7 @@ export class BackgroundTasks {
             });
 
         this.#tasks.add(tracked);
+        this.#metaByTask.set(tracked, { label, description });
         return tracked;
     }
 

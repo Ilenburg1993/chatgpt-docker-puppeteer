@@ -22,7 +22,8 @@ import { securityHeadersMiddleware } from './middleware/security-headers.js';
  * @typedef {object} CopilotAppOptions
  * @property {string} [token] - Token bearer override (para testes)
  * @property {boolean} [skipAuth] - Desabilitar auth globalmente (dev/test)
- * @property {string | string[]} [corsOrigin] - Origem(ns) CORS. Default: '*' (loopback seguro)
+ * @property {string | string[]} [corsOrigin] - Origem(ns) CORS. Quando omitido, aceita apenas `localhost` em qualquer
+ *   porta.
  */
 
 /**
@@ -50,9 +51,8 @@ export function createCopilotApp(opts) {
     // 2. Rastreabilidade: X-Request-ID
     app.use(requestIdMiddleware);
 
-    // 3. CORS: default restrito a loopback (S-A-10); caller pode override via corsOrigin
-    const DEFAULT_CORS_ORIGIN = 'http://localhost:*';
-    app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? DEFAULT_CORS_ORIGIN }));
+    // 3. CORS: default reflection para localhost em qualquer porta; caller pode override via corsOrigin
+    app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? [] }));
 
     // 3. Body parsing: JSON, limite 2MB (alinhado com terminal/server.js readBody MAX_BODY_BYTES)
     app.use(express.json({ limit: '2mb' }));

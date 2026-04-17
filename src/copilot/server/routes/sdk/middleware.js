@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { toError, CopilotError } from '#copilot/core';
+import { CopilotError, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 
 /**

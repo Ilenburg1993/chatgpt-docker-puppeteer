@@ -91,5 +91,5 @@ export function schemaValidator(event, next) {
         console.warn(msg);
     }
 
-    next();
+    return next();
 }

@@ -3,7 +3,8 @@
  * src/copilot/events/emitter-events.js — FAIXA-L19
  *
  * Constantes para eventos internos do Agent EventEmitter (always-alive). Estes são os nomes usados em
- * `emitter.emit('name')` e `emitter.on('name')`.
+ * `emitter.emit('name')` e `emitter.on('name')`. Eventos estritamente internos podem usar `Symbol` para evitar colisão
+ * acidental com consumidores externos.
  *
  * NOTA: Diferente das constantes de agent-events.js (que são SSOT do EventBus com namespace `agent:*`), estas são os
  * nomes _internos_ do emitter pattern do AlwaysAliveAgent. O bridgeEmitter em `always-alive.js` mapeia estes para os
@@ -82,7 +83,7 @@ export const EMITTER_QUESTION_ANSWERED = 'question.answered';
 export const EMITTER_PERMISSION_MODE_CHANGED = 'permission.mode_changed';
 
 // ── Internal ─────────────────────────────────────────────────
-export const EMITTER_PROCESS_QUEUE = '__processQueue';
+export const EMITTER_PROCESS_QUEUE = Symbol('agent.process_queue');
 
 // ── Handoff ──────────────────────────────────────────────────
 export const EMITTER_HANDOFF_RECEIVED = 'handoff.received';

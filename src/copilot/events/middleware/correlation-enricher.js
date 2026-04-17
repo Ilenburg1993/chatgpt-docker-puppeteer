@@ -51,5 +51,5 @@ export function correlationEnricher(event, next) {
     if (!event.causationId && _currentCausation) {
         event.causationId = _currentCausation;
     }
-    next();
+    return next();
 }

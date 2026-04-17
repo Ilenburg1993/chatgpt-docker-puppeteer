@@ -21,6 +21,7 @@ import { log } from '#copilot/observability';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '../../config/auth.js';
+import { authorizeHubSessionAction, createHubAccessPrincipal } from '../../conversation-hub/access.js';
 import { setCopilotNamespace } from '../../conversation-hub/broadcast.js';
 
 /**
@@ -69,7 +70,7 @@ export function mountCopilotNamespace(io, orchestrator, store) {
     }
 
     _setupConnectionHandlers(ns, orchestrator, store, checkSocketInjectRate);
-    _bridgeOrchestratorEvents(ns, orchestrator);
+    _bridgeOrchestratorEvents(ns, orchestrator, store);
 
     copilotNamespace = ns;
     setCopilotNamespace(ns);
@@ -143,8 +144,10 @@ function _setupAuthMiddleware(ns) {
             }
             const { token } = authResult.data;
             const payload = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+            const principal = createHubAccessPrincipal(payload);
             /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (socket))['userId'] =
                 /** @type {{ sub?: string }} */ (payload).sub;
+            _getSocketRuntime(socket).principal = principal;
             next();
         } catch (err) {
             log('WARN', `[hub-ns/copilot] Auth falhou (IP: ${socket.handshake.address}): ${toError(err).message}`);
@@ -188,13 +191,25 @@ function _setupConnectionHandlers(ns, orchestrator, store, checkRate) {
 function _handleJoinSession(socket, store, clientId) {
     socket.on(HUB_EVENTS.JOIN_SESSION, (/** @type {{ hubSession: string }} */ data) => {
         if (!data?.hubSession) return;
-        const sessionExists = store.getHubSession(data.hubSession);
-        if (!sessionExists) {
+        const authorization = _authorizeSocketSession(socket, store, data.hubSession, 'read');
+        if (!authorization.session) {
             log('WARN', `[hub-ns] join negado — sessão '${data.hubSession}' não existe (clientId=${clientId})`);
             socket.emit(HUB_EVENTS.ERROR_JOIN, { hubSession: data.hubSession, reason: 'session_not_found' });
             return;
         }
+        if (!authorization.decision.ok) {
+            log(
+                'WARN',
+                `[hub-ns] join negado — sessão '${data.hubSession}' sem permissão (${authorization.decision.reason}, clientId=${clientId})`,
+            );
+            socket.emit(HUB_EVENTS.ERROR_JOIN, {
+                hubSession: data.hubSession,
+                reason: authorization.decision.reason,
+            });
+            return;
+        }
         void socket.join(data.hubSession);
+        _getSocketRuntime(socket).authorizedHubSessions.add(data.hubSession);
         log('DEBUG', `[hub-ns] Cliente ${clientId} entrou na sala: ${data.hubSession}`);
         socket.emit(HUB_EVENTS.JOINED_SESSION, { hubSession: data.hubSession });
     });
@@ -208,6 +223,7 @@ function _handleLeaveSession(socket, clientId) {
     socket.on(HUB_EVENTS.LEAVE_SESSION, (/** @type {{ hubSession: string }} */ data) => {
         if (!data?.hubSession) return;
         void socket.leave(data.hubSession);
+        _getSocketRuntime(socket).authorizedHubSessions.delete(data.hubSession);
         log('DEBUG', `[hub-ns] Cliente ${clientId} saiu da sala: ${data.hubSession}`);
     });
 }
@@ -226,6 +242,19 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
             socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'hubSession e content são obrigatórios.' });
             return;
         }
+        const authorization = _authorizeSocketSession(socket, store, data.hubSession, 'write');
+        if (!authorization.session) {
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'session_not_found' });
+            return;
+        }
+        if (!authorization.decision.ok) {
+            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: authorization.decision.reason });
+            log(
+                'WARN',
+                `[hub-ns] inject negado — sessão '${data.hubSession}' sem permissão (${authorization.decision.reason}, clientId=${clientId})`,
+            );
+            return;
+        }
         if (!checkRate(clientId, clientIp)) {
             socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'Rate limit excedido. Tente novamente em breve.' });
             log('WARN', `[hub-ns] Rate limit atingido pelo socket ${clientId}`);
@@ -239,7 +268,7 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
             .replace(/^\s*SYSTEM:/gim, '[BLOCKED]');
 
         try {
-            const session = store.getHubSession(data.hubSession);
+            const session = authorization.session;
             if (!session || session.status !== 'active') {
                 socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: `Sessão ${data.hubSession} não está ativa.` });
                 return;
@@ -278,7 +307,8 @@ function _handleSessionsList(socket, store) {
                 /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus | undefined} */ (
                     rawStatus
                 );
-            const sessions = store.listHubSessions({
+            const principal = _getSocketRuntime(socket).principal;
+            const sessions = _listAuthorizedSessions(store, principal, {
                 limit: opts?.limit ?? 20,
                 offset: opts?.offset ?? 0,
                 ...(statusVal !== undefined ? { status: statusVal } : {}),
@@ -306,6 +336,15 @@ function _handleTurnsHistory(socket, store) {
         HUB_EVENTS.TURNS_HISTORY,
         (/** @type {{ hubSession: string; limit?: number; offset?: number; after?: number }} */ data) => {
             if (!data?.hubSession) return;
+            const authorization = _authorizeSocketSession(socket, store, data.hubSession, 'read');
+            if (!authorization.session) {
+                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: 'session_not_found' });
+                return;
+            }
+            if (!authorization.decision.ok) {
+                socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: authorization.decision.reason });
+                return;
+            }
             if (!socket.rooms.has(data.hubSession)) {
                 socket.emit(HUB_EVENTS.ERROR_HISTORY, { reason: 'not_in_session: execute join:session primeiro.' });
                 return;
@@ -329,15 +368,18 @@ function _handleTurnsHistory(socket, store) {
  *
  * @param {SocketNamespace} ns
  * @param {import('../../conversation-hub/orchestrator.js').HubOrchestrator} orchestrator
+ * @param {import('../../conversation-hub/store.js').ConversationStore} store
  * @returns {void}
  */
-function _bridgeOrchestratorEvents(ns, orchestrator) {
+function _bridgeOrchestratorEvents(ns, orchestrator, store) {
     orchestrator.on(HUB_EVENTS.SESSION_CREATED, (/** @type {{ hubSessionId: string; title: string }} */ data) => {
-        ns.emit(HUB_EVENTS.SESSION_CREATED, data);
+        _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.SESSION_CREATED, data, {
+            requireRoomMembership: false,
+        });
     });
 
     orchestrator.on(HUB_EVENTS.SESSION_CLOSED, (/** @type {{ hubSessionId: string }} */ data) => {
-        ns.to(data.hubSessionId).emit(HUB_EVENTS.SESSION_CLOSED, data);
+        _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.SESSION_CLOSED, data);
     });
 
     orchestrator.on(
@@ -345,14 +387,14 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
         (
             /** @type {{ hubSessionId: string; turnId: number; role: string; content: string; turnNumber: number }} */ data,
         ) => {
-            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_SENT, data);
+            _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.TURN_SENT, data);
         },
     );
 
     orchestrator.on(
         HUB_EVENTS.TURN_DELTA,
         (/** @type {{ hubSessionId: string; chunk: string; turnNumber: number }} */ data) => {
-            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_DELTA, data);
+            _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.TURN_DELTA, data);
         },
     );
 
@@ -371,19 +413,19 @@ function _bridgeOrchestratorEvents(ns, orchestrator) {
              * }}
              */ data,
         ) => {
-            ns.to(data.hubSessionId).emit(HUB_EVENTS.TURN_COMPLETE, data);
+            _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.TURN_COMPLETE, data);
         },
     );
 
     orchestrator.on(
         HUB_EVENTS.USER_INJECTED,
         (/** @type {{ hubSessionId: string; turnId: number; content: string }} */ data) => {
-            ns.to(data.hubSessionId).emit(HUB_EVENTS.USER_INJECTED, data);
+            _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.USER_INJECTED, data);
         },
     );
 
     orchestrator.on('error', (/** @type {{ hubSessionId: string; message: string; error: Error }} */ data) => {
-        ns.to(data.hubSessionId).emit(HUB_EVENTS.HUB_ERROR, {
+        _emitAuthorizedSessionEvent(ns, store, data.hubSessionId, HUB_EVENTS.HUB_ERROR, {
             hubSessionId: data.hubSessionId,
             message: data.message,
         });
@@ -434,4 +476,118 @@ function _parseAuthRequired() {
         if (lower === '0' || lower === 'false' || lower === 'no') return false;
     }
     return true;
+}
+
+/**
+ * @typedef {{
+ *     principal: import('../../conversation-hub/access.js').HubAccessPrincipal;
+ *     authorizedHubSessions: Set<string>;
+ * }} SocketRuntime
+ */
+
+/**
+ * @param {SocketClient} socket
+ * @returns {SocketRuntime}
+ */
+function _getSocketRuntime(socket) {
+    /** @type {Record<string, unknown>} */
+    const socketData = /** @type {Record<string, unknown>} */ (socket.data ?? {});
+    if (!(socketData['copilotSocketRuntime'] instanceof Object)) {
+        socketData['copilotSocketRuntime'] = {
+            principal: createHubAccessPrincipal({}),
+            authorizedHubSessions: new Set(),
+        };
+    }
+    return /** @type {SocketRuntime} */ (socketData['copilotSocketRuntime']);
+}
+
+/**
+ * @param {SocketClient} socket
+ * @param {import('../../conversation-hub/store.js').ConversationStore} store
+ * @param {string} hubSessionId
+ * @param {import('../../conversation-hub/access.js').HubSessionAction} action
+ * @returns {{
+ *     session: import('../../conversation-hub/store-helpers.js').HubSession | null;
+ *     decision: import('../../conversation-hub/access.js').HubSessionAccessDecision;
+ * }}
+ */
+function _authorizeSocketSession(socket, store, hubSessionId, action) {
+    const session = store.getHubSession(hubSessionId);
+    if (!session) {
+        return {
+            session: null,
+            decision: {
+                ok: false,
+                reason: 'session_not_found',
+                policy: authorizeHubSessionAction(createHubAccessPrincipal({}), { id: hubSessionId }, 'read').policy,
+            },
+        };
+    }
+    return {
+        session,
+        decision: authorizeHubSessionAction(_getSocketRuntime(socket).principal, session, action),
+    };
+}
+
+/**
+ * Lista sessões filtrando por autorização antes de paginar, evitando starvation por sessões não autorizadas.
+ *
+ * @param {import('../../conversation-hub/store.js').ConversationStore} store
+ * @param {import('../../conversation-hub/access.js').HubAccessPrincipal} principal
+ * @param {{
+ *     limit?: number;
+ *     offset?: number;
+ *     status?: import('../../conversation-hub/store-helpers.js').HubSessionStatus;
+ * }} [opts]
+ * @returns {import('../../conversation-hub/store-helpers.js').HubSession[]}
+ */
+function _listAuthorizedSessions(store, principal, opts = {}) {
+    const requestedLimit = Math.max(1, Math.min(opts.limit ?? 20, 100));
+    const requestedOffset = Math.max(0, opts.offset ?? 0);
+    const targetCount = requestedLimit + requestedOffset;
+    const pageSize = Math.max(50, targetCount * 3);
+    /** @type {import('../../conversation-hub/store-helpers.js').HubSession[]} */
+    const authorized = [];
+
+    let cursor = 0;
+    while (authorized.length < targetCount) {
+        const batch = store.listHubSessions({
+            limit: pageSize,
+            offset: cursor,
+            ...(opts.status !== undefined ? { status: opts.status } : {}),
+        });
+        if (batch.length === 0) break;
+
+        for (const session of batch) {
+            if (authorizeHubSessionAction(principal, session, 'read').ok) authorized.push(session);
+        }
+
+        cursor += batch.length;
+        if (batch.length < pageSize) break;
+    }
+
+    return authorized.slice(requestedOffset, requestedOffset + requestedLimit);
+}
+
+/**
+ * Emite eventos de sessão apenas para sockets atualmente autorizados.
+ *
+ * @param {SocketNamespace} ns
+ * @param {import('../../conversation-hub/store.js').ConversationStore} store
+ * @param {string} hubSessionId
+ * @param {string} eventName
+ * @param {unknown} payload
+ * @param {{ requireRoomMembership?: boolean }} [opts]
+ * @returns {void}
+ */
+function _emitAuthorizedSessionEvent(ns, store, hubSessionId, eventName, payload, opts = {}) {
+    const session = store.getHubSession(hubSessionId);
+    if (!session) return;
+
+    for (const socket of ns.sockets.values()) {
+        const runtime = _getSocketRuntime(socket);
+        if (!authorizeHubSessionAction(runtime.principal, session, 'read').ok) continue;
+        if (opts.requireRoomMembership !== false && !socket.rooms.has(hubSessionId)) continue;
+        socket.emit(eventName, payload);
+    }
 }

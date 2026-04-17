@@ -47,6 +47,9 @@ let _agent = null;
  * @returns {void}
  */
 export function setBridgeAgent(agent) {
+    if (_agent && _agent !== agent) {
+        log('WARN', '[LlmBridgeClient] setBridgeAgent chamado novamente — substituindo instância anterior.');
+    }
     _agent = agent;
 }
 /**

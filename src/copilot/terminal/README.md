@@ -40,6 +40,8 @@ Estado atual da convergência terminal-first:
 - o recorte de `container.resolve()` em `terminal/commands/` caiu de **22** para **0** ocorrências;
 - `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`, `dialog/engine-persistence.js`,
 	`terminal-agent-wiring.js` e `index.js` já convergiram para o gateway `terminal/frontend/llm-b-runtime.js`;
+- `terminal/frontend/llm-b-frontend.js` passou a consumir runtime/hub/transporte apenas via `llm-b-runtime.js`,
+	reforçando uma seam única entre UX local e SSOTs operacionais;
 - o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências, com apenas **1** no runtime efetivo do módulo;
 - `server/` permanece em **0 imports estruturais diretos** de `terminal/`.
 

@@ -37,6 +37,7 @@ export const KNOWN_SDK_EVENTS = new Set([
     'session.compaction_complete',
     'session.compaction_start',
     'session.context_changed',
+    'session.custom_agents_updated',
     'session.error',
     'session.extensions_loaded',
     'session.handoff',

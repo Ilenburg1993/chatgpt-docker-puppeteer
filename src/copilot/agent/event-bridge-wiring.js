@@ -25,6 +25,20 @@ let _eventBusBridgeWired = false;
 let _eventBusBridgePending = false;
 
 /**
+ * Extrai o campo `code` de um erro arbitrário sem recorrer a cast duplo via `unknown`.
+ *
+ * @param {unknown} error
+ * @returns {string | undefined}
+ */
+function getErrorCode(error) {
+    if (!error || typeof error !== 'object' || !('code' in error)) {
+        return undefined;
+    }
+    const code = error.code;
+    return typeof code === 'string' ? code : undefined;
+}
+
+/**
  * Inicializa o bridge do agente para o EventBus central de forma lazy.
  *
  * O wiring fica fora do topo do módulo para permitir que o singleton seja criado apenas sob demanda. Se o EventBus
@@ -65,10 +79,7 @@ export function ensureAgentEventBusBridge(agent, options) {
 
             _eventBusBridgeWired = true;
         } catch (_busWiringErr) {
-            const code =
-                _busWiringErr instanceof Error
-                    ? /** @type {{ code?: string }} */ (/** @type {unknown} */ (_busWiringErr)).code
-                    : undefined;
+            const code = getErrorCode(_busWiringErr);
             if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') {
                 logSwallowed(_busWiringErr, 'AlwaysAliveAgent.eventBusWiring');
             }

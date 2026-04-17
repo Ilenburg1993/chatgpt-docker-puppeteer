@@ -77,6 +77,9 @@ function printStandaloneBanner() {
 /** @type {ReturnType<typeof setInterval> | null} */
 let _reflectionTimer = null;
 
+/** @type {boolean} */
+let _sighupHandlerRegistered = false;
+
 /**
  * Ativa o reflection loop periódico se `LLM_B_REFLECTION_INTERVAL_MIN` > 0.
  *
@@ -137,11 +140,11 @@ export async function startTerminalServer() {
 
     // FAIXA-2C: bridge PinnedFilesLoader → EventBus (6/6 emitters bridged)
     const _pinnedBus = container.resolve(EVENT_BUS);
-    if (_pinnedBus) {
-        bridgeEmitter(pinnedLoader, _pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED });
-    }
+    const disposePinnedBridge = _pinnedBus
+        ? bridgeEmitter(pinnedLoader, _pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED })
+        : null;
 
-    pinnedLoader.on('changed', (/** @type {{ file: string; type: string }} */ evt) => {
+    const pinnedFilesChangedHandler = (/** @type {{ file: string; type: string }} */ evt) => {
         // F13.5: hot-reload de skills/instruções sem reiniciar o agente.
         // buildHookSystemContext() já lê do disco a cada chamada (sem cache), então a próxima
         // sessão ou turno que chamar initOrResumeSession receberá automaticamente o conteúdo atualizado.
@@ -159,7 +162,8 @@ export async function startTerminalServer() {
             type: evt?.type ?? 'change',
             note: 'Context refreshed. Next session turn will use updated skills/instructions.',
         });
-    });
+    };
+    pinnedLoader.on('changed', pinnedFilesChangedHandler);
 
     // Criar hub_session permanente (best-effort)
     try {
@@ -185,7 +189,7 @@ export async function startTerminalServer() {
         _serverOpts.orchestrator = readTerminalHubOrchestrator();
         _serverOpts.store = readTerminalHubStore();
     }
-    const copilotServerPromise = startCopilotServer(_serverOpts);
+    const copilotServer = await startCopilotServer(_serverOpts);
 
     registerAgentEventListeners(printStandaloneBanner);
     startReflectionLoop();
@@ -213,7 +217,22 @@ export async function startTerminalServer() {
         10,
     );
 
-    const copilotServer = await copilotServerPromise;
+    registerShutdownHandler(
+        'terminal.pinnedFilesLoader',
+        async () => {
+            disposePinnedBridge?.();
+            if (typeof pinnedLoader.off === 'function') {
+                pinnedLoader.off('changed', pinnedFilesChangedHandler);
+            } else {
+                pinnedLoader.removeListener('changed', pinnedFilesChangedHandler);
+            }
+            if (typeof pinnedLoader.stop === 'function') {
+                await Promise.resolve(pinnedLoader.stop());
+            }
+            log('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
+        },
+        15,
+    );
 
     // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)
     if (copilotServer.io && isTerminalHubReady()) {
@@ -231,9 +250,12 @@ export async function startTerminalServer() {
 
     // T-22: SIGHUP é enviado pelo VS Code quando o painel do terminal é fechado.
     // Ignorar para manter o inject server HTTP ativo mesmo após o painel ser fechado.
-    process.on('SIGHUP', () => {
-        log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
-    });
+    if (!_sighupHandlerRegistered) {
+        process.on('SIGHUP', () => {
+            log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
+        });
+        _sighupHandlerRegistered = true;
+    }
 
     // F13.2: emitir evento terminal.started com snapshot de boot para monitoramento
     broadcastSse('terminal.started', {

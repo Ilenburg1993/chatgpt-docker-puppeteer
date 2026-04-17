@@ -35,6 +35,7 @@ export function getAgentHealthHttpStatus(health) {
  */
 export function buildAgentModuleHealth(agent) {
     const health = getAgentHealthSnapshotCompat(agent);
+    const sdkResources = typeof agent.getSdkResourceSnapshot === 'function' ? agent.getSdkResourceSnapshot() : null;
 
     return {
         ok: health.ok,
@@ -50,7 +51,14 @@ export function buildAgentModuleHealth(agent) {
             starvationAlert: health.starvationAlert,
             keepaliveRunning: health.checks.io.keepaliveRunning,
             backgroundPendingCount: health.backgroundPendingCount,
+            backgroundPendingLabels: health.backgroundPendingLabels,
+            riskFlags: health.riskFlags,
+            recommendedAction: health.recommendedAction,
+            bootFailedSteps: health.checks.boot.failedSteps,
+            bootDegradedSteps: health.checks.boot.degradedSteps,
+            bootLastCompletedAt: health.checks.boot.lastCompletedAt,
             quotaMonitorRunning: health.checks.quota.running,
+            sdkResources,
             issues: health.issues,
         },
     };
@@ -89,8 +97,12 @@ export function buildLegacyAgentHealth(agent) {
         oldestTaskWaitMs: snap.oldestTaskWaitMs,
         starvationAlert: snap.starvationAlert,
         backgroundPendingCount: 0,
+        backgroundPendingLabels: [],
+        riskFlags: operational ? ['session.missing'] : ['runtime.stopped', 'session.missing', 'client.missing'],
+        recommendedAction: operational ? 'recreate_session' : 'restart_agent',
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
+        bootReport: null,
         checks: {
             runtime: {
                 ok: operational,
@@ -129,6 +141,14 @@ export function buildLegacyAgentHealth(agent) {
                 ok: true,
                 pendingCount: 0,
                 warnThreshold: 8,
+                labels: [],
+            },
+            boot: {
+                ok: true,
+                reportAvailable: false,
+                failedSteps: 0,
+                degradedSteps: 0,
+                lastCompletedAt: null,
             },
             quota: {
                 ok: true,

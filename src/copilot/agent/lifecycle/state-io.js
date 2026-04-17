@@ -14,13 +14,14 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { toError, logSwallowed } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
-import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
@@ -67,6 +68,14 @@ const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : join(STATE_DIR, 
 let _stateCache = null;
 
 /**
+ * Promise compartilhada da leitura assíncrona em voo. Evita múltiplos readers parseando/removendo o mesmo snapshot
+ * corrompido durante o boot.
+ *
+ * @type {Promise<AliveAgentState | null> | null}
+ */
+let _readStatePromise = null;
+
+/**
  * Flag para evitar chamadas redundantes a `mkdirSync`/`mkdir` após a primeira criação do diretório.
  *
  * @type {boolean}
@@ -77,9 +86,9 @@ let _stateDirReady = false;
  * Mutex serial para `writeStateAsync` — evita race conditions quando múltiplas escritas concorrentes lêem o estado
  * antes que qualquer escrita anterior seja concluída (G1-BUG-05).
  *
- * @type {Promise<AliveAgentState>}
+ * @type {Promise<void>}
  */
-let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+let _writeQueue = Promise.resolve();
 
 // ─── API pública ─────────────────────────────────────────────────────────────
 
@@ -96,8 +105,10 @@ let _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unk
  */
 export function readState() {
     if (_stateCache !== null) return _stateCache;
-    // F52: em vez de readFileSync, dispara async load e retorna null
-    readStateAsync().catch((e) => logSwallowed(e, 'stateIo.readState.asyncFallback'));
+    if (_readStatePromise === null) {
+        // F52: em vez de readFileSync, dispara async load e retorna null
+        readStateAsync().catch((e) => logSwallowed(e, 'stateIo.readState.asyncFallback'));
+    }
     return null;
 }
 
@@ -136,13 +147,19 @@ export function writeState(updates) {
  * @throws {Error} Se a escrita em disco falhar após retry interno
  */
 export async function writeStateAsync(updates) {
-    _writeQueue = _writeQueue
+    const resultPromise = _writeQueue
         .then(() => _doWriteState(updates))
         .catch((err) => {
             log('WARN', `[PersistentSession] writeStateAsync retry após falha: ${err?.message ?? err}`);
             return _doWriteState(updates);
         });
-    return _writeQueue;
+
+    _writeQueue = resultPromise.then(
+        () => undefined,
+        () => undefined,
+    );
+
+    return resultPromise;
 }
 
 /**
@@ -156,7 +173,7 @@ async function _doWriteState(updates) {
         await mkdir(STATE_DIR, { recursive: true });
         _stateDirReady = true;
     }
-    const current = readState() ?? _defaultState();
+    const current = (await readStateAsync()) ?? _defaultState();
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     await writeFile(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
     _stateCache = next;
@@ -173,8 +190,9 @@ async function _doWriteState(updates) {
  */
 export function clearState() {
     _stateCache = null;
+    _readStatePromise = null;
     _stateDirReady = false;
-    _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+    _writeQueue = Promise.resolve();
     clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }
 
@@ -187,38 +205,51 @@ export function clearState() {
  */
 export async function readStateAsync() {
     if (_stateCache !== null) return _stateCache;
-    try {
-        await stat(STATE_FILE);
-    } catch {
-        return null;
-    }
-    try {
-        const raw = await readFile(STATE_FILE, 'utf8');
-        const parseResult = safeJsonParse(raw, '[PersistentSession/readStateAsync]');
-        if (!parseResult.ok) {
-            log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
+    if (_readStatePromise) return _readStatePromise;
+
+    _readStatePromise = (async () => {
+        try {
+            await stat(STATE_FILE);
+        } catch {
+            return null;
+        }
+        try {
+            const raw = await readFile(STATE_FILE, 'utf8');
+            const parseResult = safeJsonParse(raw, '[PersistentSession/readStateAsync]');
+            if (!parseResult.ok) {
+                log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
+                try {
+                    await rm(STATE_FILE, { force: true });
+                } catch (e) {
+                    logSwallowed(e, 'stateIo.readStateAsync.rmCorrupt');
+                }
+                return null;
+            }
+            const result = AliveAgentStateSchema.safeParse(parseResult.data);
+            if (!result.success) {
+                log('WARN', '[PersistentSession] Estado inválido (schema validation failed) — ignorando ficheiro.');
+                return null;
+            }
+            _stateCache = /** @type {AliveAgentState} */ (result.data);
+            return _stateCache;
+        } catch (e) {
+            log(
+                'WARN',
+                `[PersistentSession] Estado corrompido (${toError(e).message}) — removendo arquivo e reiniciando.`,
+            );
             try {
                 await rm(STATE_FILE, { force: true });
             } catch (e) {
-                logSwallowed(e, 'stateIo.readStateAsync.rmCorrupt');
+                logSwallowed(e, 'stateIo.readStateAsync.rmCorruptOuter');
             }
             return null;
         }
-        const result = AliveAgentStateSchema.safeParse(parseResult.data);
-        if (!result.success) {
-            log('WARN', '[PersistentSession] Estado inválido (schema validation failed) — ignorando ficheiro.');
-            return null;
-        }
-        _stateCache = /** @type {AliveAgentState} */ (result.data);
-        return _stateCache;
-    } catch (e) {
-        log('WARN', `[PersistentSession] Estado corrompido (${toError(e).message}) — removendo arquivo e reiniciando.`);
-        try {
-            await rm(STATE_FILE, { force: true });
-        } catch (e) {
-            logSwallowed(e, 'stateIo.readStateAsync.rmCorruptOuter');
-        }
-        return null;
+    })();
+
+    try {
+        return await _readStatePromise;
+    } finally {
+        _readStatePromise = null;
     }
 }
 
@@ -237,8 +268,9 @@ export async function clearStateAsync() {
         logSwallowed(e, 'stateIo.clearStateAsync.rm');
     }
     _stateCache = null;
+    _readStatePromise = null;
     _stateDirReady = false;
-    _writeQueue = Promise.resolve(/** @type {AliveAgentState} */ (/** @type {unknown} */ (null)));
+    _writeQueue = Promise.resolve();
 }
 
 /**
@@ -250,9 +282,26 @@ export async function clearStateAsync() {
  */
 export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
     await Promise.race([
-        _writeQueue.then(() => undefined).catch((e) => logSwallowed(e, 'stateIo.drainWrites')),
+        _writeQueue.catch((e) => logSwallowed(e, 'stateIo.drainWrites')),
         new Promise((resolve) => setTimeout(resolve, timeoutMs)),
     ]);
+}
+
+/**
+ * Persiste estado usando a policy canônica do `agent`, registrando contexto operacional estruturado.
+ *
+ * @param {Partial<AliveAgentState>} data - Dados parciais a persistir
+ * @param {{ label?: string }} [opts]
+ * @returns {Promise<import('../error-policy.js').AgentPolicyResult<AliveAgentState>>}
+ */
+export async function persistStateWithPolicy(data, opts = {}) {
+    const label = opts.label ?? 'state.persist';
+    return withAgentErrorPolicy(() => writeStateAsync(data), {
+        onError: (error, disposition) => {
+            const level = disposition === 'fatal' ? 'ERROR' : 'WARN';
+            log(level, `[PersistentSession] ${label}: ${error.message}`);
+        },
+    });
 }
 
 /**
@@ -265,7 +314,7 @@ export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
  * @returns {void}
  */
 export function persistState(data, tag) {
-    writeStateAsync(data).catch((e) => log('WARN', `${tag}: ${e.message}`));
+    void persistStateWithPolicy(data, { label: tag });
 }
 
 // ─── Helpers privados ─────────────────────────────────────────────────────────

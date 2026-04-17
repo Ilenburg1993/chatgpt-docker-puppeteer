@@ -42,6 +42,17 @@ export { bootstrapLateDeps, bootstrapObservability } from './bootstrap.js';
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';
 
+// ─── EventBus Runtime Canônico ───────────────────────────────────────────────
+export {
+    attachObservabilityBusRuntime,
+    createObservabilityBusRuntime,
+    detachObservabilityBusRuntime,
+    getObservabilityBusActivity,
+    getObservabilityBusDiagnostics,
+    getObservabilityBusHealth,
+    getObservabilityBusRuntime,
+} from './event-bus-runtime.js';
+
 // ─── EventBus Observers ───────────────────────────────────────────────────────
 export { createLogObserver } from './bus-actions/log-observer.js';
 export { attachEventBusObservers, detachEventBusObservers } from './event-bus-observers.js';

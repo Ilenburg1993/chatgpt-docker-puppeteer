@@ -9,14 +9,31 @@
  *   por conta própria.
  */
 
-import { createSnapshot, getAgent, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
-import { llmBridgeClient } from '#copilot/channel';
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
-import { getSharedSessionBinding } from '#copilot/core';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
 import { getWorkspaceContext } from '../workspace-context.js';
+import {
+    canSearchTerminalHubTurns,
+    clearTerminalHistoryFeed,
+    createTerminalSnapshot,
+    deleteTerminalHubMemory,
+    getTerminalAgentRuntime,
+    isTerminalHubReady,
+    listTerminalSnapshots,
+    loadTerminalSnapshot,
+    readTerminalHistoryFeed,
+    readTerminalHubMemories,
+    readTerminalHubSession,
+    readTerminalHubSessions,
+    readTerminalHubTurns,
+    readTerminalSessionBinding,
+    readTerminalTurnCount,
+    saveTerminalSnapshot,
+    searchTerminalHubTurns,
+    seedTerminalHistoryFeed,
+    storeTerminalHubMemory,
+} from './llm-b-runtime.js';
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection
@@ -57,10 +74,10 @@ export function normalizeContextWindowProjection(raw) {
  * @returns {TerminalRuntimeBase}
  */
 export function readTerminalRuntimeBase() {
-    const agent = getAgent();
+    const agent = getTerminalAgentRuntime();
     const snap = /** @type {Record<string, unknown>} */ (agent.getStatusSnapshot());
     const health = typeof agent.getHealthSnapshot === 'function' ? agent.getHealthSnapshot() : null;
-    const binding = getSharedSessionBinding();
+    const binding = readTerminalSessionBinding();
     const runtimeSessionId =
         agent.sessionId ??
         (typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null) ??
@@ -97,7 +114,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort }
         sdkSessionId: base.binding.sdkSessionId,
         runtimeSessionId: base.runtimeSessionId,
         workspace: getWorkspaceContext(),
-        turnCount: llmBridgeClient.turnCount,
+        turnCount: readTerminalTurnCount(),
     };
 }
 
@@ -203,7 +220,12 @@ export function setTerminalReasoningProjection(effort) {
  * @returns {{ role: string; content: string; timestamp: number }[]}
  */
 export function readTerminalHistoryProjection(limitPairs = 10) {
-    return llmBridgeClient.history.slice(-limitPairs * 2);
+    return readTerminalHistoryFeed()
+        .slice(-limitPairs * 2)
+        .map((turn, index) => ({
+            ...turn,
+            timestamp: turn.timestamp ?? Date.now() + index,
+        }));
 }
 
 /**
@@ -222,9 +244,7 @@ export function readTerminalHistoryProjection(limitPairs = 10) {
  */
 export function readTerminalContextProjection() {
     const base = readTerminalRuntimeBase();
-    const history = /** @type {{ role: string; content: string }[]} */ (
-        /** @type {unknown} */ (llmBridgeClient.history) ?? []
-    );
+    const history = /** @type {{ role: string; content: string }[]} */ (readTerminalHistoryFeed());
 
     let totalChars = 0;
     let turnCount = 0;
@@ -269,10 +289,8 @@ export async function requestTerminalCompactionProjection() {
         return { ok: false, reply: null, estimatedTokens: null };
     }
 
-    llmBridgeClient.clearHistory();
-    if (typeof llmBridgeClient.seedHistory === 'function') {
-        llmBridgeClient.seedHistory('assistant', reply);
-    }
+    clearTerminalHistoryFeed();
+    seedTerminalHistoryFeed('assistant', reply);
 
     return {
         ok: true,
@@ -287,7 +305,7 @@ export async function requestTerminalCompactionProjection() {
  * @returns {void}
  */
 export function clearTerminalHistory() {
-    llmBridgeClient.clearHistory();
+    clearTerminalHistoryFeed();
 }
 
 /**
@@ -319,7 +337,7 @@ export function readTerminalDbHistoryProjection({ hubSessionId = null, limit = 2
     return {
         available: true,
         reason: null,
-        turns: conversationStore.readTurns(hubSessionId, { limit, offset }),
+        turns: readTerminalHubTurns(hubSessionId, { limit, offset }),
         limit,
         offset,
     };
@@ -334,7 +352,7 @@ export function readTerminalDbHistoryProjection({ hubSessionId = null, limit = 2
 export function readTerminalDbSessionsProjection({ currentHubSessionId = null, limit = 10 }) {
     return {
         currentHubSessionId,
-        sessions: conversationStore.listHubSessions({ limit }),
+        sessions: readTerminalHubSessions({ limit, offset: 0 }),
     };
 }
 
@@ -354,7 +372,7 @@ export function readTerminalDbSessionsProjection({ currentHubSessionId = null, l
  * }}
  */
 export function readTerminalCountProjection({ hubSessionId = null }) {
-    const binding = getSharedSessionBinding();
+    const binding = readTerminalSessionBinding();
     if (!hubSessionId) {
         return {
             available: false,
@@ -367,8 +385,8 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
             memories: 0,
         };
     }
-    const turns = conversationStore.readTurns(hubSessionId, { limit: 9999 });
-    const memories = conversationStore.recallMemories({ limit: 9999 });
+    const turns = readTerminalHubTurns(hubSessionId, { limit: 9999, offset: 0 });
+    const memories = readTerminalHubMemories({ limit: 9999 });
     return {
         available: true,
         reason: null,
@@ -389,7 +407,7 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
  */
 export async function saveTerminalSnapshotProjection(reason) {
     const { agent, snap } = readTerminalRuntimeBase();
-    const data = createSnapshot({
+    const data = createTerminalSnapshot({
         sessionId: agent.sessionId ?? null,
         model: String(snap['model'] ?? 'unknown'),
         status: String(snap['status'] ?? 'unknown'),
@@ -400,7 +418,7 @@ export async function saveTerminalSnapshotProjection(reason) {
         prMetrics: agent.dialogPrMetrics ?? null,
         reason: reason || 'manual',
     });
-    const path = await saveSnapshotAsync(data);
+    const path = await saveTerminalSnapshot(data);
     return { data, path };
 }
 
@@ -410,7 +428,7 @@ export async function saveTerminalSnapshotProjection(reason) {
  * @returns {Promise<Record<string, any>[]>}
  */
 export async function listTerminalSnapshotsProjection() {
-    return listSnapshotsAsync();
+    return listTerminalSnapshots();
 }
 
 /**
@@ -420,7 +438,7 @@ export async function listTerminalSnapshotsProjection() {
  * @returns {Promise<Record<string, any> | null>}
  */
 export async function loadTerminalSnapshotProjection(snapshotId) {
-    return loadSnapshotAsync(snapshotId);
+    return loadTerminalSnapshot(snapshotId);
 }
 
 /**
@@ -448,14 +466,14 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
     const uptimeSec = Math.round(process.uptime());
 
     let summary = 'sem storage';
-    if (conversationHub.isReady && hubSessionId) {
+    if (isTerminalHubReady() && hubSessionId) {
         try {
-            const session = conversationStore.getHubSession(hubSessionId);
+            const session = readTerminalHubSession(hubSessionId);
             summary = session ? `sessão ${hubSessionId.slice(0, 8)}…` : 'sessão não encontrada no store';
         } catch {
             summary = 'erro ao consultar store';
         }
-    } else if (!conversationHub.isReady) {
+    } else if (!isTerminalHubReady()) {
         summary = 'hub não inicializado';
     }
 
@@ -485,7 +503,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
         memMB,
         uptimeSec,
         hub: {
-            ready: conversationHub.isReady,
+            ready: isTerminalHubReady(),
             activeHubSessionId: hubSessionId ?? base.binding.hubSessionId ?? null,
             summary,
         },
@@ -531,7 +549,7 @@ export function readTerminalMetricsProjection() {
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
         pr,
-        turnCount: llmBridgeClient.turnCount,
+        turnCount: readTerminalTurnCount(),
         toolCallCount,
         toolErrorCount,
         errorStats: {
@@ -599,11 +617,7 @@ export function rememberTerminalMemoryProjection({ hubSessionId = null, input })
     if (!content) {
         return { ok: false, reason: 'empty-content', tag, content, id: null };
     }
-    const id = conversationStore.storeMemory({
-        tag,
-        content,
-        ...(hubSessionId ? { hubSessionId } : {}),
-    });
+    const id = storeTerminalHubMemory({ tag, content, ...(hubSessionId ? { hubSessionId } : {}) });
     return { ok: true, reason: null, tag, content, id };
 }
 
@@ -617,7 +631,7 @@ export function recallTerminalMemoriesProjection(rawArg) {
     const arg = rawArg.trim();
     const isSearch = arg.startsWith('?');
     const label = isSearch ? arg.slice(1).trim() : arg || null;
-    const memories = conversationStore.recallMemories({
+    const memories = readTerminalHubMemories({
         ...(isSearch ? { search: label ?? '' } : label ? { tag: label } : {}),
         limit: 10,
     });
@@ -631,7 +645,7 @@ export function recallTerminalMemoriesProjection(rawArg) {
  * @returns {boolean}
  */
 export function forgetTerminalMemoryProjection(memoryId) {
-    return conversationStore.deleteMemory(memoryId);
+    return deleteTerminalHubMemory(memoryId);
 }
 
 /**
@@ -643,7 +657,7 @@ export function forgetTerminalMemoryProjection(memoryId) {
 export function readTerminalResumeListProjection({ currentHubSessionId = null, limit = 5 }) {
     return {
         currentHubSessionId,
-        sessions: conversationStore.listHubSessions({ limit, offset: 0 }),
+        sessions: readTerminalHubSessions({ limit, offset: 0 }),
     };
 }
 
@@ -660,12 +674,17 @@ export function readTerminalResumeListProjection({ currentHubSessionId = null, l
  * }}
  */
 export function readTerminalResumeProjection({ token, limitTurns = 50 }) {
-    const sessions = conversationStore.listHubSessions({ limit: 100, offset: 0 });
-    const target = sessions.find((session) => session.id === token || session.id.startsWith(token)) ?? null;
+    const sessions = readTerminalHubSessions({ limit: 100, offset: 0 });
+    const target =
+        sessions.find((session) => {
+            const sessionId = typeof session.id === 'string' ? session.id : '';
+            return sessionId === token || sessionId.startsWith(token);
+        }) ?? null;
     if (!target) {
         return { found: false, reason: 'session-not-found', target: null, turns: [], summaryPrompt: null };
     }
-    const turns = conversationStore.readTurns(target.id, { limit: limitTurns, offset: 0 });
+    const targetId = typeof target.id === 'string' ? target.id : '';
+    const turns = readTerminalHubTurns(targetId, { limit: limitTurns, offset: 0 });
     if (turns.length === 0) {
         return { found: false, reason: 'session-empty', target, turns, summaryPrompt: null };
     }
@@ -691,12 +710,12 @@ export function searchTerminalTurnsProjection({ query, hubSessionId = null, limi
     if (!trimmed) {
         return { available: false, reason: 'empty-query', query: trimmed, results: [] };
     }
-    if (!conversationHub.isReady || !conversationHub.store) {
+    if (!canSearchTerminalHubTurns()) {
         return { available: false, reason: 'hub-unavailable', query: trimmed, results: [] };
     }
     /** @type {{ query: string; limit: number; hubSessionId?: string }} */
     const searchOpts = { query: trimmed, limit };
     if (hubSessionId) searchOpts.hubSessionId = hubSessionId;
-    const results = conversationHub.store.searchTurns(searchOpts);
+    const results = searchTerminalHubTurns(searchOpts);
     return { available: true, reason: null, query: trimmed, results };
 }

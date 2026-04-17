@@ -26,5 +26,5 @@ export function timestampEnricher(event, next) {
     if (!event._source) {
         event._source = `${_hostname}:${_pid}`;
     }
-    next();
+    return next();
 }

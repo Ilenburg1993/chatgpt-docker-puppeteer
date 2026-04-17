@@ -7,9 +7,10 @@
  * @module copilot/infra/storage
  */
 
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 /**
  * Lê e parse um arquivo JSON. Retorna `defaultValue` se o arquivo não existir ou for inválido.
@@ -43,7 +44,18 @@ export async function writeJson(filePath, data) {
         await mkdir(dir, { recursive: true });
     }
     const content = JSON.stringify(data, null, 2) + '\n';
-    await writeFile(filePath, content, 'utf-8');
+    const tmpPath = join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
+    try {
+        await writeFile(tmpPath, content, 'utf-8');
+        await rename(tmpPath, filePath);
+    } catch (err) {
+        try {
+            await unlink(tmpPath);
+        } catch {
+            /* ignore cleanup */
+        }
+        throw err;
+    }
 }
 
 /**

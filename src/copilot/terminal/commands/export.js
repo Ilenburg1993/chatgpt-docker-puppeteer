@@ -8,10 +8,10 @@
  * @see EventBus
  */
 
-import { llmBridgeClient } from '#copilot/channel';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
+import { readTerminalHistoryFeed } from '../frontend/index.js';
 
 /**
  * @typedef {object} ExportContext
@@ -26,7 +26,7 @@ import { toError } from '../../core/error-handlers.js';
  * @returns {Promise<void>}
  */
 export async function cmdExport({ println }, arg) {
-    const hist = llmBridgeClient.history;
+    const hist = readTerminalHistoryFeed();
     if (hist.length === 0) {
         println('  \x1b[33mHistórico vazio — nada para exportar.\x1b[0m');
         return;
@@ -40,7 +40,7 @@ export async function cmdExport({ println }, arg) {
     lines.push(`> ${hist.length} mensagens · exportado em ${new Date().toISOString()}`, '');
 
     for (const turn of hist) {
-        const time = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
+        const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
         const role = turn.role === 'user' ? '👤 Usuário' : '🧠 LLM-B';
         lines.push(`## ${role} — ${time}`, '');
         lines.push(turn.content, '');

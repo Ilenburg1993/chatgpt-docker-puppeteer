@@ -49,6 +49,6 @@ export function createRateLimiter(options = {}) {
             return; // não chama next() → evento suprimido
         }
 
-        next();
+        return next();
     };
 }

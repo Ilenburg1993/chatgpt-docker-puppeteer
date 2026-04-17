@@ -18,7 +18,7 @@ import {
     EMITTER_TURN_START,
 } from '#copilot/events';
 import { log, METRICS_STORE, startSpan } from '#copilot/observability';
-import { writeStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -55,6 +55,61 @@ function castListener(fn) {
 }
 
 /**
+ * @param {unknown} evt
+ * @returns {{ reply: string }}
+ */
+function normalizeReplyEvent(evt) {
+    if (!evt || typeof evt !== 'object') {
+        return { reply: '' };
+    }
+    const reply = Reflect.get(evt, 'reply');
+    return { reply: typeof reply === 'string' ? reply : '' };
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {{ authorized?: boolean; reason?: string }}
+ */
+function normalizeStopEvent(evt) {
+    if (!evt || typeof evt !== 'object') {
+        return {};
+    }
+    const authorized = Reflect.get(evt, 'authorized');
+    const reason = Reflect.get(evt, 'reason');
+    return {
+        ...(typeof authorized === 'boolean' ? { authorized } : {}),
+        ...(typeof reason === 'string' ? { reason } : {}),
+    };
+}
+
+/**
+ * @param {AbortSignal | undefined} signal
+ * @param {() => void} listener
+ * @returns {void}
+ */
+function detachAbortListener(signal, listener) {
+    signal?.removeEventListener?.('abort', listener);
+}
+
+class AbortTurnError extends Error {
+    /**
+     * @param {string} message
+     */
+    constructor(message) {
+        super(message);
+        this.name = 'AbortError';
+    }
+}
+
+/**
+ * @param {string} message
+ * @returns {Error}
+ */
+function createAbortError(message) {
+    return new AbortTurnError(message);
+}
+
+/**
  * Emite `turn_start`, incrementa o contador e persiste estado pendente.
  *
  * @param {TurnEmitter} emitter
@@ -67,10 +122,19 @@ export function emitTurnStart(emitter, message, counter, host) {
     const turnStart = Date.now();
     counter.sendCount++;
     emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
-    const persistPendingTurnTask = writeStateAsync({
-        pendingTurnMessage: message,
-        pendingTurnTs: turnStart,
-        pendingTurnConsumedPR: false,
+    const persistPendingTurnTask = persistStateWithPolicy(
+        {
+            pendingTurnMessage: message,
+            pendingTurnTs: turnStart,
+            pendingTurnConsumedPR: false,
+        },
+        { label: 'dialog.turn.pending' },
+    ).then((result) => {
+        if (!result.ok) {
+            const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
+            throw failure.error;
+        }
+        return undefined;
     });
     if (typeof host?.trackBackgroundTask === 'function') {
         void host.trackBackgroundTask(persistPendingTurnTask, {
@@ -99,7 +163,7 @@ export function emitTurnStart(emitter, message, counter, host) {
  *     message: string;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
  *     resolve: (v: string) => void;
- *     reject: (e: unknown) => void;
+ *     reject: (e: Error) => void;
  *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
  * }} opts
  * @returns {{
@@ -170,12 +234,13 @@ export function buildTurnResolutionListeners(emitter, opts) {
  *     host: TurnHost;
  *     message: string;
  *     timeout: number;
+ *     signal?: AbortSignal;
  *     timeoutHandle: ReturnType<typeof setTimeout>;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
  *     onReplyOuter: (evt: unknown) => void;
  *     onStopOuter: (evt: unknown) => void;
  *     resolve: (v: string) => void;
- *     reject: (e: unknown) => void;
+ *     reject: (e: Error) => void;
  *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
  * }} opts
  */
@@ -196,7 +261,7 @@ export function dispatchTurnToHost(emitter, opts) {
     if (host.getPendingQuestion()) {
         host.answerPendingQuestion(message);
     } else {
-        const onPending = (/** @type {unknown} */ _) => {
+        const onPending = () => {
             pendingListenerRef.current = null;
             clearTimeout(timeoutHandle);
             // F41B.3: remover os outer listeners registrados por buildTurnResolutionListeners
@@ -208,11 +273,17 @@ export function dispatchTurnToHost(emitter, opts) {
                 emitter.off(EMITTER_LOOP_STOPPED, onStop);
                 reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
             }, timeout);
+            /** @type {(() => void) | null} */
+            let onAbortInner = null;
             const onReply = castListener(
                 /** @param {{ reply: string }} evt */
                 (evt) => {
                     clearTimeout(newTimeout);
                     emitter.off(EMITTER_LOOP_STOPPED, onStop);
+                    if (onAbortInner) {
+                        detachAbortListener(opts.signal, onAbortInner);
+                        onAbortInner = null;
+                    }
                     resolve(evt.reply);
                 },
             );
@@ -221,6 +292,10 @@ export function dispatchTurnToHost(emitter, opts) {
                 (stopEvt2) => {
                     clearTimeout(newTimeout);
                     emitter.off(EMITTER_LOOP_REPLY, onReply);
+                    if (onAbortInner) {
+                        detachAbortListener(opts.signal, onAbortInner);
+                        onAbortInner = null;
+                    }
                     if (stopEvt2?.authorized) {
                         reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
                     } else {
@@ -228,6 +303,15 @@ export function dispatchTurnToHost(emitter, opts) {
                     }
                 },
             );
+            if (opts.signal) {
+                onAbortInner = () => {
+                    clearTimeout(newTimeout);
+                    emitter.off(EMITTER_LOOP_REPLY, onReply);
+                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
+                    reject(createAbortError('[DialogLoopManager] sendTurn abortado.'));
+                };
+                opts.signal.addEventListener('abort', onAbortInner, { once: true });
+            }
             emitter.once(EMITTER_LOOP_REPLY, onReply);
             emitter.once(EMITTER_LOOP_STOPPED, onStop);
             host.answerPendingQuestion(message);
@@ -237,7 +321,7 @@ export function dispatchTurnToHost(emitter, opts) {
         if (host.getPendingQuestion()) {
             emitter.off(EMITTER_QUESTION_PENDING, onPending);
             pendingListenerRef.current = null;
-            onPending(undefined);
+            onPending();
         }
     }
 }
@@ -256,31 +340,51 @@ export function dispatchTurnToHost(emitter, opts) {
 export function waitForRestartAndReply(emitter, host, message, timeout, stopReason, signal) {
     if (!host) return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
     if (signal?.aborted) {
-        return Promise.reject(new DOMException('[DialogLoopManager] restart abortado.', 'AbortError'));
+        return Promise.reject(createAbortError('[DialogLoopManager] restart abortado.'));
     }
 
     return new Promise((resolve, reject) => {
         /** @type {(() => void) | null} */
         let onRetryPending = null;
+        /** @type {((evt: unknown) => void) | null} */
+        let onRetryReply = null;
+        /** @type {((evt: unknown) => void) | null} */
+        let onRetryStopped = null;
         let settled = false;
 
-        // F41B.5: abort handler — limpa todos os listeners pendentes
-        const onAbort = () => {
-            if (settled) return;
-            settled = true;
+        const cleanup = () => {
             clearTimeout(retryTimeout);
             emitter.off(EMITTER_LOOP_READY, onRetryReady);
             if (onRetryPending) emitter.off(EMITTER_QUESTION_PENDING, onRetryPending);
-            reject(new DOMException('[DialogLoopManager] restart abortado.', 'AbortError'));
+            if (onRetryReply) emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
+            if (onRetryStopped) emitter.off(EMITTER_LOOP_STOPPED, onRetryStopped);
+            detachAbortListener(signal, onAbort);
+        };
+
+        /** @param {string} value */
+        const settleResolve = (value) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+        };
+
+        /** @param {Error} error */
+        const settleReject = (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+        };
+
+        // F41B.5: abort handler — limpa todos os listeners pendentes
+        const onAbort = () => {
+            settleReject(createAbortError('[DialogLoopManager] restart abortado.'));
         };
         if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
         const retryTimeout = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            emitter.off(EMITTER_LOOP_READY, onRetryReady);
-            if (onRetryPending) emitter.off(EMITTER_QUESTION_PENDING, onRetryPending);
-            reject(
+            settleReject(
                 new SessionError(
                     `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
                     'DIALOG_RESTART_TIMEOUT',
@@ -289,24 +393,20 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
         }, timeout);
 
         const onRetryReady = () => {
-            clearTimeout(retryTimeout);
             onRetryPending = () => {
                 host.answerPendingQuestion(message);
-                const onRetryStopped = (/** @type {unknown} */ rawEvt) => {
-                    const stoppedEvt = /** @type {{ reason?: string }} */ (rawEvt);
-                    emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
-                    reject(
+                onRetryStopped = (rawEvt) => {
+                    const stoppedEvt = normalizeStopEvent(rawEvt);
+                    settleReject(
                         new SessionError(
                             `[DialogLoopManager] stopped durante retry (${stoppedEvt?.reason ?? 'unknown'})`,
                             'DIALOG_STOPPED_DURING_RETRY',
                         ),
                     );
                 };
-                /** @type {(evt: unknown) => void} */
-                const onRetryReply = (rawEvt) => {
-                    const retryEvt = /** @type {{ reply: string }} */ (rawEvt);
-                    emitter.off(EMITTER_LOOP_STOPPED, onRetryStopped);
-                    resolve(retryEvt.reply);
+                onRetryReply = (rawEvt) => {
+                    const retryEvt = normalizeReplyEvent(rawEvt);
+                    settleResolve(retryEvt.reply);
                 };
                 emitter.once(EMITTER_LOOP_REPLY, onRetryReply);
                 emitter.once(EMITTER_LOOP_STOPPED, onRetryStopped);
@@ -340,7 +440,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
         return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
     }
     if (signal?.aborted) {
-        return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
+        return Promise.reject(createAbortError('[DialogLoopManager] sendTurn abortado.'));
     }
 
     const { turnStart } = emitTurnStart(emitter, message, sendCountRef, host);
@@ -360,6 +460,23 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
             new Promise((resolve, reject) => {
                 /** @type {{ current: ((arg: unknown) => void) | null }} */
                 const pendingListenerRef = { current: null };
+                let settled = false;
+
+                /** @param {string} value */
+                const settleResolve = (value) => {
+                    if (settled) return;
+                    settled = true;
+                    detachAbortListener(signal, onAbort);
+                    resolve(value);
+                };
+
+                /** @param {Error} error */
+                const settleReject = (error) => {
+                    if (settled) return;
+                    settled = true;
+                    detachAbortListener(signal, onAbort);
+                    reject(error instanceof Error ? error : new Error(String(error)));
+                };
 
                 const { timeoutHandle, onReplyOuter, onStopOuter } = buildTurnResolutionListeners(emitter, {
                     host,
@@ -367,22 +484,20 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
                     timeout,
                     message,
                     pendingListenerRef,
-                    resolve,
-                    reject,
+                    resolve: settleResolve,
+                    reject: settleReject,
                     waitForRestartAndReplyFn: waitFn,
                 });
 
+                const onAbort = () => {
+                    clearTimeout(timeoutHandle);
+                    emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
+                    emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
+                    settleReject(createAbortError('[DialogLoopManager] sendTurn abortado.'));
+                };
+
                 if (signal) {
-                    signal.addEventListener(
-                        'abort',
-                        () => {
-                            clearTimeout(timeoutHandle);
-                            emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
-                            emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
-                            reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
-                        },
-                        { once: true },
-                    );
+                    signal.addEventListener('abort', onAbort, { once: true });
                 }
 
                 emitter.once(EMITTER_LOOP_REPLY, onReplyOuter);
@@ -392,12 +507,13 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
                     host,
                     message,
                     timeout,
+                    ...(signal !== undefined && { signal }),
                     timeoutHandle,
                     pendingListenerRef,
                     onReplyOuter,
                     onStopOuter,
-                    resolve,
-                    reject,
+                    resolve: settleResolve,
+                    reject: settleReject,
                     waitForRestartAndReplyFn: waitFn,
                 });
             }),

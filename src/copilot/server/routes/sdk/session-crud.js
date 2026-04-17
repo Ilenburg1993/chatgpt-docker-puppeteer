@@ -14,9 +14,13 @@ import {
     disconnectClientSession,
     getClient,
     getClientSession,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
     listActiveClientSessions,
+    listAllClientSessions,
     pickDefined,
     resumeClientSession,
+    setForegroundClientSessionId,
 } from '#copilot/sdk';
 import { Router } from 'express';
 import {
@@ -81,8 +85,10 @@ router.get('/sessions/active', (_req, res) => {
  */
 router.get('/sessions/last', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const client = await getClient();
-        const meta = await resolveSdkSessionRouteMeta(client);
+        const meta = await resolveSdkSessionRouteMeta({
+            getForegroundSessionId: getForegroundClientSessionId,
+            getLastSessionId: getLastClientSessionId,
+        });
         res.json({
             ok: true,
             lastSessionId: meta.lastSessionId,
@@ -97,8 +103,10 @@ router.get('/sessions/last', (req, res) => {
  */
 router.get('/sessions/binding', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const client = await getClient();
-        const meta = await resolveSdkSessionRouteMeta(client);
+        const meta = await resolveSdkSessionRouteMeta({
+            getForegroundSessionId: getForegroundClientSessionId,
+            getLastSessionId: getLastClientSessionId,
+        });
         res.json({ ok: true, ...meta });
     });
 });
@@ -112,8 +120,10 @@ router.get('/sessions/binding', (req, res) => {
  */
 router.get('/sessions/foreground', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const client = await getClient();
-        const meta = await resolveSdkSessionRouteMeta(client);
+        const meta = await resolveSdkSessionRouteMeta({
+            getForegroundSessionId: getForegroundClientSessionId,
+            getLastSessionId: getLastClientSessionId,
+        });
         res.json({
             ok: true,
             foregroundSessionId: meta.foregroundSessionId,
@@ -129,8 +139,7 @@ router.get('/sessions/foreground', (req, res) => {
 router.put('/sessions/foreground/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const client = await getClient();
-        await client.setForegroundSessionId(id);
+        await setForegroundClientSessionId(id);
         rememberSdkSessionOwnership(id);
         res.json(attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id));
     });
@@ -154,8 +163,7 @@ router.get('/sessions', (req, res) => {
         if (req.query['branch']) filter.branch = String(req.query['branch']);
         if (req.query['cwd']) filter.cwd = String(req.query['cwd']);
 
-        const client = await getClient();
-        const sessions = await client.listSessions(Object.keys(filter).length ? filter : undefined);
+        const sessions = await listAllClientSessions(Object.keys(filter).length ? filter : undefined);
         const active = new Set(listActiveSessions().map((s) => s.sessionId));
 
         const enriched = sessions.map((s) => ({
@@ -267,8 +275,7 @@ router.get('/sessions/:id', (req, res) => {
         const { id } = req.params;
 
         // Busca todas as sessões no disco e filtra pela ID solicitada
-        const client = await getClient();
-        const all = await client.listSessions();
+        const all = await listAllClientSessions();
         const meta = all.find((s) => s.sessionId === id);
 
         const entry = getClientSession(id);

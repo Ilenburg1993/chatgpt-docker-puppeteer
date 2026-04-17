@@ -15,9 +15,9 @@ import { logSwallowed } from '#copilot/core';
 import { log, startSpan } from '#copilot/observability';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
-import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/agent.js';
 import { readState } from '../lifecycle/state-io.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
@@ -245,6 +245,31 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
     return removed;
 }
 
+/**
+ * Converte o snapshot tipado interno em um record genérico compatível com `IStateStore`.
+ *
+ * @param {SessionSnapshotData} snapshot
+ * @returns {Record<string, unknown>}
+ */
+function toSnapshotRecord(snapshot) {
+    return { ...snapshot };
+}
+
+/**
+ * Normaliza um payload externo para o schema canônico de snapshot.
+ *
+ * @param {Record<string, unknown>} snapshot
+ * @returns {SessionSnapshotData}
+ * @throws {TypeError} Quando o payload não satisfaz o schema esperado.
+ */
+function fromSnapshotRecord(snapshot) {
+    const parsed = SessionSnapshotDataSchema.safeParse(snapshot);
+    if (!parsed.success) {
+        throw new TypeError('Snapshot payload inválido para IStateStore.saveSnapshot');
+    }
+    return /** @type {SessionSnapshotData} */ (parsed.data);
+}
+
 // ─── IStateStore singleton (Faixa 3.2 — AC-5-03) ────────────────────────────
 
 /**
@@ -253,9 +278,9 @@ export async function pruneSnapshotsAsync(keep = MAX_SNAPSHOTS) {
  * @type {import('../../core/interfaces.js').IStateStore}
  */
 export const snapshotStore = {
-    createSnapshot: (opts) => /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (createSnapshot(opts))),
+    createSnapshot: (opts) => toSnapshotRecord(createSnapshot(opts)),
     saveSnapshot: async (snapshot) => {
-        await saveSnapshotAsync(/** @type {SessionSnapshotData} */ (/** @type {unknown} */ (snapshot)));
+        await saveSnapshotAsync(fromSnapshotRecord(snapshot));
     },
     loadSnapshot: (id) => (id ? loadSnapshotAsync(id) : loadLatestSnapshotAsync()),
     listSnapshots: () => listSnapshotsAsync(),

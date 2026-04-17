@@ -11,5 +11,5 @@ import { bootCopilot } from '../bootstrap.js';
 
 bootCopilot().catch((err) => {
     console.error('[terminal/bootstrap] Falha fatal no boot:', err);
-    process.exitCode = 1;
+    process.exit(1);
 });

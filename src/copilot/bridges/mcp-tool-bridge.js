@@ -268,7 +268,7 @@ function createSdkToolFromMcp(mcpTool) {
 export async function buildMcpTools() {
     // UPG-02: circuit breaker — não tentar se o circuito está aberto
     if (_mcpCircuitOpen && Date.now() - _mcpCircuitOpenAt < CIRCUIT_RESET_MS) {
-        log('INFO', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
+        log('DEBUG', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
         _mcpHealth = { ..._mcpHealth, circuitOpen: true };
         return [];
     }
@@ -276,18 +276,23 @@ export async function buildMcpTools() {
     // F10.1: port probe rápido antes de qualquer HTTP — evita 24s de bloqueio quando servidor está offline
     const portOpen = await _isMcpPortOpen();
     if (!portOpen) {
+        const closedPortReason = `ECONNREFUSED (port probe: ${MCP_PORT} fechada)`;
+        const repeatedStandalonePortClosed = _mcpHealth.lastError === closedPortReason && _mcpHealth.circuitOpen;
         _mcpCircuitOpen = true;
         _mcpCircuitOpenAt = Date.now();
         _bootAttemptCount = 0;
         _mcpHealth = {
             available: false,
             lastCheckMs: Date.now(),
-            lastError: `ECONNREFUSED (port probe: ${MCP_PORT} fechada)`,
+            lastError: closedPortReason,
             toolCount: 0,
             circuitOpen: true,
             latencyMs: null,
         };
-        log('INFO', `[mcp-tool-bridge] Porta MCP ${MCP_PORT} fechada (standalone?) — circuit aberto imediatamente.`);
+        log(
+            repeatedStandalonePortClosed ? 'DEBUG' : 'INFO',
+            `[mcp-tool-bridge] Porta MCP ${MCP_PORT} fechada (standalone?) — circuit aberto imediatamente.`,
+        );
         return [];
     }
 

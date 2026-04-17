@@ -80,6 +80,9 @@ let _client = null;
 /** @type {Promise<import('@github/copilot-sdk').CopilotClient> | null} */
 let _startPromise = null;
 
+/** @type {boolean} */
+let _registryHasActiveSessions = false;
+
 /**
  * Constrói as opções do CopilotClient, respeitando a variável de ambiente `COPILOT_CLI_URL` para conectar a um CLI já
  * em execução (PM2 separado).
@@ -158,10 +161,13 @@ export async function getClient(overrides = {}) {
 export async function stopClient() {
     if (!_client) return [];
     log('INFO', '[lib/sdk-client] Parando CopilotClient...');
-    clearActiveSdkSessions();
     const errors = await _client.stop();
     if (errors.length > 0) {
         log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
+    }
+    if (_registryHasActiveSessions) {
+        clearActiveSdkSessions();
+        _registryHasActiveSessions = false;
     }
     _client = null;
     return errors;
@@ -174,7 +180,6 @@ export async function stopClient() {
 export async function forceStopClient() {
     if (!_client) return;
     log('WARN', '[lib/sdk-client] Parando CopilotClient de forma forçada (sem cleanup)...');
-    clearActiveSdkSessions();
     try {
         /** @type {{ forceStop?: () => Promise<void> }} */
         const anyClient = _client;
@@ -185,6 +190,10 @@ export async function forceStopClient() {
         }
     } catch (e) {
         log('WARN', `[lib/sdk-client] Erro no forceStop: ${toError(e).message}`);
+    }
+    if (_registryHasActiveSessions) {
+        clearActiveSdkSessions();
+        _registryHasActiveSessions = false;
     }
     _client = null;
 }
@@ -232,6 +241,47 @@ export async function listAvailableModels() {
     const client = await getClient();
     return client.listModels();
 }
+
+/**
+ * Retorna o ID da sessão mais recentemente atualizada no servidor Copilot.
+ *
+ * @returns {Promise<string | undefined>}
+ */
+export async function getLastClientSessionId() {
+    const client = await getClient();
+    return client.getLastSessionId();
+}
+
+/**
+ * Retorna o sessionId atualmente em foreground no modo TUI+server.
+ *
+ * @returns {Promise<string | undefined>}
+ */
+export async function getForegroundClientSessionId() {
+    const client = await getClient();
+    return client.getForegroundSessionId();
+}
+
+/**
+ * Define qual sessão deve ficar em foreground no modo TUI+server.
+ *
+ * @param {string} sessionId
+ * @returns {Promise<void>}
+ */
+export async function setForegroundClientSessionId(sessionId) {
+    const client = await getClient();
+    await client.setForegroundSessionId(sessionId);
+}
+
+/**
+ * Retorna a facade de server RPC do SDK para o client atual.
+ *
+ * @returns {Promise<ReturnType<import('@github/copilot-sdk').CopilotClient['rpc']>>}
+ */
+export async function getServerRpc() {
+    const client = await getClient();
+    return client.rpc;
+}
 /**
  * Cria uma nova sessão no CopilotClient e registra no registry em memória.
  *
@@ -246,6 +296,7 @@ export async function createClientSession(config) {
         createdAt: Date.now(),
         messagesCount: 0,
     });
+    _registryHasActiveSessions = true;
     log('INFO', `[lib/sdk-client] Sessão criada: ${session.sessionId} (modelo: ${config.model ?? 'unknown'})`);
     return session;
 }
@@ -271,6 +322,7 @@ export async function resumeClientSession(sessionId, config) {
         createdAt: Date.now(),
         messagesCount: 0,
     });
+    _registryHasActiveSessions = true;
     log('INFO', `[lib/sdk-client] Sessão retomada: ${session.sessionId}`);
     return session;
 }
@@ -292,6 +344,9 @@ export async function disconnectClientSession(sessionId) {
         log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${toError(e).message}`);
     }
     removeActiveSdkSession(sessionId);
+    if (getActiveSdkSessionCount() === 0) {
+        _registryHasActiveSessions = false;
+    }
     log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
 }
 /**
@@ -310,6 +365,9 @@ export async function deleteClientSession(sessionId) {
             logSwallowed(e, 'sdk.client.disconnect');
         }
         removeActiveSdkSession(sessionId);
+        if (getActiveSdkSessionCount() === 0) {
+            _registryHasActiveSessions = false;
+        }
     }
 
     const client = await getClient();

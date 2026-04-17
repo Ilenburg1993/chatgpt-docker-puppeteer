@@ -67,6 +67,14 @@ export async function bootCopilot() {
     ]);
 
     // ── Phase 3: Terminal (único modo) ──────────────────────────────────
-    const { startTerminalServer } = await import('./terminal/index.js');
+    const [{ wireTerminalDI }, { startTerminalServer }] = await Promise.all([
+        import('./terminal/di-wiring.js'),
+        import('./terminal/index.js'),
+    ]);
+
+    // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
+    // wireTerminalDI() é idempotente; startTerminalServer() pode chamá-la novamente sem efeito.
+    wireTerminalDI();
+
     await startTerminalServer();
 }

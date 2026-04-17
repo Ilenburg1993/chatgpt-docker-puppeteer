@@ -7,9 +7,10 @@
  *   transversais em cada arquivo.
  */
 
-import { getAgent } from '#copilot/agent';
+import { createSnapshot, getAgent, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { getSharedSessionBinding } from '#copilot/core';
 
 /**
  * Retorna a instância singleton canônica do runtime do agente.
@@ -46,6 +47,15 @@ export function readTerminalRuntimeState() {
         queueSize: Number(agent.queueSize ?? 0),
         pendingQuestion: agent.pendingQuestion ?? null,
     };
+}
+
+/**
+ * Binding canônico entre runtime, sessão SDK e hub conversacional.
+ *
+ * @returns {{ hubSessionId: string | null; sdkSessionId: string | null }}
+ */
+export function readTerminalSessionBinding() {
+    return getSharedSessionBinding();
 }
 
 /**
@@ -250,6 +260,132 @@ export function attachTerminalHubSocketIO(io, mountFn) {
  */
 export function readTerminalHubSession(hubSessionId) {
     return conversationStore.getHubSession(hubSessionId);
+}
+
+/**
+ * Lê turnos persistidos de uma hub session.
+ *
+ * @param {string} hubSessionId
+ * @param {{ limit?: number; offset?: number }} [opts]
+ * @returns {Record<string, unknown>[]}
+ */
+export function readTerminalHubTurns(hubSessionId, opts = {}) {
+    return conversationStore.readTurns(hubSessionId, {
+        limit: opts.limit ?? 20,
+        offset: opts.offset ?? 0,
+    });
+}
+
+/**
+ * Lista hub sessions persistidas.
+ *
+ * @param {{ limit?: number; offset?: number }} [opts]
+ * @returns {Record<string, unknown>[]}
+ */
+export function readTerminalHubSessions(opts = {}) {
+    return conversationStore.listHubSessions({
+        limit: opts.limit ?? 10,
+        offset: opts.offset ?? 0,
+    });
+}
+
+/**
+ * Recupera memórias persistidas no hub.
+ *
+ * @param {{ tag?: string; search?: string; limit?: number }} [opts]
+ * @returns {Record<string, unknown>[]}
+ */
+export function readTerminalHubMemories(opts = {}) {
+    return conversationStore.recallMemories({
+        ...(opts.tag ? { tag: opts.tag } : {}),
+        ...(opts.search ? { search: opts.search } : {}),
+        limit: opts.limit ?? 10,
+    });
+}
+
+/**
+ * Persiste uma memória no hub.
+ *
+ * @param {{ tag: string; content: string; hubSessionId?: string | null }} payload
+ * @returns {string}
+ */
+export function storeTerminalHubMemory(payload) {
+    return conversationStore.storeMemory({
+        tag: payload.tag,
+        content: payload.content,
+        ...(payload.hubSessionId ? { hubSessionId: payload.hubSessionId } : {}),
+    });
+}
+
+/**
+ * Remove uma memória do hub pelo ID.
+ *
+ * @param {string} memoryId
+ * @returns {boolean}
+ */
+export function deleteTerminalHubMemory(memoryId) {
+    return conversationStore.deleteMemory(memoryId);
+}
+
+/**
+ * Indica se a busca FTS do hub está disponível.
+ *
+ * @returns {boolean}
+ */
+export function canSearchTerminalHubTurns() {
+    return Boolean(conversationHub.isReady && conversationHub.store);
+}
+
+/**
+ * Busca full-text em turnos persistidos do hub.
+ *
+ * @param {{ query: string; limit: number; hubSessionId?: string }} opts
+ * @returns {Record<string, unknown>[]}
+ */
+export function searchTerminalHubTurns(opts) {
+    if (!conversationHub.isReady || !conversationHub.store) {
+        return [];
+    }
+    return conversationHub.store.searchTurns(opts);
+}
+
+/**
+ * Cria um snapshot do runtime do agente para uso do frontend do terminal.
+ *
+ * @param {Parameters<typeof createSnapshot>[0]} data
+ * @returns {ReturnType<typeof createSnapshot>}
+ */
+export function createTerminalSnapshot(data) {
+    return createSnapshot(data);
+}
+
+/**
+ * Persiste um snapshot do terminal.
+ *
+ * @param {Parameters<typeof saveSnapshotAsync>[0]} data
+ * @returns {ReturnType<typeof saveSnapshotAsync>}
+ */
+export function saveTerminalSnapshot(data) {
+    return saveSnapshotAsync(data);
+}
+
+/**
+ * Lista snapshots persistidos do runtime/terminal.
+ *
+ * @returns {ReturnType<typeof listSnapshotsAsync>}
+ */
+export function listTerminalSnapshots() {
+    return listSnapshotsAsync();
+}
+
+/**
+ * Carrega um snapshot persistido do runtime/terminal.
+ *
+ * @param {string} snapshotId
+ * @returns {ReturnType<typeof loadSnapshotAsync>}
+ */
+export function loadTerminalSnapshot(snapshotId) {
+    return loadSnapshotAsync(snapshotId);
 }
 
 /**

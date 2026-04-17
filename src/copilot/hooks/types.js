@@ -67,7 +67,7 @@
  * @callback SessionEndHandler
  * @param {SessionEndHookInput} input
  * @param {InvocationContext} invocation
- * @returns {Promise<void> | void}
+ * @returns {Promise<SessionEndHookOutput | void> | SessionEndHookOutput | void}
  */
 
 /**
@@ -82,7 +82,7 @@
 /**
  * @typedef {object} PreToolUseHookInput
  * @property {string} toolName
- * @property {object} toolArgs
+ * @property {unknown} toolArgs
  * @property {number} timestamp
  * @property {string} cwd
  */
@@ -90,8 +90,8 @@
 /**
  * @typedef {object} PostToolUseHookInput
  * @property {string} toolName
- * @property {object} toolArgs
- * @property {unknown} toolResult
+ * @property {unknown} toolArgs
+ * @property {import('#copilot/sdk/types.js').ToolResultObject} toolResult
  * @property {number} timestamp
  * @property {string} cwd
  */
@@ -113,9 +113,9 @@
 
 /**
  * @typedef {object} SessionEndHookInput
- * @property {string} reason
+ * @property {'complete' | 'error' | 'abort' | 'timeout' | 'user_exit'} reason
  * @property {string} [finalMessage]
- * @property {Error} [error]
+ * @property {string} [error]
  * @property {number} timestamp
  * @property {string} cwd
  */
@@ -123,7 +123,7 @@
 /**
  * @typedef {object} ErrorOccurredHookInput
  * @property {string} error
- * @property {string} errorContext
+ * @property {'model_call' | 'tool_execution' | 'system' | 'user_input'} errorContext
  * @property {boolean} recoverable
  * @property {number} timestamp
  * @property {string} cwd
@@ -139,29 +139,45 @@
 /**
  * @typedef {object} PreToolUseHookOutput
  * @property {'allow' | 'deny' | 'ask'} [permissionDecision]
- * @property {object} [modifiedArgs] - Args modificados para substituir os originais
+ * @property {string} [permissionDecisionReason] - Razão legível da decisão
+ * @property {unknown} [modifiedArgs] - Args modificados para substituir os originais
  * @property {string} [additionalContext] - Contexto adicional injetado no modelo
+ * @property {boolean} [suppressOutput] - Solicita supressão da saída do hook/tool
  */
 
 /**
  * @typedef {object} PostToolUseHookOutput
+ * @property {import('#copilot/sdk/types.js').ToolResultObject} [modifiedResult] - Resultado modificado pelo hook
  * @property {string} [additionalContext] - Contexto adicional injetado no modelo
+ * @property {boolean} [suppressOutput] - Solicita supressão da saída do hook/tool
  */
 
 /**
  * @typedef {object} UserPromptSubmittedHookOutput
  * @property {string} [modifiedPrompt] - Prompt modificado para substituir o original
+ * @property {string} [additionalContext] - Contexto adicional injetado no modelo
+ * @property {boolean} [suppressOutput] - Solicita supressão da saída do hook/tool
  */
 
 /**
  * @typedef {object} SessionStartHookOutput
  * @property {string} [additionalContext] - Contexto adicional injetado no modelo ao iniciar
+ * @property {Record<string, unknown>} [modifiedConfig] - Config complementar sugerida pelo hook
+ */
+
+/**
+ * @typedef {object} SessionEndHookOutput
+ * @property {boolean} [suppressOutput] - Solicita supressão da saída do encerramento
+ * @property {string[]} [cleanupActions] - Ações de cleanup executadas/solicitadas
+ * @property {string} [sessionSummary] - Sumário textual opcional da sessão
  */
 
 /**
  * @typedef {object} ErrorOccurredHookOutput
- * @property {'retry' | 'skip' | 'abort'} errorHandling
+ * @property {boolean} [suppressOutput] - Solicita supressão da saída do erro
+ * @property {'retry' | 'skip' | 'abort'} [errorHandling]
  * @property {number} [retryCount]
+ * @property {string} [userNotification] - Texto opcional recomendado ao operador/usuário
  */
 
 // ─── Tipos da factory createHooks ────────────────────────────────────────────

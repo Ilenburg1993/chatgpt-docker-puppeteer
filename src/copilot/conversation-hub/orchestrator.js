@@ -107,6 +107,9 @@ export class HubOrchestrator extends EventEmitter {
      */
     #closedSessions = new Set();
 
+    /** @type {boolean} */
+    #destroyed = false;
+
     /**
      * @param {import('./store.js').ConversationStore} store
      * @param {AgentLike} [agentOverride]
@@ -127,6 +130,7 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {void}
      */
     init(bridgeOverride) {
+        this.#destroyed = false;
         this.#bridge = bridgeOverride ?? new LlmBridgeClient();
 
         // Restaurar turn counters das sessões ativas (evita sequência errada após restart)
@@ -153,12 +157,29 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {void}
      */
     destroy() {
-        this.#bridge = null;
-        this.#turnCounters.clear();
-        this.#inflightBySession.clear();
-        this.#closedSessions.clear();
-        this.removeAllListeners();
-        log('DEBUG', '[HubOrchestrator] Destruído.');
+        if (this.#destroyed) return;
+        this.#destroyed = true;
+
+        const inflightEntries = Array.from(this.#inflightBySession.entries());
+        for (const [hubSessionId] of inflightEntries) {
+            this.#closedSessions.add(hubSessionId);
+        }
+
+        const finalizeDestroy = () => {
+            this.#bridge = null;
+            this.#turnCounters.clear();
+            this.#inflightBySession.clear();
+            this.#closedSessions.clear();
+            this.removeAllListeners();
+            log('DEBUG', '[HubOrchestrator] Destruído.');
+        };
+
+        if (inflightEntries.length === 0) {
+            finalizeDestroy();
+            return;
+        }
+
+        void Promise.allSettled(inflightEntries.map(([, tail]) => tail)).finally(finalizeDestroy);
     }
 
     /**
@@ -168,6 +189,10 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {string} ID da hub_session criada
      */
     createSession(opts = {}) {
+        if (this.#destroyed) {
+            throw new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
+        }
+
         const sdkSessionId = this.#getActiveSdkSessionId();
 
         const hubSessionId = this.#store.createHubSession({
@@ -224,6 +249,10 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se a sessão já estiver encerrada ou agente não estiver ativo
      */
     sendToLlmB(hubSessionId, message, opts = {}) {
+        if (this.#destroyed) {
+            return Promise.reject(new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED'));
+        }
+
         // F6.5 (BUG-MOD-09): bloquear novas mensagens para sessões já encerradas
         if (this.#closedSessions.has(hubSessionId)) {
             return Promise.reject(
@@ -272,6 +301,13 @@ export class HubOrchestrator extends EventEmitter {
      * @throws {Error} Se não inicializado, agente parado, ou turno não encontrado após writeTurn
      */
     async #executeSendToLlmB(hubSessionId, message, opts = {}) {
+        if (!this.#bridge) {
+            throw new SessionError(
+                '[HubOrchestrator] Bridge não inicializado ou já destruído.',
+                'ORCH_BRIDGE_UNAVAILABLE',
+            );
+        }
+
         return executeSendToLlmB(hubSessionId, message, opts, {
             store: this.#store,
             bridge: this.#bridge,
@@ -291,6 +327,14 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {Promise<number>} ID do turno registrado
      */
     async injectUserMessage(hubSessionId, content, opts = {}) {
+        if (this.#destroyed) {
+            throw new SessionError('[HubOrchestrator] Orchestrator destruído.', 'ORCH_DESTROYED');
+        }
+
+        if (this.#closedSessions.has(hubSessionId)) {
+            throw new SessionError(`[HubOrchestrator] Sessão já encerrada: ${hubSessionId}`, 'ORCH_SESSION_ENDED');
+        }
+
         const turnId = await this.#store.injectUserMessage(hubSessionId, content, opts);
         this.emit(HUB_EVENTS.USER_INJECTED, { hubSessionId, turnId, content });
 
@@ -318,6 +362,10 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {import('./store.js').ConversationTurn[]}
      */
     pollUserMessages(hubSessionId) {
+        if (this.#destroyed) {
+            return [];
+        }
+
         const msgs = this.#store.getPendingUserMessages(hubSessionId);
         if (msgs.length > 0) {
             this.#store.markAllUserMessagesRead(hubSessionId);
@@ -371,6 +419,10 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {import('./store.js').ConversationTurn[]}
      */
     readHistory(hubSessionId, opts = {}) {
+        if (this.#destroyed) {
+            return [];
+        }
+
         return this.#store.readTurns(hubSessionId, opts);
     }
 
@@ -381,6 +433,10 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {import('./store.js').HubSession[]}
      */
     listSessions(opts = {}) {
+        if (this.#destroyed) {
+            return [];
+        }
+
         return this.#store.listHubSessions(opts);
     }
 

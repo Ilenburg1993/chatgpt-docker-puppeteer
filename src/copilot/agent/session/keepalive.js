@@ -28,6 +28,9 @@ export class SessionKeepalive {
     /** @type {ReturnType<typeof setInterval> | null} */
     #timer = null;
 
+    /** @type {boolean} */
+    #tickInFlight = false;
+
     /** @type {number} */
     #intervalMs;
 
@@ -78,14 +81,15 @@ export class SessionKeepalive {
     /**
      * Para o monitor de keepalive.
      */
-    stop() {
+    stop(reason = 'manual') {
         if (!this.#running) return;
         this.#running = false;
+        this.#tickInFlight = false;
         if (this.#timer) {
             clearInterval(this.#timer);
             this.#timer = null;
         }
-        log('INFO', '[SessionKeepalive] Parado.');
+        log('INFO', `[SessionKeepalive] Parado (${reason}).`);
     }
 
     /**
@@ -111,47 +115,63 @@ export class SessionKeepalive {
      * @returns {Promise<void>}
      */
     async #tick(callbacks) {
-        const { getSession, getClient, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
-
-        // Dialog loop ativo mantém a sessão viva — não precisa de heartbeat
-        if (isDialogLoopActive()) return;
-
-        // Só envia heartbeat se está idle
-        if (!isIdle()) {
-            this.#lastActivityAt = Date.now();
+        if (this.#tickInFlight) {
             return;
         }
 
-        // Verifica se idle o suficiente para enviar heartbeat
-        const idleMs = Date.now() - this.#lastActivityAt;
-        if (idleMs < this.#idleThresholdMs) return;
-
-        // M-02 (PARTE-8): usar client.ping() (0 PR) como primeiro recurso de keepalive.
-        // Apenas faz fallback para session.send() se ping() não estiver disponível.
-        const client = getClient?.();
-        if (client && typeof client.ping === 'function') {
-            try {
-                await client.ping();
-                this.#lastActivityAt = Date.now();
-                log('DEBUG', `[SessionKeepalive] Ping keepalive (0 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
-                onKeepalive?.(Date.now());
-                return;
-            } catch (pingErr) {
-                log('WARN', `[SessionKeepalive] Ping keepalive falhou: ${toError(pingErr).message} — tentando session.send()`);
-            }
-        }
-
-        // Fallback: session.send() consome 1 PR, mas garante que a sessão não expire
-        const session = getSession();
-        if (!session || typeof session.send !== 'function') return;
+        this.#tickInFlight = true;
 
         try {
-            await session.send({ prompt: '[keepalive]' });
-            this.#lastActivityAt = Date.now();
-            log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
-            onKeepalive?.(Date.now());
-        } catch (e) {
-            log('WARN', `[SessionKeepalive] Heartbeat falhou: ${toError(e).message}`);
+            const { getSession, getClient, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
+
+            // Dialog loop ativo mantém a sessão viva — não precisa de heartbeat
+            if (isDialogLoopActive()) return;
+
+            // Só envia heartbeat se está idle
+            if (!isIdle()) {
+                this.#lastActivityAt = Date.now();
+                return;
+            }
+
+            // Verifica se idle o suficiente para enviar heartbeat
+            const idleMs = Date.now() - this.#lastActivityAt;
+            if (idleMs < this.#idleThresholdMs) return;
+
+            // M-02 (PARTE-8): usar client.ping() (0 PR) como primeiro recurso de keepalive.
+            // Apenas faz fallback para session.send() se ping() não estiver disponível.
+            const client = getClient?.();
+            if (client && typeof client.ping === 'function') {
+                try {
+                    await client.ping();
+                    this.#lastActivityAt = Date.now();
+                    log(
+                        'DEBUG',
+                        `[SessionKeepalive] Ping keepalive (0 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`,
+                    );
+                    onKeepalive?.(Date.now());
+                    return;
+                } catch (pingErr) {
+                    log(
+                        'WARN',
+                        `[SessionKeepalive] Ping keepalive falhou: ${toError(pingErr).message} — tentando session.send()`,
+                    );
+                }
+            }
+
+            // Fallback: session.send() consome 1 PR, mas garante que a sessão não expire
+            const session = getSession();
+            if (!session || typeof session.send !== 'function') return;
+
+            try {
+                await session.send({ prompt: '[keepalive]' });
+                this.#lastActivityAt = Date.now();
+                log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
+                onKeepalive?.(Date.now());
+            } catch (e) {
+                log('WARN', `[SessionKeepalive] Heartbeat falhou: ${toError(e).message}`);
+            }
+        } finally {
+            this.#tickInFlight = false;
         }
     }
 }

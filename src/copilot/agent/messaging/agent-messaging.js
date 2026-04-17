@@ -12,7 +12,7 @@
  * @see EventBus
  */
 
-import { SessionError, toError } from '#copilot/core';
+import { SessionError } from '#copilot/core';
 import {
     EMITTER_QUESTION_ANSWERED,
     EMITTER_STEERING_SENT,
@@ -22,8 +22,8 @@ import {
 } from '#copilot/events';
 import { log, startSpan, startSpanImmediate } from '#copilot/observability';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
-import { classifyAgentError } from '../error-policy.js';
-import { writeStateAsync } from '../lifecycle/state-io.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
+import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -222,50 +222,59 @@ export async function executeTask(session, task, callbacks) {
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
-        const event = await session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS);
+        const execution = await withAgentErrorPolicy(() =>
+            session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS),
+        );
+
+        if (!execution.ok) {
+            const { disposition, error } = execution;
+
+            if (disposition === 'ignore') {
+                setStatus('idle');
+                emit('task.error', { taskId: task.id, error: 'AbortError' });
+                task.reject(error);
+                return;
+            }
+
+            if (disposition === 'fatal') {
+                setStatus('idle');
+                emit('task.error', { taskId: task.id, error: error.message });
+                task.reject(error);
+                return;
+            }
+
+            const recovered = await tryReconnect(error);
+            if (recovered) {
+                task.attempts = (task.attempts ?? 0) + 1;
+                if (task.attempts >= MAX_TASK_RETRIES) {
+                    setStatus('idle');
+                    emit('task.error', {
+                        taskId: task.id,
+                        error: `Máximo de ${MAX_TASK_RETRIES} tentativas atingido após reconexão`,
+                    });
+                    task.reject(
+                        new Error(
+                            `[task-executor] Máximo de ${MAX_TASK_RETRIES} tentativas atingido (taskId: ${task.id})`,
+                        ),
+                    );
+                } else {
+                    requeueTask(task);
+                    setStatus('idle');
+                }
+            } else {
+                setStatus('idle');
+                emit('task.error', { taskId: task.id, error: error.message });
+                task.reject(error);
+            }
+            return;
+        }
+
+        const event = execution.value;
         const text = event?.data?.content ?? '';
         const durationMs = (idleTime ?? Date.now()) - startTime;
         setStatus('idle');
         emit('task.completed', { taskId: task.id, response: text, responseLen: text.length, durationMs });
         task.resolve(text);
-    } catch (error) {
-        const disposition = classifyAgentError(error);
-
-        if (disposition === 'ignore') {
-            setStatus('idle');
-            emit('task.error', { taskId: task.id, error: 'AbortError' });
-            task.reject(toError(error));
-            return;
-        }
-
-        if (disposition === 'fatal') {
-            setStatus('idle');
-            emit('task.error', { taskId: task.id, error: toError(error).message });
-            task.reject(toError(error));
-            return;
-        }
-
-        const recovered = await tryReconnect(toError(error));
-        if (recovered) {
-            task.attempts = (task.attempts ?? 0) + 1;
-            if (task.attempts >= MAX_TASK_RETRIES) {
-                setStatus('idle');
-                emit('task.error', {
-                    taskId: task.id,
-                    error: `Máximo de ${MAX_TASK_RETRIES} tentativas atingido após reconexão`,
-                });
-                task.reject(
-                    new Error(`[task-executor] Máximo de ${MAX_TASK_RETRIES} tentativas atingido (taskId: ${task.id})`),
-                );
-            } else {
-                requeueTask(task);
-                setStatus('idle');
-            }
-        } else {
-            setStatus('idle');
-            emit('task.error', { taskId: task.id, error: toError(error).message });
-            task.reject(toError(error));
-        }
     } finally {
         unsubDelta();
         unsubToolStart();
@@ -291,33 +300,27 @@ export async function executeTask(session, task, callbacks) {
  */
 export function processQueue(ctx, host, callbacks) {
     // G1-ARCH-03: bloqueia processamento durante reconexão ativa
-    if (
-        ctx.sessionState.isReconnecting ||
-        ctx.runtimeState.status !== 'idle' ||
-        ctx.messageQueue.size === 0 ||
-        !ctx.sessionState.session
-    ) {
+    if (ctx.isReconnecting || ctx.status !== 'idle' || ctx.messageQueue.size === 0 || !ctx.session) {
         return;
     }
-    const session = ctx.sessionState.session;
-    const statusHost = /** @type {import('node:events').EventEmitter} */ (/** @type {unknown} */ (host));
+    const session = ctx.session;
 
     const task = ctx.messageQueue.shift();
     if (!task) {
         return;
     }
 
-    ctx.setStatus('processing', statusHost);
+    ctx.setStatus('processing', host);
     host.emit(EMITTER_TASK_STARTED, { taskId: task.id });
 
     log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
-    ctx.metricsState.sendCount++;
+    ctx.incrementSendCount();
     // F42.2: registrar atividade para reset do timer de idle do keepalive
     ctx.keepalive.ping();
 
     void executeTask(session, task, {
         onDelta: (chunk, taskId) => host.emit(EMITTER_TASK_DELTA, { taskId, chunk }),
-        setStatus: (status) => ctx.setStatus(status, statusHost),
+        setStatus: (status) => ctx.setStatus(status, host),
         emit: (event, payload) => host.emit(event, payload),
         tryReconnect: (error) => callbacks.tryReconnect(error),
         requeueTask: (queuedTask) => ctx.messageQueue.unshift(queuedTask),
@@ -336,11 +339,11 @@ export function processQueue(ctx, host, callbacks) {
  */
 export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     signal?.throwIfAborted();
-    if (!ctx.sessionState.session) {
+    if (!ctx.session) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
-    const session = ctx.sessionState.session;
-    return startSpan('copilot.agent.steer', { model: ctx.configState.model ?? '', actor: 'agent' }, async () => {
+    const session = ctx.session;
+    return startSpan('copilot.agent.steer', { model: ctx.model ?? '', actor: 'agent' }, async () => {
         const messageId = await session.send({ prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
         host.emit(EMITTER_STEERING_SENT, { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
@@ -358,9 +361,9 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
  */
 export function answerPendingQuestion(ctx, host, answer) {
     const span = startSpanImmediate('copilot.agent.answer', {
-        had_pending: String(ctx.dialogState.pendingQuestion !== null),
+        had_pending: String(ctx.hasPendingQuestion()),
     });
-    if (!ctx.dialogState.pendingQuestion) {
+    if (!ctx.pendingQuestion) {
         // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
         host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false });
         log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
@@ -368,12 +371,19 @@ export function answerPendingQuestion(ctx, host, answer) {
         return false;
     }
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
-    ctx.dialogState.pendingQuestion.resolve(answer);
-    ctx.dialogState.pendingQuestion = null;
-    void ctx.backgroundTasks.track(writeStateAsync({ pendingQuestion: null }), {
-        label: 'question.clear.pending',
-        description: 'Clear persisted pendingQuestion',
-    });
+    ctx.resolvePendingQuestion(answer);
+    void ctx.backgroundTasks.track(
+        persistStateWithPolicy({ pendingQuestion: null }, { label: 'question.clear.pending' }).then((result) => {
+            if (!result.ok) {
+                throw result.error;
+            }
+            return undefined;
+        }),
+        {
+            label: 'question.clear.pending',
+            description: 'Clear persisted pendingQuestion',
+        },
+    );
     host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: true });
     span?.end();
     return true;

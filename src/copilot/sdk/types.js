@@ -152,25 +152,28 @@
 // ─── User Input ───────────────────────────────────────────────────────────────
 
 /**
- * Pedido de input interativo do usuário (elicitation).
+ * Pedido de input interativo do usuário emitido pelo SDK.
  *
  * @typedef {{
- *     title?: string;
- *     message?: string;
- *     fields: { id: string; label: string; type?: string; required?: boolean; default?: string }[];
+ *     question: string;
+ *     choices?: string[];
+ *     allowFreeform?: boolean;
  * }} UserInputRequest
  */
 
 /**
  * Resposta do input interativo do usuário.
  *
- * @typedef {{ values: Record<string, string>; cancelled?: boolean }} UserInputResponse
+ * @typedef {{ answer: string; wasFreeform: boolean }} UserInputResponse
  */
 
 /**
  * Handler de input interativo do usuário.
  *
- * @typedef {(request: UserInputRequest) => Promise<UserInputResponse>} UserInputHandler
+ * @typedef {(
+ *     request: UserInputRequest,
+ *     invocation: { sessionId: string },
+ * ) => Promise<UserInputResponse> | UserInputResponse} UserInputHandler
  */
 
 // ─── System Message ───────────────────────────────────────────────────────────
@@ -226,38 +229,39 @@
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
- * Campos base compartilhados por todos os hook inputs (sessionId, etc.).
+ * Campos base compartilhados por todos os hook inputs.
  *
- * @typedef {{ sessionId: string; [key: string]: unknown }} BaseHookInput
+ * @typedef {{ timestamp: number; cwd: string }} BaseHookInput
  */
 
 /**
- * Configuração de hooks de sessão (preToolUse, postToolUse, sessionStart, sessionEnd, etc.).
+ * Configuração de hooks de sessão alinhada ao SDK 0.2.0.
  *
  * @typedef {{
- *     preToolUse?: PreToolUseHandler;
- *     postToolUse?: PostToolUseHandler;
- *     userPromptSubmitted?: UserPromptSubmittedHandler;
- *     sessionStart?: SessionStartHandler;
- *     sessionEnd?: SessionEndHandler;
- *     errorOccurred?: ErrorOccurredHandler;
+ *     onPreToolUse?: PreToolUseHandler;
+ *     onPostToolUse?: PostToolUseHandler;
+ *     onUserPromptSubmitted?: UserPromptSubmittedHandler;
+ *     onSessionStart?: SessionStartHandler;
+ *     onSessionEnd?: SessionEndHandler;
+ *     onErrorOccurred?: ErrorOccurredHandler;
  * }} SessionHooks
  */
 
 /**
  * Input do hook preToolUse (toolName, args, etc.).
  *
- * @typedef {BaseHookInput & { toolName: string; toolCallId: string; args: Record<string, unknown> }} PreToolUseHookInput
+ * @typedef {BaseHookInput & { toolName: string; toolArgs: unknown }} PreToolUseHookInput
  */
 
 /**
  * Output do hook preToolUse (allow, deny, modify).
  *
  * @typedef {{
- *     decision?: 'allow' | 'deny' | 'modify';
- *     modifiedArgs?: Record<string, unknown>;
- *     systemMessage?: string;
- *     [key: string]: unknown;
+ *     permissionDecision?: 'allow' | 'deny' | 'ask';
+ *     permissionDecisionReason?: string;
+ *     modifiedArgs?: unknown;
+ *     additionalContext?: string;
+ *     suppressOutput?: boolean;
  * } | void} PreToolUseHookOutput
  */
 
@@ -270,13 +274,17 @@
 /**
  * Input do hook postToolUse (toolName, result, etc.).
  *
- * @typedef {BaseHookInput & { toolName: string; toolCallId: string; result: ToolResult }} PostToolUseHookInput
+ * @typedef {BaseHookInput & {
+ *     toolName: string;
+ *     toolArgs: unknown;
+ *     toolResult: ToolResultObject;
+ * }} PostToolUseHookInput
  */
 
 /**
  * Output do hook postToolUse.
  *
- * @typedef {{ systemMessage?: string; [key: string]: unknown } | void} PostToolUseHookOutput
+ * @typedef {{ modifiedResult?: ToolResultObject; additionalContext?: string; suppressOutput?: boolean } | void} PostToolUseHookOutput
  */
 
 /**
@@ -288,13 +296,13 @@
 /**
  * Input do hook userPromptSubmitted (message text).
  *
- * @typedef {BaseHookInput & { message: string }} UserPromptSubmittedHookInput
+ * @typedef {BaseHookInput & { prompt: string }} UserPromptSubmittedHookInput
  */
 
 /**
  * Output do hook userPromptSubmitted.
  *
- * @typedef {{ systemMessage?: string; modifiedMessage?: string; [key: string]: unknown } | void} UserPromptSubmittedHookOutput
+ * @typedef {{ modifiedPrompt?: string; additionalContext?: string; suppressOutput?: boolean } | void} UserPromptSubmittedHookOutput
  */
 
 /**
@@ -308,13 +316,13 @@
 /**
  * Input do hook sessionStart.
  *
- * @typedef {BaseHookInput & { model?: string }} SessionStartHookInput
+ * @typedef {BaseHookInput & { source: 'startup' | 'resume' | 'new'; initialPrompt?: string }} SessionStartHookInput
  */
 
 /**
  * Output do hook sessionStart.
  *
- * @typedef {{ systemMessage?: string; [key: string]: unknown } | void} SessionStartHookOutput
+ * @typedef {{ additionalContext?: string; modifiedConfig?: Record<string, unknown> } | void} SessionStartHookOutput
  */
 
 /**
@@ -326,13 +334,17 @@
 /**
  * Input do hook sessionEnd.
  *
- * @typedef {BaseHookInput & { reason?: string }} SessionEndHookInput
+ * @typedef {BaseHookInput & {
+ *     reason: 'complete' | 'error' | 'abort' | 'timeout' | 'user_exit';
+ *     finalMessage?: string;
+ *     error?: string;
+ * }} SessionEndHookInput
  */
 
 /**
  * Output do hook sessionEnd.
  *
- * @typedef {{ [key: string]: unknown } | void} SessionEndHookOutput
+ * @typedef {{ suppressOutput?: boolean; cleanupActions?: string[]; sessionSummary?: string } | void} SessionEndHookOutput
  */
 
 /**
@@ -344,13 +356,22 @@
 /**
  * Input do hook errorOccurred.
  *
- * @typedef {BaseHookInput & { error: Error | unknown; context?: string }} ErrorOccurredHookInput
+ * @typedef {BaseHookInput & {
+ *     error: string;
+ *     errorContext: 'model_call' | 'tool_execution' | 'system' | 'user_input';
+ *     recoverable: boolean;
+ * }} ErrorOccurredHookInput
  */
 
 /**
  * Output do hook errorOccurred.
  *
- * @typedef {{ handled?: boolean; [key: string]: unknown } | void} ErrorOccurredHookOutput
+ * @typedef {{
+ *     suppressOutput?: boolean;
+ *     errorHandling?: 'retry' | 'skip' | 'abort';
+ *     retryCount?: number;
+ *     userNotification?: string;
+ * } | void} ErrorOccurredHookOutput
  */
 
 /**

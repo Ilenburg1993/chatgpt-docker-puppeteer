@@ -13,7 +13,7 @@
 
 import { toError } from '#copilot/core';
 import { log, startSpan } from '#copilot/observability';
-import { classifyAgentError } from '../error-policy.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
 
 /**
  * @typedef {Object} ReconnectCallbacks
@@ -80,46 +80,65 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
 
                 await new Promise((r) => setTimeout(r, delay));
 
-                try {
-                    // G2-BUG-07: parar o client antes de reinicializar para evitar listeners duplicados
-                    // e recursos pendurados da sessão anterior.
-                    if (typeof client.stop === 'function') {
-                        try {
-                            await client.stop();
-                        } catch (stopErr) {
-                            log(
-                                'WARN',
-                                `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${toError(stopErr).message}`,
-                            );
+                const attemptResult = await withAgentErrorPolicy(
+                    async () => {
+                        // G2-BUG-07: parar o client antes de reinicializar para evitar listeners duplicados
+                        // e recursos pendurados da sessão anterior.
+                        if (typeof client.stop === 'function') {
+                            try {
+                                await client.stop();
+                            } catch (stopErr) {
+                                log(
+                                    'WARN',
+                                    `[AlwaysAlive] client.stop() antes de reconexão falhou (ignorado): ${toError(stopErr).message}`,
+                                );
+                            }
                         }
-                    }
 
-                    // F42.5 (BUG-SD-002 fix): criar um novo CopilotClient a cada tentativa de reconexão
-                    // em vez de reutilizar o client parado — o SDK pode não suportar reutilização após stop().
-                    let activeClient = client;
-                    if (typeof createClient === 'function') {
-                        activeClient = createClient();
-                        if (typeof updateClient === 'function') {
-                            updateClient(activeClient);
+                        // F42.5 (BUG-SD-002 fix): criar um novo CopilotClient a cada tentativa de reconexão
+                        // em vez de reutilizar o client parado — o SDK pode não suportar reutilização após stop().
+                        let activeClient = client;
+                        if (typeof createClient === 'function') {
+                            activeClient = createClient();
+                            if (typeof updateClient === 'function') {
+                                updateClient(activeClient);
+                            }
                         }
-                    }
 
-                    const { session, isResumed } = await initSession(activeClient);
+                        const { session, isResumed } = await initSession(activeClient);
 
-                    // M-01 (PARTE-8): health check pós-reconexão — valida que o transport está funcional
-                    // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
-                    if (typeof activeClient.ping === 'function') {
-                        try {
-                            await activeClient.ping();
-                        } catch (pingErr) {
-                            log(
-                                'WARN',
-                                `[AlwaysAlive] ping() pós-reconexão falhou: ${toError(pingErr).message} — tentativa descartada`,
-                            );
-                            throw pingErr; // força retry na próxima iteração
+                        // M-01 (PARTE-8): health check pós-reconexão — valida que o transport está funcional
+                        // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
+                        if (typeof activeClient.ping === 'function') {
+                            try {
+                                await activeClient.ping();
+                            } catch (pingErr) {
+                                log(
+                                    'WARN',
+                                    `[AlwaysAlive] ping() pós-reconexão falhou: ${toError(pingErr).message} — tentativa descartada`,
+                                );
+                                throw pingErr; // força retry na próxima iteração
+                            }
                         }
-                    }
 
+                        return { session, isResumed };
+                    },
+                    {
+                        onError: (reconnectError, disposition) => {
+                            log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
+                            if (disposition !== 'retry') {
+                                const reason = disposition === 'fatal' ? 'fatal' : 'ignorado';
+                                log(
+                                    'ERROR',
+                                    `[AlwaysAlive] Erro ${reason} detectado durante reconexão — abortando retry loop.`,
+                                );
+                            }
+                        },
+                    },
+                );
+
+                if (attemptResult.ok) {
+                    const { session, isResumed } = attemptResult.value;
                     log(
                         'INFO',
                         `[AlwaysAlive] Reconexão bem-sucedida na tentativa ${attempt}. SessionId: ${session.sessionId}`,
@@ -144,17 +163,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         );
                     }
                     return true;
-                } catch (reconnectError) {
-                    log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${toError(reconnectError).message}`);
-                    const disposition = classifyAgentError(reconnectError);
-                    if (disposition !== 'retry') {
-                        const reason = disposition === 'fatal' ? 'fatal' : 'ignorado';
-                        log(
-                            'ERROR',
-                            `[AlwaysAlive] Erro ${reason} detectado durante reconexão — abortando retry loop.`,
-                        );
-                        break;
-                    }
+                }
+
+                if (attemptResult.disposition !== 'retry') {
+                    break;
                 }
             }
 

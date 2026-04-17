@@ -20,7 +20,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { toError, ConfigError, registerShutdownHandler } from '#copilot/core';
+import { ConfigError, registerShutdownHandler, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';

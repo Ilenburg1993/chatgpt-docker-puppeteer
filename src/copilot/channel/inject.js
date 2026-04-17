@@ -11,7 +11,7 @@
  */
 
 import { LLM_B_TERMINAL_PORT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { toError, BridgeError } from '#copilot/core';
+import { BridgeError, toError } from '#copilot/core';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
@@ -43,6 +43,14 @@ const INJECT_RATE_PER_SEC = (() => {
 const _injectTimestamps = [];
 
 /**
+ * Índice lógico do início da janela dentro de `_injectTimestamps`. Evita `Array.prototype.shift()` O(n) em bursts de
+ * injeção.
+ *
+ * @type {number}
+ */
+let _injectWindowStartIndex = 0;
+
+/**
  * Verifica se a próxima injeção é permitida pelo rate limiter client-side. Usa sliding window de 1s.
  *
  * @returns {boolean} true se permitido
@@ -50,14 +58,25 @@ const _injectTimestamps = [];
 function _checkClientRateLimit() {
     const now = Date.now();
     const windowStart = now - 1_000;
-    // Purga entradas expiradas (de trás para frente para eficiência com array ordenado)
-    while (_injectTimestamps.length > 0 && (_injectTimestamps[0] ?? 0) < windowStart) {
-        _injectTimestamps.shift();
+    while (
+        _injectWindowStartIndex < _injectTimestamps.length &&
+        (_injectTimestamps[_injectWindowStartIndex] ?? 0) < windowStart
+    ) {
+        _injectWindowStartIndex++;
     }
-    if (_injectTimestamps.length >= INJECT_RATE_PER_SEC) {
+
+    const activeCount = _injectTimestamps.length - _injectWindowStartIndex;
+    if (activeCount >= INJECT_RATE_PER_SEC) {
         return false;
     }
+
     _injectTimestamps.push(now);
+
+    if (_injectWindowStartIndex > 64 && _injectWindowStartIndex * 2 >= _injectTimestamps.length) {
+        _injectTimestamps.splice(0, _injectWindowStartIndex);
+        _injectWindowStartIndex = 0;
+    }
+
     return true;
 }
 /**

@@ -90,6 +90,8 @@
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor - Monitor periódico de quota.
  * @property {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} agentObserver
  *   - Observer do agente para cleanup.
+ *
+ * @property {AgentBootReport | null} lastBootReport - Último relatório consolidado do pipeline de boot.
  */
 
 /**
@@ -97,6 +99,18 @@
  *
  * @typedef {Object} AgentIOState
  * @property {CopilotClient | null} client - Cliente Copilot ativo.
+ */
+
+/**
+ * Contrato mínimo de EventEmitter exigido pelos submódulos do agent.
+ *
+ * Mantido propositalmente pequeno para reduzir casts `unknown -> EventEmitter` em módulos como dialog e messaging.
+ *
+ * @typedef {Object} AgentEventHost
+ * @property {(event: string | symbol, payload?: unknown) => boolean} emit
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [on]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [once]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [off]
  */
 
 // ─── AgentTask ────────────────────────────────────────────────────────────────
@@ -142,6 +156,113 @@
  */
 
 /**
+ * @typedef {'runtime.stopped'
+ *     | 'client.missing'
+ *     | 'session.missing'
+ *     | 'dialog.detached'
+ *     | 'io.pending_question_drift'
+ *     | 'io.keepalive_stopped'
+ *     | 'background.backlog_high'
+ *     | 'boot.failed'
+ *     | 'boot.degraded'
+ *     | 'quota.monitor_missing'
+ *     | 'queue.starvation'} AgentHealthRiskFlag
+ */
+
+/**
+ * @typedef {'none'
+ *     | 'restart_agent'
+ *     | 'recreate_client'
+ *     | 'recreate_session'
+ *     | 'reattach_dialog'
+ *     | 'resolve_pending_question'
+ *     | 'restart_keepalive'
+ *     | 'drain_background_tasks'
+ *     | 'inspect_boot_report'
+ *     | 'restart_quota_monitor'
+ *     | 'inspect_queue_starvation'} AgentRecommendedAction
+ */
+
+/**
+ * Resultado observável de uma etapa do pipeline de boot do agent.
+ *
+ * @typedef {Object} AgentBootStepResult
+ * @property {string} name
+ * @property {'session'
+ *     | 'observability'
+ *     | 'lifecycle'
+ *     | 'dialog'
+ *     | 'mcp'
+ *     | 'keepalive'
+ *     | 'quota'
+ *     | 'handoff'
+ *     | 'hooks'
+ *     | 'other'} phase
+ * @property {'ok' | 'degraded' | 'failed' | 'skipped'} status
+ * @property {number} durationMs
+ * @property {number} ts
+ * @property {string} [error]
+ */
+
+/**
+ * Relatório consolidado do último boot do agent.
+ *
+ * @typedef {Object} AgentBootReport
+ * @property {number} startedAt
+ * @property {number} completedAt
+ * @property {boolean} ok
+ * @property {number} stepCount
+ * @property {number} degradedCount
+ * @property {number} failedCount
+ * @property {AgentBootStepResult[]} steps
+ */
+
+/**
+ * Handles crus do SDK atualmente acoplados ao runtime do agent.
+ *
+ * @typedef {Object} AgentSdkHandles
+ * @property {CopilotClient | null} client
+ * @property {CopilotSession | null} session
+ * @property {unknown | null} serverRpc
+ * @property {unknown | null} sessionRpc
+ * @property {string | null} workspacePath
+ */
+
+/**
+ * Snapshot verificável da cobertura de recursos SDK disponíveis ao agent.
+ *
+ * @typedef {Object} AgentSdkAccessSnapshot
+ * @property {AgentSdkHandles} handles
+ * @property {{
+ *     clientAvailable: boolean;
+ *     sessionAvailable: boolean;
+ *     serverRpcAvailable: boolean;
+ *     sessionRpcAvailable: boolean;
+ *     workspacePathAvailable: boolean;
+ *     permissionHandlerAvailable: boolean;
+ *     userInputHandlerAvailable: boolean;
+ *     hooksAvailable: boolean;
+ *     toolRegistryAvailable: boolean;
+ *     modelSwitchAvailable: boolean;
+ *     abortAvailable: boolean;
+ *     sessionLogAvailable: boolean;
+ *     historyAvailable: boolean;
+ *     lastSessionLookupAvailable: boolean;
+ *     foregroundControlAvailable: boolean;
+ *     customAgentsAvailable: boolean;
+ *     experimentalAgentsAvailable: boolean;
+ *     skillsAvailable: boolean;
+ *     mcpAvailable: boolean;
+ *     pluginsAvailable: boolean;
+ *     extensionsAvailable: boolean;
+ *     fleetAvailable: boolean;
+ * }} resources
+ * @property {string[]} missingResources
+ * @property {boolean} allCoreResourcesAvailable
+ * @property {boolean} allRuntimeResourcesAvailable
+ */
+
+/**
  * Snapshot de health operacional do agente.
  *
  * `healthy` é mantido como alias de compatibilidade para consumidores legados; `ok` é o campo canônico para semântica
@@ -161,8 +282,12 @@
  * @property {number} oldestTaskWaitMs - Idade da tarefa mais antiga na fila.
  * @property {boolean} starvationAlert - Indica se a fila entrou em starvation.
  * @property {number} backgroundPendingCount - Quantidade de tarefas fire-and-forget em aberto.
+ * @property {string[]} backgroundPendingLabels - Labels das tarefas em background ainda pendentes.
+ * @property {AgentHealthRiskFlag[]} riskFlags - Flags canônicas de risco derivadas do estado atual.
+ * @property {AgentRecommendedAction} recommendedAction - Próxima ação operacional recomendada para troubleshooting.
  * @property {number | null} uptime - Tempo em ms desde `startedAt`, quando disponível.
  * @property {string[]} issues - Lista canônica de issues operacionais detectadas na coleta.
+ * @property {AgentBootReport | null} bootReport - Último relatório de boot conhecido, quando disponível.
  * @property {{
  *     runtime: { ok: boolean; status: AgentStatus; operational: boolean };
  *     client: { ok: boolean; available: boolean };
@@ -176,7 +301,14 @@
  *         keepaliveRunning: boolean;
  *         backgroundPendingCount: number;
  *     };
- *     background: { ok: boolean; pendingCount: number; warnThreshold: number };
+ *     background: { ok: boolean; pendingCount: number; warnThreshold: number; labels: string[] };
+ *     boot: {
+ *         ok: boolean;
+ *         reportAvailable: boolean;
+ *         failedSteps: number;
+ *         degradedSteps: number;
+ *         lastCompletedAt: number | null;
+ *     };
  *     quota: { ok: boolean; configured: boolean; running: boolean };
  * }} checks
  *   - Checks canônicos usados por rotas e diagnósticos.
@@ -190,9 +322,9 @@
  * Contrato do host exigido pelo módulo lifecycle (agentStart, agentStop, initSession).
  *
  * @typedef {Object} LifecycleHost
- * @property {(event: string, payload?: unknown) => boolean} emit
- * @property {(event: string, listener: (...args: any[]) => void) => void} on
- * @property {(event: string, listener: (...args: any[]) => void) => void} off
+ * @property {(event: string | symbol, payload?: unknown) => boolean} emit
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} off
  * @property {(event: string) => void} removeAllListeners
  * @property {string | null} sessionId
  * @property {() => AgentStatusSnapshot} getStatusSnapshot
@@ -209,8 +341,10 @@
  * Contrato do host exigido pelo módulo dialog (dialogStart, dialogStop, etc.).
  *
  * @typedef {Object} DialogHost
- * @property {(event: string, payload?: unknown) => boolean} emit
- * @property {(event: string, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string | symbol, payload?: unknown) => boolean} emit
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} once
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} off
  * @property {string | null} sessionId
  * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
  * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot
@@ -221,7 +355,7 @@
  * Contrato do host exigido pelo módulo messaging (sendMessage, enqueueTask, etc.).
  *
  * @typedef {Object} MessagingHost
- * @property {(event: string, payload?: unknown) => boolean} emit
+ * @property {(event: string | symbol, payload?: unknown) => boolean} emit
  */
 
 /**
@@ -244,6 +378,9 @@
  * @property {boolean} [dialogLoopActive] - Indica se o dialog loop está ativo
  * @property {() => AgentStatusSnapshot} getStatusSnapshot - Retorna o snapshot completo do status
  * @property {(() => AgentHealthSnapshot) | undefined} getHealthSnapshot - Retorna o snapshot consolidado de health
+ * @property {(() => AgentSdkHandles) | undefined} getSdkHandles - Retorna os handles crus do SDK atualmente acoplados
+ * @property {(() => AgentSdkAccessSnapshot) | undefined} getSdkResourceSnapshot - Retorna um snapshot verificável da
+ *   cobertura de recursos SDK
  * @property {boolean | undefined} [dialogPaused] - Indica se o dialog loop está pausado
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
@@ -285,6 +422,32 @@
  * @property {() => Record<string, number>} listenerDiagnostics - Retorna diagnóstico de listeners por evento
  * @property {((n: number) => void) | undefined} setMaxListeners - Define o número máximo de listeners
  * @property {((prompt: string) => Promise<string>) | undefined} steerMessage - Envia mensagem em modo steering
+ * @property {(() => Promise<{ message: string; timestamp: number; protocolVersion?: number }>) | undefined} pingSdk -
+ *   Executa ping no client SDK atual
+ * @property {(() => Promise<import('#copilot/sdk/types').GetStatusResponse>) | undefined} getSdkStatus - Retorna status
+ *   do SDK/CLI atual
+ * @property {(() => Promise<import('#copilot/sdk/types').GetAuthStatusResponse>) | undefined} getSdkAuthStatus -
+ *   Retorna status de autenticação do SDK/CLI atual
+ * @property {(() => Promise<string | undefined>) | undefined} getLastSdkSessionId - Retorna a última sessão conhecida
+ *   pelo SDK atual
+ * @property {(() => Promise<string | undefined>) | undefined} getForegroundSdkSessionId - Retorna a sessão em
+ *   foreground do SDK atual
+ * @property {((sessionId: string) => Promise<void>) | undefined} setForegroundSdkSessionId - Define a sessão em
+ *   foreground do SDK atual
+ * @property {((
+ *           filter?: import('#copilot/sdk/types').SessionListFilter,
+ *       ) => Promise<import('#copilot/sdk/types').SessionMetadata[]>)
+ *     | undefined} listSdkSessions
+ *   - Lista sessões conhecidas pelo SDK atual
+ *
+ * @property {(() => Promise<unknown>) | undefined} listSdkAgents - Lista agentes customizados disponíveis na sessão
+ *   atual
+ * @property {(() => Promise<unknown>) | undefined} getCurrentSdkAgent - Retorna o agente customizado ativo na sessão
+ *   atual
+ * @property {((name: string) => Promise<unknown>) | undefined} selectSdkAgent - Seleciona um agente customizado na
+ *   sessão atual
+ * @property {(() => Promise<unknown>) | undefined} deselectSdkAgent - Remove a seleção do agente customizado atual
+ * @property {(() => Promise<unknown>) | undefined} reloadSdkAgents - Recarrega agentes customizados na sessão atual
  */
 
 export {};

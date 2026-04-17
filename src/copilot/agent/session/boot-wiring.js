@@ -21,10 +21,12 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
 import { defaultMetrics, log } from '#copilot/observability';
 import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor } from '#copilot/sdk';
 import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
 import {
     createBootWiringState,
     stepAttachAgentObserver,
@@ -96,6 +98,8 @@ import {
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
+ * @property {import('../types.js').AgentBootReport} bootReport - Relatório consolidado do pipeline de boot
+ * @property {Error | null} [error] - Erro capturado durante a execução de alguma etapa
  */
 
 /**
@@ -111,6 +115,8 @@ import {
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
+ * @property {import('../types.js').AgentBootStepResult[]} stepReports
+ * @property {number} bootStartedAt
  */
 
 /**
@@ -118,7 +124,18 @@ import {
  *
  * @typedef {Object} BootWiringStep
  * @property {string} name
- * @property {() => void} run
+ * @property {'session'
+ *     | 'observability'
+ *     | 'lifecycle'
+ *     | 'dialog'
+ *     | 'mcp'
+ *     | 'keepalive'
+ *     | 'quota'
+ *     | 'handoff'
+ *     | 'hooks'
+ *     | 'other'} phase
+ * @property {boolean} required
+ * @property {() => void | Promise<void>} run
  */
 
 // ── 3. Client lifecycle handlers (via client-events.js tipado) ──
@@ -215,32 +232,138 @@ function stepStartQuotaMonitor(client, ctx, state) {
  */
 export function createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options) {
     return [
-        { name: 'wireSessionEvents', run: () => stepWireSessionEvents(session, isResumed, ctx, state) },
-        { name: 'attachEventCollector', run: () => stepAttachEventCollector(session, state) },
-        { name: 'registerClientLifecycleHandlers', run: () => stepRegisterClientLifecycleHandlers(client, ctx, state) },
-        { name: 'attachAgentObserver', run: () => stepAttachAgentObserver(agentEmitter, state, options) },
-        { name: 'cleanupStaleSessions', run: () => stepCleanupStaleSessions(client, session, ctx) },
-        { name: 'scheduleDialogRecovery', run: () => stepScheduleDialogRecovery(isResumed, ctx) },
-        { name: 'startMetricsTimer', run: () => stepStartMetricsTimer(ctx, state) },
-        { name: 'startMcpReconnect', run: () => stepStartMcpReconnect(ctx, state) },
-        { name: 'startKeepalive', run: () => stepStartKeepalive(client, session, ctx) },
-        { name: 'startQuotaMonitor', run: () => stepStartQuotaMonitor(client, ctx, state) },
-        { name: 'wireHandoff', run: () => stepWireHandoff(agentEmitter, ctx) },
-        { name: 'wireQuestionAnsweredRelay', run: () => stepWireQuestionAnsweredRelay(agentEmitter, ctx) },
+        {
+            name: 'wireSessionEvents',
+            phase: 'session',
+            required: true,
+            run: () => stepWireSessionEvents(session, isResumed, ctx, state),
+        },
+        {
+            name: 'attachEventCollector',
+            phase: 'observability',
+            required: false,
+            run: () => stepAttachEventCollector(session, state),
+        },
+        {
+            name: 'registerClientLifecycleHandlers',
+            phase: 'lifecycle',
+            required: false,
+            run: () => stepRegisterClientLifecycleHandlers(client, ctx, state),
+        },
+        {
+            name: 'attachAgentObserver',
+            phase: 'observability',
+            required: false,
+            run: () => stepAttachAgentObserver(agentEmitter, state, options),
+        },
+        {
+            name: 'cleanupStaleSessions',
+            phase: 'session',
+            required: false,
+            run: () => stepCleanupStaleSessions(client, session, ctx),
+        },
+        {
+            name: 'scheduleDialogRecovery',
+            phase: 'dialog',
+            required: false,
+            run: () => stepScheduleDialogRecovery(isResumed, ctx),
+        },
+        {
+            name: 'startMetricsTimer',
+            phase: 'observability',
+            required: false,
+            run: () => stepStartMetricsTimer(ctx, state),
+        },
+        {
+            name: 'startMcpReconnect',
+            phase: 'mcp',
+            required: false,
+            run: () => stepStartMcpReconnect(ctx, state),
+        },
+        {
+            name: 'startKeepalive',
+            phase: 'keepalive',
+            required: false,
+            run: () => stepStartKeepalive(client, session, ctx),
+        },
+        {
+            name: 'startQuotaMonitor',
+            phase: 'quota',
+            required: false,
+            run: () => stepStartQuotaMonitor(client, ctx, state),
+        },
+        {
+            name: 'wireHandoff',
+            phase: 'handoff',
+            required: false,
+            run: () => stepWireHandoff(agentEmitter, ctx),
+        },
+        {
+            name: 'wireQuestionAnsweredRelay',
+            phase: 'hooks',
+            required: false,
+            run: () => stepWireQuestionAnsweredRelay(agentEmitter, ctx),
+        },
     ];
+}
+
+/**
+ * Executa uma única etapa do pipeline de boot sob a policy canônica do agent.
+ *
+ * @param {BootWiringStep} step
+ * @param {BootWiringPipelineState} state
+ * @returns {Promise<void>}
+ */
+async function runBootStepWithPolicy(step, state) {
+    const startedAt = Date.now();
+    log('DEBUG', `[BootWiring] step ${step.name}...`);
+
+    const result = await withAgentErrorPolicy(() => step.run());
+    if (result.ok) {
+        state.stepReports.push({
+            name: step.name,
+            phase: step.phase,
+            status: 'ok',
+            durationMs: Date.now() - startedAt,
+            ts: Date.now(),
+        });
+        log('DEBUG', `[BootWiring] step ${step.name} ✓`);
+        return;
+    }
+
+    const status =
+        result.disposition === 'ignore'
+            ? 'skipped'
+            : !step.required && result.disposition !== 'fatal'
+              ? 'degraded'
+              : 'failed';
+    const level = status === 'failed' ? 'ERROR' : status === 'degraded' ? 'WARN' : 'DEBUG';
+
+    state.stepReports.push({
+        name: step.name,
+        phase: step.phase,
+        status,
+        durationMs: Date.now() - startedAt,
+        ts: Date.now(),
+        error: result.error.message,
+    });
+    log(level, `[BootWiring] step ${step.name} ${status} (${result.disposition}): ${result.error.message}`);
+
+    if (status === 'failed') {
+        throw result.error;
+    }
 }
 
 /**
  * Executa o pipeline de boot wiring em ordem.
  *
  * @param {BootWiringStep[]} steps
- * @returns {void}
+ * @param {BootWiringPipelineState} state
+ * @returns {Promise<void>}
  */
-export function runBootPipeline(steps) {
+export async function runBootPipeline(steps, state) {
     for (const step of steps) {
-        log('DEBUG', `[BootWiring] step ${step.name}...`);
-        step.run();
-        log('DEBUG', `[BootWiring] step ${step.name} ✓`);
+        await runBootStepWithPolicy(step, state);
     }
 }
 
@@ -253,13 +376,39 @@ export function runBootPipeline(steps) {
  * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
  * @param {BootWiringContext} ctx — Callbacks e referências
  * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
- * @returns {BootWiringResult}
+ * @returns {Promise<BootWiringResult>}
  */
-export function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
+export async function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
     const state = createBootWiringState();
     const steps = createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options);
-    runBootPipeline(steps);
+    /** @type {Error | null} */
+    let error = null;
+    try {
+        await runBootPipeline(steps, state);
+    } catch (caught) {
+        error = toError(caught);
+    }
 
-    const { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor } = state;
-    return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
+    const { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor, stepReports, bootStartedAt } = state;
+    const failedCount = stepReports.filter((step) => step.status === 'failed').length;
+    const degradedCount = stepReports.filter((step) => step.status === 'degraded').length;
+    const bootReport = {
+        startedAt: bootStartedAt,
+        completedAt: Date.now(),
+        ok: failedCount === 0,
+        stepCount: stepReports.length,
+        degradedCount,
+        failedCount,
+        steps: stepReports,
+    };
+
+    return {
+        unsubs,
+        agentObserver,
+        metricsTimer,
+        mcpReconnectCancel,
+        quotaMonitor,
+        bootReport,
+        ...(error ? { error } : {}),
+    };
 }

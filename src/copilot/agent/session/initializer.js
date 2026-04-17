@@ -19,9 +19,12 @@ import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
-import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../../config/agent.js';
-import { readStateAsync as _readStateAsync, writeStateAsync as _writeStateAsync } from '../lifecycle/state-io.js';
+import { buildSystemMessage } from '../../config/system-prompt/index.js';
+import {
+    persistStateWithPolicy as _persistStateWithPolicy,
+    readStateAsync as _readStateAsync,
+} from '../lifecycle/state-io.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
 
 // Re-exports para backward compatibility
@@ -174,21 +177,33 @@ export async function initOrResumeSession(client, sessionOptions) {
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
-        await _writeStateAsync({
-            resumedAt: Date.now(),
-            resumeCount: (state?.resumeCount ?? 0) + 1,
-        });
+        const persistedResume = await _persistStateWithPolicy(
+            {
+                resumedAt: Date.now(),
+                resumeCount: (state?.resumeCount ?? 0) + 1,
+            },
+            { label: 'session.initializer.resume' },
+        );
+        if (!persistedResume.ok) {
+            throw persistedResume.error;
+        }
         log('INFO', `[PersistentSession] Sessão retomada com sucesso (retomada #${(state?.resumeCount ?? 0) + 1}).`);
     } else {
-        await _writeStateAsync({
-            sessionId: result.sessionId,
-            startedAt: Date.now(),
-            resumedAt: Date.now(),
-            resumeCount: 0,
-            sendCount: 0,
-            model,
-            pendingQuestion: null,
-        });
+        const persistedNewSession = await _persistStateWithPolicy(
+            {
+                sessionId: result.sessionId,
+                startedAt: Date.now(),
+                resumedAt: Date.now(),
+                resumeCount: 0,
+                sendCount: 0,
+                model,
+                pendingQuestion: null,
+            },
+            { label: 'session.initializer.create' },
+        );
+        if (!persistedNewSession.ok) {
+            throw persistedNewSession.error;
+        }
         log('INFO', `[PersistentSession] Nova sessão criada: ${result.sessionId}`);
     }
 

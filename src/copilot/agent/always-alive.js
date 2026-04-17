@@ -12,6 +12,7 @@
  */
 
 import { container, logSwallowed } from '#copilot/core';
+import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { METRICS_STORE } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
 
@@ -49,6 +50,22 @@ import {
     setModel,
     setReasoningEffort,
 } from './facades/agent-model-config.js';
+import {
+    deselectSdkAgent,
+    getCurrentSdkAgent,
+    getForegroundSdkSessionId,
+    getLastSdkSessionId,
+    getSdkAuthStatus,
+    getSdkHandles,
+    getSdkResourceSnapshot,
+    getSdkStatus,
+    listSdkAgents,
+    listSdkSessions,
+    pingSdk,
+    reloadSdkAgents,
+    selectSdkAgent,
+    setForegroundSdkSessionId,
+} from './facades/agent-sdk-access.js';
 import {
     abortCurrentMessage,
     getSessionMessages,
@@ -95,8 +112,8 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.setMaxListeners(MAX_LISTENERS);
         this.ctx = new AgentContext(this, options);
 
-        // F35: MessageQueue emite __processQueue como evento interno para disparar processamento.
-        this.on('__processQueue', () => this.#processQueue());
+        // F35: MessageQueue emite EMITTER_PROCESS_QUEUE (Symbol interno) para disparar processamento.
+        this.on(EMITTER_PROCESS_QUEUE, () => this.#processQueue());
     }
 
     /**
@@ -166,7 +183,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return this.ctx.runtimeState.status;
+        return this.ctx.status;
     }
 
     /**
@@ -202,7 +219,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return this.ctx.dialogState.pendingQuestion;
+        return this.ctx.pendingQuestion;
     }
 
     /**
@@ -211,7 +228,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string | null}
      */
     get sessionId() {
-        return this.ctx.sessionState.session?.sessionId ?? readState()?.sessionId ?? null;
+        return this.ctx.session?.sessionId ?? readState()?.sessionId ?? null;
     }
 
     /**
@@ -363,6 +380,117 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Executa um ping no client SDK atualmente acoplado ao agent.
+     *
+     * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+     */
+    async pingSdk() {
+        return pingSdk(this.ctx);
+    }
+
+    /**
+     * Retorna o status do runtime SDK/CLI acoplado ao agent.
+     *
+     * @returns {Promise<import('#copilot/sdk/types').GetStatusResponse>}
+     */
+    async getSdkStatus() {
+        return getSdkStatus(this.ctx);
+    }
+
+    /**
+     * Retorna o status de autenticação do runtime SDK/CLI acoplado ao agent.
+     *
+     * @returns {Promise<import('#copilot/sdk/types').GetAuthStatusResponse>}
+     */
+    async getSdkAuthStatus() {
+        return getSdkAuthStatus(this.ctx);
+    }
+
+    /**
+     * Retorna o ID da última sessão conhecida pelo client SDK atual.
+     *
+     * @returns {Promise<string | undefined>}
+     */
+    async getLastSdkSessionId() {
+        return getLastSdkSessionId(this.ctx);
+    }
+
+    /**
+     * Retorna o sessionId em foreground no client SDK atual.
+     *
+     * @returns {Promise<string | undefined>}
+     */
+    async getForegroundSdkSessionId() {
+        return getForegroundSdkSessionId(this.ctx);
+    }
+
+    /**
+     * Define o sessionId em foreground no client SDK atual.
+     *
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async setForegroundSdkSessionId(sessionId) {
+        await setForegroundSdkSessionId(this.ctx, sessionId);
+    }
+
+    /**
+     * Lista sessões persistidas/acessíveis pelo client SDK atual.
+     *
+     * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+     * @returns {Promise<import('#copilot/sdk/types').SessionMetadata[]>}
+     */
+    async listSdkSessions(filter) {
+        return listSdkSessions(this.ctx, filter);
+    }
+
+    /**
+     * Lista agentes customizados disponíveis na sessão SDK atual.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async listSdkAgents() {
+        return listSdkAgents(this.ctx);
+    }
+
+    /**
+     * Retorna o agente customizado atualmente selecionado na sessão SDK.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async getCurrentSdkAgent() {
+        return getCurrentSdkAgent(this.ctx);
+    }
+
+    /**
+     * Seleciona um agente customizado na sessão SDK atual.
+     *
+     * @param {string} name
+     * @returns {Promise<unknown>}
+     */
+    async selectSdkAgent(name) {
+        return selectSdkAgent(this.ctx, name);
+    }
+
+    /**
+     * Remove a seleção do agente customizado atual na sessão SDK.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async deselectSdkAgent() {
+        return deselectSdkAgent(this.ctx);
+    }
+
+    /**
+     * Recarrega a lista de agentes customizados na sessão SDK atual.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async reloadSdkAgents() {
+        return reloadSdkAgents(this.ctx);
+    }
+
+    /**
      * Nível de raciocínio atual.
      *
      * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
@@ -403,6 +531,24 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     getHealthSnapshot() {
         return healthSnapshot(this.ctx, this);
+    }
+
+    /**
+     * Retorna os handles crus do SDK atualmente acoplados ao agent.
+     *
+     * @returns {import('./types.js').AgentSdkHandles}
+     */
+    getSdkHandles() {
+        return getSdkHandles(this.ctx);
+    }
+
+    /**
+     * Retorna um snapshot verificável da cobertura de recursos SDK disponíveis ao agent.
+     *
+     * @returns {import('./types.js').AgentSdkAccessSnapshot}
+     */
+    getSdkResourceSnapshot() {
+        return getSdkResourceSnapshot(this.ctx);
     }
 
     /**
@@ -493,7 +639,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     get lastPrInfo() {
         // Retorna cópia rasa para evitar mutação externa do estado interno.
-        return this.ctx.metricsState.lastPrInfo ? { ...this.ctx.metricsState.lastPrInfo } : null;
+        return this.ctx.getLastPrInfoSnapshot();
     }
 
     /**

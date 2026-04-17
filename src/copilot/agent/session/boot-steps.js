@@ -31,7 +31,7 @@ import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
-import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
 import { cleanupStaleSessions } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
 
@@ -90,6 +90,8 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
+ * @property {import('../types.js').AgentBootStepResult[]} stepReports
+ * @property {number} bootStartedAt
  */
 
 /**
@@ -104,6 +106,8 @@ export function createBootWiringState() {
         metricsTimer: null,
         mcpReconnectCancel: null,
         quotaMonitor: null,
+        stepReports: [],
+        bootStartedAt: Date.now(),
     };
 }
 
@@ -185,7 +189,7 @@ export function stepCleanupStaleSessions(client, session, ctx) {
  * @returns {void}
  */
 export function scheduleDialogBootRecovery(ctx) {
-    log('INFO', '[AlwaysAlive] F53/F42.1: Re-ativando dialog loop após resume — tentando zero-PR primeiro.');
+    log('DEBUG', '[AlwaysAlive] F53/F42.1: Recovery do dialog loop agendado após resume.');
     const bootRecoveryTimer = setTimeout(() => {
         if (ctx.getStatus() === 'stopped') {
             return;
@@ -207,9 +211,29 @@ export function scheduleDialogBootRecovery(ctx) {
  * @returns {Promise<void>}
  */
 export async function runDialogBootRecovery(ctx) {
+    const status = ctx.getStatus();
+    if (ctx.dialogLoop.active) {
+        log('DEBUG', '[AlwaysAlive] F53: Boot recovery dispensado — dialog loop já está ativo.');
+        return;
+    }
+    if (status === 'processing') {
+        log('DEBUG', '[AlwaysAlive] F53: Boot recovery dispensado — boot normal ainda está processando.');
+        return;
+    }
+    if (status !== 'idle' && status !== 'waiting_for_input') {
+        log('DEBUG', `[AlwaysAlive] F53: Boot recovery dispensado — status atual '${status}' não permite resume.`);
+        return;
+    }
+
     try {
         ctx.ensureDialogLoopAttached();
-        await writeStateAsync({ dialogPaused: true });
+        const pausedPersist = await persistStateWithPolicy(
+            { dialogPaused: true },
+            { label: 'dialog.boot_recovery.pause' },
+        );
+        if (!pausedPersist.ok) {
+            logSwallowed(pausedPersist.error, 'agent.bootWiring.persistDialogPaused');
+        }
         await ctx.resumeDialogLoop();
         log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
         ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
@@ -271,17 +295,7 @@ export function stepStartMetricsTimer(ctx, state) {
  * @returns {void}
  */
 export function stepStartMcpReconnect(ctx, state) {
-    const _ctxAny = /**
-     * @type {{
-     *     mcpBridge?: {
-     *         startAutoReconnect: (
-     *             onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
-     *             intervalMs: number,
-     *         ) => () => void;
-     *     } | null;
-     * }}
-     */ (/** @type {unknown} */ (ctx));
-    const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
+    const _mcpBridgeFn = ctx.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
     state.mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
         ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
     }, MCP_RECONNECT_MS);

@@ -28,11 +28,11 @@
  * @see EventBus
  */
 
+import { toError } from '../core/error-handlers.js';
 import { createErrorAlerter } from './error-alerting.js';
 import { log } from './logger.js';
 import { EMITTER_TO_BUS_TYPE } from './observers/event-name-map.js';
 import { attachDialogTaskHandlers, attachSessionAgentHandlers } from './observers/index.js';
-import { toError } from '../core/error-handlers.js';
 
 /**
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
@@ -83,11 +83,15 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
     /**
      * Registra listener no EventEmitter (legado).
      *
-     * @param {import('node:events').EventEmitter} emitter
+     * Nunca deve ser chamada com `emitter = null` em modo emitter; o null guard existe apenas para satisfazer a
+     * assinatura alargada de `ObserverContext.on` (que aceita `null` em modo bus).
+     *
+     * @param {import('node:events').EventEmitter | null} emitter
      * @param {string} event
      * @param {(...args: any[]) => void} listener
      */
     function _onEmitter(emitter, event, listener) {
+        if (!emitter) return; // modo bus não usa esta função — guard defensivo
         emitter.on(event, listener);
         _emitterRegistrations.push({ emitter, event, listener });
     }
@@ -98,7 +102,7 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
      *
      * @param {import('../core/event-bus.js').EventBus} bus
      * @returns {(
-     *     emitter: import('node:events').EventEmitter,
+     *     emitter: import('node:events').EventEmitter | null,
      *     event: string,
      *     listener: (...args: any[]) => void,
      * ) => void}
@@ -192,14 +196,12 @@ export function createAgentEventObserver({ metrics, errorTracker, modelStatsTrac
     function attachToBus(bus) {
         const busOn = _createBusOn(bus);
 
-        // Dummy emitter — handlers chamam on(agent, ...) mas no mode bus o primeiro arg é ignorado
-        const dummyAgent = /** @type {import('node:events').EventEmitter} */ (/** @type {unknown} */ ({}));
-
         /** @type {import('./observers/context.js').ObserverContext} */
         const ctx = {
             metrics,
             errorTracker: errorTracker ?? null,
-            agent: dummyAgent,
+            // Modo bus: sem EventEmitter de agente — agent é null, `on` ignora o primeiro argumento
+            agent: null,
             on: busOn,
             safe: _safe,
             modelStatsTracker: modelStatsTracker ?? null,

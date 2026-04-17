@@ -44,8 +44,39 @@ export function setCustomToolsBuilder(fn) {
     if (typeof fn === 'function') _buildTool = fn;
 }
 
-/** Caminho do arquivo de persistência. @type {string} */
-const CUSTOM_TOOLS_PATH = join(resolve(import.meta.dirname, '../..'), 'custom-tools.json');
+const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../../..');
+const LEGACY_COPILOT_ROOT = resolve(import.meta.dirname, '../..');
+
+/** Caminho canônico do arquivo de persistência. @type {string} */
+const CUSTOM_TOOLS_PATH = join(WORKSPACE_ROOT, 'custom-tools.json');
+
+/** Caminho legado mantido apenas para compatibilidade de leitura. @type {string} */
+const LEGACY_CUSTOM_TOOLS_PATH = join(LEGACY_COPILOT_ROOT, 'custom-tools.json');
+
+/** @type {boolean} */
+let _legacyPathWarned = false;
+
+/**
+ * Lê o arquivo de registry no caminho canônico ou, em fallback, no caminho legado.
+ *
+ * @returns {Promise<{ raw: string | null; path: string | null; legacy: boolean }>}
+ */
+async function _readRegistryFile() {
+    try {
+        return { raw: await readFile(CUSTOM_TOOLS_PATH, 'utf8'), path: CUSTOM_TOOLS_PATH, legacy: false };
+    } catch (e) {
+        if (toError(e).code !== 'ENOENT') throw e;
+    }
+
+    try {
+        return { raw: await readFile(LEGACY_CUSTOM_TOOLS_PATH, 'utf8'), path: LEGACY_CUSTOM_TOOLS_PATH, legacy: true };
+    } catch (e) {
+        if (toError(e).code === 'ENOENT') {
+            return { raw: null, path: null, legacy: false };
+        }
+        throw e;
+    }
+}
 
 /**
  * Mapa de handlers pré-autorizados para custom tools declarativas. Adicionar funções aqui para disponibilizá-las via
@@ -157,7 +188,19 @@ let _registry = new Map();
  */
 export async function loadCustomToolsAsync() {
     try {
-        const raw = await readFile(CUSTOM_TOOLS_PATH, 'utf8');
+        const { raw, path: sourcePath, legacy } = await _readRegistryFile();
+        if (raw === null) {
+            _registry = new Map();
+            log('DEBUG', '[custom-tools-registry] custom-tools.json ausente — registry vazio (opcional).');
+            return;
+        }
+        if (legacy && !_legacyPathWarned) {
+            _legacyPathWarned = true;
+            log(
+                'WARN',
+                `[custom-tools-registry] Usando caminho legado '${sourcePath}'. Migre o arquivo para '${CUSTOM_TOOLS_PATH}'.`,
+            );
+        }
         const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomToolsAsync]');
         if (!jsonResult.ok) {
             log('WARN', '[custom-tools-registry] custom-tools.json JSON inválido.');
@@ -171,7 +214,10 @@ export async function loadCustomToolsAsync() {
         }
         const items = result.data;
         _registry = new Map(items.map((item) => [item.name, item]));
-        log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
+        log(
+            'INFO',
+            `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async${legacy ? ', legado' : ''}).`,
+        );
     } catch (e) {
         logSwallowed(e, 'sdk.customTools.loadRegistry');
     }

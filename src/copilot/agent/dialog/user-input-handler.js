@@ -12,7 +12,7 @@
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { writeStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 
 /**
  * @typedef {import('../types.js').PendingQuestion} PendingQuestion
@@ -52,6 +52,25 @@ function trackBackgroundTask(ctx, task, meta) {
 }
 
 /**
+ * Persiste snapshot parcial do user-input usando a policy canônica do `agent`.
+ *
+ * @param {UserInputContext} ctx
+ * @param {Record<string, unknown>} data
+ * @param {{ label?: string; description?: string }} meta
+ * @returns {void}
+ */
+function trackPersistedUserInputState(ctx, data, meta) {
+    const policyOpts = meta.label !== undefined ? { label: meta.label } : {};
+    const task = persistStateWithPolicy(data, policyOpts).then((result) => {
+        if (!result.ok) {
+            throw result.error;
+        }
+        return undefined;
+    });
+    trackBackgroundTask(ctx, task, meta);
+}
+
+/**
  * Handler principal chamado pelo SDK quando o modelo usa `ask_user`.
  *
  * Delega para o handler especializado conforme o modo ativo:
@@ -78,7 +97,7 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
  * Propaga a classificação READY/REPLY/STOPPED ao DialogLoopManager e suspende a execução aguardando
  * `answerPendingQuestion()`.
  *
- * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula o writeStateAsync de pendingQuestion para
+ * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula a persistência de `pendingQuestion` para
  * evitar I/O desnecessário em cada turno do dialog loop.
  *
  * @param {{ question: string; allowFreeform: boolean }} input
@@ -106,19 +125,14 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
  */
 function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersist = false }, ctx) {
     ctx.setStatus('waiting_for_input');
-    if (!skipPersist) {
-        trackBackgroundTask(ctx, writeStateAsync({ pendingQuestion: question }), {
-            label: 'question.persist.pending',
-            description: 'Persist pendingQuestion',
-        });
-    }
+    const askedAt = Date.now();
 
     return new Promise((resolve) => {
         /** @type {PendingQuestion} */
         const pq = {
             question,
             allowFreeform,
-            askedAt: Date.now(),
+            askedAt,
             ...(choices !== undefined && { choices }),
             resolve: (/** @type {string} */ answer) => {
                 ctx.setStatus('processing');
@@ -126,11 +140,18 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
             },
         };
         ctx.setPendingQuestion(pq);
-        // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
-        trackBackgroundTask(ctx, writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() }), {
-            label: 'question.persist.ask_user',
-            description: 'Persist pendingQuestion + lastAskUserAt',
-        });
+        // F44.3 + F56.2: fora do protocolo interno do dialog loop, persistimos pergunta pendente + timestamp do ask_user
+        // em uma única operação com policy canônica, evitando write duplicado e ruído em sessões longas.
+        if (!skipPersist) {
+            trackPersistedUserInputState(
+                ctx,
+                { pendingQuestion: question, lastAskUserAt: askedAt },
+                {
+                    label: 'question.persist.pending',
+                    description: 'Persist pendingQuestion + lastAskUserAt',
+                },
+            );
+        }
         ctx.emit(EMITTER_QUESTION_PENDING, { question, choices, allowFreeform });
     });
 }

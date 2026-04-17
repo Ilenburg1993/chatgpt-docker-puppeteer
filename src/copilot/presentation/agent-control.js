@@ -7,7 +7,7 @@
  *   interface operacional da LLM-B, mas removendo a dependência direta de `server/` em `terminal/handlers/agent.js`.
  */
 
-import { alwaysAliveAgent } from '#copilot/agent';
+import { getAgent as resolveAgent } from '#copilot/agent';
 import { toError } from '#copilot/core';
 import { sendTurn } from '../terminal/dialog.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../terminal/file-context.js';
@@ -27,7 +27,7 @@ const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
 
 /** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
 function getAgent() {
-    return alwaysAliveAgent;
+    return resolveAgent();
 }
 
 /**

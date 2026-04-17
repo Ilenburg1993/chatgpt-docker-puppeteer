@@ -29,8 +29,8 @@
 /**
  * @callback Middleware
  * @param {BaseEvent} event
- * @param {() => void} next
- * @returns {void}
+ * @param {() => void | Promise<void>} next
+ * @returns {void | Promise<void>}
  */
 
 // ─── EventBus ────────────────────────────────────────────────────────────────
@@ -55,6 +55,67 @@ export class EventBus {
 
     /** @type {boolean} */
     #disposed = false;
+
+    /**
+     * Invoca um handler preservando o contrato best-effort do bus.
+     *
+     * @param {EventHandler} handler
+     * @param {BaseEvent} event
+     * @returns {void}
+     */
+    #invokeHandler(handler, event) {
+        try {
+            Promise.resolve(handler(event)).catch(() => {
+                /* async handler errors are swallowed */
+            });
+        } catch (_) {
+            /* sync handler errors are swallowed */
+        }
+    }
+
+    /**
+     * Executa a cadeia de middlewares com suporte a callbacks síncronos e assíncronos.
+     *
+     * O contrato permanece fire-and-forget (`emit()` continua retornando `void`), mas middlewares agora podem aguardar
+     * trabalho assíncrono antes de chamar `next()` sem quebrar a ordem de entrega.
+     *
+     * @param {BaseEvent} event
+     * @returns {Promise<void>}
+     */
+    async #runMiddlewareChain(event) {
+        const mw = this.#middleware;
+
+        /**
+         * @param {number} index
+         * @returns {Promise<void>}
+         */
+        const dispatch = async (index) => {
+            if (this.#disposed) return;
+
+            const fn = mw[index];
+            if (!fn) {
+                this.#deliver(event);
+                return;
+            }
+
+            let advanced = false;
+
+            /** @returns {void | Promise<void>} */
+            const next = () => {
+                if (advanced) return;
+                advanced = true;
+                return dispatch(index + 1);
+            };
+
+            try {
+                await Promise.resolve(fn(event, next));
+            } catch (_) {
+                /* middleware errors are swallowed */
+            }
+        };
+
+        await dispatch(0);
+    }
 
     /**
      * Registra um handler para um event type. Suporta wildcards: `session:*` captura todos os eventos `session:*`.
@@ -98,7 +159,7 @@ export class EventBus {
         /** @type {EventHandler} */
         const wrapper = (event) => {
             unsub?.();
-            void handler(event);
+            this.#invokeHandler(handler, event);
         };
         unsub = this.on(eventType, wrapper);
         return unsub;
@@ -127,18 +188,7 @@ export class EventBus {
         // Increment counter
         this.#counters.set(event.type, (this.#counters.get(event.type) ?? 0) + 1);
 
-        // Run middleware chain
-        let idx = 0;
-        const mw = this.#middleware;
-        const deliver = () => {
-            if (idx < mw.length) {
-                const fn = mw[idx++];
-                if (fn) fn(event, deliver);
-            } else {
-                this.#deliver(event);
-            }
-        };
-        deliver();
+        void this.#runMiddlewareChain(event);
     }
 
     /**
@@ -255,11 +305,7 @@ export class EventBus {
         const exact = this.#listeners.get(type);
         if (exact) {
             for (const handler of exact) {
-                try {
-                    void handler(event);
-                } catch (_) {
-                    /* handler errors are swallowed */
-                }
+                this.#invokeHandler(handler, event);
             }
         }
 
@@ -270,11 +316,7 @@ export class EventBus {
             const wildcard = this.#listeners.get(`${ns}:*`);
             if (wildcard) {
                 for (const handler of wildcard) {
-                    try {
-                        void handler(event);
-                    } catch (_) {
-                        /* handler errors are swallowed */
-                    }
+                    this.#invokeHandler(handler, event);
                 }
             }
         }
@@ -283,11 +325,7 @@ export class EventBus {
         const catchAll = this.#listeners.get('*');
         if (catchAll) {
             for (const handler of catchAll) {
-                try {
-                    void handler(event);
-                } catch (_) {
-                    /* handler errors are swallowed */
-                }
+                this.#invokeHandler(handler, event);
             }
         }
     }
