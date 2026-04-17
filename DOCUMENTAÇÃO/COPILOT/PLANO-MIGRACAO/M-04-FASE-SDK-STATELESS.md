@@ -1,11 +1,27 @@
 # M-04 — Fase 3: SDK Stateless
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.1
 **Pré-requisito**: M-02 (Cleanup) concluído; M-03 (Agent Refactor) K1 concluído
 **Estimativa**: ~14h
 **Risco**: Moderado-Alto (toca no wrapper do copilot-sdk)
 **Consolida**: Faixa L3 + Faixa J1
+
+## 0. Status auditado — 2026-04-15
+
+Esta fase segue **pendente estruturalmente**.
+
+Confirmado na auditoria:
+
+- `sdk/session/client.js` ainda mantém `_client` e `_sessions` internamente;
+- `sdk/config.js` ainda existe (embora já marcado como deprecated);
+- `sdk/agent/agents.js` ainda existe;
+- `conversation-hub/session-registry.js` ainda não existe.
+
+Pré-requisitos já cumpridos por trabalho anterior / M-02:
+
+- `types/contracts/` já absorveu os contratos antes em `sdk/agent/`;
+- `config/session-config.js` já parou de importar `approveAll` direto do SDK e usa `#copilot/sdk`.
 
 ---
 

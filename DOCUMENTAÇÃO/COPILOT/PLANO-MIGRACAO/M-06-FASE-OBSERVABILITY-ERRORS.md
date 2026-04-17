@@ -1,11 +1,25 @@
 # M-06 — Fase 5: Observability & Error Pipeline
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.1
 **Pré-requisito**: M-05 (Event Unification) concluído
 **Estimativa**: ~12h
 **Risco**: Baixo-Moderado
 **Consolida**: Faixa L5 + K3 (complementa) + F (parcial)
+
+## 0. Status auditado — 2026-04-15
+
+Esta fase segue **pendente**.
+
+Confirmado no baseline auditado:
+
+- `observability/error-tracker.js` ainda existe;
+- `observability/error-alerting.js` ainda existe;
+- `observability/bus-actions/` ainda existe;
+- `observability/event-catalog.js` ainda existe;
+- `observability/error-pipeline.js` ainda não existe.
+
+Ou seja: o pipeline unificado de erro continua sendo target futuro, não estado presente.
 
 ---
 

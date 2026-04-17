@@ -1,11 +1,20 @@
 # M-07 — Fases Futuras (Feature Tracks)
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.1
 **Pré-requisito**: M-02 a M-06 concluídos (parcial para algumas faixas)
 **Estimativa**: ~78h total
 **Risco**: Variável (por faixa)
 **Consolida**: Faixas D, F, G2, H, J3
+
+## 0. Status auditado — 2026-04-15
+
+As faixas futuras continuam válidas, mas o gating real mudou levemente após a auditoria:
+
+- `M-02` já pode ser tratado como praticamente encerrado no plano estrutural;
+- `M-03` a `M-06` continuam sendo o gargalo real antes de atacar features grandes com segurança;
+- em especial, `G2` (Hub Lifecycle) continua dependente da extração de session registry planejada em M-04;
+- `F` (Telemetry) continua dependente da consolidação de observability descrita em M-06.
 
 ---
 

@@ -1,9 +1,78 @@
 # M-01 — Inventário Completo: Situação Atual de src/copilot/
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.9
 **Propósito**: Referência completa e autocontida de todos os arquivos, módulos e responsabilidades
 do diretório `src/copilot/`. Este documento é referenciado por todos os M-02 a M-06.
+
+> **Nota de auditoria (2026-04-15)**: este inventário nasceu como snapshot de 2026-03-21.
+> As tabelas detalhadas abaixo preservam esse contexto histórico, mas as métricas e divergências
+> desta nota prevalecem quando houver conflito.
+
+### Addendum de auditoria — 2026-04-15
+
+| Métrica auditada                        | Valor             |
+| --------------------------------------- | ----------------- |
+| Total de arquivos `.js`                 | 420               |
+| Total de linhas                         | 63.681            |
+| Módulos arquiteturais de nível superior | 18                |
+| Diretórios top-level em disco           | 20                |
+| Diretórios totais                       | 64                |
+| Maior módulo                            | `agent/` (8.248L) |
+| Segundo maior módulo                    | `sdk/` (7.913L)   |
+
+Principais divergências estruturais já confirmadas:
+
+- `src/copilot/api/` **não existe mais**.
+- `src/copilot/services/` **não existe mais**.
+- `src/copilot/agent/config.js` foi absorvido por `src/copilot/config/agent.js`.
+- `src/copilot/types/contracts/` existe e já concentra os contratos antes em `sdk/agent/`.
+- `src/copilot/agent/infra/` já não contém `webhook-manager.js`, `permission-controller.js`,
+  `tools-bootstrap.js` nem `status-snapshot.js`.
+- `src/copilot/sdk/config.js`, `src/copilot/sdk/agent/agents.js`,
+  `src/copilot/agent/session/event-handlers/`, `src/copilot/observability/bus-actions/` e
+  `src/copilot/observability/event-catalog.js` **ainda existem** — ou seja, M-03 a M-06 seguem pendentes.
+
+### Addendum específico do `agent/` — 2026-04-15 (reauditoria arquitetural)
+
+| Métrica auditada em `src/copilot/agent/` |                    Valor |
+| ---------------------------------------- | -----------------------: |
+| Arquivos `.js`                           |                       62 |
+| Diretórios internos                      |                        8 |
+| Linhas totais                            |                    8.248 |
+| Maior arquivo                            | `always-alive.js` (638L) |
+| Maior subárvore                          |      `session/` (1.975L) |
+| Segunda maior subárvore                  |       `dialog/` (1.902L) |
+
+Estado estrutural confirmado nesta reauditoria:
+
+- `queue-processor.js` já não contém lógica real; virou shim de compatibilidade;
+- `infra/task-executor.js` já não contém lógica real; virou shim de compatibilidade;
+- `agent-context.js` agora tem **410L** e já usa subestados nomeados + accessors compatíveis (`K1a`);
+- `state/agent-state.js` e `facades/agent-model-config.js` já consomem os subestados do contexto;
+- `lifecycle/session-setup.js`, `messaging/agent-messaging.js`, `dialog/agent-dialog-controller.js` e
+        `facades/agent-session-ops.js` já entraram no **lote seguro de K1b**, consumindo subestados diretamente;
+- `lifecycle/agent-lifecycle.js` agora também consome `sessionState`, `configState`, `metricsState`, `runtimeState`
+    e `ioState` diretamente nas rotas principais de start/stop/reconnect, preservando apenas alguns acessos compatíveis
+    exigidos por contratos estruturais do repositório;
+- a fachada pública de `always-alive.js` já migrou os getters de `status`, `pendingQuestion`, `sessionId` e
+    `lastPrInfo` para leitura direta dos subestados;
+- `event-bridge-wiring.js` agora existe com **90L** e absorve o wiring lazy antes embutido em `always-alive.js`;
+- `always-alive.js` agora está em **638L**, mas passou a expor `getHealthSnapshot()` e consolidou o health formal do runtime (`K7`);
+- `lifecycle/agent-lifecycle.js` está agora em **385L**;
+- `background-tasks.js` agora existe com **133L** e já cobre o primeiro lote de tarefas fire-and-forget (`K4`);
+- `health-check.js` agora existe com **97L** e centraliza a leitura canônica de client/session/dialog/queue/io (`K7`);
+- `agent-lifecycle.js` já drena `backgroundTasks` no shutdown com `drain(5000)`;
+- `loop-manager.js` já encaminha persistências assíncronas de `dialogLoopActive`/`prMetrics` via `trackBackgroundTask`;
+- `server/routes/health.js` já expõe `GET /health/agent`, e `server/routes/copilot-api/control.js` passou a reutilizar `getHealthSnapshot()`;
+- `session/boot-wiring.js` caiu para **263L** e agora funciona como runner/compositor fino do pipeline;
+- `session/boot-steps.js` foi criado com **321L** para concentrar a maior parte das 12 etapas reais do boot (`K5b`);
+- lifecycle SDK e quota monitor permanecem visíveis em `boot-wiring.js` por compatibilidade com auditorias e testes estruturais;
+- `agent/event-bridge-map.js` já existe e alimenta o bridge lazy do EventBus;
+- `agent/session/event-handlers/` ainda existe apenas como compatibilidade residual (~104L).
+
+> As tabelas detalhadas da seção 2.1 preservam o snapshot histórico do inventário original. Para o subsistema
+> `agent/`, os números e leituras deste addendum prevalecem quando houver conflito.
 
 ---
 
@@ -11,12 +80,12 @@ do diretório `src/copilot/`. Este documento é referenciado por todos os M-02 a
 
 | Métrica                   | Valor                          |
 | ------------------------- | ------------------------------ |
-| Total de arquivos `.js`   | 408                            |
-| Total de linhas           | ~62.000                        |
-| Módulos de nível superior | 21                             |
-| Diretórios                | 56                             |
-| Maior módulo              | `agent/` (61 arquivos, 8.620L) |
-| Menor módulo              | `types/` (1 arquivo, 30L)      |
+| Total de arquivos `.js`   | 420                            |
+| Total de linhas           | 63.681                         |
+| Módulos de nível superior | 18 arquiteturais / 20 em disco |
+| Diretórios                | 64                             |
+| Maior módulo              | `agent/` (8.248L)              |
+| Menor módulo              | `types/` (219L)                |
 
 ---
 

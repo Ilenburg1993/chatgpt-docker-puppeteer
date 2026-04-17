@@ -1,11 +1,23 @@
 # M-05 — Fase 4: Event System Unification
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.1
 **Pré-requisito**: M-03 (K6 — event bridge declarativo) concluído
 **Estimativa**: ~16h
 **Risco**: Moderado
 **Consolida**: Faixa L4 + G3 + K6 (complementa)
+
+## 0. Status auditado — 2026-04-15
+
+Esta fase segue **pendente**.
+
+Estado real confirmado:
+
+- `agent/session/event-handlers/` ainda existe dentro de `agent/`;
+- `hooks/bus.js` ainda permanece como subsistema próprio;
+- `observability/collectors/` e `observability/bus-actions/` ainda coexistem;
+- `always-alive.js` já faz bridge amplo para o EventBus, então há groundwork parcial, mas
+    a unificação total de naming, lifecycle e schema ainda não aconteceu.
 
 ---
 

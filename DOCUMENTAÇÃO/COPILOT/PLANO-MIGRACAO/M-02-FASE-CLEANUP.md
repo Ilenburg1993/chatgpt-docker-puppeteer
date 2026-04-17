@@ -1,11 +1,41 @@
 # M-02 — Fase 1: Cleanup & Quick Wins
 
 **Data**: 2026-03-21
-**Versão**: 1.0
+**Versão**: 1.1
 **Pré-requisito**: Nenhum (pode iniciar imediatamente)
 **Estimativa**: ~12h
 **Risco**: Baixo
 **Consolida**: Faixa L1 + J2 (parcial) + G4 (parcial) + C4 (parcial)
+
+## 0. Addendum de execução — 2026-04-15
+
+Status auditado desta fase: **estruturalmente executada, em fechamento de validação**.
+
+O que foi confirmado ou concluído até esta data:
+
+- `src/copilot/api/` já estava removido do baseline vivo;
+- `src/copilot/services/` foi removido do runtime e do filesystem nesta execução;
+- consumers restantes foram redirecionados para módulos de origem em
+   `server/routes/copilot-api/control.js`, `server/routes/sdk/index.js`,
+   `server/routes/sdk/session-crud.js`, `server/routes/sdk/session-messaging.js` e
+   `server/routes/sdk/observability.js`;
+- `plugin-registry.js` foi alinhado para não mais procurar plugins em `services/`;
+- o último bypass residual da Faixa F19 (`config/session-config.js` importando `approveAll`
+   direto de `@github/copilot-sdk`) foi corrigido para usar `#copilot/sdk`.
+
+Validação focalizada executada neste checkpoint:
+
+- `node --strip-types --test tests/unit/copilot/test_services_l4_facades.spec.js` ✅
+- `npx vitest run tests/unit/copilot/contracts/test_services_contracts.spec.js tests/unit/copilot/sdk/test_sdk_migration_f19.spec.js` ✅
+- `make lint` / `npm run lint` ✅ (0 erros, 2 warnings preexistentes fora do escopo)
+- Resultado consolidado: **19/19 testes** verdes.
+
+Pendências explícitas desta fase após o checkpoint:
+
+- `npm run test:unit` completo ainda não fecha o phase gate por um failure baseline fora do escopo
+   de `src/copilot`: `tests/unit/agent/test_ssot_consolidation.spec.js` →
+   `DriverNERVAdapter sempre responde em duplicate dispatch (activeDrivers)`;
+- se desejado, executar `format:check` e `test:integration` como fechamento formal do phase gate.
 
 ---
 
@@ -406,18 +436,18 @@ git push origin main
 
 ## 5. Critérios de Conclusão
 
-- [ ] `src/copilot/api/` não existe
-- [ ] `src/copilot/services/` não existe
-- [ ] `src/copilot/agent/config.js` não existe; `src/copilot/config/agent.js` existe
-- [ ] `src/copilot/sdk/agent/contract.js` não existe; `src/copilot/types/contracts/contract.js` existe
-- [ ] `src/copilot/agent/infra/webhook-manager.js` não existe; `src/copilot/infra/webhooks.js` existe
-- [ ] `src/copilot/agent/infra/permission-controller.js` não existe; `src/copilot/hooks/permission-controller.js` existe
-- [ ] `src/copilot/agent/infra/tools-bootstrap.js` não existe; `src/copilot/tools/bootstrap.js` existe
-- [ ] `src/copilot/agent/infra/status-snapshot.js` não existe; `src/copilot/observability/snapshots.js` existe
-- [ ] `grep -rn "#copilot/api\|#copilot/services" src/` retorna 0 resultados
-- [ ] `npm run lint` ✅
+- [x] `src/copilot/api/` não existe
+- [x] `src/copilot/services/` não existe
+- [x] `src/copilot/agent/config.js` não existe; `src/copilot/config/agent.js` existe
+- [x] `src/copilot/sdk/agent/contract.js` não existe; `src/copilot/types/contracts/contract.js` existe
+- [x] `src/copilot/agent/infra/webhook-manager.js` não existe; `src/copilot/infra/webhooks.js` existe
+- [x] `src/copilot/agent/infra/permission-controller.js` não existe; `src/copilot/hooks/permission-controller.js` existe
+- [x] `src/copilot/agent/infra/tools-bootstrap.js` não existe; `src/copilot/tools/bootstrap.js` existe
+- [x] `src/copilot/agent/infra/status-snapshot.js` não existe; `src/copilot/observability/snapshots.js` existe
+- [x] `grep -rn "#copilot/api\|#copilot/services" src/` retorna 0 resultados
+- [x] `npm run lint` ✅
 - [ ] `npm run test:unit` ✅
-- [ ] `sdk/config.js::buildSessionConfig` tem `@deprecated`
+- [x] `sdk/config.js::buildSessionConfig` tem `@deprecated`
 
 ---
 
