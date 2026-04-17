@@ -6,12 +6,12 @@
 #
 # Goal: keep good quality while reducing latency/overhead for day-to-day work.
 
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 web_search = "cached"
 suppress_unstable_features_warning = true
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 
 [shell_environment_policy]
 inherit = "all"
