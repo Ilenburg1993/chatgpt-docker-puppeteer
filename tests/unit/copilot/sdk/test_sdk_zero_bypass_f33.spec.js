@@ -142,15 +142,14 @@ describe('F167 — tools/ sem bypass direto de SDK', () => {
     }
 });
 
-// ─── F168: api/express/ sem bypass ─────────────────────────────────────────
+// ─── F168: server/routes/sdk/ sem bypass ─────────────────────────────────────────
 
-describe('F168 — api/express/ sem bypass direto de SDK', () => {
+describe('F168 — server/routes/sdk/ sem bypass direto de SDK', () => {
     const API_FILES = [
-        'src/copilot/api/express/session-crud.js',
-        'src/copilot/api/express/session-messaging.js',
-        'src/copilot/api/express/agent.js',
-        'src/copilot/api/express/client.js',
-        'src/copilot/api/express/webhooks.js',
+        'src/copilot/server/routes/sdk/session-crud.js',
+        'src/copilot/server/routes/sdk/session-messaging.js',
+        'src/copilot/server/routes/sdk/agent.js',
+        'src/copilot/server/routes/sdk/client.js',
     ];
 
     for (const file of API_FILES) {

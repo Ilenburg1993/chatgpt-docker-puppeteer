@@ -34,6 +34,71 @@
  * @property {number} askedAt - Timestamp em ms
  */
 
+// ─── AgentContext Partitioning (K1a) ───────────────────────────────────────
+
+/**
+ * Subestado de sessão do `AgentContext`.
+ *
+ * @typedef {Object} AgentSessionState
+ * @property {CopilotSession | null} session - Sessão ativa do SDK.
+ * @property {boolean} isReconnecting - Indica se há reconnect em andamento.
+ * @property {(() => void)[]} sessionEventUnsubscribers - Callbacks de unsubscribe registrados no boot.
+ * @property {boolean} isResumed - Indica se a sessão atual foi retomada.
+ * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextState - Uso real de contexto.
+ * @property {string | null} lastCheckpointPath - Último checkpoint persistido pelo SDK.
+ */
+
+/**
+ * Subestado de diálogo do `AgentContext`.
+ *
+ * @typedef {Object} AgentDialogState
+ * @property {PendingQuestion | null} pendingQuestion - Pergunta pendente do SDK aguardando resposta.
+ * @property {boolean} dialogLoopAttached - Flag de idempotência do wiring do dialog loop.
+ */
+
+/**
+ * Subestado de configuração do `AgentContext`.
+ *
+ * @typedef {Object} AgentConfigState
+ * @property {string} model - Modelo atual em uso.
+ * @property {'low' | 'medium' | 'high' | 'xhigh' | undefined} reasoningEffort - Nível atual de reasoning.
+ * @property {{
+ *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
+ *     buildConfig: () => Record<string, unknown>;
+ *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
+ * } | null} mcpBridge
+ *   - Dependências MCP injetáveis.
+ */
+
+/**
+ * Subestado de métricas/cache do `AgentContext`.
+ *
+ * @typedef {Object} AgentMetricsState
+ * @property {number} sendCount - Total de mensagens enviadas nesta sessão.
+ * @property {{ snapshot: AgentStatusSnapshot; at: number } | null} statusSnapshotCache - Cache temporário do snapshot.
+ * @property {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} lastPrInfo
+ *   - Último snapshot de billing/quota.
+ */
+
+/**
+ * Subestado de runtime/lifecycle do `AgentContext`.
+ *
+ * @typedef {Object} AgentRuntimeState
+ * @property {AgentStatus} status - Estado atual do agente.
+ * @property {ReturnType<typeof setInterval> | null} metricsTimer - Timer de emissão periódica de métricas.
+ * @property {(() => void) | null} mcpReconnectCancel - Cancel do auto-reconnect MCP.
+ * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor - Monitor periódico de quota.
+ * @property {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} agentObserver
+ *   - Observer do agente para cleanup.
+ */
+
+/**
+ * Subestado de IO do `AgentContext`.
+ *
+ * @typedef {Object} AgentIOState
+ * @property {CopilotClient | null} client - Cliente Copilot ativo.
+ */
+
 // ─── AgentTask ────────────────────────────────────────────────────────────────
 
 /**
@@ -70,6 +135,53 @@
  *   contexto do SDK (ou null se não disponível)
  * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
  * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
+ */
+
+/**
+ * @typedef {'healthy' | 'degraded' | 'unhealthy'} AgentHealthStatus
+ */
+
+/**
+ * Snapshot de health operacional do agente.
+ *
+ * `healthy` é mantido como alias de compatibilidade para consumidores legados; `ok` é o campo canônico para semântica
+ * de rota HTTP/health.
+ *
+ * @typedef {Object} AgentHealthSnapshot
+ * @property {boolean} ok - `true` quando o agente segue operacional.
+ * @property {boolean} healthy - Alias compatível de `ok`.
+ * @property {AgentHealthStatus} status - Graduação operacional consolidada.
+ * @property {AgentStatus} agentStatus - Status interno atual do agente.
+ * @property {string | null} sessionId - SessionId ativo, quando houver.
+ * @property {string} model - Modelo configurado no agente.
+ * @property {string | undefined} reasoningEffort - Nível de raciocínio configurado.
+ * @property {boolean} dialogLoopActive - Indica se o dialog loop está ativo.
+ * @property {boolean} pendingQuestion - Indica se há pergunta pendente aguardando resposta.
+ * @property {number} queueSize - Tamanho atual da fila do agente.
+ * @property {number} oldestTaskWaitMs - Idade da tarefa mais antiga na fila.
+ * @property {boolean} starvationAlert - Indica se a fila entrou em starvation.
+ * @property {number} backgroundPendingCount - Quantidade de tarefas fire-and-forget em aberto.
+ * @property {number | null} uptime - Tempo em ms desde `startedAt`, quando disponível.
+ * @property {string[]} issues - Lista canônica de issues operacionais detectadas na coleta.
+ * @property {{
+ *     runtime: { ok: boolean; status: AgentStatus; operational: boolean };
+ *     client: { ok: boolean; available: boolean };
+ *     session: { ok: boolean; active: boolean; resumed: boolean };
+ *     dialog: { ok: boolean; active: boolean; attached: boolean; paused: boolean };
+ *     queue: { ok: boolean; size: number; oldestTaskWaitMs: number; starvationAlert: boolean };
+ *     io: {
+ *         ok: boolean;
+ *         pendingQuestion: boolean;
+ *         waitingForInput: boolean;
+ *         keepaliveRunning: boolean;
+ *         backgroundPendingCount: number;
+ *     };
+ *     background: { ok: boolean; pendingCount: number; warnThreshold: number };
+ *     quota: { ok: boolean; configured: boolean; running: boolean };
+ * }} checks
+ *   - Checks canônicos usados por rotas e diagnósticos.
+ *
+ * @property {number} ts - Timestamp da coleta.
  */
 
 // ─── Host Interfaces (contratos internos para módulos extraídos) ──────────────
@@ -130,7 +242,9 @@
  * @property {string | null} sessionId - ID da sessão ativa (null quando não conectado)
  * @property {number} queueSize - Número de tasks na fila
  * @property {boolean} [dialogLoopActive] - Indica se o dialog loop está ativo
- * @property {() => Record<string, unknown>} getStatusSnapshot - Retorna o snapshot completo do status
+ * @property {() => AgentStatusSnapshot} getStatusSnapshot - Retorna o snapshot completo do status
+ * @property {(() => AgentHealthSnapshot) | undefined} getHealthSnapshot - Retorna o snapshot consolidado de health
+ * @property {boolean | undefined} [dialogPaused] - Indica se o dialog loop está pausado
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
  * @property {(

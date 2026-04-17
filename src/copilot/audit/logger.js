@@ -32,8 +32,8 @@ let _log = (level, msg, meta) => {
 };
 
 /** @type {string} */
-let _logDir = process.env.COPILOT_LOG_DIR
-    ? resolve(process.env.COPILOT_LOG_DIR)
+let _logDir = process.env['COPILOT_LOG_DIR']
+    ? resolve(process.env['COPILOT_LOG_DIR'])
     : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot');
 
 /**

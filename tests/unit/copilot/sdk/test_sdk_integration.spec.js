@@ -163,7 +163,7 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
     beforeEach(resetMocks);
 
     it('full health check retorna healthy quando tudo ok', async () => {
-        const { fullHealthCheck } = await import('#copilot/sdk/health.js');
+        const { fullHealthCheck } = await import('#copilot/sdk/health');
         const client = createMockClient();
         const result = await fullHealthCheck(client);
         expect(result.status).toBe('healthy');
@@ -174,7 +174,7 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
 
     it('health check falha quando ping falha', async () => {
         mockPing.mockRejectedValue(new Error('timeout'));
-        const { fullHealthCheck } = await import('#copilot/sdk/health.js');
+        const { fullHealthCheck } = await import('#copilot/sdk/health');
         const client = createMockClient();
         const result = await fullHealthCheck(client);
         expect(result.status).toBe('unhealthy');
@@ -184,7 +184,7 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
     it('health check detecta auth negada (quota throws)', async () => {
         // getAuthStatus uses accountGetQuota internally
         mockAccountGetQuota.mockRejectedValue(new Error('unauthorized'));
-        const { fullHealthCheck } = await import('#copilot/sdk/health.js');
+        const { fullHealthCheck } = await import('#copilot/sdk/health');
         const client = createMockClient();
         const result = await fullHealthCheck(client);
         expect(result.status).toBe('degraded');
@@ -198,7 +198,7 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
                 chat: { remainingPercentage: 0, overageAllowedWithExhaustedQuota: false },
             },
         });
-        const { fullHealthCheck } = await import('#copilot/sdk/health.js');
+        const { fullHealthCheck } = await import('#copilot/sdk/health');
         const client = createMockClient();
         const result = await fullHealthCheck(client);
         // Auth uses same accountGetQuota so it will succeed, but quota exhausted
@@ -206,8 +206,8 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
     });
 
     it('apos health ok, session lifecycle funciona', async () => {
-        const { isServerReachable } = await import('#copilot/sdk/health.js');
-        const { runSessionLifecycle } = await import('#copilot/sdk/sdk-session-wrapper.js');
+        const { isServerReachable } = await import('#copilot/sdk/health');
+        const { runSessionLifecycle } = await import('#copilot/sdk/sdk-session-wrapper');
 
         const client = createMockClient();
         const reachable = await isServerReachable(client);
@@ -246,20 +246,20 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
     });
 
     it('modeGet retorna modo atual', async () => {
-        const { modeGet } = await import('#copilot/sdk/rpc.js');
+        const { modeGet } = await import('#copilot/sdk/rpc');
         const result = await modeGet(session);
         expect(result).toEqual({ mode: 'interactive' });
     });
 
     it('modeSet altera modo para plan', async () => {
-        const { modeSet } = await import('#copilot/sdk/rpc.js');
+        const { modeSet } = await import('#copilot/sdk/rpc');
         const result = await modeSet(session, 'plan');
         expect(result).toEqual({ mode: 'plan' });
         expect(session.rpc.mode.set).toHaveBeenCalledWith({ mode: 'plan' });
     });
 
     it('plan CRUD completo: read -> update -> read -> delete', async () => {
-        const { planRead, planUpdate, planDelete } = await import('#copilot/sdk/rpc.js');
+        const { planRead, planUpdate, planDelete } = await import('#copilot/sdk/rpc');
 
         const initial = await planRead(session);
         expect(initial.exists).toBe(true);
@@ -276,7 +276,7 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
     });
 
     it('fluxo completo: get mode -> plan -> CRUD -> restore', async () => {
-        const { modeGet, modeSet, planRead, planUpdate } = await import('#copilot/sdk/rpc.js');
+        const { modeGet, modeSet, planRead, planUpdate } = await import('#copilot/sdk/rpc');
 
         await modeGet(session);
         await modeSet(session, 'plan');
@@ -292,7 +292,7 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
     });
 
     it('mode set com sessao invalida rejeita', async () => {
-        const { modeSet } = await import('#copilot/sdk/rpc.js');
+        const { modeSet } = await import('#copilot/sdk/rpc');
         await expect(modeSet(null, 'plan')).rejects.toThrow();
     });
 });
@@ -313,20 +313,20 @@ describe('F92 - Model switch mid-session', () => {
     });
 
     it('modelGetCurrent retorna modelo ativo', async () => {
-        const { modelGetCurrent } = await import('#copilot/sdk/rpc.js');
+        const { modelGetCurrent } = await import('#copilot/sdk/rpc');
         const result = await modelGetCurrent(session);
         expect(result.modelId).toBe('gpt-4.1');
     });
 
     it('modelSwitchTo troca modelo mid-session', async () => {
-        const { modelSwitchTo } = await import('#copilot/sdk/rpc.js');
+        const { modelSwitchTo } = await import('#copilot/sdk/rpc');
         const result = await modelSwitchTo(session, 'gpt-4.1-mini');
         expect(result.modelId).toBe('gpt-4.1-mini');
         expect(session.rpc.model.switchTo).toHaveBeenCalledWith({ modelId: 'gpt-4.1-mini' });
     });
 
     it('fluxo get -> switch -> verify', async () => {
-        const { modelGetCurrent, modelSwitchTo } = await import('#copilot/sdk/rpc.js');
+        const { modelGetCurrent, modelSwitchTo } = await import('#copilot/sdk/rpc');
 
         const before = await modelGetCurrent(session);
         expect(before.modelId).toBe('gpt-4.1');
@@ -339,7 +339,7 @@ describe('F92 - Model switch mid-session', () => {
     });
 
     it('model switch com sessao invalida rejeita', async () => {
-        const { modelSwitchTo } = await import('#copilot/sdk/rpc.js');
+        const { modelSwitchTo } = await import('#copilot/sdk/rpc');
         await expect(modelSwitchTo(null, 'gpt-4.1-mini')).rejects.toThrow();
     });
 });
@@ -352,7 +352,7 @@ describe('F93 - Provider config validation + session creation', () => {
     beforeEach(resetMocks);
 
     it('openaiProvider retorna config valida com type', async () => {
-        const { openaiProvider } = await import('#copilot/sdk/provider.js');
+        const { openaiProvider } = await import('#copilot/sdk/provider');
         const config = openaiProvider({
             baseUrl: 'https://api.openai.com/v1',
             apiKey: 'sk-test-key',
@@ -363,7 +363,7 @@ describe('F93 - Provider config validation + session creation', () => {
     });
 
     it('azureProvider retorna config valida com azure options', async () => {
-        const { azureProvider } = await import('#copilot/sdk/provider.js');
+        const { azureProvider } = await import('#copilot/sdk/provider');
         const config = azureProvider({
             baseUrl: 'https://myinstance.openai.azure.com',
             apiKey: 'azure-key',
@@ -375,8 +375,8 @@ describe('F93 - Provider config validation + session creation', () => {
     });
 
     it('provider config + session config merge funciona', async () => {
-        const { openaiProvider } = await import('#copilot/sdk/provider.js');
-        const { buildSessionConfig } = await import('#copilot/sdk/config.js');
+        const { openaiProvider } = await import('#copilot/sdk/provider');
+        const { buildSessionConfig } = await import('#copilot/sdk/config');
 
         const providerConfig = openaiProvider({
             baseUrl: 'https://api.openai.com/v1',
@@ -394,7 +394,7 @@ describe('F93 - Provider config validation + session creation', () => {
     });
 
     it('isValidProviderType rejeita tipos invalidos', async () => {
-        const { isValidProviderType } = await import('#copilot/sdk/provider.js');
+        const { isValidProviderType } = await import('#copilot/sdk/provider');
         expect(isValidProviderType('openai')).toBe(true);
         expect(isValidProviderType('azure')).toBe(true);
         expect(isValidProviderType('anthropic')).toBe(true);
@@ -410,7 +410,7 @@ describe('F94 - System-message customize mode with section overrides', () => {
     beforeEach(resetMocks);
 
     it('appendSystemMessage retorna config no modo append', async () => {
-        const { appendSystemMessage } = await import('#copilot/sdk/system-message.js');
+        const { appendSystemMessage } = await import('#copilot/sdk/system-message');
         const config = appendSystemMessage('Extra instructions');
         expect(config).toBeDefined();
         expect(config.mode).toBe('append');
@@ -418,7 +418,7 @@ describe('F94 - System-message customize mode with section overrides', () => {
     });
 
     it('replaceSystemMessage retorna config no modo replace', async () => {
-        const { replaceSystemMessage } = await import('#copilot/sdk/system-message.js');
+        const { replaceSystemMessage } = await import('#copilot/sdk/system-message');
         const config = replaceSystemMessage('Custom system prompt');
         expect(config).toBeDefined();
         expect(config.mode).toBe('replace');
@@ -426,7 +426,7 @@ describe('F94 - System-message customize mode with section overrides', () => {
     });
 
     it('customizeSystemMessage com section overrides funciona', async () => {
-        const { customizeSystemMessage, sectionOverride } = await import('#copilot/sdk/system-message.js');
+        const { customizeSystemMessage, sectionOverride } = await import('#copilot/sdk/system-message');
 
         const sections = {
             identity: sectionOverride('replace', 'You are a specialized agent'),
@@ -442,7 +442,7 @@ describe('F94 - System-message customize mode with section overrides', () => {
     });
 
     it('getSectionNames retorna secoes do SDK', async () => {
-        const { getSectionNames } = await import('#copilot/sdk/system-message.js');
+        const { getSectionNames } = await import('#copilot/sdk/system-message');
         const names = getSectionNames();
         // With mock, sections come from SYSTEM_PROMPT_SECTIONS keys
         expect(names).toContain('identity');
@@ -452,8 +452,8 @@ describe('F94 - System-message customize mode with section overrides', () => {
     });
 
     it('system-message + config merge produz session config valido', async () => {
-        const { customizeSystemMessage, sectionOverride } = await import('#copilot/sdk/system-message.js');
-        const { buildSessionConfig } = await import('#copilot/sdk/config.js');
+        const { customizeSystemMessage, sectionOverride } = await import('#copilot/sdk/system-message');
+        const { buildSessionConfig } = await import('#copilot/sdk/config');
 
         const sysMsg = customizeSystemMessage(
             {

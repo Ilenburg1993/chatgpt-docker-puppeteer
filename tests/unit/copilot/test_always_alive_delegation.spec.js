@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { describe, it, before } from 'node:test';
+import { before, describe, it } from 'node:test';
 
 describe('always-alive.js › delegação para módulos extraídos', () => {
     /** @type {string} */
@@ -74,6 +74,12 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
         assert.ok(src.includes("from './state/agent-state.js'"));
         assert.ok(src.includes('stateSnapshot') || src.includes('getStatusSnapshot'));
         assert.ok(src.includes('stateDiagnostics') || src.includes('listenerDiagnostics'));
+    });
+
+    it('importa o helper de event bridge wiring dedicado', () => {
+        assert.ok(src.includes("from './event-bridge-wiring.js'"));
+        assert.ok(src.includes('ensureAgentEventBusBridge'));
+        assert.ok(src.includes('resetAgentEventBusBridgeWiring'));
     });
 
     it('getStatusSnapshot() delega para stateSnapshot(ctx, this)', () => {

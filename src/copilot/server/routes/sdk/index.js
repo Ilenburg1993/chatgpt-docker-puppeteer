@@ -20,9 +20,9 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
+import { forceStopClient, getClient, getClientState, stopClient } from '#copilot/sdk';
+import { getAllTools } from '#copilot/tools';
 import { Router } from 'express';
-import { createSessionService } from '../../../services/session-service.js';
-import { createToolService } from '../../../services/tool-service.js';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
@@ -39,16 +39,14 @@ import sessionsRouter from './sessions.js';
 function createSdkApiRouter() {
     const router = Router();
 
-    const _sessionService = createSessionService();
-    const _toolService = createToolService();
-
     const sharedDeps = {
         agent: container.resolve(ALWAYS_ALIVE_AGENT),
         metrics: container.resolve(METRICS_STORE),
-        getClient: () => _sessionService.getClient(),
-        getClientState: () => _sessionService.getClientState(),
-        stopClient: () => _sessionService.stopClient(),
-        allTools: _toolService.listAll(),
+        getClient,
+        getClientState,
+        stopClient,
+        forceStopClient,
+        allTools: getAllTools(),
     };
 
     router.use('/', createClientRouter(sharedDeps));

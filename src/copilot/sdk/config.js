@@ -96,23 +96,29 @@ export function buildSessionConfig(input = {}, defaults = {}) {
         console.warn('[DEPRECATED] buildSessionConfig — use SessionConfigBuilder from #copilot/config/session-config');
         _buildSessionConfigWarned = true;
     }
-    const base = getProjectDefaults();
+    const base = /** @type {Partial<SessionConfig> & { infiniteSessions?: InfiniteSessionConfig }} */ (
+        getProjectDefaults()
+    );
+    const inputConfig = /** @type {Partial<SessionConfig> & { infiniteSessions?: InfiniteSessionConfig }} */ (input);
+    const defaultsConfig = /** @type {Partial<SessionConfig> & { infiniteSessions?: InfiniteSessionConfig }} */ (
+        defaults
+    );
 
     /** @type {Record<string, unknown>} */
-    const merged = { ...base, ...defaults, ...input };
+    const merged = { ...base, ...defaultsConfig, ...inputConfig };
 
     // Shallow merge para campos objeto aninhados (se ambos existem)
-    if (base.infiniteSessions || defaults.infiniteSessions || input.infiniteSessions) {
-        merged.infiniteSessions = {
-            ...(base.infiniteSessions ?? {}),
-            ...(defaults.infiniteSessions ?? {}),
-            ...(input.infiniteSessions ?? {}),
+    if (base['infiniteSessions'] || defaultsConfig['infiniteSessions'] || inputConfig['infiniteSessions']) {
+        merged['infiniteSessions'] = {
+            ...(base['infiniteSessions'] ?? {}),
+            ...(defaultsConfig['infiniteSessions'] ?? {}),
+            ...(inputConfig['infiniteSessions'] ?? {}),
         };
     }
 
     // onPermissionRequest é obrigatório — garantir presença
-    if (!merged.onPermissionRequest) {
-        merged.onPermissionRequest = approveAll;
+    if (!merged['onPermissionRequest']) {
+        merged['onPermissionRequest'] = approveAll;
     }
 
     return /** @type {SessionConfig} */ (/** @type {unknown} */ (merged));

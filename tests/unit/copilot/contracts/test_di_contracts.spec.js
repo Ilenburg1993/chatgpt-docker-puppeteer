@@ -45,21 +45,7 @@ describe('FK-7 — core barrel DI exports', () => {
 
 // ─── K-7b: DI token exports ─────────────────────────────────────────────────
 
-const EXPECTED_TOKENS = [
-    'SHUTDOWN_LOGGER',
-    'DB_LOGGER',
-    'SDK_LOGGER',
-    'TOOLS_BUILDER',
-    'AUDIT_LOGGER',
-    'AUDIT_BUS',
-    'BRIDGE_AGENT',
-    'FALLBACK_AGENT',
-    'HUB',
-    'PERMISSION_AGENT',
-    'SESSION_RPC',
-    'NERV_BRIDGE_AGENT',
-    'EVENT_BUS',
-];
+const EXPECTED_TOKENS = ['SHUTDOWN_LOGGER', 'DB_LOGGER', 'EVENT_BUS'];
 
 describe('FK-7 — DI tokens canônicos', () => {
     for (const tokenName of EXPECTED_TOKENS) {

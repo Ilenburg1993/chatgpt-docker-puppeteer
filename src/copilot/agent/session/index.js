@@ -17,5 +17,6 @@ export {
     setBackgroundCompactionThreshold,
 } from './initializer.js';
 export { SessionKeepalive } from './keepalive.js';
+export { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from './ownership.js';
 export { shouldRotateSession } from './rotation.js';
 export { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from './snapshot.js';

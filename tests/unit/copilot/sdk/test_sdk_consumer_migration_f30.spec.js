@@ -38,8 +38,8 @@ describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
     ];
 
     for (const file of toolFiles) {
-        it(`${file.split('/').pop()} não importa de '#copilot/sdk/tools.js'`, () => {
-            expect(src(file)).not.toContain("from '#copilot/sdk/tools.js'");
+        it(`${file.split('/').pop()} não importa de '#copilot/sdk/tools'`, () => {
+            expect(src(file)).not.toContain("from '#copilot/sdk/tools'");
         });
 
         it(`${file.split('/').pop()} importa createTool de #copilot/sdk`, () => {
@@ -51,8 +51,8 @@ describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
 // ─── F147: bridges/ usa barrel ─────────────────────────────────────────────
 
 describe('F147 — bridges/ usa barrel para onSessionEvent e createTool', () => {
-    it('mcp-tool-bridge.js não importa de #copilot/sdk/tools.js', () => {
-        expect(src('bridges/mcp-tool-bridge.js')).not.toContain("from '#copilot/sdk/tools.js'");
+    it('mcp-tool-bridge.js não importa de #copilot/sdk/tools', () => {
+        expect(src('bridges/mcp-tool-bridge.js')).not.toContain("from '#copilot/sdk/tools'");
     });
 
     it('mcp-tool-bridge.js importa createTool de #copilot/sdk', () => {
@@ -109,8 +109,8 @@ describe('F149 — agent/session/ usa barrel para session, tools-state, utils', 
 // ─── F150: observability/ usa barrel ───────────────────────────────────────
 
 describe('F150 — observability/ usa barrel para onSessionEvent', () => {
-    it('event-collector.js não importa de #copilot/sdk/events.js', () => {
-        expect(src('observability/event-collector.js')).not.toContain("from '#copilot/sdk/events.js'");
+    it('event-collector.js não importa de #copilot/sdk/events', () => {
+        expect(src('observability/event-collector.js')).not.toContain("from '#copilot/sdk/events'");
     });
 
     it('event-collector.js importa de #copilot/sdk', () => {
@@ -156,9 +156,9 @@ describe('F151 — terminal/ usa barrel para models e tools-state', () => {
 
 describe('F152 — zero-bypass: submodules críticos não importados fora de sdk/', () => {
     const CRITICAL_SUBMODULES = [
-        '#copilot/sdk/tools.js',
+        '#copilot/sdk/tools',
         '#copilot/sdk/event-helpers',
-        '#copilot/sdk/events.js',
+        '#copilot/sdk/events',
         '#copilot/sdk/models/registry',
         '#copilot/sdk/models/helpers',
         '#copilot/sdk/utils',

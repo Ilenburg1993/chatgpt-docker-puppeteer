@@ -19,7 +19,7 @@ import { toError } from '../../core/error-handlers.js';
  * @returns {string}
  */
 export function getModel(ctx) {
-    return ctx.model;
+    return ctx.configState.model;
 }
 
 /**
@@ -30,10 +30,10 @@ export function getModel(ctx) {
  * @returns {void}
  */
 export function setModel(ctx, modelId) {
-    ctx.model = modelId;
+    ctx.configState.model = modelId;
     // G2-BUG-10: setModel() é API não documentada do SDK.
     // Cast deliberado; protegido por typeof para evitar crash em versões sem suporte.
-    const sdkSession = /** @type {{ setModel?: (id: string) => void }} */ (ctx.session);
+    const sdkSession = /** @type {{ setModel?: (id: string) => void }} */ (ctx.sessionState.session);
     if (sdkSession && typeof sdkSession.setModel === 'function') {
         try {
             sdkSession.setModel(modelId);
@@ -50,9 +50,9 @@ export function setModel(ctx, modelId) {
  * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
  */
 export async function listAvailableModels(ctx) {
-    if (!ctx.client) return [];
+    if (!ctx.ioState.client) return [];
     try {
-        return await ctx.client.listModels();
+        return await ctx.ioState.client.listModels();
     } catch (e) {
         log('WARN', `[AlwaysAlive] listModels() falhou: ${toError(e).message}`);
         return [];
@@ -66,7 +66,7 @@ export async function listAvailableModels(ctx) {
  * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
  */
 export function getReasoningEffort(ctx) {
-    return ctx.reasoningEffort;
+    return ctx.configState.reasoningEffort;
 }
 
 /**
@@ -77,5 +77,5 @@ export function getReasoningEffort(ctx) {
  * @returns {void}
  */
 export function setReasoningEffort(ctx, effort) {
-    ctx.reasoningEffort = effort;
+    ctx.configState.reasoningEffort = effort;
 }

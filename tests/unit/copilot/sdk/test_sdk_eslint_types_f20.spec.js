@@ -60,17 +60,17 @@ describe('F20 — hooks/types.js alinhamento', () => {
 
     it('hooks/types.js importa PermissionHandler de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionHandler");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionHandler");
     });
 
     it('hooks/types.js importa PermissionRequest de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionRequest");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionRequest");
     });
 
     it('hooks/types.js importa PermissionRequestResult de sdk/types.js', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain("import('#copilot/sdk/types.js').PermissionRequestResult");
+        expect(src).toContain("import('#copilot/sdk/types').PermissionRequestResult");
     });
 
     it('hooks/types.js preserva typedef SessionHooks (não afetado pela migração)', () => {

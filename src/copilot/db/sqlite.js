@@ -52,7 +52,7 @@ export function setDbLogger(logFn) {
  *
  * @type {string}
  */
-const ENV_DB_PATH = process.env.COPILOT_DB_PATH || '';
+const ENV_DB_PATH = process.env['COPILOT_DB_PATH'] || '';
 
 /** @type {import('better-sqlite3').Database | null} */
 let copilotDb = null;

@@ -2,7 +2,10 @@
 /**
  * tests/unit/copilot/test_task_executor.spec.js
  *
- * Testes unitários comportamentais para src/copilot/agent/task-executor.js.
+ * Testes unitários comportamentais para a execução por tarefa do agente.
+ *
+ * O caminho legado `infra/task-executor.js` é preservado como shim de compatibilidade; a implementação canônica mora em
+ * `agent/messaging/agent-messaging.js`.
  *
  * Cobre (G1-DX-01):
  *
@@ -17,6 +20,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { executeTask } from '../../../src/copilot/agent/infra/task-executor.js';
+import { executeTask as executeTaskCanonical } from '../../../src/copilot/agent/messaging/agent-messaging.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -24,7 +28,7 @@ import { executeTask } from '../../../src/copilot/agent/infra/task-executor.js';
  * Cria uma task mock com resolve/reject controláveis.
  *
  * @param {object} [overrides]
- * @returns {import('../../../src/copilot/agent/task-executor.js').QueuedTask & { promise: Promise<any> }}
+ * @returns {import('../../../src/copilot/agent/messaging/agent-messaging.js').QueuedTask & { promise: Promise<any> }}
  */
 function makeTask(overrides = {}) {
     /** @type {(v: any) => void} */
@@ -90,7 +94,7 @@ function makeSession(opts = {}) {
  * Retorna objeto com campos extra (_statuses, _events) para inspeção nos testes.
  *
  * @param {object} [overrides]
- * @returns {import('../../../src/copilot/agent/task-executor.js').TaskExecutorCallbacks & {
+ * @returns {import('../../../src/copilot/agent/messaging/agent-messaging.js').TaskExecutorCallbacks & {
  *     _statuses: string[];
  *     _events: [string, any][];
  * }}
@@ -114,6 +118,12 @@ function makeCallbacks(overrides = {}) {
 }
 
 // ─── Testes ───────────────────────────────────────────────────────────────────
+
+describe('task-executor › compat shim', () => {
+    it('mantém o mesmo símbolo exportado pelo caminho canônico de messaging', () => {
+        assert.strictEqual(executeTask, executeTaskCanonical);
+    });
+});
 
 describe('task-executor › execução bem-sucedida', () => {
     it('deve resolver a task com o conteúdo da resposta do SDK', async () => {
@@ -217,6 +227,30 @@ describe('task-executor › AbortError não aciona reconexão (G1-BUG-03)', () =
         const errorEvent = cbs._events.find(([e]) => e === 'task.error');
         assert.ok(errorEvent, 'task.error deve ser emitido');
         assert.strictEqual(errorEvent[1].error, 'AbortError');
+    });
+});
+
+describe('task-executor › erro fatal não aciona reconexão (K3)', () => {
+    it('deve rejeitar imediatamente quando o erro já é classificado como fatal', async () => {
+        const task = makeTask();
+        const fatalErr = Object.assign(new Error('sessão fatal'), { code: 'SESSION_FATAL' });
+        const session = makeSession({
+            onSendAndWait: async () => {
+                throw fatalErr;
+            },
+        });
+        let tryReconnectCalled = false;
+        const cbs = makeCallbacks({
+            tryReconnect: async () => {
+                tryReconnectCalled = true;
+                return false;
+            },
+        });
+
+        void executeTask(session, task, cbs);
+        await assert.rejects(task.promise, /sessão fatal/);
+
+        assert.strictEqual(tryReconnectCalled, false, 'tryReconnect não deve ser chamado para erro fatal');
     });
 });
 

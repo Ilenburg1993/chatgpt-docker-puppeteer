@@ -94,7 +94,7 @@ function createMockSession() {
 
 describe('Faixa B1 — session-lifecycle handlers', () => {
     it('wireSessionLifecycleEvents retorna array de unsubscribe functions', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -104,7 +104,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.idle ao receber evento', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -113,7 +113,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.error com errorType e message', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -125,7 +125,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('loga WARN ao receber session.error', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();
@@ -135,7 +135,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.warning', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -144,7 +144,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.model_changed com previousModel e newModel', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -156,7 +156,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.tools_updated com count', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -165,7 +165,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
     });
 
     it('emite session.snapshot_rewind', async () => {
-        const { wireSessionLifecycleEvents } = await import('#copilot/agent/session/event-handlers/session-lifecycle');
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -183,7 +183,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
 
 describe('Faixa B2 — mcp-events handlers', () => {
     it('wireMcpEvents retorna array de 3 unsubscribe functions', async () => {
-        const { wireMcpEvents } = await import('#copilot/agent/session/event-handlers/mcp-events');
+        const { wireMcpEvents } = await import('#copilot/event-handlers/mcp-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireMcpEvents(/** @type {any} */ (session), { emit });
@@ -192,7 +192,7 @@ describe('Faixa B2 — mcp-events handlers', () => {
     });
 
     it('emite mcp.server.status_changed ao receber evento', async () => {
-        const { wireMcpEvents } = await import('#copilot/agent/session/event-handlers/mcp-events');
+        const { wireMcpEvents } = await import('#copilot/event-handlers/mcp-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireMcpEvents(/** @type {any} */ (session), { emit });
@@ -204,7 +204,7 @@ describe('Faixa B2 — mcp-events handlers', () => {
     });
 
     it('loga WARN quando MCP server falha', async () => {
-        const { wireMcpEvents } = await import('#copilot/agent/session/event-handlers/mcp-events');
+        const { wireMcpEvents } = await import('#copilot/event-handlers/mcp-events');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();
@@ -214,7 +214,7 @@ describe('Faixa B2 — mcp-events handlers', () => {
     });
 
     it('emite mcp.oauth.required', async () => {
-        const { wireMcpEvents } = await import('#copilot/agent/session/event-handlers/mcp-events');
+        const { wireMcpEvents } = await import('#copilot/event-handlers/mcp-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireMcpEvents(/** @type {any} */ (session), { emit });
@@ -226,7 +226,7 @@ describe('Faixa B2 — mcp-events handlers', () => {
     });
 
     it('emite mcp.oauth.completed', async () => {
-        const { wireMcpEvents } = await import('#copilot/agent/session/event-handlers/mcp-events');
+        const { wireMcpEvents } = await import('#copilot/event-handlers/mcp-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireMcpEvents(/** @type {any} */ (session), { emit });
@@ -241,7 +241,7 @@ describe('Faixa B2 — mcp-events handlers', () => {
 
 describe('Faixa B3 — tool-lifecycle handlers', () => {
     it('wireToolLifecycleEvents retorna array de 2 unsubscribe functions', async () => {
-        const { wireToolLifecycleEvents } = await import('#copilot/agent/session/event-handlers/tool-lifecycle');
+        const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -250,7 +250,7 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
     });
 
     it('emite tool.progress com toolName e progress', async () => {
-        const { wireToolLifecycleEvents } = await import('#copilot/agent/session/event-handlers/tool-lifecycle');
+        const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -262,7 +262,7 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
     });
 
     it('emite tool.user_requested', async () => {
-        const { wireToolLifecycleEvents } = await import('#copilot/agent/session/event-handlers/tool-lifecycle');
+        const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
@@ -280,7 +280,7 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
 
 describe('Faixa B4 — interaction-events handlers', () => {
     it('wireInteractionEvents retorna array de 11 unsubscribe functions', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -289,7 +289,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('emite skill.invoked', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -298,7 +298,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('emite command.executed ao receber command.execute', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -307,7 +307,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('emite command.queued e command.completed', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -318,7 +318,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('emite permission.requested e permission.completed', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -332,7 +332,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('emite subagent lifecycle events', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
@@ -357,7 +357,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
     });
 
     it('loga WARN ao receber subagent.failed', async () => {
-        const { wireInteractionEvents } = await import('#copilot/agent/session/event-handlers/interaction-events');
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();

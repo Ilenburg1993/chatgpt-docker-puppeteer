@@ -14,7 +14,6 @@ import {
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
-    EMITTER_READY,
     EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
@@ -40,6 +39,7 @@ import { writeStateAsync } from '../lifecycle/state-io.js';
  *     answerPendingQuestion: (message: string) => boolean;
  *     getSessionId?: () => string | null;
  *     getModel?: () => string;
+ *     trackBackgroundTask?: (task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>;
  * }} TurnHost
  */
 
@@ -60,17 +60,31 @@ function castListener(fn) {
  * @param {TurnEmitter} emitter
  * @param {string} message
  * @param {{ sendCount: number }} counter - Objeto mutável com o contador de envios do DLM.
+ * @param {TurnHost | null | undefined} [host] - Host opcional para roteamento de persistências assíncronas.
  * @returns {{ turnStart: number }}
  */
-export function emitTurnStart(emitter, message, counter) {
+export function emitTurnStart(emitter, message, counter, host) {
     const turnStart = Date.now();
     counter.sendCount++;
     emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
-    void writeStateAsync({
+    const persistPendingTurnTask = writeStateAsync({
         pendingTurnMessage: message,
         pendingTurnTs: turnStart,
         pendingTurnConsumedPR: false,
     });
+    if (typeof host?.trackBackgroundTask === 'function') {
+        void host.trackBackgroundTask(persistPendingTurnTask, {
+            label: 'dialog.turn.pending',
+            description: 'Persist pending turn marker at turn start',
+        });
+    } else {
+        void persistPendingTurnTask.catch((error) => {
+            log(
+                'WARN',
+                `[DialogLoopManager] pending turn persist falhou: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        });
+    }
     return { turnStart };
 }
 
@@ -303,7 +317,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                 emitter.once(EMITTER_QUESTION_PENDING, onRetryPending);
             }
         };
-        emitter.once(EMITTER_READY, onRetryReady);
+        emitter.once('ready', onRetryReady);
     });
 }
 
@@ -329,7 +343,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal }, ctx) {
         return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
     }
 
-    const { turnStart } = emitTurnStart(emitter, message, sendCountRef);
+    const { turnStart } = emitTurnStart(emitter, message, sendCountRef, host);
 
     /** @param {string} msg @param {number} t @param {string} [r] */
     const waitFn = (msg, t, r) => waitForRestartAndReply(emitter, host, msg, t, r, signal);

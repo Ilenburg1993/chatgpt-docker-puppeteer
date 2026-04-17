@@ -43,6 +43,7 @@ export async function modelGetCurrent(session) {
  * hooks/lifecycle internos do SDK.
  *
  * @param {CopilotSession} session
+ * @param {string} modelId
  * @param {{ reasoningEffort?: string }} [options]
  * @returns {Promise<unknown>}
  */

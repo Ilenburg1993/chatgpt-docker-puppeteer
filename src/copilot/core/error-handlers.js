@@ -107,22 +107,22 @@ export function toExecError(value) {
         const v = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (value));
         return {
             message: value.message,
-            stdout: typeof v.stdout === 'string' ? v.stdout : undefined,
-            stderr: typeof v.stderr === 'string' ? v.stderr : undefined,
-            code: typeof v.code === 'number' || typeof v.code === 'string' ? v.code : undefined,
-            status: typeof v.status === 'number' ? v.status : undefined,
+            stdout: typeof v['stdout'] === 'string' ? v['stdout'] : undefined,
+            stderr: typeof v['stderr'] === 'string' ? v['stderr'] : undefined,
+            code: typeof v['code'] === 'number' || typeof v['code'] === 'string' ? v['code'] : undefined,
+            status: typeof v['status'] === 'number' ? v['status'] : undefined,
             stack: value.stack,
         };
     }
     if (typeof value === 'object' && value !== null) {
         const v = /** @type {Record<string, unknown>} */ (value);
         return {
-            message: typeof v.message === 'string' ? v.message : String(value),
-            stdout: typeof v.stdout === 'string' ? v.stdout : undefined,
-            stderr: typeof v.stderr === 'string' ? v.stderr : undefined,
-            code: typeof v.code === 'number' || typeof v.code === 'string' ? v.code : undefined,
-            status: typeof v.status === 'number' ? v.status : undefined,
-            stack: typeof v.stack === 'string' ? v.stack : undefined,
+            message: typeof v['message'] === 'string' ? v['message'] : String(value),
+            stdout: typeof v['stdout'] === 'string' ? v['stdout'] : undefined,
+            stderr: typeof v['stderr'] === 'string' ? v['stderr'] : undefined,
+            code: typeof v['code'] === 'number' || typeof v['code'] === 'string' ? v['code'] : undefined,
+            status: typeof v['status'] === 'number' ? v['status'] : undefined,
+            stack: typeof v['stack'] === 'string' ? v['stack'] : undefined,
         };
     }
     return { message: String(value) };

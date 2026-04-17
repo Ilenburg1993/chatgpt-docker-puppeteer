@@ -11,7 +11,7 @@
  * @see module:copilot/always-alive
  */
 
-import { toError, SessionError } from '#copilot/core';
+import { getSharedSdkSessionId, SessionError, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
@@ -168,16 +168,7 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {string} ID da hub_session criada
      */
     createSession(opts = {}) {
-        // Tenta obter o sdkSessionId atual do AlwaysAliveAgent
-        let sdkSessionId;
-        try {
-            const agent = this.#agent ?? _fallbackAgent;
-            if (!agent) throw new SessionError('agent not injected', 'ORCH_NO_AGENT');
-            const snap = /** @type {{ sessionId?: string }} */ (agent.getStatusSnapshot());
-            sdkSessionId = snap.sessionId;
-        } catch {
-            sdkSessionId = undefined;
-        }
+        const sdkSessionId = this.#getActiveSdkSessionId();
 
         const hubSessionId = this.#store.createHubSession({
             title: opts.title ?? `Conversa ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
@@ -399,6 +390,9 @@ export class HubOrchestrator extends EventEmitter {
      * @returns {string | undefined}
      */
     #getActiveSdkSessionId() {
+        const shared = getSharedSdkSessionId();
+        if (shared) return shared;
+
         try {
             // BUG-06 (fix): usar agentOverride quando fornecido em vez de hardcodar alwaysAliveAgent
             const activeAgent = this.#agent ?? _fallbackAgent;

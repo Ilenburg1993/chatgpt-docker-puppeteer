@@ -30,7 +30,7 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
         const [main, lifecycle, agentConfig] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/config.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/config/agent.js', import.meta.url), 'utf-8'),
         ]);
         sourceCode = main + '\n' + lifecycle + '\n' + agentConfig;
     });
@@ -71,7 +71,10 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
     });
 
     it('stop() deve emitir evento "stopped" após completar', () => {
-        assert.ok(sourceCode.includes("emit('stopped')"), "stop() deve emitir o evento 'stopped' ao finalizar");
+        assert.ok(
+            sourceCode.includes("emit('stopped')") || sourceCode.includes('emit(EMITTER_STOPPED'),
+            "stop() deve emitir o evento 'stopped' ao finalizar",
+        );
     });
 });
 

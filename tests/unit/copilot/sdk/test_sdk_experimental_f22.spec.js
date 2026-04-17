@@ -79,7 +79,7 @@ describe('F22 — F124 runtime: feature-flags API', () => {
     let featureFlags;
 
     beforeAll(async () => {
-        featureFlags = await import('#copilot/sdk/feature-flags.js');
+        featureFlags = await import('#copilot/sdk/feature-flags');
     });
 
     afterEach(() => {
@@ -198,7 +198,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     let expRpc;
 
     beforeAll(async () => {
-        featureFlags = await import('#copilot/sdk/feature-flags.js');
+        featureFlags = await import('#copilot/sdk/feature-flags');
         expRpc = await import('../../../../src/copilot/sdk/rpc/experimental.js');
     });
 

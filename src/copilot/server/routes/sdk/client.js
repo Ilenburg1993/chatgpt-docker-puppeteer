@@ -23,6 +23,7 @@
 
 import { log } from '#copilot/observability';
 import { Router } from 'express';
+import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
@@ -39,6 +40,7 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @property {() => Promise<import('@github/copilot-sdk').CopilotClient>} getClient - Factory do SDK client.
  * @property {() => string} getClientState - Estado de conexão.
  * @property {() => Promise<void | Error[]>} stopClient - Para o client.
+ * @property {() => Promise<void>} forceStopClient - Para o client forçadamente.
  * @property {import('#copilot/sdk/types').Tool[]} allTools - Ferramentas estáticas.
  */
 
@@ -49,7 +51,7 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @returns {import('express').Router}
  */
 export default function createClientRouter(deps) {
-    const { agent, getClient, getClientState, stopClient, allTools } = deps;
+    const { agent, getClient, getClientState, stopClient, forceStopClient, allTools } = deps;
     const router = Router();
 
     /**
@@ -88,12 +90,14 @@ export default function createClientRouter(deps) {
         void withErrorHandler(req, res, async () => {
             const state = getClientState();
             if (state !== 'connected') {
-                res.json({ ok: true, connectionState: state, status: null });
+                const runtimeProjection = await resolveSdkRuntimeProjection(agent, null, state);
+                res.json({ ok: true, status: null, ...runtimeProjection });
                 return;
             }
             const client = await getClient();
             const status = await client.getStatus();
-            res.json({ ok: true, connectionState: state, ...status });
+            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            res.json({ ok: true, ...status, ...runtimeProjection });
         });
     });
 
@@ -142,7 +146,8 @@ export default function createClientRouter(deps) {
         void withErrorHandler(req, res, async () => {
             const client = await getClient();
             const state = client.getState();
-            res.json({ ok: true, state, message: 'CopilotClient iniciado.' });
+            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            res.json({ ok: true, state, message: 'CopilotClient iniciado.', ...runtimeProjection });
         });
     });
 
@@ -154,7 +159,8 @@ export default function createClientRouter(deps) {
     router.post('/client/stop', (req, res) => {
         void withErrorHandler(req, res, async () => {
             await stopClient();
-            res.json({ ok: true, message: 'CopilotClient parado e sessões limpas.' });
+            const sharedBinding = clearSdkRuntimeBinding();
+            res.json({ ok: true, message: 'CopilotClient parado e sessões limpas.', sharedBinding });
         });
     });
 
@@ -165,11 +171,10 @@ export default function createClientRouter(deps) {
      */
     router.post('/client/force-stop', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const client = await getClient();
-            // F6.8 (BUG-MOD-15): usar optional chaining para compatibilidade com versões SDK sem forceStop
-            await /** @type {{ forceStop?: () => Promise<void> }} */ (client).forceStop?.();
+            await forceStopClient();
+            const sharedBinding = clearSdkRuntimeBinding();
             log('INFO', '[sdk-api] CopilotClient force-stop executado');
-            res.json({ ok: true, message: 'CopilotClient force-stop executado.' });
+            res.json({ ok: true, message: 'CopilotClient force-stop executado.', sharedBinding });
         });
     });
 

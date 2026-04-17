@@ -4,10 +4,10 @@
  *
  * Faixa 26 — Session Registry SSOT
  *
- * F123: sdk/client.js Map<sessionId, SessionEntry> como SSOT — verificação estrutural F124:
- * createClientSession/resumeClientSession populam o registry F125: disconnectClientSession/deleteClientSession removem
- * do registry F126: registry: getClientSession, listActiveClientSessions, getActiveSessionCount F127: barrel exporta
- * todas as funções do registry
+ * F123: registry ativo de sessões SDK externalizado para `infra/sdk-session-registry.js`, com fachada preservada em
+ * `sdk/session/client.js` — verificação estrutural F124: createClientSession/resumeClientSession populam o registry
+ * F125: disconnectClientSession/deleteClientSession removem do registry F126: registry: getClientSession,
+ * listActiveClientSessions, getActiveSessionCount F127: barrel exporta todas as funções do registry
  *
  * @module tests/unit/copilot/sdk/test_sdk_session_registry_f26
  */
@@ -50,12 +50,12 @@ describe('F127 — barrel exporta funções do registry de sessão', () => {
 
 // ─── Client.js registry direto ──────────────────────────────────────────────
 
-describe('F123 — sdk/client.js: registry Map como SSOT', () => {
-    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js')} */
+describe('F123 — sdk/client.js: fachada sobre registry SSOT externalizado', () => {
+    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js')} */
     let clientModule;
 
     beforeEach(async () => {
-        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js');
+        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js');
         clientModule._resetClientState();
     });
 
@@ -99,11 +99,11 @@ describe('F123 — sdk/client.js: registry Map como SSOT', () => {
 });
 
 describe('F124 — createClientSession registra sessão no Map', () => {
-    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js')} */
+    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js')} */
     let clientModule;
 
     beforeEach(async () => {
-        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js');
+        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js');
         clientModule._resetClientState();
     });
 
@@ -172,11 +172,11 @@ describe('F124 — createClientSession registra sessão no Map', () => {
 });
 
 describe('F124 — resumeClientSession registra sessão no Map', () => {
-    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js')} */
+    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js')} */
     let clientModule;
 
     beforeEach(async () => {
-        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js');
+        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js');
         clientModule._resetClientState();
     });
 
@@ -227,11 +227,11 @@ describe('F124 — resumeClientSession registra sessão no Map', () => {
 });
 
 describe('F125 — disconnectClientSession remove do registry', () => {
-    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js')} */
+    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js')} */
     let clientModule;
 
     beforeEach(async () => {
-        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js');
+        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js');
         clientModule._resetClientState();
     });
 
@@ -262,11 +262,11 @@ describe('F125 — disconnectClientSession remove do registry', () => {
 });
 
 describe('F126 — registry: listActiveClientSessions e incrementSessionMessageCount', () => {
-    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js')} */
+    /** @type {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js')} */
     let clientModule;
 
     beforeEach(async () => {
-        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/client.js');
+        clientModule = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/session/client.js');
         clientModule._resetClientState();
     });
 

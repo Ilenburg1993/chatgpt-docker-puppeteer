@@ -26,7 +26,7 @@ vi.mock('@github/copilot-sdk', () => {
     return { SYSTEM_PROMPT_SECTIONS };
 });
 
-vi.mock('#copilot/sdk/client.js', () => ({
+vi.mock('#copilot/sdk/client', () => ({
     getClient: mockGetClient,
 }));
 
@@ -43,7 +43,7 @@ import {
     onSessionDeleted,
     onSessionForeground,
     onSessionUpdated,
-} from '#copilot/sdk/client-events.js';
+} from '#copilot/sdk/client-events';
 
 // ─── Helper ────────────────────────────────────────────────────────────────
 
@@ -257,7 +257,7 @@ describe('F65 — Typed convenience handlers', () => {
 
 describe('F66 — Barrel re-exports (sdk/index.js)', () => {
     it('re-exporta todas as 10 exports do client-events.js', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
 
         expect(barrel.LIFECYCLE_EVENTS).toBeDefined();
         expect(barrel.isLifecycleEventType).toBeTypeOf('function');

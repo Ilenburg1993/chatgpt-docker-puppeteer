@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/sdk/test_sdk_client_facade.spec.js
  *
- * Testes para src/copilot/sdk/client-facade.js (Faixa 5 — Client & Session Facade).
+ * Testes para src/copilot/sdk/session/client-facade.js (Faixa 5 — Client & Session Facade).
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -46,7 +46,7 @@ const {
 }));
 
 // Mock dos módulos internos
-vi.mock('../../../../src/copilot/sdk/client.js', () => ({
+vi.mock('../../../../src/copilot/sdk/session/client.js', () => ({
     getClient: mockGetClient,
     stopClient: mockStopClient,
     getClientState: mockGetClientState,
@@ -103,7 +103,7 @@ import {
     quickResume,
     quickSession,
     shutdownClient,
-} from '../../../../src/copilot/sdk/client-facade.js';
+} from '../../../../src/copilot/sdk/session/client-facade.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

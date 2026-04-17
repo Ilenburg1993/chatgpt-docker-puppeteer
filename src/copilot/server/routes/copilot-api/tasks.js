@@ -12,6 +12,7 @@
 import { log } from '#copilot/observability';
 import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
+import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -71,10 +72,12 @@ export function registerTaskRoutes(bridge, agent) {
                     return res.json({ ok: true, response: raceResult });
                 } catch (e) {
                     clearTimeout(timeoutHandle);
-                    if (toError(e).name === 'AbortError' || toError(e).code === 'ABORT_ERR') {
-                        return res.status(504).json({ ok: false, error: `Timeout após ${timeoutMs}ms` });
-                    }
-                    throw e;
+                    const projection = projectAgentHttpError(e, {
+                        fallbackStatus: 500,
+                        timeoutStatus: 504,
+                        timeoutMessage: `Timeout após ${timeoutMs}ms`,
+                    });
+                    return res.status(projection.status).json(projection.body);
                 }
             }
 
@@ -96,20 +99,25 @@ export function registerTaskRoutes(bridge, agent) {
                 ...(attachments !== undefined ? { attachments } : {}),
                 taskId,
             });
-            // Aguarda uma microtask para capturar rejeição síncrona (QUEUE_FULL)
-            const earlyCatch = await Promise.race([
-                sendPromise.then(
-                    () => null,
-                    (e) => e,
-                ),
-                Promise.resolve(null),
-            ]);
-            if (earlyCatch !== null) {
-                const errMsg = toError(earlyCatch).message;
-                if (String(errMsg).includes('QUEUE_FULL') || String(errMsg).includes('Fila cheia')) {
-                    return res.status(429).json({ ok: false, error: errMsg });
-                }
-                return res.status(500).json({ ok: false, error: errMsg });
+            // Aguarda exatamente uma microtask para capturar rejeição imediata (ex.: QUEUE_FULL)
+            // sem transformar o endpoint assíncrono em wait-for-response completo.
+            /** @type {unknown} */
+            let earlyCatch = null;
+            let settled = false;
+            sendPromise.then(
+                () => {
+                    settled = true;
+                },
+                (e) => {
+                    settled = true;
+                    earlyCatch = e;
+                    return null;
+                },
+            );
+            await new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
+            if (settled && earlyCatch !== null) {
+                const projection = projectAgentHttpError(earlyCatch);
+                return res.status(projection.status).json(projection.body);
             }
             // Erros tardios apenas logados
             sendPromise.catch((e) => {
@@ -118,7 +126,8 @@ export function registerTaskRoutes(bridge, agent) {
             return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
         } catch (e) {
             log('ERROR', `[copilot-api/tasks/send] ${toError(e).message}`);
-            return res.status(500).json({ ok: false, error: toError(e).message });
+            const projection = projectAgentHttpError(e);
+            return res.status(projection.status).json(projection.body);
         }
     });
 

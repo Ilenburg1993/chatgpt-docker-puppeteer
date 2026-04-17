@@ -42,12 +42,12 @@ vi.mock('@github/copilot-sdk', () => ({
 }));
 
 describe('sdk/permissions.js', () => {
-    /** @type {typeof import('../../../../src/copilot/sdk/permissions.js')} */
+    /** @type {typeof import('../../../../src/copilot/sdk/session/permissions.js')} */
     let perms;
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        perms = await import('../../../../src/copilot/sdk/permissions.js');
+        perms = await import('../../../../src/copilot/sdk/session/permissions.js');
     });
 
     // ─── approveAll re-export ─────────────────────────────────────────────────

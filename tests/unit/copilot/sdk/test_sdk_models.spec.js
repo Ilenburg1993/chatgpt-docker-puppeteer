@@ -310,7 +310,7 @@ describe('F80 - filterModels', () => {
 
 describe('Barrel - Faixa 14 exports', () => {
     it('barrel exporta todas as funcoes novas da F14', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
         const expected = [
             'filterModels',
             'getBillingMultiplier',
@@ -327,7 +327,7 @@ describe('Barrel - Faixa 14 exports', () => {
     });
 
     it('barrel mantém exports pre-existentes de models', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
         const existing = [
             'buildReasoningConfig',
             'filterEnabledModels',

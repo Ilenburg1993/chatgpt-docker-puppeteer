@@ -6,7 +6,7 @@
  *
  *   - agent/session/hook-context.js (216L) — buildHookSystemContext, SessionJsonSchema, buildHookSystemContextSafe
  *   - agent/infra/webhook-manager.js (233L) — WebhookManager CRUD + sanitize + retry
- *   - agent/session/event-handlers/mode-and-tools.js (21L) — wireModeAndToolEvents
+ *   - event-handlers/mode-and-tools.js (21L) — wireModeAndToolEvents
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,7 +41,24 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        container: {
+            ...actual.container,
+            resolve: vi.fn(() => ({
+                getSummary: mocks.defaultMetrics.getSummary,
+            })),
+        },
+        logSwallowed: mocks.logSwallowed,
+        toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
+    };
+});
+vi.mock('#copilot/core/error-handlers', () => ({
+    logSwallowed: mocks.logSwallowed,
+    toError: (/** @type {unknown} */ v) => (v instanceof Error ? v : new Error(String(v))),
+}));
 vi.mock(
     '#copilot/config/env',
     () =>
@@ -411,7 +428,7 @@ describe('F44 — WebhookManager', () => {
 
 describe('F44 — wireModeAndToolEvents', () => {
     it('retorna array com 1 unsubscribe function', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireModeAndToolEvents(/** @type {any} */ (session), { emit });
@@ -420,7 +437,7 @@ describe('F44 — wireModeAndToolEvents', () => {
     });
 
     it('emite session.mode_changed com previousMode/newMode', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         wireModeAndToolEvents(/** @type {any} */ (session), { emit });
@@ -435,7 +452,7 @@ describe('F44 — wireModeAndToolEvents', () => {
     });
 
     it('loga mudança de modo com INFO', async () => {
-        const { wireModeAndToolEvents } = await import('#copilot/agent/session/event-handlers/mode-and-tools');
+        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         mocks.log.mockClear();

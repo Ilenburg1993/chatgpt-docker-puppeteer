@@ -20,6 +20,7 @@
  * @see EventBus
  */
 
+import { defaultAuditLog, getAuditTail } from '#copilot/audit';
 import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
 import { OTEL_EXPORTER_OTLP_ENDPOINT } from '#copilot/config';
 import {
@@ -35,10 +36,7 @@ import {
 } from '#copilot/observability';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
-import { createAuditService } from '../../../services/audit-service.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
-
-const auditService = createAuditService();
 
 /**
  * @typedef {import('express').Request} Req
@@ -270,7 +268,7 @@ export default function createObservabilityRouter(deps) {
         withErrorHandler(req, res, async () => {
             const n = Math.min(Number(req.query['n']) || 50, 200);
             const type = typeof req.query['type'] === 'string' ? req.query['type'] : undefined;
-            let entries = auditService.getDefaultLog().getLast(n);
+            let entries = defaultAuditLog.getLast(n);
             if (type) {
                 entries = entries.filter((e) => e.type === type);
             }
@@ -282,7 +280,7 @@ export default function createObservabilityRouter(deps) {
 
     router.post('/observability/audit/flush', (req, res) =>
         withErrorHandler(req, res, async () => {
-            await auditService.getDefaultLog().flush();
+            await defaultAuditLog.flush();
             log('INFO', '[observability] Audit log flushed via API');
             res.json({ ok: true });
         }),
@@ -295,12 +293,17 @@ export default function createObservabilityRouter(deps) {
             const n = Math.min(Math.max(Number(req.query['n']) || 50, 1), 500);
             const sessionId = typeof req.query['sessionId'] === 'string' ? req.query['sessionId'] : undefined;
             const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
-            let entries = auditService.getTail(n);
+            let entries = getAuditTail(n);
             if (sessionId) {
                 entries = entries.filter((e) => e.sessionId === sessionId);
             }
             if (tool) {
-                entries = entries.filter((e) => e.data?.['toolName'] === tool);
+                entries = entries.filter((e) => {
+                    const record = /** @type {{ data?: { toolName?: string } } | null | undefined} */ (
+                        /** @type {unknown} */ (e)
+                    );
+                    return record?.data?.toolName === tool;
+                });
             }
             res.json({ ok: true, entries, count: entries.length });
         }),

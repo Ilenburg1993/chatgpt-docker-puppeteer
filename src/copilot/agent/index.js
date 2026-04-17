@@ -6,11 +6,12 @@
  *
  * ### API pública (para uso externo)
  *
- * | Export             | Tipo      | Descrição                                 |
- * | ------------------ | --------- | ----------------------------------------- |
- * | `alwaysAliveAgent` | Singleton | Instância principal do agente AlwaysAlive |
- * | `getAgent()`       | Function  | Accessor para o agente (lazy)             |
- * | `AlwaysAliveAgent` | Class     | Classe do agente (uso interno/testes)     |
+ * | Export             | Tipo      | Descrição                                  |
+ * | ------------------ | --------- | ------------------------------------------ |
+ * | `alwaysAliveAgent` | Singleton | Instância principal do agente AlwaysAlive  |
+ * | `getAgent()`       | Function  | Accessor para o agente (lazy)              |
+ * | `resetAgent()`     | Function  | Reinicia a instância lazy (testes/runtime) |
+ * | `AlwaysAliveAgent` | Class     | Classe do agente (uso interno/testes)      |
  *
  * ### Subsistemas re-exportados
  *
@@ -32,11 +33,12 @@ export {
     HIGH_FREQUENCY_EVENTS,
     PR_CONSUMING_EVENTS,
 } from '../events/agent-events.js';
-export { AlwaysAliveAgent, alwaysAliveAgent, getAgent } from './always-alive.js';
+export { AlwaysAliveAgent, alwaysAliveAgent, getAgent, resetAgent } from './always-alive.js';
 export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 
 // ── Subsistemas ──────────────────────────────────────────────
 export * from './dialog/index.js';
+export * from './health-check.js';
 export * from './infra/index.js';
 export * from './lifecycle/index.js';
 export * from './messaging/index.js';

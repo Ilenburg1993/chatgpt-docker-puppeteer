@@ -8,7 +8,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 // Mock defineTool do SDK — retorna o config recebido para inspeção
 vi.mock('@github/copilot-sdk', () => ({
@@ -29,12 +33,12 @@ vi.mock('@github/copilot-sdk', () => ({
 }));
 
 describe('sdk/tools.js', () => {
-    /** @type {typeof import('../../../../src/copilot/sdk/tools.js')} */
+    /** @type {typeof import('../../../../src/copilot/sdk/tools/core.js')} */
     let tools;
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        tools = await import('../../../../src/copilot/sdk/tools.js');
+        tools = await import('../../../../src/copilot/sdk/tools/core.js');
     });
 
     describe('createTool()', () => {

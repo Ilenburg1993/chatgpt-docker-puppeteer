@@ -116,7 +116,7 @@ export class ClientOptionsBuilder {
      * @returns {this}
      */
     logLevelFromEnv() {
-        const envLevel = (process.env.LOG_LEVEL || '').toUpperCase();
+        const envLevel = (process.env['LOG_LEVEL'] || '').toUpperCase();
         if (envLevel && LOG_LEVEL_MAP[envLevel]) {
             this.#opts.logLevel = LOG_LEVEL_MAP[envLevel];
             log('DEBUG', `[ClientOptionsBuilder] LOG_LEVEL='${envLevel}' → SDK logLevel='${this.#opts.logLevel}'`);
@@ -146,8 +146,8 @@ export class ClientOptionsBuilder {
         }
 
         // Sempre incluir PATH e HOME para o CLI funcionar
-        if (process.env.PATH) filtered.PATH = process.env.PATH;
-        if (process.env.HOME) filtered.HOME = process.env.HOME;
+        if (process.env['PATH']) filtered['PATH'] = process.env['PATH'];
+        if (process.env['HOME']) filtered['HOME'] = process.env['HOME'];
 
         this.#opts.env = filtered;
         return this;
@@ -183,7 +183,7 @@ export class ClientOptionsBuilder {
      * @returns {this}
      */
     githubTokenFromEnv() {
-        const token = process.env.GITHUB_TOKEN;
+        const token = process.env['GITHUB_TOKEN'];
         if (token) {
             this.#opts.githubToken = token;
         }
@@ -231,7 +231,7 @@ export class ClientOptionsBuilder {
      * @returns {this}
      */
     telemetryFromEnv() {
-        const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+        const endpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
         if (endpoint) {
             this.#opts.telemetry = /** @type {NonNullable<CopilotClientOptions['telemetry']>} */ (
                 /** @type {unknown} */ ({ otlpEndpoint: endpoint })

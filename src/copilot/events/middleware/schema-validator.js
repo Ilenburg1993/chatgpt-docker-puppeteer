@@ -14,8 +14,8 @@
 
 import { getEventSchema, validateEvent } from '../schemas/registry.js';
 
-const IS_DEV = process.env.NODE_ENV !== 'production';
-const STRICT = process.env.STRICT_SCHEMA === '1';
+const IS_DEV = process.env['NODE_ENV'] !== 'production';
+const STRICT = process.env['STRICT_SCHEMA'] === '1';
 
 // ── L33: Counters & diagnostics ──────────────────────────
 

@@ -19,6 +19,6 @@ export {
     setPermissionAgent,
     setSessionRpc,
 } from '../../tools/bootstrap.js';
+export { executeTask } from '../messaging/agent-messaging.js';
 export { HandoffManager } from './handoff-manager.js';
 export { MessageQueue } from './message-queue.js';
-export { executeTask } from './task-executor.js';

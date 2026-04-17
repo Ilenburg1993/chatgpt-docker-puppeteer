@@ -15,7 +15,7 @@
  */
 
 /** @type {SystemPromptMode} */
-let _mode = /** @type {SystemPromptMode} */ (process.env.COPILOT_SYSTEM_PROMPT_MODE || 'replace');
+let _mode = /** @type {SystemPromptMode} */ (process.env['COPILOT_SYSTEM_PROMPT_MODE'] || 'replace');
 
 /**
  * Retorna o modo atual do system prompt.

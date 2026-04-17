@@ -2,10 +2,10 @@
 /**
  * src/copilot/events/service-events.js
  *
- * FAIXA-L2 — Constantes SSOT para eventos emitidos por services/*.
+ * FAIXA-L2 — Constantes SSOT para eventos de facades/integrações de serviço.
  *
- * Substitui strings inline hardcoded nos services por constantes centralizadas, garantindo conformidade C11 (single
- * source of truth para event strings).
+ * Mantidas por retrocompatibilidade de naming, mesmo após a remoção do diretório `services/` na Fase 1 da migração.
+ * Garantem conformidade C11 (single source of truth para event strings).
  *
  * @module copilot/events/service-events
  */

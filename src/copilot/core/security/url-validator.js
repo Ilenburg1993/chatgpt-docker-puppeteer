@@ -23,7 +23,7 @@ import dns from 'node:dns/promises';
  *
  * @type {boolean}
  */
-const WEBHOOK_ALLOW_PRIVATE_HOSTS = process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true';
+const WEBHOOK_ALLOW_PRIVATE_HOSTS = process.env['WEBHOOK_ALLOW_PRIVATE_HOSTS'] === 'true';
 
 // ─── Patterns de IP privado/loopback ────────────────────────────────────────
 

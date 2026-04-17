@@ -8,8 +8,23 @@
 
 import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { getCompactionHistory, log } from '#copilot/observability';
+import {
+    approveAll,
+    createClientSession,
+    disconnectClientSession,
+    getClient,
+    getClientSession,
+    listActiveClientSessions,
+    pickDefined,
+    resumeClientSession,
+} from '#copilot/sdk';
 import { Router } from 'express';
-import { approveAll, createSessionService, pickDefined } from '../../../services/session-service.js';
+import {
+    attachSdkSessionOwnership,
+    forgetSdkSessionOwnership,
+    rememberSdkSessionOwnership,
+    resolveSdkSessionRouteMeta,
+} from '../../../presentation/sdk-sessions.js';
 import {
     CreateSessionBodySchema,
     rateLimitMiddleware,
@@ -18,8 +33,6 @@ import {
     validateModel,
     withErrorHandler,
 } from './session-middleware.js';
-
-const sessionService = createSessionService();
 
 /**
  * @typedef {import('express').Request} Req
@@ -31,6 +44,26 @@ const sessionService = createSessionService();
 
 const router = Router();
 
+/**
+ * Lista sessões ativas do registry em memória com metadados derivados.
+ *
+ * @returns {{ sessionId: string; model: string; createdAt: number; messagesCount: number; activeMs: number }[]}
+ */
+function listActiveSessions() {
+    return listActiveClientSessions().map(({ sessionId, model, createdAt, messagesCount }) =>
+        attachSdkSessionOwnership(
+            {
+                sessionId,
+                model,
+                createdAt,
+                messagesCount,
+                activeMs: Date.now() - createdAt,
+            },
+            sessionId,
+        ),
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /sessions/active  +  GET /sessions/last
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +72,7 @@ const router = Router();
  * Lista sessões ativas no registry em memória (sessões com conexão aberta neste processo).
  */
 router.get('/sessions/active', (_req, res) => {
-    const active = sessionService.listActive();
+    const active = listActiveSessions();
     res.json({ ok: true, count: active.length, sessions: active });
 });
 
@@ -48,8 +81,25 @@ router.get('/sessions/active', (_req, res) => {
  */
 router.get('/sessions/last', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const sessionId = await sessionService.getLastSessionId();
-        res.json({ ok: true, lastSessionId: sessionId ?? null });
+        const client = await getClient();
+        const meta = await resolveSdkSessionRouteMeta(client);
+        res.json({
+            ok: true,
+            lastSessionId: meta.lastSessionId,
+            canonicalSessionId: meta.canonicalSessionId,
+            sharedBinding: meta.sharedBinding,
+        });
+    });
+});
+
+/**
+ * Retorna o binding canônico entre a sessão SDK ativa e a sessão conversacional.
+ */
+router.get('/sessions/binding', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const client = await getClient();
+        const meta = await resolveSdkSessionRouteMeta(client);
+        res.json({ ok: true, ...meta });
     });
 });
 
@@ -62,8 +112,14 @@ router.get('/sessions/last', (req, res) => {
  */
 router.get('/sessions/foreground', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const sessionId = await sessionService.getForegroundSessionId();
-        res.json({ ok: true, foregroundSessionId: sessionId ?? null });
+        const client = await getClient();
+        const meta = await resolveSdkSessionRouteMeta(client);
+        res.json({
+            ok: true,
+            foregroundSessionId: meta.foregroundSessionId,
+            canonicalSessionId: meta.canonicalSessionId,
+            sharedBinding: meta.sharedBinding,
+        });
     });
 });
 
@@ -73,8 +129,10 @@ router.get('/sessions/foreground', (req, res) => {
 router.put('/sessions/foreground/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        await sessionService.setForegroundSessionId(id);
-        res.json({ ok: true, foregroundSessionId: id });
+        const client = await getClient();
+        await client.setForegroundSessionId(id);
+        rememberSdkSessionOwnership(id);
+        res.json(attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id));
     });
 });
 
@@ -96,11 +154,12 @@ router.get('/sessions', (req, res) => {
         if (req.query['branch']) filter.branch = String(req.query['branch']);
         if (req.query['cwd']) filter.cwd = String(req.query['cwd']);
 
-        const sessions = await sessionService.listSessions(Object.keys(filter).length ? filter : undefined);
-        const active = new Set(sessionService.listActive().map((s) => s.sessionId));
+        const client = await getClient();
+        const sessions = await client.listSessions(Object.keys(filter).length ? filter : undefined);
+        const active = new Set(listActiveSessions().map((s) => s.sessionId));
 
         const enriched = sessions.map((s) => ({
-            ...s,
+            ...attachSdkSessionOwnership(s, s.sessionId),
             isActive: active.has(s.sessionId),
         }));
         res.json({ ok: true, count: enriched.length, sessions: enriched });
@@ -161,7 +220,7 @@ router.post(
             }
             const safeModel = modelResult.model;
 
-            const session = await sessionService.createSession({
+            const session = await createClientSession({
                 onPermissionRequest: approveAll,
                 model: safeModel,
                 ...pickDefined({
@@ -179,12 +238,19 @@ router.post(
                 }),
             });
 
-            res.status(201).json({
-                ok: true,
-                sessionId: session.sessionId,
-                model: safeModel,
-                workspacePath: session.workspacePath ?? null,
-            });
+            rememberSdkSessionOwnership(session.sessionId);
+
+            res.status(201).json(
+                attachSdkSessionOwnership(
+                    {
+                        ok: true,
+                        sessionId: session.sessionId,
+                        model: safeModel,
+                        workspacePath: session.workspacePath ?? null,
+                    },
+                    session.sessionId,
+                ),
+            );
         });
     },
 );
@@ -201,26 +267,32 @@ router.get('/sessions/:id', (req, res) => {
         const { id } = req.params;
 
         // Busca todas as sessões no disco e filtra pela ID solicitada
-        const all = await sessionService.listSessions();
+        const client = await getClient();
+        const all = await client.listSessions();
         const meta = all.find((s) => s.sessionId === id);
 
-        const entry = sessionService.getSession(id);
+        const entry = getClientSession(id);
 
         if (!meta && !entry) {
             res.status(404).json({ ok: false, error: `Sessão "${id}" não encontrada.` });
             return;
         }
 
-        res.json({
-            ok: true,
-            sessionId: id,
-            isActive: Boolean(entry),
-            model: entry?.model ?? null,
-            messagesCount: entry?.messagesCount ?? 0,
-            activeMs: entry ? Date.now() - entry.createdAt : null,
-            workspacePath: entry?.session.workspacePath ?? null,
-            metadata: meta ?? null,
-        });
+        res.json(
+            attachSdkSessionOwnership(
+                {
+                    ok: true,
+                    sessionId: id,
+                    isActive: Boolean(entry),
+                    model: entry?.model ?? null,
+                    messagesCount: entry?.messagesCount ?? 0,
+                    activeMs: entry ? Date.now() - entry.createdAt : null,
+                    workspacePath: entry?.session.workspacePath ?? null,
+                    metadata: meta ?? null,
+                },
+                id,
+            ),
+        );
     });
 });
 
@@ -265,12 +337,13 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
         }
 
         // Desconectar do registry se ativo
-        await sessionService.disconnectSession(id);
+        await disconnectClientSession(id);
+        const sharedBinding = forgetSdkSessionOwnership(id);
 
-        const client = await sessionService.getClient();
+        const client = await getClient();
         await client.deleteSession(id);
         log('INFO', `[sdk-api] Sessão deletada: ${id}`);
-        res.json({ ok: true, message: `Sessão "${id}" deletada permanentemente.` });
+        res.json({ ok: true, message: `Sessão "${id}" deletada permanentemente.`, sharedBinding });
     });
 });
 
@@ -285,7 +358,7 @@ router.post('/sessions/:id/disconnect', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
 
-        const entry = sessionService.getSession(id);
+        const entry = getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -294,9 +367,14 @@ router.post('/sessions/:id/disconnect', (req, res) => {
             return;
         }
 
-        await sessionService.disconnectSession(id);
+        await disconnectClientSession(id);
+        const sharedBinding = forgetSdkSessionOwnership(id);
         log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
-        res.json({ ok: true, message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.` });
+        res.json({
+            ok: true,
+            message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.`,
+            sharedBinding,
+        });
     });
 });
 
@@ -317,18 +395,24 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  */
 router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const id = /** @type {string} */ (req.params.id);
+        const id = /** @type {string} */ (req.params['id']);
         const { model } = req.body ?? {};
 
-        const session = await sessionService.resumeSession(
+        const session = await resumeClientSession(
             id,
             model ? { onPermissionRequest: approveAll, model } : { onPermissionRequest: approveAll },
         );
-        res.json({
-            ok: true,
-            sessionId: session.sessionId,
-            workspacePath: session.workspacePath ?? null,
-        });
+        rememberSdkSessionOwnership(session.sessionId);
+        res.json(
+            attachSdkSessionOwnership(
+                {
+                    ok: true,
+                    sessionId: session.sessionId,
+                    workspacePath: session.workspacePath ?? null,
+                },
+                session.sessionId,
+            ),
+        );
     });
 });
 

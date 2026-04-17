@@ -34,9 +34,9 @@ import {
     onAllSessionEvents,
     onSessionEvent,
     onSessionEvents,
-} from '#copilot/sdk/events.js';
+} from '#copilot/sdk/events';
 
-import { SESSION_EVENTS } from '#copilot/sdk/constants.js';
+import { SESSION_EVENTS } from '#copilot/sdk/constants';
 
 // ─── Helper: criar session mock ──────────────────────────────────────────────
 
@@ -340,7 +340,7 @@ describe('F60b — createEventFilter', () => {
 
 describe('F62 — Barrel re-exports (sdk/index.js)', () => {
     it('re-exporta todas as 8 funções do events.js', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
 
         expect(barrel.ALL_EVENT_TYPES).toBeDefined();
         expect(barrel.isKnownEventType).toBeTypeOf('function');

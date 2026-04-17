@@ -27,7 +27,7 @@ import {
     isValidProviderType,
     openaiProvider,
     validateProviderConfig,
-} from '#copilot/sdk/provider.js';
+} from '#copilot/sdk/provider';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // F67 — openaiProvider
@@ -188,7 +188,7 @@ describe('F70b — isValidProviderType', () => {
 
 describe('F71 — Barrel re-exports (sdk/index.js)', () => {
     it('re-exporta as 5 funcoes do provider.js', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
 
         expect(barrel.openaiProvider).toBeTypeOf('function');
         expect(barrel.azureProvider).toBeTypeOf('function');

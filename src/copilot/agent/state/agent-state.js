@@ -30,31 +30,31 @@ import { readState } from '../lifecycle/state-io.js';
  * @returns {import('../types.js').AgentStatusSnapshot}
  */
 export function getStatusSnapshot(ctx, host) {
-    if (ctx.statusSnapshotCache) {
-        const age = Date.now() - ctx.statusSnapshotCache.at;
+    if (ctx.metricsState.statusSnapshotCache) {
+        const age = Date.now() - ctx.metricsState.statusSnapshotCache.at;
         if (age < STATUS_SNAPSHOT_TTL_MS) {
-            return ctx.statusSnapshotCache.snapshot;
+            return ctx.metricsState.statusSnapshotCache.snapshot;
         }
-        ctx.statusSnapshotCache = null;
+        ctx.metricsState.statusSnapshotCache = null;
     }
     const state = readState();
     const snapshot = buildStatusSnapshot({
-        status: ctx.status,
+        status: ctx.runtimeState.status,
         sessionId: host.sessionId,
-        model: ctx.model,
-        reasoningEffort: ctx.reasoningEffort,
+        model: ctx.configState.model,
+        reasoningEffort: ctx.configState.reasoningEffort,
         queueSize: ctx.messageQueue.size,
         queueOldest: ctx.messageQueue.oldest,
-        pendingQuestion: ctx.pendingQuestion,
-        isResumed: ctx.isResumed,
+        pendingQuestion: ctx.dialogState.pendingQuestion,
+        isResumed: ctx.sessionState.isResumed,
         resumeCount: state?.resumeCount ?? 0,
-        sendCount: ctx.sendCount,
+        sendCount: ctx.metricsState.sendCount,
         startedAt: state?.startedAt ?? null,
-        contextWindow: ctx.contextState,
-        lastCheckpointPath: ctx.lastCheckpointPath,
+        contextWindow: ctx.sessionState.contextState,
+        lastCheckpointPath: ctx.sessionState.lastCheckpointPath,
         permissionMode: ctx.permissions.getMode(),
     });
-    ctx.statusSnapshotCache = { snapshot, at: Date.now() };
+    ctx.metricsState.statusSnapshotCache = { snapshot, at: Date.now() };
     return snapshot;
 }
 

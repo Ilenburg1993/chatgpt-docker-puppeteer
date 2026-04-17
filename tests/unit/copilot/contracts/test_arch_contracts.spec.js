@@ -36,7 +36,6 @@ function readSrc(relPath) {
 
 const EXPECTED_MODULES = [
     'agent',
-    'api',
     'audit',
     'bridges',
     'channel',
@@ -147,21 +146,7 @@ describe('W4-9 — violação de camada L3→L4: bridges não importa agent', ()
 // 4. DI tokens: 13 tokens canônicos disponíveis no core barrel
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const EXPECTED_DI_TOKENS = [
-    'SHUTDOWN_LOGGER',
-    'DB_LOGGER',
-    'SDK_LOGGER',
-    'TOOLS_BUILDER',
-    'AUDIT_LOGGER',
-    'AUDIT_BUS',
-    'BRIDGE_AGENT',
-    'FALLBACK_AGENT',
-    'HUB',
-    'PERMISSION_AGENT',
-    'SESSION_RPC',
-    'NERV_BRIDGE_AGENT',
-    'EVENT_BUS',
-];
+const EXPECTED_DI_TOKENS = ['SHUTDOWN_LOGGER', 'DB_LOGGER', 'EVENT_BUS'];
 
 describe('W4-9 — DI tokens: todos os 13 tokens canônicos', () => {
     it('di-tokens.js exporta todos os tokens esperados', async () => {

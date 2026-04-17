@@ -22,7 +22,25 @@ vi.mock('#copilot/core/errors', () => {
     return { SessionError, CopilotError };
 });
 
+vi.mock('#copilot/core', () => {
+    class SessionError extends Error {
+        /** @param {string} msg @param {string} code */
+        constructor(msg, code) {
+            super(msg);
+            this.code = code;
+            this.name = 'SessionError';
+        }
+    }
+    return {
+        SessionError,
+        container: {
+            resolve: vi.fn(() => ({ recordDialogTurn: vi.fn() })),
+        },
+    };
+});
+
 vi.mock('#copilot/observability', () => ({
+    METRICS_STORE: Symbol('METRICS_STORE_TEST'),
     defaultMetrics: { recordDialogTurn: vi.fn() },
     log: vi.fn(),
     startSpan: vi.fn((_name, _attrs, fn) => fn()),
@@ -51,6 +69,7 @@ import {
     executeTurnImpl,
     waitForRestartAndReply,
 } from '../../../src/copilot/agent/dialog/turn-executor.js';
+import { writeStateAsync } from '../../../src/copilot/agent/lifecycle/state-io.js';
 
 /* ── helpers ── */
 
@@ -77,6 +96,7 @@ describe('turn-executor', () => {
     beforeEach(async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         emitter = makeEmitter();
+        vi.mocked(writeStateAsync).mockResolvedValue(/** @type {any} */ ({}));
     });
 
     afterEach(() => {
@@ -107,6 +127,23 @@ describe('turn-executor', () => {
 
             const emitted = spy.mock.calls[0][0];
             expect(emitted.message.length).toBe(120);
+        });
+
+        it('roteia a persistência assíncrona via trackBackgroundTask quando o host suporta tracker', async () => {
+            vi.mocked(writeStateAsync).mockResolvedValue(/** @type {any} */ ({ pendingTurnMessage: 'hello world' }));
+            const counter = { sendCount: 0 };
+            const trackBackgroundTask = vi.fn().mockResolvedValue(undefined);
+
+            emitTurnStart(emitter, 'hello world', counter, { trackBackgroundTask });
+
+            expect(trackBackgroundTask).toHaveBeenCalledTimes(1);
+            expect(trackBackgroundTask).toHaveBeenCalledWith(
+                expect.any(Promise),
+                expect.objectContaining({
+                    label: 'dialog.turn.pending',
+                    description: 'Persist pending turn marker at turn start',
+                }),
+            );
         });
     });
 

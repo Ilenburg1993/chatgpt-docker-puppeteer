@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/sdk/test_sdk_client.spec.js
  *
- * Testes unitários para src/copilot/sdk/client.js Cobre: buildClientOptions, getClient, stopClient, forceStopClient,
+ * Testes unitários para src/copilot/sdk/session/client.js Cobre: buildClientOptions, getClient, stopClient, forceStopClient,
  * session CRUD, registry, getClientState, state reset/inject
  */
 
@@ -88,7 +88,7 @@ import {
     listActiveClientSessions,
     resumeClientSession,
     stopClient,
-} from '../../../../src/copilot/sdk/client.js';
+} from '../../../../src/copilot/sdk/session/client.js';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 

@@ -53,7 +53,7 @@ const ALL_NON_SDK_JS = collectJsFiles(SRC_COPILOT).filter((f) => !f.startsWith('
 // Arquivos migrados na Faixa 19
 const F19_MIGRATED = [
     'config/system-prompt.js',
-    'api/express/session-crud.js',
+    'server/routes/sdk/session-crud.js',
     'hooks/permission-controller.js',
     'hooks/permission-handler.js',
     'agent/lifecycle/agent-lifecycle.js',
@@ -113,7 +113,7 @@ describe('F19 — Zero imports diretos de @github/copilot-sdk fora de sdk/', () 
 // ---------------------------------------------------------------------------
 describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
     describe('Arquivos com approveAll', () => {
-        // session-crud.js importa approveAll de #copilot/services (re-export); config/session-config.js e audit/pipeline.js não usam mais approveAll
+        // session-crud.js agora importa approveAll diretamente de #copilot/sdk; config/session-config.js e audit/pipeline.js não usam approveAll
         const approveAllFiles = ['hooks/permission-controller.js', 'hooks/permission-handler.js'];
 
         for (const file of approveAllFiles) {
@@ -162,8 +162,8 @@ describe('F19 — Barrel exporta CopilotClient', () => {
         expect(src).toContain('CopilotClient');
     });
 
-    it('sdk/client.js re-exporta CopilotClient', () => {
-        const src = readSource('sdk/client.js');
+    it('sdk/session/client.js re-exporta CopilotClient', () => {
+        const src = readSource('sdk/session/client.js');
         expect(src).toContain('export { CopilotClient }');
     });
 });

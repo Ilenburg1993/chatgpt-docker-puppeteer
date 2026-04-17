@@ -19,12 +19,12 @@ import { log } from '#copilot/observability';
  * @returns {Promise<void>}
  */
 export async function abortCurrentMessage(ctx) {
-    if (!ctx.session || typeof ctx.session.abort !== 'function') {
+    if (!ctx.sessionState.session || typeof ctx.sessionState.session.abort !== 'function') {
         log('DEBUG', '[AlwaysAlive] abortCurrentMessage(): sem sessão ativa ou abort indisponível.');
         return;
     }
     try {
-        await ctx.session.abort();
+        await ctx.sessionState.session.abort();
         log('INFO', '[AlwaysAlive] Mensagem SDK abortada via session.abort().');
     } catch (e) {
         log('WARN', `[AlwaysAlive] session.abort() falhou: ${toError(e).message}`);
@@ -50,9 +50,9 @@ export function pingDialogWatchdog(ctx) {
  * @returns {Promise<void>}
  */
 export async function sessionLog(ctx, message, options) {
-    if (!ctx.session || typeof ctx.session.log !== 'function') return;
+    if (!ctx.sessionState.session || typeof ctx.sessionState.session.log !== 'function') return;
     try {
-        await ctx.session.log(message, options);
+        await ctx.sessionState.session.log(message, options);
     } catch (e) {
         logSwallowed(e, 'agent.sessionLog');
     }
@@ -65,5 +65,5 @@ export async function sessionLog(ctx, message, options) {
  * @returns {Promise<unknown[]>}
  */
 export async function getSessionMessages(ctx) {
-    return ctx.messagesCache.get(ctx.session);
+    return ctx.messagesCache.get(ctx.sessionState.session);
 }

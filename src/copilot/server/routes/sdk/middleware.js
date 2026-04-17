@@ -60,7 +60,7 @@ function resolveErrorCode(err) {
  * @returns {string}
  */
 function sanitizeErrorMessage(message) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env['NODE_ENV'] === 'production') {
         return 'Internal server error';
     }
     // Mesmo em dev, remover paths absolutos do sistema

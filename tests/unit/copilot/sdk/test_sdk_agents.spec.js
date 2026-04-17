@@ -358,7 +358,7 @@ describe('F85 - Agent selection flow', () => {
 
 describe('Barrel - Faixa 15 exports', () => {
     it('barrel exporta funcoes RPC de agents', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
         const expected = ['listAgents', 'getCurrentAgent', 'selectAgent', 'deselectAgent', 'reloadAgents'];
         for (const name of expected) {
             expect(typeof barrel[name]).toBe('function');
@@ -366,7 +366,7 @@ describe('Barrel - Faixa 15 exports', () => {
     });
 
     it('barrel mantém exports pre-existentes de agents', async () => {
-        const barrel = await import('#copilot/sdk/index.js');
+        const barrel = await import('#copilot/sdk/index');
         const existing = [
             'READ_ONLY_TOOLS',
             'buildAgentList',

@@ -9,6 +9,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { getClientSession, incrementSessionMessageCount } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import {
@@ -17,7 +18,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { createSessionService } from '../../../services/session-service.js';
+import { attachSdkSessionOwnership } from '../../../presentation/sdk-sessions.js';
 import {
     rateLimitMiddleware,
     SendMessageBodySchema,
@@ -26,8 +27,6 @@ import {
     validateModel,
     withErrorHandler,
 } from './session-middleware.js';
-
-const sessionService = createSessionService();
 
 /**
  * @typedef {import('express').Request} Req
@@ -105,7 +104,7 @@ router.post(
                 return;
             }
 
-            const entry = sessionService.getSession(id);
+            const entry = getClientSession(id);
             if (!entry) {
                 res.status(404).json({
                     ok: false,
@@ -114,7 +113,7 @@ router.post(
                 return;
             }
 
-            sessionService.incrementMessageCount(id);
+            incrementSessionMessageCount(id);
 
             /** @type {import('#copilot/sdk/types').MessageOptions} */
             const messageOptions = {
@@ -133,15 +132,20 @@ router.post(
                 const assistantEvent = /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */ (
                     event
                 );
-                res.json({
-                    ok: true,
-                    sessionId: id,
-                    content: assistantEvent?.data?.content ?? null,
-                    messageId: assistantEvent?.data?.messageId ?? null,
-                });
+                res.json(
+                    attachSdkSessionOwnership(
+                        {
+                            ok: true,
+                            sessionId: id,
+                            content: assistantEvent?.data?.content ?? null,
+                            messageId: assistantEvent?.data?.messageId ?? null,
+                        },
+                        id,
+                    ),
+                );
             } else {
                 const messageId = await entry.session.send(messageOptions);
-                res.json({ ok: true, sessionId: id, messageId, enqueued: true });
+                res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, messageId, enqueued: true }, id));
             }
         });
     },
@@ -175,7 +179,7 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    const entry = sessionService.getSession(id);
+    const entry = getClientSession(id);
     if (!entry) {
         res.status(404).json({
             ok: false,
@@ -199,7 +203,7 @@ router.get('/sessions/:id/stream', (req, res) => {
         maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
 
-    sse.send('connected', { sessionId: id, timestamp: Date.now() });
+    sse.send('connected', attachSdkSessionOwnership({ sessionId: id, timestamp: Date.now() }, id));
 
     // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
@@ -228,7 +232,7 @@ router.get('/sessions/:id/stream', (req, res) => {
  */
 router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const id = /** @type {string} */ (req.params.id);
+        const id = /** @type {string} */ (req.params['id']);
         const { model } = req.body ?? {};
         const modelValidation = validateModel(model);
         if (!modelValidation.ok) {
@@ -236,7 +240,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
             return;
         }
         const safeModel = modelValidation.model;
-        const entry = sessionService.getSession(id);
+        const entry = getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -246,7 +250,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
         }
         await entry.session.setModel(safeModel);
         log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
-        res.json({ ok: true, sessionId: id, model: safeModel });
+        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, model: safeModel }, id));
     });
 });
 
@@ -260,7 +264,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
 router.post('/sessions/:id/abort', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const entry = sessionService.getSession(id);
+        const entry = getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -270,7 +274,7 @@ router.post('/sessions/:id/abort', (req, res) => {
         }
         await entry.session.abort();
         log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
-        res.json({ ok: true, sessionId: id, message: 'Processamento abortado.' });
+        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, message: 'Processamento abortado.' }, id));
     });
 });
 
@@ -284,7 +288,7 @@ router.post('/sessions/:id/abort', (req, res) => {
 router.get('/sessions/:id/messages', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const { id } = req.params;
-        const entry = sessionService.getSession(id);
+        const entry = getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -293,7 +297,7 @@ router.get('/sessions/:id/messages', (req, res) => {
             return;
         }
         const messages = await entry.session.getMessages();
-        res.json({ ok: true, sessionId: id, count: messages.length, messages });
+        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, count: messages.length, messages }, id));
     });
 });
 

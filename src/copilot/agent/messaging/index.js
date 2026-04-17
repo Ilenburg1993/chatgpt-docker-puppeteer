@@ -8,6 +8,8 @@
 export {
     answerPendingQuestion,
     enqueueTask,
+    executeTask,
+    processQueue,
     sendMessage,
     sendMessageDialogBoot,
     steerMessage,

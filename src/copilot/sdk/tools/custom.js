@@ -18,7 +18,7 @@
 
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { toError, logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
@@ -140,7 +140,7 @@ export const BUILTIN_HANDLER_MAP = new Map([
  * @property {string} name - Nome único da tool (snake_case)
  * @property {string} description - Descrição para o modelo
  * @property {string} handlerId - Id do handler no BUILTIN_HANDLER_MAP
- * @property {Record<string, unknown>} [parameters] - JSON Schema dos parâmetros (opcional)
+ * @property {Record<string, unknown> | undefined} [parameters] - JSON Schema dos parâmetros (opcional)
  */
 
 /**
@@ -176,6 +176,13 @@ export async function loadCustomToolsAsync() {
         logSwallowed(e, 'sdk.customTools.loadRegistry');
     }
 }
+
+/**
+ * Alias compatível legado para o carregamento do registry de custom tools.
+ *
+ * @returns {Promise<void>}
+ */
+export const loadCustomTools = loadCustomToolsAsync;
 
 /**
  * F92: Versão async de persistCustomTools — usa fs/promises com write atômico.

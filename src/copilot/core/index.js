@@ -64,7 +64,14 @@ export {
 } from './security/url-validator.js';
 
 // ─── Shared State ─────────────────────────────────────────────────────────────
-export { getHubSessionId, setSharedHubSessionId } from './shared-state.js';
+export {
+    clearSharedSessionBinding,
+    getHubSessionId,
+    getSharedSdkSessionId,
+    getSharedSessionBinding,
+    setSharedHubSessionId,
+    setSharedSdkSessionId,
+} from './shared-state.js';
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 export { createCache } from './cache.js';

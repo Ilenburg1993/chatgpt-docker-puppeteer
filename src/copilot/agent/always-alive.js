@@ -11,7 +11,7 @@
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { bridgeEmitter, container, logSwallowed } from '#copilot/core';
+import { container, logSwallowed } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
 
@@ -25,14 +25,15 @@ import {
     dialogStop,
 } from './dialog/agent-dialog-controller.js';
 import { readState } from './lifecycle/state-io.js';
-import { processQueue } from './queue-processor.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
+import { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
 // F36: Lifecycle — start, stop, initSession, tryReconnect
 import { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
 // F38: Messaging — sendMessage, steerMessage, answerPendingQuestion
 import {
     answerPendingQuestion as msgAnswer,
+    processQueue as msgProcessQueue,
     sendMessage as msgSend,
     sendMessageDialogBoot as msgSendBoot,
     steerMessage as msgSteer,
@@ -40,6 +41,7 @@ import {
 // F39: State — getStatusSnapshot, listenerDiagnostics
 import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
 // O3: Facades extraídas para reduzir LoC desta classe
+import { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
 import {
     getModel,
     getReasoningEffort,
@@ -164,7 +166,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return this.ctx.status;
+        return this.ctx.runtimeState.status;
     }
 
     /**
@@ -200,7 +202,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return this.ctx.pendingQuestion;
+        return this.ctx.dialogState.pendingQuestion;
     }
 
     /**
@@ -209,7 +211,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string | null}
      */
     get sessionId() {
-        return this.ctx.session?.sessionId ?? readState()?.sessionId ?? null;
+        return this.ctx.sessionState.session?.sessionId ?? readState()?.sessionId ?? null;
     }
 
     /**
@@ -393,6 +395,17 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Retorna um snapshot consolidado de health do agente.
+     *
+     * Usado por rotas de health, registries de observabilidade e diagnósticos operacionais.
+     *
+     * @returns {import('./types.js').AgentHealthSnapshot}
+     */
+    getHealthSnapshot() {
+        return healthSnapshot(this.ctx, this);
+    }
+
+    /**
      * Retorna contagem de listeners por evento para diagnóstico de leaks.
      *
      * @returns {{ [event: string]: number }}
@@ -480,7 +493,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     get lastPrInfo() {
         // Retorna cópia rasa para evitar mutação externa do estado interno.
-        return this.ctx.lastPrInfo ? { ...this.ctx.lastPrInfo } : null;
+        return this.ctx.metricsState.lastPrInfo ? { ...this.ctx.metricsState.lastPrInfo } : null;
     }
 
     /**
@@ -499,7 +512,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     #processQueue() {
-        processQueue(this.ctx, this, { tryReconnect: (e) => this.#tryReconnect(e) });
+        msgProcessQueue(this.ctx, this, { tryReconnect: (e) => this.#tryReconnect(e) });
     }
 
     /**
@@ -542,210 +555,70 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.stop().catch((e) => logSwallowed(e, 'AlwaysAliveAgent.Symbol.dispose'));
     }
 }
+/** @type {AlwaysAliveAgent | null} */
+let _alwaysAliveAgent = null;
+
 /**
- * Instância singleton do Always-Alive Agent para este processo.
+ * Reseta a instância lazy do agente.
+ *
+ * Útil principalmente em testes e cenários controlados de reinicialização do runtime.
+ *
+ * @returns {void}
+ */
+export function resetAgent() {
+    _alwaysAliveAgent = null;
+    resetAgentEventBusBridgeWiring();
+}
+
+/**
+ * Proxy de compatibilidade para manter a API pública `alwaysAliveAgent` sem instanciar o singleton no topo do módulo.
  *
  * @type {AlwaysAliveAgent}
  */
-export const alwaysAliveAgent = new AlwaysAliveAgent();
-
-// M-3: Bridge agent lifecycle events → EventBus centralizado
-try {
-    const { container } = await import('../core/di-container.js');
-    const { EVENT_BUS } = await import('../core/di-tokens.js');
-    const {
-        AGENT_ABORT,
-        AGENT_ASSISTANT_INTENT,
-        AGENT_ASSISTANT_REASONING_COMPLETE,
-        AGENT_ASSISTANT_TURN_END,
-        AGENT_ASSISTANT_TURN_START,
-        AGENT_BACKGROUND_COMPLETED,
-        AGENT_BACKGROUND_IDLE,
-        AGENT_READY,
-        AGENT_BEFORE_STOP,
-        AGENT_STOPPED,
-        AGENT_ERROR,
-        AGENT_CONTEXT_COMPACTED,
-        AGENT_DIALOG_BOOT_RECOVERY,
-        AGENT_DIALOG_DELTA,
-        AGENT_DIALOG_LOOP_CHANGED,
-        AGENT_DIALOG_READY,
-        AGENT_DIALOG_STALLED,
-        AGENT_DIALOG_PAUSED,
-        AGENT_DIALOG_RESUMED,
-        AGENT_DIALOG_STOPPED,
-        AGENT_DIALOG_REPLY,
-        AGENT_DIALOG_COMPACTION_REQUESTED,
-        AGENT_DIALOG_TURN_START,
-        AGENT_DIALOG_TURN_END,
-        AGENT_DIALOG_TURN_TIMEOUT,
-        AGENT_ELICITATION_PENDING,
-        AGENT_EXIT_PLAN_MODE_COMPLETED,
-        AGENT_EXTERNAL_TOOL_COMPLETED,
-        AGENT_HANDOFF_RECEIVED,
-        AGENT_HANDOFF_ACCEPTED,
-        AGENT_HANDOFF_REJECTED,
-        AGENT_MCP_RECONNECTED,
-        AGENT_METRICS,
-        AGENT_PENDING_MESSAGES_MODIFIED,
-        AGENT_PERMISSION_MODE_CHANGED,
-        AGENT_PR_CONSUMED,
-        AGENT_PR_FALLBACK_MODEL,
-        AGENT_QUESTION_PENDING,
-        AGENT_QUESTION_ANSWERED,
-        AGENT_QUOTA_WARNING,
-        AGENT_SDK_LIFECYCLE,
-        AGENT_SESSION_CLEANUP,
-        AGENT_SESSION_COMPACTION_START,
-        AGENT_SESSION_COMPACTION_COMPLETE,
-        AGENT_SESSION_CONTEXT_CHANGED,
-        AGENT_SESSION_ERROR,
-        AGENT_SESSION_FATAL,
-        AGENT_SESSION_HANDOFF,
-        AGENT_SESSION_HISTORY_SYNCED,
-        AGENT_SESSION_INFO,
-        AGENT_SESSION_KEEPALIVE,
-        AGENT_SESSION_MODE_CHANGED,
-        AGENT_SESSION_SHUTDOWN,
-        AGENT_SESSION_SNAPSHOT_REWIND,
-        AGENT_SESSION_TASK_COMPLETE,
-        AGENT_SESSION_TITLE_CHANGED,
-        AGENT_SESSION_TOKEN_BUDGET_WARNING,
-        AGENT_SESSION_TRUNCATION,
-        AGENT_SESSION_USAGE,
-        AGENT_SESSION_WORKSPACE_FILE_CHANGED,
-        AGENT_SHELL_COMPLETED,
-        AGENT_SHELL_DETACHED_COMPLETED,
-        AGENT_STATUS,
-        AGENT_STEERING_SENT,
-        AGENT_SUBAGENT_COMPLETED,
-        AGENT_SUBAGENT_FAILED,
-        AGENT_SUBAGENT_STARTED,
-        AGENT_SYSTEM_MESSAGE,
-        AGENT_TASK_COMPLETED,
-        AGENT_TASK_DELTA,
-        AGENT_TASK_ERROR,
-        AGENT_TASK_QUEUED,
-        AGENT_TASK_REASONING,
-        AGENT_TASK_STARTED,
-        AGENT_TOOL_EXECUTION_START,
-        AGENT_TOOL_EXECUTION_COMPLETE,
-        AGENT_TOOL_EXECUTION_PROGRESS,
-        AGENT_DIALOG_PRE_STALL_WARNING,
-        AGENT_SESSION_IDLE,
-    } = await import('../events/index.js');
-    const bus = container.resolve(EVENT_BUS);
-    if (bus) {
-        // FAIXA-L7+L9: bridge completo agent → EventBus (cobre TODOS os agent events)
-        bridgeEmitter(alwaysAliveAgent, bus, {
-            ready: AGENT_READY,
-            'before-stop': AGENT_BEFORE_STOP,
-            stopped: AGENT_STOPPED,
-            error: AGENT_ERROR,
-            'dialog.loop.changed': AGENT_DIALOG_LOOP_CHANGED,
-            'dialog.ready': AGENT_DIALOG_READY,
-            'dialog.turn_start': AGENT_DIALOG_TURN_START,
-            'dialog.turn_end': AGENT_DIALOG_TURN_END,
-            'dialog.turn_timeout': AGENT_DIALOG_TURN_TIMEOUT,
-            'dialog.stalled': AGENT_DIALOG_STALLED,
-            'dialog.paused': AGENT_DIALOG_PAUSED,
-            'dialog.resumed': AGENT_DIALOG_RESUMED,
-            'dialog.stopped': AGENT_DIALOG_STOPPED,
-            'dialog.reply': AGENT_DIALOG_REPLY,
-            'session.keepalive': AGENT_SESSION_KEEPALIVE,
-            'session.fatal': AGENT_SESSION_FATAL,
-            'session.compaction_start': AGENT_SESSION_COMPACTION_START,
-            'session.compaction_complete': AGENT_SESSION_COMPACTION_COMPLETE,
-            'session.usage': AGENT_SESSION_USAGE,
-            'session.token_budget_warning': AGENT_SESSION_TOKEN_BUDGET_WARNING,
-            'session.mode_changed': AGENT_SESSION_MODE_CHANGED,
-            'session.history_synced': AGENT_SESSION_HISTORY_SYNCED,
-            'session.info': AGENT_SESSION_INFO,
-            'session.title_changed': AGENT_SESSION_TITLE_CHANGED,
-            'session.snapshot_rewind': AGENT_SESSION_SNAPSHOT_REWIND,
-            'session.workspace_file_changed': AGENT_SESSION_WORKSPACE_FILE_CHANGED,
-            'task.queued': AGENT_TASK_QUEUED,
-            'task.started': AGENT_TASK_STARTED,
-            'task.completed': AGENT_TASK_COMPLETED,
-            'task.delta': AGENT_TASK_DELTA,
-            'task.error': AGENT_TASK_ERROR,
-            'task.reasoning': AGENT_TASK_REASONING,
-            'tool.execution_start': AGENT_TOOL_EXECUTION_START,
-            'tool.execution_complete': AGENT_TOOL_EXECUTION_COMPLETE,
-            'tool.execution_progress': AGENT_TOOL_EXECUTION_PROGRESS,
-            'question.pending': AGENT_QUESTION_PENDING,
-            'question.answered': AGENT_QUESTION_ANSWERED,
-            'pr.consumed': AGENT_PR_CONSUMED,
-            'pr.fallback_model': AGENT_PR_FALLBACK_MODEL,
-            'permission.mode_changed': AGENT_PERMISSION_MODE_CHANGED,
-            'context:compacted': AGENT_CONTEXT_COMPACTED,
-            'agent.metrics': AGENT_METRICS,
-            'system.message': AGENT_SYSTEM_MESSAGE,
-            // ── FAIXA-L9: 26 previously unbridged events ─────────────────
-            'assistant.turn_start': AGENT_ASSISTANT_TURN_START,
-            'assistant.turn_end': AGENT_ASSISTANT_TURN_END,
-            'assistant.intent': AGENT_ASSISTANT_INTENT,
-            'assistant.reasoning_complete': AGENT_ASSISTANT_REASONING_COMPLETE,
-            'session.error': AGENT_SESSION_ERROR,
-            'session.shutdown': AGENT_SESSION_SHUTDOWN,
-            'session.handoff': AGENT_SESSION_HANDOFF,
-            'session.task_complete': AGENT_SESSION_TASK_COMPLETE,
-            'session.context_changed': AGENT_SESSION_CONTEXT_CHANGED,
-            'session.truncation': AGENT_SESSION_TRUNCATION,
-            'session.cleanup': AGENT_SESSION_CLEANUP,
-            'subagent.started': AGENT_SUBAGENT_STARTED,
-            'subagent.completed': AGENT_SUBAGENT_COMPLETED,
-            'subagent.failed': AGENT_SUBAGENT_FAILED,
-            'dialog.delta': AGENT_DIALOG_DELTA,
-            'dialog.boot_recovery': AGENT_DIALOG_BOOT_RECOVERY,
-            abort: AGENT_ABORT,
-            'elicitation.pending': AGENT_ELICITATION_PENDING,
-            'agent.background.completed': AGENT_BACKGROUND_COMPLETED,
-            'agent.background.idle': AGENT_BACKGROUND_IDLE,
-            'agent.shell.completed': AGENT_SHELL_COMPLETED,
-            'agent.shell.detached_completed': AGENT_SHELL_DETACHED_COMPLETED,
-            'sdk.lifecycle': AGENT_SDK_LIFECYCLE,
-            'mcp.reconnected': AGENT_MCP_RECONNECTED,
-            'quota.warning': AGENT_QUOTA_WARNING,
-            'steering.sent': AGENT_STEERING_SENT,
-            // ── FAIXA-L14: 4 previously unbridged observer events ────────
-            status: AGENT_STATUS,
-            'pending_messages.modified': AGENT_PENDING_MESSAGES_MODIFIED,
-            'exit_plan_mode.completed': AGENT_EXIT_PLAN_MODE_COMPLETED,
-            'external_tool.completed': AGENT_EXTERNAL_TOOL_COMPLETED,
-            // ── FAIXA-L32: bridge completude ────────────────────────
-            'dialog.pre_stall_warning': AGENT_DIALOG_PRE_STALL_WARNING,
-            'session.idle': AGENT_SESSION_IDLE,
-        });
-        // FAIXA-2A: bridge DialogLoopManager → EventBus
-        bridgeEmitter(alwaysAliveAgent.ctx.dialogLoop, bus, {
-            changed: AGENT_DIALOG_LOOP_CHANGED,
-            stalled: AGENT_DIALOG_STALLED,
-            paused: AGENT_DIALOG_PAUSED,
-            resumed: AGENT_DIALOG_RESUMED,
-            stopped: AGENT_DIALOG_STOPPED,
-            reply: AGENT_DIALOG_REPLY,
-            'compaction.requested': AGENT_DIALOG_COMPACTION_REQUESTED,
-            turn_timeout: AGENT_DIALOG_TURN_TIMEOUT,
-        });
-        // FAIXA-2A: bridge HandoffManager → EventBus
-        bridgeEmitter(alwaysAliveAgent.ctx.handoff, bus, {
-            'handoff.received': AGENT_HANDOFF_RECEIVED,
-            'handoff.accepted': AGENT_HANDOFF_ACCEPTED,
-            'handoff.rejected': AGENT_HANDOFF_REJECTED,
-        });
-    }
-} catch (_busWiringErr) {
-    // EventBus not available yet — expected during early bootstrap
-    // C-06 fix: log non-MODULE_NOT_FOUND errors for visibility
-    const code =
-        _busWiringErr instanceof Error
-            ? /** @type {{ code?: string }} */ (/** @type {unknown} */ (_busWiringErr)).code
-            : undefined;
-    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') {
-        logSwallowed(_busWiringErr, 'AlwaysAliveAgent.eventBusWiring');
-    }
-}
+export const alwaysAliveAgent = /** @type {AlwaysAliveAgent} */ (
+    new Proxy(
+        {},
+        {
+            get(_target, prop) {
+                const agent = getAgent();
+                const value = Reflect.get(agent, prop, agent);
+                return typeof value === 'function' ? value.bind(agent) : value;
+            },
+            set(_target, prop, value) {
+                const agent = getAgent();
+                return Reflect.set(agent, prop, value, agent);
+            },
+            defineProperty(_target, prop, descriptor) {
+                return Reflect.defineProperty(getAgent(), prop, descriptor);
+            },
+            deleteProperty(_target, prop) {
+                return Reflect.deleteProperty(getAgent(), prop);
+            },
+            getOwnPropertyDescriptor(_target, prop) {
+                const agent = getAgent();
+                return (
+                    Reflect.getOwnPropertyDescriptor(agent, prop) ??
+                    Reflect.getOwnPropertyDescriptor(AlwaysAliveAgent.prototype, prop)
+                );
+            },
+            has(_target, prop) {
+                return prop in getAgent();
+            },
+            ownKeys() {
+                return Reflect.ownKeys(getAgent());
+            },
+            getPrototypeOf() {
+                return AlwaysAliveAgent.prototype;
+            },
+            isExtensible() {
+                return Reflect.isExtensible(getAgent());
+            },
+            preventExtensions() {
+                return Reflect.preventExtensions(getAgent());
+            },
+        },
+    )
+);
 /**
  * G1-ARCH-01: Accessor lazy do singleton — use este em vez de importar `alwaysAliveAgent` diretamente.
  *
@@ -755,5 +628,11 @@ try {
  * @returns {AlwaysAliveAgent}
  */
 export function getAgent() {
-    return alwaysAliveAgent;
+    if (!_alwaysAliveAgent) {
+        _alwaysAliveAgent = new AlwaysAliveAgent();
+    }
+    ensureAgentEventBusBridge(_alwaysAliveAgent, {
+        isCurrentAgent: (agent) => agent === _alwaysAliveAgent,
+    });
+    return _alwaysAliveAgent;
 }

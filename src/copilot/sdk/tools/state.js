@@ -14,7 +14,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { toError, logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { ToolsConfigSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
@@ -58,6 +58,13 @@ export async function loadToolsConfigAsync() {
         logSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }
+
+/**
+ * Alias compatível legado para o carregamento da configuração de tools.
+ *
+ * @returns {Promise<void>}
+ */
+export const loadToolsConfig = loadToolsConfigAsync;
 
 /**
  * F92: Versão async de persistToolsConfig — usa fs/promises.

@@ -16,10 +16,10 @@
  */
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { toError, container } from '#copilot/core';
+import { container, getSharedSdkSessionId, toError } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
-import { handleListSessions, handleListTurns } from '../../terminal/handlers/dialog.js';
+import { handleListSessions, handleListTurns, VALID_HUB_SESSION_STATUS } from '../../presentation/conversation-hub.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';
 
@@ -30,9 +30,6 @@ import { validate } from '../middleware/validate.js';
  *
  * @typedef {import('express').NextFunction} NextFn
  */
-
-/** Statuses válidos para filtragem de sessions. */
-const VALID_STATUS = /** @type {const} */ (['active', 'closed', 'error']);
 
 /**
  * Cria o router de gerenciamento de hub sessions.
@@ -74,7 +71,7 @@ export function createSessionsRouter() {
     const createSessionSchema = z.object({
         title: z.string().optional(),
         sdkSessionId: z.string().optional(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
     });
 
     // ── POST /sessions — cria nova session ────────────────────────────────────
@@ -89,6 +86,10 @@ export function createSessionsRouter() {
                 const hubOpts = {};
                 if (title) hubOpts.title = title;
                 if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
+                else {
+                    const activeSdkSessionId = getSharedSdkSessionId();
+                    if (activeSdkSessionId) hubOpts.sdkSessionId = activeSdkSessionId;
+                }
                 if (metadata) hubOpts.metadata = metadata;
                 const id = container.resolve(CONVERSATION_STORE).createHubSession(hubOpts);
                 res.status(201).json({ ok: true, id });
@@ -130,7 +131,7 @@ export function createSessionsRouter() {
         })),
     );
 
-    void VALID_STATUS; // referência simbólica — usado pelo handleListSessions via bridge
+    void VALID_HUB_SESSION_STATUS; // referência simbólica do contrato canônico de status
 
     return router;
 }

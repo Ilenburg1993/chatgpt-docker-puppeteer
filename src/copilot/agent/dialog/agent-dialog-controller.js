@@ -33,15 +33,15 @@ import { wireDialogLoopEvents } from './loop-manager.js';
  * @returns {Promise<void>}
  */
 export async function dialogStart(ctx, host, bootPrompt) {
-    if (ctx.status !== 'idle') {
+    if (ctx.runtimeState.status !== 'idle') {
         throw new SessionError(
-            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.status}'`,
+            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.runtimeState.status}'`,
             'INVALID_STATE',
         );
     }
     // F44.1 (GAP-SD-08): health check pre-boot
-    if (ctx.contextState) {
-        const utilization = ctx.contextState.utilization ?? 0;
+    if (ctx.sessionState.contextState) {
+        const utilization = ctx.sessionState.contextState.utilization ?? 0;
         if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
             throw new SessionError(
                 `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
@@ -77,11 +77,11 @@ export async function dialogStart(ctx, host, bootPrompt) {
 export async function dialogStop(ctx, host, opts) {
     await ctx.dialogLoop.stop(opts);
     // F42.2: reiniciar keepalive quando dialog loop para
-    if (ctx.status !== 'stopped' && ctx.session) {
+    if (ctx.runtimeState.status !== 'stopped' && ctx.sessionState.session) {
         ctx.keepalive.start({
-            getSession: () => ctx.session,
-            getClient: () => ctx.client,
-            isIdle: () => ctx.status === 'idle',
+            getSession: () => ctx.sessionState.session,
+            getClient: () => ctx.ioState.client,
+            isIdle: () => ctx.runtimeState.status === 'idle',
             isDialogLoopActive: () => ctx.dialogLoop.active,
             onKeepalive: (/** @type {number} */ ts) => {
                 container.resolve(METRICS_STORE).recordKeepalivePing();
@@ -98,9 +98,9 @@ export async function dialogStop(ctx, host, opts) {
  * @returns {Promise<void>}
  */
 export async function dialogResume(ctx) {
-    if (ctx.status !== 'idle' && ctx.status !== 'waiting_for_input') {
+    if (ctx.runtimeState.status !== 'idle' && ctx.runtimeState.status !== 'waiting_for_input') {
         throw new SessionError(
-            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.status}'`,
+            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.runtimeState.status}'`,
             'INVALID_STATE',
         );
     }
@@ -121,11 +121,11 @@ export function ensureDialogLoopAttached(ctx, host) {
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),
         answerPendingQuestion: (answer) => host.answerPendingQuestion(answer),
         getSessionId: () => host.sessionId,
-        getModel: () => ctx.model,
+        getModel: () => ctx.configState.model,
         setModel: (modelId) => {
-            ctx.model = modelId;
+            ctx.configState.model = modelId;
             // F72: propagar ao SDK se sessão estiver ativa (mesma lógica do always-alive.setModel)
-            const sdkSess = /** @type {{ setModel?: (id: string) => void }} */ (ctx.session);
+            const sdkSess = /** @type {{ setModel?: (id: string) => void }} */ (ctx.sessionState.session);
             if (sdkSess && typeof sdkSess.setModel === 'function') {
                 try {
                     sdkSess.setModel(modelId);
@@ -134,13 +134,14 @@ export function ensureDialogLoopAttached(ctx, host) {
                 }
             }
         },
-        getPendingQuestion: () => ctx.pendingQuestion,
+        getPendingQuestion: () => ctx.dialogState.pendingQuestion,
+        trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
     };
     // Sempre atualiza host — necessário após reconexão.
     ctx.dialogLoop.attach(agentHost);
     // Wiring de eventos: somente na primeira vez.
-    if (ctx.dialogLoopAttached) return;
-    ctx.dialogLoopAttached = true;
+    if (ctx.dialogState.dialogLoopAttached) return;
+    ctx.dialogState.dialogLoopAttached = true;
     wireDialogLoopEvents(ctx.dialogLoop, (event, payload) => host.emit(event, payload));
 
     // F31.3/F31.4: Proxy token_budget_warning → DLM

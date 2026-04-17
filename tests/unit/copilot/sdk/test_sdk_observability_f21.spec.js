@@ -74,7 +74,7 @@ describe('F21 — F115: createQuotaMonitor', () => {
                 },
             },
         });
-        vi.doMock('#copilot/sdk/server-rpc.js', () => ({ accountGetQuota: mockAccountGetQuota }));
+        vi.doMock('#copilot/sdk/server-rpc', () => ({ accountGetQuota: mockAccountGetQuota }));
     });
 
     afterEach(() => {
@@ -92,19 +92,19 @@ describe('F21 — F115: createQuotaMonitor', () => {
     });
 
     it('createQuotaMonitor lança TypeError se client inválido', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor.js');
+        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
         // @ts-expect-error -- valor inválido intencional para testar validação
         expect(() => createQuotaMonitor({ client: null })).toThrow(TypeError);
     });
 
     it('createQuotaMonitor lança RangeError se intervalMs < 1000', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor.js');
+        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
         // @ts-expect-error -- valor inválido intencional para testar validação
         expect(() => createQuotaMonitor({ client: {}, intervalMs: 500 })).toThrow(RangeError);
     });
 
     it('monitor.status() retorna running=false antes de start()', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor.js');
+        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
         // @ts-expect-error -- valor inválido intencional para testar validação
         const monitor = createQuotaMonitor({ client: { rpc: {} }, intervalMs: 60_000 });
         const s = monitor.status();

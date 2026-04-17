@@ -21,32 +21,23 @@
  * @see EventBus
  */
 
-import {
-    EMITTER_AGENT_METRICS,
-    EMITTER_DIALOG_BOOT_RECOVERY,
-    EMITTER_MCP_RECONNECTED,
-    EMITTER_QUESTION_ANSWERED,
-    EMITTER_QUOTA_WARNING,
-    EMITTER_SDK_LIFECYCLE,
-    EMITTER_SESSION_CLEANUP,
-    EMITTER_SESSION_KEEPALIVE,
-} from '#copilot/events';
-import {
-    createAgentEventObserver,
-    defaultErrorTracker,
-    defaultEventCollector,
-    defaultMetrics,
-    log,
-} from '#copilot/observability';
-import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor, isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
-import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
-import { registerTimer } from '../../core/timer-registry.js';
+import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
+import { defaultMetrics, log } from '#copilot/observability';
+import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor } from '#copilot/sdk';
 import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
-import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
-import { readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
-import { cleanupStaleSessions } from './cleanup.js';
-import { wireSessionEvents } from './event-wirer.js';
+import {
+    createBootWiringState,
+    stepAttachAgentObserver,
+    stepAttachEventCollector,
+    stepCleanupStaleSessions,
+    stepScheduleDialogRecovery,
+    stepStartKeepalive,
+    stepStartMcpReconnect,
+    stepStartMetricsTimer,
+    stepWireHandoff,
+    stepWireQuestionAnsweredRelay,
+    stepWireSessionEvents,
+} from './boot-steps.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -80,6 +71,8 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
+ * @property {import('../background-tasks.js').BackgroundTasks} backgroundTasks — Tracker central de tarefas em
+ *   background do agente
  * @property {({
  *           startAutoReconnect: (
  *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
@@ -106,148 +99,87 @@ import { wireSessionEvents } from './event-wirer.js';
  */
 
 /**
- * Executa todos os wirings pós-init do boot do agente.
+ * Estado mutável interno do pipeline de boot wiring.
  *
- * @param {CopilotClient} client — Cliente SDK já instanciado
- * @param {CopilotSession} session — Sessão SDK já criada/retomada
- * @param {boolean} isResumed — Se a sessão foi retomada
- * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
- * @param {BootWiringContext} ctx — Callbacks e referências
- * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
- * @returns {BootWiringResult}
+ * @typedef {Object} BootWiringPipelineState
+ * @property {(() => void)[]} unsubs
+ * @property {{
+ *     attach: (agent: import('node:events').EventEmitter) => void;
+ *     attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void;
+ *     detach: () => void;
+ * } | null} agentObserver
+ * @property {ReturnType<typeof setInterval> | null} metricsTimer
+ * @property {(() => void) | null} mcpReconnectCancel
+ * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
  */
-export function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
-    /** @type {(() => void)[]} */
-    const unsubs = [];
 
-    // ── 1. Wire session events ──
-    const sessionUnsubs = wireSessionEvents(session, isResumed, {
-        emit: ctx.emit,
-        getStatusSnapshot: ctx.getStatusSnapshot,
-        onCheckpointPath: ctx.onCheckpointPath,
-        onContextState: ctx.onContextState,
-        onPrInfo: ctx.onPrInfo,
-        isProcessing: ctx.isProcessing,
-        dialogLoopActive: ctx.dialogLoopActive,
-    });
-    unsubs.push(...sessionUnsubs);
+/**
+ * Etapa nomeada do pipeline de boot.
+ *
+ * @typedef {Object} BootWiringStep
+ * @property {string} name
+ * @property {() => void} run
+ */
 
-    // ── 2. Event-collector de observabilidade ──
-    const collectorUnsubs = defaultEventCollector.attach(session, session.sessionId ?? 'unknown');
-    unsubs.push(...collectorUnsubs);
+// ── 3. Client lifecycle handlers (via client-events.js tipado) ──
+/**
+ * Mantido em `boot-wiring.js` como ponto canônico visível do lifecycle SDK, mesmo após a extração de K5b.
+ *
+ * @param {CopilotClient} client
+ * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
+ * @returns {void}
+ */
+function stepRegisterClientLifecycleHandlers(client, ctx, state) {
+    if (typeof client.on !== 'function') {
+        return;
+    }
 
-    // ── 3. Client lifecycle handlers (via client-events.js tipado) ──
-    if (typeof client.on === 'function') {
-        const unsubLifecycle = onLifecycleEvents(
-            {
-                [LIFECYCLE_EVENTS.CREATED]: (evt) => {
-                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
-                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                        type: SESSION_LIFECYCLE_EVENTS.CREATED,
-                        sessionId: evt?.sessionId,
-                    });
-                },
-                [LIFECYCLE_EVENTS.DELETED]: (evt) => {
-                    log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
-                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                        type: SESSION_LIFECYCLE_EVENTS.DELETED,
-                        sessionId: evt?.sessionId,
-                    });
-                },
-                [LIFECYCLE_EVENTS.UPDATED]: (evt) => {
-                    log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
-                    ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                        type: SESSION_LIFECYCLE_EVENTS.UPDATED,
-                        sessionId: evt?.sessionId,
-                    });
-                },
+    const unsubLifecycle = onLifecycleEvents(
+        {
+            [LIFECYCLE_EVENTS.CREATED]: (evt) => {
+                log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
+                ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                    type: SESSION_LIFECYCLE_EVENTS.CREATED,
+                    sessionId: evt?.sessionId,
+                });
             },
-            client,
-        );
-        unsubs.push(unsubLifecycle);
-    }
-
-    // ── 4. Agent-event-observer ──
-    const agentObserver = createAgentEventObserver({
-        metrics: defaultMetrics,
-        errorTracker: defaultErrorTracker,
-        modelStatsTracker,
-    });
-    // FAIXA-L14: prefer EventBus over direct agent emitter
-    if (options?.eventBus) {
-        agentObserver.attachToBus(options.eventBus);
-    } else {
-        agentObserver.attach(agentEmitter);
-    }
-
-    // ── 5. Limpeza assíncrona de sessões stale ──
-    void cleanupStaleSessions(client, { currentSessionId: session.sessionId })
-        .then((result) => {
-            if (result.deleted > 0) {
-                for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
-                ctx.emit(EMITTER_SESSION_CLEANUP, result);
-            }
-        })
-        .catch((e) => logSwallowed(e, 'agent.bootWiring.cleanup'));
-
-    // ── 6. Dialog loop resume após boot recovery ──
-    if (isResumed) {
-        void readStateAsync().then((savedState) => {
-            if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
-                scheduleDialogBootRecovery(ctx);
-            }
-        });
-    }
-
-    // ── 7. Timer de métricas periódicas ──
-    /** @type {ReturnType<typeof setInterval> | null} */
-    let metricsTimer = null;
-    if (METRICS_INTERVAL_MS > 0) {
-        metricsTimer = setInterval(() => {
-            ctx.emit(EMITTER_AGENT_METRICS, ctx.getStatusSnapshot());
-        }, METRICS_INTERVAL_MS);
-        metricsTimer.unref();
-        // F154: registrar no timer-registry para cleanup automático via shutdown
-        registerTimer('agent.metricsEmit', 'interval', metricsTimer);
-    }
-
-    // ── 8. Auto-reconnect MCP ──
-    // F69: mcpBridge injetável; ctx é BootWiringContext que inclui mcpBridge opcional
-    const _ctxAny = /**
-     * @type {{
-     *     mcpBridge?: {
-     *         startAutoReconnect: (
-     *             onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
-     *             intervalMs: number,
-     *         ) => () => void;
-     *     } | null;
-     * }}
-     */ (/** @type {unknown} */ (ctx));
-    const _mcpBridgeFn = _ctxAny.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
-    const mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
-        ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
-    }, MCP_RECONNECT_MS);
-
-    // ── 9. Keepalive de sessão ──
-    ctx.keepalive.start({
-        getSession: () => session,
-        getClient: () => client,
-        isIdle: () => ctx.getStatus() === 'idle',
-        isDialogLoopActive: ctx.dialogLoopActive,
-        onKeepalive: (/** @type {number} */ ts) => {
-            defaultMetrics.recordKeepalivePing();
-            ctx.emit(EMITTER_SESSION_KEEPALIVE, { ts });
+            [LIFECYCLE_EVENTS.DELETED]: (evt) => {
+                log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
+                ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                    type: SESSION_LIFECYCLE_EVENTS.DELETED,
+                    sessionId: evt?.sessionId,
+                });
+            },
+            [LIFECYCLE_EVENTS.UPDATED]: (evt) => {
+                log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
+                ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                    type: SESSION_LIFECYCLE_EVENTS.UPDATED,
+                    sessionId: evt?.sessionId,
+                });
+            },
         },
-    });
+        client,
+    );
+    state.unsubs.push(unsubLifecycle);
+}
 
-    // ── 10. Quota Monitor (F118 — Faixa 25) ──
-    // Inicia monitoramento periódico de quota para logging e alertas proativos.
-    /** @type {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} */
-    let quotaMonitor = null;
+// ── 10. Quota Monitor (F118 — Faixa 25) ──
+/**
+ * Mantido em `boot-wiring.js` como ponto canônico visível do quota monitor para auditorias estruturais existentes.
+ * Compatibilidade documental: referência histórica preservada ao caminho `#copilot/sdk/quota-monitor`, mas o import
+ * canônico permanece via barrel `#copilot/sdk`.
+ *
+ * @param {CopilotClient} client
+ * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
+ * @returns {void}
+ */
+function stepStartQuotaMonitor(client, ctx, state) {
     try {
-        quotaMonitor = createQuotaMonitor({
+        const quotaMonitor = createQuotaMonitor({
             client,
-            intervalMs: 5 * 60 * 1000, // 5 min
+            intervalMs: 5 * 60 * 1000,
             warningThreshold: 20,
             onWarning: (quotaId, snapshot) => {
                 log(
@@ -262,70 +194,72 @@ export function performBootWiring(client, session, isResumed, agentEmitter, ctx,
             },
         });
         quotaMonitor.start();
+        state.quotaMonitor = quotaMonitor;
     } catch (e) {
-        logSwallowed(e, 'agent.bootWiring.quotaMonitor');
+        const _err = /** @type {Error} */ (e);
+        log('WARN', `[boot-wiring] Quota monitor indisponível: ${_err.message}`);
     }
-
-    // ── 11. Wiring de handoff ── (F73: guardado por feature flag 'fleet')
-    if (isExperimentalEnabled('fleet')) {
-        agentEmitter.on(
-            'session.handoff',
-            (
-                /**
-                 * @type {{
-                 *     fromAgent: string;
-                 *     toAgent: string;
-                 *     reason?: string;
-                 *     context?: Record<string, unknown>;
-                 * }}
-                 */ data,
-            ) => {
-                ctx.handoff.receive(data);
-                defaultMetrics.recordHandoff();
-            },
-        );
-    } else {
-        log('DEBUG', '[BootWiring] Handoff wiring desabilitado (experimental.fleet não habilitado).');
-    }
-
-    // ── 12. F68: Relay question.answered → hook-tools (boundary decoupling) ──
-    agentEmitter.on(EMITTER_QUESTION_ANSWERED, (/** @type {{ answer?: string }} */ evt) => {
-        if (typeof evt?.answer !== 'string') return;
-        const answer = evt.answer;
-        import('../../tools/hook-tools.js')
-            .then(({ resolveUserInput }) => resolveUserInput(answer))
-            .catch((e) => logSwallowed(e, 'boot-wiring.hookToolsRelay'));
-    });
-
-    return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
 }
 
 /**
- * Agenda o boot recovery do dialog loop após resume com delay.
+ * Cria a lista ordenada de etapas do boot wiring.
  *
+ * @param {CopilotClient} client
+ * @param {CopilotSession} session
+ * @param {boolean} isResumed
+ * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
+ * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options]
+ * @returns {BootWiringStep[]}
+ */
+export function createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options) {
+    return [
+        { name: 'wireSessionEvents', run: () => stepWireSessionEvents(session, isResumed, ctx, state) },
+        { name: 'attachEventCollector', run: () => stepAttachEventCollector(session, state) },
+        { name: 'registerClientLifecycleHandlers', run: () => stepRegisterClientLifecycleHandlers(client, ctx, state) },
+        { name: 'attachAgentObserver', run: () => stepAttachAgentObserver(agentEmitter, state, options) },
+        { name: 'cleanupStaleSessions', run: () => stepCleanupStaleSessions(client, session, ctx) },
+        { name: 'scheduleDialogRecovery', run: () => stepScheduleDialogRecovery(isResumed, ctx) },
+        { name: 'startMetricsTimer', run: () => stepStartMetricsTimer(ctx, state) },
+        { name: 'startMcpReconnect', run: () => stepStartMcpReconnect(ctx, state) },
+        { name: 'startKeepalive', run: () => stepStartKeepalive(client, session, ctx) },
+        { name: 'startQuotaMonitor', run: () => stepStartQuotaMonitor(client, ctx, state) },
+        { name: 'wireHandoff', run: () => stepWireHandoff(agentEmitter, ctx) },
+        { name: 'wireQuestionAnsweredRelay', run: () => stepWireQuestionAnsweredRelay(agentEmitter, ctx) },
+    ];
+}
+
+/**
+ * Executa o pipeline de boot wiring em ordem.
+ *
+ * @param {BootWiringStep[]} steps
  * @returns {void}
  */
-function scheduleDialogBootRecovery(ctx) {
-    log('INFO', '[AlwaysAlive] F53/F42.1: Re-ativando dialog loop após resume — tentando zero-PR primeiro.');
-    setTimeout(async () => {
-        if (ctx.getStatus() === 'stopped') return;
-        try {
-            ctx.ensureDialogLoopAttached();
-            await writeStateAsync({ dialogPaused: true });
-            await ctx.resumeDialogLoop();
-            log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
-            ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
-        } catch (e) {
-            log(
-                'WARN',
-                `[AlwaysAlive] F53: Boot recovery falhou (${toError(e).message}) — fallback para startDialogLoop.`,
-            );
-            try {
-                await ctx.startDialogLoop();
-            } catch (e2) {
-                log('WARN', `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${toError(e2).message}`);
-            }
-        }
-    }, BOOT_RECOVERY_DELAY_MS);
+export function runBootPipeline(steps) {
+    for (const step of steps) {
+        log('DEBUG', `[BootWiring] step ${step.name}...`);
+        step.run();
+        log('DEBUG', `[BootWiring] step ${step.name} ✓`);
+    }
+}
+
+/**
+ * Executa todos os wirings pós-init do boot do agente.
+ *
+ * @param {CopilotClient} client — Cliente SDK já instanciado
+ * @param {CopilotSession} session — Sessão SDK já criada/retomada
+ * @param {boolean} isResumed — Se a sessão foi retomada
+ * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
+ * @param {BootWiringContext} ctx — Callbacks e referências
+ * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
+ * @returns {BootWiringResult}
+ */
+export function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
+    const state = createBootWiringState();
+    const steps = createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options);
+    runBootPipeline(steps);
+
+    const { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor } = state;
+    return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor };
 }

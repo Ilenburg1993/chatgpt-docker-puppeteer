@@ -22,6 +22,9 @@
 /** @type {string | null} */
 let _hubSessionId = null;
 
+/** @type {string | null} */
+let _sdkSessionId = null;
+
 /**
  * Retorna o ID da hub session permanente, se disponível.
  *
@@ -39,4 +42,45 @@ export function getHubSessionId() {
  */
 export function setSharedHubSessionId(id) {
     _hubSessionId = id;
+}
+
+/**
+ * Retorna o ID da sessão SDK ativa, se disponível.
+ *
+ * @returns {string | null}
+ */
+export function getSharedSdkSessionId() {
+    return _sdkSessionId;
+}
+
+/**
+ * Define o ID da sessão SDK ativa no estado compartilhado cross-layer.
+ *
+ * @param {string | null} id
+ * @returns {void}
+ */
+export function setSharedSdkSessionId(id) {
+    _sdkSessionId = id;
+}
+
+/**
+ * Retorna o vínculo compartilhado atual entre sessão conversacional (`hub`) e sessão SDK.
+ *
+ * @returns {{ hubSessionId: string | null; sdkSessionId: string | null }}
+ */
+export function getSharedSessionBinding() {
+    return {
+        hubSessionId: _hubSessionId,
+        sdkSessionId: _sdkSessionId,
+    };
+}
+
+/**
+ * Limpa o vínculo compartilhado entre hub e SDK.
+ *
+ * @returns {void}
+ */
+export function clearSharedSessionBinding() {
+    _hubSessionId = null;
+    _sdkSessionId = null;
 }

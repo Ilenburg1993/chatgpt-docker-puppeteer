@@ -28,6 +28,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
@@ -79,14 +80,21 @@ export default function createAgentRouter(deps) {
      * Retorna informações do agente Always-Alive: status, uptime, sessão ativa.
      */
     router.get('/agent/info', (_req, res) => {
-        res.json({
-            ok: true,
-            running: agent.status !== 'stopped',
-            sessionId: agent.sessionId ?? null,
-            uptime: Math.floor(process.uptime()),
-            pid: process.pid,
-            nodeVersion: process.version,
-            env: process.env['NODE_ENV'] ?? 'development',
+        void (async () => {
+            const client = agent.status !== 'stopped' ? await getClient() : null;
+            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, client?.getState?.() ?? null);
+            res.json({
+                ok: true,
+                running: agent.status !== 'stopped',
+                sessionId: agent.sessionId ?? null,
+                uptime: Math.floor(process.uptime()),
+                pid: process.pid,
+                nodeVersion: process.version,
+                env: process.env['NODE_ENV'] ?? 'development',
+                ...runtimeProjection,
+            });
+        })().catch((error) => {
+            res.status(500).json({ ok: false, error: /** @type {Error} */ (error).message });
         });
     });
 
@@ -173,7 +181,8 @@ export default function createAgentRouter(deps) {
         void withErrorHandler(req, res, async () => {
             const client = await getClient();
             const state = client.getState();
-            res.json({ ok: true, state });
+            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            res.json({ ok: true, state, ...runtimeProjection });
         });
     });
 

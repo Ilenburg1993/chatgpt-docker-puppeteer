@@ -26,8 +26,30 @@ import { writeStateAsync } from '../lifecycle/state-io.js';
  * @property {(input: { question: string }) => void} handleProtocolInput — DLM.handleProtocolInput
  * @property {(status: import('../types.js').AgentStatus) => void} setStatus — #setStatus
  * @property {(pq: PendingQuestion | null) => void} setPendingQuestion — #pendingQuestion setter
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
+ *   - Tracker opcional para writes fire-and-forget
+ *
  * @property {(event: string, payload?: unknown) => boolean} emit — EventEmitter.emit
  */
+
+/**
+ * @param {UserInputContext} ctx
+ * @param {Promise<unknown>} task
+ * @param {{ label?: string; description?: string }} meta
+ * @returns {void}
+ */
+function trackBackgroundTask(ctx, task, meta) {
+    if (typeof ctx.trackBackgroundTask === 'function') {
+        void ctx.trackBackgroundTask(task, meta);
+        return;
+    }
+    void task.catch((error) =>
+        log(
+            'WARN',
+            `[AlwaysAlive] Background task ${meta.label ?? 'unknown'} falhou: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    );
+}
 
 /**
  * Handler principal chamado pelo SDK quando o modelo usa `ask_user`.
@@ -85,7 +107,10 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
 function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersist = false }, ctx) {
     ctx.setStatus('waiting_for_input');
     if (!skipPersist) {
-        void writeStateAsync({ pendingQuestion: question });
+        trackBackgroundTask(ctx, writeStateAsync({ pendingQuestion: question }), {
+            label: 'question.persist.pending',
+            description: 'Persist pendingQuestion',
+        });
     }
 
     return new Promise((resolve) => {
@@ -102,7 +127,10 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
         };
         ctx.setPendingQuestion(pq);
         // F56.2 (PARTE-9): persistir timestamp do último ask_user para boot recovery
-        void writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() });
+        trackBackgroundTask(ctx, writeStateAsync({ pendingQuestion: question, lastAskUserAt: Date.now() }), {
+            label: 'question.persist.ask_user',
+            description: 'Persist pendingQuestion + lastAskUserAt',
+        });
         ctx.emit(EMITTER_QUESTION_PENDING, { question, choices, allowFreeform });
     });
 }

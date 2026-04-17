@@ -12,6 +12,7 @@ import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
     answerPendingQuestion,
     enqueueTask,
+    processQueue,
     sendMessage,
     sendMessageDialogBoot,
 } from '../../../src/copilot/agent/messaging/agent-messaging.js';
@@ -60,7 +61,7 @@ describe('agent-messaging › sendMessage', () => {
         assert.ok(events.includes('task.queued'), 'task.queued deve ser emitido');
 
         // Cleanup
-        ctx.messageQueue.drain().forEach((t) => t.reject(new Error('test cleanup')));
+        ctx.messageQueue.drain(new Error('test cleanup'));
     });
 });
 
@@ -80,7 +81,7 @@ describe('agent-messaging › sendMessageDialogBoot', () => {
         assert.ok(events.includes('task.queued'));
 
         // Cleanup
-        ctx.messageQueue.drain().forEach((t) => t.reject(new Error('cleanup')));
+        ctx.messageQueue.drain(new Error('cleanup'));
         promise.catch(() => {}); // ignore rejection
     });
 });
@@ -138,5 +139,51 @@ describe('agent-messaging › answerPendingQuestion', () => {
         assert.equal(resolved, 'my answer');
         assert.equal(ctx.pendingQuestion, null);
         assert.ok(answered);
+    });
+});
+
+describe('agent-messaging › processQueue', () => {
+    it('processa a próxima tarefa da fila e resolve a promise', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.status = 'idle';
+        ctx.session = /** @type {any} */ ({
+            on: () => () => {},
+            sendAndWait: async () => ({ data: { content: 'pong' } }),
+        });
+
+        /** @type {string | null} */
+        let startedTaskId = null;
+        emitter.on('task.started', (/** @type {{ taskId?: string }} */ evt) => {
+            startedTaskId = evt?.taskId ?? null;
+        });
+
+        const resultPromise = sendMessageDialogBoot(ctx, emitter, 'ping');
+        processQueue(ctx, emitter, { tryReconnect: async () => false });
+
+        const result = await resultPromise;
+        assert.equal(result, 'pong');
+        assert.equal(ctx.status, 'idle');
+        assert.equal(ctx.sendCount, 1);
+        assert.ok(typeof startedTaskId === 'string' && startedTaskId.startsWith('task-'));
+    });
+
+    it('não processa quando o agente não está idle', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.status = 'processing';
+        ctx.session = /** @type {any} */ ({
+            on: () => () => {},
+            sendAndWait: async () => ({ data: { content: 'pong' } }),
+        });
+
+        const resultPromise = sendMessageDialogBoot(ctx, emitter, 'queued-but-not-processed');
+        processQueue(ctx, emitter, { tryReconnect: async () => false });
+
+        assert.equal(ctx.messageQueue.size, 1);
+
+        const drained = ctx.messageQueue.drain(new Error('cleanup'));
+        assert.equal(drained.length, 1);
+        await assert.rejects(() => resultPromise);
     });
 });

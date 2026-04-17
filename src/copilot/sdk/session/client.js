@@ -12,7 +12,16 @@
 
 import { CopilotClient } from '@github/copilot-sdk';
 import { CircuitBreaker } from '../../core/circuit-breaker.js';
-import { toError, logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed, toError } from '../../core/error-handlers.js';
+import {
+    clearActiveSdkSessions,
+    getActiveSdkSession,
+    getActiveSdkSessionCount,
+    incrementActiveSdkSessionMessageCount,
+    listActiveSdkSessions,
+    registerActiveSdkSession,
+    removeActiveSdkSession,
+} from '../../infra/sdk-session-registry.js';
 import { log } from '../logger.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
@@ -62,7 +71,7 @@ export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', 
  * @typedef {Object} ClientState
  * @property {CopilotClient | null} client - Instância do client ou null
  * @property {boolean} starting - Se está em processo de inicialização
- * @property {Map<string, SessionEntry>} sessions - Registry de sessões ativas em memória
+ * @property {true} registryExternalized - Registry de sessões ativas externalizado para infra
  */
 /** @type {CopilotClient | null} */
 let _client = null;
@@ -70,9 +79,6 @@ let _client = null;
 // C13-01: Promise compartilhada entre waiters para evitar retry storm após falha
 /** @type {Promise<import('@github/copilot-sdk').CopilotClient> | null} */
 let _startPromise = null;
-
-/** @type {Map<string, SessionEntry>} */
-const _sessions = new Map();
 
 /**
  * Constrói as opções do CopilotClient, respeitando a variável de ambiente `COPILOT_CLI_URL` para conectar a um CLI já
@@ -88,7 +94,7 @@ const _sessions = new Map();
  * @returns {Partial<CopilotClientOptions>}
  */
 export function buildClientOptions(overrides = {}) {
-    const cliUrl = process.env.COPILOT_CLI_URL || '';
+    const cliUrl = process.env['COPILOT_CLI_URL'] || '';
     /** @type {Partial<CopilotClientOptions>} */
     const options = {};
 
@@ -100,7 +106,7 @@ export function buildClientOptions(overrides = {}) {
     }
 
     // F4.8 (UPG-02): ativa telemetria OTLP via SDK quando OTEL_EXPORTER_OTLP_ENDPOINT está definida
-    const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || '';
+    const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || '';
     if (otlpEndpoint) {
         /** @type {Record<string, unknown>} */
         const anyOptions = options;
@@ -152,7 +158,7 @@ export async function getClient(overrides = {}) {
 export async function stopClient() {
     if (!_client) return [];
     log('INFO', '[lib/sdk-client] Parando CopilotClient...');
-    _sessions.clear();
+    clearActiveSdkSessions();
     const errors = await _client.stop();
     if (errors.length > 0) {
         log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
@@ -168,7 +174,7 @@ export async function stopClient() {
 export async function forceStopClient() {
     if (!_client) return;
     log('WARN', '[lib/sdk-client] Parando CopilotClient de forma forçada (sem cleanup)...');
-    _sessions.clear();
+    clearActiveSdkSessions();
     try {
         /** @type {{ forceStop?: () => Promise<void> }} */
         const anyClient = _client;
@@ -235,8 +241,7 @@ export async function listAvailableModels() {
 export async function createClientSession(config) {
     const client = await getClient();
     const session = await client.createSession(config);
-    _sessions.set(session.sessionId, {
-        session,
+    registerActiveSdkSession(session, {
         model: config.model ?? 'unknown',
         createdAt: Date.now(),
         messagesCount: 0,
@@ -253,7 +258,7 @@ export async function createClientSession(config) {
  * @returns {Promise<CopilotSession>}
  */
 export async function resumeClientSession(sessionId, config) {
-    const existing = _sessions.get(sessionId);
+    const existing = getActiveSdkSession(sessionId);
     if (existing) {
         log('INFO', `[lib/sdk-client] Sessão ${sessionId} já ativa no registry — retornando existente.`);
         return existing.session;
@@ -261,8 +266,7 @@ export async function resumeClientSession(sessionId, config) {
 
     const client = await getClient();
     const session = await client.resumeSession(sessionId, config);
-    _sessions.set(session.sessionId, {
-        session,
+    registerActiveSdkSession(session, {
         model: /** @type {string} */ (/** @type {Record<string, unknown>} */ (config)['model'] ?? 'unknown'),
         createdAt: Date.now(),
         messagesCount: 0,
@@ -277,7 +281,7 @@ export async function resumeClientSession(sessionId, config) {
  * @returns {Promise<void>}
  */
 export async function disconnectClientSession(sessionId) {
-    const entry = _sessions.get(sessionId);
+    const entry = getActiveSdkSession(sessionId);
     if (!entry) {
         log('WARN', `[lib/sdk-client] disconnectClientSession: sessão ${sessionId} não encontrada no registry.`);
         return;
@@ -287,7 +291,7 @@ export async function disconnectClientSession(sessionId) {
     } catch (e) {
         log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${toError(e).message}`);
     }
-    _sessions.delete(sessionId);
+    removeActiveSdkSession(sessionId);
     log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
 }
 /**
@@ -298,14 +302,14 @@ export async function disconnectClientSession(sessionId) {
  */
 export async function deleteClientSession(sessionId) {
     // Desconecta do registry se estiver ativa
-    const entry = _sessions.get(sessionId);
+    const entry = getActiveSdkSession(sessionId);
     if (entry) {
         try {
             await entry.session.disconnect();
         } catch (e) {
             logSwallowed(e, 'sdk.client.disconnect');
         }
-        _sessions.delete(sessionId);
+        removeActiveSdkSession(sessionId);
     }
 
     const client = await getClient();
@@ -319,7 +323,7 @@ export async function deleteClientSession(sessionId) {
  * @returns {SessionEntry | undefined}
  */
 export function getClientSession(sessionId) {
-    return _sessions.get(sessionId);
+    return getActiveSdkSession(sessionId);
 }
 /**
  * Retorna todas as entradas de sessão ativas no registry em memória.
@@ -327,10 +331,7 @@ export function getClientSession(sessionId) {
  * @returns {({ sessionId: string } & SessionEntry)[]}
  */
 export function listActiveClientSessions() {
-    return Array.from(_sessions.entries()).map(([sessionId, entry]) => ({
-        sessionId,
-        ...entry,
-    }));
+    return listActiveSdkSessions();
 }
 /**
  * Lista todas as sessões salvas no disco do CLI (pode incluir sessões inativas).
@@ -349,12 +350,7 @@ export async function listAllClientSessions(filter) {
  * @returns {number} O novo total de mensagens (ou 0 se sessao nao encontrada)
  */
 export function incrementSessionMessageCount(sessionId) {
-    const entry = _sessions.get(sessionId);
-    if (entry) {
-        entry.messagesCount += 1;
-        return entry.messagesCount;
-    }
-    return 0;
+    return incrementActiveSdkSessionMessageCount(sessionId);
 }
 /**
  * Retorna o número de sessões ativas no registry em memória.
@@ -362,7 +358,7 @@ export function incrementSessionMessageCount(sessionId) {
  * @returns {number}
  */
 export function getActiveSessionCount() {
-    return _sessions.size;
+    return getActiveSdkSessionCount();
 }
 /**
  * Reseta o estado interno do módulo. **Apenas para uso em testes**.
@@ -372,7 +368,7 @@ export function getActiveSessionCount() {
 export function _resetClientState() {
     _client = null;
     _startPromise = null;
-    _sessions.clear();
+    clearActiveSdkSessions();
 }
 /**
  * Injeta um client mock para testes. **Apenas para uso em testes**.

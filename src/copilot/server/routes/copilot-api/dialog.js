@@ -12,6 +12,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -61,7 +62,8 @@ export function registerDialogRoutes(bridge, agent) {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             log('ERROR', `[copilot-api/dialog/start] falhou: ${msg}`);
-            return res.status(500).json({ ok: false, error: msg });
+            const projection = projectAgentHttpError(err);
+            return res.status(projection.status).json(projection.body);
         }
     });
 
@@ -104,17 +106,10 @@ export function registerDialogRoutes(bridge, agent) {
             return res.json({ ok: true, reply });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            // FLOW-UPG-04: diferenciar 409 (loop inativo) de outros erros para melhor diagnóstico
-            const isLoopInactive =
-                msg.includes('não está ativo') ||
-                (err instanceof Error && /** @type {{ code?: string }} */ (err).code === 'DIALOG_NOT_ACTIVE');
-            const isQueueFull = /** @type {{ code?: string }} */ (err)?.code === 'DIALOG_QUEUE_FULL';
-            const status = isLoopInactive ? 409 : isQueueFull ? 429 : msg.includes('timeout') ? 504 : 500;
-            log('WARN', `[copilot-api/dialog/turn] falhou (${status}): ${msg}`);
-            return res.status(status).json({
-                ok: false,
-                error: msg,
-                // FLOW-UPG-04: incluir estado do loop para facilitar diagnóstico pelo cliente
+            const projection = projectAgentHttpError(err, { timeoutStatus: 504 });
+            log('WARN', `[copilot-api/dialog/turn] falhou (${projection.status}): ${msg}`);
+            return res.status(projection.status).json({
+                ...projection.body,
                 dialogLoopActive: agent.dialogLoopActive ?? false,
             });
         } finally {
@@ -144,8 +139,8 @@ export function registerDialogRoutes(bridge, agent) {
             await agent.stopDialogLoop({ authorized: true });
             return res.json({ ok: true, message: 'Modo diálogo encerrado por autorização do usuário.' });
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            return res.status(500).json({ ok: false, error: msg });
+            const projection = projectAgentHttpError(err);
+            return res.status(projection.status).json(projection.body);
         }
     });
 }

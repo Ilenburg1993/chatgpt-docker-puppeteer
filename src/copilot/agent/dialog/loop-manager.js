@@ -22,13 +22,11 @@ import {
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_RESUMED,
     EMITTER_LOOP_STALLED,
-    EMITTER_LOOP_STOPPED,
     EMITTER_LOOP_TURN_TIMEOUT,
 } from '#copilot/events';
 import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
 import { EventEmitter } from 'node:events';
-import { logSwallowed } from '../../core/error-handlers.js';
 import {
     BOOT_TIMEOUT_MS,
     DIALOG_QUEUE_MAX,
@@ -37,6 +35,7 @@ import {
     WATCHDOG_INTERVAL_MS,
     WATCHDOG_STALL_MS,
 } from '../../config/agent.js';
+import { logSwallowed } from '../../core/error-handlers.js';
 import { readState, readStateAsync, writeStateAsync } from '../lifecycle/state-io.js';
 import { TurnQueue } from './backpressure.js';
 import { ModelFallbackState } from './model-fallback.js';
@@ -62,6 +61,8 @@ import { DialogWatchdog } from './watchdog.js';
  * @property {() => string} getModel - Retorna o modelo ativo
  * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
  * @property {() => import('../types.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
+ *   - Tracker de tarefas fire-and-forget do host
  */
 
 /**
@@ -242,7 +243,10 @@ export class DialogLoopManager extends EventEmitter {
 
         this.#active = true;
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
-        void writeStateAsync({ dialogLoopActive: true });
+        void this.#trackBackgroundTask(writeStateAsync({ dialogLoopActive: true }), {
+            label: 'dialog.state.active',
+            description: 'Persist dialogLoopActive=true',
+        });
 
         // F68.2: Span OTEL para o ciclo completo do dialog loop (start → stop)
         this.#loopSpan = startSpanImmediate('copilot.dialog.loop', {
@@ -283,7 +287,7 @@ export class DialogLoopManager extends EventEmitter {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
                 this.#active = false;
                 this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
-                this.emit(EMITTER_LOOP_STOPPED, { reason: e.message });
+                this.emit('stopped', { reason: e.message });
             }
         });
 
@@ -302,7 +306,10 @@ export class DialogLoopManager extends EventEmitter {
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
         // F42.4: persistir prMetrics após boot bem-sucedido
-        void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
+        void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
+            label: 'dialog.prMetrics.boot',
+            description: 'Persist dialog loop PR metrics after boot',
+        });
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -384,9 +391,12 @@ export class DialogLoopManager extends EventEmitter {
         this.#active = false;
         this.#stopping = false;
         this.#endLoopSpan(true);
-        void writeStateAsync({ dialogLoopActive: false });
+        void this.#trackBackgroundTask(writeStateAsync({ dialogLoopActive: false }), {
+            label: 'dialog.state.inactive',
+            description: 'Persist dialogLoopActive=false',
+        });
         this.#watchdog?.stop();
-        this.emit(EMITTER_LOOP_STOPPED, { reason, authorized: true });
+        this.emit('stopped', { reason, authorized: true });
     }
 
     /**
@@ -440,7 +450,10 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume
-                void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
+                void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
+                    label: 'dialog.prMetrics.resume_zero_pr',
+                    description: 'Persist dialog loop PR metrics after zero-PR resume',
+                });
                 this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
@@ -463,7 +476,10 @@ export class DialogLoopManager extends EventEmitter {
                 // F41B.8: contabilizar resume zero-PR
                 this.#prMetrics.resumesZeroPR++;
                 // F42.4: persistir prMetrics após resume zero-PR
-                void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
+                void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
+                    label: 'dialog.prMetrics.resume_preserved',
+                    description: 'Persist dialog loop PR metrics after preserved resume',
+                });
                 this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
                 return;
             }
@@ -481,7 +497,10 @@ export class DialogLoopManager extends EventEmitter {
             // F41B.8: contabilizar resume com PR
             this.#prMetrics.resumesWithPR++;
             // F42.4: persistir prMetrics após resume com PR
-            void writeStateAsync({ prMetrics: { ...this.#prMetrics } });
+            void this.#trackBackgroundTask(writeStateAsync({ prMetrics: { ...this.#prMetrics } }), {
+                label: 'dialog.prMetrics.resume_with_pr',
+                description: 'Persist dialog loop PR metrics after PR-consuming resume',
+            });
             this.emit(EMITTER_LOOP_RESUMED, { prConsumed: true });
         } finally {
             this.#resuming = false;
@@ -505,7 +524,7 @@ export class DialogLoopManager extends EventEmitter {
             this.emit(EMITTER_LOOP_REPLY, { reply });
         } else if (kind === 'stopped') {
             log('WARN', '[DialogLoopManager] Modelo emitiu STOPPED — emitindo stopped para restart automático.');
-            this.emit(EMITTER_LOOP_STOPPED, { reason: 'model_stopped', authorized: false });
+            this.emit('stopped', { reason: 'model_stopped', authorized: false });
         }
     }
 
@@ -537,7 +556,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#watchdog?.stop();
         this.#watchdog = null;
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
-        this.emit(EMITTER_LOOP_STOPPED, { reason: 'force_deactivate', authorized: false });
+        this.emit('stopped', { reason: 'force_deactivate', authorized: false });
         this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'force_deactivate' });
     }
 
@@ -589,6 +608,21 @@ export class DialogLoopManager extends EventEmitter {
                 host: /** @type {import('./turn-executor.js').TurnHost} */ (/** @type {unknown} */ (this.#host)),
                 sendCountRef: this.#sendCountRef,
             },
+        );
+    }
+
+    /**
+     * @param {Promise<unknown>} task
+     * @param {{ label?: string; description?: string }} meta
+     * @returns {Promise<void>}
+     */
+    #trackBackgroundTask(task, meta) {
+        if (typeof this.#host?.trackBackgroundTask === 'function') {
+            return this.#host.trackBackgroundTask(task, meta);
+        }
+        return Promise.resolve(task).then(
+            () => undefined,
+            (error) => logSwallowed(error, `agent.loopManager.${meta.label ?? 'background'}`),
         );
     }
 }

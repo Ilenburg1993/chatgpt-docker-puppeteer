@@ -55,7 +55,7 @@ export function registerEventSchemas(schemas) {
  * @returns {ValidationResult}
  */
 export function validateEvent(event) {
-    const type = /** @type {string} */ (event.type);
+    const type = /** @type {string} */ (event['type']);
     const schema = _schemas.get(type);
 
     if (!schema) {

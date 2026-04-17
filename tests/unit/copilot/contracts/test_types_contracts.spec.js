@@ -31,7 +31,7 @@ import {
 } from '#copilot/types';
 
 // ─── Direct imports ──────────────────────────────────────────────────────────
-import { EVENT_NAMES as DirectEventNames, EVENT_NAMESPACES as DirectNamespaces } from '#copilot/types/events';
+import { EVENT_NAMES as DirectEventNames, EVENT_NAMESPACES as DirectNamespaces } from '#copilot/events';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Tests
@@ -109,7 +109,7 @@ describe('types/ barrel — event exports', () => {
 });
 
 describe('types/ direct imports', () => {
-    it('#copilot/types/events resolves correctly', () => {
+    it('#copilot/events resolves EVENT_NAMES correctly', () => {
         assert.strictEqual(DirectEventNames, EVENT_NAMES);
         assert.strictEqual(DirectNamespaces, EVENT_NAMESPACES);
     });

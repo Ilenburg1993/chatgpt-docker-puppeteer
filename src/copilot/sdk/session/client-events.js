@@ -82,7 +82,7 @@ function assertClient(client) {
     if (!client || typeof client !== 'object') {
         throw new Error('[sdk/client-events] client is required');
     }
-    if (typeof /** @type {Record<string, unknown>} */ (client).on !== 'function') {
+    if (typeof /** @type {Record<string, unknown>} */ (client)['on'] !== 'function') {
         throw new Error('[sdk/client-events] client must have an .on() method');
     }
 }

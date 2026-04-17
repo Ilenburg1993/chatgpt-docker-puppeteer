@@ -103,27 +103,27 @@ describe('F18 — Migração defineTool → createTool (estática)', () => {
 // ---------------------------------------------------------------------------
 // 2. Verificação de que sdk/tools.js é o ponto canônico
 // ---------------------------------------------------------------------------
-describe('F18 — SDK tools.js permanece o wrapper canônico', () => {
-    it('sdk/tools.js importa defineTool de @github/copilot-sdk', () => {
-        const src = readSource('sdk/tools.js');
+describe('F18 — SDK tools/core.js permanece o wrapper canônico', () => {
+    it('sdk/tools/core.js importa defineTool de @github/copilot-sdk', () => {
+        const src = readSource('sdk/tools/core.js');
         const hasImport = src
             .split('\n')
             .some((line) => /import\s.*defineTool/.test(line) && /@github\/copilot-sdk/.test(line));
         expect(hasImport).toBe(true);
     });
 
-    it('sdk/tools.js exporta createTool', () => {
-        const src = readSource('sdk/tools.js');
+    it('sdk/tools/core.js exporta createTool', () => {
+        const src = readSource('sdk/tools/core.js');
         expect(src).toContain('export function createTool');
     });
 
-    it('sdk/tools.js exporta createToolSync', () => {
-        const src = readSource('sdk/tools.js');
+    it('sdk/tools/core.js exporta createToolSync', () => {
+        const src = readSource('sdk/tools/core.js');
         expect(src).toContain('export function createToolSync');
     });
 
-    it('sdk/tools.js re-exporta defineTool para backward compat', () => {
-        const src = readSource('sdk/tools.js');
+    it('sdk/tools/core.js re-exporta defineTool para backward compat', () => {
+        const src = readSource('sdk/tools/core.js');
         expect(src).toContain('export { defineTool }');
     });
 });

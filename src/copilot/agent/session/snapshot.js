@@ -148,8 +148,8 @@ export async function listSnapshotsAsync() {
                 createdAt: Number(data.createdAt ?? 0),
                 sessionId: data.sessionId ?? null,
                 model: String(data.model ?? 'unknown'),
-                reason: data.reason,
                 filepath,
+                ...(data.reason ? { reason: data.reason } : {}),
             });
         } catch (e) {
             logSwallowed(e, 'snapshot.listAsync.parseFile');

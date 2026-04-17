@@ -10,6 +10,7 @@
  * Endpoints:
  *
  * - GET /sessions/active — Lista sessões ativas no registry
+ * - GET /sessions/binding — Expõe o binding canônico entre sessão SDK ativa e hub session
  * - GET /sessions/last — Retorna ID da última sessão modificada
  * - GET /sessions/foreground — Obtém sessionId em foreground
  * - PUT /sessions/foreground/:id — Define sessão em foreground

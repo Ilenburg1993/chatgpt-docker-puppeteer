@@ -11,13 +11,14 @@
 
 import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
+import { container } from '#copilot/core';
 import { globalAuditTrail } from '#copilot/hooks';
 import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
-import { createConversationService } from '../../../services/conversation-service.js';
-
-const conversationService = createConversationService();
+import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../agent-health.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
 const _sdkVersion = (() => {
@@ -137,14 +138,13 @@ function _makeAdminAuthMiddleware() {
  * @param {AlwaysAliveAgentLike} agent
  */
 function _handleHealth(res, agent) {
-    const snap = /** @type {AgentSnap} */ (agent.getStatusSnapshot());
-    const healthy = snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
+    const health = getAgentHealthSnapshotCompat(agent);
 
     // ARCH-04: verificar conectividade do ConversationStore (SQLite)
     // API-P4-01: verificar se db existe antes de usar ? para não gerar false positive
     /** @type {{ ok: boolean; error?: string }} */
     const hubStore = (() => {
-        const store = conversationService.getStore();
+        const store = container.resolve(CONVERSATION_STORE);
         if (!store.db) return { ok: false, error: 'db não inicializado' };
         try {
             store.db.prepare('SELECT 1').get();
@@ -154,13 +154,8 @@ function _handleHealth(res, agent) {
         }
     })();
 
-    res.status(healthy ? 200 : 503).json({
-        healthy,
-        status: snap.status,
-        sessionId: snap.sessionId,
-        queueSize: snap.queueSize,
-        starvationAlert: snap.starvationAlert,
-        uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
+    res.status(getAgentHealthHttpStatus(health)).json({
+        ...health,
         // G2-API-14: permissionMode para rastreabilidade de configuração de auditoria
         permissionMode: typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all',
         channelVersion: CHANNEL_VERSION,
@@ -207,7 +202,8 @@ async function _handleStart(res, agent) {
         return void res.json({ ok: true, sessionId: agent.sessionId, status: agent.status });
     } catch (e) {
         log('ERROR', `[copilot-api/control/start] ${toError(e).message}`);
-        return void res.status(500).json({ ok: false, error: toError(e).message });
+        const projection = projectAgentHttpError(e);
+        return void res.status(projection.status).json(projection.body);
     }
 }
 
@@ -225,7 +221,8 @@ async function _handleStop(res, agent) {
         return void res.json({ ok: true, message: 'Agente parado.' });
     } catch (e) {
         log('ERROR', `[copilot-api/control/stop] ${toError(e).message}`);
-        return void res.status(500).json({ ok: false, error: toError(e).message });
+        const projection = projectAgentHttpError(e);
+        return void res.status(projection.status).json(projection.body);
     }
 }
 
@@ -268,7 +265,8 @@ function _handleSetPermissions(req, res, agent) {
         return void res.json({ ok: true, before, after });
     } catch (e) {
         log('ERROR', `[copilot-api/control/permissions] ${toError(e).message}`);
-        return void res.status(500).json({ ok: false, error: toError(e).message });
+        const projection = projectAgentHttpError(e);
+        return void res.status(projection.status).json(projection.body);
     }
 }
 
@@ -292,6 +290,7 @@ async function _handleSteer(req, res, agent) {
         return void res.json({ ok: true, messageId });
     } catch (e) {
         log('ERROR', `[copilot-api/control/steer] ${toError(e).message}`);
-        return void res.status(500).json({ ok: false, error: toError(e).message });
+        const projection = projectAgentHttpError(e);
+        return void res.status(projection.status).json(projection.body);
     }
 }

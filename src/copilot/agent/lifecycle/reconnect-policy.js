@@ -11,8 +11,9 @@
  * @see EventBus
  */
 
-import { isFatalError, toError } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { log, startSpan } from '#copilot/observability';
+import { classifyAgentError } from '../error-policy.js';
 
 /**
  * @typedef {Object} ReconnectCallbacks
@@ -145,9 +146,13 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     return true;
                 } catch (reconnectError) {
                     log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${toError(reconnectError).message}`);
-                    // F149: se o erro é fatal (CircuitOpenError, SESSION_FATAL, etc.), não vale insistir
-                    if (isFatalError(reconnectError)) {
-                        log('ERROR', '[AlwaysAlive] Erro fatal detectado durante reconexão — abortando retry loop.');
+                    const disposition = classifyAgentError(reconnectError);
+                    if (disposition !== 'retry') {
+                        const reason = disposition === 'fatal' ? 'fatal' : 'ignorado';
+                        log(
+                            'ERROR',
+                            `[AlwaysAlive] Erro ${reason} detectado durante reconexão — abortando retry loop.`,
+                        );
                         break;
                     }
                 }

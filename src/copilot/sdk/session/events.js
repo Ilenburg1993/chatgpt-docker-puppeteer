@@ -58,7 +58,7 @@ function assertSession(session) {
     if (!session || typeof session !== 'object') {
         throw new Error('[sdk/events] session is required');
     }
-    if (typeof (/** @type {Record<string, unknown>} */ (session).on) !== 'function') {
+    if (typeof (/** @type {Record<string, unknown>} */ (session)['on']) !== 'function') {
         throw new Error('[sdk/events] session must have an .on() method');
     }
 }
@@ -218,7 +218,7 @@ export function getEventPayload(event) {
     if (!event || typeof event !== 'object') {
         throw new Error('[sdk/events] event must be a non-null object');
     }
-    return /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).data;
+    return /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event))['data'];
 }
 
 /**
@@ -231,7 +231,7 @@ export function getEventType(event) {
     if (!event || typeof event !== 'object') {
         throw new Error('[sdk/events] event must be a non-null object');
     }
-    return /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).type);
+    return /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event))['type']);
 }
 
 /**
@@ -262,7 +262,7 @@ export function createEventFilter(allowedTypes, handler) {
     return /** @param {SessionEvent} event */ (event) => {
         if (
             allowSet.has(
-                /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event)).type),
+                /** @type {string} */ (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (event))['type']),
             )
         ) {
             handler(event);
