@@ -1,435 +1,567 @@
-# 11 — Agent Module: Situação Ideal Proposta
+# 11 — Agent Module: Nova Situação Ideal Proposta
 
-**Data**: 2026-03-21
-**Escopo**: `src/copilot/agent/` — proposta de arquitetura ideal
-**Referência**: [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md),
-[10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md)
+**Data de atualização**: 2026-04-17
+**Escopo**: `src/copilot/agent/`
+**Status**: proposta v2.1 alinhada com o código vivo, com critérios explícitos de consolidação
+**Referências**:
 
----
-
-## 1. Princípios da Proposta
-
-1. **Preservar a decomposição funcional existente** — não reescrever do zero
-2. **Resolver dívida técnica por prioridade** — god object → testes → patterns
-3. **Minimizar breaking changes** — API pública do `AlwaysAliveAgent` não muda
-4. **Incrementalidade** — cada fase é deployable independentemente
+- [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md)
+- [10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md)
 
 ---
 
-## 2. Proposta K1: Particionamento do AgentContext
+## 1. Princípio básico desta nova proposta
+
+A situação ideal **não é reescrever o agent**.
+
+A base de abril/2026 já tem muitos elementos corretos:
+
+- fachada pública em `always-alive.js`;
+- submódulos por domínio (`dialog`, `lifecycle`, `session`, `messaging`, `state`, `infra`, `facades`);
+- boot pipeline por steps;
+- bridge declarativo;
+- health formal;
+- background task tracker;
+- lazy singleton funcional.
+
+Portanto, a nova situação ideal deve atacar o que ainda dói de verdade:
+
+1. **governança de estado**;
+2. **contratos de host e remoção de bypasses**;
+3. **centralização real do tratamento de erro**;
+4. **completeza do lazy singleton**;
+5. **observabilidade e testabilidade do boot/runtime**.
+
+---
+
+## 2. O que não faz sentido repropor
+
+As propostas antigas `K4`–`K7` já foram essencialmente entregues e não devem reaparecer como “ideal futuro pendente”:
+
+| Tema                     | Situação em abril/2026 |
+| ------------------------ | ---------------------- |
+| Background task tracker  | já entregue            |
+| Boot pipeline            | já entregue            |
+| Event bridge declarativo | já entregue            |
+| Health check formal      | já entregue            |
+
+`K8` (lazy singleton) e `K3` (error policy) não estão mais “por fazer”; estão em **fase de endurecimento e adoção**.
+
+`K1` (estado) continua sendo a dívida arquitetural dominante.
+
+---
+
+## 3. Nova situação ideal — visão de arquitetura
+
+## 3.1 Objetivo
+
+Chegar a um `agent` onde:
+
+- `AlwaysAliveAgent` seja **uma fachada fina** e previsível;
+- `AgentContext` seja **composição**, não “bolsa de mutação livre”;
+- cada submódulo tenha **contrato explícito de capabilities**;
+- o runtime inteiro use **uma política canônica de erro**;
+- `getAgent()` seja o caminho normal de obtenção da instância;
+- health, boot e shutdown sejam **auditáveis por step e por backlog**, não apenas por status agregado.
+
+---
+
+## 3.2 Arquitetura-alvo (v2)
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│                    AlwaysAliveAgent                         │
+│  - API pública                                              │
+│  - zero lógica de negócio densa                             │
+│  - delegação para lifecycle/dialog/messaging/state          │
+└───────────────┬────────────────────────────────────────────┘
+                │
+        ┌───────▼────────────────────────────────────────┐
+        │ AgentContext (composição + mutation API)       │
+        │                                                │
+        │ sessionState   -> owner: session/lifecycle     │
+        │ dialogState    -> owner: dialog/               │
+        │ configState    -> owner: facades/config        │
+        │ metricsState   -> owner: state/observability   │
+        │ runtimeState   -> owner: lifecycle             │
+        │ ioState        -> owner: lifecycle/session     │
+        │ backgroundTasks -> cross-cutting, read-only    │
+        └───────┬────────────────────────────────────────┘
+                │
+   ┌────────────┼────────────┬────────────┬────────────┬────────────┐
+   ▼            ▼            ▼            ▼            ▼            ▼
+ lifecycle/   dialog/     session/    messaging/     state/      infra/
+    │            │            │            │            │            │
+    └───── usam apenas contracts/capabilities explícitos ───────────┘
+```
+
+### Regra central da proposta
+
+O ideal não é “ninguém tocar `ctx.*State` nunca mais” de um dia para o outro.
+
+O ideal é:
+
+1. **módulos quentes** param de escrever campos crus primeiro;
+2. `AgentContext` passa a oferecer uma **mutation API mínima e semântica**;
+3. ownership por subestado fica explícito;
+4. acesso bruto vira exceção controlada, não padrão dominante.
+
+---
+
+## 4. Propostas novas (Faixa L)
+
+## L1 — Hardening de estado (`AgentContext` deixa de ser “mutável por qualquer um”) 🔴
 
 ### Situação atual
 
-`AgentContext` (254L) tem 30+ campos públicos mutáveis agrupados em 7 categorias comentadas, mas
-sem separação formal.
+Existe partição (`sessionState`, `dialogState`, etc.), mas ainda há mutação direta disseminada.
 
-### Proposta
+### Situação ideal
 
-Particionar `AgentContext` em domínios com interfaces de leitura:
+`AgentContext` expõe **mutation methods semânticos** para o hot path e reduz writes diretos.
 
-```
-AgentContext
-  ├── session: SessionState        (client, session, unsubs, isReconnecting)
-  ├── lifecycle: LifecycleState    (status, isResumed, sendCount)
-  ├── dialog: DialogState          (dialogLoop, dialogLoopAttached)
-  ├── config: AgentConfigState     (model, reasoningEffort)
-  ├── metrics: MetricsState        (lastPrInfo, contextState, lastCheckpointPath)
-  └── managers: ManagerRefs        (messageQueue, webhooks, permissions, toolsRegistry, ...)
-```
+Exemplos de API desejada:
 
-Cada sub-estado exporia:
-- **Getters** para leitura segura
-- **Mutation methods** com validação (ex: `session.setSession(s)` valida non-null)
-- **Eventos** de mudança para invalidação de cache
+- `setStatus(...)`
+- `invalidateStatusSnapshot()`
+- `incrementSendCount()`
+- `setPendingQuestion(...)`
+- `clearPendingQuestion()`
+- `setClient(...)`
+- `setSession(...)`
+- `setDialogAttached(...)`
+- `setContextWindow(...)`
+- `setLastCheckpointPath(...)`
 
-**Impacto**: módulos declarariam dependências explícitas (`ctx.session` vs `ctx`) reduzindo a
-superfície de acoplamento.
+### Estado desta rodada
 
-**Estimativa**: 8h | **Prioridade**: 🔴
+Entregue parcialmente:
+
+- `invalidateStatusSnapshot()`
+- `incrementSendCount()`
+- `setPendingQuestion(...)`
+- `clearPendingQuestion()`
+- `setClient(...)` / `clearClient()`
+- `setSession(...)` / `clearSession()`
+- `setIsResumed(...)`
+- `setSendCount(...)`
+- `setDialogLoopAttached(...)`
+- `setContextState(...)`
+- `setLastCheckpointPath(...)`
+- `setBootReport(...)`
+- `resolvePendingQuestion(...)`
+- `getBackgroundPendingLabels(...)`
+- `hasClient()`
+- `hasActiveSession()`
+- `hasPendingQuestion()`
+- `getBackgroundPendingCount()`
+- `getLastPrInfoSnapshot()`
+- `getBootReportSnapshot()`
+
+### Próximo passo ideal
+
+Fechar o ownership final dos poucos reads/writes restantes no núcleo e manter o subtree quente (`messaging`, `dialog`,
+`facades`, `state`, `health`) dependente apenas da API semântica do `AgentContext`, não do shape cru dos subestados.
 
 ---
 
-## 3. Proposta K2: Testes Unitários para Módulos Descobertos
-
-### Gaps identificados (doc 10, seção 6.2)
-
-| Prioridade | Módulo                           | Testes Necessários                             |
-| ---------- | -------------------------------- | ---------------------------------------------- |
-| 🔴 P0       | `agent-context.js`               | FSM transições, setStatus, construtor          |
-| 🔴 P0       | `infra/message-queue.js`         | FIFO, abort, drain, size, shift                |
-| 🔴 P0       | `session/boot-wiring.js`         | 12 etapas isoladas com mocks                   |
-| 🟠 P1       | `lifecycle/agent-lifecycle.js`   | agentStop, reconnect, initSession              |
-| 🟠 P1       | `dialog/loop-manager.js`         | pause, resume, boot recovery, force deactivate |
-| 🟠 P1       | `infra/task-executor.js`         | retry após reconexão, abort, timeout           |
-| 🟡 P2       | `infra/permission-controller.js` | mode switching approve_all/selective           |
-| 🟡 P2       | `infra/webhook-manager.js`       | register, dispatch, retry                      |
-| 🟡 P2       | `lifecycle/entry.js`             | IPC, shutdown handlers                         |
-
-**Estimativa**: 12h | **Prioridade**: 🔴
-
----
-
-## 4. Proposta K3: Error Handling Centralizado
+## L2 — Contratos de host e capability boundaries 🔴
 
 ### Situação atual
 
-5+ padrões diferentes de error handling (seção 3.2 do doc 10).
+Os contratos via JSDoc já ajudam, mas ainda existem bypasses e casts residuais.
 
-### Proposta
+### Situação ideal
 
-Criar `agent/infra/error-policy.js` com:
+Criar fronteiras explícitas por capability:
 
-```js
-/**
- * @param {Error} error
- * @returns {'retry' | 'fatal' | 'ignore'}
- */
-export function classifyAgentError(error) { ... }
+- `AgentEventHost`
+- `DialogRuntimeHost`
+- `TurnHost`
+- `ReconnectHost`
+- `BootStepContext`
 
-/**
- * @param {() => Promise<void>} fn
- * @param {{ onError?: (e: Error) => void; classify?: typeof classifyAgentError }} [opts]
- */
-export async function withAgentErrorPolicy(fn, opts) { ... }
-```
+E, quando necessário, helpers de validação runtime leves:
 
-Categorias:
-- **retry**: erros de rede, session disconnected, timeout → tryReconnect
-- **fatal**: auth expired, session deleted, out of quota → emit session.fatal
-- **ignore**: AbortError, dialog stopped by user
+- `assertEmitterHost(...)`
+- `assertDialogHost(...)`
+- `assertReconnectHost(...)`
 
-Migrar gradualmente os 5 padrões existentes para usar este classificador.
+### Estado desta rodada
 
-**Estimativa**: 4h | **Prioridade**: 🟠
+Avanço real:
+
+- `loop-manager.js` perdeu um dos casts mais feios (`unknown -> EventEmitter`);
+- `messaging/agent-messaging.js` deixou de exigir cast de `host` só para `setStatus()`;
+- `types.js` foi endurecido para refletir melhor hosts emissores de eventos.
+- `session-setup.js` removeu parte importante da dívida artificial de compatibilidade, mantendo cast estreito apenas na
+        fronteira real de `hooks`, enquanto `mcpServers` e `onUserInputRequest` voltaram ao caminho semanticamente tipado.
+- `runtime-contracts.js` concentrou guards e compat shims leves (`assertEmitterHost(...)`,
+        `trySetLiveSessionModel(...)`, normalizadores de eventos), retirando exceções de contrato do meio dos módulos
+        quentes.
+- `boot-steps.js` deixou de usar cast estrutural para acessar `ctx.mcpBridge`.
+- `turn-executor.js` ganhou normalização explícita de payloads e cleanup determinístico de listeners de `AbortSignal`
+        tanto no retry quanto no caminho principal de `sendTurn()`.
+- `sdk/types.js` e `hooks/types.js` foram realinhados com a shape real de hooks do SDK 0.2.0, permitindo que
+        `session-setup.js` passe a registrar `hooks` via builder tipado, sem o boundary artificial de compatibilidade.
+
+### Próximo passo ideal
+
+manter zero casts residuais no hot path e empurrar qualquer compatibilidade futura para adapters explícitos e isolados.
 
 ---
 
-## 5. Proposta K4: Background Task Tracker
+## L3 — Error Policy v2: classifier + wrapper + adoção total 🔴
 
 ### Situação atual
 
-15+ `void writeStateAsync(...)` e outras operações fire-and-forget sem tracking.
+O classificador existe; agora também existe `withAgentErrorPolicy(...)`, mas a adoção ainda é parcial.
 
-### Proposta
+### Situação ideal
 
-Criar `agent/infra/background-tasks.js`:
+Todos os fluxos críticos do `agent` usam um mecanismo comum para:
 
-```js
-class BackgroundTaskTracker {
-    /** @param {Promise<unknown>} p */
-    track(p, label) { ... }
+- normalizar o erro;
+- classificar (`ignore` / `retry` / `fatal`);
+- registrar contexto operacional (`label`, `phase`, `taskId`, `sessionId`);
+- decidir retry/reconnect/falha terminal.
 
-    /** Aguarda todas as tasks pendentes (para shutdown) */
-    async drain(timeoutMs) { ... }
+### Estado desta rodada
 
-    /** Retorna contagem de tasks ativas para diagnóstico */
-    get pendingCount() { ... }
-}
-```
+`withAgentErrorPolicy(...)` foi implementado e adotado em:
 
-Substituir `void writeStateAsync(...)` por `bgTasks.track(writeStateAsync(...), 'state.write')`.
+- `messaging/agent-messaging.js`
+- `lifecycle/reconnect-policy.js`
+- `dialog/agent-dialog-controller.js`
+- `session/ownership.js` por meio dos wrappers `syncActiveSessionOwnershipWithPolicy(...)` e
+        `clearActiveSdkSessionOwnershipWithPolicy(...)`
 
-Integrar `bgTasks.drain()` no shutdown do agente (hoje só `drainStateWrites` cobre writes de
-state-io).
+Além disso, a persistência auxiliar do runtime ganhou um caminho canônico:
 
-**Estimativa**: 3h | **Prioridade**: 🟠
+- `lifecycle/state-io.js` agora expõe `persistStateWithPolicy(...)`;
+- esse helper já foi propagado para `agent-lifecycle.js`, `messaging/agent-messaging.js`,
+  `dialog/user-input-handler.js`, `dialog/loop-manager.js`, `dialog/turn-executor.js`
+        `session/boot-steps.js` e `session/initializer.js`.
+
+Também foi corrigido o bug de persistência redundante em `dialog/user-input-handler.js`: perguntas interativas reais
+passam a persistir `pendingQuestion + lastAskUserAt` em uma única operação, enquanto mensagens de protocolo do dialog
+loop deixam de gerar I/O desnecessário.
+
+### Próximo passo ideal
+
+Expandir para:
+
+- hooks internos do agent;
+- rotação/session cleanup onde ainda houver tratamento local demais;
+- etapas de boot/wiring que ainda dependem de heurística ad hoc em vez de contexto operacional padronizado.
 
 ---
 
-## 6. Proposta K5: Decomposição do performBootWiring
+## L4 — Lazy singleton “fechado” como caminho canônico 🔴
 
 ### Situação atual
 
-`performBootWiring()` (331L) com 12 etapas heterogêneas em uma função.
+`getAgent()` já é o caminho certo, mas o proxy compatível ainda convive com consumidores legados.
 
-### Proposta
+### Situação ideal
 
-Extrair cada etapa como função nomeada e orquestrar via pipeline:
+- consumidores operacionais usam `getAgent()`;
+- o proxy `alwaysAliveAgent` fica marcado como camada de compatibilidade;
+- exceções legítimas (como DI que não pode materializar a instância cedo demais) ficam documentadas e isoladas.
 
-```js
-const BOOT_PIPELINE = [
-    wireSessionEventsStep,
-    attachEventCollectorStep,
-    attachLifecycleHandlersStep,
-    attachAgentObserverStep,
-    cleanupStaleSessionsStep,
-    scheduleDialogRecoveryStep,
-    startMetricsTimerStep,
-    startMcpReconnectStep,
-    startKeepaliveStep,
-    startQuotaMonitorStep,
-    wireHandoffStep,
-    wireHookToolsRelayStep,
-];
+### Estado desta rodada
 
-export function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {
-    const result = { unsubs: [], ... };
-    for (const step of BOOT_PIPELINE) {
-        step(result, { client, session, isResumed, agentEmitter, ctx, options });
-    }
-    return result;
-}
-```
+Migração aplicada em:
 
-**Benefícios**: cada step testável isoladamente, adição de novos steps sem modificar a função
-principal, logging por step.
+- `agent/lifecycle/entry.js`
+- `presentation/agent-control.js`
+- documentação pública do canal
+- `terminal/di-wiring.js` agora registra o token canônico `ALWAYS_ALIVE_AGENT` resolvendo `getAgent()`, enquanto os
+        tokens legados consumidos por `wireLegacySetters()` permanecem no proxy compatível.
 
-**Estimativa**: 6h | **Prioridade**: 🟠
+### Estado adicional desta rodada
+
+- o caminho quente do `agent` deixou de ter casts `unknown` residuais no grep do subtree `src/copilot/agent/`;
+- o proxy `alwaysAliveAgent` permanece apenas como camada de compatibilidade deliberada, enquanto a instância real já é
+        o default do token canônico de DI e dos consumidores operacionais novos.
+
+### Próximo passo ideal
+
+revisar os poucos call sites restantes e decidir, caso a caso, se devem usar `getAgent()` ou manter proxy por motivo de
+boot lazy.
 
 ---
 
-## 7. Proposta K6: Event Bridge Declarativo
+## L5 — Boot pipeline com observabilidade de step 🟠
 
 ### Situação atual
 
-Bridge de ~80 eventos hardcoded no top-level de `always-alive.js` com correspondência manual
-string → constant.
+O pipeline de steps já existe.
 
-### Proposta
+### Estado desta rodada
 
-Extrair para `agent/event-bridge-map.js`:
+Avanço real:
 
-```js
-/** @type {ReadonlyArray<[localEvent: string, busEvent: symbol]>} */
-export const AGENT_EVENT_BRIDGE_MAP = [
-    ['ready', AGENT_READY],
-    ['before-stop', AGENT_BEFORE_STOP],
-    ['stopped', AGENT_STOPPED],
-    // ...
-];
-```
+- `runBootPipeline(...)` passou a registrar duração/resultado por step;
+- o runner de boot agora classifica steps opcionais como `degraded` ou `skipped`, em vez de derrubar o boot inteiro por
+        qualquer erro lateral;
+- `performBootWiring(...)` agora retorna `bootReport` consolidado;
+- `AgentContext.runtimeState.lastBootReport` já recebe esse relatório;
+- `health-check.js` passou a refletir falhas de boot e backlog rotulado.
 
-E em `always-alive.js`:
+### Situação ideal
 
-```js
-import { AGENT_EVENT_BRIDGE_MAP } from './event-bridge-map.js';
-bridgeEmitter(alwaysAliveAgent, bus, Object.fromEntries(AGENT_EVENT_BRIDGE_MAP));
-```
+Cada step de boot deve carregar:
 
-**Benefícios**: fonte única de verdade para mapeamento, testável, adição de eventos sem mudar
-always-alive.js.
+- nome canônico;
+- fase (`session`, `observability`, `dialog`, `mcp`, `handoff`, `health`);
+- duração;
+- outcome (`ok`, `skipped`, `degraded`, `failed`);
+- impacto no health snapshot.
 
-**Estimativa**: 4h | **Prioridade**: 🟡
+### Próximo passo ideal
 
----
-
-## 8. Proposta K7: Health Check Formal
-
-### Proposta
-
-Criar `agent/infra/health-check.js`:
-
-```js
-/**
- * @typedef {Object} HealthCheckResult
- * @property {'healthy' | 'degraded' | 'unhealthy'} status
- * @property {HealthCheckItem[]} checks
- */
-
-/**
- * @param {AgentContext} ctx
- * @returns {Promise<HealthCheckResult>}
- */
-export async function runHealthCheck(ctx) {
-    return {
-        status: ...,
-        checks: [
-            { name: 'sdk_client', ok: ctx.client !== null },
-            { name: 'session_active', ok: ctx.session !== null },
-            { name: 'dialog_responsive', ok: !isDialogStalled(ctx) },
-            { name: 'queue_not_starved', ok: !isQueueStarved(ctx) },
-            { name: 'state_writable', ok: await canWriteState() },
-        ],
-    };
-}
-```
-
-Expor via `GET /health` na API HTTP.
-
-**Estimativa**: 3h | **Prioridade**: 🟡
+propagar `degraded/skipped` para dashboards/rotas/diagnósticos adicionais e reduzir ainda mais heurísticas locais no
+boot wiring.
 
 ---
 
-## 9. Proposta K8: Lazy Singleton
+## L6 — Health snapshot enriquecido 🟠
 
 ### Situação atual
 
-```js
-export const alwaysAliveAgent = new AlwaysAliveAgent(); // Executa no import
-```
+O health atual já é bom. O problema deixou de ser “não existe health” e passou a ser “ainda dá para enriquecer muito”.
 
-Side effects no import: instancia 8+ managers, faz leitura síncrona de disco, executa top-level
-await bridge.
+### Estado desta rodada
 
-### Proposta
+O health já evoluiu além da versão anterior e agora expõe:
 
-```js
-/** @type {AlwaysAliveAgent | null} */
-let _instance = null;
+- `backgroundPendingLabels`;
+- `bootReport`;
+- check `boot` com `failedSteps` e `lastCompletedAt`.
+- check `boot` com `degradedSteps` além de `failedSteps`.
+- `riskFlags` canônicas derivadas do estado operacional.
+- `recommendedAction` com próxima ação sugerida para troubleshooting.
+- `sdkResources` na projeção HTTP/registry, permitindo verificar em runtime a cobertura real da superfície SDK acoplada
+        ao agent.
 
-export function getAgent() {
-    if (!_instance) _instance = new AlwaysAliveAgent();
-    return _instance;
-}
+### Situação ideal
 
-/** @internal Para testes */
-export function resetAgent() {
-    _instance = null;
-}
-```
+Adicionar no snapshot:
 
-O `getAgent()` já existe mas retorna o singleton eagerly-created. A mudança para lazy mantém
-backward compat via re-export.
-
-**Trade-off**: código que faz `import { alwaysAliveAgent }` precisaria migrar para `getAgent()`.
-A migração pode ser feita incrementalmente com deprecation warning.
-
-**Estimativa**: 3h | **Prioridade**: 🟡
+- labels das tarefas de background pendentes;
+- timings recentes de boot steps;
+- status de ownership/session rotation;
+- flags de risco de drift (`dialog active but host detached`, `quota monitor stale`, etc.);
+- hint operacional para o operador (“próxima ação recomendada”).
 
 ---
 
-## 10. Arquitetura Ideal — Diagrama
+## L7 — Sprint de testes direcionada 🔴
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    AlwaysAliveAgent                       │
-│  (Fachada pública — 0 lógica, 100% delegação)           │
-│  - API methods → facades/                                │
-│  - Lifecycle → lifecycle/                                │
-│  - Dialog → dialog/agent-dialog-controller               │
-│  - Events → event-bridge-map.js (declarativo)           │
-└────────────┬────────────────────────────────────────────┘
-             │
-     ┌───────▼───────┐
-     │ AgentContext   │  (particionado)
-     │ ├── session    │  SessionState
-     │ ├── lifecycle  │  LifecycleState
-     │ ├── dialog     │  DialogState
-     │ ├── config     │  AgentConfigState
-     │ ├── metrics    │  MetricsState
-     │ └── managers   │  ManagerRefs
-     └───────┬───────┘
-             │
-    ┌────────┼────────┬──────────┬───────────┬───────────┐
-    ▼        ▼        ▼          ▼           ▼           ▼
-┌────────┐┌────────┐┌─────────┐┌──────────┐┌─────────┐┌───────┐
-│dialog/ ││lifecy/ ││session/ ││messaging/││infra/   ││state/ │
-│        ││        ││         ││          ││         ││       │
-│ Loop   ││ Start  ││ Boot    ││ Enqueue  ││ Queue   ││Snap   │
-│ Manager││ Stop   ││ Wiring  ││ Send     ││ Task    ││shot   │
-│ Turn   ││ Entry  ││ Events  ││ Steer    ││ Webhook ││Diag   │
-│ Exec   ││ Reconn ││ Init    ││ Answer   ││ Perms   ││       │
-│ Watch  ││ Setup  ││ Keepalv ││          ││ Handoff ││       │
-│ Proto  ││ State  ││ History ││          ││ Health  ││       │
-│ BPress ││ IO     ││ Rotate  ││          ││ BgTasks ││       │
-│ Fallbk ││        ││ Cleanup ││          ││ ErrPol  ││       │
-└────────┘└────────┘└─────────┘└──────────┘└─────────┘└───────┘
-```
+### Situação atual
 
-### Novos componentes (propostos):
+Existe uma malha razoável, mas ainda há zonas críticas subcobertas.
 
-- `infra/health-check.js` — K7
-- `infra/background-tasks.js` — K4
-- `infra/error-policy.js` — K3
-- `event-bridge-map.js` — K6
+### Situação ideal
 
-### Componentes refatorados:
+Priorizar testes para:
 
-- `agent-context.js` — K1 (particionamento)
-- `session/boot-wiring.js` — K5 (pipeline)
-- `always-alive.js` — K6 (bridge declarativo) + K8 (lazy singleton)
+1. boot steps isolados;
+2. reconnect policy;
+3. mutation API do `AgentContext`;
+4. comportamento lazy do singleton;
+5. regressão dos contratos de host.
 
----
+### Estado desta rodada
 
-## 11. Plano de Execução: Faixa K
+Cobertura nova/atualizada já entregue para:
 
-### Fase K1 — AgentContext Partitioning (8h) 🔴
+- `session-setup` (sem boundary artificial de hooks);
+- `sdk/session/client` (last session, foreground session e server RPC);
+- `agent-sdk-access` (handles + snapshot de cobertura SDK + operações client/session);
+- `agent-health-routes` (projeção de `sdkResources`).
 
-| #    | Subfase                                               | Estimativa |
-| ---- | ----------------------------------------------------- | ---------- |
-| K1.1 | Definir interfaces SessionState, LifecycleState, etc. | 2h         |
-| K1.2 | Refatorar AgentContext para compor sub-estados        | 3h         |
-| K1.3 | Migrar consumidores para acessar via sub-estado       | 2h         |
-| K1.4 | Testes de regressão                                   | 1h         |
+## L9 — Cobertura total da superfície do SDK 🔴
 
-### Fase K2 — Test Coverage Sprint (12h) 🔴
+### Situação atual
 
-| #    | Subfase                                        | Estimativa |
-| ---- | ---------------------------------------------- | ---------- |
-| K2.1 | Testes AgentContext FSM                        | 2h         |
-| K2.2 | Testes MessageQueue (FIFO, abort, drain)       | 2h         |
-| K2.3 | Testes performBootWiring (12 etapas mockadas)  | 3h         |
-| K2.4 | Testes agentStop + agentTryReconnect           | 2h         |
-| K2.5 | Testes DialogLoopManager pause/resume/recovery | 2h         |
-| K2.6 | Testes TaskExecutor retry                      | 1h         |
+O projeto já tinha uma camada `src/copilot/sdk/`, mas ainda restavam dois problemas:
 
-### Fase K3 — Error Handling Centralizado (4h) 🟠
+1. alguns recursos reais do `CopilotClient` não estavam cobertos pela camada canônica (`getLastSessionId()`,
+         foreground session e `client.rpc`);
+2. o `AlwaysAliveAgent` não oferecia um ponto único e explícito para acessar handles crus do SDK nem um snapshot
+         verificável da cobertura de recursos disponíveis em runtime.
 
-| #    | Subfase                                 | Estimativa |
-| ---- | --------------------------------------- | ---------- |
-| K3.1 | Criar error-policy.js com classificador | 2h         |
-| K3.2 | Migrar task-executor e queue-processor  | 1h         |
-| K3.3 | Testes de classificação + policy        | 1h         |
+### Situação ideal
 
-### Fase K4 — Background Task Tracker (3h) 🟠
+O agent deve conseguir acessar **toda** a superfície útil do SDK por duas vias complementares:
 
-| #    | Subfase                                     | Estimativa |
-| ---- | ------------------------------------------- | ---------- |
-| K4.1 | Criar background-tasks.js                   | 1h         |
-| K4.2 | Migrar void writeStateAsync → bgTasks.track | 1h         |
-| K4.3 | Integrar drain no shutdown + testes         | 1h         |
+1. **via façade canônica de alto nível**, para operações comuns e estáveis;
+2. **via handles crus controlados** (`client`, `session`, `serverRpc`, `sessionRpc`) quando for necessário consumir uma
+         capacidade nova do SDK sem esperar uma nova rodada de wrappers.
 
-### Fase K5 — Boot Wiring Pipeline (6h) 🟠
+### Estado desta rodada
 
-| #    | Subfase                                 | Estimativa |
-| ---- | --------------------------------------- | ---------- |
-| K5.1 | Extrair 12 etapas como funções nomeadas | 3h         |
-| K5.2 | Criar pipeline runner                   | 1h         |
-| K5.3 | Testes de cada step isolado             | 2h         |
+Entregue:
 
-### Fase K6 — Event Bridge Declarativo (4h) 🟡
+- `sdk/session/client.js` agora expõe:
+        - `getLastClientSessionId()`
+        - `getForegroundClientSessionId()`
+        - `setForegroundClientSessionId()`
+        - `getServerRpc()`
+- `agent/facades/agent-sdk-access.js` passou a centralizar:
+        - `getSdkHandles()`
+        - `getSdkResourceSnapshot()`
+        - `pingSdk()`
+        - `getSdkStatus()`
+        - `getSdkAuthStatus()`
+        - `getLastSdkSessionId()`
+        - `getForegroundSdkSessionId()` / `setForegroundSdkSessionId()`
+        - `listSdkSessions()`
+        - `listSdkAgents()` / `getCurrentSdkAgent()` / `selectSdkAgent()` / `deselectSdkAgent()` / `reloadSdkAgents()`
+- `AlwaysAliveAgent` agora expõe essa superfície na API pública.
 
-| #    | Subfase                                 | Estimativa |
-| ---- | --------------------------------------- | ---------- |
-| K6.1 | Criar event-bridge-map.js               | 1h         |
-| K6.2 | Migrar always-alive.js para usar o mapa | 2h         |
-| K6.3 | Testes de completude do bridge          | 1h         |
+### Regra de consolidação
 
-### Fase K7 — Health Check (3h) 🟡
-
-| #    | Subfase                        | Estimativa |
-| ---- | ------------------------------ | ---------- |
-| K7.1 | Criar health-check.js          | 1.5h       |
-| K7.2 | Expor via GET /health + testes | 1.5h       |
-
-### Fase K8 — Lazy Singleton (3h) 🟡
-
-| #    | Subfase                                | Estimativa |
-| ---- | -------------------------------------- | ---------- |
-| K8.1 | Refatorar para lazy init + resetAgent  | 1h         |
-| K8.2 | Migrar imports diretos para getAgent() | 1h         |
-| K8.3 | Testes + deprecation warning           | 1h         |
+Quando `getSdkResourceSnapshot()` reportar `allCoreResourcesAvailable=true` e `allRuntimeResourcesAvailable=true` em um
+boot saudável da LLM-B, consideramos que a superfície runtime do SDK está consolidada para o agent.
 
 ---
 
-## 12. Resumo de Estimativas
+## L8 — Backlog estratégico (não bloquear curto prazo) 🟡
 
-| Fase      | Nome                        | Prioridade | Horas   |
-| --------- | --------------------------- | ---------- | ------- |
-| K1        | AgentContext Partitioning   | 🔴 P0       | 8h      |
-| K2        | Test Coverage Sprint        | 🔴 P0       | 12h     |
-| K3        | Error Handling Centralizado | 🟠 P1       | 4h      |
-| K4        | Background Task Tracker     | 🟠 P1       | 3h      |
-| K5        | Boot Wiring Pipeline        | 🟠 P1       | 6h      |
-| K6        | Event Bridge Declarativo    | 🟡 P2       | 4h      |
-| K7        | Health Check Formal         | 🟡 P2       | 3h      |
-| K8        | Lazy Singleton              | 🟡 P2       | 3h      |
-| **Total** |                             |            | **43h** |
+Esses itens seguem importantes, mas não são o melhor próximo corte para o runtime atual:
 
-### Sprint Sugerido
+- multi-session real;
+- watchdog adaptativo baseado em histórico;
+- protocolo formal de handoff;
+- ownership/migração de estado entre sessões em modo avançado.
 
-| Sprint     | Fases        | Horas | Foco                         |
-| ---------- | ------------ | ----- | ---------------------------- |
-| K-Sprint 1 | K1 + K2      | 20h   | Fundação: estado + testes    |
-| K-Sprint 2 | K3 + K4 + K5 | 13h   | Patterns: erros + boot       |
-| K-Sprint 3 | K6 + K7 + K8 | 10h   | Polish: events + health + DX |
+---
+
+## 5. Prioridade recomendada de implementação
+
+## Sprint L-A (curto prazo, alto retorno)
+
+| Fase  | Tema                                                | Status            |
+| ----- | --------------------------------------------------- | ----------------- |
+| `L1a` | ampliar mutation API do `AgentContext`              | **em andamento**  |
+| `L2a` | remover casts do hot path                           | **em andamento**  |
+| `L3a` | usar `withAgentErrorPolicy(...)` em fluxos críticos | **avançado**      |
+| `L4a` | migrar consumidores seguros para `getAgent()`       | **quase fechado** |
+
+### Objetivo
+
+Fechar a primeira “casca dura” do agent sem reestruturação destrutiva.
+
+---
+
+## Sprint L-B (médio prazo)
+
+| Fase | Tema                             | Objetivo                                 |
+| ---- | -------------------------------- | ---------------------------------------- |
+| `L5` | observabilidade de boot por step | diagnósticos operacionais mais precisos  |
+| `L6` | health enriquecido               | health deixa de ser só semáforo agregado |
+| `L7` | cobertura de testes              | blindar regressões do novo desenho       |
+
+---
+
+## Sprint L-C (estratégico)
+
+| Fase   | Tema                | Objetivo                                         |
+| ------ | ------------------- | ------------------------------------------------ |
+| `L8.1` | multi-session       | suportar múltiplas sessões ativas com isolamento |
+| `L8.2` | watchdog adaptativo | thresholds mais inteligentes                     |
+| `L8.3` | handoff formal      | protocolo com mais governança e testes           |
+
+---
+
+## 6. Critérios claros de consolidação arquitetural
+
+O `agent` só deve ser considerado **arquiteturalmente consolidado** quando todos os critérios abaixo forem verdadeiros
+ao mesmo tempo:
+
+### CA-1 — Hot path sem casts residuais
+
+Critério verificável:
+
+- `rg -n "@type \{unknown\}|/\*\* @type \{unknown\} \*/" src/copilot/agent --glob '*.js'` retorna `0` matches.
+
+### CA-2 — Boundary de hooks alinhado ao SDK
+
+Critério verificável:
+
+- `sdk/types.js` e `hooks/types.js` refletem a shape atual do SDK;
+- `buildSessionOptions()` registra `hooks` via `SessionConfigBuilder.hooks(...)`, sem cast de compatibilidade.
+
+### CA-3 — Mutation API domina o hot path
+
+Critério verificável:
+
+- `messaging`, `dialog`, `lifecycle` e `session wiring` não fazem writes diretos a `ctx.*State` nos caminhos quentes,
+        salvo exceções documentadas e justificadas.
+- os módulos quentes de leitura (`health`, `state`, `facades`, getters públicos do agent) usam getters/helpers do
+        `AgentContext` em vez de depender diretamente de `sessionState/dialogState/configState/...`.
+
+### CA-4 — Error policy vira padrão operacional
+
+Critério verificável:
+
+- `withAgentErrorPolicy(...)` é adotado nos fluxos centrais de `messaging`, `reconnect`, `dialog`, `session ownership`
+        e persistence auxiliar com contexto estruturado.
+- `persistStateWithPolicy(...)` é o caminho dominante para snapshots auxiliares do runtime do `agent`, em vez de
+        chamadas dispersas a `writeStateAsync(...)` nos módulos quentes de diálogo.
+- fora do próprio `state-io.js`, o grep de `writeStateAsync(...)` no subtree `src/copilot/agent/` fica zerado ou
+        restrito apenas a comentários/documentação histórica.
+
+### CA-5 — Lazy singleton totalmente governado
+
+Critério verificável:
+
+- consumidores operacionais usam `getAgent()`;
+- o proxy `alwaysAliveAgent` permanece apenas em boundaries de compatibilidade explicitamente documentados.
+
+### CA-6 — Superfície SDK consolidada e auditável
+
+Critério verificável:
+
+- `AlwaysAliveAgent` expõe `getSdkHandles()` e `getSdkResourceSnapshot()`;
+- `getSdkResourceSnapshot()` reporta `allCoreResourcesAvailable=true` e `allRuntimeResourcesAvailable=true` em boot
+        saudável da LLM-B;
+- client/session/serverRpc/sessionRpc/foreground/last session/custom agents ficam acessíveis pela API canônica.
+
+### CA-7 — Health acionável de verdade
+
+Critério verificável:
+
+- o snapshot de health explica boot/runtime/backlog com granularidade suficiente para troubleshooting direto,
+        incluindo `riskFlags`, `recommendedAction`, `bootReport`, `sdkResources` e contagem de boot `degraded/failed`.
+
+### CA-8 — Testes de regressão estrutural mínimos
+
+Critério verificável:
+
+- a malha cobre pelo menos:
+        - `session-setup`
+        - `agent-sdk-access`
+        - `sdk/session/client` surface
+        - `boot/reconnect`
+        - `health routes`
+        - comportamento lazy singleton / DI
+
+---
+
+## 7. Conclusão
+
+A nova situação ideal do `agent` não é mais “fatiar um monólito”. Isso já aconteceu em grande medida.
+
+A nova situação ideal é:
+
+> **transformar uma boa arquitetura modular em uma arquitetura modular com fronteiras rígidas, contratos semânticos,
+> mutation API explícita, política de erro unificada e lazy singleton plenamente governado.**
+
+Em resumo:
+
+- a era do “grande refactor estrutural” já passou;
+- a era correta agora é a do **hardening arquitetural**.

@@ -606,8 +606,10 @@ Esse foco também já começou a se materializar:
 - surgiu `src/copilot/terminal/frontend/llm-b-frontend.js` como consumer layer principal da LLM-B dentro do terminal;
 - `commands/session.js`, `commands/diagnose.js`, `commands/metrics.js`, `commands/usage.js`, `commands/memory.js`, `commands/resume.js` e `commands/search.js` já migraram para essa camada;
 - `commands/config.js`, `commands/context.js` e `commands/errors.js` também já migraram para essa camada;
+- `commands/export.js` também passou a consumir a seam runtime compartilhada, sem abrir `channel/` diretamente;
 - o recorte de DI direta em `terminal/commands/` caiu de **22** para **0** ocorrências;
 - surgiu `src/copilot/terminal/frontend/llm-b-runtime.js` como gateway runtime do terminal para `agent/`, `channel/` e `conversation-hub`;
+- `llm-b-frontend.js` deixou de importar diretamente `#copilot/agent`, `#copilot/channel`, `#copilot/conversation-hub` e `#copilot/core`, passando a consumir runtime/hub/transporte apenas via `llm-b-runtime.js`;
 - `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`, `dialog/engine-persistence.js`, `terminal-agent-wiring.js` e `index.js` passaram a consumir esse gateway;
 - o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências, com apenas **1** remanescente no runtime do módulo;
 - validação focada mais recente do slice terminal-first:

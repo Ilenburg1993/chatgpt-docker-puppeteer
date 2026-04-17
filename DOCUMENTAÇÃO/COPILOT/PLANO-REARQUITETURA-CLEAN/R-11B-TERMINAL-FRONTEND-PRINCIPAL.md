@@ -208,3 +208,21 @@ rearquitertura clean busca não é reduzir essa centralidade, e sim discipliná-
 - SSOTs continuam nos domínios certos;
 - projections compartilhadas continuam em `presentation/`;
 - o terminal passa a ser um frontend principal mais explícito, mais fino por dentro e mais forte por fora.
+
+## 8. Atualização do baseline terminal-first
+
+O terminal agora também converge para uma regra interna mais forte:
+
+- `terminal/frontend/llm-b-runtime.js` é a seam canônica de acesso a `agent/`, `channel/`,
+  `conversation-hub/` e binding compartilhado de sessão;
+- `terminal/frontend/llm-b-frontend.js` passa a ser uma camada de projeção/UX, sem reabrir acesso
+  direto a essas SSOTs de runtime;
+- comandos como `/export` passam a reutilizar a mesma seam runtime, em vez de falar direto com o
+  transporte.
+
+Critério de sucesso adicional desta frente:
+
+1. `llm-b-frontend.js` não deve importar diretamente `#copilot/agent`, `#copilot/channel`,
+   `#copilot/conversation-hub` ou `#copilot/core`;
+2. o acesso a runtime/hub/transporte deve convergir em `llm-b-runtime.js`;
+3. comandos REPL devem consumir `frontend/*`, não SSOTs de domínio diretamente.
