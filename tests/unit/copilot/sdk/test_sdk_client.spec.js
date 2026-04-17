@@ -2,14 +2,18 @@
 /**
  * tests/unit/copilot/sdk/test_sdk_client.spec.js
  *
- * Testes unitários para src/copilot/sdk/session/client.js Cobre: buildClientOptions, getClient, stopClient, forceStopClient,
- * session CRUD, registry, getClientState, state reset/inject
+ * Testes unitários para src/copilot/sdk/session/client.js Cobre: buildClientOptions, getClient, stopClient,
+ * forceStopClient, session CRUD, registry, getClientState, state reset/inject
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock logger
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('#copilot/config/env', () => ({
     COPILOT_CLI_URL: '',
@@ -35,12 +39,16 @@ function mockSession(id = 'sess-1') {
 /** @returns {any} */
 function mockClient() {
     return {
+        rpc: { tools: { list: vi.fn() } },
         getState: vi.fn(() => 'connected'),
         start: vi.fn().mockResolvedValue(undefined),
         stop: vi.fn().mockResolvedValue([]),
         ping: vi.fn().mockResolvedValue({ message: 'pong', timestamp: Date.now() }),
         getStatus: vi.fn().mockResolvedValue({ version: '1.0' }),
         getAuthStatus: vi.fn().mockResolvedValue({ authenticated: true }),
+        getLastSessionId: vi.fn().mockResolvedValue('last-session-id'),
+        getForegroundSessionId: vi.fn().mockResolvedValue('foreground-session-id'),
+        setForegroundSessionId: vi.fn().mockResolvedValue(undefined),
         listModels: vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }]),
         createSession: vi.fn((_cfg) => Promise.resolve(mockSession())),
         resumeSession: vi.fn((id, _cfg) => Promise.resolve(mockSession(id))),
@@ -59,7 +67,11 @@ vi.mock('@github/copilot-sdk', () => {
             this.ping = vi.fn().mockResolvedValue({ message: 'pong', timestamp: Date.now() });
             this.getStatus = vi.fn().mockResolvedValue({ version: '1.0' });
             this.getAuthStatus = vi.fn().mockResolvedValue({ authenticated: true });
+            this.getLastSessionId = vi.fn().mockResolvedValue('last-session-id');
+            this.getForegroundSessionId = vi.fn().mockResolvedValue('foreground-session-id');
+            this.setForegroundSessionId = vi.fn().mockResolvedValue(undefined);
             this.listModels = vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }]);
+            this.rpc = { tools: { list: vi.fn() } };
             this.createSession = vi.fn((_cfg) => Promise.resolve({ sessionId: 'sess-1', disconnect: vi.fn() }));
             this.resumeSession = vi.fn((id, _cfg) => Promise.resolve({ sessionId: id, disconnect: vi.fn() }));
             this.deleteSession = vi.fn().mockResolvedValue(undefined);
@@ -84,9 +96,13 @@ import {
     getClient,
     getClientSession,
     getClientState,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
+    getServerRpc,
     incrementSessionMessageCount,
     listActiveClientSessions,
     resumeClientSession,
+    setForegroundClientSessionId,
     stopClient,
 } from '../../../../src/copilot/sdk/session/client.js';
 
@@ -186,6 +202,30 @@ describe('sdk/client › getClientState', () => {
         mc.getState.mockReturnValue('disconnected');
         _injectClientForTest(/** @type {any} */ (mc));
         expect(getClientState()).toBe('disconnected');
+    });
+});
+
+// ─── client surface extras ─────────────────────────────────────────────────
+
+describe('sdk/client › surface extras', () => {
+    it('expõe getLastClientSessionId, getForegroundClientSessionId e setForegroundClientSessionId', async () => {
+        const mc = mockClient();
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(getLastClientSessionId()).resolves.toBe('last-session-id');
+        await expect(getForegroundClientSessionId()).resolves.toBe('foreground-session-id');
+        await expect(setForegroundClientSessionId('sess-999')).resolves.toBeUndefined();
+
+        expect(mc.getLastSessionId).toHaveBeenCalled();
+        expect(mc.getForegroundSessionId).toHaveBeenCalled();
+        expect(mc.setForegroundSessionId).toHaveBeenCalledWith('sess-999');
+    });
+
+    it('expõe getServerRpc do client atual', async () => {
+        const mc = mockClient();
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(getServerRpc()).resolves.toBe(mc.rpc);
     });
 });
 

@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it, before, after } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
 const TEST_STATE_DIR = join(import.meta.dirname, '.tmp-state-io-test');
@@ -24,7 +24,7 @@ const TEST_STATE_FILE = join(TEST_STATE_DIR, 'test-state.json');
 process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
 
 // Importar após definir env
-const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync } =
+const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync, persistStateWithPolicy } =
     await import('#copilot/agent/lifecycle/state-io');
 
 describe('state-io', () => {
@@ -106,6 +106,18 @@ describe('state-io', () => {
             // Cache deve estar populado
             const cached = readState();
             assert.equal(cached?.sendCount, 42);
+        });
+
+        it('persistStateWithPolicy resolve explicitamente com ok=true em caso de sucesso', async () => {
+            clearState();
+            await clearStateAsync();
+
+            const result = await persistStateWithPolicy({ sendCount: 7 }, { label: 'test.persist.policy' });
+
+            assert.equal(result.ok, true);
+            if (result.ok) {
+                assert.equal(result.value.sendCount, 7);
+            }
         });
     });
 

@@ -76,8 +76,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         oldestTaskWaitMs: 0,
                         starvationAlert: false,
                         backgroundPendingCount: 0,
+                        backgroundPendingLabels: [],
+                        riskFlags: [],
+                        recommendedAction: 'none',
                         uptime: 1234,
                         issues: [],
+                        bootReport: null,
                         checks: {
                             runtime: { ok: true, status: 'idle', operational: true },
                             client: { ok: true, available: true },
@@ -91,7 +95,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                                 keepaliveRunning: true,
                                 backgroundPendingCount: 0,
                             },
-                            background: { ok: true, pendingCount: 0, warnThreshold: 8 },
+                            background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                            boot: {
+                                ok: true,
+                                reportAvailable: false,
+                                failedSteps: 0,
+                                degradedSteps: 0,
+                                lastCompletedAt: null,
+                            },
                             quota: { ok: true, configured: true, running: true },
                         },
                         ts: Date.now(),
@@ -138,8 +149,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         oldestTaskWaitMs: 0,
                         starvationAlert: false,
                         backgroundPendingCount: 0,
+                        backgroundPendingLabels: [],
+                        riskFlags: ['runtime.stopped', 'client.missing', 'session.missing'],
+                        recommendedAction: 'restart_agent',
                         uptime: null,
                         issues: ['runtime.not_operational.stopped', 'client.unavailable', 'session.inactive'],
+                        bootReport: null,
                         checks: {
                             runtime: { ok: false, status: 'stopped', operational: false },
                             client: { ok: false, available: false },
@@ -153,7 +168,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                                 keepaliveRunning: false,
                                 backgroundPendingCount: 0,
                             },
-                            background: { ok: true, pendingCount: 0, warnThreshold: 8 },
+                            background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                            boot: {
+                                ok: true,
+                                reportAvailable: false,
+                                failedSteps: 0,
+                                degradedSteps: 0,
+                                lastCompletedAt: null,
+                            },
                             quota: { ok: false, configured: true, running: false },
                         },
                         ts: Date.now(),
@@ -217,8 +239,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                 oldestTaskWaitMs: 0,
                 starvationAlert: false,
                 backgroundPendingCount: 2,
+                backgroundPendingLabels: ['bg.task.1'],
+                riskFlags: [],
+                recommendedAction: 'none',
                 uptime: 1000,
                 issues: [],
+                bootReport: null,
                 checks: {
                     runtime: { ok: true, status: 'idle', operational: true },
                     client: { ok: true, available: true },
@@ -232,7 +258,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         keepaliveRunning: false,
                         backgroundPendingCount: 2,
                     },
-                    background: { ok: true, pendingCount: 2, warnThreshold: 8 },
+                    background: { ok: true, pendingCount: 2, warnThreshold: 8, labels: ['bg.task.1'] },
+                    boot: {
+                        ok: true,
+                        reportAvailable: false,
+                        failedSteps: 0,
+                        degradedSteps: 0,
+                        lastCompletedAt: null,
+                    },
                     quota: { ok: true, configured: true, running: true },
                 },
                 ts: Date.now(),
@@ -283,11 +316,50 @@ describe('agent health routes', { concurrency: 1 }, () => {
         assert.ok(health.issues.includes('runtime.not_operational.stopped'));
         assert.equal(health.checks.runtime.ok, false);
         assert.equal(health.checks.background.warnThreshold, 8);
+        assert.equal(health.recommendedAction, 'restart_agent');
     });
 
     it('buildAgentModuleHealth projeta detalhes ricos para o registry', () => {
+        const sdkResources = {
+            handles: {
+                client: null,
+                session: null,
+                serverRpc: null,
+                sessionRpc: null,
+                workspacePath: null,
+            },
+            resources: {
+                clientAvailable: true,
+                sessionAvailable: true,
+                serverRpcAvailable: true,
+                sessionRpcAvailable: true,
+                workspacePathAvailable: true,
+                permissionHandlerAvailable: true,
+                userInputHandlerAvailable: true,
+                hooksAvailable: true,
+                toolRegistryAvailable: true,
+                modelSwitchAvailable: true,
+                abortAvailable: true,
+                sessionLogAvailable: true,
+                historyAvailable: true,
+                lastSessionLookupAvailable: true,
+                foregroundControlAvailable: true,
+                customAgentsAvailable: true,
+                experimentalAgentsAvailable: true,
+                skillsAvailable: true,
+                mcpAvailable: true,
+                pluginsAvailable: true,
+                extensionsAvailable: true,
+                fleetAvailable: true,
+            },
+            missingResources: [],
+            allCoreResourcesAvailable: true,
+            allRuntimeResourcesAvailable: true,
+        };
+
         const result = buildAgentModuleHealth(
             /** @type {any} */ ({
+                getSdkResourceSnapshot: () => sdkResources,
                 getHealthSnapshot: () => ({
                     ok: true,
                     healthy: true,
@@ -302,8 +374,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                     oldestTaskWaitMs: 1200,
                     starvationAlert: false,
                     backgroundPendingCount: 4,
+                    backgroundPendingLabels: ['bg.sync.1'],
+                    riskFlags: ['io.keepalive_stopped'],
+                    recommendedAction: 'restart_keepalive',
                     uptime: 999,
                     issues: ['io.keepalive_stopped'],
+                    bootReport: null,
                     checks: {
                         runtime: { ok: true, status: 'processing', operational: true },
                         client: { ok: true, available: true },
@@ -317,7 +393,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                             keepaliveRunning: false,
                             backgroundPendingCount: 4,
                         },
-                        background: { ok: true, pendingCount: 4, warnThreshold: 8 },
+                        background: { ok: true, pendingCount: 4, warnThreshold: 8, labels: ['bg.sync.1'] },
+                        boot: {
+                            ok: true,
+                            reportAvailable: false,
+                            failedSteps: 0,
+                            degradedSteps: 0,
+                            lastCompletedAt: null,
+                        },
                         quota: { ok: true, configured: true, running: true },
                     },
                     ts: Date.now(),
@@ -328,6 +411,10 @@ describe('agent health routes', { concurrency: 1 }, () => {
         assert.equal(result.ok, true);
         assert.equal(result.details.keepaliveRunning, false);
         assert.equal(result.details.quotaMonitorRunning, true);
+        assert.equal(result.details.recommendedAction, 'restart_keepalive');
+        assert.deepEqual(result.details.riskFlags, ['io.keepalive_stopped']);
+        assert.equal(result.details.bootDegradedSteps, 0);
+        assert.equal(result.details.sdkResources.allCoreResourcesAvailable, true);
         assert.deepEqual(result.details.issues, ['io.keepalive_stopped']);
     });
 });

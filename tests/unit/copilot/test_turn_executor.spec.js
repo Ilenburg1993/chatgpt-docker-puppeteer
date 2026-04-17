@@ -58,6 +58,7 @@ vi.mock('#copilot/observability/otel', () => ({
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
     writeStateAsync: vi.fn(),
 }));
 
@@ -69,7 +70,7 @@ import {
     executeTurnImpl,
     waitForRestartAndReply,
 } from '../../../src/copilot/agent/dialog/turn-executor.js';
-import { writeStateAsync } from '../../../src/copilot/agent/lifecycle/state-io.js';
+import { persistStateWithPolicy } from '../../../src/copilot/agent/lifecycle/state-io.js';
 
 /* ── helpers ── */
 
@@ -80,6 +81,19 @@ import { EventEmitter } from 'events';
  */
 function makeEmitter() {
     return new EventEmitter();
+}
+
+/**
+ * Cria um host mínimo compatível com TurnHost.
+ *
+ * @param {Partial<import('../../../src/copilot/agent/dialog/turn-executor.js').TurnHost>} [overrides]
+ */
+function makeTurnHost(overrides = {}) {
+    return {
+        getPendingQuestion: vi.fn(() => null),
+        answerPendingQuestion: vi.fn(() => false),
+        ...overrides,
+    };
 }
 
 /**
@@ -96,7 +110,7 @@ describe('turn-executor', () => {
     beforeEach(async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         emitter = makeEmitter();
-        vi.mocked(writeStateAsync).mockResolvedValue(/** @type {any} */ ({}));
+        vi.mocked(persistStateWithPolicy).mockResolvedValue({ ok: true, value: /** @type {any} */ ({}) });
     });
 
     afterEach(() => {
@@ -130,11 +144,14 @@ describe('turn-executor', () => {
         });
 
         it('roteia a persistência assíncrona via trackBackgroundTask quando o host suporta tracker', async () => {
-            vi.mocked(writeStateAsync).mockResolvedValue(/** @type {any} */ ({ pendingTurnMessage: 'hello world' }));
+            vi.mocked(persistStateWithPolicy).mockResolvedValue({
+                ok: true,
+                value: /** @type {any} */ ({ pendingTurnMessage: 'hello world' }),
+            });
             const counter = { sendCount: 0 };
             const trackBackgroundTask = vi.fn().mockResolvedValue(undefined);
 
-            emitTurnStart(emitter, 'hello world', counter, { trackBackgroundTask });
+            emitTurnStart(emitter, 'hello world', counter, makeTurnHost({ trackBackgroundTask }));
 
             expect(trackBackgroundTask).toHaveBeenCalledTimes(1);
             expect(trackBackgroundTask).toHaveBeenCalledWith(
@@ -143,6 +160,20 @@ describe('turn-executor', () => {
                     label: 'dialog.turn.pending',
                     description: 'Persist pending turn marker at turn start',
                 }),
+            );
+        });
+
+        it('usa persistStateWithPolicy para marcar pending turn no início do turno', () => {
+            const counter = { sendCount: 0 };
+
+            emitTurnStart(emitter, 'hello world', counter);
+
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    pendingTurnMessage: 'hello world',
+                    pendingTurnConsumedPR: false,
+                }),
+                { label: 'dialog.turn.pending' },
             );
         });
     });
@@ -155,7 +186,7 @@ describe('turn-executor', () => {
             const pendingListenerRef = { current: null };
 
             const { onReplyOuter, timeoutHandle } = buildTurnResolutionListeners(emitter, {
-                host: {},
+                host: makeTurnHost(),
                 turnStart: Date.now(),
                 timeout: 5000,
                 message: 'hi',
@@ -179,7 +210,7 @@ describe('turn-executor', () => {
             const pendingListenerRef = { current: null };
 
             buildTurnResolutionListeners(emitter, {
-                host: {},
+                host: makeTurnHost(),
                 turnStart: Date.now(),
                 timeout: 3000,
                 message: 'hi',
@@ -200,7 +231,7 @@ describe('turn-executor', () => {
             const reject = vi.fn();
 
             const { onStopOuter } = buildTurnResolutionListeners(emitter, {
-                host: {},
+                host: makeTurnHost(),
                 turnStart: Date.now(),
                 timeout: 5000,
                 message: 'hi',
@@ -222,7 +253,7 @@ describe('turn-executor', () => {
             const waitFn = vi.fn().mockResolvedValue('restart-reply');
 
             const { onStopOuter } = buildTurnResolutionListeners(emitter, {
-                host: {},
+                host: makeTurnHost(),
                 turnStart: Date.now(),
                 timeout: 5000,
                 message: 'hi',
@@ -354,6 +385,26 @@ describe('turn-executor', () => {
             expect(err).toBeInstanceOf(DOMException);
             expect(err.message).toMatch(/abortado/);
         });
+
+        it('remove listener de abort após concluir com reply', async () => {
+            const ac = new AbortController();
+            const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
+            const host = {
+                getPendingQuestion: vi.fn().mockReturnValue(false),
+                answerPendingQuestion: vi.fn(),
+            };
+
+            const p = waitForRestartAndReply(emitter, host, 'retry-msg', 10000, undefined, ac.signal);
+            emitter.emit('ready');
+            await tick();
+            emitter.emit('question.pending', {});
+            await tick();
+            emitter.emit('reply', { reply: 'ok-result' });
+            await tick();
+
+            await expect(p).resolves.toBe('ok-result');
+            expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+        });
     });
 
     /* ── F65.5: executeTurnImpl (orquestração) ── */
@@ -401,6 +452,30 @@ describe('turn-executor', () => {
 
             await expect(p).resolves.toBe('answer!');
             expect(sendCountRef.sendCount).toBe(1);
+        });
+
+        it('remove listener de abort após reply no caminho principal', async () => {
+            const ac = new AbortController();
+            const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
+            const host = {
+                getPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-4o'),
+            };
+
+            const p = executeTurnImpl(
+                emitter,
+                'question?',
+                { timeout: 5000, signal: ac.signal },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            emitter.emit('reply', { reply: 'answer!' });
+            await tick();
+
+            await expect(p).resolves.toBe('answer!');
+            expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
         });
     });
 });

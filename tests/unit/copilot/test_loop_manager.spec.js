@@ -53,7 +53,11 @@ vi.mock('#copilot/core/errors', async () => {
     const actual = await vi.importActual('#copilot/core/errors');
     return actual;
 });
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 // Mock waitForEvent — resolve imediatamente por padrão
 const mockWaitForEvent = vi.fn(() => Promise.resolve({}));
@@ -61,6 +65,7 @@ vi.mock('#copilot/sdk/event-helpers', () => ({ waitForEvent: (...args) => mockWa
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
     readState: vi.fn(() => null),
     writeStateAsync: vi.fn(async () => {}),
     SYSTEM_PROMPT_SECTIONS: {},
@@ -80,15 +85,15 @@ vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
 
 import { DialogLoopManager } from '../../../src/copilot/agent/dialog/loop-manager.js';
 import { executeTurnImpl } from '../../../src/copilot/agent/dialog/turn-executor.js';
-import { readState } from '../../../src/copilot/agent/lifecycle/state-io.js';
+import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/lifecycle/state-io.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Cria um host mock mínimo */
 function createMockHost() {
     return {
-        sendMessage: vi.fn(async () => {}),
-        sendMessageDialogBoot: vi.fn(async () => {}),
+        sendMessage: vi.fn(async () => 'ok'),
+        sendMessageDialogBoot: vi.fn(async () => 'ok'),
         answerPendingQuestion: vi.fn(),
         getPendingQuestion: vi.fn(() => null),
         setModel: vi.fn(),
@@ -127,11 +132,32 @@ describe('DialogLoopManager', () => {
             expect(dlm.active).toBe(true);
         });
 
+        it('start() persiste dialogLoopActive via persistStateWithPolicy', async () => {
+            await dlm.start('Hello');
+
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                { dialogLoopActive: true },
+                { label: 'dialog.state.active' },
+            );
+        });
+
         it('deve desativar após stop({ authorized: true })', async () => {
             await dlm.start('Hello');
             expect(dlm.active).toBe(true);
             await dlm.stop({ authorized: true });
             expect(dlm.active).toBe(false);
+        });
+
+        it('stop({ authorized: true }) persiste dialogLoopActive=false via persistStateWithPolicy', async () => {
+            await dlm.start('Hello');
+            vi.mocked(persistStateWithPolicy).mockClear();
+
+            await dlm.stop({ authorized: true });
+
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                { dialogLoopActive: false },
+                { label: 'dialog.state.inactive' },
+            );
         });
 
         it('stop() sem authorized deve ser ignorado', async () => {
@@ -281,6 +307,18 @@ describe('DialogLoopManager', () => {
             dlm.on('paused', spy);
             await dlm.pause('sess1');
             expect(spy).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'sess1' }));
+        });
+
+        it('pause() persiste estado com a policy canônica', async () => {
+            await dlm.start('Hello');
+            vi.mocked(persistStateWithPolicy).mockClear();
+
+            await dlm.pause('sess1');
+
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                expect.objectContaining({ dialogPaused: true, dialogLoopActive: true }),
+                { label: 'dialog.state.pause' },
+            );
         });
     });
 

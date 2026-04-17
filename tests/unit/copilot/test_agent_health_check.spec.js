@@ -49,6 +49,7 @@ function createHost(overrides = {}) {
  *     keepaliveRunning?: boolean;
  *     backgroundPendingCount?: number;
  *     quotaMonitorRunning?: boolean;
+ *     bootReport?: import('../../../src/copilot/agent/types.js').AgentBootReport | null;
  * }} [overrides]
  */
 function createContext(overrides = {}) {
@@ -72,6 +73,12 @@ function createContext(overrides = {}) {
         },
         backgroundTasks: {
             pendingCount: overrides.backgroundPendingCount ?? 0,
+            getPendingLabels: () => ((overrides.backgroundPendingCount ?? 0) > 0 ? ['bg.task.1', 'bg.task.2'] : []),
+        },
+        getBackgroundPendingLabels: () =>
+            (overrides.backgroundPendingCount ?? 0) > 0 ? ['bg.task.1', 'bg.task.2'] : [],
+        runtimeState: {
+            lastBootReport: /** @type {any} */ (overrides.bootReport ?? null),
         },
         quotaMonitor: overrides.quotaMonitorRunning ? /** @type {any} */ ({ stop() {} }) : null,
     });
@@ -93,6 +100,11 @@ describe('agent/health-check', () => {
         assert.equal(health.checks.io.ok, true);
         assert.equal(health.checks.quota.ok, true);
         assert.equal(health.checks.background.ok, true);
+        assert.deepEqual(health.backgroundPendingLabels, []);
+        assert.deepEqual(health.riskFlags, []);
+        assert.equal(health.recommendedAction, 'none');
+        assert.equal(health.checks.boot.ok, true);
+        assert.equal(health.checks.boot.degradedSteps, 0);
     });
 
     it('retorna degraded quando há inconsistência de dialog, starvation e backlog alto', () => {
@@ -112,6 +124,46 @@ describe('agent/health-check', () => {
         assert.ok(health.issues.includes('background.backlog_high'));
         assert.ok(health.issues.includes('quota.monitor_missing'));
         assert.equal(health.starvationAlert, true);
+        assert.deepEqual(health.backgroundPendingLabels, ['bg.task.1', 'bg.task.2']);
+        assert.ok(health.riskFlags.includes('dialog.detached'));
+        assert.ok(health.riskFlags.includes('background.backlog_high'));
+        assert.equal(health.recommendedAction, 'reattach_dialog');
+    });
+
+    it('retorna degraded quando o boot conclui com steps degradados', () => {
+        const health = getAgentHealthSnapshot(
+            createContext({
+                quotaMonitorRunning: true,
+                bootReport: {
+                    startedAt: 1,
+                    completedAt: 2,
+                    ok: true,
+                    stepCount: 2,
+                    degradedCount: 1,
+                    failedCount: 0,
+                    steps: [
+                        { name: 'wireSessionEvents', phase: 'session', status: 'ok', durationMs: 1, ts: 1 },
+                        {
+                            name: 'startQuotaMonitor',
+                            phase: 'quota',
+                            status: 'degraded',
+                            durationMs: 1,
+                            ts: 2,
+                            error: 'quota unavailable',
+                        },
+                    ],
+                },
+            }),
+            createHost(),
+        );
+
+        assert.equal(health.status, 'degraded');
+        assert.ok(health.issues.includes('boot.steps_degraded'));
+        assert.equal(health.checks.boot.ok, false);
+        assert.equal(health.checks.boot.failedSteps, 0);
+        assert.equal(health.checks.boot.degradedSteps, 1);
+        assert.ok(health.riskFlags.includes('boot.degraded'));
+        assert.equal(health.recommendedAction, 'inspect_boot_report');
     });
 
     it('retorna unhealthy quando runtime não está operacional ou sessão/client faltam', () => {
@@ -128,5 +180,44 @@ describe('agent/health-check', () => {
         assert.ok(health.issues.includes('session.inactive'));
         assert.equal(health.checks.client.ok, false);
         assert.equal(health.checks.session.ok, false);
+        assert.ok(health.riskFlags.includes('runtime.stopped'));
+        assert.equal(health.recommendedAction, 'restart_agent');
+    });
+
+    it('retorna degraded quando o último boot teve steps com falha', () => {
+        const health = getAgentHealthSnapshot(
+            createContext({
+                quotaMonitorRunning: true,
+                bootReport: {
+                    startedAt: 1,
+                    completedAt: 2,
+                    ok: false,
+                    stepCount: 2,
+                    degradedCount: 0,
+                    failedCount: 1,
+                    steps: [
+                        { name: 'wireSessionEvents', phase: 'session', status: 'ok', durationMs: 1, ts: 1 },
+                        {
+                            name: 'startQuotaMonitor',
+                            phase: 'quota',
+                            status: 'failed',
+                            durationMs: 1,
+                            ts: 2,
+                            error: 'boom',
+                        },
+                    ],
+                },
+            }),
+            createHost(),
+        );
+
+        assert.equal(health.status, 'degraded');
+        assert.ok(health.issues.includes('boot.steps_failed'));
+        assert.equal(health.checks.boot.ok, false);
+        assert.equal(health.checks.boot.failedSteps, 1);
+        assert.equal(health.checks.boot.degradedSteps, 0);
+        assert.equal(health.bootReport?.ok, false);
+        assert.ok(health.riskFlags.includes('boot.failed'));
+        assert.equal(health.recommendedAction, 'inspect_boot_report');
     });
 });

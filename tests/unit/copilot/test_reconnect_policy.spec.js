@@ -116,6 +116,34 @@ describe('reconnect-policy › reconexão bem-sucedida', () => {
             `Status reconnecting:1/3 deve ter sido emitido. Emitidos: ${JSON.stringify(statuses)}`,
         );
     });
+
+    it('deve criar novo client e chamar updateClient quando createClient é fornecido', async () => {
+        /** @type {any[]} */
+        const updatedClients = [];
+        const originalClient = {
+            stop: async () => {},
+            ping: async () => {},
+        };
+        const replacementClient = {
+            stop: async () => {},
+            ping: async () => {},
+            marker: 'replacement',
+        };
+
+        const cbs = makeCallbacks({
+            createClient: () => replacementClient,
+            updateClient: (client) => updatedClients.push(client),
+            initSession: async (client) => {
+                assert.strictEqual(client, replacementClient, 'initSession deve receber o client recém-criado');
+                return { session: { sessionId: 'sess-new' }, isResumed: false };
+            },
+        });
+
+        const result = await tryReconnect(new Error('err'), originalClient, 'idle', cbs, FAST_OPTS);
+
+        assert.strictEqual(result, true);
+        assert.deepEqual(updatedClients, [replacementClient]);
+    });
 });
 
 describe('reconnect-policy › falhas parciais antes do sucesso', () => {

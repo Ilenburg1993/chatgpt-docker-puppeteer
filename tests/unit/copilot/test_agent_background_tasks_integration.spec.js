@@ -48,16 +48,19 @@ describe('agent › K4 background task tracker integration', () => {
 
     it('user-input-handler aceita trackBackgroundTask para persistência assíncrona', () => {
         assert.ok(userInputSrc.includes('trackBackgroundTask'));
+        assert.ok(userInputSrc.includes('persistStateWithPolicy'));
         assert.ok(userInputSrc.includes('question.persist.pending'));
     });
 
     it('loop-manager roteia writes assíncronos via trackBackgroundTask', () => {
         assert.ok(loopManagerSrc.includes('#trackBackgroundTask('));
+        assert.ok(loopManagerSrc.includes('#trackPersistedState('));
         assert.ok(loopManagerSrc.includes('dialog.prMetrics.resume_with_pr'));
     });
 
     it('turn-executor roteia persistência de pending turn via trackBackgroundTask', () => {
         assert.ok(turnExecutorSrc.includes('trackBackgroundTask'));
+        assert.ok(turnExecutorSrc.includes('persistStateWithPolicy'));
         assert.ok(turnExecutorSrc.includes('dialog.turn.pending'));
     });
 });

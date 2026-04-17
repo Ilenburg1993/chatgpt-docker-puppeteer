@@ -156,6 +156,116 @@ describe('AgentContext', () => {
         assert.equal(emittedStatus, 'idle');
     });
 
+    it('helpers semânticos invalidam snapshot e atualizam subestado', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        ctx.statusSnapshotCache = /** @type {any} */ ({ snapshot: {}, at: Date.now() });
+        ctx.incrementSendCount();
+        assert.equal(ctx.sendCount, 1);
+        assert.equal(ctx.statusSnapshotCache, null);
+
+        ctx.setPendingQuestion({
+            question: 'Q?',
+            allowFreeform: true,
+            resolve: () => {},
+            askedAt: Date.now(),
+        });
+        assert.equal(ctx.pendingQuestion?.question, 'Q?');
+
+        ctx.clearPendingQuestion();
+        assert.equal(ctx.pendingQuestion, null);
+    });
+
+    it('mutation API expandida governa session/client/model/context/boot report', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        ctx.setClient(/** @type {any} */ ({ id: 'client-1' }));
+        ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-1' }));
+        ctx.setModel('gpt-5');
+        ctx.setReasoningEffort('high');
+        ctx.setIsResumed(true);
+        ctx.setSendCount(12);
+        ctx.setDialogLoopAttached(true);
+        ctx.setContextState({ tokens: 10, tokenLimit: 100, utilization: 0.1 });
+        ctx.setLastCheckpointPath('/tmp/ckpt.json');
+        ctx.setBootReport({
+            startedAt: 1,
+            completedAt: 2,
+            ok: true,
+            stepCount: 1,
+            degradedCount: 0,
+            failedCount: 0,
+            steps: [],
+        });
+        ctx.cacheStatusSnapshot(/** @type {any} */ ({ status: 'idle' }));
+
+        assert.equal(ctx.client?.id, 'client-1');
+        assert.equal(ctx.session?.sessionId, 'sess-1');
+        assert.equal(ctx.model, 'gpt-5');
+        assert.equal(ctx.reasoningEffort, 'high');
+        assert.equal(ctx.isResumed, true);
+        assert.equal(ctx.sendCount, 12);
+        assert.equal(ctx.dialogLoopAttached, true);
+        assert.deepEqual(ctx.contextState, { tokens: 10, tokenLimit: 100, utilization: 0.1 });
+        assert.equal(ctx.lastCheckpointPath, '/tmp/ckpt.json');
+        assert.deepEqual(ctx.bootReport, {
+            startedAt: 1,
+            completedAt: 2,
+            ok: true,
+            stepCount: 1,
+            degradedCount: 0,
+            failedCount: 0,
+            steps: [],
+        });
+        assert.equal(ctx.hasClient(), true);
+        assert.equal(ctx.hasActiveSession(), true);
+        assert.equal(ctx.hasPendingQuestion(), false);
+        assert.equal(ctx.getBackgroundPendingCount(), 0);
+        assert.deepEqual(ctx.getLastPrInfoSnapshot(), null);
+        assert.deepEqual(ctx.getBootReportSnapshot(), {
+            startedAt: 1,
+            completedAt: 2,
+            ok: true,
+            stepCount: 1,
+            degradedCount: 0,
+            failedCount: 0,
+            steps: [],
+        });
+        assert.deepEqual(ctx.statusSnapshotCache, { snapshot: { status: 'idle' }, at: ctx.statusSnapshotCache?.at });
+
+        ctx.clearSession();
+        ctx.clearClient();
+        assert.equal(ctx.session, null);
+        assert.equal(ctx.client, null);
+    });
+
+    it('resolvePendingQuestion e getBackgroundPendingLabels centralizam operações semânticas', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        /** @type {string[]} */
+        const answers = [];
+        ctx.setPendingQuestion({
+            question: 'Qual o status?',
+            allowFreeform: true,
+            resolve: (answer) => answers.push(answer),
+            askedAt: Date.now(),
+        });
+
+        assert.equal(ctx.resolvePendingQuestion('Tudo certo'), true);
+        assert.deepEqual(answers, ['Tudo certo']);
+        assert.equal(ctx.pendingQuestion, null);
+        assert.equal(ctx.resolvePendingQuestion('Nada a resolver'), false);
+
+        await ctx.backgroundTasks.track(Promise.resolve('ok'), {
+            label: 'bg.one',
+            description: 'primeira task',
+        });
+        assert.deepEqual(ctx.getBackgroundPendingLabels(), []);
+    });
+
     it('accessors compatíveis refletem e atualizam subestados', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
