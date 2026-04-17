@@ -7,46 +7,33 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock logger
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
-
-// Mock llmBridgeClient — fully inline for hoisting
-vi.mock('#copilot/channel/client', () => {
-    const _history = [];
-    return {
-        llmBridgeClient: {
-            get history() {
-                return _history;
-            },
-            clearHistory: vi.fn(),
-            seedHistory: vi.fn(),
+const frontendMocks = vi.hoisted(() => ({
+    readTerminalContextProjection: vi.fn(() => ({
+        isRealData: false,
+        hasHistory: false,
+        usedTokens: 0,
+        maxTokens: 128000,
+        utilization: 0,
+        turnCount: 0,
+        totalChars: 0,
+        workspace: {
+            cwd: '/workspaces/test',
+            gitRoot: '/workspaces/test',
+            currentBranch: 'main',
         },
-    };
-});
-
-// Mock alwaysAliveAgent
-vi.mock('#copilot/agent', () => ({
-    alwaysAliveAgent: {
-        getStatusSnapshot: vi.fn(() => ({ contextWindow: null })),
-    },
-}));
-
-// Mock workspace-context
-vi.mock('../../../../src/copilot/terminal/workspace-context.js', () => ({
-    getWorkspaceContext: vi.fn(() => ({
-        cwd: '/workspaces/test',
-        gitRoot: '/workspaces/test',
-        currentBranch: 'main',
+    })),
+    requestTerminalCompactionProjection: vi.fn(async () => ({
+        ok: true,
+        reply: 'Resumo compactado...',
+        estimatedTokens: 6,
     })),
 }));
 
-// Mock dialog (for cmdCompact)
-vi.mock('../../../../src/copilot/terminal/dialog.js', () => ({
-    sendTurn: vi.fn().mockResolvedValue('Resumo compactado...'),
+vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+    readTerminalContextProjection: frontendMocks.readTerminalContextProjection,
+    requestTerminalCompactionProjection: frontendMocks.requestTerminalCompactionProjection,
 }));
 
-import { alwaysAliveAgent } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel/client';
 import { cmdCompact, cmdContext } from '../../../../src/copilot/terminal/commands/context.js';
 
 // ─── cmdContext ─────────────────────────────────────────────────────────────
@@ -58,8 +45,20 @@ describe('terminal/commands/cmdContext', () => {
     beforeEach(() => {
         lines = [];
         println = (text) => lines.push(text);
-        llmBridgeClient.history.length = 0;
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(/** @type {any} */ ({ contextWindow: null }));
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: false,
+            hasHistory: false,
+            usedTokens: 0,
+            maxTokens: 128000,
+            utilization: 0,
+            turnCount: 0,
+            totalChars: 0,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
     });
 
     it('exibe mensagem quando histórico vazio e sem SDK', () => {
@@ -69,7 +68,20 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('exibe estimativa heurística quando sem SDK', () => {
-        llmBridgeClient.history.push({ role: 'user', content: 'hello world' });
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: false,
+            hasHistory: true,
+            usedTokens: 3,
+            maxTokens: 128000,
+            utilization: 3 / 128000,
+            turnCount: 1,
+            totalChars: 11,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('estimad');
@@ -77,12 +89,20 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('exibe dados do SDK real quando disponível', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
-            /** @type {any} */ ({
-                contextWindow: { tokens: 5000, tokenLimit: 128000, utilization: 0.039 },
-            }),
-        );
-        llmBridgeClient.history.push({ role: 'user', content: 'test' });
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: true,
+            hasHistory: true,
+            usedTokens: 5000,
+            maxTokens: 128000,
+            utilization: 0.039,
+            turnCount: 1,
+            totalChars: 4,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('real SDK');
@@ -90,31 +110,60 @@ describe('terminal/commands/cmdContext', () => {
     });
 
     it('alerta quando context window > 85%', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
-            /** @type {any} */ ({
-                contextWindow: { tokens: 110000, tokenLimit: 128000, utilization: 0.86 },
-            }),
-        );
-        llmBridgeClient.history.push({ role: 'user', content: 'x' });
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: true,
+            hasHistory: true,
+            usedTokens: 110000,
+            maxTokens: 128000,
+            utilization: 0.86,
+            turnCount: 1,
+            totalChars: 1,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('compact');
     });
 
     it('alerta moderado quando context window > 65%', () => {
-        vi.mocked(alwaysAliveAgent.getStatusSnapshot).mockReturnValue(
-            /** @type {any} */ ({
-                contextWindow: { tokens: 85000, tokenLimit: 128000, utilization: 0.66 },
-            }),
-        );
-        llmBridgeClient.history.push({ role: 'user', content: 'x' });
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: true,
+            hasHistory: true,
+            usedTokens: 85000,
+            maxTokens: 128000,
+            utilization: 0.66,
+            turnCount: 1,
+            totalChars: 1,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('monitore');
     });
 
     it('mostra workspace info', () => {
-        llmBridgeClient.history.push({ role: 'user', content: 'hello' });
+        frontendMocks.readTerminalContextProjection.mockReturnValue({
+            isRealData: false,
+            hasHistory: true,
+            usedTokens: 2,
+            maxTokens: 128000,
+            utilization: 2 / 128000,
+            turnCount: 1,
+            totalChars: 5,
+            workspace: {
+                cwd: '/workspaces/test',
+                gitRoot: '/workspaces/test',
+                currentBranch: 'main',
+            },
+        });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('Workspace');
@@ -132,21 +181,27 @@ describe('terminal/commands/cmdCompact', () => {
     beforeEach(() => {
         lines = [];
         println = (text) => lines.push(text);
-        vi.mocked(llmBridgeClient.clearHistory).mockClear();
-        vi.mocked(llmBridgeClient.seedHistory).mockClear();
+        frontendMocks.requestTerminalCompactionProjection.mockReset();
+        frontendMocks.requestTerminalCompactionProjection.mockResolvedValue({
+            ok: true,
+            reply: 'Resumo compactado...',
+            estimatedTokens: 6,
+        });
     });
 
     it('solicita compactação e exibe sucesso', async () => {
         await cmdCompact({ println });
         const output = lines.join('\n');
         expect(output).toContain('compactado');
-        expect(llmBridgeClient.clearHistory).toHaveBeenCalled();
-        expect(llmBridgeClient.seedHistory).toHaveBeenCalledWith('assistant', 'Resumo compactado...');
+        expect(frontendMocks.requestTerminalCompactionProjection).toHaveBeenCalled();
     });
 
     it('exibe erro quando sendTurn retorna null', async () => {
-        const { sendTurn } = await import('../../../../src/copilot/terminal/dialog.js');
-        vi.mocked(sendTurn).mockResolvedValueOnce(null);
+        frontendMocks.requestTerminalCompactionProjection.mockResolvedValueOnce({
+            ok: false,
+            reply: null,
+            estimatedTokens: null,
+        });
         await cmdCompact({ println });
         const output = lines.join('\n');
         expect(output).toContain('sem resposta');

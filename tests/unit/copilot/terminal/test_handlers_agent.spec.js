@@ -112,6 +112,14 @@ describe('handlers/agent — handleInject validação', () => {
         expect(result.body.ok).toBe(true);
         expect(result.body.reply).toBe('resposta');
     });
+
+    it('projeta AbortError para 504', async () => {
+        mockSendTurn.mockRejectedValueOnce(new DOMException('aborted', 'AbortError'));
+        const result = await handleInject({ message: 'timeout please' });
+        expect(result.status).toBe(504);
+        expect(result.body.disposition).toBe('ignore');
+        expect(result.body.retryable).toBe(false);
+    });
 });
 
 // ─── Pause / Resume ──────────────────────────────────────────────────────────
@@ -127,6 +135,19 @@ describe('handlers/agent — dialog pause/resume', () => {
         const result = await handleDialogResume();
         expect(result.status).toBe(200);
         expect(result.body.ok).toBe(true);
+    });
+
+    it('handleDialogResume projeta erro de sessão para 503', async () => {
+        const { alwaysAliveAgent } = await import('#copilot/agent');
+        alwaysAliveAgent.resumeDialogLoop.mockRejectedValueOnce(
+            Object.assign(new Error('agente parado'), { code: 'AGENT_STOPPED' }),
+        );
+
+        const result = await handleDialogResume();
+
+        expect(result.status).toBe(503);
+        expect(result.body.code).toBe('AGENT_STOPPED');
+        expect(result.body.ok).toBe(false);
     });
 });
 

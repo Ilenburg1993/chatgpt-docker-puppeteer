@@ -27,6 +27,7 @@ import { log } from '#copilot/observability';
  * @returns {void}
  */
 export function copilotErrorHandler(err, req, res, next) {
+    void next;
     const error = /** @type {AppError & { status?: number; code?: string }} */ (err);
     const status = error?.status ?? 500;
     const message = error?.message ?? 'Internal server error';

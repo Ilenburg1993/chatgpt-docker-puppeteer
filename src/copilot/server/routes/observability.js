@@ -21,7 +21,7 @@ import {
     handleGetToolStats,
     handleMetrics,
     handleSystemReset,
-} from '../../terminal/handlers/system-metrics.js';
+} from '../../presentation/system-metrics.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { toError, container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
@@ -20,6 +20,28 @@ const execFileAsync = promisify(execFile);
 /** Diretório raiz do projeto para executar git. */
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GIT_DEFAULT_TIMEOUT_MS = 10_000;
+
+/**
+ * Registra métricas do bridge git em modo best-effort.
+ *
+ * Em contextos de teste ou scripts isolados, a infraestrutura de observability pode não estar totalmente registrada no
+ * container. O bridge de leitura não deve falhar por causa disso.
+ *
+ * @param {string} method
+ * @param {number} elapsed
+ * @param {boolean} ok
+ * @returns {void}
+ */
+function recordGitMetricBestEffort(method, elapsed, ok) {
+    try {
+        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, ok);
+        if (!ok) {
+            container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
+        }
+    } catch {
+        // Observability indisponível neste contexto — não bloquear bridge read-only.
+    }
+}
 
 /**
  * Executa git com args a partir da raiz do projeto.
@@ -47,7 +69,7 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('duration_ms', elapsed);
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, true);
+        recordGitMetricBestEffort(method, elapsed, true);
         return stdout.trim();
     } catch (err) {
         const elapsed = Date.now() - t0;
@@ -55,8 +77,7 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: toError(err).message });
         span?.recordException(err);
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, false);
-        container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
+        recordGitMetricBestEffort(method, elapsed, false);
         throw err;
     } finally {
         span?.end();

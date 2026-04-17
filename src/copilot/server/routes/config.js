@@ -23,7 +23,7 @@ import {
     handleSetInfiniteSessionConfig,
     handleSetSkills,
     handleSetToolsConfig,
-} from '../../terminal/handlers/system-config.js';
+} from '../../presentation/system-config.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';
 
@@ -44,7 +44,7 @@ const toolsConfigBodySchema = z.object({
 const customToolBodySchema = z.object({
     name: z.string().min(1).max(128),
     description: z.string().max(1024).optional(),
-    schema: z.record(z.unknown()).optional(),
+    schema: z.record(z.string(), z.unknown()).optional(),
 });
 
 const customToolParamsSchema = z.object({

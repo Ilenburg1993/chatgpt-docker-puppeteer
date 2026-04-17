@@ -60,26 +60,62 @@ import { buildTool, withSkipPermission } from './tool-factory.js';
 import { webTools } from './web-tools.js';
 
 /**
- * Conjunto completo de Custom Tools disponíveis para o SDK Agent.
+ * Conjunto completo de Custom Tools disponíveis para o SDK Agent. Inicializado lazily para evitar circular-dependency
+ * durante avaliação de módulos.
  *
  * @type {import('#copilot/sdk/types').Tool[]}
  */
-export const allTools = [
-    ...taskTools,
-    ...codeTools,
-    ...gitTools,
-    ...sessionTools,
-    ...sessionRpcTools,
-    ...hookTools,
-    ...hubTools,
-    ...introspectionTools,
-    ...fileTools,
-    ...shellTools,
-    ...webTools,
-    ...todoTools,
-    ...permissionTools,
-    ...experimentalRpcTools,
-];
+let _allToolsCache;
+
+/**
+ * Retorna o array completo de tools. Lazy: constrói na primeira chamada.
+ *
+ * @returns {import('#copilot/sdk/types').Tool[]}
+ */
+export function getAllTools() {
+    if (!_allToolsCache) {
+        _allToolsCache = [
+            ...taskTools,
+            ...codeTools,
+            ...gitTools,
+            ...sessionTools,
+            ...sessionRpcTools,
+            ...hookTools,
+            ...hubTools,
+            ...introspectionTools,
+            ...fileTools,
+            ...shellTools,
+            ...webTools,
+            ...todoTools,
+            ...permissionTools,
+            ...experimentalRpcTools,
+        ];
+    }
+    return _allToolsCache;
+}
+
+/**
+ * @deprecated Use `getAllTools()` — lazy accessor que evita circular deps.
+ * @type {import('#copilot/sdk/types').Tool[]}
+ */
+export const allTools = /** @type {any} */ (
+    new Proxy([], {
+        get(_, prop) {
+            const arr = getAllTools();
+            const val = Reflect.get(arr, prop);
+            return typeof val === 'function' ? val.bind(arr) : val;
+        },
+        has(_, prop) {
+            return Reflect.has(getAllTools(), prop);
+        },
+        ownKeys() {
+            return Reflect.ownKeys(getAllTools());
+        },
+        getOwnPropertyDescriptor(_, prop) {
+            return Object.getOwnPropertyDescriptor(getAllTools(), prop);
+        },
+    })
+);
 
 export {
     buildTool,

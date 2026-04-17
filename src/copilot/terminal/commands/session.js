@@ -9,17 +9,19 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import {
-    ALWAYS_ALIVE_AGENT,
-    createSnapshot,
-    listSnapshotsAsync,
-    loadSnapshotAsync,
-    saveSnapshotAsync,
-} from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container, toError } from '#copilot/core';
-import { getWorkspaceContext } from '../workspace-context.js';
+    answerPendingTerminalQuestion,
+    clearTerminalHistory,
+    listTerminalSnapshotsProjection,
+    loadTerminalSnapshotProjection,
+    readTerminalCountProjection,
+    readTerminalDbHistoryProjection,
+    readTerminalDbSessionsProjection,
+    readTerminalHistoryProjection,
+    readTerminalStatusProjection,
+    saveTerminalSnapshotProjection,
+} from '../frontend/index.js';
 
 /**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
@@ -38,23 +40,34 @@ import { getWorkspaceContext } from '../workspace-context.js';
  * @returns {void}
  */
 export function cmdStatus({ hubSessionId, injectPort, println }) {
-    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
-    const active = container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive;
+    const projection = readTerminalStatusProjection({
+        hubSessionId: hubSessionId ?? null,
+        ...(typeof injectPort === 'number' ? { injectPort } : {}),
+    });
+    const { snap, health } = projection;
+    const active = projection.dialogLoopActive;
     const statusColor =
         snap['status'] === 'waiting_for_input' ? '\x1b[32m' : snap['status'] === 'idle' ? '\x1b[33m' : '\x1b[31m';
     const effort = snap['reasoningEffort'] ?? 'high';
-    const ws = getWorkspaceContext();
+    const healthColor =
+        health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
+    const ws = projection.workspace;
     const branchStr = ws.currentBranch ? `\x1b[32m${ws.currentBranch}\x1b[0m` : '\x1b[90m(sem branch)\x1b[0m';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
   agente           ${statusColor}${snap['status']}\x1b[0m
+        health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
   modelo           \x1b[36m${snap['model']}\x1b[0m
   reasoning        \x1b[35m${effort}\x1b[0m
-  turnos (memória) ${llmBridgeClient.turnCount}
-  hub session      \x1b[90m${hubSessionId ?? '(sem hub)'}\x1b[0m
-  inject port      ${injectPort}
+        bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
+        issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
+    runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
+    sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
+    hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
+    turnos (memória) ${projection.turnCount}
+    inject port      ${projection.injectPort}
   ─────────────────────────────────────
   workspace        \x1b[90m${ws.cwd}\x1b[0m
   git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
@@ -71,14 +84,13 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
  * @returns {void}
  */
 export function cmdHistory({ println }, n = 10) {
-    const hist = llmBridgeClient.history;
+    const hist = readTerminalHistoryProjection(n);
     if (hist.length === 0) {
         println('[history] Histórico vazio.');
         return;
     }
-    const slice = hist.slice(-n * 2);
-    println(`\n── Histórico (últimos ${Math.floor(slice.length / 2)} pares) ──`);
-    for (const turn of slice) {
+    println(`\n── Histórico (últimos ${Math.floor(hist.length / 2)} pares) ──`);
+    for (const turn of hist) {
         const ts = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
         const roleLabel = turn.role === 'user' ? '👤' : '🧠';
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
@@ -96,12 +108,13 @@ export function cmdHistory({ println }, n = 10) {
  * @returns {void}
  */
 export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
-    if (!hubSessionId) {
+    const projection = readTerminalDbHistoryProjection({ hubSessionId: hubSessionId ?? null, limit: n, offset });
+    if (!projection.available) {
         println('\x1b[90m  /db-history: Hub session não disponível (sem persistência).\x1b[0m');
         return;
     }
     try {
-        const turns = container.resolve(CONVERSATION_STORE).readTurns(hubSessionId, { limit: n, offset });
+        const turns = projection.turns;
         if (turns.length === 0) {
             println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
             return;
@@ -110,9 +123,11 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual${offsetLabel}\x1b[0m`);
         println('  ─────────────────────────────────────────────────');
         for (const t of turns) {
-            const ts = new Date(t.created_at).toLocaleTimeString('pt-BR');
-            const emoji = t.role === 'llm_b' ? '🧠' : t.role === 'llm_a' ? '🤖' : '👤';
-            const preview = t.content.slice(0, 160) + (t.content.length > 160 ? '…' : '');
+            const ts = new Date(String(t['created_at'] ?? '')).toLocaleTimeString('pt-BR');
+            const role = String(t['role'] ?? 'user');
+            const content = String(t['content'] ?? '');
+            const emoji = role === 'llm_b' ? '🧠' : role === 'llm_a' ? '🤖' : '👤';
+            const preview = content.slice(0, 160) + (content.length > 160 ? '…' : '');
             println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
         }
         println('  ─────────────────────────────────────────────────\n');
@@ -130,7 +145,10 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
  */
 export function cmdDbSessions({ hubSessionId, println }, n = 10) {
     try {
-        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: n });
+        const { sessions, currentHubSessionId } = readTerminalDbSessionsProjection({
+            currentHubSessionId: hubSessionId ?? null,
+            limit: n,
+        });
         if (sessions.length === 0) {
             println('\x1b[90m  /db-sessions: Nenhuma sessão persistida ainda.\x1b[0m');
             return;
@@ -138,12 +156,15 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
         println(`\n  \x1b[36mÚltimas ${sessions.length} hub sessions\x1b[0m`);
         println('  ──────────────────────────────────────────────────────────────');
         for (const s of sessions) {
-            const createdAt = new Date(s.created_at).toLocaleString('pt-BR');
-            const isCurrent = s.id === hubSessionId;
-            const statusColor = s.status === 'active' ? '\x1b[32m' : '\x1b[90m';
+            const createdAt = new Date(String(s['created_at'] ?? '')).toLocaleString('pt-BR');
+            const sessionId = String(s['id'] ?? '');
+            const sessionStatus = String(s['status'] ?? 'unknown');
+            const title = String(s['title'] ?? '(sem título)');
+            const isCurrent = sessionId === currentHubSessionId;
+            const statusColor = sessionStatus === 'active' ? '\x1b[32m' : '\x1b[90m';
             const marker = isCurrent ? ' \x1b[33m← atual\x1b[0m' : '';
             println(
-                `  ${statusColor}${s.status}\x1b[0m  \x1b[90m${createdAt}\x1b[0m  \x1b[2m${s.id.slice(0, 8)}\x1b[0m  ${s.title}${marker}`,
+                `  ${statusColor}${sessionStatus}\x1b[0m  \x1b[90m${createdAt}\x1b[0m  \x1b[2m${sessionId.slice(0, 8)}\x1b[0m  ${title}${marker}`,
             );
         }
         println('  ──────────────────────────────────────────────────────────────\n');
@@ -175,22 +196,20 @@ export function cmdWho({ injectPort, println }) {
  * @returns {void}
  */
 export function cmdCount({ hubSessionId, println }) {
-    if (!hubSessionId) {
+    const projection = readTerminalCountProjection({ hubSessionId: hubSessionId ?? null });
+    if (!projection.available) {
         println('\x1b[33m  Nenhuma hub session ativa.\x1b[0m');
         return;
     }
-    const turns = container.resolve(CONVERSATION_STORE).readTurns(hubSessionId, { limit: 9999 });
-    const mems = container.resolve(CONVERSATION_STORE).recallMemories({ limit: 9999 });
-    const userCount = turns.filter((t) => t.role === 'user').length;
-    const llmbCount = turns.filter((t) => t.role === 'llm_b').length;
     println(`
   \x1b[36mEstatísticas da sessão\x1b[0m
   ─────────────────────────────────────────────
-  Turnos (usuário):   ${String(userCount).padStart(4)}
-  Turnos (LLM-B):     ${String(llmbCount).padStart(4)}
-  Turnos (total):     ${String(turns.length).padStart(4)}
-  Memórias salvas:    ${String(mems.length).padStart(4)}
-  Hub session:        ${hubSessionId?.slice(0, 8) ?? '—'}…
+    Turnos (usuário):   ${String(projection.userTurns).padStart(4)}
+    Turnos (LLM-B):     ${String(projection.llmBTurns).padStart(4)}
+    Turnos (total):     ${String(projection.turns).padStart(4)}
+    Memórias salvas:    ${String(projection.memories).padStart(4)}
+    Hub session:        ${projection.hubSessionId?.slice(0, 8) ?? '—'}…
+    SDK session:        ${projection.sdkSessionId?.slice(0, 8) ?? '—'}…
   ─────────────────────────────────────────────\n`);
 }
 
@@ -201,7 +220,7 @@ export function cmdCount({ hubSessionId, println }) {
  * @returns {void}
  */
 export function cmdClear({ println }) {
-    llmBridgeClient.clearHistory();
+    clearTerminalHistory();
     println('\x1b[90m  Histórico em memória limpo.\x1b[0m');
 }
 
@@ -213,7 +232,7 @@ export function cmdClear({ println }) {
  * @returns {void}
  */
 export function cmdAnswer({ println }, arg) {
-    const ok = container.resolve(ALWAYS_ALIVE_AGENT).answerPendingQuestion(arg);
+    const ok = answerPendingTerminalQuestion(arg);
     println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
 }
 
@@ -225,23 +244,8 @@ export function cmdAnswer({ println }, arg) {
  * @returns {Promise<void>}
  */
 export async function cmdSessionSave({ println }, reason) {
-    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
-    const prm = container.resolve(ALWAYS_ALIVE_AGENT).dialogPrMetrics;
-
-    const data = createSnapshot({
-        sessionId: container.resolve(ALWAYS_ALIVE_AGENT).sessionId ?? null,
-        model: String(snap['model'] ?? 'unknown'),
-        status: String(snap['status'] ?? 'unknown'),
-        sendCount: Number(snap['sendCount'] ?? 0),
-        dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
-        dialogPaused: Boolean(snap['dialogPaused']),
-        pendingQuestion: snap['pendingQuestion'] ? String(snap['pendingQuestion']) : null,
-        prMetrics: prm ?? null,
-        reason: reason || 'manual',
-    });
-
-    const path = await saveSnapshotAsync(data);
-    println(`\x1b[32m  ✓ Snapshot salvo: ${data.snapshotId}\x1b[0m`);
+    const { data, path } = await saveTerminalSnapshotProjection(reason);
+    println(`\x1b[32m  ✓ Snapshot salvo: ${String(data['snapshotId'] ?? '(sem id)')}\x1b[0m`);
     println(`\x1b[90m    Path: ${path}\x1b[0m`);
 }
 
@@ -252,15 +256,19 @@ export async function cmdSessionSave({ println }, reason) {
  * @returns {Promise<void>}
  */
 export async function cmdSessionList({ println }) {
-    const snaps = await listSnapshotsAsync();
+    const snaps = await listTerminalSnapshotsProjection();
     if (snaps.length === 0) {
         println('\x1b[90m  Nenhum snapshot encontrado.\x1b[0m');
         return;
     }
     println(`\x1b[36m  Snapshots disponíveis (${snaps.length}):\x1b[0m`);
     for (const s of snaps) {
-        const date = new Date(s.createdAt).toISOString().replace('T', ' ').slice(0, 19);
-        println(`    ${s.snapshotId}  ${date}  model=${s.model}  ${s.reason ?? ''}`);
+        const createdAt = s['createdAt'];
+        const date =
+            typeof createdAt === 'number' || typeof createdAt === 'string'
+                ? new Date(createdAt).toISOString().replace('T', ' ').slice(0, 19)
+                : 'invalid-date';
+        println(`    ${String(s['snapshotId'] ?? '')}  ${date}  model=${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`);
     }
 }
 
@@ -278,22 +286,26 @@ export async function cmdSessionRestore({ println }, snapshotId) {
         return;
     }
 
-    const snap = await loadSnapshotAsync(snapshotId);
+    const snap = await loadTerminalSnapshotProjection(snapshotId);
     if (!snap) {
         println(`\x1b[31m  Snapshot não encontrado: ${snapshotId}\x1b[0m`);
         return;
     }
 
-    println(`\x1b[36m  Snapshot: ${snap.snapshotId}\x1b[0m`);
-    println(`    Criado: ${new Date(snap.createdAt).toISOString()}`);
-    println(`    Session: ${snap.sessionId ?? '(none)'}`);
-    println(`    Model: ${snap.model}  Status: ${snap.status}`);
-    println(`    Send count: ${snap.sendCount}`);
-    println(`    Dialog loop: ${snap.dialogLoopActive ? 'active' : 'inactive'}${snap.dialogPaused ? ' (paused)' : ''}`);
-    if (snap.pendingQuestion) println(`    Pending question: ${snap.pendingQuestion}`);
-    if (snap.prMetrics) {
+    println(`\x1b[36m  Snapshot: ${String(snap['snapshotId'] ?? '(sem id)')}\x1b[0m`);
+    const createdAt = snap['createdAt'];
+    const createdAtIso =
+        typeof createdAt === 'number' || typeof createdAt === 'string' ? new Date(createdAt).toISOString() : 'invalid-date';
+    println(`    Criado: ${createdAtIso}`);
+    println(`    Session: ${String(snap['sessionId'] ?? '(none)')}`);
+    println(`    Model: ${String(snap['model'] ?? 'unknown')}  Status: ${String(snap['status'] ?? 'unknown')}`);
+    println(`    Send count: ${Number(snap['sendCount'] ?? 0)}`);
+    println(`    Dialog loop: ${snap['dialogLoopActive'] ? 'active' : 'inactive'}${snap['dialogPaused'] ? ' (paused)' : ''}`);
+    if (snap['pendingQuestion']) println(`    Pending question: ${String(snap['pendingQuestion'])}`);
+    if (snap['prMetrics']) {
+        const prMetrics = /** @type {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number }} */ (snap['prMetrics']);
         println(
-            `    PR metrics: boots=${snap.prMetrics.boots} resumePR=${snap.prMetrics.resumesWithPR} zeroPR=${snap.prMetrics.resumesZeroPR}`,
+            `    PR metrics: boots=${Number(prMetrics.boots ?? 0)} resumePR=${Number(prMetrics.resumesWithPR ?? 0)} zeroPR=${Number(prMetrics.resumesZeroPR ?? 0)}`,
         );
     }
     println('\x1b[90m    (Restore automático ocorre no boot via PM2 — use /session save antes de reiniciar)\x1b[0m');

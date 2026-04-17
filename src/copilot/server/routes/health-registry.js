@@ -10,6 +10,7 @@
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { bridgeEmitter, container } from '#copilot/core';
+import { buildAgentModuleHealth } from './agent-health.js';
 import { registerModuleHealth } from './health-modules.js';
 
 /**
@@ -21,14 +22,7 @@ export function registerCopilotHealthChecks() {
     // ── Agent ────────────────────────────────────────────────────────────────
     registerModuleHealth('agent', () => {
         const agent = container.resolve(ALWAYS_ALIVE_AGENT);
-        return {
-            ok: true,
-            details: {
-                status: agent.status,
-                dialogLoopActive: agent.dialogLoopActive,
-                model: agent.model,
-            },
-        };
+        return buildAgentModuleHealth(agent);
     });
 
     // ── ConversationHub ──────────────────────────────────────────────────────

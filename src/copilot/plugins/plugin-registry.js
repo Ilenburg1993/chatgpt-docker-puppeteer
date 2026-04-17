@@ -150,7 +150,7 @@ export function createPluginRegistry() {
 /**
  * Descobre e carrega plugins a partir de diretórios convencionais no filesystem.
  *
- * Escaneia por arquivos `*.js` nos subdiretórios `tools/`, `hooks/`, `bridges/`, `services/` dentro de `baseDir`. Cada
+ * Escaneia por arquivos `*.js` nos subdiretórios `tools/`, `hooks/` e `bridges/` dentro de `baseDir`. Cada
  * arquivo deve exportar um default que satisfaça o contrato CopilotPlugin.
  *
  * @param {string} baseDir - Diretório raiz de plugins (ex: `src/copilot/plugins`).
@@ -162,7 +162,7 @@ export async function discoverPlugins(baseDir, registry) {
     const { join } = await import('node:path');
     const { pathToFileURL } = await import('node:url');
 
-    const subdirs = ['tools', 'hooks', 'bridges', 'services'];
+    const subdirs = ['tools', 'hooks', 'bridges'];
     /** @type {string[]} */
     const registered = [];
 

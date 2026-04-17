@@ -12,10 +12,10 @@ import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
 import { eventFanout } from '../../infra/sse/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
+import { CRITICAL_EVENTS } from '../../presentation/realtime.js';
 import { getHubSessionId } from '../state.js';
 
-/** Eventos considerados críticos para clientes em modo ?level=critical. */
-export const CRITICAL_EVENTS = new Set(['dialog.stalled', 'fatal', 'system']);
+export { CRITICAL_EVENTS } from '../../presentation/realtime.js';
 
 /**
  * Contador monotônico de IDs para eventos SSE do terminal.

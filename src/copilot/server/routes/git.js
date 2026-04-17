@@ -17,7 +17,7 @@ import {
     handleGhPrs,
     handleGitLog,
     handleGitStatus,
-} from '../../terminal/handlers/system-metrics.js';
+} from '../../presentation/system-metrics.js';
 import { bridgeHandler } from '../handler-bridge.js';
 
 /**

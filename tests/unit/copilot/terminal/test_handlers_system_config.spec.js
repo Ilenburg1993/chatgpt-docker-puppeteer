@@ -15,7 +15,37 @@ vi.mock('#copilot/agent', () => ({
         dialogLoopActive: false,
         status: 'idle',
         getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
+        getHealthSnapshot: () => ({
+            ok: true,
+            healthy: true,
+            status: 'healthy',
+            issues: [],
+            backgroundPendingCount: 0,
+            checks: {
+                io: { keepaliveRunning: true },
+                quota: { running: true },
+            },
+        }),
     },
+    getAgent: () =>
+        /** @type {any} */ ({
+            model: 'test-model',
+            reasoningEffort: 'high',
+            dialogLoopActive: false,
+            status: 'idle',
+            getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                issues: [],
+                backgroundPendingCount: 0,
+                checks: {
+                    io: { keepaliveRunning: true },
+                    quota: { running: true },
+                },
+            }),
+        }),
     setBackgroundCompactionThreshold: vi.fn(),
 }));
 vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
@@ -77,6 +107,10 @@ describe('handlers/system-config — handleHealth', () => {
         const result = handleHealth();
         expect(result.status).toBe(200);
         expect(result.body.ok).toBe(true);
+        expect(result.body.healthStatus).toBe('healthy');
+        expect(result.body.backgroundPendingCount).toBe(0);
+        expect(result.body.keepaliveRunning).toBe(true);
+        expect(result.body.quotaMonitorRunning).toBe(true);
         expect(typeof result.body.uptime).toBe('number');
         expect(typeof result.body.memoryMB).toBe('number');
     });

@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { toError, container } from '#copilot/core';
+import { toError } from '#copilot/core';
+import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
 
 /**
  * Handler do comando `/resume`.
@@ -26,7 +26,10 @@ export async function cmdResume({ println, hubSessionId }, arg) {
     // Sem argumento: lista últimas 5 sessões
     if (!trimmed) {
         try {
-            const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: 5, offset: 0 });
+            const { sessions, currentHubSessionId } = readTerminalResumeListProjection({
+                currentHubSessionId: hubSessionId ?? null,
+                limit: 5,
+            });
             if (sessions.length === 0) {
                 println('\x1b[90m  Nenhuma sessão anterior encontrada.\x1b[0m');
                 return;
@@ -34,10 +37,10 @@ export async function cmdResume({ println, hubSessionId }, arg) {
             println('');
             println('\x1b[36m  ─── Sessões Anteriores ─────────────────────────────────────────\x1b[0m');
             for (const s of sessions) {
-                const ts = new Date(s.created_at).toLocaleString('pt-BR');
-                const current = s.id === hubSessionId ? ' \x1b[32m← atual\x1b[0m' : '';
+                const ts = new Date(String(s['created_at'] ?? '')).toLocaleString('pt-BR');
+                const current = s['id'] === currentHubSessionId ? ' \x1b[32m← atual\x1b[0m' : '';
                 println(
-                    `  \x1b[33m${s.id.slice(0, 8)}\x1b[90m…\x1b[0m  ${s.title ?? 'sem título'}  \x1b[90m(${s.status}, ${ts})${current}\x1b[0m`,
+                    `  \x1b[33m${String(s['id'] ?? '').slice(0, 8)}\x1b[90m…\x1b[0m  ${s['title'] ?? 'sem título'}  \x1b[90m(${s['status'] ?? 'unknown'}, ${ts})${current}\x1b[0m`,
                 );
             }
             println('');
@@ -51,36 +54,25 @@ export async function cmdResume({ println, hubSessionId }, arg) {
 
     // Com sessionId: carrega turnos e retoma
     try {
-        // Suporta prefixo de 8+ chars
-        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions({ limit: 100, offset: 0 });
-        const target = sessions.find((s) => s.id === trimmed || s.id.startsWith(trimmed));
-        if (!target) {
+        const projection = readTerminalResumeProjection({ token: trimmed });
+        if (!projection.found || !projection.target) {
+            if (projection.reason === 'session-empty') {
+                println(
+                    `\x1b[90m  Sessão ${String(projection.target?.['id'] ?? trimmed).slice(0, 8)}… não tem turnos registrados.\x1b[0m`,
+                );
+                return;
+            }
             println(`\x1b[31m  ✗ Sessão não encontrada: ${trimmed}\x1b[0m`);
             return;
         }
 
-        const turns = container.resolve(CONVERSATION_STORE).readTurns(target.id, { limit: 50, offset: 0 });
-        if (turns.length === 0) {
-            println(`\x1b[90m  Sessão ${target.id.slice(0, 8)}… não tem turnos registrados.\x1b[0m`);
-            return;
-        }
-
-        // Monta resumo textual dos turnos
-        const lines = [];
-        for (const t of turns) {
-            const roleLabel = t.role === 'llm_b' ? 'LLM-B' : t.role === 'llm_a' ? 'LLM-A' : 'Usuário';
-            lines.push(`[${roleLabel}] ${t.content}`);
-        }
-        const summaryPrompt =
-            '[CONTEXTO DE SESSÃO ANTERIOR] Estou retomando a seguinte conversa. ' +
-            'Leia o contexto abaixo e continue a partir daí:\n\n' +
-            lines.join('\n\n');
-
-        println(`\x1b[36m  ↩️  Retomando sessão ${target.id.slice(0, 8)}… (${turns.length} turnos)\x1b[0m`);
+        println(
+            `\x1b[36m  ↩️  Retomando sessão ${String(projection.target['id'] ?? '').slice(0, 8)}… (${projection.turns.length} turnos)\x1b[0m`,
+        );
 
         // Import dinâmico para evitar ciclo
         const { sendTurn } = await import('../dialog.js');
-        await sendTurn(summaryPrompt, 'user');
+        await sendTurn(projection.summaryPrompt ?? '', 'user');
     } catch (e) {
         println(`\x1b[31m  ✗ Erro ao retomar sessão: ${toError(e).message}\x1b[0m`);
     }

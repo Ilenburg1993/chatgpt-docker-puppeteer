@@ -6,6 +6,8 @@
  * testa saída via println mock.
  */
 
+import { describe, expect, it, vi } from 'vitest';
+
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: {
         status: 'idle',
@@ -13,6 +15,13 @@ vi.mock('#copilot/agent', () => ({
         reasoningEffort: 'high',
         dialogLoopActive: false,
         sessionId: 'test-session-id',
+        getHealthSnapshot: () => ({
+            ok: true,
+            healthy: true,
+            status: 'healthy',
+            issues: [],
+            backgroundPendingCount: 0,
+        }),
         getStatusSnapshot: () => ({
             status: 'idle',
             model: 'gpt-4.1',
@@ -25,6 +34,32 @@ vi.mock('#copilot/agent', () => ({
         dialogPrMetrics: null,
         answerPendingQuestion: vi.fn((/** @type {string} */ _arg) => true),
     },
+    getAgent: () =>
+        /** @type {any} */ ({
+            status: 'idle',
+            model: 'gpt-4.1',
+            reasoningEffort: 'high',
+            dialogLoopActive: false,
+            sessionId: 'test-session-id',
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                issues: [],
+                backgroundPendingCount: 0,
+            }),
+            getStatusSnapshot: () => ({
+                status: 'idle',
+                model: 'gpt-4.1',
+                reasoningEffort: 'high',
+                sendCount: 5,
+                dialogPaused: false,
+                pendingQuestion: null,
+                contextWindow: 128000,
+            }),
+            dialogPrMetrics: null,
+            answerPendingQuestion: vi.fn((/** @type {string} */ _arg) => true),
+        }),
     createSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
         snapshotId: 'snap-001',
         createdAt: Date.now(),
@@ -53,7 +88,15 @@ vi.mock('#copilot/agent', () => ({
     }),
 }));
 
-vi.mock('#copilot/channel/client', () => ({
+vi.mock('#copilot/core', async () => {
+    const actual = await vi.importActual('#copilot/core');
+    return {
+        ...actual,
+        getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
+    };
+});
+
+vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {
         turnCount: 12,
         history: [
@@ -64,7 +107,7 @@ vi.mock('#copilot/channel/client', () => ({
     },
 }));
 
-vi.mock('#copilot/conversation-hub/store', () => ({
+vi.mock('#copilot/conversation-hub', () => ({
     conversationStore: {
         readTurns: vi.fn((_id, _opts) => [
             { role: 'user', content: 'a', created_at: Date.now() },
@@ -107,6 +150,8 @@ describe('commands/session — sync commands', () => {
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.println).toHaveBeenCalled();
         expect(ctx.output()).toContain('gpt-4.1');
+        expect(ctx.output()).toContain('healthy');
+        expect(ctx.output()).toContain('bg tasks');
     });
 
     it('cmdHistory imprime histórico', () => {
@@ -126,7 +171,7 @@ describe('commands/session — sync commands', () => {
     it('cmdClear chama clearHistory', async () => {
         const ctx = mockCtx();
         cmdClear({ println: ctx.println });
-        const { llmBridgeClient } = await import('#copilot/channel/client');
+        const { llmBridgeClient } = await import('#copilot/channel');
         expect(llmBridgeClient.clearHistory).toHaveBeenCalled();
     });
 

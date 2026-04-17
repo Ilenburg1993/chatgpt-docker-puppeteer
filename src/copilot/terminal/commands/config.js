@@ -10,9 +10,14 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { toError, container } from '#copilot/core';
-import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { toError } from '#copilot/core';
+import {
+    listTerminalAvailableModelsProjection,
+    readTerminalConfigProjection,
+    readTerminalModelStatsProjection,
+    setTerminalModelProjection,
+    setTerminalReasoningProjection,
+} from '../frontend/index.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 
@@ -38,15 +43,14 @@ const VALID_EFFORTS = /** @type {const} */ (['low', 'medium', 'high', 'xhigh']);
  * @returns {Promise<void>}
  */
 export async function cmdModel({ println }, arg) {
-    const current = container.resolve(ALWAYS_ALIVE_AGENT).model;
+    const { currentModel: current, modelMeta: meta } = readTerminalConfigProjection();
 
     if (!arg || arg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
-        const meta = modelRegistry.get(current);
         if (meta) {
-            println(
-                `  \x1b[90m    cost=${meta.costTier}  speed=${meta.speedTier}  ctx=${meta.contextWindow.toLocaleString()}\x1b[0m`,
-            );
+            const contextWindowLabel =
+                typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
+            println(`  \x1b[90m    cost=${meta.costTier}  speed=${meta.speedTier}  ctx=${contextWindowLabel}\x1b[0m`);
         }
         println(`  \x1b[90mUso: /model list | stats | <id>\x1b[0m\n`);
         return;
@@ -55,7 +59,7 @@ export async function cmdModel({ println }, arg) {
     const trimmed = arg.trim().toLowerCase();
 
     if (trimmed === 'stats') {
-        const stats = modelStatsTracker.allStats();
+        const { stats } = readTerminalModelStatsProjection();
         if (stats.length === 0) {
             println('  \x1b[33mSem estatísticas coletadas ainda.\x1b[0m\n');
             return;
@@ -77,7 +81,7 @@ export async function cmdModel({ println }, arg) {
     if (trimmed === 'list') {
         println('\x1b[90m  Consultando modelos disponíveis…\x1b[0m');
         try {
-            const models = await listModels();
+            const { models } = await listTerminalAvailableModelsProjection();
             if (models.length === 0) {
                 println('  \x1b[33mNenhum modelo retornado pelo SDK.\x1b[0m\n');
                 return;
@@ -98,8 +102,7 @@ export async function cmdModel({ println }, arg) {
     }
 
     // Troca de modelo
-    const previous = current;
-    container.resolve(ALWAYS_ALIVE_AGENT).setModel(trimmed);
+    const { previousModel: previous } = setTerminalModelProjection(trimmed);
     println(`\n  🔄  Modelo trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     println('  \x1b[90mEfetivo no próximo turno. Use /restart para reiniciar o loop com o novo modelo.\x1b[0m\n');
 }
@@ -118,7 +121,7 @@ export async function cmdModel({ println }, arg) {
  * @returns {void}
  */
 export function cmdReasoning({ println }, arg) {
-    const current = container.resolve(ALWAYS_ALIVE_AGENT).reasoningEffort ?? 'off';
+    const { currentReasoningEffort: current } = readTerminalConfigProjection();
 
     if (!arg || arg.trim() === '') {
         println(`\n  🧠  Reasoning effort: \x1b[36m${current}\x1b[0m`);
@@ -129,7 +132,7 @@ export function cmdReasoning({ println }, arg) {
     const trimmed = arg.trim().toLowerCase();
 
     if (trimmed === 'off' || trimmed === 'none') {
-        container.resolve(ALWAYS_ALIVE_AGENT).setReasoningEffort(undefined);
+        setTerminalReasoningProjection(undefined);
         println(`\n  🧠  Raciocínio extendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
         return;
     }
@@ -139,8 +142,9 @@ export function cmdReasoning({ println }, arg) {
         return;
     }
 
-    const previous = current;
-    container.resolve(ALWAYS_ALIVE_AGENT).setReasoningEffort(/** @type {ReasoningEffort} */ (trimmed));
+    const { previousReasoningEffort: previous } = setTerminalReasoningProjection(
+        /** @type {ReasoningEffort} */ (trimmed),
+    );
     println(`\n  🧠  Reasoning trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     println('  \x1b[90mEfetivo no próximo turno.\x1b[0m\n');
 }

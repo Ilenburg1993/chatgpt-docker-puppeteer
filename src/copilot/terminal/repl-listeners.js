@@ -9,7 +9,6 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import {
     EMITTER_ASSISTANT_INTENT,
     EMITTER_QUESTION_PENDING,
@@ -23,11 +22,8 @@ import {
     EMITTER_TOOL_EXECUTION_COMPLETE,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { container } from '../core/di-container.js';
 import { broadcastSse, println } from './dialog.js';
-
-/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
-const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
+import { getTerminalAgentRuntime } from './frontend/llm-b-runtime.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.
@@ -36,6 +32,7 @@ const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
  * @returns {() => void} Função de cleanup
  */
 export function setupAgentListeners(rl) {
+    const agent = getTerminalAgentRuntime();
     const onQuestion = (/** @type {Record<string, unknown>} */ evt) => {
         const q = /** @type {string} */ (evt?.['question'] ?? '');
         const choices = /** @type {string[]} */ (evt?.['choices'] ?? []);
@@ -136,29 +133,29 @@ export function setupAgentListeners(rl) {
         println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
     };
 
-    getAgent().on(EMITTER_QUESTION_PENDING, onQuestion);
-    getAgent().once(EMITTER_STOPPED, onStopped);
-    getAgent().on(EMITTER_TOOL_EXECUTION_START, onToolStart);
-    getAgent().on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
-    getAgent().on(EMITTER_SESSION_ERROR, onSessionError);
-    getAgent().on(EMITTER_SESSION_COMPACTION_START, onCompactionStart);
-    getAgent().on(EMITTER_SESSION_COMPACTION_COMPLETE, onCompactionComplete);
-    getAgent().on(EMITTER_ASSISTANT_INTENT, onIntent);
-    getAgent().on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
-    getAgent().on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
-    getAgent().on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
+    agent.on(EMITTER_QUESTION_PENDING, onQuestion);
+    agent.once(EMITTER_STOPPED, onStopped);
+    agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
+    agent.on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
+    agent.on(EMITTER_SESSION_ERROR, onSessionError);
+    agent.on(EMITTER_SESSION_COMPACTION_START, onCompactionStart);
+    agent.on(EMITTER_SESSION_COMPACTION_COMPLETE, onCompactionComplete);
+    agent.on(EMITTER_ASSISTANT_INTENT, onIntent);
+    agent.on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
+    agent.on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
+    agent.on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
 
     return () => {
-        getAgent().off('question.pending', onQuestion);
-        getAgent().off('stopped', onStopped);
-        getAgent().off('tool.execution_start', onToolStart);
-        getAgent().off('tool.execution_complete', onToolComplete);
-        getAgent().off('session.error', onSessionError);
-        getAgent().off('session.compaction_start', onCompactionStart);
-        getAgent().off('session.compaction_complete', onCompactionComplete);
-        getAgent().off('assistant.intent', onIntent);
-        getAgent().off('subagent.started', onSubagentStarted);
-        getAgent().off('subagent.completed', onSubagentCompleted);
-        getAgent().off('subagent.failed', onSubagentFailed);
+        agent.off('question.pending', onQuestion);
+        agent.off('stopped', onStopped);
+        agent.off('tool.execution_start', onToolStart);
+        agent.off('tool.execution_complete', onToolComplete);
+        agent.off('session.error', onSessionError);
+        agent.off('session.compaction_start', onCompactionStart);
+        agent.off('session.compaction_complete', onCompactionComplete);
+        agent.off('assistant.intent', onIntent);
+        agent.off('subagent.started', onSubagentStarted);
+        agent.off('subagent.completed', onSubagentCompleted);
+        agent.off('subagent.failed', onSubagentFailed);
     };
 }

@@ -17,10 +17,8 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
-import { HUB } from '#copilot/conversation-hub';
-import { bridgeEmitter, EVENT_BUS, toError } from '#copilot/core';
+import { bridgeEmitter, EVENT_BUS, getSharedSdkSessionId, toError } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { resolve } from 'node:path';
@@ -33,6 +31,15 @@ import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { loadAliasesAsync } from './alias-store.js';
 import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
+import {
+    attachTerminalHubSocketIO,
+    createTerminalHubSession,
+    getTerminalAgentRuntime,
+    initTerminalConversationHub,
+    isTerminalHubReady,
+    readTerminalHubOrchestrator,
+    readTerminalHubStore,
+} from './frontend/llm-b-runtime.js';
 import { startRepl } from './repl.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
@@ -83,9 +90,10 @@ function startReflectionLoop() {
     log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
 
     const runReflection = () => {
-        if (!container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive) return;
+        const agent = getTerminalAgentRuntime();
+        if (!agent.dialogLoopActive) return;
         // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
-        if (container.resolve(ALWAYS_ALIVE_AGENT).queueSize > 0) {
+        if (agent.queueSize > 0) {
             log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
             return;
         }
@@ -155,9 +163,11 @@ export async function startTerminalServer() {
 
     // Criar hub_session permanente (best-effort)
     try {
-        await container.resolve(HUB).init();
-        const hubSessionId = container.resolve(HUB).store.createHubSession({
+        await initTerminalConversationHub();
+        const sdkSessionId = getSharedSdkSessionId();
+        const hubSessionId = createTerminalHubSession({
             title: 'Terminal Permanente LLM-B',
+            ...(sdkSessionId ? { sdkSessionId } : {}),
             metadata: { source: 'terminal-server', startedAt: new Date().toISOString() },
         });
         setHubSessionId(hubSessionId);
@@ -168,12 +178,12 @@ export async function startTerminalServer() {
 
     // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
     // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
-    const _hubReady = container.resolve(HUB).isReady;
+    const _hubReady = isTerminalHubReady();
     /** @type {import('../server/index.js').CopilotServerOptions} */
     const _serverOpts = {};
     if (_hubReady) {
-        _serverOpts.orchestrator = container.resolve(HUB).orchestrator;
-        _serverOpts.store = container.resolve(HUB).store;
+        _serverOpts.orchestrator = readTerminalHubOrchestrator();
+        _serverOpts.store = readTerminalHubStore();
     }
     const copilotServerPromise = startCopilotServer(_serverOpts);
 
@@ -206,8 +216,8 @@ export async function startTerminalServer() {
     const copilotServer = await copilotServerPromise;
 
     // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)
-    if (copilotServer.io && container.resolve(HUB).isReady) {
-        container.resolve(HUB).attachSocketIO(copilotServer.io);
+    if (copilotServer.io && isTerminalHubReady()) {
+        attachTerminalHubSocketIO(copilotServer.io);
     }
 
     registerShutdownHandler(
@@ -234,8 +244,8 @@ export async function startTerminalServer() {
         })(),
         mcpToolCount: getMcpStatus().toolCount,
         hubSessionId: getHubSessionId(),
-        dialogLoopActive: container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive,
-        model: container.resolve(ALWAYS_ALIVE_AGENT).model,
+        dialogLoopActive: getTerminalAgentRuntime().dialogLoopActive,
+        model: getTerminalAgentRuntime().model,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
 

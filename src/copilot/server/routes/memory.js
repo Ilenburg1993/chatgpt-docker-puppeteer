@@ -12,7 +12,7 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../terminal/handlers/dialog.js';
+import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../presentation/conversation-hub.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
@@ -21,7 +21,7 @@ import { validate } from '../middleware/validate.js';
 const storeMemoryBodySchema = z.object({
     content: z.string().min(1).max(32_000),
     tag: z.string().max(128).optional(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const memoryParamsSchema = z.object({

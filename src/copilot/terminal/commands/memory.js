@@ -8,8 +8,11 @@
  * @see EventBus
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import {
+    forgetTerminalMemoryProjection,
+    recallTerminalMemoriesProjection,
+    rememberTerminalMemoryProjection,
+} from '../frontend/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -25,19 +28,12 @@ import { container } from '#copilot/core';
  * @returns {void}
  */
 export function cmdRemember({ hubSessionId, println }, arg) {
-    const match = arg.match(/^([a-z0-9_-]+):\s*(.+)$/i);
-    const tag = match ? (match[1] ?? 'geral') : 'geral';
-    const content = match ? (match[2] ?? '').trim() : arg.trim();
-    if (!content) {
+    const result = rememberTerminalMemoryProjection({ hubSessionId: hubSessionId ?? null, input: arg });
+    if (!result.ok || !result.id) {
         println('\x1b[90m  Uso: /remember [tag:] conteúdo\x1b[0m');
         return;
     }
-    const id = container.resolve(CONVERSATION_STORE).storeMemory({
-        tag,
-        content,
-        ...(hubSessionId ? { hubSessionId } : {}),
-    });
-    println(`\x1b[32m  ✓ Memória salva\x1b[0m \x1b[90m[${tag}] ${id.slice(0, 8)}…\x1b[0m`);
+    println(`\x1b[32m  ✓ Memória salva\x1b[0m \x1b[90m[${result.tag}] ${result.id.slice(0, 8)}…\x1b[0m`);
 }
 
 /**
@@ -48,20 +44,16 @@ export function cmdRemember({ hubSessionId, println }, arg) {
  * @returns {void}
  */
 export function cmdRecall({ println }, arg) {
-    const isSearch = arg.startsWith('?');
-    const memories = container.resolve(CONVERSATION_STORE).recallMemories({
-        ...(isSearch ? { search: arg.slice(1).trim() } : arg ? { tag: arg } : {}),
-        limit: 10,
-    });
+    const { label, memories } = recallTerminalMemoriesProjection(arg);
     if (memories.length === 0) {
         println('\x1b[90m  Nenhuma memória encontrada.\x1b[0m');
         return;
     }
-    println(`\n  \x1b[36mMemórias\x1b[0m ${arg ? `[${arg}]` : '(todas)'}`);
+    println(`\n  \x1b[36mMemórias\x1b[0m ${label ? `[${arg}]` : '(todas)'}`);
     println('  ─────────────────────────────────────────────');
     for (const m of memories) {
-        const ts = new Date(m.created_at).toLocaleString('pt-BR');
-        println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m.tag}\x1b[0m  ${m.content}`);
+        const ts = new Date(String(m['created_at'] ?? '')).toLocaleString('pt-BR');
+        println(`  \x1b[90m[${ts}]\x1b[0m \x1b[33m${m['tag'] ?? ''}\x1b[0m  ${m['content'] ?? ''}`);
     }
     println('  ─────────────────────────────────────────────\n');
 }
@@ -78,7 +70,7 @@ export function cmdForget({ println }, arg) {
         println('\x1b[90m  Uso: /forget <id>\x1b[0m');
         return;
     }
-    const deleted = container.resolve(CONVERSATION_STORE).deleteMemory(arg);
+    const deleted = forgetTerminalMemoryProjection(arg);
     println(
         deleted
             ? `\x1b[32m  ✓ Memória removida: ${arg.slice(0, 8)}…\x1b[0m`

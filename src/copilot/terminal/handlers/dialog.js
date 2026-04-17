@@ -1,164 +1,18 @@
 // @ts-check
 /**
- * src/copilot/terminal/handlers-dialog.js
- *
- * Handlers para endpoints de sessão, memória e turnos do ConversationHub.
- *
  * @module copilot/terminal/handlers-dialog
- * @see EventBus
- * @see module:copilot/terminal/route-table
- */
-
-import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
-import { container, toError } from '#copilot/core';
-import { getHubSessionId } from '../state.js';
-
-/**
- * @typedef {import('./shared.js').HandlerResult} HandlerResult
- */
-
-// ─── GET /sessions ────────────────────────────────────────────────────────────
-
-/**
- * Lista hub_sessions persistidas.
+ * @file Adapter fino do terminal para a superfície compartilhada de sessions, memory e hub-health.
  *
- * @param {{ limit?: number; offset?: number; status?: string }} [params]
- * @returns {HandlerResult}
+ *   A lógica canônica agora vive em `src/copilot/presentation/conversation-hub.js` para que `server` e `terminal`
+ *   consumam a mesma SSOT de presentation.
  */
-export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
-    // T-25: validar status contra valores permitidos pelo schema HubSessionStatus
-    const VALID_STATUS = new Set(['active', 'closed', 'error']);
-    if (status !== undefined && !VALID_STATUS.has(status)) {
-        return { status: 400, body: { ok: false, error: `status inválido: "${status}". Use: active, closed, error` } };
-    }
-    try {
-        const opts = {
-            limit: isNaN(limit) ? 20 : limit,
-            offset: isNaN(offset) ? 0 : offset,
-            ...(status !== undefined && {
-                status: /** @type {import('../../conversation-hub/store-helpers.js').HubSessionStatus} */ (status),
-            }),
-        };
-        const sessions = container.resolve(CONVERSATION_STORE).listHubSessions(opts);
-        return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
-    } catch (e) {
-        return { status: 500, body: { ok: false, error: toError(e).message } };
-    }
-}
 
-// ─── GET /sessions/:id/turns ──────────────────────────────────────────────────
-
-/**
- * Retorna os turnos de uma sessão específica.
- *
- * @param {Record<string, unknown>} params
- * @returns {HandlerResult}
- */
-export function handleListTurns(params) {
-    const sessionId = typeof params['sessionId'] === 'string' ? params['sessionId'] : '';
-    const rawLimit = params['limit'];
-    const rawOffset = params['offset'];
-    const limit = typeof rawLimit === 'number' && !isNaN(rawLimit) ? rawLimit : 50;
-    const offset = typeof rawOffset === 'number' && !isNaN(rawOffset) ? rawOffset : 0;
-    try {
-        const turns = container.resolve(CONVERSATION_STORE).readTurns(sessionId, { limit, offset });
-        // T-26 fix: incluir totalCount para paginação correta no cliente
-        const totalCount = container.resolve(CONVERSATION_STORE).countTurns(sessionId);
-        return { status: 200, cors: true, body: { ok: true, turns, sessionId, totalCount } };
-    } catch (e) {
-        return { status: 500, body: { ok: false, error: toError(e).message } };
-    }
-}
-
-// ─── POST /memory ─────────────────────────────────────────────────────────────
-
-/**
- * Armazena uma memória semântica.
- *
- * @param {{ content?: string; tag?: string }} body
- * @returns {HandlerResult}
- */
-export function handleStoreMemory(body) {
-    if (!body?.content) {
-        return { status: 400, body: { ok: false, error: '"content" obrigatório' } };
-    }
-    try {
-        const _hubSessionId = getHubSessionId();
-        const id = container.resolve(CONVERSATION_STORE).storeMemory({
-            content: body.content,
-            tag: body.tag ?? 'geral',
-            ...(_hubSessionId ? { hubSessionId: _hubSessionId } : {}),
-        });
-        return { status: 201, body: { ok: true, id } };
-    } catch (e) {
-        return { status: 500, body: { ok: false, error: toError(e).message } };
-    }
-}
-
-// ─── GET /memory ──────────────────────────────────────────────────────────────
-
-/**
- * Recupera memórias semânticas.
- *
- * @param {{ tag?: string | null; search?: string | null; limit?: number }} [params]
- * @returns {HandlerResult}
- */
-export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
-    try {
-        const memories = container.resolve(CONVERSATION_STORE).recallMemories({
-            ...(tag ? { tag } : {}),
-            ...(search ? { search } : {}),
-            limit: isNaN(/** @type {number} */ (limit)) ? 20 : /** @type {number} */ (limit),
-        });
-        return { status: 200, cors: true, body: { ok: true, memories } };
-    } catch (e) {
-        return { status: 500, body: { ok: false, error: toError(e).message } };
-    }
-}
-
-// ─── DELETE /memory/:id ───────────────────────────────────────────────────────
-
-/**
- * Remove uma memória semântica.
- *
- * @param {{ memoryId: string }} params
- * @returns {HandlerResult}
- */
-export function handleDeleteMemory({ memoryId }) {
-    try {
-        const deleted = container.resolve(CONVERSATION_STORE).deleteMemory(memoryId);
-        return { status: deleted ? 200 : 404, cors: true, body: { ok: deleted, id: memoryId } };
-    } catch (e) {
-        return { status: 500, body: { ok: false, error: toError(e).message } };
-    }
-}
-
-// ─── GET /hub-health ─────────────────────────────────────────────────────────
-
-/**
- * Executa `SELECT 1` no banco para confirmar que está responsivo. Retorna `{ ok: true }` se o DB responder, `{ ok:
- * false }` com erro descritivo caso contrário.
- *
- * @returns {HandlerResult}
- */
-export function handleHubHealth() {
-    if (!container.resolve(HUB).isReady) {
-        return { status: 503, body: { ok: false, error: 'ConversationHub não inicializado' } };
-    }
-    try {
-        // T-08: usar countHubSessions (COUNT(*)) em vez de listHubSessions({limit:1000}).length — O(1) com índice
-        const activeSessions = container.resolve(CONVERSATION_STORE).countHubSessions({ status: 'active' });
-        const totalSessions = container.resolve(CONVERSATION_STORE).countHubSessions();
-        return {
-            status: 200,
-            body: {
-                ok: true,
-                dbResponsive: true,
-                activeSessions,
-                totalSessions,
-            },
-        };
-    } catch (e) {
-        return { status: 503, body: { ok: false, error: toError(e).message ?? String(e), dbResponsive: false } };
-    }
-}
+export {
+    VALID_HUB_SESSION_STATUS,
+    handleDeleteMemory,
+    handleHubHealth,
+    handleListSessions,
+    handleListTurns,
+    handleRecallMemories,
+    handleStoreMemory,
+} from '../../presentation/conversation-hub.js';

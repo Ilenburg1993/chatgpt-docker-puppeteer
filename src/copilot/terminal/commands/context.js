@@ -11,28 +11,7 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
-import { container } from '#copilot/core';
-import { getWorkspaceContext } from '../workspace-context.js';
-
-// ─── Estimativa de tokens ─────────────────────────────────────────────────────
-
-/** Heurística de tokens: ~4 chars por token. */
-const CHARS_PER_TOKEN = 4;
-
-/** Limite padrão estimado de tokens (128k context window — conservador). */
-const DEFAULT_MAX_TOKENS = 128_000;
-
-/**
- * Estima o número de tokens a partir de uma contagem de caracteres.
- *
- * @param {number} charCount - Número de caracteres
- * @returns {number}
- */
-function estimateTokens(charCount) {
-    return Math.ceil(charCount / CHARS_PER_TOKEN);
-}
+import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
 
 /**
  * Renderiza uma barra de progresso ASCII.
@@ -59,41 +38,18 @@ function progressBar(used, total, width = 20) {
  * @returns {void}
  */
 export function cmdContext({ println }) {
-    const history = /** @type {{ role: string; content: string }[]} */ (
-        /** @type {unknown} */ (llmBridgeClient.history) ?? []
-    );
+    const projection = readTerminalContextProjection();
 
-    // AA.3: usar dados reais do SDK se disponíveis
-    const sdkContext = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot().contextWindow;
-
-    if (!sdkContext && history.length === 0) {
+    if (!projection.isRealData && !projection.hasHistory) {
         println('\x1b[90m  Nenhum histórico em memória ainda. Envie um turno primeiro.\x1b[0m');
         return;
     }
 
-    // Total de chars (para exibição complementar)
-    let totalChars = 0;
-    let turnCount = 0;
-    for (const turn of history) {
-        const text = typeof turn.content === 'string' ? turn.content : JSON.stringify(turn.content);
-        totalChars += text.length;
-        turnCount++;
-    }
-
-    let usedTokens, maxTokens, pct, pctStr, isRealData;
-    if (sdkContext) {
-        usedTokens = sdkContext.tokens;
-        maxTokens = sdkContext.tokenLimit;
-        pct = Math.min(sdkContext.utilization, 1);
-        pctStr = (pct * 100).toFixed(1);
-        isRealData = true;
-    } else {
-        usedTokens = estimateTokens(totalChars);
-        maxTokens = DEFAULT_MAX_TOKENS;
-        pct = Math.min(usedTokens / maxTokens, 1);
-        pctStr = (pct * 100).toFixed(1);
-        isRealData = false;
-    }
+    const usedTokens = projection.usedTokens;
+    const maxTokens = projection.maxTokens;
+    const pct = Math.min(projection.utilization, 1);
+    const pctStr = (pct * 100).toFixed(1);
+    const isRealData = projection.isRealData;
 
     const bar = progressBar(usedTokens, maxTokens);
 
@@ -103,9 +59,9 @@ export function cmdContext({ println }) {
     println(
         `  Tokens${isRealData ? ' (real SDK)' : ' estimados'}: \x1b[33m${usedTokens.toLocaleString('pt-BR')}\x1b[0m / \x1b[90m${maxTokens.toLocaleString('pt-BR')}\x1b[0m`,
     );
-    if (turnCount > 0) {
-        println(`  Chars totais     : \x1b[33m${totalChars.toLocaleString('pt-BR')}\x1b[0m`);
-        println(`  Turnos na memória: \x1b[33m${turnCount}\x1b[0m`);
+    if (projection.turnCount > 0) {
+        println(`  Chars totais     : \x1b[33m${projection.totalChars.toLocaleString('pt-BR')}\x1b[0m`);
+        println(`  Turnos na memória: \x1b[33m${projection.turnCount}\x1b[0m`);
     }
 
     if (pct > 0.85) {
@@ -121,7 +77,7 @@ export function cmdContext({ println }) {
     }
 
     // AG.5 — workspace SessionContext
-    const ws = getWorkspaceContext();
+    const ws = projection.workspace;
     println(`\x1b[36m  ─── Workspace ──────────────────────────────────────────────────\x1b[0m`);
     println(`  cwd    \x1b[90m${ws.cwd}\x1b[0m`);
     if (ws.gitRoot) println(`  git    \x1b[90m${ws.gitRoot}\x1b[0m  branch: \x1b[32m${ws.currentBranch ?? '?'}\x1b[0m`);
@@ -130,13 +86,6 @@ export function cmdContext({ println }) {
 }
 
 // ─── /compact ─────────────────────────────────────────────────────────────────
-
-/** Pedido de compactação enviado à LLM-B como mensagem de sistema. */
-const COMPACT_PROMPT =
-    '[SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve: ' +
-    'todos os fatos, código, decisões, estados e contexto de arquivos discutidos. ' +
-    'Responda APENAS com esse resumo. Após isso, considere o resumo como o novo ' +
-    'contexto inicial desta sessão.';
 
 /**
  * Solicita compactação manual à LLM-B e exibe o resultado.
@@ -151,20 +100,13 @@ const COMPACT_PROMPT =
 export async function cmdCompact({ println }) {
     println('\x1b[90m  ⚙️  Solicitando compactação à LLM-B… aguarde.\x1b[0m');
 
-    // Import dinâmico para evitar ciclo dialog.js ↔ commands/context.js
-    const { sendTurn } = await import('../dialog.js');
-
-    const reply = await sendTurn(COMPACT_PROMPT, 'user');
-    if (!reply) {
+    const result = await requestTerminalCompactionProjection();
+    if (!result.ok || !result.reply) {
         println('\x1b[31m  ✗ LLM-B ocupada ou sem resposta. Tente novamente.\x1b[0m');
         return;
     }
 
-    // BUG-05 (fix): usar clearHistory()/seedHistory() em vez de mutação direta de ReadonlyArray
-    llmBridgeClient.clearHistory();
-    llmBridgeClient.seedHistory('assistant', reply);
-
-    const estimatedNew = estimateTokens(reply?.length ?? 0);
+    const estimatedNew = result.estimatedTokens ?? 0;
     println('');
     println(`\x1b[32m  ✓ Histórico local compactado.\x1b[0m`);
     println(`\x1b[90m  Tokens estimados após compactação: ~${estimatedNew.toLocaleString('pt-BR')} tokens\x1b[0m`);

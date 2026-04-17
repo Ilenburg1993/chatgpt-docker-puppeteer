@@ -22,8 +22,8 @@ import {
     handleInject,
     handlePipeline,
     handleRejectHandoff,
-} from '../../terminal/handlers/agent.js';
-import { handleGetPrBudget, handleGetQuota } from '../../terminal/handlers/system-metrics.js';
+} from '../../presentation/agent-control.js';
+import { handleGetPrBudget, handleGetQuota } from '../../presentation/system-metrics.js';
 import { bridgeHandler } from '../handler-bridge.js';
 import { injectRateMiddleware, writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
@@ -31,11 +31,11 @@ import { validate } from '../middleware/validate.js';
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const injectBodySchema = z.object({
     content: z.string().min(1).max(64_000),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const pipelineBodySchema = z.object({
-    steps: z.array(z.object({ type: z.string(), config: z.record(z.unknown()).optional() })).min(1),
+    steps: z.array(z.object({ type: z.string(), config: z.record(z.string(), z.unknown()).optional() })).min(1),
 });
 
 const handoffParamsSchema = z.object({

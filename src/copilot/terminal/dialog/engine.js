@@ -6,12 +6,16 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { emitNerv } from '#copilot/bridges';
-import { llmBridgeClient } from '#copilot/channel';
-import { container, toError } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { embedMultiple, readFileContext } from '../file-context.js';
+import {
+    getTerminalAgentRuntime,
+    readTerminalDialogStreamMeta,
+    runTerminalDialogTurn,
+    startTerminalDialogMode,
+} from '../frontend/llm-b-runtime.js';
 import {
     clearAttachments,
     getAttachmentQueue,
@@ -43,9 +47,6 @@ import {
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
-/** @returns {import('../../agent/always-alive.js').AlwaysAliveAgent} */
-const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
-
 const MAX_TURN_QUEUE_SIZE = 10;
 /** @type {number} */
 let _turnQueueDepth = 0;
@@ -69,10 +70,10 @@ let _ensureDialogLoopInFlight = null;
  * @returns {Promise<void>}
  */
 export function ensureDialogLoop() {
-    if (getAgent().dialogLoopActive) {
+    if (getTerminalAgentRuntime().dialogLoopActive) {
         return Promise.resolve();
     }
-    if (getAgent().dialogPaused) {
+    if (getTerminalAgentRuntime().dialogPaused) {
         log('INFO', '[dialog] ensureDialogLoop() ignorado — dialogPaused=true (pausado pelo usuário)');
         return Promise.resolve();
     }
@@ -128,14 +129,15 @@ async function _doEnsureDialogLoop() {
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
-    const status = getAgent().status;
+    const agent = getTerminalAgentRuntime();
+    const status = agent.status;
     if (status === 'stopped') {
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
-        await getAgent().start();
+        await agent.start();
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timeout aguardando idle')), 30_000);
             const check = () => {
-                if (getAgent().status === 'idle') {
+                if (agent.status === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
                 } else {
@@ -146,7 +148,7 @@ async function _tryStartDialogLoop() {
         });
     }
 
-    if (getAgent().status === 'processing') {
+    if (agent.status === 'processing') {
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(
@@ -154,7 +156,7 @@ async function _tryStartDialogLoop() {
                 30_000,
             );
             const check = () => {
-                const s = getAgent().status;
+                const s = agent.status;
                 if (s === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
@@ -170,7 +172,7 @@ async function _tryStartDialogLoop() {
     }
 
     println('\x1b[90m  Conectando ao agente…\x1b[0m');
-    await llmBridgeClient.startDialogMode(BOOT_PROMPT ?? undefined, {
+    await startTerminalDialogMode(BOOT_PROMPT ?? undefined, {
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
     });
 }
@@ -214,7 +216,8 @@ export function sendTurn(message, actor = 'user') {
  * @returns {Promise<string | null>}
  */
 async function _executeTurn(message, actor) {
-    const ctxState = getAgent().getStatusSnapshot().contextWindow;
+    const agent = getTerminalAgentRuntime();
+    const ctxState = agent.getStatusSnapshot().contextWindow;
     if (ctxState) {
         const u = ctxState.utilization;
         if (u >= 0.95) {
@@ -232,8 +235,8 @@ async function _executeTurn(message, actor) {
     broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
     if (rl) {
-        const model = getAgent().model;
-        const effort = getAgent().reasoningEffort ?? 'high';
+        const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+        const effort = reasoningEffort;
         process.stdout.write(`  \x1b[90m⏳ aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m…\x1b[0m`);
         rl.setPrompt(PROMPT_WAITING);
     }
@@ -276,8 +279,8 @@ async function _executeTurn(message, actor) {
         }
 
         const showThinking = getShowThinking();
-        const model = getAgent().model;
-        const effort = getAgent().reasoningEffort ?? 'high';
+        const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+        const effort = reasoningEffort;
         const displayState = createDisplayState({ model, effort, turnStartTime: t0 });
 
         /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
@@ -286,7 +289,7 @@ async function _executeTurn(message, actor) {
         /** @type {(chunk: string) => void} */
         const onDelta = createDeltaCallback(displayState);
 
-        const reply = await llmBridgeClient.dialogTurn(enrichedMessage, {
+        const reply = await runTerminalDialogTurn(enrichedMessage, {
             timeout: TURN_TIMEOUT_MS,
             onDelta,
             ...(onReasoning && { onReasoning }),
@@ -311,9 +314,9 @@ async function _executeTurn(message, actor) {
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
 
         if (getShowUsage()) {
-            const snap = getAgent().getStatusSnapshot();
+            const snap = agent.getStatusSnapshot();
             const ctxWin = snap?.contextWindow;
-            const prInfo = getAgent().lastPrInfo;
+            const prInfo = agent.lastPrInfo;
             if (ctxWin || prInfo) {
                 const parts = [];
                 if (prInfo) {
@@ -343,7 +346,7 @@ async function _executeTurn(message, actor) {
     } catch (e) {
         println(`[erro] ${toError(e).message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
-        if (!getAgent().dialogLoopActive) {
+        if (!agent.dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             setTimeout(() => {
                 ensureDialogLoop().catch((restartErr) => {

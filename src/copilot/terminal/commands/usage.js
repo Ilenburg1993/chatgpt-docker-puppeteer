@@ -10,8 +10,7 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
+import { readTerminalUsageNowProjection } from '../frontend/index.js';
 import { getShowUsage, setShowUsage } from '../state.js';
 
 /**
@@ -35,8 +34,8 @@ export function cmdUsage({ println }, arg) {
     const trimmed = (arg ?? '').trim().toLowerCase();
 
     if (trimmed === 'now') {
-        const snap = container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot();
-        const ctx = snap?.contextWindow;
+        const projection = readTerminalUsageNowProjection();
+        const ctx = projection.contextWindow;
         if (ctx) {
             const pct = (ctx.utilization * 100).toFixed(0);
             const bar = _renderBar(ctx.utilization);
@@ -46,11 +45,16 @@ export function cmdUsage({ println }, arg) {
             println('\n  \x1b[33m⚠️  Dados de context window não disponíveis.\x1b[0m');
         }
 
-        const pr = container.resolve(ALWAYS_ALIVE_AGENT).lastPrInfo;
+        const pr = projection.pr;
         if (pr) {
-            const model = pr.model ?? 'unknown';
-            const cost = typeof pr.cost === 'number' ? pr.cost.toFixed(4) : '?';
+            const model = pr['model'] ?? 'unknown';
+            const cost = typeof pr['cost'] === 'number' ? pr['cost'].toFixed(4) : '?';
             println(`      Último turno: modelo=\x1b[36m${model}\x1b[0m · custo=\x1b[33m${cost}\x1b[0m`);
+        }
+        if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
+            println(
+                `      Binding: runtime=\x1b[90m${projection.runtimeSessionId ?? '-'}\x1b[0m · sdk=\x1b[90m${projection.binding.sdkSessionId ?? '-'}\x1b[0m · hub=\x1b[90m${projection.binding.hubSessionId ?? '-'}\x1b[0m`,
+            );
         }
         println('');
         return;

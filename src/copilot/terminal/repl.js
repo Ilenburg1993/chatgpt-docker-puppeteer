@@ -10,13 +10,11 @@
  * @see module:copilot/terminal/dialog
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
-import { toError, container } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
-import { llmBridgeClient } from '../channel/client.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { resolve } from './alias-store.js';
 import {
@@ -59,12 +57,17 @@ import {
 } from './commands/index.js';
 import { ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
+import {
+    getTerminalAgentRuntime,
+    pauseTerminalDialogLoop,
+    readTerminalHandoffHistory,
+    resumeTerminalDialogLoop,
+    stopTerminalAgentRuntime,
+    stopTerminalDialogMode,
+} from './frontend/llm-b-runtime.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
-
-/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
-const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 const INJECT_PORT = LLM_B_TERMINAL_PORT;
 const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
@@ -235,14 +238,15 @@ async function _cmdRestart() {
             clearTimeout(timeout);
             resolveReady();
         };
-        getAgent().once(EMITTER_DIALOG_READY, onReady);
-        await llmBridgeClient.stopDialogMode();
-        if (!getAgent().dialogLoopActive) {
+        const agent = getTerminalAgentRuntime();
+        agent.once(EMITTER_DIALOG_READY, onReady);
+        await stopTerminalDialogMode();
+        if (!agent.dialogLoopActive) {
             await readyPromise;
         } else {
             // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout
             clearTimeout(timeout);
-            getAgent().off('dialog.ready', onReady);
+            agent.off('dialog.ready', onReady);
         }
     } catch (e) {
         println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);
@@ -253,7 +257,7 @@ async function _cmdRestart() {
 
 async function _cmdPauseDialogLoop() {
     try {
-        await getAgent().pauseDialogLoop();
+        await pauseTerminalDialogLoop();
         println('\x1b[33m  Dialog loop pausado. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
     } catch (e) {
         println(`\x1b[31m  Erro ao pausar: ${toError(e).message}\x1b[0m`);
@@ -262,7 +266,7 @@ async function _cmdPauseDialogLoop() {
 
 async function _cmdDialogResume() {
     try {
-        await getAgent().resumeDialogLoop();
+        await resumeTerminalDialogLoop();
         println('\x1b[32m  Dialog loop retomado.\x1b[0m');
     } catch (e) {
         println(`\x1b[31m  Erro ao retomar: ${toError(e).message}\x1b[0m`);
@@ -270,19 +274,18 @@ async function _cmdDialogResume() {
 }
 
 function _cmdHandoff() {
-    const mgr = getAgent().getHandoffManager?.();
-    if (!mgr) {
+    const history = readTerminalHandoffHistory();
+    if (!history) {
         println('\x1b[31m  HandoffManager não disponível.\x1b[0m');
         return;
     }
-    const history = mgr.getHistory();
     if (history.length === 0) {
         println('\x1b[33m  Nenhum handoff registrado nesta sessão.\x1b[0m');
         return;
     }
     println('\x1b[36m  ── Handoff History ──\x1b[0m');
     for (const h of history) {
-        const ts = new Date(h.receivedAt).toISOString();
+        const ts = new Date(Number(h.receivedAt)).toISOString();
         println(
             `  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  reason=\x1b[90m${h.reason ?? '-'}\x1b[0m  status=\x1b[36m${h.status}\x1b[0m`,
         );
@@ -297,7 +300,7 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     println('[terminal] Encerrando sessão…');
     cleanup();
     try {
-        await getAgent().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+        await stopTerminalAgentRuntime();
     } catch (e) {
         logSwallowed(e, 'terminal.repl.stopLoop');
     }

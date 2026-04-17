@@ -9,8 +9,6 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { HUB } from '#copilot/conversation-hub';
 import {
     AGENT_EVENTS,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -26,14 +24,17 @@ import {
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { llmBridgeClient } from '../channel/client.js';
-import { container } from '../core/di-container.js';
 import { logSwallowed } from '../core/error-handlers.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog.js';
+import {
+    getTerminalAgentRuntime,
+    pingTerminalDialogWatchdog,
+    readTerminalDialogStreamMeta,
+    readTerminalRuntimeState,
+    stopTerminalDialogMode,
+    writeTerminalHubSystemTurn,
+} from './frontend/llm-b-runtime.js';
 import { getHubSessionId } from './state.js';
-
-/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
-const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;
@@ -48,19 +49,20 @@ export function registerAgentEventListeners(printBanner) {
     // T-14: guard contra registros duplicados (ex: hot-reload, tests)
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
-    getAgent().on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
+    const agent = getTerminalAgentRuntime();
+    agent.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo).`);
 
         // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
         // 1. Abortar mensagem travada (session.abort — 0 PR)
-        await getAgent().abortCurrentMessage();
+        await agent.abortCurrentMessage();
 
         // 2. Aguardar até 5s para o ask_user reaparecer (0 PR se reaparecer)
         const recovered = await new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(false), 5_000);
             const check = () => {
-                if (getAgent().pendingQuestion) {
+                if (readTerminalRuntimeState().pendingQuestion) {
                     clearTimeout(timeout);
                     resolve(true);
                 }
@@ -69,7 +71,7 @@ export function registerAgentEventListeners(printBanner) {
             check();
             const interval = setInterval(() => {
                 check();
-                if (getAgent().pendingQuestion) clearInterval(interval);
+                if (readTerminalRuntimeState().pendingQuestion) clearInterval(interval);
             }, 500);
             setTimeout(() => clearInterval(interval), 5_100);
         });
@@ -78,7 +80,7 @@ export function registerAgentEventListeners(printBanner) {
             // F52.3: ask_user reapareceu — dialog loop continua sem custo de PR
             println(`\n[watchdog] ✅  Dialog loop recuperado sem consumir PR (ask_user preservado).`);
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
-            getAgent().pingDialogWatchdog();
+            pingTerminalDialogWatchdog();
             broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: true });
             return;
         }
@@ -90,10 +92,10 @@ export function registerAgentEventListeners(printBanner) {
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {
-                await container.resolve(HUB).store.writeTurn(_hubSessionId, {
-                    role: 'user',
-                    content: `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
-                });
+                await writeTerminalHubSystemTurn(
+                    _hubSessionId,
+                    `[SISTEMA] Watchdog: dialog loop inativo por ${secs}s — reinício automático.`,
+                );
             } catch (e) {
                 logSwallowed(e, 'terminal.index.watchdogWriteTurn');
             }
@@ -101,7 +103,7 @@ export function registerAgentEventListeners(printBanner) {
         // DL-PERM-06: stopDialogMode() usará reason='watchdog_restart', que o handler de
         // 'dialog.stopped' capturará e chamará ensureDialogLoop(). Não chamar ensureDialogLoop()
         // aqui diretamente para evitar duplo restart.
-        llmBridgeClient.stopDialogMode().catch((e) => {
+        stopTerminalDialogMode().catch((e) => {
             log('ERROR', `[TerminalServer] Falha ao parar dialog loop no watchdog: ${e.message}`);
             // Fallback: se stopDialogMode() falhar, tentar reiniciar diretamente
             ensureDialogLoop().catch((e2) =>
@@ -112,28 +114,30 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
-    getAgent().on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
+    agent.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
+        const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         broadcastSse('dialog.reply', {
             content: evt.reply,
             timestamp: Date.now(),
-            model: getAgent().model,
-            reasoningEffort: getAgent().reasoningEffort ?? 'high',
+            model,
+            reasoningEffort,
         });
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    getAgent().on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
+    agent.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
         broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
     });
-    getAgent().on(EMITTER_DIALOG_READY, () => {
+    agent.on(EMITTER_DIALOG_READY, () => {
+        const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         broadcastSse('dialog.ready', {
             timestamp: Date.now(),
-            model: getAgent().model,
-            reasoningEffort: getAgent().reasoningEffort ?? 'high',
+            model,
+            reasoningEffort,
         });
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
-    getAgent().on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+    agent.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
@@ -144,7 +148,7 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // T-15: respeitar pausa intencional do usuário — não reiniciar se dialogPaused
-        if (getAgent().dialogPaused) {
+        if (readTerminalRuntimeState().dialogPaused) {
             println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
             broadcastSse('dialog.stopped', { reason, paused: true });
@@ -162,7 +166,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AA.4: SSE 'context' event
-    getAgent().on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
+    agent.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
             broadcastSse('session.usage', {
@@ -175,7 +179,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AB.4: SSE 'cache.hit'
-    getAgent().on(
+    agent.on(
         'session.compaction_complete',
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
             const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
@@ -186,33 +190,30 @@ export function registerAgentEventListeners(printBanner) {
     );
 
     // Persiste reconexões e sessões fatais no Hub
-    getAgent().on(
-        'ready',
-        async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
-            // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
-            if (!evt.reconected) {
-                printBanner();
-            }
-            const _hubSessionId = getHubSessionId();
-            if (!_hubSessionId || !evt.reconected) return;
-            try {
-                await container.resolve(HUB).store.writeTurn(_hubSessionId, {
-                    role: 'user',
-                    content: `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
-                });
-            } catch (e) {
-                logSwallowed(e, 'terminal.index.reconnectWriteTurn');
-            }
-        },
-    );
-    getAgent().on(EMITTER_SESSION_FATAL, async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+    agent.on('ready', async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
+        // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
+        if (!evt.reconected) {
+            printBanner();
+        }
+        const _hubSessionId = getHubSessionId();
+        if (!_hubSessionId || !evt.reconected) return;
+        try {
+            await writeTerminalHubSystemTurn(
+                _hubSessionId,
+                `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
+            );
+        } catch (e) {
+            logSwallowed(e, 'terminal.index.reconnectWriteTurn');
+        }
+    });
+    agent.on(EMITTER_SESSION_FATAL, async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
         const _hubSessionId = getHubSessionId();
         if (!_hubSessionId) return;
         try {
-            await container.resolve(HUB).store.writeTurn(_hubSessionId, {
-                role: 'user',
-                content: `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
-            });
+            await writeTerminalHubSystemTurn(
+                _hubSessionId,
+                `[SISTEMA] session.fatal após ${evt.attempts} tentativas: ${evt.originalError}`,
+            );
         } catch (e) {
             logSwallowed(e, 'terminal.index.fatalWriteTurn');
         }
@@ -251,26 +252,26 @@ export function registerAgentEventListeners(printBanner) {
         }
     };
 
-    getAgent().on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
+    agent.on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(chunk);
     });
-    getAgent().on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
+    agent.on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
         const text = evt?.text ?? '';
         if (!text) return;
         _startTaskBlock(evt.taskId ?? null);
         _writeTaskChunk(`\x1b[2m${text}\x1b[22m`); // dim text para reasoning
     });
-    getAgent().on(EMITTER_TASK_COMPLETED, () => {
+    agent.on(EMITTER_TASK_COMPLETED, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[90m└── task complete ───┘\x1b[0m');
             _activeTaskId = null;
         }
     });
-    getAgent().on(EMITTER_TASK_ERROR, () => {
+    agent.on(EMITTER_TASK_ERROR, () => {
         if (_activeTaskId) {
             process.stdout.write('\n');
             println('  \x1b[31m└── task error ──────┘\x1b[0m');
@@ -299,7 +300,7 @@ export function registerAgentEventListeners(printBanner) {
     ]);
     for (const evt of AGENT_EVENTS) {
         if (!handledEvents.has(evt)) {
-            getAgent().on(evt, (/** @type {unknown} */ data) => {
+            agent.on(evt, (/** @type {unknown} */ data) => {
                 broadcastSse(evt, /** @type {object} */ (data ?? {}));
             });
         }

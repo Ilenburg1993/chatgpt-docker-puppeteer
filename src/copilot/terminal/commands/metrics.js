@@ -8,10 +8,7 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { llmBridgeClient } from '#copilot/channel';
-import { container } from '#copilot/core';
-import { ERROR_TRACKER, getToolStats } from '#copilot/observability';
+import { readTerminalMetricsProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} MetricsContext
@@ -25,38 +22,24 @@ import { ERROR_TRACKER, getToolStats } from '#copilot/observability';
  * @returns {void}
  */
 export function cmdMetrics({ println }) {
-    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
-    const pr = /** @type {Record<string, unknown> | null} */ (container.resolve(ALWAYS_ALIVE_AGENT).lastPrInfo);
-    const toolStats = getToolStats();
-    const errorStats = container.resolve(ERROR_TRACKER).getStats();
-    const turnCount = llmBridgeClient.turnCount;
+    const projection = readTerminalMetricsProjection();
+    const { snap, pr, turnCount, contextWindow, toolCallCount, toolErrorCount, errorStats, binding, runtimeSessionId } =
+        projection;
 
     // ── Session info ─────────────────────────────────────────────────
     const model = snap['model'] ?? '?';
     const status = snap['status'] ?? '?';
-    const sessionId = snap['sessionId'] ?? '?';
+    const sessionId = runtimeSessionId ?? '?';
 
     // ── Token context ────────────────────────────────────────────────
-    const contextState = /** @type {Record<string, unknown> | null} */ (snap['contextState']);
     let ctxStr = '\x1b[90m(sem dados)\x1b[0m';
-    if (contextState) {
-        const tokens = /** @type {number} */ (contextState['tokens'] ?? 0);
-        const limit = /** @type {number} */ (contextState['tokenLimit'] ?? 0);
+    if (contextWindow) {
+        const tokens = contextWindow.tokens;
+        const limit = contextWindow.tokenLimit;
         const pct = limit > 0 ? ((tokens / limit) * 100).toFixed(1) : '?';
         const pctNum = Number(pct);
         const color = pctNum > 80 ? '\x1b[31m' : pctNum > 60 ? '\x1b[33m' : '\x1b[32m';
         ctxStr = `${color}${pct}%\x1b[0m (${tokens.toLocaleString('pt-BR')} / ${limit.toLocaleString('pt-BR')})`;
-    }
-
-    // ── Tool stats ───────────────────────────────────────────────────
-    let toolCallCount = 0;
-    let toolErrorCount = 0;
-    if (toolStats && typeof toolStats === 'object') {
-        for (const v of Object.values(toolStats)) {
-            const stat = /** @type {Record<string, unknown>} */ (v);
-            toolCallCount += Number(stat['calls'] ?? 0);
-            toolErrorCount += Number(stat['errors'] ?? 0);
-        }
     }
 
     // ── Billing ──────────────────────────────────────────────────────
@@ -68,6 +51,8 @@ export function cmdMetrics({ println }) {
   \x1b[36mMétricas da Sessão\x1b[0m
   ═════════════════════════════════════
   sessão      \x1b[90m${sessionId}\x1b[0m
+    sdk sessão  \x1b[90m${binding.sdkSessionId ?? '(sem sdk)'}\x1b[0m
+    hub sessão  \x1b[90m${binding.hubSessionId ?? '(sem hub)'}\x1b[0m
   status      ${status}
   modelo      \x1b[36m${model}\x1b[0m
 

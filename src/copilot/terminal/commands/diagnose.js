@@ -18,11 +18,7 @@
  * @see EventBus
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { getMcpStatus } from '#copilot/bridges';
-import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
-import { getToolStats } from '#copilot/observability';
+import { readTerminalDiagnoseProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} DiagnoseContext
@@ -49,85 +45,52 @@ const C = {
  * @returns {Promise<void>}
  */
 export async function cmdDiagnose({ hubSessionId, println }) {
-    const snap = /** @type {Record<string, unknown>} */ (container.resolve(ALWAYS_ALIVE_AGENT).getStatusSnapshot());
-    const mcp = getMcpStatus();
-    const memMB = Math.round(process.memoryUsage().rss / 1_048_576);
-    const uptimeSec = Math.round(process.uptime());
+    const {
+        snap,
+        health,
+        dialogLoopActive,
+        binding,
+        runtimeSessionId,
+        mcp,
+        memMB,
+        uptimeSec,
+        hub,
+        todos,
+        topToolStats,
+    } = await readTerminalDiagnoseProjection({ hubSessionId: hubSessionId ?? null });
 
     const agentStatusColor =
         snap['status'] === 'waiting_for_input' ? C.green : snap['status'] === 'idle' ? C.yellow : C.red;
-
-    // ── MCP ──────────────────────────────────────────────────────────────────
     const mcpLine =
         mcp.available && !mcp.circuitOpen && mcp.toolCount > 0
             ? `${C.green}✅ ${mcp.toolCount} tools (lat: ${mcp.latencyMs ?? '?'}ms)${C.reset}`
             : mcp.circuitOpen
               ? `${C.red}❌ circuit aberto${C.reset}`
               : `${C.yellow}⚠️  indisponível${C.reset}`;
-
-    // ── Hub ───────────────────────────────────────────────────────────────────
-    let hubLine = `${C.grey}sem storage${C.reset}`;
-    if (container.resolve(HUB).isReady && hubSessionId) {
-        try {
-            const session = container.resolve(CONVERSATION_STORE).getHubSession(hubSessionId);
-            hubLine = session
-                ? `${C.green}✅ sessão ${hubSessionId.slice(0, 8)}…${C.reset}`
-                : `${C.yellow}⚠️  sessão não encontrada no store${C.reset}`;
-        } catch {
-            hubLine = `${C.red}❌ erro ao consultar store${C.reset}`;
-        }
-    } else if (!container.resolve(HUB).isReady) {
-        hubLine = `${C.yellow}⚠️  hub não inicializado${C.reset}`;
-    }
-
-    // ── TODOs pendentes ───────────────────────────────────────────────────────
-    /** @type {string} */
-    let todoLines;
-    try {
-        const { readStore } = await import('../../tools/todo/store.js');
-        const storeData = await readStore();
-        const pending = Object.values(storeData.tasks)
-            .filter(
-                (/** @type {import('../../tools/todo/store.js').TodoItem} */ t) =>
-                    t.status === 'todo' || t.status === 'in_progress',
-            )
-            .slice(0, 5);
-        if (pending.length === 0) {
-            todoLines = `${C.green}nenhum pendente${C.reset}`;
-        } else {
-            todoLines = pending
-                .map(
-                    (/** @type {import('../../tools/todo/store.js').TodoItem} */ t) =>
-                        `  ${C.grey}•${C.reset} [${t.id.slice(0, 6)}] ${t.title}`,
-                )
-                .join('\n');
-        }
-    } catch {
-        todoLines = `${C.grey}módulo não disponível${C.reset}`;
-    }
-
-    // ── Tool stats top-5 ─────────────────────────────────────────────────────
-    /** @type {string} */
-    let statsLines;
-    try {
-        const stats = getToolStats();
-        const top5 = Object.entries(stats)
-            .sort(([, a], [, b]) => (b.avgLatencyMs ?? 0) - (a.avgLatencyMs ?? 0))
-            .slice(0, 5);
-        if (top5.length === 0) {
-            statsLines = `${C.grey}nenhum dado registrado${C.reset}`;
-        } else {
-            statsLines = top5
-                .map(([name, s]) => {
-                    const rate = s.calls > 0 ? Math.round(((s.calls - s.errors) / s.calls) * 100) : 0;
-                    const col = rate >= 90 ? C.green : rate >= 70 ? C.yellow : C.red;
-                    return `  ${C.grey}•${C.reset} ${name.padEnd(30)} ${col}${rate}%${C.reset} avg ${s.avgLatencyMs ?? 0}ms (${s.calls} calls)`;
-                })
-                .join('\n');
-        }
-    } catch {
-        statsLines = `${C.grey}módulo não disponível${C.reset}`;
-    }
+    const hubLine =
+        hub.summary === 'sem storage'
+            ? `${C.grey}${hub.summary}${C.reset}`
+            : hub.summary.includes('não inicializado')
+              ? `${C.yellow}⚠️  ${hub.summary}${C.reset}`
+              : hub.summary.includes('erro')
+                ? `${C.red}❌ ${hub.summary}${C.reset}`
+                : `${C.green}✅ ${hub.summary}${C.reset}`;
+    const todoLines =
+        todos.length === 0
+            ? `${C.green}nenhum pendente${C.reset}`
+            : todos.map((task) => `  ${C.grey}•${C.reset} [${task.id.slice(0, 6)}] ${task.title}`).join('\n');
+    const statsLines =
+        topToolStats.length === 0
+            ? `${C.grey}nenhum dado registrado${C.reset}`
+            : topToolStats
+                  .map(([name, stat]) => {
+                      const calls = Number(stat['calls'] ?? 0);
+                      const errors = Number(stat['errors'] ?? 0);
+                      const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
+                      const col = rate >= 90 ? C.green : rate >= 70 ? C.yellow : C.red;
+                      return `  ${C.grey}•${C.reset} ${name.padEnd(30)} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
+                  })
+                  .join('\n');
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -135,9 +98,17 @@ ${C.bold}${C.cyan}║             Diagnóstico do Terminal LLM-B (F13.1)        
 ${C.bold}${C.cyan}╠══════════════════════════════════════════════════════════════╣${C.reset}
 ${C.cyan}  AGENTE${C.reset}
     status        ${agentStatusColor}${snap['status']}${C.reset}
-    dialog loop   ${container.resolve(ALWAYS_ALIVE_AGENT).dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
+    health        ${health ? `${health['status'] === 'healthy' ? C.green : health['status'] === 'degraded' ? C.yellow : C.red}${health['status']}${C.reset}` : `${C.grey}n/d${C.reset}`}
+    dialog loop   ${dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
     reasoning     ${C.magenta}${snap['reasoningEffort'] ?? 'high'}${C.reset}
+    runtime       ${runtimeSessionId ? `${C.grey}${runtimeSessionId}${C.reset}` : `${C.grey}(sem runtime)${C.reset}`}
+    sdk session   ${binding.sdkSessionId ? `${C.grey}${binding.sdkSessionId}${C.reset}` : `${C.grey}(sem sdk)${C.reset}`}
+    hub session   ${hub.activeHubSessionId ? `${C.grey}${hub.activeHubSessionId}${C.reset}` : `${C.grey}(sem hub)${C.reset}`}
+    bg tasks      ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
+    keepalive     ${health?.['checks']?.['io']?.['keepaliveRunning'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
+    quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
+    issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
 
 ${C.cyan}  INFRAESTRUTURA${C.reset}
     MCP bridge    ${mcpLine}

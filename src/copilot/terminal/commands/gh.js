@@ -238,10 +238,10 @@ async function handleRun(println, args) {
             println(`\x1b[31m  Run "${runId}" não encontrado.\x1b[0m`);
             return;
         }
-        println(`\n  \x1b[36mRun #${run.databaseId ?? runId}\x1b[0m  ${run.displayTitle ?? run.name}`);
-        println(`  Status: ${run.status}  ·  Conclusão: ${run.conclusion ?? '…'}`);
-        println(`  Branch: ${run.headBranch}  ·  Workflow: ${run.workflowName}`);
-        println(`  URL: \x1b[34m${run.url}\x1b[0m`);
+        println(`\n  \x1b[36mRun #${run['databaseId'] ?? runId}\x1b[0m  ${run['displayTitle'] ?? run['name']}`);
+        println(`  Status: ${run['status']}  ·  Conclusão: ${run['conclusion'] ?? '…'}`);
+        println(`  Branch: ${run['headBranch']}  ·  Workflow: ${run['workflowName']}`);
+        println(`  URL: \x1b[34m${run['url']}\x1b[0m`);
         println('');
         return;
     }
@@ -283,8 +283,8 @@ async function handleSearch(println, args) {
     }
     println(`\n  \x1b[36mResultados para:\x1b[0m "${query}"`);
     for (const r of /** @type {Record<string, unknown>[]} */ (results)) {
-        const typeLabel = r.isPullRequest ? '\x1b[34mPR\x1b[0m' : '\x1b[36missue\x1b[0m';
-        println(`  ${typeLabel}  #${r.number}  ${r.title}  \x1b[90m[${r.state}]\x1b[0m`);
+        const typeLabel = r['isPullRequest'] ? '\x1b[34mPR\x1b[0m' : '\x1b[36missue\x1b[0m';
+        println(`  ${typeLabel}  #${r['number']}  ${r['title']}  \x1b[90m[${r['state']}]\x1b[0m`);
     }
     println('');
 }
