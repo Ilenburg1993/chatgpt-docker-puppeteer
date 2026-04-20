@@ -1,7 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import express from 'express';
 import request from 'supertest';
@@ -75,6 +75,30 @@ describe('copilot-api runtime error projection', () => {
         assert.equal(res.body.code, 'DIALOG_TIMEOUT');
         assert.equal(res.body.dialogLoopActive, true);
         assert.equal(res.body.retryable, true);
+    });
+
+    it('POST /answer/clear-shadow limpa shadow persistida quando suportado', async () => {
+        const agent = /** @type {any} */ ({
+            clearPendingQuestionShadow: () => true,
+        });
+        const app = createApp(registerTaskRoutes, agent);
+
+        const res = await request(app).post('/answer/clear-shadow').send({});
+
+        assert.equal(res.status, 200);
+        assert.equal(res.body.ok, true);
+    });
+
+    it('POST /answer/clear-shadow retorna 409 quando não há shadow persistida', async () => {
+        const agent = /** @type {any} */ ({
+            clearPendingQuestionShadow: () => false,
+        });
+        const app = createApp(registerTaskRoutes, agent);
+
+        const res = await request(app).post('/answer/clear-shadow').send({});
+
+        assert.equal(res.status, 409);
+        assert.equal(res.body.ok, false);
     });
 
     it('POST /steer projeta NO_SESSION para 503', async () => {

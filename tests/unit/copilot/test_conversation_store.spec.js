@@ -23,7 +23,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, before, after } from 'node:test';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
@@ -62,7 +62,7 @@ let store;
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-before(() => {
+beforeAll(() => {
     // DB in-memory — injeta no store via dbOverride para não tocar em copilot.sqlite
     const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
@@ -72,7 +72,7 @@ before(() => {
     store.init(testDb);
 });
 
-after(() => {
+afterAll(() => {
     testDb?.close();
 });
 
@@ -172,7 +172,7 @@ describe('ConversationStore.writeTurn / readTurns', () => {
     /** @type {string} */
     let sessionId;
 
-    before(async () => {
+    beforeAll(async () => {
         sessionId = store.createHubSession({ title: 'Sessão de turns' });
     });
 
@@ -252,7 +252,7 @@ describe('ConversationStore mensagens do usuário', () => {
     /** @type {string} */
     let sessionId;
 
-    before(async () => {
+    beforeAll(async () => {
         sessionId = store.createHubSession({ title: 'User messages test' });
     });
 
@@ -315,7 +315,7 @@ describe('ConversationStore.searchTurns', () => {
     /** @type {string} */
     let sessionId;
 
-    before(async () => {
+    beforeAll(async () => {
         sessionId = store.createHubSession({ title: 'FTS5 search test' });
         await store.writeTurn(sessionId, { role: 'user', content: 'Como configurar autenticação OAuth2?' });
         await store.writeTurn(sessionId, { role: 'llm_b', content: 'Use o fluxo authorization_code com PKCE.' });

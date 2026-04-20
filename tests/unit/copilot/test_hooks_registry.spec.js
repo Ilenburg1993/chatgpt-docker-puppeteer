@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('HookRegistry', () => {
     it('instancia sem erros com registry vazio', async () => {
@@ -23,6 +23,8 @@ describe('HookRegistry', () => {
             description: 'Chamado antes de executar tool',
             inputFields: ['tool.name', 'tool.input'],
             outputFields: ['decision'],
+            canModifyInput: true,
+            canAbort: true,
         });
 
         assert.equal(reg.list().length, 1, 'Deve ter 1 hook registrado');
@@ -36,6 +38,8 @@ describe('HookRegistry', () => {
             description: 'Início de sessão',
             inputFields: ['sessionId'],
             outputFields: [],
+            canModifyInput: false,
+            canAbort: false,
         });
 
         const schema = reg.get('onSessionStart');
@@ -54,9 +58,27 @@ describe('HookRegistry', () => {
         const { HookRegistry } = await import('../../../src/copilot/hooks/registry.js');
         const reg = new HookRegistry();
 
-        reg.register('hook1', { description: 'h1', inputFields: [], outputFields: [] });
-        reg.register('hook2', { description: 'h2', inputFields: [], outputFields: [] });
-        reg.register('hook3', { description: 'h3', inputFields: [], outputFields: [] });
+        reg.register('hook1', {
+            description: 'h1',
+            inputFields: [],
+            outputFields: [],
+            canModifyInput: false,
+            canAbort: false,
+        });
+        reg.register('hook2', {
+            description: 'h2',
+            inputFields: [],
+            outputFields: [],
+            canModifyInput: false,
+            canAbort: false,
+        });
+        reg.register('hook3', {
+            description: 'h3',
+            inputFields: [],
+            outputFields: [],
+            canModifyInput: false,
+            canAbort: false,
+        });
 
         const all = reg.list();
         assert.equal(all.length, 3, 'Deve listar 3 hooks');

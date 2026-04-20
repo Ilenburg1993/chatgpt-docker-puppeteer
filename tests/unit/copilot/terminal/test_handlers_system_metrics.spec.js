@@ -14,6 +14,9 @@ import {
 } from '../../../../src/copilot/terminal/handlers/system-metrics.js';
 import { recordInjectHistory } from '../../../../src/copilot/terminal/state.js';
 
+/** @template T @param {{ body: unknown }} result @returns {T} */
+const bodyOf = (result) => /** @type {T} */ (result.body);
+
 describe('handlers/system-metrics — handleGetHistory', () => {
     it('retorna status 200 com array de entries', () => {
         // Popula inject history
@@ -27,10 +30,11 @@ describe('handlers/system-metrics — handleGetHistory', () => {
         });
 
         const result = handleGetHistory({ limit: 10 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.entries)).toBe(true);
-        expect(result.body.entries.length).toBeGreaterThanOrEqual(1);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.entries)).toBe(true);
+        expect(body.entries.length).toBeGreaterThanOrEqual(1);
     });
 
     it('respeita parâmetro limit', () => {
@@ -46,29 +50,33 @@ describe('handlers/system-metrics — handleGetHistory', () => {
         }
 
         const result = handleGetHistory({ limit: 2 });
-        expect(result.body.entries.length).toBeLessThanOrEqual(2);
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(body.entries.length).toBeLessThanOrEqual(2);
     });
 
     it('usa limit padrão 50 se não especificado', () => {
         const result = handleGetHistory();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 });
 
 describe('handlers/system-metrics — git endpoints (real git)', () => {
     it('handleGitStatus retorna entries do repo', async () => {
         const result = await handleGitStatus();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.entries)).toBe(true);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.entries)).toBe(true);
     });
 
     it('handleGitLog retorna commits recentes', async () => {
         const result = await handleGitLog({ n: 5 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.entries)).toBe(true);
-        expect(result.body.entries.length).toBeGreaterThanOrEqual(1);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.entries)).toBe(true);
+        expect(body.entries.length).toBeGreaterThanOrEqual(1);
     });
 });

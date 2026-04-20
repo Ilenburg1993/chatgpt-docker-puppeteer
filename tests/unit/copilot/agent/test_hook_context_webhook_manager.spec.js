@@ -2,8 +2,6 @@
 /**
  * @file Faixa 44 — Agent: hook-context + WebhookManager + mode-and-tools
  *
- *   Cobre módulos verdadeiramente sem cobertura:
- *
  *   - agent/session/hook-context.js (216L) — buildHookSystemContext, SessionJsonSchema, buildHookSystemContextSafe
  *   - agent/infra/webhook-manager.js (233L) — WebhookManager CRUD + sanitize + retry
  *   - event-handlers/mode-and-tools.js (21L) — wireModeAndToolEvents
@@ -75,7 +73,16 @@ vi.mock(
                 COPILOT_DISABLED_AGENTS: '',
                 AGENT_MAX_LISTENERS: 100,
             },
-            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? '' : undefined), has: () => true },
+            {
+                get: (t, p) => {
+                    if (typeof p === 'string' && p in t) {
+                        const key = /** @type {keyof typeof t} */ (p);
+                        return t[key];
+                    }
+                    return typeof p === 'string' ? '' : undefined;
+                },
+                has: () => true,
+            },
         ),
 );
 vi.mock('#copilot/observability/metrics', () => ({ defaultMetrics: mocks.defaultMetrics }));
@@ -194,7 +201,9 @@ describe('F44 — buildHookSystemContext', () => {
     it('inclui briefing quando session-briefing.md existe', async () => {
         const callOrder = [0];
         mocks.fsAccess.mockImplementation(async () => {
-            if (callOrder[0]++ === 0) return; // briefing exists
+            const current = callOrder[0] ?? 0;
+            callOrder[0] = current + 1;
+            if (current === 0) return; // briefing exists
             throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); // session.json doesn't
         });
         mocks.fsStat.mockResolvedValue({ size: 100 });
@@ -208,7 +217,9 @@ describe('F44 — buildHookSystemContext', () => {
     it('trunca briefing >16KB com aviso', async () => {
         const callOrder = [0];
         mocks.fsAccess.mockImplementation(async () => {
-            if (callOrder[0]++ === 0) return;
+            const current = callOrder[0] ?? 0;
+            callOrder[0] = current + 1;
+            if (current === 0) return;
             throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
         });
         mocks.fsStat.mockResolvedValue({ size: 20_000 }); // >16KB

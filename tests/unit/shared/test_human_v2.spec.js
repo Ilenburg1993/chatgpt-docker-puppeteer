@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert';
 import { performance } from 'node:perf_hooks';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
 describe('human.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;

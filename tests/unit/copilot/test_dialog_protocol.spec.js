@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, expect } from 'vitest';
 import {
     DIALOG_PROTO_DONE,
     DIALOG_PROTO_READY,

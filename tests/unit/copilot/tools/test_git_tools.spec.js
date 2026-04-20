@@ -36,19 +36,22 @@ vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
 /** Resultado padrão do execFile mockado */
 let execFileMockImpl = vi.fn();
 
-vi.mock('node:child_process', () => ({
-    execFile: (...args) => {
-        // promisify precisa do callback-style
-        const cb = args[args.length - 1];
-        if (typeof cb === 'function') {
-            const result = execFileMockImpl(args[0], args[1], args[2]);
-            if (result instanceof Error) {
-                cb(result);
-            } else {
-                cb(null, result);
-            }
+/** @param {...any} args */
+const execFileCallbackStyle = (...args) => {
+    // promisify precisa do callback-style
+    const cb = args[args.length - 1];
+    if (typeof cb === 'function') {
+        const result = execFileMockImpl(args[0], args[1], args[2]);
+        if (result instanceof Error) {
+            cb(result);
+        } else {
+            cb(null, result);
         }
-    },
+    }
+};
+
+vi.mock('node:child_process', () => ({
+    execFile: execFileCallbackStyle,
 }));
 
 vi.mock('#copilot/sdk', () => ({
@@ -101,6 +104,11 @@ function mockGitSequence(seq) {
         }
         return { stdout: curr.stdout || '', stderr: curr.stderr || '' };
     });
+}
+
+/** @param {number} [callIndex] */
+function gitArgs(callIndex = 0) {
+    return /** @type {string[]} */ (execFileMockImpl.mock.calls[callIndex]?.[1] || []);
 }
 
 // ─── Suite ────────────────────────────────────────────────────────────────────
@@ -185,17 +193,16 @@ describe('git-tools', () => {
             expect(result.output).toContain('+staged change');
             // Verifica que args contêm --staged
             expect(execFileMockImpl).toHaveBeenCalled();
-            const args = execFileMockImpl.mock.calls[0];
-            expect(args[1]).toContain('--staged');
+            expect(gitArgs()).toContain('--staged');
         });
 
         it('aceita caminho específico', async () => {
             mockGitOutput('+change in file');
             await find().handler({ path: 'src/test.js' });
 
-            const args = execFileMockImpl.mock.calls[0];
-            expect(args[1]).toContain('--');
-            expect(args[1]).toContain('src/test.js');
+            const args = gitArgs();
+            expect(args).toContain('--');
+            expect(args).toContain('src/test.js');
         });
 
         it('trunca a 200 linhas', async () => {
@@ -284,7 +291,7 @@ describe('git-tools', () => {
             const result = await find().handler({});
 
             expect(result.success).toBe(true);
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('push');
             expect(args).toContain('origin');
         });
@@ -293,7 +300,7 @@ describe('git-tools', () => {
             mockGitOutput('ok');
             await find().handler({ setUpstream: true });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('--set-upstream');
         });
 
@@ -301,7 +308,7 @@ describe('git-tools', () => {
             mockGitOutput('');
             await find().handler({ remote: 'evil;rm -rf /' });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             const remote = args[args.length - 1];
             expect(remote).not.toContain(';');
             expect(remote).not.toContain(' ');
@@ -319,7 +326,7 @@ describe('git-tools', () => {
             const result = await find().handler({ name: 'feat/test' });
 
             expect(result.success).toBe(true);
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('checkout');
             expect(args).toContain('-b');
             expect(args).toContain('feat/test');
@@ -329,7 +336,7 @@ describe('git-tools', () => {
             mockGitOutput('');
             await find().handler({ name: 'feat/test', checkout: false });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('branch');
             expect(args).not.toContain('checkout');
         });
@@ -338,7 +345,7 @@ describe('git-tools', () => {
             mockGitOutput('');
             await find().handler({ name: 'feat/test', base: 'develop' });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('develop');
         });
 
@@ -369,7 +376,7 @@ describe('git-tools', () => {
             const result = await find().handler({});
 
             expect(result.output).toContain('abc1234 fix stuff');
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('--oneline');
             expect(args).toContain('-10');
         });
@@ -378,7 +385,7 @@ describe('git-tools', () => {
             mockGitOutput('log');
             await find().handler({ n: 5 });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('-5');
         });
 
@@ -386,7 +393,7 @@ describe('git-tools', () => {
             mockGitOutput('hash author date msg');
             await find().handler({ oneline: false });
 
-            const args = execFileMockImpl.mock.calls[0][1];
+            const args = gitArgs();
             expect(args).toContain('--pretty=format:%h %an %ar %s');
             expect(args).not.toContain('--oneline');
         });

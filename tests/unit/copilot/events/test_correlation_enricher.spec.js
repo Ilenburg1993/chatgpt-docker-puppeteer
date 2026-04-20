@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { correlationEnricher } from '../../../../src/copilot/events/middleware/correlation-enricher.js';
 
@@ -9,7 +9,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /**
  * @param {string} type
  * @param {Record<string, unknown>} [extra]
- * @returns {import('../../../../src/copilot/types/events.js').BaseEvent}
+ * @returns {import('../../../../src/copilot/events/legacy-events.js').BaseEvent}
  */
 function evt(type, extra = {}) {
     return { type, timestamp: Date.now(), ...extra };

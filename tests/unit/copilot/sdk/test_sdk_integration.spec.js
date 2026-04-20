@@ -16,10 +16,10 @@ const mockAccountGetQuota = vi.fn();
 
 // Logger mock: must be a callable function (modules use `log('LEVEL', msg)`)
 const logFn = vi.fn();
-logFn.info = vi.fn();
-logFn.warn = vi.fn();
-logFn.debug = vi.fn();
-logFn.error = vi.fn();
+/** @type {any} */ (logFn).info = vi.fn();
+/** @type {any} */ (logFn).warn = vi.fn();
+/** @type {any} */ (logFn).debug = vi.fn();
+/** @type {any} */ (logFn).error = vi.fn();
 
 vi.mock('#copilot/observability/logger', () => ({
     log: logFn,
@@ -112,6 +112,7 @@ function createMockRpc() {
     };
 }
 
+/** @returns {any} */
 function createMockSession() {
     const rpc = createMockRpc();
     return {
@@ -126,6 +127,7 @@ function createMockSession() {
     };
 }
 
+/** @returns {any} */
 function createMockClient() {
     return {
         rpc: {
@@ -261,14 +263,14 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
     it('plan CRUD completo: read -> update -> read -> delete', async () => {
         const { planRead, planUpdate, planDelete } = await import('#copilot/sdk/rpc');
 
-        const initial = await planRead(session);
+        const initial = /** @type {any} */ (await planRead(session));
         expect(initial.exists).toBe(true);
 
         await planUpdate(session, 'New plan content');
         expect(session.rpc.plan.update).toHaveBeenCalledWith({ content: 'New plan content' });
 
         session.rpc.plan.read.mockResolvedValue({ exists: true, content: 'New plan content', path: '/plan.md' });
-        const afterUpdate = await planRead(session);
+        const afterUpdate = /** @type {any} */ (await planRead(session));
         expect(afterUpdate.content).toBe('New plan content');
 
         await planDelete(session);
@@ -281,7 +283,7 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
         await modeGet(session);
         await modeSet(session, 'plan');
 
-        const plan = await planRead(session);
+        const plan = /** @type {any} */ (await planRead(session));
         expect(plan.exists).toBe(true);
 
         await planUpdate(session, 'Updated plan');
@@ -293,7 +295,7 @@ describe('F91 - Mode switch -> Plan CRUD -> Mode restore', () => {
 
     it('mode set com sessao invalida rejeita', async () => {
         const { modeSet } = await import('#copilot/sdk/rpc');
-        await expect(modeSet(null, 'plan')).rejects.toThrow();
+        await expect(modeSet(/** @type {any} */ (null), 'plan')).rejects.toThrow();
     });
 });
 
@@ -314,13 +316,13 @@ describe('F92 - Model switch mid-session', () => {
 
     it('modelGetCurrent retorna modelo ativo', async () => {
         const { modelGetCurrent } = await import('#copilot/sdk/rpc');
-        const result = await modelGetCurrent(session);
+        const result = /** @type {any} */ (await modelGetCurrent(session));
         expect(result.modelId).toBe('gpt-4.1');
     });
 
     it('modelSwitchTo troca modelo mid-session', async () => {
         const { modelSwitchTo } = await import('#copilot/sdk/rpc');
-        const result = await modelSwitchTo(session, 'gpt-4.1-mini');
+        const result = /** @type {any} */ (await modelSwitchTo(session, 'gpt-4.1-mini'));
         expect(result.modelId).toBe('gpt-4.1-mini');
         expect(session.rpc.model.switchTo).toHaveBeenCalledWith({ modelId: 'gpt-4.1-mini' });
     });
@@ -328,19 +330,19 @@ describe('F92 - Model switch mid-session', () => {
     it('fluxo get -> switch -> verify', async () => {
         const { modelGetCurrent, modelSwitchTo } = await import('#copilot/sdk/rpc');
 
-        const before = await modelGetCurrent(session);
+        const before = /** @type {any} */ (await modelGetCurrent(session));
         expect(before.modelId).toBe('gpt-4.1');
 
         await modelSwitchTo(session, 'gpt-4.1-mini');
 
         session.rpc.model.getCurrent.mockResolvedValue({ modelId: 'gpt-4.1-mini' });
-        const after = await modelGetCurrent(session);
+        const after = /** @type {any} */ (await modelGetCurrent(session));
         expect(after.modelId).toBe('gpt-4.1-mini');
     });
 
     it('model switch com sessao invalida rejeita', async () => {
         const { modelSwitchTo } = await import('#copilot/sdk/rpc');
-        await expect(modelSwitchTo(null, 'gpt-4.1-mini')).rejects.toThrow();
+        await expect(modelSwitchTo(/** @type {any} */ (null), 'gpt-4.1-mini')).rejects.toThrow();
     });
 });
 
@@ -436,9 +438,9 @@ describe('F94 - System-message customize mode with section overrides', () => {
         const config = customizeSystemMessage(sections, 'Base content');
         expect(config).toBeDefined();
         expect(config.mode).toBe('customize');
-        expect(config.sections).toBeDefined();
-        expect(config.sections.identity).toBeDefined();
-        expect(config.sections.guidelines).toBeDefined();
+        expect(/** @type {any} */ (config).sections).toBeDefined();
+        expect(/** @type {any} */ (config).sections.identity).toBeDefined();
+        expect(/** @type {any} */ (config).sections.guidelines).toBeDefined();
     });
 
     it('getSectionNames retorna secoes do SDK', async () => {

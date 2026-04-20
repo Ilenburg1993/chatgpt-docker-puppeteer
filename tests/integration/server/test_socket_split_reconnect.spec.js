@@ -2,7 +2,7 @@
 import * as socketEngine from '#server/engine/socket';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { test } from 'node:test';
+import { onTestFinished, test } from 'vitest';
 
 function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {

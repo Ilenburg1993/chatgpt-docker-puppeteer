@@ -10,6 +10,7 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { readFileSync } = require('node:fs');
@@ -75,7 +76,7 @@ describe('F22 — F124: feature-flags.js', () => {
 // ─── F124 runtime: feature-flags API ──────────────────────────────────────────
 
 describe('F22 — F124 runtime: feature-flags API', () => {
-    /** @type {import('../../../../../../src/copilot/sdk/feature-flags.js')} */
+    /** @type {import('../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
 
     beforeAll(async () => {
@@ -100,8 +101,9 @@ describe('F22 — F124 runtime: feature-flags API', () => {
     });
 
     it('setExperimentalFlag lança RangeError para feature desconhecida', () => {
-        // @ts-expect-error -- valor inválido intencional para testar validação
-        expect(() => featureFlags.setExperimentalFlag('unknown_feature', true)).toThrow(RangeError);
+        expect(() => featureFlags.setExperimentalFlag(/** @type {any} */ ('unknown_feature'), true)).toThrow(
+            RangeError,
+        );
     });
 
     it('resetExperimentalFlags desabilita tudo', () => {
@@ -118,8 +120,7 @@ describe('F22 — F124 runtime: feature-flags API', () => {
         expect(snapshot.mcp).toBe(true);
         // Snapshot deve ser congelado (não deve permitir mutação)
         expect(() => {
-            // @ts-expect-error -- valor inválido intencional para testar validação
-            snapshot.mcp = false;
+            Reflect.set(snapshot, 'mcp', false);
         }).toThrow();
     });
 
@@ -192,9 +193,9 @@ describe('F22 — F118-F123: experimental-rpc.js exports', () => {
 // ─── F125: feature flag on/off por subsistema (runtime) ──────────────────────
 
 describe('F22 — F125: feature flag on/off por subsistema', () => {
-    /** @type {typeof import('../../../../../../src/copilot/sdk/feature-flags.js')} */
+    /** @type {typeof import('../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
-    /** @type {typeof import('../../../../../../src/copilot/sdk/rpc/experimental.js')} */
+    /** @type {typeof import('../../../../src/copilot/sdk/rpc/experimental.js')} */
     let expRpc;
 
     beforeAll(async () => {
@@ -262,7 +263,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         const sess = /** @type {any} */ ({ rpc: { mcp: { list: listMock } } });
         const result = await expRpc.mcpList(sess);
         expect(listMock).toHaveBeenCalledOnce();
-        expect(result[0].id).toBe('mcp1');
+        expect(result[0]?.id).toBe('mcp1');
     });
 
     it('sdk/barrel reexporta funções experimentais alinhadas com SDK', () => {
@@ -358,7 +359,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         const sess = /** @type {any} */ ({ rpc: { plugins: { list: listMock } } });
         const result = await expRpc.pluginsList(sess);
         expect(listMock).toHaveBeenCalledOnce();
-        expect(result[0].id).toBe('p1');
+        expect(result[0]?.id).toBe('p1');
     });
 
     it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ extensionId })', async () => {

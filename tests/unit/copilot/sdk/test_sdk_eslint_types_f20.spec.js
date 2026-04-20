@@ -141,6 +141,7 @@ describe('F20 — Cleanup: zero runtime imports de @github/copilot-sdk fora de s
             const lines = src.split('\n');
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                if (line === undefined) continue;
                 const t = line.trimStart();
                 // Ignorar comentários JSDoc, // comments — apenas olhar runtime imports
                 if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/**')) continue;

@@ -2,6 +2,8 @@
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+const clearPendingQuestionShadow = vi.fn(() => true);
+
 vi.mock('#copilot/agent', () => ({
     getAgent: () =>
         /** @type {any} */ ({
@@ -14,6 +16,21 @@ vi.mock('#copilot/agent', () => ({
             setModel: vi.fn(),
             setReasoningEffort: vi.fn(),
             answerPendingQuestion: vi.fn(() => true),
+            clearPendingQuestionShadow,
+            pendingQuestion: { question: 'Ready?', kind: 'question', allowFreeform: true, askedAt: 1 },
+            pendingQuestionKind: 'question',
+            pendingQuestionShadow: {
+                question: 'READY: aguardando próxima mensagem',
+                meta: { kind: 'ready', askedAt: 1, allowFreeform: true, protocolControlled: true },
+                restoredAt: 2,
+                expiresAt: 3,
+            },
+            pendingQuestionShadowKind: 'ready',
+            pendingQuestionShadowState: 'expired',
+            pendingQuestionShadowExpired: true,
+            pendingQuestionShadowAgeMs: 1200,
+            pendingQuestionShadowExpiresAt: 3,
+            pendingQuestionShadowRemainingMs: 0,
             getStatusSnapshot: () => ({
                 status: 'waiting_for_input',
                 model: 'gpt-5',
@@ -27,6 +44,7 @@ vi.mock('#copilot/agent', () => ({
                 status: 'healthy',
                 backgroundPendingCount: 2,
                 issues: [],
+                recommendedAction: 'clear_pending_question_shadow',
                 checks: { io: { keepaliveRunning: true }, quota: { running: true } },
             }),
         }),
@@ -90,7 +108,11 @@ vi.mock('#copilot/sdk', () => ({
     listModels: vi.fn(async () => [
         { id: 'gpt-5', capabilities: { supports: { reasoningEffort: true, vision: true } } },
     ]),
-    modelRegistry: new Map([['gpt-5', { costTier: 'high', speedTier: 'fast', contextWindow: 128000 }]]),
+    modelRegistry: new Map([
+        ['gpt-5', { costTier: 'high', speedTier: 'fast', contextWindow: 128000, supportsReasoning: true, supportsVision: true }],
+        ['gpt-5-mini', { costTier: 'low', speedTier: 'fast', contextWindow: 128000, supportsReasoning: true, supportsVision: false }],
+        ['gpt-4.1', { costTier: 'medium', speedTier: 'fast', contextWindow: 1047576, supportsReasoning: false, supportsVision: true }],
+    ]),
     modelStatsTracker: {
         allStats: () => [{ modelId: 'gpt-5', totalCalls: 2, avgLatencyMs: 44, successRate: 1, totalTokens: 200 }],
     },
@@ -133,6 +155,20 @@ describe('terminal/frontend/llm-b-frontend', () => {
         expect(projection.hubSessionId).toBe('hub-1');
         expect(projection.turnCount).toBe(9);
         expect(projection.workspace.currentBranch).toBe('main');
+        expect(projection.pendingQuestionKind).toBe('question');
+        expect(projection.pendingQuestionShadowExpired).toBe(true);
+        expect(projection.pendingQuestionShadowState).toBe('expired');
+        expect(projection.pendingQuestionShadowAgeMs).toBe(1200);
+        expect(projection.pendingQuestionShadowRemainingMs).toBe(0);
+        expect(projection.recommendedAction).toBe('clear_pending_question_shadow');
+        expect(projection.activity.label).toBeTruthy();
+    });
+
+    it('expõe limpeza canônica da shadow persistida do ask_user', () => {
+        const ok = frontend.clearPendingTerminalQuestionShadow();
+
+        expect(ok).toBe(true);
+        expect(clearPendingQuestionShadow).toHaveBeenCalled();
     });
 
     it('constrói metrics projection com agregados de tool/error/context', () => {
@@ -168,18 +204,29 @@ describe('terminal/frontend/llm-b-frontend', () => {
         expect(config.currentModel).toBe('gpt-5');
         expect(config.currentReasoningEffort).toBe('high');
         expect(config.modelMeta?.contextWindow).toBe(128000);
+        expect(config.modelMeta?.supportsReasoning).toBe(true);
         expect(stats.stats[0]?.modelId).toBe('gpt-5');
         expect(available.models).toHaveLength(1);
     });
 
     it('ajusta model e reasoning via frontend canônico', () => {
-        const modelResult = frontend.setTerminalModelProjection('gpt-4.1');
+        const modelResult = frontend.setTerminalModelProjection('gpt-5-mini');
         const reasoningResult = frontend.setTerminalReasoningProjection('low');
 
         expect(modelResult.previousModel).toBe('gpt-5');
-        expect(modelResult.currentModel).toBe('gpt-4.1');
+        expect(modelResult.currentModel).toBe('gpt-5-mini');
+        expect(modelResult.reasoningAdjusted).toBe(false);
         expect(reasoningResult.previousReasoningEffort).toBe('high');
         expect(reasoningResult.currentReasoningEffort).toBe('low');
+    });
+
+    it('limpa reasoning ao migrar para modelo sem suporte explícito', () => {
+        const modelResult = frontend.setTerminalModelProjection('gpt-4.1');
+
+        expect(modelResult.currentModel).toBe('gpt-4.1');
+        expect(modelResult.reasoningAdjusted).toBe(true);
+        expect(modelResult.currentReasoningEffort).toBe('off');
+        expect(modelResult.modelMeta?.supportsReasoning).toBe(false);
     });
 
     it('projeta contexto e erros e compacta histórico pela camada frontend', async () => {

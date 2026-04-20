@@ -164,7 +164,7 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
         vi.clearAllMocks();
         dlm = new DialogLoopManager();
         host = makeHost();
-        dlm.attach(host);
+        dlm.attach(/** @type {any} */ (host));
     });
 
     afterEach(() => {

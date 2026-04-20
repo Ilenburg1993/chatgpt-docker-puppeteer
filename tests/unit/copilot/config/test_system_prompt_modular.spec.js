@@ -6,6 +6,8 @@
  * mode switching, facade backward compat.
  */
 
+import { describe, expect, it } from 'vitest';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Seções individuais
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,8 +63,10 @@ describe('system-prompt-modular › SECTIONS map', () => {
         ];
         for (const key of expectedKeys) {
             expect(SECTIONS).toHaveProperty(key);
-            expect(typeof SECTIONS[key].CONTENT).toBe('string');
-            expect(typeof SECTIONS[key].ACTION).toBe('string');
+            const section = SECTIONS[/** @type {keyof typeof SECTIONS} */ (key)];
+            expect(section).toBeDefined();
+            expect(typeof section?.CONTENT).toBe('string');
+            expect(typeof section?.ACTION).toBe('string');
         }
     });
 });
@@ -259,13 +263,13 @@ describe('system-prompt-modular › facade backward compat', () => {
     it('constantes devem ser idênticas ao CONTENT das seções modulares', async () => {
         const facade = await import('../../../../src/copilot/config/system-prompt.js');
         const { SECTIONS } = await import('../../../../src/copilot/config/system-prompt/index.js');
-        expect(facade.AGENT_IDENTITY).toBe(SECTIONS.identity.CONTENT);
-        expect(facade.AGENT_TONE).toBe(SECTIONS.tone.CONTENT);
-        expect(facade.TOOL_EFFICIENCY).toBe(SECTIONS.tool_efficiency.CONTENT);
-        expect(facade.ENVIRONMENT_CONTEXT).toBe(SECTIONS.environment_context.CONTENT);
-        expect(facade.CODE_CHANGE_RULES).toBe(SECTIONS.code_change_rules.CONTENT);
-        expect(facade.AGENT_GUIDELINES).toBe(SECTIONS.guidelines.CONTENT);
-        expect(facade.LAST_INSTRUCTIONS).toBe(SECTIONS.last_instructions.CONTENT);
+        expect(facade.AGENT_IDENTITY).toBe(SECTIONS.identity?.CONTENT);
+        expect(facade.AGENT_TONE).toBe(SECTIONS.tone?.CONTENT);
+        expect(facade.TOOL_EFFICIENCY).toBe(SECTIONS.tool_efficiency?.CONTENT);
+        expect(facade.ENVIRONMENT_CONTEXT).toBe(SECTIONS.environment_context?.CONTENT);
+        expect(facade.CODE_CHANGE_RULES).toBe(SECTIONS.code_change_rules?.CONTENT);
+        expect(facade.AGENT_GUIDELINES).toBe(SECTIONS.guidelines?.CONTENT);
+        expect(facade.LAST_INSTRUCTIONS).toBe(SECTIONS.last_instructions?.CONTENT);
     });
 
     it('buildAlwaysAliveSystemMessage deve delegar ao buildSystemMessage', async () => {

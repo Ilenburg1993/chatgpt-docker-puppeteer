@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import {
     formatBranch,
@@ -25,7 +25,7 @@ describe('git-bridge formatStatus', () => {
     });
 
     it('formata entradas com cor e path', () => {
-        /** @type {import('../../../../src/copilot/bridges/git-bridge.js').StatusEntry[]} */
+        /** @type {{ xy: string; path: string; label: string; color: string }[]} */
         const entries = [
             { xy: 'M ', path: 'file.js', label: 'staged:modificado', color: '\x1b[33m' },
             { xy: '??', path: 'new.txt', label: 'unstaged:não rastreado', color: '\x1b[90m' },
@@ -91,8 +91,10 @@ describe('git-bridge async (real git)', () => {
         const result = await gitLog({ n: 3 });
         assert.ok(Array.isArray(result));
         assert.ok(result.length > 0, 'deve haver pelo menos 1 commit');
-        assert.ok(result[0].hash);
-        assert.ok(result[0].subject);
+        const first = result[0];
+        assert.ok(first, 'deve haver pelo menos um commit');
+        assert.ok(first.hash);
+        assert.ok(first.subject);
     });
 
     it('gitBranch retorna pelo menos uma branch', async () => {

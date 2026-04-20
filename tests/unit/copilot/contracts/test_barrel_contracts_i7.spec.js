@@ -32,7 +32,7 @@ describe('FI-7 — config barrel contract', () => {
         const barrel = await import('#copilot/config');
         const expected = ['buildAlwaysAliveSystemMessage', 'buildAppendSystemMessage', 'buildReplaceSystemMessage'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -41,7 +41,7 @@ describe('FI-7 — config barrel contract', () => {
         // Spot-check: alguns dos ~97 exports de env.js
         const expected = ['DEFAULT_EXCLUDED_TOOLS'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });
@@ -61,7 +61,7 @@ describe('FI-7 — observability barrel contract', () => {
         const barrel = await import('#copilot/observability');
         const expected = ['attachSdkEventTyped'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -69,7 +69,7 @@ describe('FI-7 — observability barrel contract', () => {
         const barrel = await import('#copilot/observability');
         const expected = ['getToolStats', 'recordToolCall'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });
@@ -95,7 +95,7 @@ describe('FI-7 — hooks barrel contract', () => {
             'createProductionHooks',
         ];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });
@@ -118,7 +118,7 @@ describe('FI-7 — audit barrel contract', () => {
             'logToolAudit',
         ];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });
@@ -132,7 +132,7 @@ describe('FI-7 — bridges barrel contract', () => {
         const barrel = await import('#copilot/bridges');
         const expected = ['gitLog', 'gitStatus', 'gitCommit', 'gitPush', 'gitPull'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -140,7 +140,7 @@ describe('FI-7 — bridges barrel contract', () => {
         const barrel = await import('#copilot/bridges');
         const expected = ['getMcpStatus', 'emitNerv', 'nervEventBusAdapter'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -148,7 +148,7 @@ describe('FI-7 — bridges barrel contract', () => {
         const barrel = await import('#copilot/bridges');
         const expected = ['listIssues', 'listPrs', 'listRuns'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });
@@ -184,13 +184,14 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
             const content = await readFile(join(copilotDir, fileStr), 'utf-8');
             const lines = content.split('\n');
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
+                const line = lines[i] ?? '';
                 // Pular comentários
                 if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) continue;
                 // Checar deep imports em linhas de import
                 const match = line.match(/from\s+['"]([^'"]+)['"]/);
-                if (match && DEEP_IMPORT_RE.test(match[1]) && !INTENTIONAL_ALIASES.has(match[1])) {
-                    violations.push(`${fileStr}:${i + 1} → ${match[1]}`);
+                const importPath = match?.[1];
+                if (importPath && DEEP_IMPORT_RE.test(importPath) && !INTENTIONAL_ALIASES.has(importPath)) {
+                    violations.push(`${fileStr}:${i + 1} → ${importPath}`);
                 }
             }
         }

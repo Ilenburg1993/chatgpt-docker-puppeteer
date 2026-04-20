@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { projectAgentHttpError } from '../../../src/copilot/presentation/agent-http-errors.js';
 

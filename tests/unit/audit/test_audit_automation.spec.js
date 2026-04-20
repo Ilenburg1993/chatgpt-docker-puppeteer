@@ -104,8 +104,7 @@ test('check:forbidden executes without fs runtime crash', async () => {
 });
 
 test('triage fallback is deterministic when MCP is unavailable', async () => {
-    vi.resetModules();
-    const mod = await import('../../../scripts/audit/triage_llm.mjs');
+    const mod = await import(`../../../scripts/audit/triage_llm.mjs?test=${Date.now()}`);
     const finding = {
         id: 'BUG-20990101-001',
         severity: 'P1',
@@ -125,12 +124,14 @@ test('triage fallback is deterministic when MCP is unavailable', async () => {
         updated_at: new Date().toISOString(),
     };
 
-    const result = await mod.triageFindings([finding], { enabled: false });
+    const result = await mod.triageFindings([/** @type {any} */ (finding)], { enabled: false });
     assert.equal(result.degraded, true);
     assert.equal(result.usedMcp, false);
-    assert.ok(result.findings[0].root_cause, 'fallback root cause should be filled');
-    assert.ok(result.findings[0].suggested_patch, 'fallback patch should be filled');
-    assert.ok(result.findings[0].test_strategy, 'fallback test strategy should be filled');
+    const firstFinding = result.findings[0];
+    assert.ok(firstFinding, 'fallback triage should return at least one finding');
+    assert.ok(firstFinding.root_cause, 'fallback root cause should be filled');
+    assert.ok(firstFinding.suggested_patch, 'fallback patch should be filled');
+    assert.ok(firstFinding.test_strategy, 'fallback test strategy should be filled');
 });
 
 test('publishSnapshot creates immutable markdown copy from master', () => {

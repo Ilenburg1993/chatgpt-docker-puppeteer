@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('git-bridge — funções de formatação', () => {
     it('formatLog é função exportada por bridges', async () => {

@@ -42,9 +42,9 @@ describe('copilot/plugins/PluginRegistry', () => {
         reg.register({ name: 'b', type: /** @type {const} */ ('hook'), install: () => {} });
         const list = reg.list();
         expect(list.length).toBe(2);
-        expect(list[0].name).toBe('a');
-        expect(list[0].type).toBe('tool');
-        expect(list[0].installed).toBe(false);
+        expect(list[0]?.name).toBe('a');
+        expect(list[0]?.type).toBe('tool');
+        expect(list[0]?.installed).toBe(false);
     });
 
     it('install() instala plugin e marca como installed', async () => {
@@ -61,7 +61,7 @@ describe('copilot/plugins/PluginRegistry', () => {
         const container = createContainer();
         await reg.install('inst', container);
         expect(called).toBe(true);
-        expect(reg.list()[0].installed).toBe(true);
+        expect(reg.list()[0]?.installed).toBe(true);
     });
 
     it('install() plugin não encontrado lança erro', async () => {

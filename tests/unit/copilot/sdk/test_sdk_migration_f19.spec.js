@@ -74,6 +74,7 @@ describe('F19 — Zero imports diretos de @github/copilot-sdk fora de sdk/', () 
             const lines = src.split('\n');
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                if (line === undefined) continue;
                 // Ignora comentários e JSDoc
                 const trimmed = line.trimStart();
                 if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/**')) {

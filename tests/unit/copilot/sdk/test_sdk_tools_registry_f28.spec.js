@@ -33,19 +33,21 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+/** @typedef {import('@github/copilot-sdk').Tool} SdkTool */
+
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 /**
  * Cria um Tool stub mínimo.
  *
  * @param {string} name
- * @returns {{ name: string; description: string; execute: () => Promise<string> }}
+ * @returns {SdkTool}
  */
 function makeTool(name) {
     return {
         name,
         description: `tool ${name}`,
-        execute: async () => `result:${name}`,
+        handler: async () => `result:${name}`,
     };
 }
 
@@ -123,6 +125,7 @@ describe('F135 — contratos de registro', () => {
     });
 
     it('registerTools registra múltiplas tools de uma vez', () => {
+        /** @type {SdkTool[]} */
         const tools = [makeTool('a'), makeTool('b'), makeTool('c')];
         registerTools(reg, tools, { category: 'task' });
         expect(reg.entries.size).toBe(3);
@@ -162,7 +165,7 @@ describe('F136 — funções de consulta', () => {
     it('getReadOnlyTools retorna apenas ferramentas somente-leitura', () => {
         const ro = getReadOnlyTools(reg);
         expect(ro).toHaveLength(1);
-        expect(ro[0].name).toBe('codeA');
+        expect(ro[0]?.name).toBe('codeA');
     });
 
     it('listToolNames retorna nomes de todas as tools', () => {

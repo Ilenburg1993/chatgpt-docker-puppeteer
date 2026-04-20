@@ -404,6 +404,7 @@ describe('F88 - tools-registry.js backward-compat', () => {
 describe('F16 - Newly added module exports', () => {
     it('exports custom-tools.js', async () => {
         const barrel = await import('#copilot/sdk/index');
+        const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const names = [
             'BUILTIN_HANDLER_MAP',
             'buildCustomTools',
@@ -414,13 +415,14 @@ describe('F16 - Newly added module exports', () => {
             'removeCustomTool',
             '_resetCustomToolsRegistry',
         ];
-        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
+        for (const n of names) expect(barrelMap[n], `missing: ${n}`).toBeDefined();
     });
 
     it('exports tools-state.js', async () => {
         const barrel = await import('#copilot/sdk/index');
+        const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const names = ['getToolsConfig', 'loadToolsConfig', 'loadToolsConfigAsync', 'patchToolsConfig'];
-        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
+        for (const n of names) expect(barrelMap[n], `missing: ${n}`).toBeDefined();
     });
 });
 

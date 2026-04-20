@@ -90,11 +90,11 @@ describe('check-layer-violations — LAYER_MAP', () => {
     });
 
     it('cada layer inferior tem valor menor', () => {
-        assert.ok(LAYER_MAP['core'] < LAYER_MAP['config']);
-        assert.ok(LAYER_MAP['config'] < LAYER_MAP['hooks']);
-        assert.ok(LAYER_MAP['hooks'] < LAYER_MAP['agent']);
-        assert.ok(LAYER_MAP['agent'] < LAYER_MAP['api']);
-        assert.ok(LAYER_MAP['api'] < LAYER_MAP['terminal']);
+        assert.ok((LAYER_MAP['core'] ?? 0) < (LAYER_MAP['config'] ?? 0));
+        assert.ok((LAYER_MAP['config'] ?? 0) < (LAYER_MAP['hooks'] ?? 0));
+        assert.ok((LAYER_MAP['hooks'] ?? 0) < (LAYER_MAP['agent'] ?? 0));
+        assert.ok((LAYER_MAP['agent'] ?? 0) < (LAYER_MAP['api'] ?? 0));
+        assert.ok((LAYER_MAP['api'] ?? 0) < (LAYER_MAP['terminal'] ?? 0));
     });
 });
 
@@ -103,28 +103,28 @@ describe('check-layer-violations — regex patterns', () => {
         importRegex.lastIndex = 0;
         const m = importRegex.exec("import { foo } from '#copilot/hooks/factory';");
         assert.ok(m);
-        assert.equal(m[1], '#copilot/hooks/factory');
+        assert.equal(m?.[1], '#copilot/hooks/factory');
     });
 
     it('exportFromRegex captura named re-export', () => {
         exportFromRegex.lastIndex = 0;
         const m = exportFromRegex.exec("export { bar, baz } from '#copilot/config/env';");
         assert.ok(m);
-        assert.equal(m[1], '#copilot/config/env');
+        assert.equal(m?.[1], '#copilot/config/env');
     });
 
     it('exportFromRegex captura star re-export', () => {
         exportFromRegex.lastIndex = 0;
         const m = exportFromRegex.exec("export * from './constants.js';");
         assert.ok(m);
-        assert.equal(m[1], './constants.js');
+        assert.equal(m?.[1], './constants.js');
     });
 
     it('dynamicImportRegex captura dynamic import', () => {
         dynamicImportRegex.lastIndex = 0;
         const m = dynamicImportRegex.exec("const mod = await import('#copilot/agent/loop');");
         assert.ok(m);
-        assert.equal(m[1], '#copilot/agent/loop');
+        assert.equal(m?.[1], '#copilot/agent/loop');
     });
 });
 

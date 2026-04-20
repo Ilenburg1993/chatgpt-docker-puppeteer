@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('HookBus — emissão e escuta', () => {
     it('instancia sem erros', async () => {
@@ -73,11 +73,15 @@ describe('attachBus — envolve SessionHooks', () => {
     it('attachBus preserva handler original e publica no bus', async () => {
         const { HookBus, attachBus } = await import('../../../src/copilot/hooks/bus.js');
         const bus = new HookBus();
+        /** @type {string[]} */
         const origCalls = [];
 
         /** @type {any} */
         const hooks = {
-            onPreToolUse: async (input, _inv) => {
+            onPreToolUse: async (
+                /** @type {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput} */ input,
+                /** @type {import('../../../src/copilot/hooks/types.js').InvocationContext} */ _inv,
+            ) => {
                 origCalls.push('called');
                 return { decision: 'allow' };
             },
@@ -91,7 +95,15 @@ describe('attachBus — envolve SessionHooks', () => {
             busEvent = e;
         });
 
-        await wrapped.onPreToolUse?.({ tool: { name: 'bash', input: {} }, decision: 'allow' }, { sessionId: 's1' });
+        await wrapped.onPreToolUse?.(
+            {
+                toolName: 'bash',
+                toolArgs: {},
+                timestamp: Date.now(),
+                cwd: process.cwd(),
+            },
+            { sessionId: 's1' },
+        );
 
         assert.deepEqual(origCalls, ['called']);
         assert.ok(busEvent !== null, 'Bus deve ter recebido evento');

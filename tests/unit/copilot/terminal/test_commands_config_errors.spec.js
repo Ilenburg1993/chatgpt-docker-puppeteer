@@ -5,7 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 const readTerminalConfigProjection = vi.fn(() => ({
     currentModel: 'gpt-5',
     currentReasoningEffort: 'high',
-    modelMeta: { costTier: 'high', speedTier: 'fast', contextWindow: 128000 },
+    modelMeta: {
+        costTier: 'high',
+        speedTier: 'fast',
+        contextWindow: 128000,
+        supportsReasoning: true,
+        supportsVision: true,
+    },
     binding: { hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' },
     runtimeSessionId: 'sdk-1',
 }));
@@ -20,7 +26,17 @@ const listTerminalAvailableModelsProjection = vi.fn(async () => ({
         { id: 'gpt-4.1', capabilities: { supports: { reasoningEffort: false, vision: false } } },
     ],
 }));
-const setTerminalModelProjection = vi.fn((modelId) => ({ previousModel: 'gpt-5', currentModel: modelId }));
+const setTerminalModelProjection = vi.fn((modelId) => ({
+    previousModel: 'gpt-5',
+    previousReasoningEffort: 'high',
+    currentModel: modelId,
+    currentReasoningEffort: modelId === 'gpt-4.1' ? 'off' : 'high',
+    reasoningAdjusted: modelId === 'gpt-4.1',
+    modelMeta:
+        modelId === 'gpt-4.1'
+            ? { costTier: 'medium', speedTier: 'fast', contextWindow: 1047576, supportsReasoning: false, supportsVision: false }
+            : { costTier: 'high', speedTier: 'fast', contextWindow: 128000, supportsReasoning: true, supportsVision: true },
+}));
 const setTerminalReasoningProjection = vi.fn((effort) => ({
     previousReasoningEffort: 'high',
     currentReasoningEffort: effort ?? 'off',
@@ -46,6 +62,7 @@ const { cmdModel, cmdReasoning } = await import('../../../../src/copilot/termina
 const { cmdErrors } = await import('../../../../src/copilot/terminal/commands/errors.js');
 
 function mockCtx() {
+    /** @type {string[]} */
     const lines = [];
     const println = vi.fn((/** @type {string} */ text) => lines.push(text));
     return { println, output: () => lines.join('\n') };
@@ -59,6 +76,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(ctx.output()).toContain('Modelo ativo');
         expect(ctx.output()).toContain('gpt-5');
+        expect(ctx.output()).toContain('caps: reasoning=yes');
         expect(readTerminalConfigProjection).toHaveBeenCalled();
     });
 
@@ -89,6 +107,16 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(setTerminalReasoningProjection).toHaveBeenCalledWith('medium');
         expect(ctx.output()).toContain('Reasoning trocado');
+    });
+
+    it('cmdModel explica ajuste de reasoning quando o modelo alvo não suporta capability', async () => {
+        const ctx = mockCtx();
+
+        await cmdModel({ println: ctx.println }, 'gpt-4.1');
+
+        expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
+        expect(ctx.output()).toContain('Reasoning ajustado');
+        expect(ctx.output()).toContain('reasoning=no');
     });
 
     it('cmdErrors usa projection de erros do frontend', () => {

@@ -84,14 +84,14 @@ describe('types/ barrel — event exports', () => {
     it('EVENT_NAMESPACES has all 8 namespaces', () => {
         const expected = ['HOOK', 'SESSION', 'TOOL', 'SDK', 'AGENT', 'API', 'TERMINAL', 'AUDIT'];
         for (const ns of expected) {
-            assert.ok(EVENT_NAMESPACES[ns], `missing namespace: ${ns}`);
+            assert.ok(/** @type {Record<string, unknown>} */ (EVENT_NAMESPACES)[ns], `missing namespace: ${ns}`);
         }
     });
 
     it('EVENT_NAMES has all namespace groups', () => {
         const groups = ['hook', 'session', 'tool', 'sdk', 'agent', 'api', 'terminal', 'audit'];
         for (const g of groups) {
-            assert.ok(EVENT_NAMES[g], `missing event group: ${g}`);
+            assert.ok(/** @type {Record<string, unknown>} */ (EVENT_NAMES)[g], `missing event group: ${g}`);
         }
     });
 

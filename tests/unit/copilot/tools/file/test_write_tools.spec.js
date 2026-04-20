@@ -15,7 +15,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockLog = vi.fn();
 vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
 
-/** @type {Record<string, import('vitest').Mock>} */
+/** @type {{
+ *  access: import('vitest').Mock;
+ *  writeFile: import('vitest').Mock;
+ *  rename: import('vitest').Mock;
+ *  mkdir: import('vitest').Mock;
+ *  stat: import('vitest').Mock;
+ *  unlink: import('vitest').Mock;
+ *  copyFile: import('vitest').Mock;
+ *  readFile: import('vitest').Mock;
+ * }} */
 const fsMock = {
     access: vi.fn(),
     writeFile: vi.fn(),
@@ -78,7 +87,7 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — write_file_content (F181-F182)', () => {
-    const handler = writeFileContentTool.handler;
+    const handler = /** @type {any} */ (writeFileContentTool.handler);
 
     it('escreve conteúdo em arquivo existente (utf8)', async () => {
         pathOk('/workspace/file.txt');
@@ -145,7 +154,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         await handler({ path: 'f.txt', content: 'ok', encoding: 'utf8' });
 
-        const tmpPath = fsMock.writeFile.mock.calls[0][0];
+        const tmpPath = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[0]);
         expect(tmpPath).toContain('.tmp');
         expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/f.txt');
     });
@@ -167,7 +176,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — create_file (F184)', () => {
-    const handler = createFileTool.handler;
+    const handler = /** @type {any} */ (createFileTool.handler);
 
     it('cria novo arquivo com conteúdo', async () => {
         pathOk('/workspace/new.txt');
@@ -273,7 +282,7 @@ describe('F35 — create_file (F184)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — delete_file (F185)', () => {
-    const handler = deleteFileTool.handler;
+    const handler = /** @type {any} */ (deleteFileTool.handler);
 
     it('deleta arquivo existente', async () => {
         pathOk('/workspace/doomed.txt');
@@ -320,7 +329,7 @@ describe('F35 — delete_file (F185)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — copy_file (F186)', () => {
-    const handler = copyFileTool.handler;
+    const handler = /** @type {any} */ (copyFileTool.handler);
 
     it('copia arquivo com sucesso', async () => {
         mockValidatePath
@@ -372,7 +381,7 @@ describe('F35 — copy_file (F186)', () => {
 });
 
 describe('F35 — move_file (F186)', () => {
-    const handler = moveFileTool.handler;
+    const handler = /** @type {any} */ (moveFileTool.handler);
 
     it('move arquivo com sucesso', async () => {
         mockValidatePath
@@ -420,7 +429,7 @@ describe('F35 — move_file (F186)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — patch_file (F187)', () => {
-    const handler = patchFileTool.handler;
+    const handler = /** @type {any} */ (patchFileTool.handler);
 
     it('aplica patch com sucesso', async () => {
         pathOk('/workspace/target.js');
@@ -508,7 +517,7 @@ describe('F35 — patch_file (F187)', () => {
         });
 
         // O conteúdo escrito deve conter $100 literalmente
-        const writtenContent = fsMock.writeFile.mock.calls[0][1];
+        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
         expect(writtenContent).toContain('$100');
     });
 
@@ -526,7 +535,7 @@ describe('F35 — patch_file (F187)', () => {
         });
 
         expect(result.success).toBe(true);
-        const writtenContent = fsMock.writeFile.mock.calls[0][1];
+        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
         expect(writtenContent).toBe('keep this keep that');
     });
 

@@ -27,11 +27,35 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** @param {string} toolName */
-const makeInput = (toolName, args = {}) => ({ toolName, toolArgs: args });
+/** @param {string} toolName @param {Record<string, unknown>} [args] */
+const makeInput = (toolName, args = {}) => ({ toolName, toolArgs: args, timestamp: Date.now(), cwd: '/tmp' });
 
 /** @param {string} [sessionId] */
 const makeInvocation = (sessionId = 'sess-1') => ({ sessionId });
+
+/** @param {Partial<import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput>} [overrides] */
+const errorInput = (overrides = {}) => ({
+    error: 'erro',
+    errorContext: 'system',
+    recoverable: true,
+    timestamp: Date.now(),
+    cwd: '/tmp',
+    ...overrides,
+});
+
+/**
+ * @param {ReturnType<typeof createHooks>} hooks
+ * @param {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput} input
+ * @param {{ sessionId: string }} [invocation]
+ */
+const callPreTool = async (hooks, input, invocation = makeInvocation()) => /** @type {any} */ (await hooks.onPreToolUse?.(input, invocation));
+
+/**
+ * @param {ReturnType<typeof createHooks>} hooks
+ * @param {import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput} input
+ * @param {{ sessionId: string }} [invocation]
+ */
+const callErrorHook = async (hooks, input, invocation = makeInvocation()) => /** @type {any} */ (await hooks.onErrorOccurred?.(input, invocation));
 
 // ─── createHooks ──────────────────────────────────────────────────────────────
 
@@ -72,25 +96,25 @@ describe('hooks/factory › createHooks', () => {
 describe('hooks/factory › onPreToolUse', () => {
     it('permite tool por padrão (sem restrições)', async () => {
         const hooks = createHooks();
-        const result = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file'));
         expect(result.permissionDecision).toBe('allow');
     });
 
     it('nega tool explicitamente listada em denyTools', async () => {
         const hooks = createHooks({ denyTools: ['rm_rf'] });
-        const result = await hooks.onPreToolUse(makeInput('rm_rf'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('rm_rf'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('nega tool por denyPatterns regex', async () => {
         const hooks = createHooks({ denyPatterns: [/^shell_/] });
-        const result = await hooks.onPreToolUse(makeInput('shell_exec'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('shell_exec'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('permite tool que não bate com denyPatterns', async () => {
         const hooks = createHooks({ denyPatterns: [/^shell_/] });
-        const result = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file'));
         expect(result.permissionDecision).toBe('allow');
     });
 
@@ -98,9 +122,9 @@ describe('hooks/factory › onPreToolUse', () => {
         const globalRegex = /^shell_/g; // bug: stateful regex
         const hooks = createHooks({ denyPatterns: [globalRegex] });
         // Chamadas consecutivas devem negar consistentemente (lastIndex reset)
-        const r1 = await hooks.onPreToolUse(makeInput('shell_exec'), makeInvocation());
-        const r2 = await hooks.onPreToolUse(makeInput('shell_exec'), makeInvocation());
-        const r3 = await hooks.onPreToolUse(makeInput('shell_exec'), makeInvocation());
+        const r1 = await callPreTool(hooks, makeInput('shell_exec'));
+        const r2 = await callPreTool(hooks, makeInput('shell_exec'));
+        const r3 = await callPreTool(hooks, makeInput('shell_exec'));
         expect(r1.permissionDecision).toBe('deny');
         expect(r2.permissionDecision).toBe('deny');
         expect(r3.permissionDecision).toBe('deny');
@@ -108,26 +132,26 @@ describe('hooks/factory › onPreToolUse', () => {
 
     it('com allowTools, nega tool não listada', async () => {
         const hooks = createHooks({ allowTools: ['read_file', 'list_dir'] });
-        const result = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('bash'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('com allowTools, permite tool listada', async () => {
         const hooks = createHooks({ allowTools: ['read_file', 'list_dir'] });
-        const result = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file'));
         expect(result.permissionDecision).toBe('allow');
     });
 
     it('denyTools tem precedência sobre allowTools', async () => {
         const hooks = createHooks({ allowTools: ['bash', 'read_file'], denyTools: ['bash'] });
-        const result = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('bash'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('askHandler aprova tool não-listada em allow nem deny', async () => {
         const ask = vi.fn().mockResolvedValue(true);
         const hooks = createHooks({ allowTools: ['read_file'], onPermissionAsk: ask });
-        const result = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('bash'));
         expect(ask).toHaveBeenCalledWith('bash');
         expect(result.permissionDecision).toBe('allow');
     });
@@ -135,21 +159,21 @@ describe('hooks/factory › onPreToolUse', () => {
     it('askHandler nega tool quando retorna false', async () => {
         const ask = vi.fn().mockResolvedValue(false);
         const hooks = createHooks({ allowTools: ['read_file'], onPermissionAsk: ask });
-        const result = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('bash'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('askHandler que lança erro resulta em deny', async () => {
         const ask = vi.fn().mockRejectedValue(new Error('boom'));
         const hooks = createHooks({ allowTools: ['read_file'], onPermissionAsk: ask });
-        const result = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('bash'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('argsModifier modifica args quando retorna objeto', async () => {
         const modifier = vi.fn().mockReturnValue({ modified: true });
         const hooks = createHooks({ argsModifier: modifier });
-        const result = await hooks.onPreToolUse(makeInput('read_file', { path: '/x' }), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file', { path: '/x' }));
         expect(result.permissionDecision).toBe('allow');
         expect(result.modifiedArgs).toEqual({ modified: true });
     });
@@ -157,14 +181,14 @@ describe('hooks/factory › onPreToolUse', () => {
     it('argsModifier ignorado quando retorna null', async () => {
         const modifier = vi.fn().mockReturnValue(null);
         const hooks = createHooks({ argsModifier: modifier });
-        const result = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file'));
         expect(result.permissionDecision).toBe('allow');
         expect(result.modifiedArgs).toBeUndefined();
     });
 
     it('toolName desconhecido usa fallback "unknown"', async () => {
         const hooks = createHooks({ debugTools: true });
-        const result = await hooks.onPreToolUse({}, makeInvocation());
+        const result = await callPreTool(hooks, /** @type {any} */ ({}));
         expect(result.permissionDecision).toBe('allow');
     });
 });
@@ -174,29 +198,20 @@ describe('hooks/factory › onPreToolUse', () => {
 describe('hooks/factory › onErrorOccurred', () => {
     it('retorna retry para model_call recuperável', async () => {
         const hooks = createHooks();
-        const result = await hooks.onErrorOccurred(
-            { error: 'rate_limit', errorContext: 'model_call', recoverable: true },
-            makeInvocation(),
-        );
+        const result = await callErrorHook(hooks, errorInput({ error: 'rate_limit', errorContext: 'model_call' }));
         expect(result.errorHandling).toBe('retry');
         expect(result.retryCount).toBe(3);
     });
 
     it('retorna skip para tool_execution recuperável', async () => {
         const hooks = createHooks();
-        const result = await hooks.onErrorOccurred(
-            { error: 'tool failed', errorContext: 'tool_execution', recoverable: true },
-            makeInvocation(),
-        );
+        const result = await callErrorHook(hooks, errorInput({ error: 'tool failed', errorContext: 'tool_execution' }));
         expect(result.errorHandling).toBe('skip');
     });
 
     it('retorna abort para erro não-recuperável', async () => {
         const hooks = createHooks();
-        const result = await hooks.onErrorOccurred(
-            { error: 'fatal', errorContext: 'unknown', recoverable: false },
-            makeInvocation(),
-        );
+        const result = await callErrorHook(hooks, errorInput({ error: 'fatal', errorContext: 'system', recoverable: false }));
         expect(result.errorHandling).toBe('abort');
     });
 });
@@ -222,21 +237,21 @@ describe('hooks/factory › presets', () => {
 
     it('createDenyAllHooks nega qualquer tool', async () => {
         const hooks = createDenyAllHooks();
-        const result = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('read_file'));
         expect(result.permissionDecision).toBe('deny');
     });
 
     it('createSafeHooks permite read_file, nega bash', async () => {
         const hooks = createSafeHooks();
-        const allow = await hooks.onPreToolUse(makeInput('read_file'), makeInvocation());
+        const allow = await callPreTool(hooks, makeInput('read_file'));
         expect(allow.permissionDecision).toBe('allow');
-        const deny = await hooks.onPreToolUse(makeInput('bash'), makeInvocation());
+        const deny = await callPreTool(hooks, makeInput('bash'));
         expect(deny.permissionDecision).toBe('deny');
     });
 
     it('createSafeHooks aceita extra allowed tools', async () => {
         const hooks = createSafeHooks(['web_search']);
-        const result = await hooks.onPreToolUse(makeInput('web_search'), makeInvocation());
+        const result = await callPreTool(hooks, makeInput('web_search'));
         expect(result.permissionDecision).toBe('allow');
     });
 });
@@ -249,7 +264,7 @@ describe('hooks/factory › composePreToolUseHandlers', () => {
         const h2 = vi.fn().mockResolvedValue({ permissionDecision: 'allow' });
         const composed = composePreToolUseHandlers(h1, h2);
         const result = await composed(makeInput('bash'), makeInvocation());
-        expect(result.permissionDecision).toBe('deny');
+        expect(result?.permissionDecision).toBe('deny');
         expect(h2).not.toHaveBeenCalled();
     });
 
@@ -258,7 +273,7 @@ describe('hooks/factory › composePreToolUseHandlers', () => {
         const h2 = vi.fn().mockResolvedValue({ permissionDecision: 'allow' });
         const composed = composePreToolUseHandlers(h1, h2);
         const result = await composed(makeInput('bash'), makeInvocation());
-        expect(result.permissionDecision).toBe('allow');
+        expect(result?.permissionDecision).toBe('allow');
     });
 
     it('retorna undefined se nenhum handler decide', async () => {
@@ -275,14 +290,14 @@ describe('hooks/factory › createErrorNotifierHook', () => {
     it('delega ao callback com todos os parâmetros', async () => {
         const cb = vi.fn();
         const hook = createErrorNotifierHook(cb);
-        await hook({ error: 'boom', errorContext: 'model_call', recoverable: true }, makeInvocation('sess-42'));
+        await hook(errorInput({ error: 'boom', errorContext: 'model_call' }), makeInvocation('sess-42'));
         expect(cb).toHaveBeenCalledWith('boom', 'model_call', true, 'sess-42');
     });
 
     it('sessionId default vazio se invocation sem id', async () => {
         const cb = vi.fn();
         const hook = createErrorNotifierHook(cb);
-        await hook({ error: 'x', errorContext: 'y', recoverable: false }, {});
+        await hook(errorInput({ error: 'x', errorContext: 'system', recoverable: false }), /** @type {any} */ ({}));
         expect(cb).toHaveBeenCalledWith('x', 'y', false, '');
     });
 });

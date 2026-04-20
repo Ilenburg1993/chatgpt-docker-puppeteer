@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { calcFetchLimit, fmtDate, runIcon, slicePage } from '../../../../src/copilot/bridges/gh/shared.js';
 

@@ -22,6 +22,9 @@ import {
 } from '#copilot/observability/tool-stats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** @param {Record<string, unknown>} stats @param {string} name */
+const entryOf = (stats, name) => /** @type {any} */ (stats[name]);
+
 // ─── F164: _resetToolStats isolamento ──────────────────────────────────────
 // Executado antes de cada describe para garantir estado limpo
 
@@ -35,17 +38,19 @@ describe('F159 — recordToolCall acumula métricas por tool', () => {
     it('registra chamada com sucesso', () => {
         recordToolCall('git.status', 50, true);
         const stats = getToolStats();
-        expect(stats['git.status']).toBeDefined();
-        expect(stats['git.status'].calls).toBe(1);
-        expect(stats['git.status'].errors).toBe(0);
-        expect(stats['git.status'].lastOk).toBe(true);
+        const entry = entryOf(stats, 'git.status');
+        expect(entry).toBeDefined();
+        expect(entry.calls).toBe(1);
+        expect(entry.errors).toBe(0);
+        expect(entry.lastOk).toBe(true);
     });
 
     it('registra chamada com erro', () => {
         recordToolCall('git.status', 30, false);
         const stats = getToolStats();
-        expect(stats['git.status'].errors).toBe(1);
-        expect(stats['git.status'].lastOk).toBe(false);
+        const entry = entryOf(stats, 'git.status');
+        expect(entry.errors).toBe(1);
+        expect(entry.lastOk).toBe(false);
     });
 
     it('acumula múltiplas chamadas', () => {
@@ -53,15 +58,17 @@ describe('F159 — recordToolCall acumula métricas por tool', () => {
         recordToolCall('shell.exec', 200, true);
         recordToolCall('shell.exec', 150, false);
         const stats = getToolStats();
-        expect(stats['shell.exec'].calls).toBe(3);
-        expect(stats['shell.exec'].errors).toBe(1);
+        const entry = entryOf(stats, 'shell.exec');
+        expect(entry.calls).toBe(3);
+        expect(entry.errors).toBe(1);
     });
 
     it('defaulta success=true quando não passado', () => {
         recordToolCall('tool.test', 20);
         const stats = getToolStats();
-        expect(stats['tool.test'].lastOk).toBe(true);
-        expect(stats['tool.test'].errors).toBe(0);
+        const entry = entryOf(stats, 'tool.test');
+        expect(entry.lastOk).toBe(true);
+        expect(entry.errors).toBe(0);
     });
 });
 
@@ -75,7 +82,7 @@ describe('F160 — getToolStats retorna snapshot com campos corretos', () => {
     it('snapshot contém calls, errors, avgLatencyMs, errorRate, lastCallIso, lastOk', () => {
         recordToolCall('code.lint', 120, true);
         const stats = getToolStats();
-        const entry = stats['code.lint'];
+        const entry = entryOf(stats, 'code.lint');
         expect(entry).toHaveProperty('calls');
         expect(entry).toHaveProperty('errors');
         expect(entry).toHaveProperty('avgLatencyMs');
@@ -88,20 +95,20 @@ describe('F160 — getToolStats retorna snapshot com campos corretos', () => {
         recordToolCall('code.lint', 100, true);
         recordToolCall('code.lint', 200, true);
         const stats = getToolStats();
-        expect(stats['code.lint'].avgLatencyMs).toBe(150);
+        expect(entryOf(stats, 'code.lint').avgLatencyMs).toBe(150);
     });
 
     it('errorRate é calculado corretamente', () => {
         recordToolCall('code.lint', 100, true);
         recordToolCall('code.lint', 100, false);
         const stats = getToolStats();
-        expect(stats['code.lint'].errorRate).toBe(50.0);
+        expect(entryOf(stats, 'code.lint').errorRate).toBe(50.0);
     });
 
     it('lastCallIso é string ISO quando houve chamadas', () => {
         recordToolCall('code.lint', 10, true);
         const stats = getToolStats();
-        expect(stats['code.lint'].lastCallIso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(entryOf(stats, 'code.lint').lastCallIso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it('lastCallIso é null antes de qualquer chamada', () => {
@@ -111,14 +118,15 @@ describe('F160 — getToolStats retorna snapshot com campos corretos', () => {
         recordToolCall('fresh.tool', 0, true);
         // _stats.lastCallMs será Date.now() > 0, então IsoString deve existir
         const stats = getToolStats();
-        expect(stats['fresh.tool'].lastCallIso).not.toBeNull();
+        expect(entryOf(stats, 'fresh.tool').lastCallIso).not.toBeNull();
     });
 });
 
 // ─── F161: wrapWithStats não altera retorno ────────────────────────────────
 
 describe('F161 — wrapWithStats não altera retorno da tool', () => {
-    /** @returns {{ name: string; handler: (p: any, i: any) => Promise<string> }} */
+    /** @param {string} name @param {string} [returnValue]
+     * @returns {{ name: string; description: string; handler: (p: any, i: any) => Promise<string> }} */
     function makeToolWithHandler(name, returnValue = 'result') {
         return {
             name,
@@ -155,9 +163,10 @@ describe('F161 — wrapWithStats não altera retorno da tool', () => {
         const wrapped = wrapWithStats(/** @type {any} */ (tool));
         await wrapped.handler({}, /** @type {any} */ ({}));
         const stats = getToolStats();
-        expect(stats['test.wrapped']).toBeDefined();
-        expect(stats['test.wrapped'].calls).toBe(1);
-        expect(stats['test.wrapped'].errors).toBe(0);
+        const entry = entryOf(stats, 'test.wrapped');
+        expect(entry).toBeDefined();
+        expect(entry.calls).toBe(1);
+        expect(entry.errors).toBe(0);
     });
 });
 
@@ -188,8 +197,9 @@ describe('F162 — wrapWithStats captura erro e re-lança', () => {
             /* esperado */
         }
         const stats = getToolStats();
-        expect(stats['failing.tool'].errors).toBe(1);
-        expect(stats['failing.tool'].lastOk).toBe(false);
+        const entry = entryOf(stats, 'failing.tool');
+        expect(entry.errors).toBe(1);
+        expect(entry.lastOk).toBe(false);
     });
 });
 
@@ -201,17 +211,20 @@ describe('F163 — getStatsByCategory agrupa por prefixo', () => {
         recordToolCall('shell.list_dir', 50, true);
         recordToolCall('git.status', 80, false);
         const byCategory = getStatsByCategory();
-        expect(byCategory['shell']).toBeDefined();
-        expect(byCategory['git']).toBeDefined();
-        expect(byCategory['shell'].tools).toHaveLength(2);
-        expect(byCategory['git'].tools).toHaveLength(1);
+        const shell = entryOf(byCategory, 'shell');
+        const git = entryOf(byCategory, 'git');
+        expect(shell).toBeDefined();
+        expect(git).toBeDefined();
+        expect(shell.tools).toHaveLength(2);
+        expect(git.tools).toHaveLength(1);
     });
 
     it('tools sem ponto ficam na categoria other', () => {
         recordToolCall('standalonetool', 30, true);
         const byCategory = getStatsByCategory();
-        expect(byCategory['other']).toBeDefined();
-        expect(byCategory['other'].tools).toContain('standalonetool');
+        const other = entryOf(byCategory, 'other');
+        expect(other).toBeDefined();
+        expect(other.tools).toContain('standalonetool');
     });
 
     it('totalCalls soma todas as chamadas da categoria', () => {
@@ -219,8 +232,9 @@ describe('F163 — getStatsByCategory agrupa por prefixo', () => {
         recordToolCall('code.lint', 100, true);
         recordToolCall('code.typecheck', 200, false);
         const byCategory = getStatsByCategory();
-        expect(byCategory['code'].totalCalls).toBe(3);
-        expect(byCategory['code'].totalErrors).toBe(1);
+        const code = entryOf(byCategory, 'code');
+        expect(code.totalCalls).toBe(3);
+        expect(code.totalErrors).toBe(1);
     });
 });
 

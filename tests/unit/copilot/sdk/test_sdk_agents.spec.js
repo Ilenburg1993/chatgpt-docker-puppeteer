@@ -169,7 +169,7 @@ describe('F81 - listAgents', () => {
         const session = makeSession();
         const result = await listAgents(session);
         expect(result.agents).toHaveLength(2);
-        expect(result.agents[0].name).toBe('auditor');
+        expect(result.agents[0]?.name).toBe('auditor');
         expect(session.rpc.agent.list).toHaveBeenCalledOnce();
     });
 
@@ -299,7 +299,9 @@ describe('F85 - Agent selection flow', () => {
         const { agents } = await listAgents(session);
         expect(agents.length).toBeGreaterThan(0);
 
-        await selectAgent(session, agents[1].name);
+        const second = agents[1];
+        expect(second).toBeDefined();
+        await selectAgent(session, second?.name ?? 'fixer');
         expect(session.rpc.agent.select).toHaveBeenCalledWith({ name: 'fixer' });
 
         const current = await getCurrentAgent(session);
@@ -359,14 +361,16 @@ describe('F85 - Agent selection flow', () => {
 describe('Barrel - Faixa 15 exports', () => {
     it('barrel exporta funcoes RPC de agents', async () => {
         const barrel = await import('#copilot/sdk/index');
+        const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const expected = ['listAgents', 'getCurrentAgent', 'selectAgent', 'deselectAgent', 'reloadAgents'];
         for (const name of expected) {
-            expect(typeof barrel[name]).toBe('function');
+            expect(typeof barrelMap[name]).toBe('function');
         }
     });
 
     it('barrel mantém exports pre-existentes de agents', async () => {
         const barrel = await import('#copilot/sdk/index');
+        const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const existing = [
             'READ_ONLY_TOOLS',
             'buildAgentList',
@@ -378,7 +382,7 @@ describe('Barrel - Faixa 15 exports', () => {
             'isValidAgentName',
         ];
         for (const name of existing) {
-            expect(barrel[name]).toBeDefined();
+            expect(barrelMap[name]).toBeDefined();
         }
     });
 });

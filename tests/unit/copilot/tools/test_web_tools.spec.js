@@ -322,7 +322,7 @@ describe('web-tools', () => {
 
             expect(result.success).toBe(true);
             // Deve ter filtrado o 127.0.0.1
-            expect(result.results.every((r) => !r.url.includes('127.0.0.1'))).toBe(true);
+            expect(result.results.every((/** @type {{ url: string }} */ r) => !r.url.includes('127.0.0.1'))).toBe(true);
         });
 
         it('retorna erro em timeout', async () => {

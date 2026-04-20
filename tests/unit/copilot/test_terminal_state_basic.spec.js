@@ -5,42 +5,45 @@
  * Contrato: terminal/state.js
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from 'node:test';
-describe("terminal/state.js — contrato", () => {
-    it("importa sem erros", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.ok(mod, "módulo deve carregar");
+import { describe, expect, it } from 'vitest';
+describe('terminal/state.js — contrato', () => {
+    it('importa sem erros', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(mod).toBeTruthy();
     });
 
-    it("exporta getBusy", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.getBusy !== "undefined", true, "getBusy deve estar exportado");
+    it('exporta getBusy', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.getBusy).toBe('function');
     });
 
-    it("exporta setBusy", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.setBusy !== "undefined", true, "setBusy deve estar exportado");
+    it('exporta setBusy', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.setBusy).toBe('function');
     });
 
-    it("exporta getPlanMode", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.getPlanMode !== "undefined", true, "getPlanMode deve estar exportado");
+    it('exporta getSdkSessionMode', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.getSdkSessionMode).toBe('function');
     });
 
-    it("exporta setPlanMode", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.setPlanMode !== "undefined", true, "setPlanMode deve estar exportado");
+    it('exporta setSdkSessionMode', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.setSdkSessionMode).toBe('function');
     });
 
-    it("exporta getTerminalPhase", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.getTerminalPhase !== "undefined", true, "getTerminalPhase deve estar exportado");
+    it('exporta getLastSdkPlanOperation', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.getLastSdkPlanOperation).toBe('function');
     });
 
-    it("exporta TerminalPhase", async () => {
-        const mod = await import("../../../src/copilot/terminal/state.js");
-        assert.equal(typeof mod.TerminalPhase !== "undefined", true, "TerminalPhase deve estar exportado");
+    it('exporta getTerminalPhase', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(typeof mod.getTerminalPhase).toBe('function');
     });
 
+    it('exporta TerminalPhase', async () => {
+        const mod = await import('../../../src/copilot/terminal/state.js');
+        expect(mod.TerminalPhase).toBeTruthy();
+    });
 });

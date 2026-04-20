@@ -139,7 +139,7 @@ describe('turn-executor', () => {
 
             emitTurnStart(emitter, longMsg, counter);
 
-            const emitted = spy.mock.calls[0][0];
+            const emitted = spy.mock.calls[0]?.[0];
             expect(emitted.message.length).toBe(120);
         });
 
@@ -222,7 +222,7 @@ describe('turn-executor', () => {
 
             await vi.advanceTimersByTimeAsync(3100);
             expect(reject).toHaveBeenCalledTimes(1);
-            const err = reject.mock.calls[0][0];
+            const err = reject.mock.calls[0]?.[0];
             expect(err.code).toBe('DIALOG_TIMEOUT');
         });
 
@@ -243,7 +243,7 @@ describe('turn-executor', () => {
 
             onStopOuter({ authorized: true, reason: 'user' });
             expect(reject).toHaveBeenCalledTimes(1);
-            const err = reject.mock.calls[0][0];
+            const err = reject.mock.calls[0]?.[0];
             expect(err.code).toBe('DIALOG_ENDED');
         });
 
@@ -323,7 +323,9 @@ describe('turn-executor', () => {
     /* ── F65.4: waitForRestartAndReply ── */
     describe('waitForRestartAndReply', () => {
         it('rejeita NOT_ATTACHED se host é null', async () => {
-            await expect(waitForRestartAndReply(emitter, null, 'msg', 5000)).rejects.toThrow(/Host não vinculado/);
+            await expect(waitForRestartAndReply(emitter, /** @type {any} */ (null), 'msg', 5000)).rejects.toThrow(
+                /Host não vinculado/,
+            );
         });
 
         it('rejeita AbortError se signal já abortado', async () => {
@@ -411,7 +413,12 @@ describe('turn-executor', () => {
     describe('executeTurnImpl', () => {
         it('rejeita NOT_ATTACHED se host ausente', async () => {
             await expect(
-                executeTurnImpl(emitter, 'hi', { timeout: 5000 }, { host: null, sendCountRef: { sendCount: 0 } }),
+                executeTurnImpl(
+                    emitter,
+                    'hi',
+                    { timeout: 5000 },
+                    /** @type {any} */ ({ host: null, sendCountRef: { sendCount: 0 } }),
+                ),
             ).rejects.toThrow(/Host não vinculado/);
         });
 

@@ -14,14 +14,15 @@ vi.mock('#copilot/audit/pipeline', () => ({
     globalAuditBuffer: { push: vi.fn() },
 }));
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 /**
  * Cria um context mock mínimo para os collectors.
  *
- * @returns {import('#copilot/observability/collectors/context').CollectorContext & {
- *     _emit: (event: string, data: any) => void;
- * }}
+ * @returns {any}
  */
 function createMockContext() {
     /** @type {Map<string, Function[]>} */
@@ -42,13 +43,13 @@ function createMockContext() {
     return {
         session: /** @type {any} */ (session),
         sessionId: 'test-session-001',
-        metrics: {
+        metrics: /** @type {any} */ ({
             recordToolCall: vi.fn(),
             recordCounter: vi.fn(),
             recordUsage: vi.fn(),
-        },
-        errorTracker: { trackError: vi.fn() },
-        hookBus: { emitHook: vi.fn() },
+        }),
+        errorTracker: /** @type {any} */ ({ trackError: vi.fn() }),
+        hookBus: /** @type {any} */ ({ emitHook: vi.fn() }),
         persist: true,
         persistSet: new Set([
             'tool.execution_start',

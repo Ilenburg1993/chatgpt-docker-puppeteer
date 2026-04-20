@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { EventBus, createEventBus } from '../../../src/copilot/core/event-bus.js';
 
@@ -9,7 +9,7 @@ import { EventBus, createEventBus } from '../../../src/copilot/core/event-bus.js
  *
  * @param {string} type
  * @param {Record<string, unknown>} [extra]
- * @returns {import('../../../src/copilot/types/events.js').BaseEvent}
+ * @returns {import('../../../src/copilot/events/legacy-events.js').BaseEvent}
  */
 function evt(type, extra = {}) {
     return { type, timestamp: Date.now(), ...extra };
@@ -35,7 +35,9 @@ describe('core/event-bus.js › on + emit', () => {
         const bus = createEventBus();
         /** @type {unknown[]} */
         const received = [];
-        bus.on('test:foo', (e) => received.push(e));
+        bus.on('test:foo', (e) => {
+            received.push(e);
+        });
         const e = evt('test:foo');
         bus.emit(e);
         assert.equal(received.length, 1);
@@ -46,7 +48,9 @@ describe('core/event-bus.js › on + emit', () => {
         const bus = createEventBus();
         /** @type {unknown[]} */
         const received = [];
-        bus.on('test:foo', (e) => received.push(e));
+        bus.on('test:foo', (e) => {
+            received.push(e);
+        });
         bus.emit(evt('test:bar'));
         assert.equal(received.length, 0);
     });
@@ -54,8 +58,12 @@ describe('core/event-bus.js › on + emit', () => {
     it('múltiplos handlers para mesmo tipo', () => {
         const bus = createEventBus();
         let count = 0;
-        bus.on('x:y', () => count++);
-        bus.on('x:y', () => count++);
+        bus.on('x:y', () => {
+            count++;
+        });
+        bus.on('x:y', () => {
+            count++;
+        });
         bus.emit(evt('x:y'));
         assert.equal(count, 2);
     });
@@ -86,7 +94,9 @@ describe('core/event-bus.js › unsubscribe', () => {
     it('on retorna função de unsubscribe', () => {
         const bus = createEventBus();
         let count = 0;
-        const unsub = bus.on('a:b', () => count++);
+        const unsub = bus.on('a:b', () => {
+            count++;
+        });
         bus.emit(evt('a:b'));
         assert.equal(count, 1);
         unsub();
@@ -110,7 +120,9 @@ describe('core/event-bus.js › once', () => {
     it('handler é chamado apenas uma vez', () => {
         const bus = createEventBus();
         let count = 0;
-        bus.once('x:y', () => count++);
+        bus.once('x:y', () => {
+            count++;
+        });
         bus.emit(evt('x:y'));
         bus.emit(evt('x:y'));
         assert.equal(count, 1);
@@ -119,7 +131,9 @@ describe('core/event-bus.js › once', () => {
     it('once retorna unsubscribe funcional', () => {
         const bus = createEventBus();
         let count = 0;
-        const unsub = bus.once('x:y', () => count++);
+        const unsub = bus.once('x:y', () => {
+            count++;
+        });
         unsub();
         bus.emit(evt('x:y'));
         assert.equal(count, 0);
@@ -135,7 +149,9 @@ describe('core/event-bus.js › wildcards', () => {
         const bus = createEventBus();
         /** @type {string[]} */
         const types = [];
-        bus.on('session:*', (e) => types.push(e.type));
+        bus.on('session:*', (e) => {
+            types.push(e.type);
+        });
         bus.emit(evt('session:start'));
         bus.emit(evt('session:end'));
         bus.emit(evt('tool:invoke'));
@@ -145,7 +161,9 @@ describe('core/event-bus.js › wildcards', () => {
     it('catch-all * captura todos os eventos', () => {
         const bus = createEventBus();
         let count = 0;
-        bus.on('*', () => count++);
+        bus.on('*', () => {
+            count++;
+        });
         bus.emit(evt('a:x'));
         bus.emit(evt('b:y'));
         bus.emit(evt('c:z'));
@@ -156,9 +174,15 @@ describe('core/event-bus.js › wildcards', () => {
         const bus = createEventBus();
         /** @type {string[]} */
         const log = [];
-        bus.on('tool:invoke', () => log.push('exact'));
-        bus.on('tool:*', () => log.push('wildcard'));
-        bus.on('*', () => log.push('catchall'));
+        bus.on('tool:invoke', () => {
+            log.push('exact');
+        });
+        bus.on('tool:*', () => {
+            log.push('wildcard');
+        });
+        bus.on('*', () => {
+            log.push('catchall');
+        });
         bus.emit(evt('tool:invoke'));
         assert.deepStrictEqual(log, ['exact', 'wildcard', 'catchall']);
     });
@@ -177,7 +201,9 @@ describe('core/event-bus.js › middleware', () => {
             order.push('mw');
             next();
         });
-        bus.on('a:b', () => order.push('handler'));
+        bus.on('a:b', () => {
+            order.push('handler');
+        });
         bus.emit(evt('a:b'));
         assert.deepStrictEqual(order, ['mw', 'handler']);
     });
@@ -211,7 +237,9 @@ describe('core/event-bus.js › middleware', () => {
             order.push(3);
             next();
         });
-        bus.on('x:y', () => order.push(4));
+        bus.on('x:y', () => {
+            order.push(4);
+        });
         bus.emit(evt('x:y'));
         assert.deepStrictEqual(order, [1, 2, 3, 4]);
     });
@@ -341,14 +369,14 @@ describe('core/event-bus.js › bridgeEmitter', () => {
     // Dynamic import to get bridgeEmitter
     /** @type {typeof import('../../../src/copilot/core/event-bus.js').bridgeEmitter} */
     let bridgeEmitter;
-    /** @type {typeof import('node:events').default} */
+    /** @type {typeof import('node:events').EventEmitter} */
     let EventEmitter;
 
     it('carrega bridgeEmitter', async () => {
         const mod = await import('../../../src/copilot/core/event-bus.js');
         bridgeEmitter = mod.bridgeEmitter;
         const events = await import('node:events');
-        EventEmitter = events.default;
+        EventEmitter = events.EventEmitter;
         assert.ok(typeof bridgeEmitter === 'function');
     });
 
@@ -357,7 +385,9 @@ describe('core/event-bus.js › bridgeEmitter', () => {
         const bus = createEventBus();
         /** @type {unknown[]} */
         const received = [];
-        bus.on('hub:session:created', (ev) => received.push(ev));
+        bus.on('hub:session:created', (ev) => {
+            received.push(ev);
+        });
 
         bridgeEmitter(emitter, bus, { 'session:created': 'hub:session:created' });
         emitter.emit('session:created', { hubSessionId: 'abc' });
@@ -372,7 +402,9 @@ describe('core/event-bus.js › bridgeEmitter', () => {
         const emitter = new EventEmitter();
         const bus = createEventBus();
         let count = 0;
-        bus.on('x:y', () => count++);
+        bus.on('x:y', () => {
+            count++;
+        });
 
         const unbind = bridgeEmitter(emitter, bus, { ev1: 'x:y' });
         emitter.emit('ev1', {});
@@ -388,7 +420,9 @@ describe('core/event-bus.js › bridgeEmitter', () => {
         const bus = createEventBus();
         /** @type {unknown[]} */
         const received = [];
-        bus.on('test:event', (ev) => received.push(ev));
+        bus.on('test:event', (ev) => {
+            received.push(ev);
+        });
 
         bridgeEmitter(emitter, bus, { raw: 'test:event' });
         emitter.emit('raw', 'string-payload');

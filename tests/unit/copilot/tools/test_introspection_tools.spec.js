@@ -166,7 +166,7 @@ describe('introspection-tools', () => {
         it('filtra por categoria', async () => {
             const result = await find().handler({ category: 'git' });
             expect(
-                result.tools.every((t) =>
+                result.tools.every((/** @type {{ name: string }} */ t) =>
                     ['git_status', 'git_diff', 'git_commit', 'git_changed_files'].includes(t.name),
                 ),
             ).toBe(true);
@@ -178,7 +178,7 @@ describe('introspection-tools', () => {
             await /** @type {any} */ (toggle).handler({ toolName: 'web_fetch', enabled: false });
 
             const result = await find().handler({});
-            expect(result.tools.some((t) => t.name === 'web_fetch')).toBe(false);
+            expect(result.tools.some((/** @type {{ name: string }} */ t) => t.name === 'web_fetch')).toBe(false);
             expect(result.count).toBe(4);
         });
     });

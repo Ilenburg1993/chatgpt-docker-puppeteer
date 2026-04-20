@@ -14,7 +14,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'vitest';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 import { MAX_QUEUE_SIZE } from '../../../src/copilot/config/env.js';
@@ -25,7 +25,7 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle, agentConfig] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
@@ -114,7 +114,7 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
@@ -210,7 +210,7 @@ describe('always-alive › stop() idempotência', async () => {
     /** @type {string} */
     let sourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),

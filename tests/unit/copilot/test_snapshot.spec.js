@@ -34,20 +34,33 @@ vi.mock('#copilot/core/schemas', () => ({
 }));
 
 /* fs/promises mock */
-const mockAccess = vi.fn(() => Promise.resolve());
-const mockMkdir = vi.fn(() => Promise.resolve());
-const mockReaddir = vi.fn(() => Promise.resolve([]));
-const mockReadFile = vi.fn(() => Promise.resolve('{}'));
-const mockWriteFile = vi.fn(() => Promise.resolve());
-const mockRm = vi.fn(() => Promise.resolve());
+const mockAccess = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+const mockMkdir = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+const mockReaddir = /** @type {any} */ (vi.fn(() => Promise.resolve([])));
+const mockReadFile = /** @type {any} */ (vi.fn(() => Promise.resolve('{}')));
+const mockWriteFile = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+const mockRm = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+
+/** @param {...any} args */
+const accessProxy = (...args) => mockAccess(...args);
+/** @param {...any} args */
+const mkdirProxy = (...args) => mockMkdir(...args);
+/** @param {...any} args */
+const readdirProxy = (...args) => mockReaddir(...args);
+/** @param {...any} args */
+const readFileProxy = (...args) => mockReadFile(...args);
+/** @param {...any} args */
+const writeFileProxy = (...args) => mockWriteFile(...args);
+/** @param {...any} args */
+const rmProxy = (...args) => mockRm(...args);
 
 vi.mock('node:fs/promises', () => ({
-    access: (...args) => mockAccess(...args),
-    mkdir: (...args) => mockMkdir(...args),
-    readdir: (...args) => mockReaddir(...args),
-    readFile: (...args) => mockReadFile(...args),
-    writeFile: (...args) => mockWriteFile(...args),
-    rm: (...args) => mockRm(...args),
+    access: accessProxy,
+    mkdir: mkdirProxy,
+    readdir: readdirProxy,
+    readFile: readFileProxy,
+    writeFile: writeFileProxy,
+    rm: rmProxy,
 }));
 
 /* ── SUT ── */
@@ -142,13 +155,14 @@ describe('snapshot', () => {
 
             const list = await listSnapshotsAsync();
             expect(list).toHaveLength(2);
-            expect(list[0].snapshotId).toBe('snap-2'); // mais recente primeiro
+            const first = list[0];
+            expect(first?.snapshotId).toBe('snap-2'); // mais recente primeiro
         });
     });
 
     describe('loadSnapshotAsync', () => {
         it('carrega snapshot por ID exato', async () => {
-            const data = { snapshotId: 'snap-abc', createdAt: 100 };
+            const data = { snapshotId: 'snap-abc', createdAt: 100, model: 'gpt-4o' };
             mockReadFile.mockResolvedValue(JSON.stringify(data));
 
             const snap = await loadSnapshotAsync('snap-abc');
@@ -163,6 +177,7 @@ describe('snapshot', () => {
 
     describe('pruneSnapshotsAsync', () => {
         it('remove snapshots antigos além do limite', async () => {
+            /** @type {{ snapshotId: string, createdAt: number, model: string }[]} */
             const snaps = [
                 { snapshotId: 's1', createdAt: 300, model: 'm' },
                 { snapshotId: 's2', createdAt: 200, model: 'm' },

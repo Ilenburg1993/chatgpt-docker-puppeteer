@@ -5,10 +5,11 @@
  * F41.1: Testes unitários para AgentContext (F35).
  */
 
-import assert from 'node:assert/strict';
-import EventEmitter from 'node:events';
-import { describe, it } from 'node:test';
+import * as assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
+import { PENDING_QUESTION_SHADOW_TTL_MS } from '../../../src/copilot/config/agent.js';
 
 describe('AgentContext', () => {
     it('construção com defaults popula campos essenciais', () => {
@@ -170,11 +171,68 @@ describe('AgentContext', () => {
             allowFreeform: true,
             resolve: () => {},
             askedAt: Date.now(),
+            kind: 'question',
+            protocolControlled: false,
         });
         assert.equal(ctx.pendingQuestion?.question, 'Q?');
+        assert.equal(ctx.getPendingQuestionKind(), 'question');
+        assert.equal(ctx.hasPendingQuestionShadow(), false);
 
         ctx.clearPendingQuestion();
         assert.equal(ctx.pendingQuestion, null);
+
+        ctx.setPendingQuestionShadow({
+            question: 'READY: aguardando próxima mensagem',
+            meta: {
+                kind: 'ready',
+                askedAt: Date.now(),
+                allowFreeform: true,
+                protocolControlled: true,
+            },
+            restoredAt: Date.now(),
+            expiresAt: Date.now() + PENDING_QUESTION_SHADOW_TTL_MS,
+        });
+        assert.equal(ctx.hasPendingQuestionShadow(), true);
+        assert.equal(ctx.getPendingQuestionKind(), null);
+        assert.equal(ctx.getPendingQuestionShadowKind(), 'ready');
+        assert.equal(ctx.getPendingQuestionShadowState(), 'fresh');
+        assert.equal(ctx.isPendingQuestionShadowExpired(), false);
+        assert.ok((ctx.getPendingQuestionShadowExpiresAt() ?? 0) > Date.now());
+        assert.ok((ctx.getPendingQuestionShadowAgeMs() ?? -1) >= 0);
+        assert.ok((ctx.getPendingQuestionShadowRemainingMs() ?? -1) > 0);
+
+        ctx.setPendingQuestion({
+            question: 'Pergunta viva',
+            allowFreeform: true,
+            resolve: () => {},
+            askedAt: Date.now(),
+            kind: 'question',
+            protocolControlled: false,
+        });
+        assert.equal(ctx.hasPendingQuestionShadow(), false);
+    });
+
+    it('detecta shadow expirada semanticamente', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        const askedAt = Date.now() - (PENDING_QUESTION_SHADOW_TTL_MS + 1000);
+
+        ctx.setPendingQuestionShadow({
+            question: 'READY: aguardando próxima mensagem',
+            meta: {
+                kind: 'ready',
+                askedAt,
+                allowFreeform: true,
+                protocolControlled: true,
+            },
+            restoredAt: Date.now(),
+            expiresAt: askedAt + PENDING_QUESTION_SHADOW_TTL_MS,
+        });
+
+        assert.equal(ctx.hasPendingQuestionShadow(), true);
+        assert.equal(ctx.isPendingQuestionShadowExpired(), true);
+        assert.equal(ctx.getPendingQuestionShadowState(), 'expired');
+        assert.ok((ctx.getPendingQuestionShadowAgeMs() ?? 0) > PENDING_QUESTION_SHADOW_TTL_MS);
     });
 
     it('mutation API expandida governa session/client/model/context/boot report', () => {
@@ -201,7 +259,7 @@ describe('AgentContext', () => {
         });
         ctx.cacheStatusSnapshot(/** @type {any} */ ({ status: 'idle' }));
 
-        assert.equal(ctx.client?.id, 'client-1');
+        assert.equal(/** @type {any} */ (ctx.client)?.id, 'client-1');
         assert.equal(ctx.session?.sessionId, 'sess-1');
         assert.equal(ctx.model, 'gpt-5');
         assert.equal(ctx.reasoningEffort, 'high');
@@ -252,6 +310,8 @@ describe('AgentContext', () => {
             allowFreeform: true,
             resolve: (answer) => answers.push(answer),
             askedAt: Date.now(),
+            kind: 'ready',
+            protocolControlled: true,
         });
 
         assert.equal(ctx.resolvePendingQuestion('Tudo certo'), true);
@@ -264,6 +324,8 @@ describe('AgentContext', () => {
             description: 'primeira task',
         });
         assert.deepEqual(ctx.getBackgroundPendingLabels(), []);
+        assert.equal(ctx.getPendingQuestionKind(), null);
+        assert.equal(ctx.getPendingQuestionShadowKind(), null);
     });
 
     it('accessors compatíveis refletem e atualizam subestados', () => {

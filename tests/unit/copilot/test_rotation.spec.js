@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, expect } from 'vitest';
 import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';
 
 describe('shouldRotateSession()', () => {

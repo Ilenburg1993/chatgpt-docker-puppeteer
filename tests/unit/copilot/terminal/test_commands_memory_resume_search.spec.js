@@ -46,6 +46,7 @@ const { cmdResume } = await import('../../../../src/copilot/terminal/commands/re
 const { cmdSearch } = await import('../../../../src/copilot/terminal/commands/search.js');
 
 function mockCtx() {
+    /** @type {string[]} */
     const lines = [];
     const println = vi.fn((/** @type {string} */ text) => lines.push(text));
     return { println, output: () => lines.join('\n') };

@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'vitest';
 
 // alias-store.js é um módulo singleton com estado interno.
 // Importamos uma única vez — cada describe usa resetAliases para limpar estado.

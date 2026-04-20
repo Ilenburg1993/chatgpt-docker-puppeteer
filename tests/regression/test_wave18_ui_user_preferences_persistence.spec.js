@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { onTestFinished, test } from 'vitest';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';

@@ -1,7 +1,7 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import * as assert from 'node:assert/strict';
+import { describe, it } from 'vitest';
 
 import { getAgentHealthSnapshot } from '../../../src/copilot/agent/health-check.js';
 
@@ -18,7 +18,7 @@ import { getAgentHealthSnapshot } from '../../../src/copilot/agent/health-check.
 function createHost(overrides = {}) {
     return {
         getStatusSnapshot() {
-            return {
+            return /** @type {import('../../../src/copilot/agent/types.js').AgentStatusSnapshot} */ ({
                 status: overrides.status ?? 'idle',
                 sessionId: overrides.sessionId ?? 'session-1',
                 model: 'gpt-5',
@@ -34,7 +34,7 @@ function createHost(overrides = {}) {
                 contextWindow: null,
                 lastCheckpointPath: null,
                 permissionMode: 'approve_all',
-            };
+            });
         },
     };
 }
@@ -46,6 +46,10 @@ function createHost(overrides = {}) {
  *     dialogActive?: boolean;
  *     dialogAttached?: boolean;
  *     pendingQuestion?: boolean;
+ *     pendingQuestionKind?: import('../../../src/copilot/agent/types.js').PendingQuestionKind;
+ *     pendingQuestionShadow?: boolean;
+ *     pendingQuestionShadowKind?: import('../../../src/copilot/agent/types.js').PendingQuestionKind;
+ *     pendingQuestionShadowExpired?: boolean;
  *     keepaliveRunning?: boolean;
  *     backgroundPendingCount?: number;
  *     quotaMonitorRunning?: boolean;
@@ -53,6 +57,28 @@ function createHost(overrides = {}) {
  * }} [overrides]
  */
 function createContext(overrides = {}) {
+    const pendingQuestion = overrides.pendingQuestion
+        ? /** @type {any} */ ({
+              question: 'Q?',
+              kind: overrides.pendingQuestionKind ?? 'ready',
+              allowFreeform: true,
+              askedAt: Date.now(),
+              protocolControlled: true,
+          })
+        : null;
+    const pendingQuestionShadow = overrides.pendingQuestionShadow
+        ? /** @type {any} */ ({
+              question: 'READY: aguardando próxima mensagem',
+              meta: {
+                  kind: overrides.pendingQuestionShadowKind ?? 'ready',
+                  askedAt: Date.now(),
+                  allowFreeform: true,
+                  protocolControlled: true,
+              },
+              restoredAt: Date.now(),
+              expiresAt: Date.now() + 60_000,
+          })
+        : null;
     return /** @type {import('../../../src/copilot/agent/agent-context.js').AgentContext} */ ({
         ioState: {
             client: overrides.hasClient === false ? null : /** @type {any} */ ({}),
@@ -61,7 +87,8 @@ function createContext(overrides = {}) {
             session: overrides.hasSession === false ? null : /** @type {any} */ ({}),
         },
         dialogState: {
-            pendingQuestion: overrides.pendingQuestion ? /** @type {any} */ ({ question: 'Q?' }) : null,
+            pendingQuestion,
+            pendingQuestionShadow,
             dialogLoopAttached: overrides.dialogAttached ?? true,
         },
         dialogLoop: {
@@ -81,6 +108,19 @@ function createContext(overrides = {}) {
             lastBootReport: /** @type {any} */ (overrides.bootReport ?? null),
         },
         quotaMonitor: overrides.quotaMonitorRunning ? /** @type {any} */ ({ stop() {} }) : null,
+        hasClient: () => overrides.hasClient !== false,
+        hasActiveSession: () => overrides.hasSession !== false,
+        hasPendingQuestion: () => pendingQuestion !== null,
+        getPendingQuestionKind: () => pendingQuestion?.kind ?? null,
+        hasPendingQuestionShadow: () => pendingQuestionShadow !== null,
+        getPendingQuestionShadowKind: () => pendingQuestionShadow?.meta.kind ?? null,
+        getPendingQuestionShadowState: () =>
+            pendingQuestionShadow !== null ? (overrides.pendingQuestionShadowExpired ? 'expired' : 'active') : null,
+        isPendingQuestionShadowExpired: () => overrides.pendingQuestionShadowExpired ?? false,
+        getPendingQuestionShadowAgeMs: () => (pendingQuestionShadow !== null ? 1_000 : null),
+        getPendingQuestionShadowExpiresAt: () => (pendingQuestionShadow !== null ? Date.now() + 60_000 : null),
+        getPendingQuestionShadowRemainingMs: () => (pendingQuestionShadow !== null ? 60_000 : null),
+        getBackgroundPendingCount: () => overrides.backgroundPendingCount ?? 0,
     });
 }
 
@@ -98,6 +138,11 @@ describe('agent/health-check', () => {
         assert.equal(health.checks.session.ok, true);
         assert.equal(health.checks.queue.ok, true);
         assert.equal(health.checks.io.ok, true);
+        assert.equal(health.pendingQuestionKind, null);
+        assert.equal(health.pendingQuestionShadow, false);
+        assert.equal(health.pendingQuestionShadowKind, null);
+        assert.equal(health.pendingQuestionShadowState, null);
+        assert.equal(health.pendingQuestionShadowExpired, false);
         assert.equal(health.checks.quota.ok, true);
         assert.equal(health.checks.background.ok, true);
         assert.deepEqual(health.backgroundPendingLabels, []);
@@ -128,6 +173,23 @@ describe('agent/health-check', () => {
         assert.ok(health.riskFlags.includes('dialog.detached'));
         assert.ok(health.riskFlags.includes('background.backlog_high'));
         assert.equal(health.recommendedAction, 'reattach_dialog');
+    });
+
+    it('marca shadow expiring_soon sem tratá-la como expirada', () => {
+        const health = getAgentHealthSnapshot(
+            /** @type {any} */ ({
+                ...createContext({ pendingQuestionShadow: true, quotaMonitorRunning: true }),
+                getPendingQuestionShadowState: () => 'expiring_soon',
+                getPendingQuestionShadowRemainingMs: () => 15_000,
+            }),
+            createHost(),
+        );
+
+        assert.equal(health.pendingQuestionShadowState, 'expiring_soon');
+        assert.equal(health.pendingQuestionShadowExpired, false);
+        assert.equal(health.pendingQuestionShadowRemainingMs, 15_000);
+        assert.ok(health.issues.includes('io.pending_question_shadow_expiring_soon'));
+        assert.equal(health.recommendedAction, 'review_pending_question_shadow');
     });
 
     it('retorna degraded quando o boot conclui com steps degradados', () => {
@@ -175,6 +237,7 @@ describe('agent/health-check', () => {
         assert.equal(health.ok, false);
         assert.equal(health.healthy, false);
         assert.equal(health.status, 'unhealthy');
+        assert.equal(health.pendingQuestionKind, 'ready');
         assert.ok(health.issues.includes('runtime.not_operational.stopped'));
         assert.ok(health.issues.includes('client.unavailable'));
         assert.ok(health.issues.includes('session.inactive'));
@@ -182,6 +245,47 @@ describe('agent/health-check', () => {
         assert.equal(health.checks.session.ok, false);
         assert.ok(health.riskFlags.includes('runtime.stopped'));
         assert.equal(health.recommendedAction, 'restart_agent');
+    });
+
+    it('retorna degraded quando existe sombra persistida de ask_user sem pergunta viva', () => {
+        const health = getAgentHealthSnapshot(
+            createContext({
+                quotaMonitorRunning: true,
+                pendingQuestionShadow: true,
+                pendingQuestionShadowKind: 'ready',
+            }),
+            createHost(),
+        );
+
+        assert.equal(health.status, 'degraded');
+        assert.equal(health.pendingQuestion, false);
+        assert.equal(health.pendingQuestionShadow, true);
+        assert.equal(health.pendingQuestionShadowKind, 'ready');
+        assert.equal(health.pendingQuestionShadowExpired, false);
+        assert.ok(health.issues.includes('io.pending_question_shadow'));
+        assert.ok(health.riskFlags.includes('io.pending_question_shadow'));
+        assert.equal(health.recommendedAction, 'review_pending_question_shadow');
+        assert.equal(health.checks.io.pendingQuestionShadow, true);
+    });
+
+    it('retorna ação de limpeza quando a shadow restaurada já expirou', () => {
+        const health = getAgentHealthSnapshot(
+            createContext({
+                quotaMonitorRunning: true,
+                pendingQuestionShadow: true,
+                pendingQuestionShadowKind: 'ready',
+                pendingQuestionShadowExpired: true,
+            }),
+            createHost(),
+        );
+
+        assert.equal(health.status, 'degraded');
+        assert.equal(health.pendingQuestionShadow, true);
+        assert.equal(health.pendingQuestionShadowExpired, true);
+        assert.ok(health.issues.includes('io.pending_question_shadow_expired'));
+        assert.ok(health.riskFlags.includes('io.pending_question_shadow_expired'));
+        assert.equal(health.recommendedAction, 'clear_pending_question_shadow');
+        assert.equal(health.checks.io.pendingQuestionShadowExpired, true);
     });
 
     it('retorna degraded quando o último boot teve steps com falha', () => {

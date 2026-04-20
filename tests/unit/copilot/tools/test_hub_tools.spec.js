@@ -20,7 +20,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
     buildTool: vi.fn((opts) => ({
@@ -199,8 +202,8 @@ describe('hub-tools', () => {
                 message: longMsg,
             });
 
-            const call = fakeHub.sendToLlmB.mock.calls[0];
-            const payload = call[1];
+            const call = /** @type {any[]} */ (fakeHub.sendToLlmB.mock.calls[0] ?? []);
+            const payload = call?.[1];
             expect(typeof payload).toBe('string');
             expect(payload.length).toBeLessThanOrEqual(32020); // 32000 + truncation marker
             expect(payload).toContain('…truncado');
@@ -213,7 +216,7 @@ describe('hub-tools', () => {
                 timeoutMs: 1000000, // absurdo
             });
 
-            const opts = fakeHub.sendToLlmB.mock.calls[0][2];
+            const opts = /** @type {any} */ (/** @type {any[]} */ (fakeHub.sendToLlmB.mock.calls[0] ?? [])[2]);
             expect(opts.timeoutMs).toBeLessThanOrEqual(300000);
         });
 

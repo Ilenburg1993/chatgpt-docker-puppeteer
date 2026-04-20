@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'vitest';
 
 describe('agent › K4 background task tracker integration', () => {
     /** @type {string} */
@@ -18,7 +18,7 @@ describe('agent › K4 background task tracker integration', () => {
     /** @type {string} */
     let turnExecutorSrc = '';
 
-    before(async () => {
+    beforeAll(async () => {
         [contextSrc, lifecycleSrc, bootStepsSrc, userInputSrc, loopManagerSrc, turnExecutorSrc] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/agent-context.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),

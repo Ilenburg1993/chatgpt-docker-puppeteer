@@ -5,17 +5,16 @@
  * Contrato: terminal/terminal-agent-wiring.js
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from 'node:test';
-describe("terminal/terminal-agent-wiring.js — contrato", () => {
-    it("importa sem erros", async () => {
-        const mod = await import("../../../src/copilot/terminal/terminal-agent-wiring.js");
-        assert.ok(mod, "módulo deve carregar");
+import { describe, expect, it } from 'vitest';
+
+describe('terminal/terminal-agent-wiring.js — contrato', () => {
+    it('importa sem erros', async () => {
+        const mod = await import('../../../src/copilot/terminal/terminal-agent-wiring.js');
+        expect(mod).toBeTruthy();
     });
 
-    it("exporta registerAgentEventListeners", async () => {
-        const mod = await import("../../../src/copilot/terminal/terminal-agent-wiring.js");
-        assert.equal(typeof mod.registerAgentEventListeners !== "undefined", true, "registerAgentEventListeners deve estar exportado");
+    it('exporta registerAgentEventListeners', async () => {
+        const mod = await import('../../../src/copilot/terminal/terminal-agent-wiring.js');
+        expect(typeof mod.registerAgentEventListeners).toBe('function');
     });
-
 });

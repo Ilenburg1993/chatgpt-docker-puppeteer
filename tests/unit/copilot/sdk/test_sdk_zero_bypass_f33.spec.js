@@ -45,8 +45,13 @@ function read(relPath) {
  * @returns {string[]} Lista de bypasses encontrados
  */
 function findSdkBypasses(content) {
-    const matches = content.matchAll(/from\s+'(#copilot\/sdk\/[^']+)'/g);
-    return [...matches].map((m) => m[1]);
+    /** @type {string[]} */
+    const results = [];
+    for (const match of content.matchAll(/from\s+'(#copilot\/sdk\/[^']+)'/g)) {
+        const value = match[1];
+        if (value) results.push(value);
+    }
+    return results;
 }
 
 // ─── F166: Auditoria completa de bypasses ─────────────────────────────────

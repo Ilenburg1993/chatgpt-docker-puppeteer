@@ -1,6 +1,6 @@
 // @ts-check
 import * as assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'vitest';
 
 import { createEventBus } from '../../../../src/copilot/core/event-bus.js';
 import { createObservabilityBusRuntime } from '../../../../src/copilot/observability/event-bus-runtime.js';

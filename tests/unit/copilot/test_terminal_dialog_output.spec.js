@@ -5,27 +5,35 @@
  * Contrato: terminal/dialog/output.js
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from 'node:test';
-describe("terminal/dialog/output.js — contrato", () => {
-    it("importa sem erros", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/output.js");
-        assert.ok(mod, "módulo deve carregar");
+import { describe, expect, it } from 'vitest';
+describe('terminal/dialog/output.js — contrato', () => {
+    it('importa sem erros', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod).toBeTruthy();
     });
 
-    it("exporta BOOT_PROMPT", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/output.js");
-        assert.equal(typeof mod.BOOT_PROMPT !== "undefined", true, "BOOT_PROMPT deve estar exportado");
+    it('exporta BOOT_PROMPT', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod.BOOT_PROMPT).toBeDefined();
     });
 
-    it("exporta PROMPT_USER", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/output.js");
-        assert.equal(typeof mod.PROMPT_USER !== "undefined", true, "PROMPT_USER deve estar exportado");
+    it('exporta PROMPT_USER', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod.PROMPT_USER).toBeDefined();
     });
 
-    it("exporta SEPARATOR", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/output.js");
-        assert.equal(typeof mod.SEPARATOR !== "undefined", true, "SEPARATOR deve estar exportado");
+    it('exporta buildUserPrompt', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(typeof mod.buildUserPrompt).toBe('function');
     });
 
+    it('exporta buildWaitingPrompt', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(typeof mod.buildWaitingPrompt).toBe('function');
+    });
+
+    it('exporta SEPARATOR', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod.SEPARATOR).toBeDefined();
+    });
 });

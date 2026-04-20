@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('createMetricsStore', () => {
     it('cria um store com métodos esperados', async () => {
@@ -21,7 +21,7 @@ describe('createMetricsStore', () => {
     it('getSummary retorna objeto com as métricas', async () => {
         const { createMetricsStore } = await import('../../../src/copilot/observability/metrics.js');
         const store = createMetricsStore();
-        store.recordUsage({ promptTokens: 10, completionTokens: 5 });
+        store.recordUsage('gpt-4o', 10, 5);
         const summary = store.getSummary();
         assert.ok(summary !== null && typeof summary === 'object', 'getSummary deve retornar objeto');
     });

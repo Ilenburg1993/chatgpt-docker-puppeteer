@@ -51,7 +51,12 @@ vi.mock(
                 TERMINAL_SHOW_USAGE: true,
             },
             {
-                get: (target, prop) => (prop in target ? target[prop] : typeof prop === 'string' ? '' : undefined),
+                get: (target, prop) =>
+                    typeof prop === 'string' && prop in target
+                        ? target[/** @type {keyof typeof target} */ (prop)]
+                        : typeof prop === 'string'
+                          ? ''
+                          : undefined,
                 has: () => true,
             },
         ),
@@ -99,8 +104,20 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         const emit = vi.fn();
         const unsubs = wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(6);
+        expect(unsubs.length).toBe(7);
         unsubs.forEach((u) => expect(typeof u).toBe('function'));
+    });
+
+    it('emite session.info com tipo e mensagem', async () => {
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
+        session._emit('session.info', { infoType: 'configuration', message: 'streaming on' });
+        expect(emit).toHaveBeenCalledWith(
+            'session.info',
+            expect.objectContaining({ infoType: 'configuration', message: 'streaming on' }),
+        );
     });
 
     it('emite session.idle ao receber evento', async () => {
@@ -240,24 +257,46 @@ describe('Faixa B2 — mcp-events handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B3 — tool-lifecycle handlers', () => {
-    it('wireToolLifecycleEvents retorna array de 2 unsubscribe functions', async () => {
+    it('wireToolLifecycleEvents retorna array de 3 unsubscribe functions', async () => {
         const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(2);
+        expect(unsubs.length).toBe(3);
     });
 
-    it('emite tool.progress com toolName e progress', async () => {
+    it('emite tool.execution_partial_result', async () => {
         const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
-        session._emit('tool.execution_progress', { toolName: 'run_in_terminal', progress: 50, requestId: 'r1' });
+        session._emit('tool.execution_partial_result', { toolCallId: 'tool-9', partialOutput: 'linha parcial' });
         expect(emit).toHaveBeenCalledWith(
-            'tool.progress',
-            expect.objectContaining({ toolName: 'run_in_terminal', progress: 50, requestId: 'r1' }),
+            'tool.execution_partial_result',
+            expect.objectContaining({ toolCallId: 'tool-9', partialOutput: 'linha parcial' }),
+        );
+    });
+
+    it('emite tool.execution_progress com payload real do SDK', async () => {
+        const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
+        session._emit('tool.execution_progress', {
+            toolCallId: 'tool-1',
+            toolName: 'run_in_terminal',
+            progressMessage: 'Compilando projeto…',
+            requestId: 'r1',
+        });
+        expect(emit).toHaveBeenCalledWith(
+            'tool.execution_progress',
+            expect.objectContaining({
+                toolCallId: 'tool-1',
+                toolName: 'run_in_terminal',
+                progressMessage: 'Compilando projeto…',
+                requestId: 'r1',
+            }),
         );
     });
 
@@ -272,6 +311,21 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
             expect.objectContaining({ toolName: 'search', requestId: 'r2' }),
         );
     });
+
+    it('mode-and-tools emite session.mode_changed e session.plan_changed', async () => {
+        const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
+        const session = createMockSession();
+        const emit = vi.fn();
+        const unsubs = wireModeAndToolEvents(/** @type {any} */ (session), { emit });
+        expect(unsubs).toHaveLength(2);
+        session._emit('session.mode_changed', { previousMode: 'interactive', newMode: 'plan' });
+        session._emit('session.plan_changed', { operation: 'update' });
+        expect(emit).toHaveBeenCalledWith(
+            'session.mode_changed',
+            expect.objectContaining({ previousMode: 'interactive', newMode: 'plan' }),
+        );
+        expect(emit).toHaveBeenCalledWith('session.plan_changed', expect.objectContaining({ operation: 'update' }));
+    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -279,13 +333,13 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B4 — interaction-events handlers', () => {
-    it('wireInteractionEvents retorna array de 11 unsubscribe functions', async () => {
+    it('wireInteractionEvents retorna array de 12 unsubscribe functions', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireInteractionEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(11);
+        expect(unsubs.length).toBe(12);
     });
 
     it('emite skill.invoked', async () => {
@@ -315,6 +369,15 @@ describe('Faixa B4 — interaction-events handlers', () => {
         expect(emit).toHaveBeenCalledWith('command.queued', expect.objectContaining({ requestId: 'cmd-1' }));
         session._emit('command.completed', { requestId: 'cmd-1' });
         expect(emit).toHaveBeenCalledWith('command.completed', expect.objectContaining({ requestId: 'cmd-1' }));
+    });
+
+    it('emite exit_plan_mode.completed', async () => {
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireInteractionEvents(/** @type {any} */ (session), { emit });
+        session._emit('exit_plan_mode.completed', { requestId: 'plan-1' });
+        expect(emit).toHaveBeenCalledWith('exit_plan_mode.completed', expect.objectContaining({ requestId: 'plan-1' }));
     });
 
     it('emite permission.requested e permission.completed', async () => {
@@ -412,7 +475,7 @@ describe('Faixa B — wireSessionEvents integração', () => {
         expect(emit).toHaveBeenCalledWith('mcp.server.status_changed', expect.any(Object));
 
         session._emit('tool.execution_progress', { toolName: 'test', progress: 75 });
-        expect(emit).toHaveBeenCalledWith('tool.progress', expect.any(Object));
+        expect(emit).toHaveBeenCalledWith('tool.execution_progress', expect.any(Object));
 
         session._emit('skill.invoked', { skillName: 'test-skill' });
         expect(emit).toHaveBeenCalledWith('skill.invoked', expect.any(Object));

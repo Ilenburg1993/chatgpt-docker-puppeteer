@@ -59,7 +59,7 @@ describe('FG-3 — core barrel contract', () => {
             'ValidationError',
         ];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -67,7 +67,7 @@ describe('FG-3 — core barrel contract', () => {
         const barrel = await import('#copilot/core/index');
         const expected = ['withRetry', 'withTimeout', 'CircuitBreaker', 'wrapAsync'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 
@@ -75,7 +75,7 @@ describe('FG-3 — core barrel contract', () => {
         const barrel = await import('#copilot/core/index');
         const expected = ['registerShutdownHandler', 'runShutdown', 'isShuttingDown'];
         for (const name of expected) {
-            expect(barrel[name], `missing: ${name}`).toBeDefined();
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
     });
 });

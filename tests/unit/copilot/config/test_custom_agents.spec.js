@@ -13,7 +13,16 @@ vi.mock(
     () =>
         new Proxy(
             { COPILOT_CUSTOM_AGENTS: 'task,explore,diagnostic', COPILOT_DISABLED_AGENTS: '' },
-            { get: (t, p) => (p in t ? t[p] : typeof p === 'string' ? '' : undefined), has: () => true },
+            {
+                get: (t, p) => {
+                    if (typeof p === 'string' && p in t) {
+                        const key = /** @type {keyof typeof t} */ (p);
+                        return t[key];
+                    }
+                    return typeof p === 'string' ? '' : undefined;
+                },
+                has: () => true,
+            },
         ),
 );
 

@@ -91,6 +91,19 @@ import {
 /** @type {import('../../../../src/copilot/hooks/types.js').InvocationContext} */
 const INV = { sessionId: 'test-session-001' };
 
+const anyComposeHandlers = /** @type {any} */ (composeHandlers);
+const anyConditional = /** @type {any} */ (conditional);
+const anyCreateCleanupHandler = /** @type {any} */ (createCleanupHandler);
+const anyFallback = /** @type {any} */ (fallback);
+const anyForTools = /** @type {any} */ (forTools);
+const anyMemoize = /** @type {any} */ (memoize);
+const anyMiddleware = /** @type {any} */ (middleware);
+const anyPipeline = /** @type {any} */ (pipeline);
+const anyRaceWithTimeout = /** @type {any} */ (raceWithTimeout);
+const anyWithErrorAudit = /** @type {any} */ (withErrorAudit);
+const anyWithPostToolAudit = /** @type {any} */ (withPostToolAudit);
+const anyWithPreToolAudit = /** @type {any} */ (withPreToolAudit);
+
 // ═════════════════════════════════════════════════════════════════════════════
 // E1 — Tool Filter Extraction
 // ═════════════════════════════════════════════════════════════════════════════
@@ -245,14 +258,14 @@ describe('E2.1 — middleware composition', () => {
         /** @type {string[]} */
         const order = [];
 
-        const hook = middleware(
-            async (input, inv, next) => {
+        const hook = anyMiddleware(
+            async (/** @type {any} */ input, /** @type {any} */ inv, /** @type {any} */ next) => {
                 order.push('mw1-before');
                 const r = await next(input, inv);
                 order.push('mw1-after');
                 return r;
             },
-            async (input, inv, next) => {
+            async (/** @type {any} */ input, /** @type {any} */ inv, /** @type {any} */ next) => {
                 order.push('mw2-before');
                 const r = await next(input, inv);
                 order.push('mw2-after');
@@ -264,14 +277,14 @@ describe('E2.1 — middleware composition', () => {
             },
         );
 
-        const result = await hook({ toolName: 'test', toolArgs: {} }, INV);
+        const result = await hook({ toolName: 'test', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(order).toEqual(['mw1-before', 'mw2-before', 'terminal', 'mw2-after', 'mw1-after']);
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
 
     it('rejeita se next() chamado múltiplas vezes', async () => {
-        const hook = middleware(
-            async (input, inv, next) => {
+        const hook = anyMiddleware(
+            async (/** @type {any} */ input, /** @type {any} */ inv, /** @type {any} */ next) => {
                 await next(input, inv);
                 return next(input, inv);
             },
@@ -282,15 +295,15 @@ describe('E2.1 — middleware composition', () => {
     });
 
     it('retorna undefined se não há handlers', async () => {
-        const hook = middleware();
+        const hook = anyMiddleware();
         expect(await hook({}, INV)).toBeUndefined();
     });
 });
 
 describe('E2.1 — loggingMiddleware', () => {
     it('não altera o resultado', async () => {
-        const hook = middleware(loggingMiddleware('test'), async () => ({ permissionDecision: 'allow' }));
-        const result = await hook({ toolName: 'x' }, INV);
+        const hook = anyMiddleware(loggingMiddleware('test'), async () => ({ permissionDecision: 'allow' }));
+        const result = await hook({ toolName: 'x', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
 });
@@ -301,30 +314,30 @@ describe('E2.1 — forTools', () => {
             return { permissionDecision: 'deny' };
         });
 
-        const hook = middleware(forTools(['shell'], spy), async () => ({ permissionDecision: 'allow' }));
+        const hook = anyMiddleware(anyForTools(['shell'], spy), async () => ({ permissionDecision: 'allow' }));
 
         // shell → spy intercepta
-        const r1 = await hook({ toolName: 'shell', toolArgs: {} }, INV);
+        const r1 = await hook({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(r1?.permissionDecision).toBe('deny');
         expect(spy).toHaveBeenCalledTimes(1);
 
         // read_file → bypassed
-        const r2 = await hook({ toolName: 'read_file', toolArgs: {} }, INV);
+        const r2 = await hook({ toolName: 'read_file', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(r2?.permissionDecision).toBe('allow');
         expect(spy).toHaveBeenCalledTimes(1); // não chamou novamente
     });
 
     it('case insensitive por toolName', async () => {
-        const spy = vi.fn(async () => ({ permissionDecision: 'deny' }));
-        const hook = middleware(forTools(['Shell'], spy), async () => ({}));
-        await hook({ toolName: 'SHELL', toolArgs: {} }, INV);
+        const spy = vi.fn(async () => ({ permissionDecision: /** @type {'deny'} */ ('deny') }));
+        const hook = anyMiddleware(anyForTools(['Shell'], spy), async () => ({}));
+        await hook({ toolName: 'SHELL', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(spy).toHaveBeenCalledTimes(1);
     });
 });
 
 describe('E2.1 — existing composers still work', () => {
     it('composeHandlers: primeiro com decisão vence', async () => {
-        const h = composeHandlers(
+        const h = anyComposeHandlers(
             async () => ({ permissionDecision: 'deny' }),
             async () => ({ permissionDecision: 'allow' }),
         );
@@ -333,7 +346,7 @@ describe('E2.1 — existing composers still work', () => {
     });
 
     it('pipeline: merge de todos os resultados', async () => {
-        const h = pipeline(
+        const h = anyPipeline(
             async () => ({ additionalContext: 'a' }),
             async () => ({ additionalContext: 'b' }),
         );
@@ -342,8 +355,8 @@ describe('E2.1 — existing composers still work', () => {
     });
 
     it('conditional: executa handler correto', async () => {
-        const h = conditional(
-            (input) => /** @type {any} */ (input).flag === true,
+        const h = anyConditional(
+            (/** @type {any} */ input) => /** @type {any} */ (input).flag === true,
             async () => ({ yes: true }),
             async () => ({ no: true }),
         );
@@ -352,7 +365,7 @@ describe('E2.1 — existing composers still work', () => {
     });
 
     it('fallback: usa fallback em caso de erro', async () => {
-        const h = fallback(
+        const h = anyFallback(
             async () => {
                 throw new Error('boom');
             },
@@ -363,13 +376,13 @@ describe('E2.1 — existing composers still work', () => {
 
     it('raceWithTimeout: retorna undefined se timeout', async () => {
         const slow = async () => new Promise((r) => setTimeout(() => r({ ok: true }), 5000));
-        const h = raceWithTimeout(slow, 10);
+        const h = anyRaceWithTimeout(slow, 10);
         expect(await h({}, INV)).toBeUndefined();
     });
 
     it('memoize: retorna cache na segunda chamada', async () => {
         const spy = vi.fn(async () => ({ cached: true }));
-        const h = memoize(spy, (input) => /** @type {any} */ (input).key);
+        const h = anyMemoize(spy, (/** @type {{ key?: string }} */ input) => input.key);
         await h({ key: 'k1' }, INV);
         await h({ key: 'k1' }, INV);
         expect(spy).toHaveBeenCalledTimes(1);
@@ -384,27 +397,27 @@ describe('E2.2 — createCleanupHandler', () => {
     it('executa todos os cleanups em sequência', async () => {
         /** @type {string[]} */
         const calls = [];
-        const handler = createCleanupHandler([
-            async (sid) => {
+        const handler = anyCreateCleanupHandler([
+            async (/** @type {string} */ sid) => {
                 calls.push(`clean1:${sid}`);
             },
-            async (sid) => {
+            async (/** @type {string} */ sid) => {
                 calls.push(`clean2:${sid}`);
             },
         ]);
 
-        await handler({ reason: 'shutdown', timestamp: 0, cwd: '/' }, { sessionId: 'abc' });
+        await handler({ reason: 'user_exit', timestamp: 0, cwd: '/' }, { sessionId: 'abc' });
         expect(calls).toEqual(['clean1:abc', 'clean2:abc']);
     });
 
     it('continua após erro em um cleanup', async () => {
         /** @type {string[]} */
         const calls = [];
-        const handler = createCleanupHandler([
+        const handler = anyCreateCleanupHandler([
             async () => {
                 throw new Error('falha');
             },
-            async (sid) => {
+            async (/** @type {string} */ sid) => {
                 calls.push(`ok:${sid}`);
             },
         ]);
@@ -414,8 +427,10 @@ describe('E2.2 — createCleanupHandler', () => {
     });
 
     it('funciona com 0 cleanups', async () => {
-        const handler = createCleanupHandler([]);
-        await expect(handler({ reason: 'done', timestamp: 0, cwd: '/' }, { sessionId: 'z' })).resolves.toBeUndefined();
+        const handler = anyCreateCleanupHandler([]);
+        await expect(
+            handler({ reason: 'complete', timestamp: 0, cwd: '/' }, { sessionId: 'z' }),
+        ).resolves.toBeUndefined();
     });
 });
 
@@ -442,8 +457,9 @@ describe('E3.1 — AuditTrail', () => {
         });
         expect(trail.size).toBe(1);
         const [first] = trail.tail(1);
-        expect(first.toolName).toBe('read_file');
-        expect(first.decision).toBe('allow');
+        expect(first).toBeDefined();
+        expect(first?.toolName).toBe('read_file');
+        expect(first?.decision).toBe('allow');
     });
 
     it('respeita maxSize (ring buffer)', () => {
@@ -468,7 +484,8 @@ describe('E3.1 — AuditTrail', () => {
         trail.record({ hookName: 'post', decision: 'enrich', sessionId: 's', timestamp: 2 });
         const result = trail.query({ hookName: 'pre' });
         expect(result).toHaveLength(1);
-        expect(result[0].hookName).toBe('pre');
+        expect(result[0]).toBeDefined();
+        expect(result[0]?.hookName).toBe('pre');
     });
 
     it('query filtra por decision', () => {
@@ -532,17 +549,21 @@ describe('E3.1 — withPreToolAudit', () => {
 
     it('registra decisão allow no trail', async () => {
         const trail = new AuditTrail();
-        const handler = withPreToolAudit(async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }), trail);
+        const handler = anyWithPreToolAudit(
+            async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }),
+            trail,
+        );
         await handler({ toolName: 'read', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(trail.size).toBe(1);
         const [d] = trail.tail();
-        expect(d.decision).toBe('allow');
-        expect(d.toolName).toBe('read');
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('allow');
+        expect(d?.toolName).toBe('read');
     });
 
     it('registra decisão deny no trail', async () => {
         const trail = new AuditTrail();
-        const handler = withPreToolAudit(
+        const handler = anyWithPreToolAudit(
             async () => ({
                 permissionDecision: /** @type {'deny'} */ ('deny'),
                 additionalContext: 'blocked by policy',
@@ -551,44 +572,66 @@ describe('E3.1 — withPreToolAudit', () => {
         );
         await handler({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         const [d] = trail.tail();
-        expect(d.decision).toBe('deny');
-        expect(d.reason).toBe('blocked by policy');
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('deny');
+        expect(d?.reason).toBe('blocked by policy');
     });
 
     it('registra modify quando modifiedArgs presente', async () => {
         const trail = new AuditTrail();
-        const handler = withPreToolAudit(
+        const handler = anyWithPreToolAudit(
             async () => ({ permissionDecision: /** @type {'allow'} */ ('allow'), modifiedArgs: { x: 1 } }),
             trail,
         );
         await handler({ toolName: 't', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         const [d] = trail.tail();
-        expect(d.decision).toBe('modify');
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('modify');
     });
 });
 
 describe('E3.1 — withPostToolAudit', () => {
     it('registra enrich quando additionalContext presente', async () => {
         const trail = new AuditTrail();
-        const handler = withPostToolAudit(async () => ({ additionalContext: 'extra info' }), trail);
-        await handler({ toolName: 'test', toolArgs: {}, toolResult: 'ok', timestamp: 0, cwd: '/' }, INV);
+        const handler = anyWithPostToolAudit(async () => ({ additionalContext: 'extra info' }), trail);
+        await handler(
+            {
+                toolName: 'test',
+                toolArgs: {},
+                toolResult: { textResultForLlm: 'ok', resultType: 'success' },
+                timestamp: 0,
+                cwd: '/',
+            },
+            INV,
+        );
         const [d] = trail.tail();
-        expect(d.decision).toBe('enrich');
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('enrich');
     });
 
     it('registra allow quando sem additionalContext', async () => {
         const trail = new AuditTrail();
-        const handler = withPostToolAudit(async () => ({}), trail);
-        await handler({ toolName: 'test', toolArgs: {}, toolResult: 'ok', timestamp: 0, cwd: '/' }, INV);
+        const handler = anyWithPostToolAudit(async () => ({}), trail);
+        await handler(
+            {
+                toolName: 'test',
+                toolArgs: {},
+                toolResult: { textResultForLlm: 'ok', resultType: 'success' },
+                timestamp: 0,
+                cwd: '/',
+            },
+            INV,
+        );
         const [d] = trail.tail();
-        expect(d.decision).toBe('allow');
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('allow');
     });
 });
 
 describe('E3.1 — withErrorAudit', () => {
     it('registra decisão de erro no trail', async () => {
         const trail = new AuditTrail();
-        const handler = withErrorAudit(
+        const handler = anyWithErrorAudit(
             async () => ({ errorHandling: /** @type {'retry'} */ ('retry'), retryCount: 3 }),
             trail,
         );
@@ -597,9 +640,10 @@ describe('E3.1 — withErrorAudit', () => {
             INV,
         );
         const [d] = trail.tail();
-        expect(d.decision).toBe('retry');
-        expect(d.hookName).toBe('onErrorOccurred');
-        expect(d.metadata).toEqual({ recoverable: true });
+        expect(d).toBeDefined();
+        expect(d?.decision).toBe('retry');
+        expect(d?.hookName).toBe('onErrorOccurred');
+        expect(d?.metadata).toEqual({ recoverable: true });
     });
 });
 
@@ -617,7 +661,7 @@ describe('E3.2 — globalAuditTrail', () => {
     });
 
     it('withPreToolAudit usa globalAuditTrail por default', async () => {
-        const handler = withPreToolAudit(async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }));
+        const handler = anyWithPreToolAudit(async () => ({ permissionDecision: /** @type {'allow'} */ ('allow') }));
         await handler({ toolName: 'read', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         expect(globalAuditTrail.size).toBe(1);
     });

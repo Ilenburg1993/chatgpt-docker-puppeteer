@@ -34,8 +34,8 @@ describe('audit/pipeline › createAuditLog', () => {
         auditLog.record({ type: 'test' });
         const entries = auditLog.getEntries();
         expect(entries).toHaveLength(1);
-        expect(entries[0].type).toBe('test');
-        expect(entries[0].ts).toBeTruthy();
+        expect(entries[0]?.type).toBe('test');
+        expect(entries[0]?.ts).toBeTruthy();
     });
 
     it('getEntries retorna cópia do buffer', () => {
@@ -51,8 +51,8 @@ describe('audit/pipeline › createAuditLog', () => {
         }
         const last = auditLog.getLast(2);
         expect(last).toHaveLength(2);
-        expect(last[0].type).toBe('t3');
-        expect(last[1].type).toBe('t4');
+        expect(last[0]?.type).toBe('t3');
+        expect(last[1]?.type).toBe('t4');
     });
 
     it('respeita maxEntries (ring buffer behavior)', () => {

@@ -2,27 +2,32 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+const defaultRuntime = /** @type {any} */ ({
+    sessionId: 'runtime-456',
+    dialogLoopActive: true,
+    dialogPrMetrics: null,
+    lastPrInfo: { model: 'gpt-5-mini', cost: 0.0456 },
+    answerPendingQuestion: vi.fn(() => true),
+    getStatusSnapshot: () => ({
+        status: 'idle',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        contextState: { tokens: 64000, tokenLimit: 128000, utilization: 0.5 },
+    }),
+    getHealthSnapshot: () => ({
+        status: 'healthy',
+        backgroundPendingCount: 0,
+        issues: [],
+        checks: { io: { keepaliveRunning: true }, quota: { running: true } },
+    }),
+});
+
 vi.mock('#copilot/agent', () => ({
-    getAgent: () =>
-        /** @type {any} */ ({
-            sessionId: 'runtime-456',
-            dialogLoopActive: true,
-            dialogPrMetrics: null,
-            lastPrInfo: { model: 'gpt-4.1', cost: 0.0456 },
-            answerPendingQuestion: vi.fn(() => true),
-            getStatusSnapshot: () => ({
-                status: 'idle',
-                model: 'gpt-4.1',
-                reasoningEffort: 'medium',
-                contextState: { tokens: 64000, tokenLimit: 128000, utilization: 0.5 },
-            }),
-            getHealthSnapshot: () => ({
-                status: 'healthy',
-                backgroundPendingCount: 0,
-                issues: [],
-                checks: { io: { keepaliveRunning: true }, quota: { running: true } },
-            }),
-        }),
+    getAgent: () => defaultRuntime,
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
     createSnapshot: vi.fn(),
     saveSnapshotAsync: vi.fn(),
     listSnapshotsAsync: vi.fn(async () => []),
@@ -59,10 +64,27 @@ vi.mock('#copilot/observability', () => ({
     defaultErrorTracker: { getStats: () => ({ total: 2, buffered: 1 }) },
 }));
 
+vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+    readTerminalActivitySnapshot: () => ({
+        phase: 'turn',
+        label: 'Processando mensagem',
+        detail: 'mensagem do usuário',
+        source: 'dialog',
+        severity: 'info',
+        progress: null,
+        toolName: null,
+        startedAt: 1,
+        updatedAt: 2,
+        ageMs: 1200,
+    }),
+    readTerminalActivityHistory: () => [],
+}));
+
 const { cmdMetrics } = await import('../../../../src/copilot/terminal/commands/metrics.js');
 const { cmdUsage } = await import('../../../../src/copilot/terminal/commands/usage.js');
 
 function mockCtx() {
+    /** @type {string[]} */
     const lines = [];
     const println = vi.fn((/** @type {string} */ text) => lines.push(text));
     return { println, output: () => lines.join('\n') };
@@ -76,7 +98,11 @@ describe('commands/metrics + usage', () => {
 
         expect(ctx.output()).toContain('sdk sessão');
         expect(ctx.output()).toContain('hub sessão');
+        expect(ctx.output()).toContain('modo sdk');
+        expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('11');
+        expect(ctx.output()).toContain('Atividade');
+        expect(ctx.output()).toContain('Processando mensagem');
     });
 
     it('cmdUsage now exibe contexto e binding runtime/sdk/hub', () => {
@@ -86,6 +112,7 @@ describe('commands/metrics + usage', () => {
 
         expect(ctx.output()).toContain('Context window');
         expect(ctx.output()).toContain('Binding: runtime=');
-        expect(ctx.output()).toContain('gpt-4.1');
+        expect(ctx.output()).toContain('Modo: sdk=');
+        expect(ctx.output()).toContain('gpt-5-mini');
     });
 });

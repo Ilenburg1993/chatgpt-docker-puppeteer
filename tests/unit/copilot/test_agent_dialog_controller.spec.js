@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
     dialogResume,
@@ -31,10 +31,10 @@ describe('agent-dialog-controller › dialogStart', () => {
 
     it('rejeita quando status não é idle', async () => {
         const { ctx, host } = setup();
-        ctx.status = 'busy';
+        ctx.status = 'processing';
 
         await assert.rejects(
-            () => dialogStart(ctx, host),
+            () => dialogStart(ctx, /** @type {any} */ (host)),
             (/** @type {any} */ err) => err.code === 'INVALID_STATE',
         );
     });
@@ -45,7 +45,7 @@ describe('agent-dialog-controller › dialogStart', () => {
         ctx.contextState = { tokens: 950, tokenLimit: 1000, utilization: 0.96 };
 
         await assert.rejects(
-            () => dialogStart(ctx, host),
+            () => dialogStart(ctx, /** @type {any} */ (host)),
             (/** @type {any} */ err) => err.code === 'CONTEXT_EXHAUSTED',
         );
     });
@@ -55,7 +55,7 @@ describe('agent-dialog-controller › dialogResume', () => {
     it('rejeita quando status não é idle nem waiting_for_input', async () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
-        ctx.status = 'busy';
+        ctx.status = 'processing';
 
         await assert.rejects(
             () => dialogResume(ctx),
@@ -76,7 +76,7 @@ describe('agent-dialog-controller › ensureDialogLoopAttached', () => {
         });
 
         assert.equal(ctx.dialogLoopAttached, false);
-        ensureDialogLoopAttached(ctx, host);
+        ensureDialogLoopAttached(ctx, /** @type {any} */ (host));
         assert.equal(ctx.dialogLoopAttached, true);
     });
 
@@ -90,10 +90,10 @@ describe('agent-dialog-controller › ensureDialogLoopAttached', () => {
             answerPendingQuestion: () => false,
         });
 
-        ensureDialogLoopAttached(ctx, host);
+        ensureDialogLoopAttached(ctx, /** @type {any} */ (host));
         const listenerCount1 = emitter.listenerCount('session.token_budget_warning');
 
-        ensureDialogLoopAttached(ctx, host);
+        ensureDialogLoopAttached(ctx, /** @type {any} */ (host));
         const listenerCount2 = emitter.listenerCount('session.token_budget_warning');
 
         assert.equal(listenerCount1, listenerCount2, 'wiring não deve duplicar listeners');

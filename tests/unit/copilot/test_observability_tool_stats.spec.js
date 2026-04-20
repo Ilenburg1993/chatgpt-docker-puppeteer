@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'vitest';
 
 describe('tool-stats — estatísticas de ferramentas', () => {
     beforeEach(async () => {

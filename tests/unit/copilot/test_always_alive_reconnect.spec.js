@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
+import { describe, it, beforeAll } from 'vitest';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
@@ -24,7 +24,7 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
     /** @type {string} */
     let reconnectPolicyCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const [mainCode, rpCode, qpCode] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),

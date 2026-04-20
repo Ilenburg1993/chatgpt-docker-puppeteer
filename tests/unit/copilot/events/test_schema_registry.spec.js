@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'vitest';
 
 import { BUILTIN_SCHEMAS } from '../../../../src/copilot/events/schemas/builtin-schemas.js';
 import {

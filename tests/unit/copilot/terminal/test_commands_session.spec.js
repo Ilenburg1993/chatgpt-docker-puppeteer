@@ -8,58 +8,47 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/agent', () => ({
-    alwaysAliveAgent: {
+const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
+const clearPendingQuestionShadow = vi.fn(() => true);
+
+const defaultRuntime = /** @type {any} */ ({
+    status: 'idle',
+    model: 'gpt-5-mini',
+    reasoningEffort: 'high',
+    dialogLoopActive: false,
+    sessionId: 'test-session-id',
+    getHealthSnapshot: () => ({
+        ok: true,
+        healthy: true,
+        status: 'healthy',
+        issues: [],
+        backgroundPendingCount: 0,
+        recommendedAction: 'clear_pending_question_shadow',
+    }),
+    getStatusSnapshot: () => ({
         status: 'idle',
-        model: 'gpt-4.1',
+        model: 'gpt-5-mini',
         reasoningEffort: 'high',
-        dialogLoopActive: false,
-        sessionId: 'test-session-id',
-        getHealthSnapshot: () => ({
-            ok: true,
-            healthy: true,
-            status: 'healthy',
-            issues: [],
-            backgroundPendingCount: 0,
-        }),
-        getStatusSnapshot: () => ({
-            status: 'idle',
-            model: 'gpt-4.1',
-            reasoningEffort: 'high',
-            sendCount: 5,
-            dialogPaused: false,
-            pendingQuestion: null,
-            contextWindow: 128000,
-        }),
-        dialogPrMetrics: null,
-        answerPendingQuestion: vi.fn((/** @type {string} */ _arg) => true),
-    },
-    getAgent: () =>
-        /** @type {any} */ ({
-            status: 'idle',
-            model: 'gpt-4.1',
-            reasoningEffort: 'high',
-            dialogLoopActive: false,
-            sessionId: 'test-session-id',
-            getHealthSnapshot: () => ({
-                ok: true,
-                healthy: true,
-                status: 'healthy',
-                issues: [],
-                backgroundPendingCount: 0,
-            }),
-            getStatusSnapshot: () => ({
-                status: 'idle',
-                model: 'gpt-4.1',
-                reasoningEffort: 'high',
-                sendCount: 5,
-                dialogPaused: false,
-                pendingQuestion: null,
-                contextWindow: 128000,
-            }),
-            dialogPrMetrics: null,
-            answerPendingQuestion: vi.fn((/** @type {string} */ _arg) => true),
-        }),
+        sendCount: 5,
+        dialogPaused: false,
+        pendingQuestion: null,
+        contextWindow: 128000,
+    }),
+    dialogPrMetrics: null,
+    answerPendingQuestion,
+    clearPendingQuestionShadow,
+    pendingQuestionShadowState: 'expired',
+    pendingQuestionShadowExpired: true,
+    pendingQuestionShadowRemainingMs: 0,
+});
+
+vi.mock('#copilot/agent', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
     createSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
         snapshotId: 'snap-001',
         createdAt: Date.now(),
@@ -67,7 +56,7 @@ vi.mock('#copilot/agent', () => ({
     })),
     saveSnapshotAsync: vi.fn(async () => '/tmp/snap-001.json'),
     listSnapshotsAsync: vi.fn(async () => [
-        { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-4.1', reason: 'manual' },
+        { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-5-mini', reason: 'manual' },
     ]),
     loadSnapshotAsync: vi.fn(async (/** @type {string} */ id) => {
         if (id === 'snap-001') {
@@ -75,12 +64,18 @@ vi.mock('#copilot/agent', () => ({
                 snapshotId: 'snap-001',
                 createdAt: Date.now(),
                 sessionId: 'sess',
-                model: 'gpt-4.1',
+                model: 'gpt-5-mini',
                 status: 'idle',
                 sendCount: 5,
                 dialogLoopActive: false,
                 dialogPaused: false,
                 pendingQuestion: null,
+                pendingQuestionShadow: {
+                    question: 'READY: aguardando próxima mensagem',
+                    meta: { kind: 'ready' },
+                    restoredAt: 1,
+                    expiresAt: 2,
+                },
                 prMetrics: null,
             };
         }
@@ -133,12 +128,14 @@ const {
     cmdSessionSave,
     cmdSessionList,
     cmdSessionRestore,
+    cmdClearShadow,
 } = await import('../../../../src/copilot/terminal/commands/session.js');
 
 /**
  * @returns {{ println: import('vitest').Mock; output: () => string }}
  */
 function mockCtx() {
+    /** @type {string[]} */
     const lines = [];
     const println = vi.fn((/** @type {string} */ text) => lines.push(text));
     return { println, output: () => lines.join('\n') };
@@ -149,9 +146,14 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.println).toHaveBeenCalled();
-        expect(ctx.output()).toContain('gpt-4.1');
+        expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toContain('healthy');
+        expect(ctx.output()).toContain('modo SDK');
+        expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('bg tasks');
+        expect(ctx.output()).toContain('display');
+        expect(ctx.output()).toContain('shadow expirada');
+        expect(ctx.output()).toContain('perfil modelo');
     });
 
     it('cmdHistory imprime histórico', () => {
@@ -166,6 +168,7 @@ describe('commands/session — sync commands', () => {
         cmdWho({ injectPort: 3009, println: ctx.println });
         expect(ctx.output()).toContain('3009');
         expect(ctx.output()).toContain('LLM-A');
+        expect(ctx.output()).toContain('gpt-5-mini');
     });
 
     it('cmdClear chama clearHistory', async () => {
@@ -179,6 +182,20 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
         expect(ctx.output()).toContain('Resposta enviada');
+    });
+
+    it('cmdAnswer explica quando só resta shadow expirada', () => {
+        answerPendingQuestion.mockReturnValueOnce(false);
+        const ctx = mockCtx();
+        cmdAnswer({ println: ctx.println }, 'sim');
+        expect(ctx.output()).toContain('shadow expirada');
+    });
+
+    it('cmdClearShadow limpa shadow persistida restaurada', () => {
+        const ctx = mockCtx();
+        cmdClearShadow({ println: ctx.println });
+        expect(ctx.output()).toContain('Shadow persistida');
+        expect(clearPendingQuestionShadow).toHaveBeenCalled();
     });
 
     it('cmdDbHistory sem hubSessionId avisa', () => {
@@ -235,7 +252,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionRestore({ println: ctx.println }, 'snap-001');
         expect(ctx.output()).toContain('snap-001');
-        expect(ctx.output()).toContain('gpt-4.1');
+        expect(ctx.output()).toContain('gpt-5-mini');
+        expect(ctx.output()).toContain('Pending shadow');
     });
 
     it('cmdSessionRestore com id inválido mostra erro', async () => {

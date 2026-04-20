@@ -5,22 +5,21 @@
  * Contrato: terminal/dialog/sse.js
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from 'node:test';
-describe("terminal/dialog/sse.js — contrato", () => {
-    it("importa sem erros", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/sse.js");
-        assert.ok(mod, "módulo deve carregar");
+import { describe, expect, it } from 'vitest';
+
+describe('terminal/dialog/sse.js — contrato', () => {
+    it('importa sem erros', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/sse.js');
+        expect(mod).toBeTruthy();
     });
 
-    it("exporta broadcastSse", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/sse.js");
-        assert.equal(typeof mod.broadcastSse !== "undefined", true, "broadcastSse deve estar exportado");
+    it('exporta broadcastSse', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/sse.js');
+        expect(typeof mod.broadcastSse).toBe('function');
     });
 
-    it("exporta CRITICAL_EVENTS", async () => {
-        const mod = await import("../../../src/copilot/terminal/dialog/sse.js");
-        assert.equal(typeof mod.CRITICAL_EVENTS !== "undefined", true, "CRITICAL_EVENTS deve estar exportado");
+    it('exporta CRITICAL_EVENTS', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/sse.js');
+        expect(mod.CRITICAL_EVENTS).toBeDefined();
     });
-
 });

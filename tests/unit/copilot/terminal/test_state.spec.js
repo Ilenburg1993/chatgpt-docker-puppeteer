@@ -5,6 +5,8 @@
  * F185: Testes para state.js — getters/setters, stateEmitter events, attachment queue, inject history.
  */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
     clearSharedSessionBinding,
     getSharedSdkSessionId,
@@ -17,16 +19,23 @@ import {
     getBusy,
     getHubSessionId,
     getInjectHistory,
-    getPlanMode,
+    getLastSdkPlanChangedAt,
+    getLastSdkPlanOperation,
+    getSdkSessionMode,
+    getShowIntentActivity,
     getShowStreaming,
     getShowThinking,
+    getShowToolActivity,
     getShowUsage,
     recordInjectHistory,
     setBusy,
     setHubSessionId,
-    setPlanMode,
+    setLastSdkPlanOperation,
+    setSdkSessionMode,
+    setShowIntentActivity,
     setShowStreaming,
     setShowThinking,
+    setShowToolActivity,
     setShowUsage,
     stateEmitter,
 } from '../../../../src/copilot/terminal/state.js';
@@ -36,7 +45,8 @@ describe('state getters/setters', () => {
         clearSharedSessionBinding();
         setHubSessionId(null);
         setBusy(false);
-        setPlanMode(false);
+        setSdkSessionMode(null);
+        setLastSdkPlanOperation(null, 0);
     });
 
     it('getHubSessionId/setHubSessionId round-trip', () => {
@@ -56,9 +66,15 @@ describe('state getters/setters', () => {
         expect(getBusy()).toBe(false);
     });
 
-    it('getPlanMode/setPlanMode round-trip', () => {
-        setPlanMode(true);
-        expect(getPlanMode()).toBe(true);
+    it('getSdkSessionMode/setSdkSessionMode round-trip', () => {
+        setSdkSessionMode('plan');
+        expect(getSdkSessionMode()).toBe('plan');
+    });
+
+    it('getLastSdkPlanOperation/setLastSdkPlanOperation round-trip', () => {
+        setLastSdkPlanOperation('update', 123);
+        expect(getLastSdkPlanOperation()).toBe('update');
+        expect(getLastSdkPlanChangedAt()).toBe(123);
     });
 });
 
@@ -120,6 +136,24 @@ describe('state stateEmitter', () => {
         setShowStreaming(!prev);
         expect(handler).toHaveBeenCalledWith(!prev);
         setShowStreaming(prev);
+    });
+
+    it('emite showToolActivity:changed', () => {
+        const handler = vi.fn();
+        stateEmitter.on('showToolActivity:changed', handler);
+        const prev = getShowToolActivity();
+        setShowToolActivity(!prev);
+        expect(handler).toHaveBeenCalledWith(!prev);
+        setShowToolActivity(prev);
+    });
+
+    it('emite showIntentActivity:changed', () => {
+        const handler = vi.fn();
+        stateEmitter.on('showIntentActivity:changed', handler);
+        const prev = getShowIntentActivity();
+        setShowIntentActivity(!prev);
+        expect(handler).toHaveBeenCalledWith(!prev);
+        setShowIntentActivity(prev);
     });
 });
 

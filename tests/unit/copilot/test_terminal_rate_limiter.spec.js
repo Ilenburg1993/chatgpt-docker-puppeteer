@@ -5,22 +5,21 @@
  * Contrato: terminal/rate-limiter-state.js
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from 'node:test';
-describe("terminal/rate-limiter-state.js — contrato", () => {
-    it("importa sem erros", async () => {
-        const mod = await import("../../../src/copilot/terminal/rate-limiter-state.js");
-        assert.ok(mod, "módulo deve carregar");
+import { describe, expect, it } from 'vitest';
+
+describe('terminal/rate-limiter-state.js — contrato', () => {
+    it('importa sem erros', async () => {
+        const mod = await import('../../../src/copilot/terminal/rate-limiter-state.js');
+        expect(mod).toBeTruthy();
     });
 
-    it("exporta clearRateLimiters", async () => {
-        const mod = await import("../../../src/copilot/terminal/rate-limiter-state.js");
-        assert.equal(typeof mod.clearRateLimiters !== "undefined", true, "clearRateLimiters deve estar exportado");
+    it('exporta clearRateLimiters', async () => {
+        const mod = await import('../../../src/copilot/terminal/rate-limiter-state.js');
+        expect(typeof mod.clearRateLimiters).toBe('function');
     });
 
-    it("exporta registerClearRateLimiters", async () => {
-        const mod = await import("../../../src/copilot/terminal/rate-limiter-state.js");
-        assert.equal(typeof mod.registerClearRateLimiters !== "undefined", true, "registerClearRateLimiters deve estar exportado");
+    it('exporta registerClearRateLimiters', async () => {
+        const mod = await import('../../../src/copilot/terminal/rate-limiter-state.js');
+        expect(typeof mod.registerClearRateLimiters).toBe('function');
     });
-
 });

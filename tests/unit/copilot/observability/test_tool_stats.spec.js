@@ -26,7 +26,7 @@ describe('tool-stats', () => {
     describe('recordToolCall', () => {
         it('registra chamada bem-sucedida', () => {
             recordToolCall('git_status', 120, true);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.git_status.calls).toBe(1);
             expect(stats.git_status.errors).toBe(0);
             expect(stats.git_status.lastOk).toBe(true);
@@ -34,7 +34,7 @@ describe('tool-stats', () => {
 
         it('registra chamada com erro', () => {
             recordToolCall('web_fetch', 500, false);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.web_fetch.calls).toBe(1);
             expect(stats.web_fetch.errors).toBe(1);
             expect(stats.web_fetch.lastOk).toBe(false);
@@ -42,7 +42,7 @@ describe('tool-stats', () => {
 
         it('default success=true quando omitido', () => {
             recordToolCall('shell_exec', 50);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.shell_exec.lastOk).toBe(true);
             expect(stats.shell_exec.errors).toBe(0);
         });
@@ -51,7 +51,7 @@ describe('tool-stats', () => {
             recordToolCall('cmd', 100, true);
             recordToolCall('cmd', 200, true);
             recordToolCall('cmd', 300, false);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.cmd.calls).toBe(3);
             expect(stats.cmd.errors).toBe(1);
         });
@@ -67,20 +67,20 @@ describe('tool-stats', () => {
         it('calcula avgLatencyMs corretamente', () => {
             recordToolCall('test', 100, true);
             recordToolCall('test', 300, true);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.test.avgLatencyMs).toBe(200);
         });
 
         it('calcula errorRate corretamente', () => {
             recordToolCall('t', 10, true);
             recordToolCall('t', 10, false);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.t.errorRate).toBe(50.0);
         });
 
         it('retorna lastCallIso como ISO string', () => {
             recordToolCall('t', 10);
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.t.lastCallIso).toBeTruthy();
             // ISO 8601 format check
             expect(() => new Date(/** @type {string} */ (stats.t.lastCallIso))).not.toThrow();
@@ -102,7 +102,7 @@ describe('tool-stats', () => {
             recordToolCall('shell.read_file', 50, true);
             recordToolCall('git.status', 200, true);
 
-            const cats = getStatsByCategory();
+            const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.shell.totalCalls).toBe(2);
             expect(cats.shell.tools).toEqual(['shell.exec_command', 'shell.read_file']);
             expect(cats.git.totalCalls).toBe(1);
@@ -110,7 +110,7 @@ describe('tool-stats', () => {
 
         it('categoriza tools sem ponto como "other"', () => {
             recordToolCall('standalone', 100, true);
-            const cats = getStatsByCategory();
+            const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.other).toBeDefined();
             expect(cats.other.tools).toContain('standalone');
         });
@@ -118,21 +118,21 @@ describe('tool-stats', () => {
         it('calcula avgLatencyMs por categoria', () => {
             recordToolCall('shell.a', 100, true);
             recordToolCall('shell.b', 300, true);
-            const cats = getStatsByCategory();
+            const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.shell.avgLatencyMs).toBe(200);
         });
 
         it('acumula erros por categoria', () => {
             recordToolCall('git.push', 10, false);
             recordToolCall('git.pull', 10, false);
-            const cats = getStatsByCategory();
+            const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.git.totalErrors).toBe(2);
         });
 
         it('retorna tools ordenadas', () => {
             recordToolCall('z.b', 10, true);
             recordToolCall('z.a', 10, true);
-            const cats = getStatsByCategory();
+            const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.z.tools).toEqual(['z.a', 'z.b']);
         });
     });
@@ -149,7 +149,7 @@ describe('tool-stats', () => {
             const result = await wrapped.handler(/** @type {any} */ ({}), /** @type {any} */ ({}));
             expect(result).toEqual({ content: 'ok' });
 
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.test_tool.calls).toBe(1);
             expect(stats.test_tool.lastOk).toBe(true);
         });
@@ -164,7 +164,7 @@ describe('tool-stats', () => {
             const wrapped = wrapWithStats(/** @type {any} */ (tool));
             await expect(wrapped.handler(/** @type {any} */ ({}), /** @type {any} */ ({}))).rejects.toThrow('boom');
 
-            const stats = getToolStats();
+            const stats = /** @type {any} */ (getToolStats());
             expect(stats.fail_tool.calls).toBe(1);
             expect(stats.fail_tool.lastOk).toBe(false);
         });

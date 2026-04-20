@@ -278,7 +278,9 @@ describe('sdk/client › session management', () => {
 
     it('listActiveClientSessions retorna todas as sessões', async () => {
         const mc = mockClient();
-        mc.createSession.mockImplementation((cfg) => Promise.resolve(mockSession(`s-${cfg.model}`)));
+        mc.createSession.mockImplementation((/** @type {{ model?: string }} */ cfg) =>
+            Promise.resolve(mockSession(`s-${cfg.model}`)),
+        );
         _injectClientForTest(/** @type {any} */ (mc));
 
         await createClientSession(/** @type {any} */ ({ model: 'a' }));

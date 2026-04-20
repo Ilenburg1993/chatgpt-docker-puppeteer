@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, before, after, beforeEach } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
@@ -16,6 +16,34 @@ import { QueueWorker } from '../../../src/agent/queue_worker.js';
 import { TaskControlWatcher } from '../../../src/agent/task_control_watcher.js';
 import { TaskStateProjector } from '../../../src/agent/task_state_projector.js';
 import { DriverNERVAdapter } from '../../../src/driver/nerv_adapter/driver_nerv_adapter.js';
+
+/**
+ * Poll simples para testes `node:test` sem depender de helpers do Vitest.
+ *
+ * @param {() => void} assertion
+ * @param {{ timeoutMs?: number; intervalMs?: number }} [opts]
+ * @returns {Promise<void>}
+ */
+async function waitForAssertion(assertion, opts = {}) {
+    const timeoutMs = opts.timeoutMs ?? 2000;
+    const intervalMs = opts.intervalMs ?? 10;
+    const deadline = Date.now() + timeoutMs;
+    /** @type {unknown} */
+    let lastError = null;
+
+    while (Date.now() < deadline) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    if (lastError instanceof Error) throw lastError;
+    throw new Error('waitForAssertion timeout');
+}
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
@@ -716,16 +744,13 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
 
         nerv.receive(cmd);
         // handler é async e passa por vários awaits internos (_emitBoth → _emitEvent → nerv.emitEvent)
-        await vi.waitFor(
-            () => {
-                assert.strictEqual(
-                    nerv.emittedEvents.length,
-                    1,
-                    'deve emitir ao menos 1 evento de falha (resposta ao comando)',
-                );
-            },
-            { timeout: 2000, interval: 10 },
-        );
+        await waitForAssertion(() => {
+            assert.strictEqual(
+                nerv.emittedEvents.length,
+                1,
+                'deve emitir ao menos 1 evento de falha (resposta ao comando)',
+            );
+        });
         assert.strictEqual(nerv.emittedEvents[0].type.action_code, ActionCode.DRIVER_TASK_FAILED);
         assert.strictEqual(nerv.emittedEvents[0].payload.taskId, taskId);
         assert.strictEqual(nerv.emittedEvents[0].payload.reason, 'TASK_ALREADY_RUNNING');

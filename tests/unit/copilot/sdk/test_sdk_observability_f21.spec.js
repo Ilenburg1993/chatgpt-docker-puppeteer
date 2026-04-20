@@ -11,11 +11,12 @@
 
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { readFileSync } = require('node:fs');
 
-const ROOT = join(import.meta.url.replace('file://', ''), '../../../../..');
+const ROOT = process.cwd();
 const SRC_COPILOT = join(ROOT, 'src/copilot');
 
 /**
@@ -92,21 +93,18 @@ describe('F21 — F115: createQuotaMonitor', () => {
     });
 
     it('createQuotaMonitor lança TypeError se client inválido', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
-        // @ts-expect-error -- valor inválido intencional para testar validação
-        expect(() => createQuotaMonitor({ client: null })).toThrow(TypeError);
+        const { createQuotaMonitor } = await import('../../../../src/copilot/sdk/telemetry/quota-monitor.js');
+        expect(() => createQuotaMonitor(/** @type {any} */ ({ client: null }))).toThrow(TypeError);
     });
 
     it('createQuotaMonitor lança RangeError se intervalMs < 1000', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
-        // @ts-expect-error -- valor inválido intencional para testar validação
-        expect(() => createQuotaMonitor({ client: {}, intervalMs: 500 })).toThrow(RangeError);
+        const { createQuotaMonitor } = await import('../../../../src/copilot/sdk/telemetry/quota-monitor.js');
+        expect(() => createQuotaMonitor(/** @type {any} */ ({ client: {}, intervalMs: 500 }))).toThrow(RangeError);
     });
 
     it('monitor.status() retorna running=false antes de start()', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
-        // @ts-expect-error -- valor inválido intencional para testar validação
-        const monitor = createQuotaMonitor({ client: { rpc: {} }, intervalMs: 60_000 });
+        const { createQuotaMonitor } = await import('../../../../src/copilot/sdk/telemetry/quota-monitor.js');
+        const monitor = createQuotaMonitor(/** @type {any} */ ({ client: { rpc: {} }, intervalMs: 60_000 }));
         const s = monitor.status();
         expect(s.running).toBe(false);
         expect(s.ts).toBe(0);

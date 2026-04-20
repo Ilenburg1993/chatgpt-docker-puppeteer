@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog, mockBuildTool, mockLogSwallowed } = vi.hoisted(() => ({
     mockLog: vi.fn(),
-    mockBuildTool: vi.fn((opts) => ({ name: opts.name, _handler: opts.handler })),
+    mockBuildTool: vi.fn((opts) => ({ name: opts.name, handler: opts.handler, _handler: opts.handler })),
     mockLogSwallowed: vi.fn(),
 }));
 
@@ -135,7 +135,7 @@ describe('F39 — BUILTIN_HANDLER_MAP', () => {
 
     it('process_info retorna JSON com pid', () => {
         const pi = BUILTIN_HANDLER_MAP.get('process_info');
-        const result = JSON.parse(pi?.({}));
+        const result = JSON.parse(String(pi?.({}) ?? '{}'));
         expect(result).toHaveProperty('pid');
         expect(result).toHaveProperty('uptime');
     });

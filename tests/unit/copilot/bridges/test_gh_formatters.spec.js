@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it } from 'node:test';
+import { describe, expect, it } from 'vitest';
 /**
  * tests/unit/copilot/bridges/test_gh_formatters.spec.js
  *

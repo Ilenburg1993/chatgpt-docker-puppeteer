@@ -50,7 +50,7 @@ const EXPECTED_TOKENS = ['SHUTDOWN_LOGGER', 'DB_LOGGER', 'EVENT_BUS'];
 describe('FK-7 — DI tokens canônicos', () => {
     for (const tokenName of EXPECTED_TOKENS) {
         it(`exporta token ${tokenName} com nome e _id`, () => {
-            const token = core[tokenName];
+            const token = /** @type {Record<string, any>} */ (core)[tokenName];
             assert.ok(token, `Token ${tokenName} não encontrado no barrel core`);
             assert.equal(token.name, tokenName);
             assert.equal(typeof token._id, 'symbol');
@@ -58,7 +58,7 @@ describe('FK-7 — DI tokens canônicos', () => {
     }
 
     it('todos tokens são distintos (sem colisão de _id)', () => {
-        const ids = new Set(EXPECTED_TOKENS.map((n) => core[n]._id));
+        const ids = new Set(EXPECTED_TOKENS.map((n) => /** @type {Record<string, any>} */ (core)[n]._id));
         assert.equal(ids.size, EXPECTED_TOKENS.length);
     });
 });

@@ -7,6 +7,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
 
@@ -48,7 +49,7 @@ const { _storeRef, hubRef } = vi.hoisted(() => ({
 
 // Mock conversationStore using vi.fn-based passthroughs
 vi.mock('#copilot/conversation-hub/store', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         conversationStore: {
@@ -79,6 +80,9 @@ const {
     handleHubHealth,
 } = await import('../../../../src/copilot/terminal/handlers/dialog.js');
 
+/** @template T @param {{ body: unknown }} result @returns {T} */
+const bodyOf = (result) => /** @type {T} */ (result.body);
+
 describe('handlers/dialog — sessions', () => {
     beforeEach(() => {
         const Database = require('better-sqlite3');
@@ -95,21 +99,24 @@ describe('handlers/dialog — sessions', () => {
 
     it('handleListSessions retorna lista vazia inicialmente', () => {
         const result = handleListSessions();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.sessions)).toBe(true);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.sessions)).toBe(true);
     });
 
     it('handleListSessions retorna sessions criadas', () => {
         store.createHubSession({ title: 'test-session' });
         const result = handleListSessions({ limit: 10, offset: 0 });
-        expect(result.body.sessions.length).toBeGreaterThanOrEqual(1);
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(body.sessions.length).toBeGreaterThanOrEqual(1);
     });
 
     it('handleListSessions rejeita status inválido', () => {
         const result = handleListSessions({ status: 'invalid' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.ok).toBe(false);
+        expect(body.ok).toBe(false);
     });
 });
 
@@ -129,9 +136,10 @@ describe('handlers/dialog — turns', () => {
 
     it('handleListTurns retorna lista vazia para session inexistente', () => {
         const result = handleListTurns({ sessionId: 'non-existent' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.turns).toEqual([]);
-        expect(result.body.totalCount).toBe(0);
+        expect(body.turns).toEqual([]);
+        expect(body.totalCount).toBe(0);
     });
 
     it('handleListTurns retorna turns de session real', async () => {
@@ -141,8 +149,9 @@ describe('handlers/dialog — turns', () => {
             content: 'hello',
         });
         const result = handleListTurns({ sessionId });
-        expect(result.body.turns.length).toBe(1);
-        expect(result.body.totalCount).toBe(1);
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(body.turns.length).toBe(1);
+        expect(body.totalCount).toBe(1);
     });
 });
 
@@ -167,27 +176,32 @@ describe('handlers/dialog — memory', () => {
 
     it('handleStoreMemory cria e handleRecallMemories recupera', () => {
         const storeResult = handleStoreMemory({ content: 'test memory', tag: 'unit-test' });
+        const storeBody = bodyOf(/** @type {{ body: any }} */ (storeResult));
         expect(storeResult.status).toBe(201);
-        expect(storeResult.body.ok).toBe(true);
+        expect(storeBody.ok).toBe(true);
 
         const recallResult = handleRecallMemories({ tag: 'unit-test' });
+        const recallBody = bodyOf(/** @type {{ body: any }} */ (recallResult));
         expect(recallResult.status).toBe(200);
-        expect(recallResult.body.memories.length).toBeGreaterThanOrEqual(1);
+        expect(recallBody.memories.length).toBeGreaterThanOrEqual(1);
     });
 
     it('handleDeleteMemory remove memória existente', () => {
         const storeResult = handleStoreMemory({ content: 'to delete' });
-        const memoryId = storeResult.body.id;
+        const storeBody = bodyOf(/** @type {{ body: any }} */ (storeResult));
+        const memoryId = storeBody.id;
 
         const deleteResult = handleDeleteMemory({ memoryId });
+        const deleteBody = bodyOf(/** @type {{ body: any }} */ (deleteResult));
         expect(deleteResult.status).toBe(200);
-        expect(deleteResult.body.ok).toBe(true);
+        expect(deleteBody.ok).toBe(true);
     });
 
     it('handleDeleteMemory retorna 404 para id inexistente', () => {
         const result = handleDeleteMemory({ memoryId: 'fake-id' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(404);
-        expect(result.body.ok).toBe(false);
+        expect(body.ok).toBe(false);
     });
 });
 
@@ -207,10 +221,11 @@ describe('handlers/dialog — hub-health', () => {
 
     it('handleHubHealth retorna ok com contadores', () => {
         const result = handleHubHealth();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.dbResponsive).toBe(true);
-        expect(typeof result.body.activeSessions).toBe('number');
-        expect(typeof result.body.totalSessions).toBe('number');
+        expect(body.ok).toBe(true);
+        expect(body.dbResponsive).toBe(true);
+        expect(typeof body.activeSessions).toBe('number');
+        expect(typeof body.totalSessions).toBe('number');
     });
 });

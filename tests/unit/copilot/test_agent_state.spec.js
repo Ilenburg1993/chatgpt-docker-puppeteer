@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import { getStatusSnapshot, listenerDiagnostics } from '../../../src/copilot/agent/state/agent-state.js';
 import { AGENT_EVENTS } from '../../../src/copilot/events/agent-events.js';
@@ -59,11 +59,11 @@ describe('agent-state › getStatusSnapshot', () => {
 
     it('snapshot reflete mudança de status', () => {
         const { ctx, host } = setup();
-        ctx.status = 'busy';
+        ctx.status = 'processing';
         ctx.statusSnapshotCache = null;
         const snap = getStatusSnapshot(ctx, host);
 
-        assert.equal(snap.status, 'busy');
+        assert.equal(snap.status, 'processing');
     });
 });
 

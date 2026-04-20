@@ -15,7 +15,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { MessageQueue } from '../../../src/copilot/agent/infra/message-queue.js';
 
@@ -28,13 +28,15 @@ let _taskSeq = 0;
  *
  * @param {object} [overrides]
  * @returns {{
- *     task: import('../../../src/copilot/agent/message-queue.js').AgentTask;
+ *     task: import('../../../src/copilot/agent/infra/message-queue.js').AgentTask;
  *     resolved: { value: string | null };
  *     rejected: { error: Error | null };
  * }}
  */
 function makeTask(overrides = {}) {
+    /** @type {{ value: string | null }} */
     const resolved = { value: null };
+    /** @type {{ error: Error | null }} */
     const rejected = { error: null };
     const task = /** @type {any} */ ({
         id: `task-${++_taskSeq}`,

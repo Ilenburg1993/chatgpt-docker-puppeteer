@@ -16,6 +16,8 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
 // O alwaysAliveAgent é um singleton que EventEmitter; precisamos interceptar
@@ -25,6 +27,7 @@
 const _listeners = new Map();
 
 const mockAgent = {
+    status: 'idle',
     getStatusSnapshot: () => ({ status: 'idle', sessionId: 'test-session-id', model: 'gpt-4.1', tools: 30 }),
     enqueue: vi.fn((/** @type {string} */ _msg, _opts) => {
         return Promise.resolve('mock-task-id');
@@ -32,7 +35,14 @@ const mockAgent = {
     on: (/** @type {string} */ event, /** @type {Function} */ fn) => {
         _listeners.set(event, fn);
     },
+    once: (/** @type {string} */ event, /** @type {Function} */ fn) => {
+        _listeners.set(event, fn);
+    },
     off: (/** @type {any} */ _event, /** @type {any} */ _fn) => {},
+    sendMessage: vi.fn(),
+    startDialogLoop: vi.fn(async () => undefined),
+    sendDialogTurn: vi.fn(async () => 'ok'),
+    stopDialogLoop: vi.fn(),
     answerPendingQuestion: vi.fn(),
 };
 
@@ -64,7 +74,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
         // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
         const mod = await import('../../../src/copilot/channel/client.js');
         // Injeta mock como bridge agent para que requireAgent() não lance
-        mod.setBridgeAgent(mockAgent);
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         bridge = new mod.LlmBridgeClient();
     });
 

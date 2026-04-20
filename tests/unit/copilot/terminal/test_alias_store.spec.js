@@ -7,6 +7,8 @@
  * Usa mocks de fs para isolar persistência.
  */
 
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
     formatAliases,
     getAliases,

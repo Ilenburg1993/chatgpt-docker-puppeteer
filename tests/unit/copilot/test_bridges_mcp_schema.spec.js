@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('buildZodSchema — parse básico', () => {
     it('retorna schema Zod para tipo string', async () => {

@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'vitest';
 
 import { createEventBus } from '../../../../src/copilot/core/event-bus.js';
 import { createActivityTracker } from '../../../../src/copilot/observability/bus-actions/activity-tracker.js';
@@ -72,7 +72,7 @@ describe('bus-actions (FAIXA-L15)', () => {
             bus.emit({ type: 'agent:dialog:turn_end', timestamp: Date.now(), correlationId: 'abc-123' });
             const traces = ct.getTraces('abc-123');
             assert.equal(traces.length, 2);
-            assert.equal(traces[0].type, 'agent:dialog:turn_start');
+            assert.equal(traces[0]?.type, 'agent:dialog:turn_start');
             ct.unsub();
         });
 

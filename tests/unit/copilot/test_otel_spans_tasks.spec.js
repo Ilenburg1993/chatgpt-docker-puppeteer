@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { describe, it, before } from 'node:test';
+import { describe, it, beforeAll } from 'vitest';
 
 describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
     /** @type {typeof import('../../../src/copilot/observability/otel.js')} */
@@ -19,7 +19,7 @@ describe('F29.4 — OTEL spans para tasks não-dialog', async () => {
     /** @type {string} */
     let observerSource = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         otel = await import('../../../src/copilot/observability/otel.js');
         // O observer foi decomposto em sub-módulos; ler todos para inspeção

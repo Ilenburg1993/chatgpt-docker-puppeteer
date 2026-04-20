@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { describe, it, before } from 'node:test';
+import { beforeAll, describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 
 describe('agent-lifecycle › exports', () => {
@@ -55,7 +55,7 @@ describe('agent-lifecycle › source contracts', () => {
     /** @type {string} */
     let src;
 
-    before(async () => {
+    beforeAll(async () => {
         src = await readFile(
             new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url),
             'utf-8',
@@ -80,6 +80,14 @@ describe('agent-lifecycle › source contracts', () => {
 
     it('agentStart usa SHUTDOWN_TIMEOUT_MS do config', () => {
         assert.ok(src.includes('SHUTDOWN_TIMEOUT_MS'), 'deve importar SHUTDOWN_TIMEOUT_MS');
+    });
+
+    it('agentStart reconcilia shadow expirada de ask_user no boot', () => {
+        assert.ok(src.includes('createPendingQuestionShadow('), 'agentStart deve restaurar shadow via helper');
+        assert.ok(
+            src.includes('state.pendingQuestionShadow.expire'),
+            'agentStart deve limpar shadow expirada do state',
+        );
     });
 
     it('initSession recebe ctx, client e host como parâmetros', () => {

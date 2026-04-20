@@ -17,7 +17,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { executeTask } from '../../../src/copilot/agent/infra/task-executor.js';
 import { executeTask as executeTaskCanonical } from '../../../src/copilot/agent/messaging/agent-messaging.js';
@@ -89,6 +89,18 @@ function makeSession(opts = {}) {
 }
 
 /**
+ * Invoca o executor canônico tratando a sessão mock como compatível para fins de teste.
+ *
+ * @param {ReturnType<typeof makeSession>} session
+ * @param {ReturnType<typeof makeTask>} task
+ * @param {ReturnType<typeof makeCallbacks> | Record<string, unknown>} callbacks
+ * @returns {Promise<void>}
+ */
+function runExecuteTask(session, task, callbacks) {
+    return executeTask(/** @type {any} */ (session), /** @type {any} */ (task), /** @type {any} */ (callbacks));
+}
+
+/**
  * Cria callbacks padrão para executeTask.
  *
  * Retorna objeto com campos extra (_statuses, _events) para inspeção nos testes.
@@ -133,7 +145,7 @@ describe('task-executor › execução bem-sucedida', () => {
         });
         const cbs = makeCallbacks();
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         const result = await task.promise;
 
         assert.strictEqual(result, 'Resposta correta.');
@@ -144,7 +156,7 @@ describe('task-executor › execução bem-sucedida', () => {
         const session = makeSession();
         const cbs = makeCallbacks();
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise;
 
         assert.ok(
@@ -158,7 +170,7 @@ describe('task-executor › execução bem-sucedida', () => {
         const session = makeSession();
         const cbs = makeCallbacks();
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise;
 
         const completed = cbs._events.find(([e]) => e === 'task.completed');
@@ -179,7 +191,7 @@ describe('task-executor › execução bem-sucedida', () => {
             },
         };
 
-        void executeTask(session, task, cbs2);
+        void runExecuteTask(session, task, cbs2);
         await task.promise;
 
         assert.ok(wrapper.did, 'scheduleNext deve ter sido chamado');
@@ -202,7 +214,7 @@ describe('task-executor › AbortError não aciona reconexão (G1-BUG-03)', () =
             },
         });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await assert.rejects(task.promise, (err) => {
             assert.ok(err instanceof DOMException);
             assert.strictEqual(err.name, 'AbortError');
@@ -221,7 +233,7 @@ describe('task-executor › AbortError não aciona reconexão (G1-BUG-03)', () =
         });
         const cbs = makeCallbacks();
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise.catch(() => {});
 
         const errorEvent = cbs._events.find(([e]) => e === 'task.error');
@@ -247,7 +259,7 @@ describe('task-executor › erro fatal não aciona reconexão (K3)', () => {
             },
         });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await assert.rejects(task.promise, /sessão fatal/);
 
         assert.strictEqual(tryReconnectCalled, false, 'tryReconnect não deve ser chamado para erro fatal');
@@ -271,7 +283,7 @@ describe('task-executor › erro de sessão + reconexão', () => {
             },
         });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         const result = await task.promise;
 
         assert.ok(requeued, 'requeueTask deve ter sido chamado');
@@ -287,7 +299,7 @@ describe('task-executor › erro de sessão + reconexão', () => {
         });
         const cbs = makeCallbacks({ tryReconnect: async () => false });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await assert.rejects(task.promise, /Falha permanente de rede/);
     });
 
@@ -300,7 +312,7 @@ describe('task-executor › erro de sessão + reconexão', () => {
         });
         const cbs = makeCallbacks({ tryReconnect: async () => false });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise.catch(() => {});
 
         const errorEvent = cbs._events.find(([e]) => e === 'task.error');
@@ -321,7 +333,7 @@ describe('task-executor › max retries atingido', () => {
             tryReconnect: async () => true, // reconexão sempre OK mas max retries atingido
         });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await assert.rejects(task.promise, /Máximo de 3 tentativas atingido/);
     });
 
@@ -334,7 +346,7 @@ describe('task-executor › max retries atingido', () => {
         });
         const cbs = makeCallbacks({ tryReconnect: async () => true });
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise.catch(() => {});
 
         const errorEvent = cbs._events.find(([e]) => e === 'task.error');
@@ -363,7 +375,7 @@ describe('task-executor › cleanup de listeners', () => {
             },
         };
 
-        void executeTask(session, task, cbs);
+        void runExecuteTask(session, task, cbs);
         await task.promise.catch(() => {});
 
         assert.ok(wrapper.did, 'scheduleNext deve ser chamado mesmo em caso de erro (finally)');

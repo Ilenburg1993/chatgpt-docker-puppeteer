@@ -60,8 +60,14 @@ vi.mock('#copilot/observability/logger', () => ({
 }));
 
 // Mock waitForEvent — resolve imediatamente por padrão
-const mockWaitForEvent = vi.fn(() => Promise.resolve({}));
-vi.mock('#copilot/sdk/event-helpers', () => ({ waitForEvent: (...args) => mockWaitForEvent(...args) }));
+const mockWaitForEvent = vi.fn((/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) => Promise.resolve({}));
+vi.mock('#copilot/sdk/event-helpers', () => ({
+    waitForEvent: (
+        /** @type {import('node:events').EventEmitter} */ emitter,
+        /** @type {string} */ event,
+        /** @type {{ timeoutMs?: number; timeoutError?: string; signal?: AbortSignal }} */ opts,
+    ) => mockWaitForEvent(emitter, event, opts),
+}));
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
@@ -115,6 +121,7 @@ describe('DialogLoopManager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockWaitForEvent.mockImplementation(() => Promise.resolve({}));
+        vi.mocked(readState).mockReturnValue(null);
         dlm = new DialogLoopManager({ bootTimeoutMs: 500, watchdogIntervalMs: 60000, watchdogStallMs: 120000 });
         host = createMockHost();
         dlm.attach(host);
@@ -132,11 +139,26 @@ describe('DialogLoopManager', () => {
             expect(dlm.active).toBe(true);
         });
 
+        it('start() limpa paused em memória mesmo quando o estado persistido vinha pausado', async () => {
+            vi.mocked(readState).mockReturnValue(/** @type {any} */ ({ dialogPaused: true }));
+            const fresh = new DialogLoopManager({
+                bootTimeoutMs: 500,
+                watchdogIntervalMs: 60000,
+                watchdogStallMs: 120000,
+            });
+            fresh.attach(createMockHost());
+
+            expect(fresh.paused).toBe(true);
+            await fresh.start('Hello');
+
+            expect(fresh.paused).toBe(false);
+        });
+
         it('start() persiste dialogLoopActive via persistStateWithPolicy', async () => {
             await dlm.start('Hello');
 
             expect(persistStateWithPolicy).toHaveBeenCalledWith(
-                { dialogLoopActive: true },
+                { dialogLoopActive: true, dialogPaused: false },
                 { label: 'dialog.state.active' },
             );
         });
@@ -291,7 +313,13 @@ describe('DialogLoopManager', () => {
 
         it('paused retorna true quando state indica dialogPaused', () => {
             vi.mocked(readState).mockReturnValue(/** @type {any} */ ({ dialogPaused: true }));
-            expect(dlm.paused).toBe(true);
+            const fresh = new DialogLoopManager({
+                bootTimeoutMs: 500,
+                watchdogIntervalMs: 60000,
+                watchdogStallMs: 120000,
+            });
+            fresh.attach(createMockHost());
+            expect(fresh.paused).toBe(true);
         });
 
         it('pause() com loop inativo não emite paused', async () => {

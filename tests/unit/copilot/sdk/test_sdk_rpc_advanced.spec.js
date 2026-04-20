@@ -7,7 +7,7 @@
  * toolsHandlePendingCall
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),

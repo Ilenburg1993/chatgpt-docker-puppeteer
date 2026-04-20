@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { describe, it, before, after } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 // ─── Test infra: mock HTTP server ────────────────────────────────────────────
 
@@ -105,14 +105,14 @@ describe('F32.3 — injectToLlmB concurrência com múltiplos inject', () => {
     /** @type {typeof import('../../../src/copilot/channel/inject.js').injectToLlmB} */
     let injectToLlmB;
 
-    before(async () => {
+    beforeAll(async () => {
         mock = createMockLlmBServer({ concurrentDelay: 30, maxConcurrent: 1 });
         port = await mock.start();
         const mod = await import('../../../src/copilot/channel/inject.js');
         injectToLlmB = mod.injectToLlmB;
     });
 
-    after(() => {
+    afterAll(() => {
         mock.server.close();
     });
 
@@ -171,9 +171,11 @@ describe('F32.3 — injectToLlmB concurrência com múltiplos inject', () => {
             const results = await Promise.all(promises);
 
             for (let i = 0; i < messages.length; i++) {
+                const result = results[i];
+                const message = messages[i];
                 assert.ok(
-                    results[i].reply?.includes(messages[i]),
-                    `resposta ${i} deve conter "${messages[i]}", recebeu: "${results[i].reply}"`,
+                    result?.reply?.includes(message ?? ''),
+                    `resposta ${i} deve conter "${message}", recebeu: "${result?.reply}"`,
                 );
             }
         } finally {

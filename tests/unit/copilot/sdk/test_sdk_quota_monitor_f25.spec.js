@@ -19,7 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
  * Cria snapshot de quota mock.
  *
  * @param {number} remainingPercentage
- * @returns {import('/workspaces/chatgpt-docker-puppeteer/src/copilot/sdk/server-rpc.js').QuotaSnapshot}
+ * @returns {{ entitlementRequests: number; usedRequests: number; remainingPercentage: number; overage: number; overageAllowedWithExhaustedQuota: boolean }}
  */
 function makeSnapshot(remainingPercentage) {
     return {

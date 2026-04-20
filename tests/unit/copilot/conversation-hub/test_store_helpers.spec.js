@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, before, after } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import {
     initTurnsFts,
@@ -48,7 +48,7 @@ let db;
 
 const HUB_SESSION = 'test-hub-session-001';
 
-before(() => {
+beforeAll(() => {
     const Database = require('better-sqlite3');
     db = new Database(':memory:');
     applyCopilotMigrations(db);
@@ -59,7 +59,7 @@ before(() => {
     ).run(HUB_SESSION, 'Test Session', 'active', Date.now(), Date.now());
 });
 
-after(() => {
+afterAll(() => {
     db?.close();
 });
 
@@ -138,7 +138,7 @@ describe('migrateFts5Tokenizer', () => {
 describe('store-queries', () => {
     const SESSION = 'queries-session-001';
 
-    before(() => {
+    beforeAll(() => {
         db.prepare(
             `INSERT INTO copilot_hub_sessions (id, title, status, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?)`,
@@ -164,7 +164,10 @@ describe('store-queries', () => {
             const turns = readTurns(db, SESSION);
             assert.ok(turns.length >= 5);
             for (let i = 1; i < turns.length; i++) {
-                assert.ok(turns[i].turn_number >= turns[i - 1].turn_number);
+                const current = turns[i];
+                const previous = turns[i - 1];
+                assert.ok(current && previous, 'turns devem existir para comparação sequencial');
+                assert.ok(current.turn_number >= previous.turn_number);
             }
         });
 
@@ -175,7 +178,9 @@ describe('store-queries', () => {
 
         it('filtra por after (id)', () => {
             const all = readTurns(db, SESSION);
-            const afterId = all[1].id;
+            const second = all[1];
+            assert.ok(second, 'deve haver pelo menos dois turns para testar after');
+            const afterId = second.id;
             const filtered = readTurns(db, SESSION, { after: afterId });
             for (const t of filtered) {
                 assert.ok(t.id > afterId);
@@ -215,7 +220,9 @@ describe('store-queries', () => {
     describe('getTurn', () => {
         it('retorna turn por id', () => {
             const all = readTurns(db, SESSION);
-            const turn = getTurn(db, all[0].id);
+            const first = all[0];
+            assert.ok(first, 'deve haver ao menos um turn');
+            const turn = getTurn(db, first.id);
             assert.ok(turn);
             assert.strictEqual(turn.hub_session_id, SESSION);
         });
@@ -252,7 +259,9 @@ describe('store-memories', () => {
         storeMemory(db, { content: 'Memória tagged', tag: 'recall-test' });
         const memories = recallMemories(db, { tag: 'recall-test' });
         assert.ok(memories.length >= 1);
-        assert.strictEqual(memories[0].tag, 'recall-test');
+        const first = memories[0];
+        assert.ok(first, 'deve haver ao menos uma memória');
+        assert.strictEqual(first.tag, 'recall-test');
     });
 
     it('recallMemories retorna todas quando sem filtro', () => {
@@ -290,6 +299,8 @@ describe('store-memories', () => {
         storeMemory(db, { content: 'Special content for combo test', tag: 'combo-tag' });
         const results = recallMemories(db, { search: 'special content', tag: 'combo-tag' });
         assert.ok(results.length >= 1);
-        assert.strictEqual(results[0].tag, 'combo-tag');
+        const first = results[0];
+        assert.ok(first, 'deve haver pelo menos um resultado');
+        assert.strictEqual(first.tag, 'combo-tag');
     });
 });

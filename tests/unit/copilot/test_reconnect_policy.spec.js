@@ -17,9 +17,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
-import { tryReconnect } from '../../../src/copilot/agent/lifecycle/reconnect-policy.js';
+import { tryReconnect as importedTryReconnect } from '../../../src/copilot/agent/lifecycle/reconnect-policy.js';
+
+const tryReconnect = /** @type {any} */ (importedTryReconnect);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -132,8 +134,8 @@ describe('reconnect-policy › reconexão bem-sucedida', () => {
 
         const cbs = makeCallbacks({
             createClient: () => replacementClient,
-            updateClient: (client) => updatedClients.push(client),
-            initSession: async (client) => {
+            updateClient: (/** @type {any} */ client) => updatedClients.push(client),
+            initSession: async (/** @type {any} */ client) => {
                 assert.strictEqual(client, replacementClient, 'initSession deve receber o client recém-criado');
                 return { session: { sessionId: 'sess-new' }, isResumed: false };
             },
@@ -295,7 +297,9 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
 
         // delay da tentativa 1: 100 * 2^0 + 0 = 100ms
         assert.ok(delays.length >= 1, 'Pelo menos 1 setTimeout deve ter sido chamado');
-        assert.strictEqual(delays[0], 100, `Delay da tentativa 1 deve ser 100ms, obtido: ${delays[0]}`);
+        const firstDelay = delays[0];
+        assert.ok(firstDelay !== undefined);
+        assert.strictEqual(firstDelay, 100, `Delay da tentativa 1 deve ser 100ms, obtido: ${firstDelay}`);
     });
 });
 
@@ -356,7 +360,7 @@ describe('reconnect-policy › M-05: sessionLog callback', () => {
         });
         assert.ok(logs.length > 0, 'sessionLog deve ter sido chamado');
         assert.ok(
-            logs[0].includes('Reconexão bem-sucedida'),
+            logs[0]?.includes('Reconexão bem-sucedida'),
             `Mensagem deve conter "Reconexão bem-sucedida": ${logs[0]}`,
         );
     });

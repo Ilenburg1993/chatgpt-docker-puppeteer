@@ -71,7 +71,12 @@ vi.mock(
                 AGENT_MAX_LISTENERS: 100,
             },
             {
-                get: (target, prop) => (prop in target ? target[prop] : typeof prop === 'string' ? '' : undefined),
+                get: (target, prop) =>
+                    typeof prop === 'string' && prop in target
+                        ? target[/** @type {keyof typeof target} */ (prop)]
+                        : typeof prop === 'string'
+                          ? ''
+                          : undefined,
                 has: () => true,
             },
         ),
@@ -242,6 +247,36 @@ describe('F43 — event-handlers/sdk-responses', () => {
             expect.objectContaining({
                 messageTruncatedCount: 5,
                 tokensTruncated: 1000,
+            }),
+        );
+    });
+
+    it('emite session.shutdown com payload bruto do SDK', async () => {
+        const { wireSdkResponseEvents } = await import('#copilot/event-handlers/sdk-responses');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSdkResponseEvents(/** @type {any} */ (session), { emit });
+        session._emit('session.shutdown', { shutdownType: 'graceful', reason: 'user_exit' });
+        expect(emit).toHaveBeenCalledWith(
+            'session.shutdown',
+            expect.objectContaining({
+                shutdownType: 'graceful',
+                reason: 'user_exit',
+            }),
+        );
+    });
+
+    it('emite session.workspace_file_changed com path e operation', async () => {
+        const { wireSdkResponseEvents } = await import('#copilot/event-handlers/sdk-responses');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSdkResponseEvents(/** @type {any} */ (session), { emit });
+        session._emit('session.workspace_file_changed', { path: 'files/plan.md', operation: 'update' });
+        expect(emit).toHaveBeenCalledWith(
+            'session.workspace_file_changed',
+            expect.objectContaining({
+                path: 'files/plan.md',
+                operation: 'update',
             }),
         );
     });

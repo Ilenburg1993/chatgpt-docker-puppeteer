@@ -19,7 +19,11 @@ const { mockLog, mockLogSwallowed } = vi.hoisted(() => ({
     mockLogSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
@@ -281,6 +285,7 @@ describe('F40 — chatStructured', () => {
         const result = await chatStructured(deps, {
             context: 'test',
             intent: 'check',
+            responseType: 'diagnostic',
             priority: 'high',
         });
 
@@ -305,6 +310,7 @@ describe('F40 — chatStructured', () => {
         const result = await chatStructured(deps, {
             context: 'test',
             intent: 'check',
+            responseType: 'diagnostic',
         });
 
         expect(result.structured).toBeNull();
@@ -332,7 +338,7 @@ describe('F40 — chatStructured', () => {
             getSessionId: () => 'sess-2',
         };
 
-        const result = await chatStructured(deps, { context: 'test', intent: 'check' });
+        const result = await chatStructured(deps, { context: 'test', intent: 'check', responseType: 'diagnostic' });
 
         expect(result.structured?.responseType).toBe('info');
         expect(deps.chat).toHaveBeenCalledTimes(2);
@@ -351,7 +357,11 @@ describe('F40 — chatStructured', () => {
             getSessionId: () => 'default-sess',
         };
 
-        await chatStructured(deps, { context: 'test', intent: 'check' }, { sessionId: 'custom-sess' });
+        await chatStructured(
+            deps,
+            { context: 'test', intent: 'check', responseType: 'diagnostic' },
+            { sessionId: 'custom-sess' },
+        );
 
         // buildStructuredRequest should have received custom-sess
         const { buildStructuredRequest } = await import('#copilot/core/structured-message');

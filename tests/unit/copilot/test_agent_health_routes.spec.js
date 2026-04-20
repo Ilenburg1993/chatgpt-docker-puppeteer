@@ -1,7 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { ALWAYS_ALIVE_AGENT, alwaysAliveAgent } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
@@ -13,7 +13,7 @@ import { buildAgentModuleHealth, buildLegacyAgentHealth } from '../../../src/cop
 import { registerControlRoutes } from '../../../src/copilot/server/routes/copilot-api/control.js';
 import { createHealthRouter } from '../../../src/copilot/server/routes/health.js';
 
-describe('agent health routes', { concurrency: 1 }, () => {
+describe('agent health routes', () => {
     /** @type {unknown} */
     let previousAgent;
 
@@ -72,6 +72,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         reasoningEffort: 'high',
                         dialogLoopActive: false,
                         pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: false,
+                        pendingQuestionShadowKind: null,
+                        pendingQuestionShadowState: null,
+                        pendingQuestionShadowExpired: false,
+                        pendingQuestionShadowAgeMs: null,
+                        pendingQuestionShadowExpiresAt: null,
+                        pendingQuestionShadowRemainingMs: null,
                         queueSize: 0,
                         oldestTaskWaitMs: 0,
                         starvationAlert: false,
@@ -91,6 +99,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                             io: {
                                 ok: true,
                                 pendingQuestion: false,
+                                pendingQuestionKind: null,
+                                pendingQuestionShadow: false,
+                                pendingQuestionShadowKind: null,
+                                pendingQuestionShadowState: null,
+                                pendingQuestionShadowExpired: false,
+                                pendingQuestionShadowAgeMs: null,
+                                pendingQuestionShadowExpiresAt: null,
+                                pendingQuestionShadowRemainingMs: null,
                                 waitingForInput: false,
                                 keepaliveRunning: true,
                                 backgroundPendingCount: 0,
@@ -145,6 +161,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         reasoningEffort: 'high',
                         dialogLoopActive: false,
                         pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: false,
+                        pendingQuestionShadowKind: null,
+                        pendingQuestionShadowState: null,
+                        pendingQuestionShadowExpired: false,
+                        pendingQuestionShadowAgeMs: null,
+                        pendingQuestionShadowExpiresAt: null,
+                        pendingQuestionShadowRemainingMs: null,
                         queueSize: 0,
                         oldestTaskWaitMs: 0,
                         starvationAlert: false,
@@ -164,6 +188,14 @@ describe('agent health routes', { concurrency: 1 }, () => {
                             io: {
                                 ok: true,
                                 pendingQuestion: false,
+                                pendingQuestionKind: null,
+                                pendingQuestionShadow: false,
+                                pendingQuestionShadowKind: null,
+                                pendingQuestionShadowState: null,
+                                pendingQuestionShadowExpired: false,
+                                pendingQuestionShadowAgeMs: null,
+                                pendingQuestionShadowExpiresAt: null,
+                                pendingQuestionShadowRemainingMs: null,
                                 waitingForInput: false,
                                 keepaliveRunning: false,
                                 backgroundPendingCount: 0,
@@ -235,6 +267,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                 reasoningEffort: 'medium',
                 dialogLoopActive: true,
                 pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: true,
+                pendingQuestionShadowKind: 'ready',
+                pendingQuestionShadowExpired: true,
+                pendingQuestionShadowAgeMs: 90_000,
+                pendingQuestionShadowExpiresAt: 123456789,
                 queueSize: 1,
                 oldestTaskWaitMs: 0,
                 starvationAlert: false,
@@ -254,6 +292,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                     io: {
                         ok: true,
                         pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: true,
+                        pendingQuestionShadowKind: 'ready',
+                        pendingQuestionShadowExpired: true,
+                        pendingQuestionShadowAgeMs: 90_000,
+                        pendingQuestionShadowExpiresAt: 123456789,
                         waitingForInput: false,
                         keepaliveRunning: false,
                         backgroundPendingCount: 2,
@@ -284,6 +328,9 @@ describe('agent health routes', { concurrency: 1 }, () => {
         assert.equal(res.body.status, 'healthy');
         assert.equal(res.body.sessionId, 'session-456');
         assert.equal(res.body.backgroundPendingCount, 2);
+        assert.equal(res.body.pendingQuestionShadow, true);
+        assert.equal(res.body.pendingQuestionShadowKind, 'ready');
+        assert.equal(res.body.pendingQuestionShadowExpired, true);
         assert.equal(res.body.permissionMode, 'selective');
         assert.equal(res.body.hubStore.ok, true);
     });
@@ -316,6 +363,7 @@ describe('agent health routes', { concurrency: 1 }, () => {
         assert.ok(health.issues.includes('runtime.not_operational.stopped'));
         assert.equal(health.checks.runtime.ok, false);
         assert.equal(health.checks.background.warnThreshold, 8);
+        assert.equal(health.pendingQuestionShadow, false);
         assert.equal(health.recommendedAction, 'restart_agent');
     });
 
@@ -370,6 +418,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                     reasoningEffort: 'high',
                     dialogLoopActive: true,
                     pendingQuestion: true,
+                    pendingQuestionKind: 'question',
+                    pendingQuestionShadow: true,
+                    pendingQuestionShadowKind: 'ready',
+                    pendingQuestionShadowExpired: true,
+                    pendingQuestionShadowAgeMs: 90_000,
+                    pendingQuestionShadowExpiresAt: 123456789,
                     queueSize: 3,
                     oldestTaskWaitMs: 1200,
                     starvationAlert: false,
@@ -389,6 +443,12 @@ describe('agent health routes', { concurrency: 1 }, () => {
                         io: {
                             ok: false,
                             pendingQuestion: true,
+                            pendingQuestionKind: 'question',
+                            pendingQuestionShadow: true,
+                            pendingQuestionShadowKind: 'ready',
+                            pendingQuestionShadowExpired: true,
+                            pendingQuestionShadowAgeMs: 90_000,
+                            pendingQuestionShadowExpiresAt: 123456789,
                             waitingForInput: false,
                             keepaliveRunning: false,
                             backgroundPendingCount: 4,
@@ -411,10 +471,18 @@ describe('agent health routes', { concurrency: 1 }, () => {
         assert.equal(result.ok, true);
         assert.equal(result.details.keepaliveRunning, false);
         assert.equal(result.details.quotaMonitorRunning, true);
+        assert.equal(result.details.pendingQuestionShadow, true);
+        assert.equal(result.details.pendingQuestionShadowKind, 'ready');
+        assert.equal(result.details.pendingQuestionShadowExpired, true);
+        assert.equal(result.details.pendingQuestionShadowAgeMs, 90_000);
         assert.equal(result.details.recommendedAction, 'restart_keepalive');
         assert.deepEqual(result.details.riskFlags, ['io.keepalive_stopped']);
         assert.equal(result.details.bootDegradedSteps, 0);
-        assert.equal(result.details.sdkResources.allCoreResourcesAvailable, true);
+        assert.equal(
+            /** @type {{ allCoreResourcesAvailable?: boolean }} */ (result.details.sdkResources)
+                .allCoreResourcesAvailable,
+            true,
+        );
         assert.deepEqual(result.details.issues, ['io.keepalive_stopped']);
     });
 });

@@ -5,6 +5,7 @@
  * F158: Testes para call-strategies.js (estratégias de chamada LLM-B).
  */
 
+import { describe, expect, it, vi } from 'vitest';
 import {
     callViaDialogLoop,
     callViaSimpleChat,
@@ -50,7 +51,7 @@ describe('callViaDialogLoop', () => {
         const listeners = /** @type {{ event: string; fn: Function }[]} */ ([]);
         const agent = {
             sendDialogTurn: vi.fn(async () => 'ok'),
-            on: vi.fn((event, fn) => listeners.push({ event, fn })),
+            on: vi.fn((/** @type {string} */ event, /** @type {Function} */ fn) => listeners.push({ event, fn })),
             off: vi.fn(),
         };
         const ctx = makeCtx();
@@ -77,7 +78,8 @@ describe('callViaDialogLoop', () => {
         await callViaDialogLoop(/** @type {any} */ (agent), 'msg', 'msg', ctx);
         expect(
             /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
-                (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'chunk1',
+                (/** @type {unknown[]} */ c) =>
+                    c[0] === 'turn:delta' && /** @type {{ chunk?: string }} */ (c[1])?.chunk === 'chunk1',
             ),
         ).toBeTruthy();
     });
@@ -115,9 +117,10 @@ describe('callViaStructured', () => {
     });
 
     it('usa accumulated quando raw é undefined', async () => {
+        /** @type {((chunk: string) => void) | undefined} */
         let onDeltaCb;
         const bridge = {
-            chatStructured: vi.fn(async (_msg, opts) => {
+            chatStructured: vi.fn(async (_msg, /** @type {{ onDelta: (chunk: string) => void }} */ opts) => {
                 onDeltaCb = opts.onDelta;
                 onDeltaCb('chunk1');
                 onDeltaCb('chunk2');
@@ -144,7 +147,7 @@ describe('callViaSimpleChat', () => {
 
     it('emite turn:delta via onDelta callback', async () => {
         const bridge = {
-            chat: vi.fn(async (_msg, opts) => {
+            chat: vi.fn(async (_msg, /** @type {{ onDelta: (chunk: string) => void }} */ opts) => {
                 opts.onDelta('delta1');
                 return { response: 'done' };
             }),
@@ -153,7 +156,8 @@ describe('callViaSimpleChat', () => {
         await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);
         expect(
             /** @type {import('vitest').Mock} */ (ctx.emit).mock.calls.some(
-                (c) => c[0] === 'turn:delta' && c[1]?.chunk === 'delta1',
+                (/** @type {unknown[]} */ c) =>
+                    c[0] === 'turn:delta' && /** @type {{ chunk?: string }} */ (c[1])?.chunk === 'delta1',
             ),
         ).toBeTruthy();
     });

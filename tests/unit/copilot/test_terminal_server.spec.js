@@ -5,16 +5,15 @@
  * Contrato: terminal/index.js
  */
 
-import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, expect, it } from 'vitest';
 describe('terminal/index.js — contrato', () => {
     it('importa sem erros', async () => {
         const mod = await import('../../../src/copilot/terminal/index.js');
-        assert.ok(mod, 'módulo deve carregar');
+        expect(mod).toBeTruthy();
     });
 
     it('exporta startTerminalServer', async () => {
         const mod = await import('../../../src/copilot/terminal/index.js');
-        assert.equal(typeof mod.startTerminalServer !== 'undefined', true, 'startTerminalServer deve estar exportado');
+        expect(typeof mod.startTerminalServer).toBe('function');
     });
 });

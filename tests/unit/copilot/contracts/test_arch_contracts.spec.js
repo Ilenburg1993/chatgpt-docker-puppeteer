@@ -22,10 +22,18 @@ const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathna
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * @param {...string} parts
+ * @returns {string}
+ */
 function copilotPath(...parts) {
     return join(COPILOT_ROOT, ...parts);
 }
 
+/**
+ * @param {string} relPath
+ * @returns {string}
+ */
 function readSrc(relPath) {
     return readFileSync(copilotPath(relPath), 'utf-8');
 }
@@ -158,7 +166,7 @@ describe('W4-9 — DI tokens: todos os 13 tokens canônicos', () => {
     it('cada token tem _id Symbol e name', async () => {
         const tokens = await import('../../../../src/copilot/core/di-tokens.js');
         for (const name of EXPECTED_DI_TOKENS) {
-            const token = tokens[name];
+            const token = tokens[/** @type {keyof typeof tokens} */ (name)];
             assert.ok(token, `Token ${name} deve existir`);
             assert.ok(typeof token._id === 'symbol', `${name}._id deve ser symbol`);
             assert.equal(token.name, name, `${name}.name deve ser '${name}'`);

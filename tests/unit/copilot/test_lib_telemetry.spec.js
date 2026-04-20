@@ -7,7 +7,7 @@
  * Substituição canônica de `lib/telemetry.js` (deletado). Cobre createMetricsStore + todas as funções de registro.
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { createMetricsStore } from '../../../src/copilot/observability/metrics.js';
 

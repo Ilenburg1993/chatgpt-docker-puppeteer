@@ -25,7 +25,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
+import { describe, it, beforeAll } from 'vitest';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
@@ -39,7 +39,7 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
     /** @type {string} */
     let wirerSourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         dlmSourceCode = await readFile(
@@ -197,7 +197,7 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
     /** @type {string} */
     let dlmSourceCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
             new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
@@ -272,7 +272,7 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     /** @type {string} */
     let turnExecutorCode = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
             new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),

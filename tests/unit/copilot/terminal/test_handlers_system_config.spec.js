@@ -6,53 +6,43 @@
  * singletons para testar lógica de validação dos handlers.
  */
 
+import { describe, expect, it, vi } from 'vitest';
+
 // ─── Mock singletons ─────────────────────────────────────────────────────────
 
+const defaultRuntime = /** @type {any} */ ({
+    model: 'test-model',
+    reasoningEffort: 'high',
+    dialogLoopActive: false,
+    status: 'idle',
+    getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
+    getHealthSnapshot: () => ({
+        ok: true,
+        healthy: true,
+        status: 'healthy',
+        issues: [],
+        backgroundPendingCount: 0,
+        checks: {
+            io: { keepaliveRunning: true },
+            quota: { running: true },
+        },
+    }),
+});
+
 vi.mock('#copilot/agent', () => ({
-    alwaysAliveAgent: {
-        model: 'test-model',
-        reasoningEffort: 'high',
-        dialogLoopActive: false,
-        status: 'idle',
-        getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
-        getHealthSnapshot: () => ({
-            ok: true,
-            healthy: true,
-            status: 'healthy',
-            issues: [],
-            backgroundPendingCount: 0,
-            checks: {
-                io: { keepaliveRunning: true },
-                quota: { running: true },
-            },
-        }),
-    },
-    getAgent: () =>
-        /** @type {any} */ ({
-            model: 'test-model',
-            reasoningEffort: 'high',
-            dialogLoopActive: false,
-            status: 'idle',
-            getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
-            getHealthSnapshot: () => ({
-                ok: true,
-                healthy: true,
-                status: 'healthy',
-                issues: [],
-                backgroundPendingCount: 0,
-                checks: {
-                    io: { keepaliveRunning: true },
-                    quota: { running: true },
-                },
-            }),
-        }),
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
     setBackgroundCompactionThreshold: vi.fn(),
 }));
 vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
     getMcpStatus: () => ({ available: false, toolCount: 0, circuitOpen: false }),
 }));
 vi.mock('#copilot/config/env', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         LLM_B_TERMINAL_PORT: 3009,
@@ -100,28 +90,39 @@ const {
     handleDeleteCustomTool,
 } = await import('../../../../src/copilot/terminal/handlers/system-config.js');
 
+/** @template T @param {{ body: unknown }} result @returns {T} */
+const bodyOf = (result) => /** @type {T} */ (result.body);
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('handlers/system-config — handleHealth', () => {
     it('retorna status 200 com shape esperado', () => {
         const result = handleHealth();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.healthStatus).toBe('healthy');
-        expect(result.body.backgroundPendingCount).toBe(0);
-        expect(result.body.keepaliveRunning).toBe(true);
-        expect(result.body.quotaMonitorRunning).toBe(true);
-        expect(typeof result.body.uptime).toBe('number');
-        expect(typeof result.body.memoryMB).toBe('number');
+        expect(body.ok).toBe(true);
+        expect(body.healthStatus).toBe('healthy');
+        expect(body.runtimeId).toBe('default');
+        expect(Array.isArray(body.agentRuntimes)).toBe(true);
+        expect(body.backgroundPendingCount).toBe(0);
+        expect(body.keepaliveRunning).toBe(true);
+        expect(body.quotaMonitorRunning).toBe(true);
+        expect(typeof body.uptime).toBe('number');
+        expect(typeof body.memoryMB).toBe('number');
     });
 });
 
 describe('handlers/system-config — handleGetConfig', () => {
-    it('retorna config com model e planMode', () => {
+    it('retorna config com model e modo/plan do SDK', () => {
         const result = handleGetConfig();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.model).toBe('test-model');
+        expect(body.ok).toBe(true);
+        expect(body.runtimeId).toBe('default');
+        expect(Array.isArray(body.agentRuntimes)).toBe(true);
+        expect(body.model).toBe('test-model');
+        expect(body).toHaveProperty('sdkSessionMode');
+        expect(body).toHaveProperty('sdkPlanOperation');
     });
 });
 
@@ -133,35 +134,42 @@ describe('handlers/system-config — infiniteSession', () => {
 
     it('handleSetInfiniteSessionConfig aceita valor válido', () => {
         const result = handleSetInfiniteSessionConfig({ backgroundCompactionThreshold: 0.5 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.infiniteSession.backgroundCompactionThreshold).toBe(0.5);
+        expect(body.ok).toBe(true);
+        expect(body.infiniteSession.backgroundCompactionThreshold).toBe(0.5);
     });
 
     it('handleSetInfiniteSessionConfig rejeita valor < 0.1', () => {
         const result = handleSetInfiniteSessionConfig({ backgroundCompactionThreshold: 0.05 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.ok).toBe(false);
+        expect(body.ok).toBe(false);
     });
 
     it('handleSetInfiniteSessionConfig rejeita valor > 1.0', () => {
         const result = handleSetInfiniteSessionConfig({ backgroundCompactionThreshold: 1.5 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.ok).toBe(false);
+        expect(body.ok).toBe(false);
     });
 
     it('handleSetInfiniteSessionConfig rejeita tipo não-numérico', () => {
-        const result = handleSetInfiniteSessionConfig({ backgroundCompactionThreshold: 'high' });
+        const result = handleSetInfiniteSessionConfig(
+            /** @type {any} */ ({ backgroundCompactionThreshold: 'high' }),
+        );
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.ok).toBe(false);
+        expect(body.ok).toBe(false);
     });
 });
 
 describe('handlers/system-config — tools config', () => {
     it('handleGetToolsConfig retorna ok', () => {
         const result = handleGetToolsConfig();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 
     it('handleSetToolsConfig rejeita allowlist inválido (não-array)', async () => {
@@ -176,18 +184,20 @@ describe('handlers/system-config — tools config', () => {
 
     it('handleSetToolsConfig aceita denylist válida', async () => {
         const result = await handleSetToolsConfig({ denylist: ['tool-a', 'tool-b'] });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 });
 
 describe('handlers/system-config — custom tools', () => {
     it('handleGetCustomTools retorna lista', () => {
         const result = handleGetCustomTools();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.tools)).toBe(true);
-        expect(Array.isArray(result.body.availableHandlers)).toBe(true);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.tools)).toBe(true);
+        expect(Array.isArray(body.availableHandlers)).toBe(true);
     });
 
     it('handleRegisterCustomTool rejeita sem name', async () => {

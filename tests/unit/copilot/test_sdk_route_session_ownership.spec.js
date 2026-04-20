@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import {
@@ -70,14 +70,18 @@ describe('sdk routes session ownership SSOT', () => {
 
         container.register(
             CONVERSATION_STORE,
-            () => ({
-                updateSdkSession(hubSessionId, sdkSessionId) {
-                    persistedBindings.push({ hubSessionId, sdkSessionId });
-                },
-                createHubSession: () => 'hub-test',
-                getHubSession: () => null,
-                closeHubSession: () => {},
-            }),
+            () =>
+                /** @type {any} */ ({
+                    updateSdkSession(
+                        /** @type {string} */ hubSessionId,
+                        /** @type {string} */ sdkSessionId,
+                    ) {
+                        persistedBindings.push({ hubSessionId, sdkSessionId });
+                    },
+                    createHubSession: () => 'hub-test',
+                    getHubSession: () => null,
+                    closeHubSession: () => {},
+                }),
             'singleton',
         );
 
@@ -87,17 +91,17 @@ describe('sdk routes session ownership SSOT', () => {
                 getState: () => 'connected',
                 getForegroundSessionId: async () => foregroundSessionId,
                 getLastSessionId: async () => lastSessionId,
-                setForegroundSessionId: async (id) => {
+                setForegroundSessionId: async (/** @type {string} */ id) => {
                     foregroundSessionId = id;
                     lastSessionId = id;
                 },
                 listSessions: async () => [],
-                createSession: async (config) => {
+                createSession: async (/** @type {{ sessionId?: string }} */ config) => {
                     const session = makeSession(config.sessionId ?? 'sdk-created');
                     lastSessionId = session.sessionId;
                     return session;
                 },
-                resumeSession: async (id) => {
+                resumeSession: async (/** @type {string} */ id) => {
                     const session = makeSession(id);
                     lastSessionId = session.sessionId;
                     return session;

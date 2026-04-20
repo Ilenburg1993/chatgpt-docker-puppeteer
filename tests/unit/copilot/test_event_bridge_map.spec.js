@@ -5,7 +5,7 @@
 
 import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import {
     AGENT_EVENT_BRIDGE_MAP,

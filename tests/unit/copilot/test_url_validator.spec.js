@@ -1,7 +1,7 @@
 // @ts-check
 import { validateUrl, validateUrlString } from '#copilot/core';
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('url-validator', () => {
     describe('validateUrl()', () => {

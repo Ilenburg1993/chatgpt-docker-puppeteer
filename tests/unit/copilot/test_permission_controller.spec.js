@@ -10,7 +10,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before, afterEach } from 'node:test';
+import { describe, it, beforeAll, afterEach } from 'vitest';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite: análise estrutural
@@ -20,7 +20,7 @@ describe.skip('PermissionController › análise estrutural (G2-DX-12/13/15)', a
     /** @type {string} */
     let src = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
@@ -57,7 +57,7 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
     /** @type {import('#copilot/hooks/permission-controller')} */
     let mod;
 
-    before(async () => {
+    beforeAll(async () => {
         mod = await import('#copilot/hooks/permission-controller');
         const { PermissionController } = mod;
         ctrl = new PermissionController();

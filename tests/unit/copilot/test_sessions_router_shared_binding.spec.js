@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { clearSharedSessionBinding, container, setSharedSdkSessionId } from '#copilot/core';
@@ -44,8 +44,8 @@ describe('sessions router shared sdk binding', () => {
         const calls = [];
         container.register(
             CONVERSATION_STORE,
-            () => ({
-                createHubSession(opts) {
+            () => /** @type {any} */ ({
+                createHubSession(/** @type {{ title?: string; sdkSessionId?: string; metadata?: object } | undefined} */ opts) {
                     calls.push(opts);
                     return 'hub-created';
                 },

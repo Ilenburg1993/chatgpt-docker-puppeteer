@@ -7,12 +7,40 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
+import { beforeAll, describe, it } from 'vitest';
 
 /** @type {typeof import('#copilot/observability/snapshots').buildStatusSnapshot} */
 let buildStatusSnapshot;
 
-before(async () => {
+/** @returns {import('../../../src/copilot/agent/types.js').PendingQuestion} */
+function makePendingQuestion() {
+    return {
+        question: 'Vous avez une question?',
+        choices: ['sim', 'não'],
+        allowFreeform: true,
+        resolve: () => {},
+        askedAt: Date.now(),
+        kind: 'question',
+        protocolControlled: false,
+    };
+}
+
+/**
+ * @param {string} id
+ * @param {number} enqueuedAt
+ * @returns {import('../../../src/copilot/agent/types.js').AgentTask}
+ */
+function makeTask(id, enqueuedAt) {
+    return {
+        id,
+        message: 'test',
+        resolve: () => {},
+        reject: () => {},
+        enqueuedAt,
+    };
+}
+
+beforeAll(async () => {
     ({ buildStatusSnapshot } = await import('#copilot/observability/snapshots'));
 });
 
@@ -47,8 +75,8 @@ describe('buildStatusSnapshot() › campos obrigatórios', () => {
     });
 
     it('status deve ser repassado inalterado', () => {
-        const snap = buildStatusSnapshot({ ...baseParams(), status: 'running' });
-        assert.equal(snap.status, 'running');
+        const snap = buildStatusSnapshot({ ...baseParams(), status: 'processing' });
+        assert.equal(snap.status, 'processing');
     });
 
     it('queueSize deve ser repassado inalterado', () => {
@@ -62,15 +90,9 @@ describe('buildStatusSnapshot() › campos obrigatórios', () => {
     });
 
     it('pendingQuestion com objeto deve ser mapeado corretamente', () => {
-        const now = Date.now();
         const snap = buildStatusSnapshot({
             ...baseParams(),
-            pendingQuestion: {
-                question: 'Vous avez une question?',
-                choices: ['sim', 'não'],
-                allowFreeform: true,
-                askedAt: now,
-            },
+            pendingQuestion: makePendingQuestion(),
         });
         assert.ok(snap.pendingQuestion !== null, 'pendingQuestion deve estar presente');
         assert.equal(snap.pendingQuestion.question, 'Vous avez une question?');
@@ -110,12 +132,12 @@ describe('buildStatusSnapshot() › starvationAlert', () => {
 
     it('starvationAlert deve ser false para tarefa recente', () => {
         const snap = buildStatusSnapshot({
-            status: 'running',
+            status: 'processing',
             sessionId: 's1',
             model: 'gpt-4o',
             reasoningEffort: undefined,
             queueSize: 1,
-            queueOldest: { enqueuedAt: Date.now() - 100, message: 'test', id: 'x1' },
+            queueOldest: makeTask('x1', Date.now() - 100),
             pendingQuestion: null,
             isResumed: false,
             resumeCount: 0,
@@ -130,13 +152,13 @@ describe('buildStatusSnapshot() › starvationAlert', () => {
 
     it('starvationAlert deve ser true para tarefa muito antiga', () => {
         const snap = buildStatusSnapshot({
-            status: 'running',
+            status: 'processing',
             sessionId: 's1',
             model: 'gpt-4o',
             reasoningEffort: undefined,
             queueSize: 1,
             // 2 minutos atrás — acima do default de 60s
-            queueOldest: { enqueuedAt: Date.now() - 120_000, message: 'teste', id: 'x2' },
+            queueOldest: makeTask('x2', Date.now() - 120_000),
             pendingQuestion: null,
             isResumed: false,
             resumeCount: 0,
@@ -152,12 +174,12 @@ describe('buildStatusSnapshot() › starvationAlert', () => {
     it('oldestTaskWaitMs deve refletir a idade da tarefa mais antiga', () => {
         const enqueuedAt = Date.now() - 5000;
         const snap = buildStatusSnapshot({
-            status: 'running',
+            status: 'processing',
             sessionId: 's1',
             model: 'gpt-4o',
             reasoningEffort: undefined,
             queueSize: 1,
-            queueOldest: { enqueuedAt, message: 'test', id: 'x3' },
+            queueOldest: makeTask('x3', enqueuedAt),
             pendingQuestion: null,
             isResumed: false,
             resumeCount: 0,
@@ -182,7 +204,7 @@ describe('AlwaysAliveAgent.getStatusSnapshot() › integração', async () => {
     /** @type {import('../../../src/copilot/agent/always-alive.js').AlwaysAliveAgent} */
     let agent;
 
-    before(async () => {
+    beforeAll(async () => {
         const { AlwaysAliveAgent } = await import('../../../src/copilot/agent/always-alive.js');
         agent = new AlwaysAliveAgent();
     });

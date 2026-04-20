@@ -6,13 +6,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
+import { beforeAll, describe, it } from 'vitest';
 
 describe('cleanupStaleSessions', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/cleanup.js').cleanupStaleSessions} */
     let cleanupStaleSessions;
 
-    before(async () => {
+    beforeAll(async () => {
         ({ cleanupStaleSessions } = await import('../../../src/copilot/agent/session/cleanup.js'));
     });
 
@@ -21,10 +21,10 @@ describe('cleanupStaleSessions', async () => {
      * @returns {any}
      */
     function mockClient(sessions) {
-        return {
+        return /** @type {any} */ ({
             listSessions: async () => sessions,
             deleteSession: async () => {},
-        };
+        });
     }
 
     it('deve retornar resultado zerado quando não há sessões', async () => {
@@ -45,7 +45,7 @@ describe('cleanupStaleSessions', async () => {
     it('deve deletar sessões mais velhas que maxAgeMs', async () => {
         const now = Date.now();
         const deleted = [];
-        const client = {
+        const client = /** @type {any} */ ({
             listSessions: async () => [
                 { sessionId: 'old-1', startTime: new Date(now - 48 * 3600_000) },
                 { sessionId: 'recent-1', startTime: new Date(now - 1 * 3600_000) },
@@ -53,7 +53,7 @@ describe('cleanupStaleSessions', async () => {
             deleteSession: async (/** @type {string} */ id) => {
                 deleted.push(id);
             },
-        };
+        });
         const result = await cleanupStaleSessions(client, {
             maxAgeMs: 24 * 3600_000,
             currentSessionId: null,
@@ -71,15 +71,15 @@ describe('cleanupStaleSessions', async () => {
     });
 
     it('deve lidar com erro de deleteSession gracefully', async () => {
-        const client = {
+        const client = /** @type {any} */ ({
             listSessions: async () => [{ sessionId: 'fail-1', startTime: new Date(Date.now() - 48 * 3600_000) }],
             deleteSession: async () => {
                 throw new Error('API error');
             },
-        };
+        });
         const result = await cleanupStaleSessions(client, { maxAgeMs: 24 * 3600_000 });
         assert.equal(result.deleted, 0);
         assert.equal(result.errors.length, 1);
-        assert.ok(result.errors[0].includes('API error'));
+        assert.ok(result.errors[0]?.includes('API error'));
     });
 });

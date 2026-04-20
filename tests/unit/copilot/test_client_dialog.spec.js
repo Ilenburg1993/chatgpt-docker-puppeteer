@@ -29,11 +29,11 @@ function createMockAgent() {
     return /** @type {any} */ ({
         on: vi.fn((event, fn) => {
             if (!listeners.has(event)) listeners.set(event, []);
-            listeners.get(event).push(fn);
+            listeners.get(event)?.push(fn);
         }),
         once: vi.fn((event, fn) => {
             if (!listeners.has(event)) listeners.set(event, []);
-            listeners.get(event).push(fn);
+            listeners.get(event)?.push(fn);
         }),
         off: vi.fn((event, fn) => {
             const fns = listeners.get(event);
@@ -51,7 +51,7 @@ function createMockAgent() {
         getStatusSnapshot: vi.fn().mockReturnValue({}),
         answerPendingQuestion: vi.fn(),
         _listeners: listeners,
-        _fire(event, data) {
+        _fire(/** @type {string} */ event, /** @type {unknown} */ data) {
             for (const fn of listeners.get(event) ?? []) fn(data);
         },
     });
@@ -87,7 +87,7 @@ describe('client-dialog › registerDialogListeners', () => {
         const { replyHandler } = registerDialogListeners(agent, { onReply });
 
         expect(replyHandler).toBeTypeOf('function');
-        replyHandler({ reply: 'hello' });
+        replyHandler?.({ reply: 'hello' });
         expect(onReply).toHaveBeenCalledWith('hello');
     });
 
@@ -96,7 +96,7 @@ describe('client-dialog › registerDialogListeners', () => {
         const onReply = vi.fn();
         const { replyHandler } = registerDialogListeners(agent, { onReply });
 
-        replyHandler({});
+        replyHandler?.({});
         expect(onReply).toHaveBeenCalledWith('');
     });
 

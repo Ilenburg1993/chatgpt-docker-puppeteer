@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
     answerPendingQuestion,
@@ -165,7 +165,7 @@ describe('agent-messaging › processQueue', () => {
         assert.equal(result, 'pong');
         assert.equal(ctx.status, 'idle');
         assert.equal(ctx.sendCount, 1);
-        assert.ok(typeof startedTaskId === 'string' && startedTaskId.startsWith('task-'));
+        assert.ok(typeof startedTaskId === 'string' && /** @type {string} */ (startedTaskId).startsWith('task-'));
     });
 
     it('não processa quando o agente não está idle', async () => {

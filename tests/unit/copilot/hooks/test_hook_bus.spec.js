@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 // Stub do log para evitar saída durante testes
 process.env.LOG_LEVEL = 'silent';
@@ -21,6 +21,7 @@ describe('HookBus', () => {
     it('emitHook dispara listener registrado', async () => {
         const { HookBus } = await import('../../../../src/copilot/hooks/bus.js');
         const bus = new HookBus();
+        /** @type {{ hookName: string; sessionId: string; input: Record<string, unknown> } | null} */
         let received = null;
 
         bus.on('pre_tool_use', (evt) => {
@@ -30,14 +31,16 @@ describe('HookBus', () => {
         bus.emitHook('pre_tool_use', 'session-123', { tool: 'bash' }, null);
 
         assert.ok(received, 'Listener deve ter recebido o evento');
-        assert.equal(received.hookName, 'pre_tool_use', 'hookName deve ser correto');
-        assert.equal(received.sessionId, 'session-123', 'sessionId deve ser correto');
-        assert.deepEqual(received.input, { tool: 'bash' }, 'input deve ser passado');
+        const event = /** @type {{ hookName: string; sessionId: string; input: Record<string, unknown> }} */ (received);
+        assert.equal(event.hookName, 'pre_tool_use', 'hookName deve ser correto');
+        assert.equal(event.sessionId, 'session-123', 'sessionId deve ser correto');
+        assert.deepEqual(event.input, { tool: 'bash' }, 'input deve ser passado');
     });
 
     it('emitHook dispara wildcard listener', async () => {
         const { HookBus } = await import('../../../../src/copilot/hooks/bus.js');
         const bus = new HookBus();
+        /** @type {string[]} */
         const events = [];
 
         bus.on('*', (evt) => events.push(evt.hookName));
@@ -56,13 +59,14 @@ describe('HookBus', () => {
     it('attachBus envolve onPreToolUse existente', async () => {
         const { HookBus, attachBus } = await import('../../../../src/copilot/hooks/bus.js');
         const bus = new HookBus();
+        /** @type {string[]} */
         const calls = [];
 
         /** @type {import('../../../../src/copilot/hooks/types.js').SessionHooks} */
         const hooks = {
             onPreToolUse: async (input, _inv) => {
                 calls.push('orig');
-                return { decision: 'allow' };
+                return { permissionDecision: 'allow' };
             },
         };
 
@@ -73,7 +77,15 @@ describe('HookBus', () => {
             busEvent = e;
         });
 
-        await wrapped.onPreToolUse?.({ tool: { name: 'bash', input: {} }, decision: 'allow' }, { sessionId: 's1' });
+        await wrapped.onPreToolUse?.(
+            {
+                toolName: 'bash',
+                toolArgs: {},
+                timestamp: Date.now(),
+                cwd: process.cwd(),
+            },
+            { sessionId: 's1' },
+        );
 
         assert.deepEqual(calls, ['orig'], 'Handler original deve ter sido chamado');
         assert.ok(busEvent, 'Bus deve ter recebido o evento');

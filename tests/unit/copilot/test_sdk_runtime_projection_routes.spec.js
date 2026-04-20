@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { clearSharedSessionBinding, setSharedHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import express from 'express';

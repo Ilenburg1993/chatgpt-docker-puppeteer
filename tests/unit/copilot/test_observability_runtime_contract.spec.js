@@ -2,11 +2,11 @@
 import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 const root = '/workspaces/chatgpt-docker-puppeteer/src/copilot';
 
-function read(relPath) {
+function read(/** @type {string} */ relPath) {
     return readFileSync(path.join(root, relPath), 'utf8');
 }
 

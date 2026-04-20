@@ -40,8 +40,8 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 describe('Config constants', () => {
-    it('DEFAULT_MODEL é gpt-4.1', () => {
-        expect(DEFAULT_MODEL).toBe('gpt-4.1');
+    it('DEFAULT_MODEL é gpt-5-mini', () => {
+        expect(DEFAULT_MODEL).toBe('gpt-5-mini');
     });
 
     it('DEFAULT_DIAGNOSTIC_MODEL é gpt-4.1-mini', () => {
@@ -62,7 +62,7 @@ describe('Config constants', () => {
 describe('getProjectDefaults()', () => {
     it('retorna Partial<SessionConfig> com defaults canônicos', () => {
         const d = getProjectDefaults();
-        expect(d.model).toBe('gpt-4.1');
+        expect(d.model).toBe('gpt-5-mini');
         expect(d.streaming).toBe(true);
         expect(d.infiniteSessions).toEqual({ enabled: true, backgroundCompactionThreshold: 0.75 });
         expect(/** @type {any} */ (d.onPermissionRequest)._isMockApproveAll).toBe(true);
@@ -81,7 +81,7 @@ describe('getProjectDefaults()', () => {
 describe('buildSessionConfig()', () => {
     it('sem argumentos retorna config com defaults', () => {
         const cfg = buildSessionConfig();
-        expect(cfg.model).toBe('gpt-4.1');
+        expect(cfg.model).toBe('gpt-5-mini');
         expect(cfg.streaming).toBe(true);
         expect(/** @type {any} */ (cfg.onPermissionRequest)._isMockApproveAll).toBe(true);
     });
@@ -186,7 +186,7 @@ describe('mergeExcludedTools()', () => {
 describe('sdk/index.js barrel re-exports config', () => {
     it('re-exporta funções e constantes que permanecem no barrel', async () => {
         const barrel = await import('../../../../src/copilot/sdk/index.js');
-        expect(barrel.DEFAULT_MODEL).toBe('gpt-4.1');
+        expect(barrel.DEFAULT_MODEL).toBe('gpt-5-mini');
         expect(barrel.DEFAULT_DIAGNOSTIC_MODEL).toBe('gpt-4.1-mini');
         expect(barrel.DEFAULT_INFINITE_SESSION).toBeDefined();
         expect(typeof barrel.getProjectDefaults).toBe('function');

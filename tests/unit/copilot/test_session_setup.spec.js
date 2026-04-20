@@ -9,6 +9,20 @@ vi.mock('#copilot/observability/logger', () => ({
 }));
 vi.mock('#copilot/sdk/index', () => ({
     createRegistry: vi.fn(() => new Map()),
+    modelRegistry: {
+        get: vi.fn((modelId) => {
+            if (modelId === 'gpt-4.1') {
+                return { supportsReasoning: false };
+            }
+            return { supportsReasoning: true };
+        }),
+    },
+    REASONING_EFFORTS: {
+        LOW: 'low',
+        MEDIUM: 'medium',
+        HIGH: 'high',
+        XHIGH: 'xhigh',
+    },
     SYSTEM_PROMPT_SECTIONS: {},
     createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
     createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
@@ -33,6 +47,7 @@ vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
+import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
 import {
     buildSessionHooks,
     buildSessionOptions,
@@ -65,7 +80,15 @@ describe('session-setup (F63)', () => {
             pendingQuestion: null,
             session: null,
             isResumed: false,
+            setSession: vi.fn(function (session) {
+                this.session = session;
+            }),
+            setIsResumed: vi.fn(function (isResumed) {
+                this.isResumed = isResumed;
+            }),
+            setReasoningEffort: vi.fn(),
             setStatus: vi.fn(),
+            backgroundTasks: { track: vi.fn() },
         };
         host = {
             emit: vi.fn(),
@@ -96,7 +119,7 @@ describe('session-setup (F63)', () => {
 
     describe('buildSessionOptions', () => {
         it('deve incluir model e hooks e tools nas opções', () => {
-            const tools = ['t1', 't2'];
+            const tools = /** @type {any} */ (['t1', 't2']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
@@ -107,6 +130,66 @@ describe('session-setup (F63)', () => {
             expect(options.injectHookContext).toBe(true);
             expect(typeof options.onPermissionRequest).toBe('function');
             expect(typeof options.onUserInputRequest).toBe('function');
+        });
+
+        it('omite reasoningEffort quando o modelo não suporta a capability e normaliza o ctx', () => {
+            ctx.model = 'gpt-4.1';
+            ctx.reasoningEffort = 'medium';
+            const tools = /** @type {any} */ (['t1']);
+            const busHooks = /** @type {any} */ ({ mock: true });
+
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+
+            expect(options.reasoningEffort).toBeUndefined();
+            expect(ctx.setReasoningEffort).toHaveBeenCalledWith(undefined);
+        });
+
+        it('normaliza UserInputRequest do SDK preservando default allowFreeform=true', async () => {
+            const tools = /** @type {any} */ (['t1']);
+            const busHooks = /** @type {any} */ ({ mock: true });
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+            const onUserInputRequest =
+                /** @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>} */ (
+                    options.onUserInputRequest
+                );
+
+            await onUserInputRequest({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
+
+            expect(handleUserInputRequest).toHaveBeenCalledWith(
+                {
+                    question: 'Qual o próximo passo?',
+                    choices: ['A', 'B'],
+                    allowFreeform: true,
+                },
+                expect.objectContaining({
+                    isDialogLoopActive: expect.any(Function),
+                    handleProtocolInput: expect.any(Function),
+                    setStatus: expect.any(Function),
+                    setPendingQuestion: expect.any(Function),
+                    trackBackgroundTask: expect.any(Function),
+                    emit: expect.any(Function),
+                }),
+            );
+        });
+
+        it('preserva allowFreeform=false quando o SDK envia false explicitamente', async () => {
+            const tools = /** @type {any} */ (['t1']);
+            const busHooks = /** @type {any} */ ({ mock: true });
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+            const onUserInputRequest =
+                /** @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>} */ (
+                    options.onUserInputRequest
+                );
+
+            await onUserInputRequest({ question: 'Escolha', allowFreeform: false });
+
+            expect(handleUserInputRequest).toHaveBeenLastCalledWith(
+                {
+                    question: 'Escolha',
+                    allowFreeform: false,
+                },
+                expect.any(Object),
+            );
         });
     });
 

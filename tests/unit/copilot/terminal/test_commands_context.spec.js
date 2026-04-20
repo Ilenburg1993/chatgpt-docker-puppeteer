@@ -39,12 +39,14 @@ import { cmdCompact, cmdContext } from '../../../../src/copilot/terminal/command
 // ─── cmdContext ─────────────────────────────────────────────────────────────
 
 describe('terminal/commands/cmdContext', () => {
+    /** @type {string[]} */
     let lines;
+    /** @type {(text: string) => void} */
     let println;
 
     beforeEach(() => {
         lines = [];
-        println = (text) => lines.push(text);
+        println = (/** @type {string} */ text) => lines.push(text);
         frontendMocks.readTerminalContextProjection.mockReturnValue({
             isRealData: false,
             hasHistory: false,
@@ -175,12 +177,14 @@ describe('terminal/commands/cmdContext', () => {
 // ─── cmdCompact ─────────────────────────────────────────────────────────────
 
 describe('terminal/commands/cmdCompact', () => {
+    /** @type {string[]} */
     let lines;
+    /** @type {(text: string) => void} */
     let println;
 
     beforeEach(() => {
         lines = [];
-        println = (text) => lines.push(text);
+        println = (/** @type {string} */ text) => lines.push(text);
         frontendMocks.requestTerminalCompactionProjection.mockReset();
         frontendMocks.requestTerminalCompactionProjection.mockResolvedValue({
             ok: true,
@@ -197,11 +201,13 @@ describe('terminal/commands/cmdCompact', () => {
     });
 
     it('exibe erro quando sendTurn retorna null', async () => {
-        frontendMocks.requestTerminalCompactionProjection.mockResolvedValueOnce({
-            ok: false,
-            reply: null,
-            estimatedTokens: null,
-        });
+        frontendMocks.requestTerminalCompactionProjection.mockResolvedValueOnce(
+            /** @type {any} */ ({
+                ok: false,
+                reply: null,
+                estimatedTokens: null,
+            }),
+        );
         await cmdCompact({ println });
         const output = lines.join('\n');
         expect(output).toContain('sem resposta');

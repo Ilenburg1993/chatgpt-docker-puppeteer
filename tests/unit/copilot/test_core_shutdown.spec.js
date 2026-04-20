@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, after, beforeEach } from 'node:test';
+import { afterAll, beforeEach, describe, it } from 'vitest';
 
 import {
     _resetForTesting,
@@ -20,7 +20,7 @@ describe('core/shutdown.js', () => {
         _resetForTesting();
     });
 
-    after(() => {
+    afterAll(() => {
         _resetForTesting();
     });
 
@@ -32,9 +32,27 @@ describe('core/shutdown.js', () => {
         /** @type {string[]} */
         const order = [];
 
-        registerShutdownHandler('low', async () => order.push('low'), 30);
-        registerShutdownHandler('high', async () => order.push('high'), 10);
-        registerShutdownHandler('mid', async () => order.push('mid'), 20);
+        registerShutdownHandler(
+            'low',
+            async () => {
+                order.push('low');
+            },
+            30,
+        );
+        registerShutdownHandler(
+            'high',
+            async () => {
+                order.push('high');
+            },
+            10,
+        );
+        registerShutdownHandler(
+            'mid',
+            async () => {
+                order.push('mid');
+            },
+            20,
+        );
 
         await runShutdown('test');
 
@@ -44,7 +62,13 @@ describe('core/shutdown.js', () => {
 
     it('runShutdown é idempotente (não executa duas vezes)', async () => {
         let calls = 0;
-        registerShutdownHandler('counter', async () => calls++, 10);
+        registerShutdownHandler(
+            'counter',
+            async () => {
+                calls++;
+            },
+            10,
+        );
 
         await runShutdown('first');
         await runShutdown('second');
@@ -63,7 +87,13 @@ describe('core/shutdown.js', () => {
             },
             10,
         );
-        registerShutdownHandler('ok', async () => order.push('ok'), 20);
+        registerShutdownHandler(
+            'ok',
+            async () => {
+                order.push('ok');
+            },
+            20,
+        );
 
         await runShutdown('test');
 

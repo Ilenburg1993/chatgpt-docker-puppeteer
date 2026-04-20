@@ -1,7 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { createBootWiringState } from '../../../src/copilot/agent/session/boot-steps.js';
 import { runBootPipeline } from '../../../src/copilot/agent/session/boot-wiring.js';

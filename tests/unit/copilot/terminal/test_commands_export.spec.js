@@ -20,6 +20,7 @@ vi.mock('node:fs/promises', () => ({
 const { cmdExport } = await import('../../../../src/copilot/terminal/commands/export.js');
 
 function mockCtx() {
+    /** @type {string[]} */
     const lines = [];
     const println = vi.fn((/** @type {string} */ text) => lines.push(text));
     return { println, output: () => lines.join('\n') };

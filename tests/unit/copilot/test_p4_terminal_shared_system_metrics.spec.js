@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('P4 — superfícies compartilhadas de agent/system-metrics', () => {
     it('server/routes/observability.js não depende mais de terminal/handlers/system-metrics.js', async () => {

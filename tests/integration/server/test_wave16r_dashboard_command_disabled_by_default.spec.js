@@ -1,6 +1,7 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { test } from 'vitest';
 
 test('wave16r: dashboard command channel is disabled by default', () => {
     const script = `

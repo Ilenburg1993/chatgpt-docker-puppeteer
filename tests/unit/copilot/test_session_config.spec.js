@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 const CONFIG_SRC = fs.readFileSync(path.resolve('src/copilot/config/index.js'), 'utf8');
 const PROFILES_SRC = fs.readFileSync(path.resolve('src/copilot/hooks/presets/profiles.js'), 'utf8');
@@ -36,7 +36,7 @@ describe('copilot/config — DEFAULT_EXCLUDED_TOOLS structural', () => {
     it('deve excluir memory por default', () => {
         const match = CONFIG_SRC.match(/DEFAULT_EXCLUDED_TOOLS[\s\S]*?\[([^\]]+)\]/);
         assert.ok(match, 'DEFAULT_EXCLUDED_TOOLS deve ser um array');
-        assert.ok(match[1].includes("'memory'"));
+        assert.ok(match[1]?.includes("'memory'"));
     });
 });
 

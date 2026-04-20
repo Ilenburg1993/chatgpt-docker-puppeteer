@@ -6,31 +6,40 @@
  * sendTurn para testar validação e fluxo dos handlers.
  */
 
+import { describe, expect, it, vi } from 'vitest';
+
 const mockSendTurn = vi.fn(async (/** @type {string} */ _msg, /** @type {string} */ _from) => 'reply');
 
+const defaultRuntime = /** @type {any} */ ({
+    dialogLoopActive: false,
+    status: 'idle',
+    getStatusSnapshot: () => ({
+        contextWindow: {
+            tokens: 50000,
+            tokenLimit: 128000,
+            utilization: 0.39,
+        },
+        lastCheckpointPath: null,
+    }),
+    pauseDialogLoop: vi.fn(async () => {}),
+    resumeDialogLoop: vi.fn(async () => {}),
+    getHandoffManager: () => ({
+        getPending: () => [],
+        getHistory: () => [],
+        accept: vi.fn((/** @type {string} */ id) => (id === 'h-1' ? { accepted: true } : { accepted: false })),
+        reject: vi.fn((/** @type {string} */ _id, /** @type {string | undefined} */ _reason) => ({
+            rejected: true,
+        })),
+    }),
+});
+
 vi.mock('#copilot/agent', () => ({
-    alwaysAliveAgent: {
-        dialogLoopActive: false,
-        status: 'idle',
-        getStatusSnapshot: () => ({
-            contextWindow: {
-                tokens: 50000,
-                tokenLimit: 128000,
-                utilization: 0.39,
-            },
-            lastCheckpointPath: null,
-        }),
-        pauseDialogLoop: vi.fn(async () => {}),
-        resumeDialogLoop: vi.fn(async () => {}),
-        getHandoffManager: () => ({
-            getPending: () => [],
-            getHistory: () => [],
-            accept: vi.fn((/** @type {string} */ id) => (id === 'h-1' ? { accepted: true } : { accepted: false })),
-            reject: vi.fn((/** @type {string} */ _id, /** @type {string | undefined} */ _reason) => ({
-                rejected: true,
-            })),
-        }),
-    },
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
 }));
 
 vi.mock('../../../../src/copilot/terminal/dialog.js', () => ({
@@ -48,16 +57,20 @@ const {
     handleRejectHandoff,
 } = await import('../../../../src/copilot/terminal/handlers/agent.js');
 
+/** @template T @param {{ body: unknown }} result @returns {T} */
+const bodyOf = (result) => /** @type {T} */ (result.body);
+
 // ─── handleGetContext ─────────────────────────────────────────────────────────
 
 describe('handlers/agent — handleGetContext', () => {
     it('retorna utilização e warning', () => {
         const result = handleGetContext();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.tokens).toBe(50000);
-        expect(result.body.utilizationPercent).toBe(39);
-        expect(result.body.warning).toBe('none');
+        expect(body.ok).toBe(true);
+        expect(body.tokens).toBe(50000);
+        expect(body.utilizationPercent).toBe(39);
+        expect(body.warning).toBe('none');
     });
 });
 
@@ -66,8 +79,9 @@ describe('handlers/agent — handleGetContext', () => {
 describe('handlers/agent — handlePipeline validação', () => {
     it('rejeita body sem steps', async () => {
         const result = await handlePipeline({});
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.error).toContain('steps');
+        expect(body.error).toContain('steps');
     });
 
     it('rejeita steps vazio', async () => {
@@ -78,16 +92,18 @@ describe('handlers/agent — handlePipeline validação', () => {
     it('rejeita >20 steps', async () => {
         const steps = Array.from({ length: 21 }, (_, i) => ({ prompt: `p${i}` }));
         const result = await handlePipeline({ steps });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.error).toContain('20');
+        expect(body.error).toContain('20');
     });
 
     it('executa pipeline com 1 step', async () => {
         mockSendTurn.mockResolvedValueOnce('ok-reply');
         const result = await handlePipeline({ steps: [{ prompt: 'test' }] });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.results.length).toBe(1);
+        expect(body.ok).toBe(true);
+        expect(body.results.length).toBe(1);
     });
 });
 
@@ -96,8 +112,9 @@ describe('handlers/agent — handlePipeline validação', () => {
 describe('handlers/agent — handleInject validação', () => {
     it('rejeita body sem message', async () => {
         const result = await handleInject({});
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
-        expect(result.body.error).toContain('message');
+        expect(body.error).toContain('message');
     });
 
     it('rejeita message vazia (whitespace)', async () => {
@@ -108,17 +125,19 @@ describe('handlers/agent — handleInject validação', () => {
     it('injeta message válida e retorna reply', async () => {
         mockSendTurn.mockResolvedValueOnce('resposta');
         const result = await handleInject({ message: 'hello' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(result.body.reply).toBe('resposta');
+        expect(body.ok).toBe(true);
+        expect(body.reply).toBe('resposta');
     });
 
     it('projeta AbortError para 504', async () => {
         mockSendTurn.mockRejectedValueOnce(new DOMException('aborted', 'AbortError'));
         const result = await handleInject({ message: 'timeout please' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(504);
-        expect(result.body.disposition).toBe('ignore');
-        expect(result.body.retryable).toBe(false);
+        expect(body.disposition).toBe('ignore');
+        expect(body.retryable).toBe(false);
     });
 });
 
@@ -133,21 +152,22 @@ describe('handlers/agent — dialog pause/resume', () => {
     it('handleDialogResume tenta retomar loop', async () => {
         // dialogLoopActive already false in mock, so resume should try
         const result = await handleDialogResume();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 
     it('handleDialogResume projeta erro de sessão para 503', async () => {
-        const { alwaysAliveAgent } = await import('#copilot/agent');
-        alwaysAliveAgent.resumeDialogLoop.mockRejectedValueOnce(
+        defaultRuntime.resumeDialogLoop.mockRejectedValueOnce(
             Object.assign(new Error('agente parado'), { code: 'AGENT_STOPPED' }),
         );
 
         const result = await handleDialogResume();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
 
         expect(result.status).toBe(503);
-        expect(result.body.code).toBe('AGENT_STOPPED');
-        expect(result.body.ok).toBe(false);
+        expect(body.code).toBe('AGENT_STOPPED');
+        expect(body.ok).toBe(false);
     });
 });
 
@@ -156,10 +176,11 @@ describe('handlers/agent — dialog pause/resume', () => {
 describe('handlers/agent — handoff', () => {
     it('handleGetHandoffs retorna pending e history', () => {
         const result = handleGetHandoffs();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
-        expect(Array.isArray(result.body.pending)).toBe(true);
-        expect(Array.isArray(result.body.history)).toBe(true);
+        expect(body.ok).toBe(true);
+        expect(Array.isArray(body.pending)).toBe(true);
+        expect(Array.isArray(body.history)).toBe(true);
     });
 
     it('handleAcceptHandoff rejeita sem handoffId', () => {
@@ -169,8 +190,9 @@ describe('handlers/agent — handoff', () => {
 
     it('handleAcceptHandoff aceita id válido', () => {
         const result = handleAcceptHandoff({ handoffId: 'h-1' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 
     it('handleAcceptHandoff retorna 404 para id inválido', () => {
@@ -185,7 +207,8 @@ describe('handlers/agent — handoff', () => {
 
     it('handleRejectHandoff aceita id com reason', () => {
         const result = handleRejectHandoff({ handoffId: 'h-1' }, { reason: 'not needed' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
-        expect(result.body.ok).toBe(true);
+        expect(body.ok).toBe(true);
     });
 });

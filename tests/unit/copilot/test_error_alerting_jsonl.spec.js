@@ -179,7 +179,7 @@ describe('F49 — createJsonlWriter', () => {
         // Flush is scheduled via setImmediate — wait for it
         await new Promise((r) => setTimeout(r, 50));
         expect(mockFs.appendFile).toHaveBeenCalled();
-        const written = mockFs.appendFile.mock.calls[0]?.[1];
+        const written = /** @type {string | undefined} */ (/** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1]);
         expect(typeof written).toBe('string');
         expect(written).toContain('"event":"test"');
     });

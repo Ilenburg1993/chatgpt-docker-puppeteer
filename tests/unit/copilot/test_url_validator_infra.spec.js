@@ -5,6 +5,8 @@
  * F71.4 — Testes unitários para url-validator.js (infra).
  */
 
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 vi.mock('#copilot/config/env', () => ({
     WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
     NODE_ENV: 'test',

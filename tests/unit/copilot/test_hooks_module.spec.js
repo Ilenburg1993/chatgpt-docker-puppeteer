@@ -16,7 +16,7 @@
  */
 
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 // ─── Imports diretos dos novos módulos ────────────────────────────────────────
 import {
@@ -65,6 +65,39 @@ import {
 
 // ─── Helpers de mock ──────────────────────────────────────────────────────────
 
+const anyAttachBus = /** @type {any} */ (attachBus);
+const anyComposeHandlers = /** @type {any} */ (composeHandlers);
+const anyComposePreToolUseHandlers = /** @type {any} */ (composePreToolUseHandlers);
+const anyConditional = /** @type {any} */ (conditional);
+const anyCreateAuditPreset = /** @type {any} */ (createAuditPreset);
+const anyCreateCircuitBreakerHandler = /** @type {any} */ (createCircuitBreakerHandler);
+const anyCreateDenyAllPreset = /** @type {any} */ (createDenyAllPreset);
+const anyCreateErrorHandler = /** @type {any} */ (createErrorHandler);
+const anyCreateHooks = /** @type {any} */ (createHooks);
+const anyCreateInteractivePreset = /** @type {any} */ (createInteractivePreset);
+const anyCreateMinimalHooks = /** @type {any} */ (createMinimalHooks);
+const anyCreateMinimalPreset = /** @type {any} */ (createMinimalPreset);
+const anyCreatePromptTransformer = /** @type {any} */ (createPromptTransformer);
+const anyCreateProductionHooks = /** @type {any} */ (createProductionHooks);
+const anyCreatePostToolEnricher = /** @type {any} */ (createPostToolEnricher);
+const anyCreateQueuedInputHandler = /** @type {any} */ (createQueuedInputHandler);
+const anyCreateSafeHooks = /** @type {any} */ (createSafeHooks);
+const anyCreateSafePreset = /** @type {any} */ (createSafePreset);
+const anyCreateSessionHooks = /** @type {any} */ (createSessionHooks);
+const anyCreateSensitiveDataRedactor = /** @type {any} */ (createSensitiveDataRedactor);
+const anyCreateContextInjector = /** @type {any} */ (createContextInjector);
+const anyCreateLoggingPromptHook = /** @type {any} */ (createLoggingPromptHook);
+const anyCreateArgSanitizerHook = /** @type {any} */ (createArgSanitizerHook);
+const anyCreateBlocklistHook = /** @type {any} */ (createBlocklistHook);
+const anyCreateAllowlistHook = /** @type {any} */ (createAllowlistHook);
+const anyCreateStaticInputHandler = /** @type {any} */ (createStaticInputHandler);
+const anyCreateAuditHooks = /** @type {any} */ (createAuditHooks);
+const anyCreateDenyAllHooks = /** @type {any} */ (createDenyAllHooks);
+const anyCreateSafeFactoryHooks = /** @type {any} */ (createSafeHooks);
+const anyFallback = /** @type {any} */ (fallback);
+const anyPipeline = /** @type {any} */ (pipeline);
+const anyRaceWithTimeout = /** @type {any} */ (raceWithTimeout);
+
 /** @param {string} toolName @param {object} [args] */
 const preInput = (toolName, args = {}) => ({
     toolName,
@@ -77,19 +110,57 @@ const preInput = (toolName, args = {}) => ({
 const postInput = (toolName) => ({
     toolName,
     toolArgs: {},
-    toolResult: 'resultado',
+    toolResult: {
+        textResultForLlm: 'resultado',
+        resultType: 'success',
+    },
     timestamp: Date.now(),
     cwd: '/tmp',
 });
 
+/** @param {Partial<import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput>} [overrides] */
+const errorInput = (overrides = {}) =>
+    /** @type {import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput} */ ({
+        error: 'erro',
+        errorContext: 'system',
+        recoverable: true,
+        timestamp: Date.now(),
+        cwd: '/tmp',
+        ...overrides,
+    });
+
+/** @param {Partial<import('../../../src/copilot/hooks/types.js').SessionStartHookInput>} [overrides] */
+const sessionStartInput = (overrides = {}) =>
+    /** @type {import('../../../src/copilot/hooks/types.js').SessionStartHookInput} */ ({
+        source: 'new',
+        timestamp: Date.now(),
+        cwd: '/tmp',
+        ...overrides,
+    });
+
+/** @param {Partial<import('../../../src/copilot/hooks/types.js').SessionEndHookInput>} [overrides] */
+const sessionEndInput = (overrides = {}) =>
+    /** @type {import('../../../src/copilot/hooks/types.js').SessionEndHookInput} */ ({
+        reason: 'complete',
+        timestamp: Date.now(),
+        cwd: '/tmp',
+        ...overrides,
+    });
+
 /** @param {string} sessionId */
 const inv = (sessionId = 'test-session') => ({ sessionId });
+
+/** @param {Function | undefined} hook @param {unknown} input @param {unknown} [invocation] */
+const callHook = async (hook, input, invocation = inv()) => /** @type {any} */ (await hook?.(input, invocation));
+
+/** @param {Function | undefined} hook @param {unknown} input */
+const callUnaryHook = async (hook, input) => /** @type {any} */ (await hook?.(input));
 
 // ─── Seção 1: factory.js ──────────────────────────────────────────────────────
 
 describe('hooks/factory › createHooks', () => {
     it('retorna todos os 6 hook slots quando auditLog: true', () => {
-        const h = createHooks({ auditLog: true });
+        const h = anyCreateHooks({ auditLog: true });
         assert.ok(typeof h.onPreToolUse === 'function');
         assert.ok(typeof h.onPostToolUse === 'function');
         assert.ok(typeof h.onUserPromptSubmitted === 'function');
@@ -99,42 +170,42 @@ describe('hooks/factory › createHooks', () => {
     });
 
     it('retorna onPreToolUse sem config (os outros são opcionais)', () => {
-        const h = createHooks();
+        const h = anyCreateHooks();
         assert.ok(typeof h.onPreToolUse === 'function');
     });
 
     it('onPreToolUse permite tool quando sem allowTools', async () => {
-        const h = createHooks();
+        const h = anyCreateHooks();
         const result = await h.onPreToolUse(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('onPreToolUse nega tool na denyTools', async () => {
-        const h = createHooks({ denyTools: ['shell'] });
+        const h = anyCreateHooks({ denyTools: ['shell'] });
         const result = await h.onPreToolUse(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('onPreToolUse nega tool fora da allowTools', async () => {
-        const h = createHooks({ allowTools: ['read_file'] });
+        const h = anyCreateHooks({ allowTools: ['read_file'] });
         const result = await h.onPreToolUse(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('onPreToolUse permite tool na allowTools', async () => {
-        const h = createHooks({ allowTools: ['read_file'] });
+        const h = anyCreateHooks({ allowTools: ['read_file'] });
         const result = await h.onPreToolUse(preInput('read_file'), inv());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('onPreToolUse nega por denyPatterns', async () => {
-        const h = createHooks({ denyPatterns: [/^rm/] });
+        const h = anyCreateHooks({ denyPatterns: [/^rm/] });
         const result = await h.onPreToolUse(preInput('rm_rf'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('createMinimalHooks permite tudo', async () => {
-        const h = createMinimalHooks();
+        const h = anyCreateMinimalHooks();
         const r1 = await h.onPreToolUse(preInput('shell'), inv());
         const r2 = await h.onPreToolUse(preInput('delete_file'), inv());
         assert.strictEqual(r1?.permissionDecision, 'allow');
@@ -142,19 +213,19 @@ describe('hooks/factory › createHooks', () => {
     });
 
     it('createDenyAllHooks nega tudo', async () => {
-        const h = createDenyAllHooks();
+        const h = anyCreateDenyAllHooks();
         const result = await h.onPreToolUse(preInput('read_file'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('createAuditHooks permite tudo (apenas loga)', async () => {
-        const h = createAuditHooks();
+        const h = anyCreateAuditHooks();
         const result = await h.onPreToolUse(preInput('run_code'), inv());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
 
     it('createSafeHooks nega shell por padrão', async () => {
-        const h = createSafeHooks();
+        const h = anyCreateSafeFactoryHooks();
         const result = await h.onPreToolUse(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
@@ -165,17 +236,23 @@ describe('hooks/factory › createHooks', () => {
             called = true;
             assert.ok(ctx === 'rate_limit');
         });
-        await h(
-            {
-                error: new Error('too many'),
-                errorContext: 'rate_limit',
-                recoverable: true,
-                timestamp: Date.now(),
-                cwd: '/tmp',
-            },
-            inv(),
-        );
+        await h(errorInput({ error: 'too many', errorContext: 'rate_limit' }), inv());
         assert.ok(called);
+    });
+
+    it('onErrorOccurred default isola retries por sessionId', async () => {
+        const h = anyCreateHooks();
+        const first = await h.onErrorOccurred(errorInput({ error: 'boom', errorContext: 'model_call' }), {
+            sessionId: 's1',
+        });
+        const second = await h.onErrorOccurred(errorInput({ error: 'boom', errorContext: 'model_call' }), {
+            sessionId: 's2',
+        });
+
+        assert.strictEqual(first?.errorHandling, 'retry');
+        assert.strictEqual(first?.retryCount, 1);
+        assert.strictEqual(second?.errorHandling, 'retry');
+        assert.strictEqual(second?.retryCount, 1);
     });
 });
 
@@ -184,7 +261,7 @@ describe('hooks/factory › createHooks', () => {
 describe('hooks/permission-handler › createPermissionHandler', () => {
     it('mode approve-all: aprova tudo', async () => {
         const handler = createPermissionHandler({ allowAll: true });
-        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' });
+        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
         assert.ok(
             ['approved'].includes(result?.kind ?? result),
             `esperado approved, recebido: ${JSON.stringify(result)}`,
@@ -193,10 +270,10 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
 
     it('mode deny-all: nega ferramentas listadas', async () => {
         const handler = createPermissionHandler({ denyTools: ['shell'] });
-        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' });
+        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
         assert.ok(
-            result?.kind === 'denied-by-rules' || result === false,
-            `esperado denied-by-rules ou false, recebido: ${JSON.stringify(result)}`,
+            result?.kind === 'denied-by-rules',
+            `esperado denied-by-rules, recebido: ${JSON.stringify(result)}`,
         );
     });
 });
@@ -205,29 +282,29 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
 
 describe('hooks/prompt-transformer (Gap 1 — modifiedPrompt)', () => {
     it('passthrough: sem transformFn retorna {} sem modifiedPrompt', async () => {
-        const hook = createPromptTransformer();
-        const result = await hook({ prompt: 'Olá', timestamp: Date.now(), cwd: '/tmp' });
+        const hook = anyCreatePromptTransformer();
+        const result = await callHook(hook, { prompt: 'Olá', timestamp: Date.now(), cwd: '/tmp' });
         assert.deepStrictEqual(result, {});
     });
 
     it('transformFn: retorna modifiedPrompt quando prompt muda', async () => {
-        const hook = createPromptTransformer({ transformFn: (p) => `PREFIXO: ${p}` });
-        const result = await hook({ prompt: 'teste', timestamp: Date.now(), cwd: '/tmp' });
+        const hook = anyCreatePromptTransformer({ transformFn: (/** @type {string} */ p) => `PREFIXO: ${p}` });
+        const result = await callHook(hook, { prompt: 'teste', timestamp: Date.now(), cwd: '/tmp' });
         assert.ok(result.modifiedPrompt?.startsWith('PREFIXO:'));
     });
 
     it('transformFn: não retorna modifiedPrompt quando resultado é igual', async () => {
-        const hook = createPromptTransformer({ transformFn: (p) => p });
-        const result = await hook({ prompt: 'sem mudança', timestamp: Date.now(), cwd: '/tmp' });
+        const hook = anyCreatePromptTransformer({ transformFn: (/** @type {string} */ p) => p });
+        const result = await callHook(hook, { prompt: 'sem mudança', timestamp: Date.now(), cwd: '/tmp' });
         assert.deepStrictEqual(result, {});
     });
 
     it('sensitivePattern: redacta tokens Bearer', async () => {
-        const hook = createPromptTransformer({
+        const hook = anyCreatePromptTransformer({
             sensitivePattern: /Bearer\s+\S+/gi,
             sensitiveReplacement: '[REDACTED]',
         });
-        const result = await hook({
+        const result = await callHook(hook, {
             prompt: 'token: Bearer abc123xyz faz isso',
             timestamp: Date.now(),
             cwd: '/tmp',
@@ -237,8 +314,8 @@ describe('hooks/prompt-transformer (Gap 1 — modifiedPrompt)', () => {
     });
 
     it('createSensitiveDataRedactor: redacta api-key', async () => {
-        const hook = createSensitiveDataRedactor();
-        const result = await hook({
+        const hook = anyCreateSensitiveDataRedactor();
+        const result = await callHook(hook, {
             prompt: 'use api-key: secretABC123 para autenticar',
             timestamp: Date.now(),
             cwd: '/tmp',
@@ -247,15 +324,15 @@ describe('hooks/prompt-transformer (Gap 1 — modifiedPrompt)', () => {
     });
 
     it('createContextInjector: injeta prefix e suffix', async () => {
-        const hook = createContextInjector({ prefix: 'SYS:', suffix: 'END' });
-        const result = await hook({ prompt: 'user msg', timestamp: Date.now(), cwd: '/tmp' });
+        const hook = anyCreateContextInjector({ prefix: 'SYS:', suffix: 'END' });
+        const result = await callHook(hook, { prompt: 'user msg', timestamp: Date.now(), cwd: '/tmp' });
         assert.ok(result.modifiedPrompt?.startsWith('SYS:'));
         assert.ok(result.modifiedPrompt?.endsWith('END'));
     });
 
     it('createLoggingPromptHook: retorna {} sem modifiedPrompt', async () => {
-        const hook = createLoggingPromptHook();
-        const result = await hook({ prompt: 'log test', timestamp: Date.now(), cwd: '/tmp' });
+        const hook = anyCreateLoggingPromptHook();
+        const result = await callHook(hook, { prompt: 'log test', timestamp: Date.now(), cwd: '/tmp' });
         assert.deepStrictEqual(result, {});
     });
 });
@@ -264,50 +341,50 @@ describe('hooks/prompt-transformer (Gap 1 — modifiedPrompt)', () => {
 
 describe('hooks/tool-interceptor (Gap 2 — modifiedArgs)', () => {
     it('sem regras: permite tool e não modifica args', async () => {
-        const hook = createArgSanitizerHook();
-        const result = await hook(preInput('shell', { cmd: 'ls' }));
+        const hook = anyCreateArgSanitizerHook();
+        const result = await callUnaryHook(hook, preInput('shell', { cmd: 'ls' }));
         assert.strictEqual(result.permissionDecision, 'allow');
         assert.ok(!result.modifiedArgs, 'não deve ter modifiedArgs');
     });
 
     it('defaults: injeta arg ausente', async () => {
-        const hook = createArgSanitizerHook({ defaults: { shell: { timeout: 5000 } } });
-        const result = await hook(preInput('shell', {}));
+        const hook = anyCreateArgSanitizerHook({ defaults: { shell: { timeout: 5000 } } });
+        const result = await callUnaryHook(hook, preInput('shell', {}));
         assert.strictEqual(result.permissionDecision, 'allow');
         assert.strictEqual(result.modifiedArgs?.timeout, 5000);
     });
 
     it('defaults: não sobrescreve arg já presente', async () => {
-        const hook = createArgSanitizerHook({ defaults: { shell: { timeout: 5000 } } });
-        const result = await hook(preInput('shell', { timeout: 9000 }));
+        const hook = anyCreateArgSanitizerHook({ defaults: { shell: { timeout: 5000 } } });
+        const result = await callUnaryHook(hook, preInput('shell', { timeout: 9000 }));
         assert.ok(!result.modifiedArgs, 'arg já presente não deve gerar modifiedArgs');
     });
 
     it('overrides: força sobreescrita', async () => {
-        const hook = createArgSanitizerHook({ overrides: { shell: { allowSudo: false } } });
-        const result = await hook(preInput('shell', { allowSudo: true }));
+        const hook = anyCreateArgSanitizerHook({ overrides: { shell: { allowSudo: false } } });
+        const result = await callUnaryHook(hook, preInput('shell', { allowSudo: true }));
         assert.strictEqual(result.modifiedArgs?.allowSudo, false);
     });
 
     it('stripArgs: remove arg especificado', async () => {
-        const hook = createArgSanitizerHook({ stripArgs: { shell: ['dangerous'] } });
-        const result = await hook(preInput('shell', { cmd: 'ls', dangerous: 'yes' }));
+        const hook = anyCreateArgSanitizerHook({ stripArgs: { shell: ['dangerous'] } });
+        const result = await callUnaryHook(hook, preInput('shell', { cmd: 'ls', dangerous: 'yes' }));
         assert.strictEqual(result.permissionDecision, 'allow');
         assert.ok(result.modifiedArgs && !('dangerous' in result.modifiedArgs));
     });
 
     it('createBlocklistHook: nega tool na lista', async () => {
-        const hook = createBlocklistHook(['shell', 'bash']);
-        const r1 = await hook(preInput('shell'));
-        const r2 = await hook(preInput('read_file'));
+        const hook = anyCreateBlocklistHook(['shell', 'bash']);
+        const r1 = await callUnaryHook(hook, preInput('shell'));
+        const r2 = await callUnaryHook(hook, preInput('read_file'));
         assert.strictEqual(r1.permissionDecision, 'deny');
         assert.strictEqual(r2.permissionDecision, 'allow');
     });
 
     it('createAllowlistHook: permite só as tools listadas', async () => {
-        const hook = createAllowlistHook(['read_file', 'list_dir']);
-        const r1 = await hook(preInput('shell'));
-        const r2 = await hook(preInput('read_file'));
+        const hook = anyCreateAllowlistHook(['read_file', 'list_dir']);
+        const r1 = await callUnaryHook(hook, preInput('shell'));
+        const r2 = await callUnaryHook(hook, preInput('read_file'));
         assert.strictEqual(r1.permissionDecision, 'deny');
         assert.strictEqual(r2.permissionDecision, 'allow');
     });
@@ -315,16 +392,16 @@ describe('hooks/tool-interceptor (Gap 2 — modifiedArgs)', () => {
 
 describe('hooks/tool-interceptor (Gap 3 — onPostToolUse additionalContext)', () => {
     it('sem contextFn: retorna {}', async () => {
-        const hook = createPostToolEnricher();
-        const result = await hook(postInput('read_file'));
+        const hook = anyCreatePostToolEnricher();
+        const result = await callUnaryHook(hook, postInput('read_file'));
         assert.deepStrictEqual(result, {});
     });
 
     it('contextFn: retorna additionalContext', async () => {
-        const hook = createPostToolEnricher({
-            contextFn: (input) => `tool ${input.toolName} executada`,
+        const hook = anyCreatePostToolEnricher({
+            contextFn: (/** @type {any} */ input) => `tool ${input.toolName} executada`,
         });
-        const result = await hook(postInput('read_file'));
+        const result = await callUnaryHook(hook, postInput('read_file'));
         assert.ok(result.additionalContext?.includes('read_file'));
     });
 });
@@ -333,7 +410,7 @@ describe('hooks/tool-interceptor (Gap 3 — onPostToolUse additionalContext)', (
 
 describe('hooks/user-input (Gap 5)', () => {
     it('createStaticInputHandler: responde por substring da pergunta', async () => {
-        const handler = createStaticInputHandler({ continuar: 'sim', cancelar: 'nao' });
+        const handler = anyCreateStaticInputHandler({ continuar: 'sim', cancelar: 'nao' });
         const r1 = await handler({ question: 'Deseja continuar?' });
         const r2 = await handler({ question: 'Deseja cancelar?' });
         assert.strictEqual(r1.answer, 'sim');
@@ -341,17 +418,17 @@ describe('hooks/user-input (Gap 5)', () => {
     });
 
     it('createStaticInputHandler: usa defaultAnswer quando sem match', async () => {
-        const handler = createStaticInputHandler({}, 'padrão');
+        const handler = anyCreateStaticInputHandler({}, 'padrão');
         const result = await handler({ question: 'Pergunta sem match' });
         assert.strictEqual(result.answer, 'padrão');
         assert.strictEqual(result.wasFreeform, true);
     });
 
     it('createQueuedInputHandler: handler fica pendente até answerNext', async () => {
-        const { handler, answerNext, listPending } = createQueuedInputHandler();
+        const { handler, answerNext, listPending } = anyCreateQueuedInputHandler();
 
         let resolved = false;
-        const pending = handler({ question: 'Confirmar?' }).then((r) => {
+        const pending = handler({ question: 'Confirmar?' }).then((/** @type {any} */ r) => {
             resolved = true;
             return r;
         });
@@ -367,7 +444,7 @@ describe('hooks/user-input (Gap 5)', () => {
     });
 
     it('createQueuedInputHandler: answerNext retorna false quando fila vazia', () => {
-        const { answerNext } = createQueuedInputHandler();
+        const { answerNext } = anyCreateQueuedInputHandler();
         const result = answerNext({ answer: 'x', wasFreeform: false });
         assert.strictEqual(result, false);
     });
@@ -378,33 +455,37 @@ describe('hooks/user-input (Gap 5)', () => {
 describe('hooks/bus (Gap 6 — HookBus)', () => {
     it('HookBus emite eventos por nome de hook', () => {
         const bus = new HookBus();
+        /** @type {{ hookName?: string; sessionId?: string } | null} */
         let received = null;
-        bus.on('pre_tool_use', (event) => {
+        bus.on('pre_tool_use', (/** @type {any} */ event) => {
             received = event;
         });
         bus.emitHook('pre_tool_use', 'sess-1', { toolName: 'shell' }, { permissionDecision: 'allow' });
         assert.ok(received !== null);
-        assert.strictEqual(received.hookName, 'pre_tool_use');
-        assert.strictEqual(received.sessionId, 'sess-1');
+        const event = /** @type {{ hookName?: string; sessionId?: string }} */ (received);
+        assert.strictEqual(event.hookName, 'pre_tool_use');
+        assert.strictEqual(event.sessionId, 'sess-1');
     });
 
     it('HookBus emite evento wildcard (*)', () => {
         const bus = new HookBus();
+        /** @type {string[]} */
         const events = [];
-        bus.on('*', (e) => events.push(e.hookName));
+        bus.on('*', (/** @type {any} */ e) => events.push(e.hookName));
         bus.emitHook('session_start', 'sess-2', {}, null);
         bus.emitHook('session_end', 'sess-2', {}, null);
         assert.deepStrictEqual(events, ['session_start', 'session_end']);
     });
 
     it('attachBus: onPreToolUse observado sem alterar resultado', async () => {
-        const hooks = createHooks();
+        const hooks = anyCreateHooks();
         const bus = new HookBus();
+        /** @type {string[]} */
         const events = [];
         bus.on('pre_tool_use', (e) => events.push(e.hookName));
 
-        const withBus = attachBus(hooks, bus);
-        const result = await withBus.onPreToolUse(preInput('shell'), inv());
+        const withBus = anyAttachBus(hooks, bus);
+        const result = await callHook(withBus.onPreToolUse, preInput('shell'));
         assert.strictEqual(result?.permissionDecision, 'allow');
         assert.strictEqual(events.length, 1);
     });
@@ -465,7 +546,7 @@ describe('hooks/composer', () => {
             calls++;
             return { permissionDecision: 'allow' };
         };
-        const composed = composeHandlers(h1, h2);
+        const composed = anyComposeHandlers(h1, h2);
         const result = await composed(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
         assert.strictEqual(calls, 1, 'h2 não deve ter sido chamado');
@@ -474,7 +555,7 @@ describe('hooks/composer', () => {
     it('composePreToolUseHandlers (da factory): funciona como composeHandlers', async () => {
         const deny = async () => ({ permissionDecision: 'deny' });
         const allow = async () => ({ permissionDecision: 'allow' });
-        const composed = composePreToolUseHandlers(deny, allow);
+        const composed = anyComposePreToolUseHandlers(deny, allow);
         const result = await composed(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
@@ -482,7 +563,7 @@ describe('hooks/composer', () => {
     it('pipeline: todos os handlers executam e o resultado é merged', async () => {
         const h1 = async () => ({ additionalContext: 'contexto1' });
         const h2 = async () => ({ additionalContext: 'contexto2' });
-        const pipe = pipeline(h1, h2);
+        const pipe = anyPipeline(h1, h2);
         const result = await pipe(postInput('shell'), inv());
         // último sobrescreve
         assert.strictEqual(result?.additionalContext, 'contexto2');
@@ -493,7 +574,7 @@ describe('hooks/composer', () => {
             throw new Error('falhou');
         };
         const fallbackFn = async () => ({ permissionDecision: 'allow' });
-        const composed = fallback(primary, fallbackFn);
+        const composed = anyFallback(primary, fallbackFn);
         const result = await composed(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'allow');
     });
@@ -505,7 +586,7 @@ describe('hooks/composer', () => {
             return { permissionDecision: 'deny' };
         };
         const elseH = async () => ({ permissionDecision: 'allow' });
-        const hook = conditional((input) => input.toolName === 'shell', handler, elseH);
+        const hook = anyConditional((/** @type {any} */ input) => input.toolName === 'shell', handler, elseH);
 
         const r1 = await hook(preInput('read_file'), inv());
         assert.strictEqual(r1?.permissionDecision, 'allow');
@@ -518,14 +599,14 @@ describe('hooks/composer', () => {
 
     it('raceWithTimeout: retorna resultado do handler quando resolve antes do timeout', async () => {
         const handler = async () => ({ permissionDecision: 'deny' });
-        const wrapped = raceWithTimeout(handler, 5000);
+        const wrapped = anyRaceWithTimeout(handler, 5000);
         const result = await wrapped(preInput('shell'), inv());
         assert.strictEqual(result?.permissionDecision, 'deny');
     });
 
     it('raceWithTimeout: retorna undefined quando handler excede timeout', async () => {
         const handler = () => new Promise((resolve) => setTimeout(() => resolve({ permissionDecision: 'deny' }), 500));
-        const wrapped = raceWithTimeout(handler, 10);
+        const wrapped = anyRaceWithTimeout(handler, 10);
         const result = await wrapped(preInput('shell'), inv());
         assert.strictEqual(result, undefined);
     });
@@ -534,7 +615,7 @@ describe('hooks/composer', () => {
         // Se o timer não for limpo, o teste pode vazar o setTimeout.
         // Verificamos indiretamente: handler rápido deve resolver sem pendências.
         const handler = async () => ({ additionalContext: 'ok' });
-        const wrapped = raceWithTimeout(handler, 60_000);
+        const wrapped = anyRaceWithTimeout(handler, 60_000);
         const result = await wrapped(postInput('shell'), inv());
         assert.strictEqual(result?.additionalContext, 'ok');
     });
@@ -544,20 +625,20 @@ describe('hooks/composer', () => {
 
 describe('hooks/presets/minimal', () => {
     it('preset.hooks.onPreToolUse permite tudo', async () => {
-        const { hooks } = createMinimalPreset();
-        const r = await hooks.onPreToolUse(preInput('shell'), inv());
+        const { hooks } = anyCreateMinimalPreset();
+        const r = await callHook(hooks.onPreToolUse, preInput('shell'));
         assert.strictEqual(r?.permissionDecision, 'allow');
     });
 
     it('preset.hooks.onSessionEnd não lança', async () => {
-        const { hooks } = createMinimalPreset();
-        await assert.doesNotReject(() => hooks.onSessionEnd({ reason: 'manual', timestamp: Date.now(), cwd: '/tmp' }));
+        const { hooks } = anyCreateMinimalPreset();
+        await assert.doesNotReject(() => callHook(hooks.onSessionEnd, sessionEndInput({ reason: 'user_exit' })));
     });
 });
 
 describe('hooks/presets/audit', () => {
     it('registra atividade no audit trail', async () => {
-        const { hooks, getAuditTrail, clearAuditTrail } = createAuditPreset();
+        const { hooks, getAuditTrail, clearAuditTrail } = anyCreateAuditPreset();
         clearAuditTrail();
         await hooks.onPreToolUse(preInput('shell'), inv());
         const trail = getAuditTrail();
@@ -567,7 +648,7 @@ describe('hooks/presets/audit', () => {
     });
 
     it('clearAuditTrail: limpa o trail', async () => {
-        const { hooks, getAuditTrail, clearAuditTrail } = createAuditPreset();
+        const { hooks, getAuditTrail, clearAuditTrail } = anyCreateAuditPreset();
         await hooks.onPreToolUse(preInput('shell'), inv());
         clearAuditTrail();
         assert.strictEqual(getAuditTrail().length, 0);
@@ -576,33 +657,24 @@ describe('hooks/presets/audit', () => {
 
 describe('hooks/presets/safe', () => {
     it('pede "ask" para shell', async () => {
-        const { hooks } = createSafePreset();
-        const r = await hooks.onPreToolUse(preInput('shell'), inv());
+        const { hooks } = anyCreateSafePreset();
+        const r = await callHook(hooks.onPreToolUse, preInput('shell'));
         assert.strictEqual(r?.permissionDecision, 'ask');
     });
 
     it('nega tools do extraDenyTools', async () => {
-        const { hooks } = createSafePreset({ extraDenyTools: ['forbidden_tool'] });
-        const r = await hooks.onPreToolUse(preInput('forbidden_tool'), inv());
+        const { hooks } = anyCreateSafePreset({ extraDenyTools: ['forbidden_tool'] });
+        const r = await callHook(hooks.onPreToolUse, preInput('forbidden_tool'));
         assert.strictEqual(r?.permissionDecision, 'deny');
     });
 
     it('recuperável → retry; irrecuperável → abort', async () => {
-        const { hooks } = createSafePreset();
-        const rRetry = await hooks.onErrorOccurred({
-            error: 'oops',
-            errorContext: 'net',
-            recoverable: true,
-            timestamp: Date.now(),
-            cwd: '/',
-        });
-        const rAbort = await hooks.onErrorOccurred({
-            error: 'oops',
-            errorContext: 'net',
-            recoverable: false,
-            timestamp: Date.now(),
-            cwd: '/',
-        });
+        const { hooks } = anyCreateSafePreset();
+        const rRetry = await callHook(hooks.onErrorOccurred, errorInput({ error: 'oops', errorContext: 'net' }));
+        const rAbort = await callHook(
+            hooks.onErrorOccurred,
+            errorInput({ error: 'oops', errorContext: 'net', recoverable: false }),
+        );
         assert.strictEqual(rRetry?.errorHandling, 'retry');
         assert.strictEqual(rAbort?.errorHandling, 'abort');
     });
@@ -610,40 +682,40 @@ describe('hooks/presets/safe', () => {
 
 describe('hooks/presets/deny-all', () => {
     it('nega tudo por padrão', async () => {
-        const { hooks } = createDenyAllPreset();
-        const r = await hooks.onPreToolUse(preInput('read_file'), inv());
+        const { hooks } = anyCreateDenyAllPreset();
+        const r = await callHook(hooks.onPreToolUse, preInput('read_file'));
         assert.strictEqual(r?.permissionDecision, 'deny');
     });
 
     it('excetuadas são permitidas', async () => {
-        const { hooks } = createDenyAllPreset({ exceptTools: ['read_file'] });
-        const r = await hooks.onPreToolUse(preInput('read_file'), inv());
+        const { hooks } = anyCreateDenyAllPreset({ exceptTools: ['read_file'] });
+        const r = await callHook(hooks.onPreToolUse, preInput('read_file'));
         assert.strictEqual(r?.permissionDecision, 'allow');
     });
 
     it('onSessionStart retorna additionalContext de modo restrito', async () => {
-        const { hooks } = createDenyAllPreset();
-        const r = await hooks.onSessionStart({ source: 'new', timestamp: Date.now(), cwd: '/' });
+        const { hooks } = anyCreateDenyAllPreset();
+        const r = await callHook(hooks.onSessionStart, sessionStartInput());
         assert.ok(r?.additionalContext?.includes('RESTRITO'));
     });
 });
 
 describe('hooks/presets/interactive', () => {
     it('pede "ask" para tools não listadas', async () => {
-        const { hooks } = createInteractivePreset();
-        const r = await hooks.onPreToolUse(preInput('write_file'), inv());
+        const { hooks } = anyCreateInteractivePreset();
+        const r = await callHook(hooks.onPreToolUse, preInput('write_file'));
         assert.strictEqual(r?.permissionDecision, 'ask');
     });
 
     it('autoAllow: read_file é permitido automaticamente', async () => {
-        const { hooks } = createInteractivePreset();
-        const r = await hooks.onPreToolUse(preInput('read_file'), inv());
+        const { hooks } = anyCreateInteractivePreset();
+        const r = await callHook(hooks.onPreToolUse, preInput('read_file'));
         assert.strictEqual(r?.permissionDecision, 'allow');
     });
 
     it('autoDeny: nega explicitamente', async () => {
-        const { hooks } = createInteractivePreset({ autoDenyTools: ['danger'] });
-        const r = await hooks.onPreToolUse(preInput('danger'), inv());
+        const { hooks } = anyCreateInteractivePreset({ autoDenyTools: ['danger'] });
+        const r = await callHook(hooks.onPreToolUse, preInput('danger'));
         assert.strictEqual(r?.permissionDecision, 'deny');
     });
 });
@@ -665,7 +737,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
     it('onSessionStart: retorna additionalContext com sessionId e model', async () => {
         const ctx = makeCtx();
         const { onSessionStart } = createSessionHooks(ctx);
-        const result = await onSessionStart({ source: 'new' }, { sessionId: 'test-123' });
+        const result = await onSessionStart(sessionStartInput({ source: 'new' }), { sessionId: 'test-123' });
         assert.ok(result.additionalContext?.includes('test-123'));
         assert.ok(result.additionalContext?.includes('gpt-4'));
     });
@@ -682,17 +754,25 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         process.env['COPILOT_FALLBACK_MODEL'] = 'gpt-3.5-turbo';
         let scheduled = null;
         const ctx = makeCtx({
-            scheduleFallback: (m) => {
+            scheduleFallback: (/** @type {string} */ m) => {
                 scheduled = m;
             },
         });
         const { onErrorOccurred } = createSessionHooks(ctx);
         onErrorOccurred(
-            { error: 'Too many requests', errorContext: 'rate_limit', recoverable: true },
+            errorInput({ error: 'Too many requests', errorContext: 'rate_limit' }),
             { sessionId: 'sess' },
         );
         assert.strictEqual(scheduled, 'gpt-3.5-turbo');
         delete process.env['COPILOT_FALLBACK_MODEL'];
+    });
+
+    it('onErrorOccurred: retorna retry para erro recuperável', async () => {
+        const ctx = makeCtx();
+        const { onErrorOccurred } = createSessionHooks(ctx);
+        const result = await onErrorOccurred(errorInput({ error: 'temporary' }), { sessionId: 'sess-retry' });
+        assert.strictEqual(result?.errorHandling, 'retry');
+        assert.strictEqual(result?.retryCount, 1);
     });
 });
 
@@ -701,7 +781,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
 describe('createErrorHandler', () => {
     it('retorna estratégia fixa "retry"', async () => {
         const handler = createErrorHandler({ strategy: 'retry', maxRetries: 3 });
-        const result = await handler({ error: 'oops', errorContext: 'tool', recoverable: true }, { sessionId: 's' });
+        const result = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's' });
         assert.strictEqual(result.errorHandling, 'retry');
         // retryCount começa em 1 na primeira chamada
         assert.strictEqual(result.retryCount, 1);
@@ -709,7 +789,7 @@ describe('createErrorHandler', () => {
 
     it('retorna estratégia fixa "skip"', async () => {
         const handler = createErrorHandler({ strategy: 'skip' });
-        const result = await handler({ error: 'err', errorContext: 'tool', recoverable: false }, { sessionId: 's' });
+        const result = await handler(errorInput({ error: 'err', errorContext: 'tool', recoverable: false }), { sessionId: 's' });
         assert.strictEqual(result.errorHandling, 'skip');
     });
 
@@ -717,16 +797,35 @@ describe('createErrorHandler', () => {
         const handler = createErrorHandler({
             strategy: (input) => (input.errorContext === 'rate_limit' ? 'retry' : 'abort'),
         });
-        const r1 = await handler({ error: 'e', errorContext: 'rate_limit', recoverable: true }, { sessionId: 's' });
+        const r1 = await handler(errorInput({ error: 'e', errorContext: 'rate_limit' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'retry');
-        const r2 = await handler({ error: 'e', errorContext: 'other', recoverable: false }, { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'other', recoverable: false }), { sessionId: 's' });
         assert.strictEqual(r2.errorHandling, 'abort');
     });
 
     it('usa "abort" como padrão quando nenhuma opção passada', async () => {
         const handler = createErrorHandler();
-        const result = await handler({ error: 'err', errorContext: '', recoverable: false }, { sessionId: 's' });
+        const result = await handler(errorInput({ error: 'err', errorContext: '', recoverable: false }), { sessionId: 's' });
         assert.strictEqual(result.errorHandling, 'abort');
+    });
+
+    it('isola retryCount por sessionId para o mesmo errorContext', async () => {
+        const handler = createErrorHandler({ strategy: 'retry', maxRetries: 1 });
+
+        const first = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's1' });
+        const secondSameSession = await handler(
+            errorInput({ error: 'oops', errorContext: 'tool' }),
+            { sessionId: 's1' },
+        );
+        const firstOtherSession = await handler(
+            errorInput({ error: 'oops', errorContext: 'tool' }),
+            { sessionId: 's2' },
+        );
+
+        assert.strictEqual(first.errorHandling, 'retry');
+        assert.strictEqual(secondSameSession.errorHandling, 'abort');
+        assert.strictEqual(firstOtherSession.errorHandling, 'retry');
+        assert.strictEqual(firstOtherSession.retryCount, 1);
     });
 });
 
@@ -734,13 +833,14 @@ describe('createCircuitBreakerHandler', () => {
     it('permite retries até maxRetries', async () => {
         // maxRetries: 3 → primeira falha = retry (failures=1, 1<3)
         const handler = createCircuitBreakerHandler({ maxRetries: 3, resetAfterMs: 10_000 });
-        const r1 = await handler({ error: 'e', errorContext: 'tool_x', recoverable: true }, { sessionId: 's' });
+        const r1 = await handler(errorInput({ error: 'e', errorContext: 'tool_x' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'retry');
-        const r2 = await handler({ error: 'e', errorContext: 'tool_x', recoverable: true }, { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'tool_x' }), { sessionId: 's' });
         assert.strictEqual(r2.errorHandling, 'retry');
     });
 
     it('aborta quando circuit está aberto após maxRetries', async () => {
+        /** @type {string[]} */
         const tripped = [];
         // maxRetries: 1 → na primeira falha, failures++ = 1 >= 1, abre circuit
         const handler = createCircuitBreakerHandler({
@@ -749,11 +849,11 @@ describe('createCircuitBreakerHandler', () => {
             onTrip: (ctx) => tripped.push(ctx),
         });
         // primeira falha → abre o circuit (já retorna abort)
-        const r1 = await handler({ error: 'e', errorContext: 'ctx_a', recoverable: true }, { sessionId: 's' });
+        const r1 = await handler(errorInput({ error: 'e', errorContext: 'ctx_a' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'abort');
         assert.ok(tripped.includes('ctx_a'));
         // segunda falha → circuit ainda aberto → abort
-        const r2 = await handler({ error: 'e', errorContext: 'ctx_a', recoverable: true }, { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'ctx_a' }), { sessionId: 's' });
         assert.strictEqual(r2.errorHandling, 'abort');
     });
 
@@ -761,11 +861,11 @@ describe('createCircuitBreakerHandler', () => {
         // maxRetries: 2 → ctx_1: failures=1 → 1<2 = retry, mas ctx_2 tem failures=0 → retry também
         const handler = createCircuitBreakerHandler({ maxRetries: 2, resetAfterMs: 10_000 });
         // Primeira falha de ctx_1 — failures=1
-        await handler({ error: 'e', errorContext: 'ctx_1', recoverable: true }, { sessionId: 's' });
+        await handler(errorInput({ error: 'e', errorContext: 'ctx_1' }), { sessionId: 's' });
         // Segunda falha de ctx_1 — failures=2 → abre ctx_1
-        await handler({ error: 'e', errorContext: 'ctx_1', recoverable: true }, { sessionId: 's' });
+        await handler(errorInput({ error: 'e', errorContext: 'ctx_1' }), { sessionId: 's' });
         // ctx_2 ainda sem falhas → deve retornar retry
-        const r = await handler({ error: 'e', errorContext: 'ctx_2', recoverable: true }, { sessionId: 's' });
+        const r = await handler(errorInput({ error: 'e', errorContext: 'ctx_2' }), { sessionId: 's' });
         assert.strictEqual(r.errorHandling, 'retry');
     });
 
@@ -775,10 +875,9 @@ describe('createCircuitBreakerHandler', () => {
             resetAfterMs: 10_000,
             fatalPatterns: ['ERR_SOCKET_CLOSED', 'SESSION_FATAL'],
         });
-        const r = await handler(
-            { error: 'ERR_SOCKET_CLOSED: connection lost', errorContext: 'ctx', recoverable: true },
-            { sessionId: 's' },
-        );
+        const r = await handler(errorInput({ error: 'ERR_SOCKET_CLOSED: connection lost', errorContext: 'ctx' }), {
+            sessionId: 's',
+        });
         assert.strictEqual(r.errorHandling, 'abort');
     });
 
@@ -789,33 +888,56 @@ describe('createCircuitBreakerHandler', () => {
             transientPatterns: ['ECONNREFUSED', 'ETIMEDOUT'],
         });
         const r = await handler(
-            { error: 'connect ECONNREFUSED 127.0.0.1:3000', errorContext: 'ctx', recoverable: false },
+            errorInput({
+                error: 'connect ECONNREFUSED 127.0.0.1:3000',
+                errorContext: 'ctx',
+                recoverable: false,
+            }),
             { sessionId: 's' },
         );
         assert.strictEqual(r.errorHandling, 'retry');
     });
 
     it('onError callback é chamado para cada erro', async () => {
+        /** @type {string[]} */
         const errors = [];
         const handler = createCircuitBreakerHandler({
             maxRetries: 3,
             resetAfterMs: 10_000,
             onError: (input) => errors.push(input.error),
         });
-        await handler({ error: 'test-error', errorContext: 'ctx', recoverable: true }, { sessionId: 's' });
+        await handler(errorInput({ error: 'test-error', errorContext: 'ctx' }), { sessionId: 's' });
         assert.strictEqual(errors.length, 1);
         assert.strictEqual(errors[0], 'test-error');
+    });
+
+    it('isola o circuit breaker por sessionId para o mesmo errorContext', async () => {
+        const handler = createCircuitBreakerHandler({ maxRetries: 2, resetAfterMs: 10_000 });
+
+        const firstSession = await handler(
+            errorInput({ error: 'e', errorContext: 'ctx-shared' }),
+            { sessionId: 's1' },
+        );
+        const secondSession = await handler(
+            errorInput({ error: 'e', errorContext: 'ctx-shared' }),
+            { sessionId: 's2' },
+        );
+
+        assert.strictEqual(firstSession.errorHandling, 'retry');
+        assert.strictEqual(firstSession.retryCount, 1);
+        assert.strictEqual(secondSession.errorHandling, 'retry');
+        assert.strictEqual(secondSession.retryCount, 1);
     });
 });
 
 describe('createContextualErrorHandler', () => {
     it('mapeia errorContext para estratégia correta', async () => {
         const handler = createContextualErrorHandler({ rate_limit: 'retry', permission: 'skip' }, 'abort');
-        const r1 = await handler({ error: 'e', errorContext: 'rate_limit', recoverable: true }, { sessionId: 's' });
+        const r1 = await handler(errorInput({ error: 'e', errorContext: 'rate_limit' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'retry');
-        const r2 = await handler({ error: 'e', errorContext: 'permission', recoverable: false }, { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'permission', recoverable: false }), { sessionId: 's' });
         assert.strictEqual(r2.errorHandling, 'skip');
-        const r3 = await handler({ error: 'e', errorContext: 'unknown', recoverable: false }, { sessionId: 's' });
+        const r3 = await handler(errorInput({ error: 'e', errorContext: 'unknown', recoverable: false }), { sessionId: 's' });
         assert.strictEqual(r3.errorHandling, 'abort');
     });
 });
@@ -836,7 +958,8 @@ describe('createProductionHooks', () => {
 
     it('onPreToolUse: solicita confirmação para tool fora do allowList quando toolAllowList fornecido', async () => {
         const { hooks } = createProductionHooks({ toolAllowList: ['read_file', 'list_dir'] });
-        const result = await hooks.onPreToolUse(
+        const result = await callHook(
+            hooks.onPreToolUse,
             { toolName: 'run_in_terminal', toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' },
             { sessionId: 'prod-test' },
         );
@@ -846,7 +969,8 @@ describe('createProductionHooks', () => {
 
     it('onPreToolUse: permite tool dentro do allowList', async () => {
         const { hooks } = createProductionHooks({ toolAllowList: ['read_file', 'list_dir'] });
-        const result = await hooks.onPreToolUse(
+        const result = await callHook(
+            hooks.onPreToolUse,
             { toolName: 'read_file', toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' },
             { sessionId: 'prod-test' },
         );
@@ -856,16 +980,15 @@ describe('createProductionHooks', () => {
     it('onErrorOccurred: usa circuit-breaker por padrão', async () => {
         // circuitBreakerMaxRetries: 2 → abre depois de 2 falhas; 1ª = retry
         const { hooks } = createProductionHooks({ circuitBreakerMaxRetries: 2 });
-        const r1 = await hooks.onErrorOccurred(
-            { error: 'e', errorContext: 'circuit_test', recoverable: true },
-            { sessionId: 's' },
-        );
+        const r1 = await callHook(hooks.onErrorOccurred, errorInput({ error: 'e', errorContext: 'circuit_test' }), {
+            sessionId: 's',
+        });
         assert.strictEqual(r1.errorHandling, 'retry');
     });
 
     it('onSessionStart: retorna additionalContext', async () => {
         const { hooks } = createProductionHooks();
-        const result = await hooks.onSessionStart({ sessionId: 'p-1', source: 'new' }, { sessionId: 'p-1' });
+        const result = await callHook(hooks.onSessionStart, sessionStartInput({ source: 'new' }), { sessionId: 'p-1' });
         assert.ok(typeof result.additionalContext === 'string');
         assert.ok(result.additionalContext.includes('p-1'));
     });
@@ -987,7 +1110,9 @@ describe('hooks/audit › createAuditPostToolHandler', () => {
             { sessionId: 'sess-2' },
         );
         assert.strictEqual(captured.length, 1);
-        assert.strictEqual(captured[0].toolName, 'bash');
+        const entry = captured[0];
+        assert.ok(entry);
+        assert.strictEqual(entry.toolName, 'bash');
     });
 
     it('ignora exceção lançada pelo logger externo (não propaga)', async () => {
@@ -1023,7 +1148,9 @@ describe('hooks/audit › createAuditPostToolHandler', () => {
         const ts = '2026-01-01T00:00:00.000Z';
         const handler = createAuditPostToolHandler(null, buf);
         await handler({ toolName: 't', toolArgs: {}, toolResult: '', timestamp: ts }, { sessionId: 's' });
-        assert.strictEqual(buf.tail(1)[0].ts, ts);
+        const entry = buf.tail(1)[0];
+        assert.ok(entry);
+        assert.strictEqual(entry.ts, ts);
     });
 });
 
@@ -1048,7 +1175,9 @@ describe('hooks/audit › getAuditTail', () => {
         buf.push({ toolName: 'custom', toolArgs: {}, toolResult: '', sessionId: 's', ts: '', durationMs: 0 });
         const tail = getAuditTail(5, buf);
         assert.strictEqual(tail.length, 1);
-        assert.strictEqual(tail[0].toolName, 'custom');
+        const entry = tail[0];
+        assert.ok(entry);
+        assert.strictEqual(entry.toolName, 'custom');
     });
 
     it('retorna vazio quando buffer está vazio', () => {

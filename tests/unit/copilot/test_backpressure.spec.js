@@ -16,6 +16,7 @@ describe('TurnQueue', () => {
 
     it('deve serializar execuções via mutex', async () => {
         const q = new TurnQueue({ maxSize: 5 });
+        /** @type {string[]} */
         const order = [];
         const p1 = q.enqueue(async () => {
             order.push('a-start');

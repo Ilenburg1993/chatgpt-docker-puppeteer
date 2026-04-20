@@ -278,13 +278,13 @@ describe('F80 - filterModels', () => {
     it('filtra por vision=true', () => {
         const result = filterModels(allModels, { vision: true });
         expect(result).toHaveLength(1);
-        expect(result[0].id).toBe('gpt-4.1');
+        expect(result[0]?.id).toBe('gpt-4.1');
     });
 
     it('filtra por reasoningEffort=true', () => {
         const result = filterModels(allModels, { reasoningEffort: true });
         expect(result).toHaveLength(1);
-        expect(result[0].id).toBe('o3');
+        expect(result[0]?.id).toBe('o3');
     });
 
     it('filtra por enabled=true', () => {
@@ -296,7 +296,7 @@ describe('F80 - filterModels', () => {
     it('combina filtros', () => {
         const result = filterModels(allModels, { vision: true, reasoningEffort: false });
         expect(result).toHaveLength(1);
-        expect(result[0].id).toBe('gpt-4.1');
+        expect(result[0]?.id).toBe('gpt-4.1');
     });
 
     it('retorna array vazio para input nao-array', () => {
@@ -310,7 +310,7 @@ describe('F80 - filterModels', () => {
 
 describe('Barrel - Faixa 14 exports', () => {
     it('barrel exporta todas as funcoes novas da F14', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk/index'));
         const expected = [
             'filterModels',
             'getBillingMultiplier',
@@ -327,7 +327,7 @@ describe('Barrel - Faixa 14 exports', () => {
     });
 
     it('barrel mantém exports pre-existentes de models', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk/index'));
         const existing = [
             'buildReasoningConfig',
             'filterEnabledModels',

@@ -4,6 +4,8 @@
  * Testes para F68 (OTEL spans), F69 (async FS), F70 (metrics + cleanup paralelo).
  */
 
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock('#copilot/config/env', () => ({
@@ -120,6 +122,42 @@ import { deleteSession, listSessions } from '#copilot/sdk/session';
 import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
 import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';
 
+/** @returns {import('#copilot/sdk/types').CopilotClient} */
+function makeClient() {
+    return /** @type {any} */ ({ stop: vi.fn() });
+}
+
+/**
+ * @param {string} sessionId
+ * @param {Date} startTime
+ * @returns {import('#copilot/sdk/types').SessionMetadata}
+ */
+function makeSessionMetadata(sessionId, startTime) {
+    return {
+        sessionId,
+        startTime,
+        modifiedTime: startTime,
+        isRemote: false,
+    };
+}
+
+/** @returns {import('../../../src/copilot/agent/dialog/loop-manager.js').AgentHost} */
+function makeDialogHost() {
+    return /** @type {any} */ ({
+        sendMessage: vi.fn(async () => ''),
+        sendMessageDialogBoot: vi.fn(async () => ''),
+        answerPendingQuestion: vi.fn(() => true),
+        getPendingQuestion: vi.fn(() => null),
+        setModel: vi.fn(),
+        emit: vi.fn(() => true),
+        on: vi.fn(() => {}),
+        once: vi.fn(() => {}),
+        off: vi.fn(() => {}),
+        getSessionId: vi.fn(() => 'sess-span'),
+        getModel: vi.fn(() => 'gpt-4o'),
+    });
+}
+
 // ── F68.3: reconnect-policy span ────────────────────────────────────────────
 
 describe('F68: OTEL Spans', () => {
@@ -131,14 +169,14 @@ describe('F68: OTEL Spans', () => {
         it('envolve tryReconnect em startSpan copilot.reconnect', async () => {
             const { tryReconnect } = await import('../../../src/copilot/agent/lifecycle/reconnect-policy.js');
 
-            const callbacks = {
+            const callbacks = /** @type {any} */ ({
                 emit: vi.fn(),
                 initSession: vi.fn(async () => ({ session: { sessionId: 'new-sess' }, isResumed: false })),
                 dialogLoop: { active: false, notifyReconnect: vi.fn() },
                 clearSessionEventUnsubs: vi.fn(),
-            };
+            });
 
-            const result = await tryReconnect(new Error('test'), { stop: vi.fn() }, 'running', callbacks, {
+            const result = await tryReconnect(new Error('test'), makeClient(), 'processing', callbacks, {
                 maxAttempts: 1,
                 baseDelayMs: 0,
                 jitterFn: () => 0,
@@ -158,23 +196,12 @@ describe('F68: OTEL Spans', () => {
             const { DialogLoopManager } = await import('../../../src/copilot/agent/dialog/loop-manager.js');
             const dlm = new DialogLoopManager({ bootTimeoutMs: 50 });
 
-            const host = {
-                sendMessage: vi.fn(async () => {}),
-                sendMessageDialogBoot: vi.fn(async () => {}),
-                answerPendingQuestion: vi.fn(),
-                getPendingQuestion: vi.fn(() => null),
-                setModel: vi.fn(),
-                emit: vi.fn(),
-                on: vi.fn(() => () => {}),
-                off: vi.fn(),
-                getSessionId: vi.fn(() => 'sess-span'),
-                getModel: vi.fn(() => 'gpt-4o'),
-            };
+            const host = makeDialogHost();
 
             dlm.attach(host);
 
             // start will fail (boot timeout) but startSpanImmediate should be called before the await
-            await dlm.start(null).catch(() => {});
+            await dlm.start(undefined).catch(() => {});
 
             expect(vi.mocked(startSpanImmediate)).toHaveBeenCalledWith(
                 'copilot.dialog.loop',
@@ -227,16 +254,16 @@ describe('F70: Métricas e Cleanup paralelo', () => {
     describe('cleanup paralelo (Promise.allSettled)', () => {
         it('deleta múltiplas sessões em paralelo', async () => {
             const now = Date.now();
-            const oldTime = new Date(now - 100_000_000).toISOString();
+            const oldTime = new Date(now - 100_000_000);
 
             vi.mocked(listSessions).mockResolvedValueOnce([
-                { sessionId: 'old-1', startTime: oldTime },
-                { sessionId: 'old-2', startTime: oldTime },
-                { sessionId: 'old-3', startTime: oldTime },
+                makeSessionMetadata('old-1', oldTime),
+                makeSessionMetadata('old-2', oldTime),
+                makeSessionMetadata('old-3', oldTime),
             ]);
             vi.mocked(deleteSession).mockResolvedValue(undefined);
 
-            const client = /** @type {any} */ ({});
+            const client = makeClient();
             const result = await cleanupStaleSessions(client, { maxAgeMs: 86_400_000 });
 
             expect(result.deleted).toBe(3);
@@ -246,15 +273,15 @@ describe('F70: Métricas e Cleanup paralelo', () => {
 
         it('captura erros individuais via Promise.allSettled', async () => {
             const now = Date.now();
-            const oldTime = new Date(now - 100_000_000).toISOString();
+            const oldTime = new Date(now - 100_000_000);
 
             vi.mocked(listSessions).mockResolvedValueOnce([
-                { sessionId: 'ok-1', startTime: oldTime },
-                { sessionId: 'fail-1', startTime: oldTime },
+                makeSessionMetadata('ok-1', oldTime),
+                makeSessionMetadata('fail-1', oldTime),
             ]);
             vi.mocked(deleteSession).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('network error'));
 
-            const client = /** @type {any} */ ({});
+            const client = makeClient();
             const result = await cleanupStaleSessions(client, { maxAgeMs: 86_400_000 });
 
             expect(result.deleted).toBe(1);
@@ -264,17 +291,17 @@ describe('F70: Métricas e Cleanup paralelo', () => {
 
         it('preserva sessão ativa e sessões jovens', async () => {
             const now = Date.now();
-            const recentTime = new Date(now - 1000).toISOString();
-            const oldTime = new Date(now - 100_000_000).toISOString();
+            const recentTime = new Date(now - 1000);
+            const oldTime = new Date(now - 100_000_000);
 
             vi.mocked(listSessions).mockResolvedValueOnce([
-                { sessionId: 'current', startTime: oldTime },
-                { sessionId: 'young', startTime: recentTime },
-                { sessionId: 'old', startTime: oldTime },
+                makeSessionMetadata('current', oldTime),
+                makeSessionMetadata('young', recentTime),
+                makeSessionMetadata('old', oldTime),
             ]);
             vi.mocked(deleteSession).mockResolvedValue(undefined);
 
-            const client = /** @type {any} */ ({});
+            const client = makeClient();
             const result = await cleanupStaleSessions(client, {
                 maxAgeMs: 86_400_000,
                 currentSessionId: 'current',
@@ -306,7 +333,7 @@ describe('F69: Async snapshot exports', () => {
         const snap = createSnapshot({
             sessionId: 'test-sess',
             model: 'gpt-4o',
-            status: 'running',
+            status: 'processing',
             sendCount: 5,
             dialogLoopActive: true,
             dialogPaused: false,

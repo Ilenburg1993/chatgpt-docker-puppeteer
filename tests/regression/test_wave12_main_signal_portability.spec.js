@@ -12,7 +12,7 @@ test.afterEach(() => {
 test('wave12: setupSignalHandlers tolerates unsupported SIGUSR2 and SIGHUP', () => {
     const originalOn = process.on;
 
-    process.on = function patchedOn(eventName, handler) {
+    process.on = function patchedOn(/** @type {string} */ eventName, /** @type {(...args: any[]) => void} */ handler) {
         if (eventName === 'SIGUSR2' || eventName === 'SIGHUP') {
             throw new Error(`unsupported signal: ${eventName}`);
         }

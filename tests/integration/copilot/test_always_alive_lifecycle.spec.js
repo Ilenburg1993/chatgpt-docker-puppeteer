@@ -20,7 +20,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { it, before, after } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 // AlwaysAliveAgent é um singleton exportado do módulo — importamos diretamente
 // para garantir o mesmo objeto monitorado pelos listeners do sistema.
@@ -141,7 +141,7 @@ async function runLifecycleCycle(cycleNum, agent) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.skip('AlwaysAliveAgent › ciclo stop/start › F4.7 (UPG-12)', { timeout: BOOT_TIMEOUT_MS * 7 }, () => {
-    before(async () => {
+    beforeAll(async () => {
         // Garantir que o agente está parado antes dos testes
         if (alwaysAliveAgent.status !== 'stopped') {
             if (alwaysAliveAgent.dialogLoopActive) {
@@ -151,7 +151,7 @@ describe.skip('AlwaysAliveAgent › ciclo stop/start › F4.7 (UPG-12)', { timeo
         }
     });
 
-    after(async () => {
+    afterAll(async () => {
         // Limpeza final
         if (alwaysAliveAgent.status !== 'stopped') {
             if (alwaysAliveAgent.dialogLoopActive) {
@@ -164,8 +164,8 @@ describe.skip('AlwaysAliveAgent › ciclo stop/start › F4.7 (UPG-12)', { timeo
     it('ciclo 1: start → startDialogLoop → stopDialogLoop → stop', async () => {
         const result = await runLifecycleCycle(1, alwaysAliveAgent);
         assert.equal(result.loopChangedEvents.length, 2, 'Deve ter exatamente 2 eventos dialog.loop.changed');
-        assert.equal(result.loopChangedEvents[0].active, true);
-        assert.equal(result.loopChangedEvents[1].active, false);
+        assert.equal(result.loopChangedEvents[0]?.active, true);
+        assert.equal(result.loopChangedEvents[1]?.active, false);
     });
 
     it('ciclo 2: sem vazamento de listeners — segundo ciclo completo', async () => {

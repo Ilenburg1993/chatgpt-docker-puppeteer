@@ -8,7 +8,7 @@
  * CopilotClient REAL nao e instanciado — todos os testes usam mocks.
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 // ─── mock de CopilotClient ───────────────────────────────────────────────────
 
@@ -64,13 +64,13 @@ describe('lib/session › createSession', () => {
     it('cria sessao com client mock e retorna result correto', async () => {
         const { createSession } = await import('#copilot/sdk/session');
         const client = makeMockClient({ sessionId: 'new-sess-abc' });
-        const result = await createSession(client, { model: 'gpt-4.1' });
+        const result = await createSession(client, { model: 'gpt-5-mini' });
         assert.strictEqual(result.sessionId, 'new-sess-abc');
         assert.strictEqual(result.isResumed, false);
         assert.ok(result.session);
     });
 
-    it('usa gpt-4.1 como model padrao', async () => {
+    it('usa gpt-5-mini como model padrao', async () => {
         const { createSession } = await import('#copilot/sdk/session');
         const capturedConfigs = /** @type {any[]} */ ([]);
         const client = {
@@ -82,8 +82,8 @@ describe('lib/session › createSession', () => {
         };
         await createSession(client);
         assert.ok(capturedConfigs.length > 0);
-        // model deve ser 'gpt-4.1' (default)
-        assert.strictEqual(capturedConfigs[0].model, 'gpt-4.1');
+        // model deve ser 'gpt-5-mini' (default)
+        assert.strictEqual(capturedConfigs[0].model, 'gpt-5-mini');
     });
 
     it('inclui systemMessage quando systemMessageContent fornecido', async () => {

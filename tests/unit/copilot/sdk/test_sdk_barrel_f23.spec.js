@@ -40,6 +40,7 @@ function extractExportedNames(sourceText) {
     let m;
     while ((m = blockRegex.exec(sourceText)) !== null) {
         const block = m[1];
+        if (!block) continue;
         // Cada linha pode ser `name`, `name as alias`, ou `* as ns`
         const items = block
             .split(',')
@@ -47,7 +48,7 @@ function extractExportedNames(sourceText) {
             .filter(Boolean);
         for (const item of items) {
             const alias = item.match(/as\s+(\w+)/);
-            if (alias) {
+            if (alias?.[1]) {
                 names.push(alias[1]);
             } else {
                 names.push(item);
@@ -57,7 +58,7 @@ function extractExportedNames(sourceText) {
     // Captura `export function name` e `export const name` diretos (não re-exports)
     const directRegex = /export\s+(?:async\s+)?(?:function|const|class|let|var)\s+(\w+)/g;
     while ((m = directRegex.exec(sourceText)) !== null) {
-        names.push(m[1]);
+        if (m[1]) names.push(m[1]);
     }
     return names;
 }

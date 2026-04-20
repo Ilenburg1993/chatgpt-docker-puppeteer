@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { createContainer, createToken } from '../../../src/copilot/core/di.js';
 
@@ -279,6 +279,7 @@ describe('core/di.js › dispose', () => {
     });
 
     it('dispose children antes do parent', () => {
+        /** @type {string[]} */
         const order = [];
         const root = createContainer();
         const RT = createToken('ROOT');
@@ -295,6 +296,7 @@ describe('core/di.js › dispose', () => {
     });
 
     it('dispose em ordem reversa de registro', () => {
+        /** @type {string[]} */
         const order = [];
         const A = createToken('A');
         const B = createToken('B');
@@ -351,10 +353,10 @@ describe('core/di.js › dependency chain', () => {
         const DB = createToken('DB');
         const REPO = createToken('REPO');
         const c = createContainer();
-        c.register(DB, () => ({ query: (q) => `result:${q}` }));
+        c.register(DB, () => ({ query: (/** @type {string} */ q) => `result:${q}` }));
         c.register(REPO, (container) => {
             const db = container.resolve(DB);
-            return { find: (id) => db.query(`SELECT * WHERE id=${id}`) };
+            return { find: (/** @type {number} */ id) => db.query(`SELECT * WHERE id=${id}`) };
         });
         const repo = c.resolve(REPO);
         assert.equal(repo.find(1), 'result:SELECT * WHERE id=1');
@@ -380,6 +382,7 @@ describe('core/di-container.js › wireLegacySetters', () => {
         const B = createToken('WL_B');
         c.register(A, () => 'valueA');
         c.register(B, () => 42);
+        /** @type {[string, unknown][]} */
         const called = [];
         const count = wireLegacySetters(c, [
             { token: A, setter: (v) => called.push(['A', v]) },

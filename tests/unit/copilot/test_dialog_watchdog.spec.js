@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { before, describe, it, mock } from 'node:test';
+import { afterEach, beforeAll, describe, it, vi } from 'vitest';
 import { DialogWatchdog, WATCHDOG_THRESHOLDS } from '../../../src/copilot/agent/dialog/watchdog.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ describe('DialogLoopManager › G2-ARCH-11: stop() com shutdownTimeoutMs', async
     /** @type {string} */
     let src = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
@@ -62,7 +62,7 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
     /** @type {string} */
     let src = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
@@ -101,6 +101,10 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('start() ativa o watchdog (running=true)', () => {
         const wd = new DialogWatchdog({ intervalMs: 100, stallThresholdMs: 50, onStall: () => {} });
         assert.strictEqual(wd.running, false, 'deve iniciar inativo');
@@ -116,8 +120,8 @@ describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
         assert.strictEqual(wd.running, false, 'deve estar inativo após stop()');
     });
 
-    it('stop() durante pausa NÃO dispara onStall', (t) => {
-        mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+    it('stop() durante pausa NÃO dispara onStall', () => {
+        vi.useFakeTimers();
         let stallCount = 0;
         const wd = new DialogWatchdog({
             intervalMs: 100,
@@ -131,9 +135,8 @@ describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
         // Simula pause: stop watchdog
         wd.stop();
         // Avança 500ms — sem watchdog ativo, nenhum stall deve ser disparado
-        mock.timers.tick(500);
+        vi.advanceTimersByTime(500);
         assert.strictEqual(stallCount, 0, 'onStall NÃO deve ser chamado durante pausa');
-        mock.timers.reset();
     });
 
     it('após resume (start), watchdog volta a disparar onStall em stall real', async () => {
@@ -157,8 +160,8 @@ describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
         wd.stop();
     });
 
-    it('ping() reseta o timer de inatividade', (t) => {
-        mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+    it('ping() reseta o timer de inatividade', () => {
+        vi.useFakeTimers();
         let stallCount = 0;
         const wd = new DialogWatchdog({
             intervalMs: 100,
@@ -170,18 +173,17 @@ describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
 
         wd.start();
         // Avança 100ms — o interval dispara mas ainda não atingiu 150ms de stall
-        mock.timers.tick(100);
+        vi.advanceTimersByTime(100);
         assert.strictEqual(stallCount, 0, 'sem stall antes do threshold');
 
         // Ping reseta — lastActivity = Date.now() snapshot no mock
         wd.ping();
 
         // Avança mais 100ms — desde o ping, só 100ms (< 150ms threshold)
-        mock.timers.tick(100);
+        vi.advanceTimersByTime(100);
         assert.strictEqual(stallCount, 0, 'ping deve resetar o timer — sem stall');
 
         wd.stop();
-        mock.timers.reset();
     });
 
     it('start() chamado duas vezes não cria timer duplicado', () => {
@@ -229,7 +231,7 @@ describe('DialogWatchdog › F31: DLM pause/resume integração source analysis'
     /** @type {string} */
     let dlmSrc = '';
 
-    before(async () => {
+    beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');

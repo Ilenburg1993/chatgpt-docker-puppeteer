@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { onTestFinished, test } from 'vitest';
 
 import { MissionRunner } from '#agent/mission_runner';
 import { getMissionById, updateMission } from '#infra/db/mission_repo';

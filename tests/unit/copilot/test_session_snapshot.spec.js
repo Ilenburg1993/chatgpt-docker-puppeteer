@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, it, before, after, beforeEach } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 // Stub logger antes de importar o módulo
 
@@ -16,7 +16,7 @@ describe('session-snapshot', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/snapshot.js')} */
     let mod;
 
-    before(async () => {
+    beforeAll(async () => {
         mod = await import('../../../src/copilot/agent/session/snapshot.js');
     });
 
@@ -27,7 +27,7 @@ describe('session-snapshot', async () => {
         }
     });
 
-    after(() => {
+    afterAll(() => {
         if (existsSync(TEST_SNAPSHOT_DIR)) {
             rmSync(TEST_SNAPSHOT_DIR, { recursive: true, force: true });
         }
@@ -67,11 +67,45 @@ describe('session-snapshot', async () => {
                 dialogLoopActive: false,
                 dialogPaused: true,
                 pendingQuestion: 'What is your name?',
+                pendingQuestionMeta: {
+                    kind: 'question',
+                    askedAt: 123,
+                    allowFreeform: true,
+                    protocolControlled: false,
+                },
+                pendingQuestionShadow: {
+                    question: 'READY: aguardando próxima mensagem',
+                    meta: {
+                        kind: 'ready',
+                        askedAt: 456,
+                        allowFreeform: true,
+                        protocolControlled: true,
+                    },
+                    restoredAt: 789,
+                    expiresAt: 999,
+                },
                 prMetrics: { boots: 3, resumesWithPR: 1, resumesZeroPR: 5, totalPR: 4 },
                 reason: 'handoff',
             });
 
             assert.deepEqual(snap.prMetrics, { boots: 3, resumesWithPR: 1, resumesZeroPR: 5, totalPR: 4 });
+            assert.deepEqual(snap.pendingQuestionMeta, {
+                kind: 'question',
+                askedAt: 123,
+                allowFreeform: true,
+                protocolControlled: false,
+            });
+            assert.deepEqual(snap.pendingQuestionShadow, {
+                question: 'READY: aguardando próxima mensagem',
+                meta: {
+                    kind: 'ready',
+                    askedAt: 456,
+                    allowFreeform: true,
+                    protocolControlled: true,
+                },
+                restoredAt: 789,
+                expiresAt: 999,
+            });
             assert.equal(snap.reason, 'handoff');
         });
     });
@@ -131,8 +165,8 @@ describe('session-snapshot', async () => {
 
             const list = await mod.listSnapshotsAsync();
             assert.equal(list.length, 2);
-            assert.equal(list[0].createdAt, 2000);
-            assert.equal(list[1].createdAt, 1000);
+            assert.equal(list[0]?.createdAt, 2000);
+            assert.equal(list[1]?.createdAt, 1000);
         });
 
         it('retorna array vazio se diretório não existe', async () => {

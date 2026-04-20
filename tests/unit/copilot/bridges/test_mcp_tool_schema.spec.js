@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { buildZodSchema } from '../../../../src/copilot/bridges/mcp-tool-schema.js';
 
@@ -41,7 +41,7 @@ describe('buildZodSchema — escalares', () => {
     });
 
     it('schema null/undefined retorna z.unknown()', () => {
-        const schema = buildZodSchema(null);
+        const schema = buildZodSchema(/** @type {any} */ (null));
         assert.ok(schema.safeParse(123).success);
         assert.ok(schema.safeParse('xyz').success);
     });

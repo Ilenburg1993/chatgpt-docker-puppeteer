@@ -19,7 +19,13 @@ vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: vi.fn(),
 }));
 
-/** @type {Record<string, import('vitest').Mock>} */
+/** @type {{
+ *  readFile: import('vitest').Mock;
+ *  writeFile: import('vitest').Mock;
+ *  mkdir: import('vitest').Mock;
+ *  stat: import('vitest').Mock;
+ *  readdir: import('vitest').Mock;
+ * }} */
 const fsMock = {
     readFile: vi.fn(),
     writeFile: vi.fn(),
@@ -49,7 +55,10 @@ const { sessionTools } = await import('#copilot/tools/session-tools');
 
 // Desestruturar tools do array exportado
 const [readBriefingTool, writePendingTaskTool, getWorkspaceInfoTool, setSessionContextTool, invokeSkillTool] =
-    sessionTools;
+    /** @type {[any, any, any, any, any]} */ (sessionTools);
+
+/** @param {Function} handler @param {Record<string, unknown>} [args] */
+const callTool = async (handler, args = {}) => /** @type {any} */ (await handler(args, { sessionId: 'test-session' }));
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -60,12 +69,12 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F36 — read_briefing (F189-F190)', () => {
-    const handler = readBriefingTool.handler;
+    const handler = /** @type {Function} */ (readBriefingTool.handler);
 
     it('retorna conteúdo do briefing quando existe', async () => {
         fsMock.readFile.mockResolvedValue('# Session Briefing\nclose_key: abc123');
 
-        const result = await handler({});
+        const result = await callTool(handler, {});
 
         expect(result.content).toContain('close_key: abc123');
     });
@@ -73,7 +82,7 @@ describe('F36 — read_briefing (F189-F190)', () => {
     it('retorna null quando briefing não existe', async () => {
         fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
 
-        const result = await handler({});
+        const result = await callTool(handler, {});
 
         expect(result.content).toBeNull();
         expect(result.message).toContain('não encontrado');
@@ -89,19 +98,20 @@ describe('F36 — read_briefing (F189-F190)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F36 — write_pending_task (F191-F192)', () => {
-    const handler = writePendingTaskTool.handler;
+    const handler = /** @type {Function} */ (writePendingTaskTool.handler);
 
     it('adiciona tarefa ao pending-tasks.md', async () => {
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.readFile.mockResolvedValue('# Tarefas Pendentes\n\n');
         fsMock.writeFile.mockResolvedValue(undefined);
 
-        const result = await handler({ title: 'Fix bug', description: 'Corrigir bug X', priority: 'high' });
+        const result = await callTool(handler, { title: 'Fix bug', description: 'Corrigir bug X', priority: 'high' });
 
         expect(result.success).toBe(true);
         expect(result.title).toBe('Fix bug');
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
-        const written = fsMock.writeFile.mock.calls[0][1];
+        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        expect(written).toBeDefined();
         expect(written).toContain('[HIGH] Fix bug');
         expect(written).toContain('Corrigir bug X');
     });
@@ -111,10 +121,11 @@ describe('F36 — write_pending_task (F191-F192)', () => {
         fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
         fsMock.writeFile.mockResolvedValue(undefined);
 
-        const result = await handler({ title: 'Nova tarefa' });
+        const result = await callTool(handler, { title: 'Nova tarefa' });
 
         expect(result.success).toBe(true);
-        const written = fsMock.writeFile.mock.calls[0][1];
+        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        expect(written).toBeDefined();
         expect(written).toContain('# Tarefas Pendentes');
     });
 
@@ -123,16 +134,17 @@ describe('F36 — write_pending_task (F191-F192)', () => {
         fsMock.readFile.mockResolvedValue('');
         fsMock.writeFile.mockResolvedValue(undefined);
 
-        await handler({ title: 'Default priority' });
+        await callTool(handler, { title: 'Default priority' });
 
-        const written = fsMock.writeFile.mock.calls[0][1];
+        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        expect(written).toBeDefined();
         expect(written).toContain('[MEDIUM]');
     });
 
     it('retorna erro em falha de escrita', async () => {
         fsMock.mkdir.mockRejectedValue(new Error('EACCES'));
 
-        const result = await handler({ title: 'Will fail' });
+        const result = await callTool(handler, { title: 'Will fail' });
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('EACCES');
@@ -143,7 +155,7 @@ describe('F36 — write_pending_task (F191-F192)', () => {
         fsMock.readFile.mockResolvedValue('');
         fsMock.writeFile.mockResolvedValue(undefined);
 
-        await handler({ title: 'Logged task' });
+        await callTool(handler, { title: 'Logged task' });
 
         expect(mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_pending_task'));
     });
@@ -154,7 +166,7 @@ describe('F36 — write_pending_task (F191-F192)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F36 — get_workspace_info (F193)', () => {
-    const handler = getWorkspaceInfoTool.handler;
+    const handler = /** @type {Function} */ (getWorkspaceInfoTool.handler);
 
     it('retorna info básica do workspace com git', async () => {
         mockExecFileSync
@@ -162,7 +174,7 @@ describe('F36 — get_workspace_info (F193)', () => {
             .mockReturnValueOnce('/workspaces/project\n') // root
             .mockReturnValueOnce('abc1234\n'); // commit
 
-        const result = await handler({});
+        const result = await callTool(handler, {});
 
         expect(result.cwd).toBeDefined();
         expect(result.nodeVersion).toBe(process.version);
@@ -179,7 +191,7 @@ describe('F36 — get_workspace_info (F193)', () => {
             throw new Error('not a git repo');
         });
 
-        const result = await handler({});
+        const result = await callTool(handler, {});
 
         expect(result.git).toBeNull();
         expect(result.nodeVersion).toBeDefined();
@@ -195,10 +207,10 @@ describe('F36 — get_workspace_info (F193)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F36 — set_session_context (F194)', () => {
-    const handler = setSessionContextTool.handler;
+    const handler = /** @type {Function} */ (setSessionContextTool.handler);
 
     it('armazena contexto e retorna contagem', async () => {
-        const result = await handler({ key: 'current_task', value: 'fixing bugs' });
+        const result = await callTool(handler, { key: 'current_task', value: 'fixing bugs' });
 
         expect(result.success).toBe(true);
         expect(result.key).toBe('current_task');
@@ -206,14 +218,14 @@ describe('F36 — set_session_context (F194)', () => {
     });
 
     it('sobrescreve valor existente', async () => {
-        await handler({ key: 'mykey', value: 'v1' });
-        const result = await handler({ key: 'mykey', value: 'v2' });
+        await callTool(handler, { key: 'mykey', value: 'v1' });
+        const result = await callTool(handler, { key: 'mykey', value: 'v2' });
 
         expect(result.success).toBe(true);
     });
 
     it('loga a operação', async () => {
-        await handler({ key: 'log_test', value: 'x' });
+        await callTool(handler, { key: 'log_test', value: 'x' });
 
         expect(mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('set_session_context'));
     });
@@ -224,7 +236,7 @@ describe('F36 — set_session_context (F194)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F36 — invoke_skill (F195)', () => {
-    const handler = invokeSkillTool.handler;
+    const handler = /** @type {Function} */ (invokeSkillTool.handler);
 
     it('lista skills disponíveis quando name omitido', async () => {
         fsMock.stat.mockResolvedValue({});
@@ -234,7 +246,7 @@ describe('F36 — invoke_skill (F195)', () => {
             { name: 'README.md', isDirectory: () => false },
         ]);
 
-        const result = await handler({});
+        const result = await callTool(handler, {});
 
         expect(result.available).toEqual(['code-audit', 'jsdoc-authoring']);
     });
@@ -244,7 +256,7 @@ describe('F36 — invoke_skill (F195)', () => {
         fsMock.readdir.mockResolvedValue([{ name: 'code-audit', isDirectory: () => true }]);
         fsMock.readFile.mockResolvedValue('# Code Audit Skill\nInstruções...');
 
-        const result = await handler({ name: 'code-audit' });
+        const result = await callTool(handler, { name: 'code-audit' });
 
         expect(result.name).toBe('code-audit');
         expect(result.content).toContain('Code Audit Skill');
@@ -255,7 +267,7 @@ describe('F36 — invoke_skill (F195)', () => {
         fsMock.readdir.mockResolvedValue([]);
         fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
 
-        const result = await handler({ name: 'nonexistent' });
+        const result = await callTool(handler, { name: 'nonexistent' });
 
         expect(result.error).toContain("'nonexistent'");
     });
@@ -263,7 +275,7 @@ describe('F36 — invoke_skill (F195)', () => {
     it('retorna erro se diretório skills/ não existe', async () => {
         fsMock.stat.mockRejectedValue(new Error('ENOENT'));
 
-        const result = await handler({ name: 'test' });
+        const result = await callTool(handler, { name: 'test' });
 
         expect(result.error).toContain('.github/skills/');
     });

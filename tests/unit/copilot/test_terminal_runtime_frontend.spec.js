@@ -19,23 +19,46 @@ const getHubSession = vi.fn(() => ({ id: 'hub-1', title: 'Hub' }));
 const getTurn = vi.fn(() => ({ turn_number: 7 }));
 const writeTurn = vi.fn(async () => 42);
 
+const defaultRuntime = /** @type {any} */ ({
+    model: 'gpt-5',
+    reasoningEffort: 'high',
+    status: 'idle',
+    sessionId: 'sdk-live',
+    dialogLoopActive: true,
+    dialogPaused: false,
+    queueSize: 3,
+    pendingQuestion: {
+        question: 'seguir?',
+        choices: ['sim', 'não'],
+        kind: 'question',
+        allowFreeform: true,
+        askedAt: 1,
+        protocolControlled: false,
+    },
+    pendingQuestionShadow: {
+        question: 'READY: aguardando próxima mensagem',
+        meta: { kind: 'ready', askedAt: 1, allowFreeform: true, protocolControlled: true },
+        restoredAt: 2,
+        expiresAt: 3,
+    },
+    pendingQuestionShadowState: 'expired',
+    pendingQuestionShadowExpired: true,
+    pendingQuestionShadowAgeMs: 1200,
+    pendingQuestionShadowExpiresAt: 3,
+    pendingQuestionShadowRemainingMs: 0,
+    pauseDialogLoop,
+    resumeDialogLoop,
+    stopDialogLoop,
+    pingDialogWatchdog,
+    getHandoffManager: () => ({ getHistory: () => [{ fromAgent: 'llm-a', toAgent: 'llm-b', status: 'done' }] }),
+});
+
 vi.mock('#copilot/agent', () => ({
-    getAgent: () =>
-        /** @type {any} */ ({
-            model: 'gpt-5',
-            reasoningEffort: 'high',
-            status: 'idle',
-            sessionId: 'sdk-live',
-            dialogLoopActive: true,
-            dialogPaused: false,
-            queueSize: 3,
-            pendingQuestion: { question: 'seguir?', choices: ['sim', 'não'] },
-            pauseDialogLoop,
-            resumeDialogLoop,
-            stopDialogLoop,
-            pingDialogWatchdog,
-            getHandoffManager: () => ({ getHistory: () => [{ fromAgent: 'llm-a', toAgent: 'llm-b', status: 'done' }] }),
-        }),
+    getAgent: () => defaultRuntime,
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
 }));
 
 vi.mock('#copilot/channel', () => ({
@@ -77,11 +100,19 @@ describe('terminal/frontend/llm-b-runtime', () => {
     it('projeta o estado canônico do runtime do terminal', () => {
         const state = runtime.readTerminalRuntimeState();
 
+        expect(state.runtimeId).toBe('default');
         expect(state.model).toBe('gpt-5');
         expect(state.reasoningEffort).toBe('high');
         expect(state.dialogLoopActive).toBe(true);
         expect(state.queueSize).toBe(3);
         expect(state.pendingQuestion?.question).toBe('seguir?');
+        expect(state.pendingQuestionKind).toBe('question');
+        expect(state.pendingQuestionShadowKind).toBe('ready');
+        expect(state.pendingQuestionShadowState).toBe('expired');
+        expect(state.pendingQuestionShadowExpired).toBe(true);
+        expect(state.pendingQuestionShadowAgeMs).toBe(1200);
+        expect(state.pendingQuestionShadowExpiresAt).toBe(3);
+        expect(state.pendingQuestionShadowRemainingMs).toBe(0);
     });
 
     it('encapsula operações de dialog mode e histórico do channel', async () => {
@@ -108,7 +139,11 @@ describe('terminal/frontend/llm-b-runtime', () => {
         await runtime.initTerminalConversationHub();
         const hubId = runtime.createTerminalHubSession({ title: 'Terminal' });
         const turnId = await runtime.writeTerminalHubSystemTurn('hub-1', '[SISTEMA] ok');
-        runtime.notifyTerminalHubTurn('hub-1', { turnId: 1 }, { turnId: 2 });
+        runtime.notifyTerminalHubTurn(
+            'hub-1',
+            { turnId: 1, role: 'user', content: 'olá', turnNumber: 1 },
+            { turnId: 2, content: 'oi', turnNumber: 2, durationMs: 16 },
+        );
         runtime.attachTerminalHubSocketIO(/** @type {any} */ ({ id: 'io' }));
 
         expect(runtime.readTerminalHandoffHistory()).toHaveLength(1);

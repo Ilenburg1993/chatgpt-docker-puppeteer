@@ -162,7 +162,7 @@ describe('F114 — mensagem clara quando não autenticado', () => {
         expect(result.ok).toBe(false);
         // Quando não autenticado, error deve ter mensagem descritiva
         expect(typeof result.error).toBe('string');
-        expect(result.error.length).toBeGreaterThan(0);
+        expect(result.error?.length ?? 0).toBeGreaterThan(0);
     });
 
     it('mensagem de nenhuma quota indica falha de auth provável', async () => {

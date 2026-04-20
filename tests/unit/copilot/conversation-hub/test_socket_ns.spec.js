@@ -8,6 +8,7 @@
 
 import EventEmitter from 'node:events';
 import { createRequire } from 'node:module';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
@@ -45,16 +46,16 @@ function createMockSocket() {
         id: 'mock-socket-001',
         rooms,
         handshake: { address: '127.0.0.1', auth: {}, headers: {} },
-        emit: vi.fn((event, data) => {
+        emit: vi.fn((/** @type {string} */ event, /** @type {unknown} */ data) => {
             const arr = emitted.get(event) ?? [];
             arr.push(data);
             emitted.set(event, arr);
         }),
-        on: vi.fn((event, handler) => {
+        on: vi.fn((/** @type {string} */ event, /** @type {Function} */ handler) => {
             listeners.set(event, handler);
         }),
-        join: vi.fn((room) => rooms.add(room)),
-        leave: vi.fn((room) => rooms.delete(room)),
+        join: vi.fn((/** @type {string} */ room) => rooms.add(room)),
+        leave: vi.fn((/** @type {string} */ room) => rooms.delete(room)),
         _emitted: emitted,
         _listeners: listeners,
         /** @param {string} event @param {any} data */
@@ -66,29 +67,30 @@ function createMockSocket() {
 }
 
 function createMockNamespace() {
+    /** @type {any} */
     const ns = new EventEmitter();
     const emitted = /** @type {{ event: string; data: any }[]} */ ([]);
     const origEmit = ns.emit.bind(ns);
-    ns.emit = vi.fn((event, data) => {
-        emitted.push({ event, data });
+    ns.emit = vi.fn((/** @type {string | symbol} */ event, /** @type {unknown} */ data) => {
+        emitted.push({ event: String(event), data });
         return origEmit(event, data);
     });
     ns.use = vi.fn();
     ns.disconnectSockets = vi.fn();
     ns.removeAllListeners = vi.fn();
     ns.to = vi.fn(() => ({
-        emit: vi.fn((event, data) => {
+        emit: vi.fn((/** @type {string} */ event, /** @type {unknown} */ data) => {
             emitted.push({ event: `room:${event}`, data });
         }),
     }));
-    // @ts-expect-error — propriedade de teste
     ns._emitted = emitted;
     return ns;
 }
 
+/** @param {any} ns */
 function createMockIo(ns) {
     return {
-        of: vi.fn(() => ns),
+        of: vi.fn((/** @type {string} */ _namespace) => ns),
     };
 }
 
@@ -117,7 +119,7 @@ afterAll(() => {
 describe('socket-ns mountCopilotNamespace', () => {
     it('monta namespace /copilot e registra connection handler', async () => {
         // Limpar state anterior
-        const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
+        const mod = await import('../../../../src/copilot/server/socket/hub-ns.js');
         mod.unmountCopilotNamespace();
 
         const ns = createMockNamespace();
@@ -136,7 +138,7 @@ describe('socket-ns mountCopilotNamespace', () => {
 
         const result = mod.mountCopilotNamespace(/** @type {any} */ (mockIo), orch, store);
         expect(result).toBeTruthy(); // deve retornar o namespace;
-        expect(mockIo.of.mock.calls[0][0] === '/copilot').toBeTruthy();
+        expect(mockIo.of).toHaveBeenCalledWith('/copilot');
 
         // Cleanup
         mod.unmountCopilotNamespace();
@@ -144,7 +146,7 @@ describe('socket-ns mountCopilotNamespace', () => {
     });
 
     it('ignora re-mount quando namespace já montado', async () => {
-        const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
+        const mod = await import('../../../../src/copilot/server/socket/hub-ns.js');
         mod.unmountCopilotNamespace();
 
         const ns = createMockNamespace();
@@ -174,7 +176,7 @@ describe('socket-ns mountCopilotNamespace', () => {
 
 describe('socket-ns unmountCopilotNamespace', () => {
     it('limpa namespace e desconecta sockets', async () => {
-        const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
+        const mod = await import('../../../../src/copilot/server/socket/hub-ns.js');
         mod.unmountCopilotNamespace();
 
         const ns = createMockNamespace();
@@ -200,8 +202,8 @@ describe('socket-ns unmountCopilotNamespace', () => {
 
 describe('socket-ns broadcastToSession', () => {
     it('ignora broadcast quando namespace não montado', async () => {
-        const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
-        mod.unmountCopilotNamespace();
+        const mod = await import('../../../../src/copilot/conversation-hub/broadcast.js');
+        mod.setCopilotNamespace(null);
 
         // Não deve lançar
         expect(() => {
@@ -212,8 +214,8 @@ describe('socket-ns broadcastToSession', () => {
 
 describe('socket-ns broadcastGlobal', () => {
     it('ignora broadcast quando namespace não montado', async () => {
-        const mod = await import('../../../../src/copilot/conversation-hub/socket-ns.js');
-        mod.unmountCopilotNamespace();
+        const mod = await import('../../../../src/copilot/conversation-hub/broadcast.js');
+        mod.setCopilotNamespace(null);
 
         expect(() => {
             mod.broadcastGlobal('test-event', { data: 1 });

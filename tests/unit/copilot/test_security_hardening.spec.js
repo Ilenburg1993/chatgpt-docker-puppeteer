@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 // ─── F131: execFileSync security ─────────────────────────────────────────────
 
@@ -15,7 +15,12 @@ describe('session-tools — execFileSync security (F131)', () => {
         const { sessionTools } = await import('../../../src/copilot/tools/session-tools.js');
         const getWorkspaceInfo = sessionTools.find((t) => t.name === 'get_workspace_info');
         assert.ok(getWorkspaceInfo, 'Tool get_workspace_info deve existir');
-        const result = await getWorkspaceInfo.handler({});
+        const result = /** @type {any} */ (
+            await getWorkspaceInfo.handler(
+                {},
+                { sessionId: 'test-session', toolCallId: 'tool-1', toolName: 'get_workspace_info', arguments: {} },
+            )
+        );
         assert.ok(result.cwd, 'Deve ter cwd');
         assert.ok(result.nodeVersion, 'Deve ter nodeVersion');
         // Git info pode ser null em ambientes sem git, mas no workspace deve existir
@@ -38,7 +43,7 @@ describe('session-tools — execFileSync security (F131)', () => {
 
 describe('middleware — error sanitizer (F136)', () => {
     it('módulo middleware exporta withErrorHandler', async () => {
-        const mod = await import('../../../src/copilot/api/express/middleware.js');
+        const mod = await import('../../../src/copilot/server/routes/sdk/middleware.js');
         assert.ok(typeof mod.withErrorHandler === 'function');
     });
 });

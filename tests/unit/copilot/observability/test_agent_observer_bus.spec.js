@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 import { EMITTER_TO_BUS_TYPE } from '../../../../src/copilot/observability/observers/event-name-map.js';
 

@@ -305,8 +305,8 @@ describe('F60b — createEventFilter', () => {
         filtered(/** @type {any} */ ({ type: 'session.error', data: { message: 'err' } }));
 
         expect(handler).toHaveBeenCalledTimes(2);
-        expect(handler.mock.calls[0][0].type).toBe('assistant.message');
-        expect(handler.mock.calls[1][0].type).toBe('session.error');
+        expect(handler.mock.calls[0]?.[0]?.type).toBe('assistant.message');
+        expect(handler.mock.calls[1]?.[0]?.type).toBe('session.error');
     });
 
     it('lança erro se allowedTypes está vazio', () => {

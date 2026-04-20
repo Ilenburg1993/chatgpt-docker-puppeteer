@@ -55,7 +55,7 @@ describe('createMetricsStore', () => {
     describe('recordToolCall', () => {
         it('registra tool com sucesso', () => {
             store.recordToolCall('web_fetch', 150, true);
-            const summary = store.getSummary();
+            const summary = /** @type {any} */ (store.getSummary());
             expect(summary.tools.web_fetch.totalCalls).toBe(1);
             expect(summary.tools.web_fetch.successCount).toBe(1);
             expect(summary.tools.web_fetch.errorCount).toBe(0);
@@ -63,7 +63,7 @@ describe('createMetricsStore', () => {
 
         it('registra tool com erro', () => {
             store.recordToolCall('web_fetch', 500, false);
-            const summary = store.getSummary();
+            const summary = /** @type {any} */ (store.getSummary());
             expect(summary.tools.web_fetch.errorCount).toBe(1);
         });
 
@@ -71,7 +71,7 @@ describe('createMetricsStore', () => {
             store.recordToolCall('git_status', 100, true);
             store.recordToolCall('git_status', 200, true);
             store.recordToolCall('git_status', 50, false);
-            const summary = store.getSummary();
+            const summary = /** @type {any} */ (store.getSummary());
             expect(summary.tools.git_status.totalCalls).toBe(3);
             expect(summary.tools.git_status.successCount).toBe(2);
             expect(summary.tools.git_status.errorCount).toBe(1);
@@ -80,7 +80,7 @@ describe('createMetricsStore', () => {
         it('registra latência no histograma', () => {
             store.recordToolCall('test', 100, true);
             store.recordToolCall('test', 200, true);
-            const latency = store.getSummary().tools.test.latency;
+            const latency = /** @type {any} */ (store.getSummary()).tools.test.latency;
             expect(latency.count).toBe(2);
             expect(latency.min).toBe(100);
             expect(latency.max).toBe(200);
@@ -104,7 +104,7 @@ describe('createMetricsStore', () => {
         it('separa tokens por modelo', () => {
             store.recordUsage('gpt-4.1', 0, 100);
             store.recordUsage('claude', 0, 200);
-            const tokens = store.getSummary().tokens;
+            const tokens = /** @type {any} */ (store.getSummary()).tokens;
             expect(tokens.byModel['gpt-4.1']).toBe(100);
             expect(tokens.byModel['claude']).toBe(200);
         });
@@ -123,7 +123,7 @@ describe('createMetricsStore', () => {
             store.recordSessionCleanup();
             store.recordHandoff();
 
-            const s = store.getSummary().sessions;
+            const s = /** @type {any} */ (store.getSummary()).sessions;
             expect(s.started).toBe(2);
             expect(s.ended).toBe(1);
             expect(s.errors).toBe(1);
@@ -143,7 +143,7 @@ describe('createMetricsStore', () => {
             store.recordDialogStall(2000);
             store.recordDialogTimeout();
 
-            const d = store.getSummary().dialog;
+            const d = /** @type {any} */ (store.getSummary()).dialog;
             expect(d.turnsTotal).toBe(2);
             expect(d.turnsSuccess).toBe(1);
             expect(d.stallsTotal).toBe(1);
@@ -160,7 +160,7 @@ describe('createMetricsStore', () => {
             store.recordTaskCompletion(300, true);
             store.recordTaskCompletion(100, false);
 
-            const t = store.getSummary().tasks;
+            const t = /** @type {any} */ (store.getSummary()).tasks;
             expect(t.completed).toBe(1);
             expect(t.failed).toBe(1);
             expect(t.taskLatency.count).toBe(2);
@@ -173,14 +173,14 @@ describe('createMetricsStore', () => {
         it('registra streaming chunks', () => {
             store.recordStreamingChunk(50);
             store.recordStreamingChunk(80);
-            const s = store.getSummary().streaming;
+            const s = /** @type {any} */ (store.getSummary()).streaming;
             expect(s.chunksTotal).toBe(2);
             expect(s.chunkLatency.count).toBe(2);
         });
 
         it('registra question latency', () => {
             store.recordQuestionLatency(1200);
-            const q = store.getSummary().questions;
+            const q = /** @type {any} */ (store.getSummary()).questions;
             expect(q.total).toBe(1);
             expect(q.latency.count).toBe(1);
         });
@@ -192,20 +192,20 @@ describe('createMetricsStore', () => {
         it('incrementa counters genéricos', () => {
             store.recordCounter('custom.counter', 5);
             store.recordCounter('custom.counter');
-            expect(store.getSummary().counters['custom.counter']).toBe(6);
+            expect(/** @type {any} */ (store.getSummary()).counters['custom.counter']).toBe(6);
         });
 
         it('registra gauges com valor e timestamp', () => {
             store.recordGauge('cpu.usage', 42);
             const gauges = store.getGauges();
-            expect(gauges['cpu.usage'].value).toBe(42);
-            expect(gauges['cpu.usage'].ts).toBeGreaterThan(0);
+            expect(gauges['cpu.usage']?.value).toBe(42);
+            expect(gauges['cpu.usage']?.ts).toBeGreaterThan(0);
         });
 
         it('gauge sobrescreve valor anterior', () => {
             store.recordGauge('mem', 100);
             store.recordGauge('mem', 200);
-            expect(store.getGauges().mem.value).toBe(200);
+            expect(store.getGauges().mem?.value).toBe(200);
         });
     });
 

@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 
 describe('P4 — superfícies compartilhadas de realtime', () => {
     it('server/routes/sse.js não depende mais de terminal/dialog/sse.js', async () => {

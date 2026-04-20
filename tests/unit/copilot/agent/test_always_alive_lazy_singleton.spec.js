@@ -48,7 +48,7 @@ describe('AlwaysAliveAgent lazy singleton (K8)', () => {
 
         expect(alwaysAliveAgent.status).toBe('idle');
 
-        delete alwaysAliveAgent.status;
+        Reflect.deleteProperty(/** @type {any} */ (alwaysAliveAgent), 'status');
 
         expect(alwaysAliveAgent.status).toBe(agent.status);
     });
