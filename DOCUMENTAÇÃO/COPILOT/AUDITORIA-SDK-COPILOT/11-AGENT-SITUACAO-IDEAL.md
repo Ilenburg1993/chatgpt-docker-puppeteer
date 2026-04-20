@@ -7,6 +7,8 @@
 
 - [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md)
 - [10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md)
+- [../AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md](../AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md)
+- [../AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md](../AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md)
 
 ---
 
@@ -255,6 +257,18 @@ Expandir para:
 - rotação/session cleanup onde ainda houver tratamento local demais;
 - etapas de boot/wiring que ainda dependem de heurística ad hoc em vez de contexto operacional padronizado.
 
+### Estado adicional desta continuação
+
+- `hooks/error-handler.js` deixou de compartilhar `retryCounts` e `circuits` entre sessões distintas;
+- o estado de recuperação agora é escopado por `sessionId + errorContext`, reduzindo leak cross-session em hooks.
+- `hooks/factory.js`, `hooks/session-hooks.js` e os presets `minimal/safe/interactive/deny-all/audit` passaram a
+        delegar `onErrorOccurred` ao motor canônico de erro, reduzindo deriva de política entre módulos do subsistema
+        de hooks.
+- `presets/production.js` deixou de usar `console.info` como destino padrão de auditoria e passou a registrar entradas
+        estruturadas em `defaultAuditLog`, mitigando a mistura entre audit log e log operacional.
+- o subfluxo `ask_user` agora respeita também o default real do SDK para `allowFreeform` (`undefined` → `true`) em
+        `session-setup.js`, em vez de degradar silenciosamente para `false`.
+
 ---
 
 ## L4 — Lazy singleton “fechado” como caminho canônico 🔴
@@ -427,6 +441,65 @@ Entregue:
 Quando `getSdkResourceSnapshot()` reportar `allCoreResourcesAvailable=true` e `allRuntimeResourcesAvailable=true` em um
 boot saudável da LLM-B, consideramos que a superfície runtime do SDK está consolidada para o agent.
 
+## L10 — Governança semântica do `ask_user` 🔴
+
+### Situação atual
+
+O `ask_user` deixou de ser só texto cru e já passou a carregar semântica persistível:
+
+- `PendingQuestionKind`
+- `PendingQuestionMeta`
+- `PendingQuestionShadow`
+
+Além disso, o runtime passou a separar:
+
+- **pergunta viva do SDK**;
+- **sombra persistida restaurada do disco**.
+
+### Situação ideal
+
+O subfluxo `ask_user` deve operar como protocolo governado, com:
+
+1. persistência seletiva por `kind`;
+2. recovery zero-PR baseado apenas em `ready` vivo;
+3. shadow com TTL/expiração e UX operacional dedicada;
+4. mesma semântica refletida em health, terminal, snapshots e rotas HTTP.
+
+### Estado desta rodada
+
+Entregue:
+
+- classificação semântica `ready/reply/stopped/question`;
+- persistência de `pendingQuestionMeta` para `ready/question`;
+- restauração de `pendingQuestionShadow` no boot;
+- TTL/expiração explícita da shadow (`restoredAt`, `expiresAt`) com janela semântica por `kind` e limpeza do estado
+        persistido quando o boot encontra shadow já vencida;
+- health com `pendingQuestionShadow`, `pendingQuestionShadowKind`, `pendingQuestionShadowExpired`,
+        `pendingQuestionShadowAgeMs`, `pendingQuestionShadowExpiresAt` e ações `review_pending_question_shadow` /
+        `clear_pending_question_shadow`;
+- watchdog zero-PR do terminal exigindo `ready` vivo em vez de “qualquer pendência”.
+- frontend/status do terminal com projeção semântica da shadow e limpeza canônica disponível via agent/HTTP/REPL.
+- reaper contínuo da shadow expirada no timer periódico do runtime, evitando acúmulo após expiração tardia no mesmo
+        processo.
+- conformidade do `session-setup` com o default real de `allowFreeform=true` no SDK quando o campo vem omitido.
+- o terminal passou a expor atividade canônica em tempo real (`activity-state.js`), consumindo a trilha semântica de
+        `ask_user`, `tool.execution_*`, `task.*`, `assistant.intent` e eventos de compaction/runtime.
+- o terminal passou a consumir também `assistant.streaming_delta` como sinal operacional de progresso de resposta, mesmo
+        quando a UX decide não renderizar texto incremental.
+- o fluxo de `tool.execution_progress` foi alinhado ao payload real do SDK, tratando `progressMessage` como fonte
+        primária e `%` numérico como opcional.
+- o terminal passou a consumir também `tool.execution_partial_result`, `session.mode_changed`, `session.plan_changed`,
+        `session.info`, `session.warning`, `session.model_change`, `session.context_changed` e
+        `exit_plan_mode.completed`, evitando perder sinais semânticos do SDK na última milha da UX.
+- a shadow de `ask_user` agora também expõe estado semântico (`fresh/active/expiring_soon/expired`) e tempo restante,
+        reduzindo ambiguidade operacional para terminal, health e troubleshooting.
+- o runtime do terminal passou a operar com default canônico `gpt-5-mini` + `reasoning=high`, refletido no próprio
+        prompt interativo do REPL e nas projeções públicas do frontend.
+
+### Próximo passo ideal
+
+aprimorar heurísticas por idade/estado operacional e enriquecer a UX do operador para estados intermediários da shadow.
+
 ---
 
 ## L8 — Backlog estratégico (não bloquear curto prazo) 🟡
@@ -437,6 +510,56 @@ Esses itens seguem importantes, mas não são o melhor próximo corte para o run
 - watchdog adaptativo baseado em histórico;
 - protocolo formal de handoff;
 - ownership/migração de estado entre sessões em modo avançado.
+
+## L11 — Arquitetura padronizada e centralizada entre SDK, agent e bordas 🔴
+
+### Situação atual
+
+O fluxo melhorou bastante, mas ainda há três fontes de confusão estrutural:
+
+1. a noção de runtime default do agent continua implícita demais;
+2. `presentation/` ainda não é o hub único de acesso compartilhado ao runtime;
+3. `terminal/` ainda conhece partes demais da topologia do runtime em alguns pontos.
+
+### Situação ideal
+
+Padronizar o fluxo assim:
+
+```text
+sdk/
+        -> event-handlers/
+                -> agent/
+                        -> presentation/
+                                -> terminal/ e server/
+```
+
+Com regras explícitas:
+
+- tudo que for runtime/session/capability vanilla do SDK passa pelo `agent` antes de chegar ao terminal;
+- tudo que for compartilhado entre bordas passa por `presentation/`;
+- o terminal deixa de conhecer detalhes do runtime onde uma projection/shared facade puder responder;
+- o singleton lazy passa a conviver com uma `AgentRuntimeRegistry` explícita para preparar multi-agent futuro.
+
+### Estado desta rodada
+
+Entregue parcialmente:
+
+- `agent/runtime-registry.js` criado como SSOT dos runtimes registrados;
+- `always-alive.js` já registra/desregistra o runtime default lazy nessa registry;
+- `presentation/agent-runtime.js` criado como accessor compartilhado do runtime default;
+- `system-config.js`, `system-metrics.js`, `agent-control.js` e `terminal/frontend/llm-b-runtime.js` já migraram para
+        esse accessor;
+- projections compartilhadas e frontend do terminal já expõem `runtimeId` / `agentRuntimes`, preparando troubleshooting
+        e multi-agent futuro.
+
+### Próximo passo ideal
+
+Implementar em fases:
+
+1. `agent/runtime-registry.js` como SSOT dos runtimes registrados;
+2. `presentation/agent-runtime.js` como hub compartilhado de acesso ao runtime default;
+3. migração progressiva de `terminal/` e projections compartilhadas para esse accessor canônico;
+4. documentação viva esclarecendo papéis de `agent/`, `presentation/`, `terminal/`, `event-handlers/` e `observability/`.
 
 ---
 
@@ -514,6 +637,8 @@ Critério verificável:
         chamadas dispersas a `writeStateAsync(...)` nos módulos quentes de diálogo.
 - fora do próprio `state-io.js`, o grep de `writeStateAsync(...)` no subtree `src/copilot/agent/` fica zerado ou
         restrito apenas a comentários/documentação histórica.
+- no subsistema `src/copilot/hooks`, `factory`, `session-hooks` e presets usam handlers canônicos (`createErrorHandler`
+        / `createCircuitBreakerHandler`) em vez de políticas artesanais duplicadas por arquivo.
 
 ### CA-5 — Lazy singleton totalmente governado
 
@@ -537,6 +662,15 @@ Critério verificável:
 
 - o snapshot de health explica boot/runtime/backlog com granularidade suficiente para troubleshooting direto,
         incluindo `riskFlags`, `recommendedAction`, `bootReport`, `sdkResources` e contagem de boot `degraded/failed`.
+- a trilha de `ask_user` diferencia pergunta viva de sombra persistida, com `pendingQuestionKind` e
+        `pendingQuestionShadowKind` consistentes entre runtime, health e terminal.
+- shadows expirada expõem idade/expiração e podem ser limpas por caminho canônico do runtime.
+- o terminal reflete progresso/atividade usando sinais reais do SDK (`assistant.streaming_delta`, `tool.execution_progress`
+        com `progressMessage`) em vez de heurísticas exclusivamente locais.
+- o terminal consome o plan mode vanilla do SDK sem manter um plan mode local paralelo, preservando alinhamento direto
+        com `session.mode_changed`/`session.plan_changed`.
+- a trilha de auditoria default dos hooks de produção é separada do stream operacional e observável por buffer
+        estruturado, não por `console.info` solto.
 
 ### CA-8 — Testes de regressão estrutural mínimos
 
@@ -549,6 +683,7 @@ Critério verificável:
         - `boot/reconnect`
         - `health routes`
         - comportamento lazy singleton / DI
+        - `runtime-registry` / accessors compartilhados de runtime quando introduzidos
 
 ---
 

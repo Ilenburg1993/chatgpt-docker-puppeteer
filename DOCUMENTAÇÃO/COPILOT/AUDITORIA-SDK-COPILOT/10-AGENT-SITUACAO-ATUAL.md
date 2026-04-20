@@ -52,6 +52,31 @@ Além disso, embora o `agent` agora tenha uma façade canônica de acesso total 
 `withAgentErrorPolicy(...)`, a propagação completa da mutation API e o fechamento final do ownership semântico do
 `AgentContext` ainda seguem como trabalho de consolidação.
 
+Também nesta última frente do subfluxo `ask_user`, o agent passou a:
+
+- distinguir pergunta viva do SDK de `pendingQuestionShadow` restaurada do disco;
+- carregar TTL/expiração explícita na shadow (`restoredAt`, `expiresAt`), agora com TTL semântico por `kind`;
+- expor `pendingQuestionShadowExpired`, `pendingQuestionShadowAgeMs` e `pendingQuestionShadowExpiresAt` no health;
+- disponibilizar limpeza canônica da shadow por API pública do agent, por rota HTTP dedicada e por comando explícito no
+  REPL do terminal.
+- fazer reap contínuo da shadow expirada no timer periódico do runtime, sem depender apenas do boot para limpeza.
+- alimentar uma nova camada canônica de atividade do terminal, que agora traduz eventos do agent/SDK em fases
+  operacionais visíveis (`turn`, `thinking`, `tool`, `task`, `question`, `compaction`, `error`).
+- consumir `assistant.streaming_delta` como sinal operacional adicional de progresso de resposta, sem depender apenas do
+  texto incremental renderizado.
+- alinhar `tool.execution_progress` ao payload real do SDK (`progressMessage`, com `progress` opcional), melhorando a
+  UX do terminal e removendo a suposição de que o progresso sempre viria em `%` numérico.
+- expor `pendingQuestionShadowState` + `pendingQuestionShadowRemainingMs`, permitindo distinguir shadow recém-restaurada,
+  ativa, expirando ou expirada sem reabrir o state cru.
+- propagar a shadow persistida também para snapshots manuais do terminal/agent.
+
+Também houve correção fina de conformidade com o SDK neste ponto:
+
+- `onUserInputRequest` agora trata `allowFreeform` omitido como `true`, em linha com o contrato real do
+  `@github/copilot-sdk`.
+- o runtime do terminal/agent passou a alinhar seu default canônico para `gpt-5-mini` com `reasoning=high`, reduzindo
+  drift entre defaults do agent, frontend do terminal e seleção de modelo em runtime.
+
 Resumo franco: **o agent deixou de estar “arquiteturalmente atrasado”, mas ainda está “arquiteturalmente semi-endurecido”.**
 
 ---
@@ -256,6 +281,14 @@ O quadro atual é melhor que o de março e melhorou também nesta última onda:
   de vínculo SDK↔hub em abortos arbitrários do runtime;
 - `lifecycle/state-io.js` ganhou `persistStateWithPolicy(...)`, e esse helper passou a ser usado em
   `agent-lifecycle.js`, `dialog/user-input-handler.js`, `dialog/loop-manager.js` e `dialog/turn-executor.js`.
+- o subsistema `src/copilot/hooks/` deixou de manter políticas de erro divergentes por preset/factory: `factory.js`,
+  `session-hooks.js` e os presets `minimal/safe/interactive/deny-all/audit` agora convergem para handlers canônicos,
+  com estado de retry/circuit isolado por `sessionId + errorContext`.
+- o preset de produção também deixou de usar `console.info` como destino padrão de auditoria e passou a registrar
+  entradas estruturadas em `defaultAuditLog`.
+- numa rodada dedicada ao `ask_user`, o runtime passou a distinguir pergunta viva do SDK de sombra persistida restaurada
+  do disco (`pendingQuestionShadow`), com classificação semântica (`ready/reply/stopped/question`) refletida em
+  health, terminal e snapshots.
 
 Também foi corrigido um bug operacional importante em `dialog/user-input-handler.js`: perguntas interativas reais agora
 persistem `pendingQuestion + lastAskUserAt` em **uma única operação**, enquanto mensagens de protocolo interno do dialog
@@ -267,6 +300,11 @@ O que ainda falta:
   local ou via fire-and-forget simples);
 - reduzir padrões locais duplicados de `try/catch + classify + emit + retry`;
 - enriquecer a política com metadados estruturados por contexto (`label`, `phase`, `sessionId`, `taskId`).
+
+Nesta continuação, o subsistema de hooks também deixou de compartilhar retry/circuit state por contexto puro:
+
+- `hooks/error-handler.js` agora escopa `retryCounts` e `circuits` por `sessionId + errorContext`;
+- isso elimina o leak cross-session em que uma sessão podia herdar o estado de retry/circuit-breaker de outra.
 
 **Conclusão**: a policy deixou de ser apenas “um classificador com dois call sites” e passou a cobrir partes centrais
 de `messaging`, `reconnect`, `dialog`, `ownership` e persistência auxiliar — mas ainda não domina o módulo inteiro.

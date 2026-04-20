@@ -18,6 +18,10 @@
 > - o terminal continua subindo em modo standalone com MCP ausente, mas sem o ruído anterior de fallback ambíguo no registry de custom tools;
 > - o log de `SessionKeepalive` agora explicita o motivo da parada (`dialog_loop_active`), deixando claro que o stop durante o boot é intencional;
 > - os falsos warnings de boot recovery F53 deixaram de aparecer quando a retomada da sessão ainda está em `processing`.
+> - o runtime do terminal/agent passou a usar `gpt-5-mini` com `reasoning=high` como defaults canônicos.
+> - o REPL agora constrói prompt dinâmico com `modelo/esforço` (e marcador `PLAN` quando aplicável), reduzindo ambiguidade operacional.
+> - o prompt dinâmico também passou a refletir o modo real do SDK (`MODE:PLAN`, `MODE:AUTOPILOT`, etc.) quando ele diverge do estado local do terminal.
+> - o terminal agora consome `tool.execution_partial_result`, `session.mode_changed`, `session.plan_changed`, `session.info`, `session.warning`, `session.model_change`, `session.context_changed` e `exit_plan_mode.completed` como sinais operacionais visíveis.
 
 ```
 npm run terminal:llm-b
@@ -243,6 +247,14 @@ stopTerminalDialogMode()
 - Facade pura: nenhum acesso direto ao container fora deste arquivo em módulos terminal
 - Centraliza controle de `pause/resume/stop/start` do dialog loop
 
+### Status adicional do `ask_user` / zero-PR (2026-04-18)
+
+- o watchdog zero-PR do terminal deixou de tratar “qualquer `pendingQuestion`” como recuperação bem-sucedida;
+- agora a recuperação zero-PR exige especificamente `pendingQuestionKind === 'ready'`;
+- o runtime do terminal também passou a expor `pendingQuestionShadow` e `pendingQuestionShadowKind`, permitindo distinguir loop realmente pronto de sombra restaurada do disco.
+- o terminal passou a usar `assistant.streaming_delta` como sinal operacional de progresso de resposta mesmo quando o texto incremental está oculto pela UX.
+- o handler de `tool.execution_progress` foi alinhado ao payload real do SDK (`progressMessage`, com `progress` opcional), removendo a suposição de que sempre existiria percentual numérico.
+
 ---
 
 ## 9. Resumo de Achados do Módulo Terminal
@@ -267,7 +279,40 @@ Nenhum bug P0/P1 encontrado no módulo terminal. Os gaps P2 afetam confiabilidad
 
 ---
 
-## 10. Fluxo LLM-B — Estado Operacional
+## 10. Diagnóstico de UX do terminal (2026-04-18)
+
+Embora o runtime do terminal já tivesse boa cobertura funcional, a UX ainda estava primitiva em relação à superfície
+real do sistema:
+
+- havia eventos ricos de `assistant.intent`, `tool.execution_*`, `task.*`, `dialog.*` e `session.usage`;
+- mas o operador ainda precisava inferir “o que a LLM-B está fazendo” a partir de linhas soltas, snapshots e blocos
+  textuais pouco semânticos.
+
+### Melhorias aplicadas nesta onda
+
+- camada canônica de atividade (`activity-state.js`);
+- novo comando `/activity [n]`;
+- atividade integrada em `/status`, `/diagnose` e `/metrics`;
+- broadcast SSE `terminal.activity` para dashboards/consumidores externos;
+- correção do comportamento parcialmente enganoso do toggle `streaming`;
+- toggles adicionais para `tools` e `intent`.
+- prompt interativo dinâmico (`você[modelo/reasoning][MODE:<SDK>]›` quando a sessão sai de `interactive`).
+- prompt interativo dinâmico também com `MODE:<SDK>` quando o runtime reporta modo não-interativo.
+- `/status` enriquecido com metadata local do modelo (`cost`, `speed`, `contextWindow`) e timeline curta da atividade recente.
+- `/status`, `/diagnose`, `/metrics` e `/usage now` agora refletem diretamente o `mode` e o `plan` vanilla observados do SDK, sem um plan mode local paralelo no terminal.
+- o terminal passou a tratar `tool.execution_partial_result` como streaming incremental de saída de tool, em vez de depender só de `progress`/`complete`.
+- o terminal passou a refletir também `session.task_complete`, `session.truncation`, `session.snapshot_rewind`,
+  `session.shutdown`, `session.handoff` e `session.workspace_file_changed`, deixando a trilha vanilla do SDK mais
+  observável para operador e dashboards.
+
+### Estado atual
+
+O terminal ainda tem backlog de evolução visual, mas já saiu do modelo “REPL com muitas features” e começou a entrar no
+modelo “console operacional contínuo”.
+
+---
+
+## 11. Fluxo LLM-B — Estado Operacional
 
 ### Entrada Confirmada
 

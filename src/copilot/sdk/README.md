@@ -1,21 +1,53 @@
 # sdk/
 
-**Camada**: L1-L2 — wrapper sobre `@anthropic-ai/sdk` e `@anthropic-ai/bedrock-sdk`.
+## Responsabilidades
 
-Encapsula toda a comunicação com o SDK do provedor de IA. Nenhum outro módulo deve importar
-diretamente do SDK externo — sempre via este módulo.
+Wrapper canônico sobre o **`@github/copilot-sdk`**.
 
-## Subdomínios
+Esta pasta é a fonte de verdade local para:
 
-| Área              | Arquivos                                      |
-| ----------------- | --------------------------------------------- |
-| Client lifecycle  | `client.js`, `client-factory.js`, `config.js` |
-| Session lifecycle | `sdk-session-wrapper.js`, `session-setup.js`  |
-| RPC facade        | `rpc.js`, `rpc-health.js`                     |
-| Types & utils     | `types.js`, `utils.js`                        |
-| Wrappers          | `send.js`, `command.js`, `response.js`        |
+- tipos do SDK (`types.js`);
+- client lifecycle;
+- session lifecycle;
+- operações RPC vanilla (`mode`, `plan`, `agents`, `sessions`, etc.);
+- model registry/helpers;
+- telemetry e feature flags relacionadas ao SDK.
+
+## Princípio arquitetural
+
+Nenhum módulo do runtime deve “recriar” uma capability do SDK sem passar por esta camada.
+
+Se o SDK já oferece:
+
+- `mode.get/set`
+- `plan.read/update/delete`
+- `listSessions`
+- `foreground session`
+- `custom agents`
+- `streaming` / `usage` / hooks / user input
+
+então a implementação local deve começar aqui, e só depois ser ampliada em `agent/`, `terminal/` ou `presentation/`.
+
+## Subdomínios reais
+
+| Área                 | Arquivos / pastas                                                                |
+| -------------------- | -------------------------------------------------------------------------------- |
+| Client lifecycle     | `session/client.js`, `session/lifecycle.js`                                      |
+| Session ops          | `session/plan.js`, `session/mode.js`, `session/agents.js`, `session/messages.js` |
+| RPC helpers          | `rpc/`, `rpc.js`                                                                 |
+| Model registry       | `models/`                                                                        |
+| Tools state/registry | `tools/`                                                                         |
+| Types & helpers      | `types.js`, `utils.js`, `event-helpers.js`, `constants.js`                       |
+| Telemetry            | `telemetry/`                                                                     |
+
+## Relação com outras camadas
+
+- `event-handlers/` traduz `SessionEvent` do SDK para sinais internos.
+- `agent/facades/agent-sdk-access.js` expõe um subconjunto estratégico do SDK como API pública do runtime.
+- `terminal/frontend/sdk-session-projection.js` monta UX vanilla de `mode/plan` em cima desta camada.
 
 ## Regras de importação
 
-- **Pode importar**: `core/`, `config/`, `observability/`, `node:*`, SDKs externos
-- **NÃO pode importar**: `agent/`, `bridges/`, `terminal/`, `tools/`
+- **Pode importar**: `core/`, `config/`, `observability/`, `node:*`, `@github/copilot-sdk`
+- **NÃO deve importar**: `terminal/`, `presentation/`
+- `agent/` pode consumir `sdk/`, mas não deve duplicar contratos que já existem aqui.

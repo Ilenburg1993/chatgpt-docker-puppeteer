@@ -294,7 +294,7 @@ Terminal Permanente LLM-B (processo separado: npm run terminal:llm-b)
 AlwaysAliveAgent → answerPendingQuestion(message) → Copilot SDK ask_user()
     │
     ▼
-LLM-B (modelo: gpt-4.1, reasoning: high)
+LLM-B (modelo: gpt-5-mini, reasoning: high)
     │
     │  ask_user("REPLY: <resposta>")
     ▼
@@ -324,16 +324,16 @@ reinicia automaticamente se o loop travar.
 
 ## Variáveis de Ambiente Relevantes
 
-| Variável                   | Padrão    | Descrição                                        |
-| -------------------------- | --------- | ------------------------------------------------ |
-| `LLM_B_TERMINAL_PORT`      | `3009`    | Porta HTTP do terminal                           |
-| `COPILOT_SDK_ENABLED`      | `false`   | **Obrigatório** `true` para o terminal funcionar |
-| `COPILOT_MODEL`            | `gpt-4.1` | Modelo usado pela LLM-B                          |
-| `LLM_B_TURN_TIMEOUT_MS`    | `130000`  | Timeout por turno (130s)                         |
-| `LLM_B_WATCHDOG_MS`        | `300000`  | Intervalo do watchdog (5min)                     |
-| `LLM_B_WATCHDOG_STALL_MS`  | `900000`  | Stall threshold (15min)                          |
-| `LLM_B_BOOT_PROMPT`        | (interno) | Sobrescreve o boot prompt padrão                 |
-| `COPILOT_TERMINAL_ENABLED` | `false`   | Habilita o terminal via PM2                      |
+| Variável                   | Padrão       | Descrição                                        |
+| -------------------------- | ------------ | ------------------------------------------------ |
+| `LLM_B_TERMINAL_PORT`      | `3009`       | Porta HTTP do terminal                           |
+| `COPILOT_SDK_ENABLED`      | `false`      | **Obrigatório** `true` para o terminal funcionar |
+| `COPILOT_MODEL`            | `gpt-5-mini` | Modelo usado pela LLM-B                          |
+| `LLM_B_TURN_TIMEOUT_MS`    | `130000`     | Timeout por turno (130s)                         |
+| `LLM_B_WATCHDOG_MS`        | `300000`     | Intervalo do watchdog (5min)                     |
+| `LLM_B_WATCHDOG_STALL_MS`  | `900000`     | Stall threshold (15min)                          |
+| `LLM_B_BOOT_PROMPT`        | (interno)    | Sobrescreve o boot prompt padrão                 |
+| `COPILOT_TERMINAL_ENABLED` | `false`      | Habilita o terminal via PM2                      |
 
 ---
 

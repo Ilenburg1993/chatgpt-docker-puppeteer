@@ -72,6 +72,7 @@ O `AlwaysAliveAgent` foi extensamente refatorado nas fases F35–F39 e O3:
 - `loop-manager.js` e `agent-messaging.js` reduziram bypasses de contrato de host, removendo casts quentes para `EventEmitter`;
 - `agent/lifecycle/entry.js` e `presentation/agent-control.js` migraram para `getAgent()` como caminho canônico do singleton.
 - numa segunda onda, a mutation API do `AgentContext` foi ampliada (`setClient`, `clearClient`, `setSession`, `clearSession`, `setContextState`, `setLastCheckpointPath`, `setDialogLoopAttached`, `setBootReport`), o `session-setup.js` perdeu parte da dívida artificial de tipos e o boot do agent passou a produzir `bootReport` por step.
+- numa frente dedicada ao `ask_user`, o runtime passou a distinguir pergunta viva do SDK de sombra persistida restaurada do disco (`pendingQuestionShadow`), com classificação semântica (`ready/reply/stopped/question`) refletida em health, terminal e snapshots.
 
 ### Positivos
 

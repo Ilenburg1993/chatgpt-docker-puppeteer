@@ -30,9 +30,15 @@
 - **Hardening arquitetural do agent (onda 5)**: `withAgentErrorPolicy(...)` passou a cobrir `dialog-controller`, wrappers de ownership e persistência auxiliar via `persistStateWithPolicy(...)`; `dialog/user-input-handler.js` deixou de gravar `pendingQuestion` em duplicidade, `agent-messaging.js` passou a limpar `pendingQuestion` pela policy canônica, `boot-steps.js` deixou de usar persistência nua no boot recovery e `initializer.js` foi migrado para a mesma rota canônica de persistência.
 - **Hardening arquitetural do agent (onda 6)**: o runner de boot agora distingue steps `required` de steps opcionais degradáveis, registra `degraded/skipped` no `bootReport`, e o health/HTTP do agent passaram a reportar também degradação parcial do boot (`boot.steps_degraded`, `bootDegradedSteps`).
 - **Hardening arquitetural do agent (onda 7)**: a leitura semântica do `AgentContext` avançou para `health`, `state`, facades e getters públicos do agent, reduzindo a dependência direta dos módulos quentes em `sessionState/dialogState/configState/...`.
+- **Hardening arquitetural do agent/hooks (onda 8)**: o estado de retry/circuit-breaker dos hooks deixou de ser global por contexto e passou a ser isolado por `sessionId + errorContext`, mitigando `GAP-HOOK-01` sem quebrar a API pública dos presets.
+- **Hardening arquitetural do agent/hooks (onda 9)**: `factory.js`, `session-hooks.js` e os presets `minimal/safe/interactive/deny-all/audit` passaram a usar handlers canônicos de erro, e o preset de produção deixou de usar `console` como sink padrão de auditoria, mitigando `GAP-HOOKS-03`.
+- **Hardening ask_user / dialog loop (onda 10)**: `ask_user` ganhou `PendingQuestionMeta`, `pendingQuestionShadow`, projeção semântica em health/terminal/snapshot e critério zero-PR baseado em `ready` vivo.
+- **Hardening UX terminal (onda 11)**: camada canônica de atividade em tempo real, `/activity`, integração da atividade em `/status`/`/diagnose`/`/metrics`, correção do toggle `streaming` e broadcast SSE `terminal.activity`.
+- **Clareza arquitetural terminal/SDK (onda 12)**: extração de `sdk-session-events`, `sdk-session-projection`, `agent-runtime-events`, `task-stream-events` e `agent-sse-fallback`, reduzindo mistura entre sinais vanilla do SDK e sinais já normalizados pelo runtime.
+- **Documentação viva adicional**: novo mapa canônico do fluxo em `14-FLUXO-AGENT-TERMINAL-SDK.md` e READMEs locais atualizados em `sdk/`, `agent/`, `terminal/`, `event-handlers/`, `presentation/` e `observability/`.
 - **Re-triado**: `F2.4` mudou de fix de runtime para revisão de JSDoc/comentários, porque não foi encontrado import runtime direto fora de `src/copilot/sdk/`.
 - **Re-triado**: `GAP-SDK-01` deixou de ser sobre logging de `stopClient()` e passa a ser risco de versionamento em `waitForEvent`.
-- **Próximo lote natural**: `F3` (P2/P3) com foco em `GAP-CHAN-02`, `GAP-HOOK-01`, `GAP-HOOKS-03`, além do hardening residual do `agent` (`AgentContext` ownership completo, hooks internos sob policy canônica e testes específicos de lazy singleton/reconnect/boot degradation`).
+- **Próximo lote natural**: `F3` (P2/P3) com foco em `GAP-CHAN-02`, `GAP-TERM-03`, heurísticas temporais/UX intermediária do subfluxo `ask_user`, evolução adicional da camada de atividade do terminal, ampliação de cobertura vanilla do SDK no terminal e no hardening residual do `agent` (`AgentContext` ownership completo, hooks internos sob policy canônica e testes específicos de lazy singleton/reconnect/boot degradation`).
 
 ---
 
@@ -211,17 +217,17 @@ Os matches restantes fora dessa camada são referências em JSDoc, comentários 
 
 ## FASE 4 — P3: Melhorias (manutenção contínua)
 
-| ID           | Fix Sugerido                                                                   |
-| ------------ | ------------------------------------------------------------------------------ |
-| GAP-TERM-01  | Aguardar `clearActiveSdkSessions()` no shutdown graceful                       |
-| GAP-TERM-02  | Registrar SIGINT/SIGTERM handlers no bootstrap                                 |
-| GAP-TERM-03  | Healthcheck verificar estado real do SDK                                       |
-| GAP-HOOKS-02 | Logar warning ao usar preset sem PII patterns                                  |
-| GAP-HOOKS-03 | Adicionar `auditSink` separado de logger padrão                                |
-| GAP-INFRA-01 | Mover `clearActiveSdkSessions()` para após `client.stop()`                     |
-| GAP-OBS-01   | Adicionar `metrics.reset()` para testes                                        |
-| GAP-SDK-01   | Encapsular `waitForEvent` em wrapper local para reduzir risco de versionamento |
-| GAP-HOOK-01  | Isolat retry/circuit state por `sessionId`                                     |
+| ID           | Fix Sugerido                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------ |
+| GAP-TERM-01  | Aguardar `clearActiveSdkSessions()` no shutdown graceful                                                     |
+| GAP-TERM-02  | Registrar SIGINT/SIGTERM handlers no bootstrap                                                               |
+| GAP-TERM-03  | Healthcheck verificar estado real do SDK                                                                     |
+| GAP-HOOKS-02 | Logar warning ao usar preset sem PII patterns                                                                |
+| GAP-HOOKS-03 | ~~Adicionar `auditSink` separado de logger padrão~~ ✅ mitigado com fallback estruturado em `defaultAuditLog` |
+| GAP-INFRA-01 | Mover `clearActiveSdkSessions()` para após `client.stop()`                                                   |
+| GAP-OBS-01   | Adicionar `metrics.reset()` para testes                                                                      |
+| GAP-SDK-01   | Encapsular `waitForEvent` em wrapper local para reduzir risco de versionamento                               |
+| GAP-HOOK-01  | Isolat retry/circuit state por `sessionId`                                                                   |
 
 ---
 

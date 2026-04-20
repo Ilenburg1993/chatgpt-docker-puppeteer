@@ -55,10 +55,13 @@ createProductionHooks({
 | ---------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **GAP-HOOKS-01** | P2  | `toolAllowList` vazio (valor padrão) = allow all. Sem allowlist configurada em produção, a proteção de `onPreToolUse` é efetivamente desativada. Não há warning/log de que o sistema está em modo permissivo total. |
 | **GAP-HOOKS-02** | P3  | `piiPatterns` default é array vazio — sem redação de PII por padrão. Em produção sem configuração explícita, prompts com tokens, passwords ou dados pessoais são logados inteiros.                                  |
-| **GAP-HOOKS-03** | P3  | `auditSink` default usa `core/logger` — audit entries vão para o mesmo stream que logs operacionais. Em ambientes regulados, audit log e operational log deveriam ser separados.                                    |
+| **GAP-HOOKS-03** | P3  | `auditSink` default usava stream operacional (`console`/logger) — auditoria e operação ficavam misturadas. **Mitigado em 2026-04-17** com fallback estruturado em `defaultAuditLog`.                                |
 
-> **Status de execução (2026-04-17): `GAP-HOOKS-01` e `GAP-HOOKS-02` mitigados.**
+> **Status de execução (2026-04-17): `GAP-HOOKS-01`, `GAP-HOOKS-02` e `GAP-HOOKS-03` mitigados.**
 > O preset agora emite warnings explícitos para `toolAllowList=[]` e `piiPatterns=[]`. Além disso, tools sensíveis de shell passam por `ask` por padrão quando não estiverem explicitamente allowlisted.
+> Nesta continuação, o sink padrão de auditoria do preset de produção também passou a registrar em `defaultAuditLog`,
+> separando a trilha de auditoria do log operacional padrão. O motor de `onErrorOccurred` também foi unificado entre
+> factory, lifecycle e presets via handlers canônicos.
 
 ---
 
@@ -107,14 +110,14 @@ selective     → whitelist/blacklist/callback customizado
 | ------------ | ---------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | GAP-HOOKS-01 | P2         | `presets/production.js`                           | `toolAllowList=[]` = allow all sem aviso — **mitigado em 2026-04-17 com warnings explícitos**                                                  |
 | GAP-HOOKS-04 | P2         | `permission-handler.js` + `presets/production.js` | Modo `approve_all` sem lista de tools sempre-bloqueadas — **mitigado em 2026-04-17 com guard `ask` + deny permanente por padrões destrutivos** |
-| GAP-HOOK-01  | P3         | `error-handler.js`                                | Shared state em closures cross-session (vide 03-SDK)                                                                                           |
+| GAP-HOOK-01  | P3         | `error-handler.js`                                | Shared state em closures cross-session — **mitigado em 2026-04-17 com escopo por `sessionId + errorContext`**                                  |
 | GAP-HOOKS-02 | P3         | `presets/production.js`                           | `piiPatterns=[]` por padrão — sem redação de PII                                                                                               |
-| GAP-HOOKS-03 | P3         | `presets/production.js`                           | Audit log misturado com operational log                                                                                                        |
+| GAP-HOOKS-03 | P3         | `presets/production.js`                           | Audit log misturado com operational log — **mitigado em 2026-04-17 com fallback estruturado em `defaultAuditLog`**                             |
 | GAP-HOOKS-05 | P3         | `prompt-transformer.js`                           | Sem configuração de PII, prompts passam inteiros                                                                                               |
 
 ### Severidade Geral do Módulo: **P2 (Médio)**
 
-Os gaps de segurança (P2) seguem relevantes como desenho global do subsistema, mas o código atual já endurece de forma material o preset de produção e melhora a sinalização operacional.
+Os gaps de segurança (P2) seguem relevantes como desenho global do subsistema, mas o código atual já endurece de forma material o preset de produção, separa melhor auditoria de operação e melhora a sinalização operacional.
 
 ---
 

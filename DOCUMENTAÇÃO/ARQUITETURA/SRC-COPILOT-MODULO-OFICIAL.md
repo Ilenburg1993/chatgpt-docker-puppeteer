@@ -6,6 +6,14 @@
 > parciais em arquivos anteriores. Baseado na inspeção exaustiva do código-fonte combinada com o
 > histórico de fases de desenvolvimento (AE → AI).
 
+> **Nota de governança (abril/2026):** a arquitetura evoluiu desde esta fotografia. Para o fluxo canônico
+> atualizado `sdk -> event-handlers -> agent -> presentation -> terminal/server` e para a proposta de
+> centralização com `AgentRuntimeRegistry` / `presentation/agent-runtime.js`, leia também:
+>
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-SDK-COPILOT/11-AGENT-SITUACAO-IDEAL.md`
+
 ---
 
 ## Índice
@@ -527,15 +535,16 @@ api/sdk-api.js (/api/sdk/*)
 
 #### `terminal/state.js` — Estado Global
 
-| Getter/Setter             | Tipo                  | Propósito                                   |
-| ------------------------- | --------------------- | ------------------------------------------- |
-| `getHubSessionId()`       | `string \| null`      | Hub session ativa                           |
-| `getBusy()` / `setBusy()` | `boolean`             | Flag de turno em processamento              |
-| `getRl()` / `setRl()`     | `readline \| null`    | Instância readline ativa                    |
-| `getAttachmentQueue()`    | `string[]`            | Fila de arquivos a embutir no próximo turno |
-| `getPlanMode()`           | `boolean`             | Prefácio de planejamento ativo              |
-| `getSseClients()`         | `Set<ServerResponse>` | Clientes SSE conectados                     |
-| `getSseCriticalClients()` | `Set<ServerResponse>` | Clientes SSE nível crítico                  |
+| Getter/Setter               | Tipo                                   | Propósito                                      |
+| --------------------------- | -------------------------------------- | ---------------------------------------------- |
+| `getHubSessionId()`         | `string \| null`                       | Hub session ativa                              |
+| `getBusy()` / `setBusy()`   | `boolean`                              | Flag de turno em processamento                 |
+| `getRl()` / `setRl()`       | `readline \| null`                     | Instância readline ativa                       |
+| `getAttachmentQueue()`      | `string[]`                             | Fila de arquivos a embutir no próximo turno    |
+| `getSdkSessionMode()`       | `string \| null`                       | Último modo vanilla observado da sessão SDK    |
+| `getLastSdkPlanOperation()` | `'create'\|'update'\|'delete' \| null` | Última operação vanilla observada em `plan.md` |
+| `getSseClients()`           | `Set<ServerResponse>`                  | Clientes SSE conectados                        |
+| `getSseCriticalClients()`   | `Set<ServerResponse>`                  | Clientes SSE nível crítico                     |
 
 #### `terminal/http-handlers.js` — Endpoints
 
@@ -566,20 +575,20 @@ api/sdk-api.js (/api/sdk/*)
 
 #### `terminal/commands/` — Comandos REPL
 
-| Arquivo      | Comandos REPL disponíveis                                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------------- |
-| `alias.js`   | `/alias list`, `/alias add`, `/alias remove`                                                            |
-| `attach.js`  | `/attach <caminho>` — adiciona arquivo à fila de contexto                                               |
-| `config.js`  | `/model <nome>`, `/reasoning <effort>`                                                                  |
-| `context.js` | `/compact`, `/context`                                                                                  |
-| `gh.js`      | `/gh issues`, `/gh prs`, `/gh ci`                                                                       |
-| `git.js`     | `/git status`, `/git log`                                                                               |
-| `help.js`    | `/help`                                                                                                 |
-| `memory.js`  | `/remember <texto>`, `/recall <query>`, `/forget <id>`                                                  |
-| `plan.js`    | `/plan on`, `/plan off`                                                                                 |
-| `resume.js`  | `/resume`                                                                                               |
-| `session.js` | `/status`, `/history`, `/db-history`, `/db-sessions`, `/who`, `/clear`, `/answer`, `/count`, `/restart` |
-| `skills.js`  | `/skills`                                                                                               |
+| Arquivo      | Comandos REPL disponíveis                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `alias.js`   | `/alias list`, `/alias add`, `/alias remove`                                                                  |
+| `attach.js`  | `/attach <caminho>` — adiciona arquivo à fila de contexto                                                     |
+| `config.js`  | `/model <nome>`, `/reasoning <effort>`                                                                        |
+| `context.js` | `/compact`, `/context`                                                                                        |
+| `gh.js`      | `/gh issues`, `/gh prs`, `/gh ci`                                                                             |
+| `git.js`     | `/git status`, `/git log`                                                                                     |
+| `help.js`    | `/help`                                                                                                       |
+| `memory.js`  | `/remember <texto>`, `/recall <query>`, `/forget <id>`                                                        |
+| `plan.js`    | `/plan`, `/plan on`, `/plan off`, `/plan autopilot`, `/plan read`, `/plan set`, `/plan append`, `/plan clear` |
+| `resume.js`  | `/resume`                                                                                                     |
+| `session.js` | `/status`, `/history`, `/db-history`, `/db-sessions`, `/who`, `/clear`, `/answer`, `/count`, `/restart`       |
+| `skills.js`  | `/skills`                                                                                                     |
 
 ---
 
@@ -846,11 +855,11 @@ remoção.
 
 ## 11. Issues e Pontos de Atenção
 
-| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                             |
-| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                  |
-| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                  |
-| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                  |
+| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                            |
+| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                 |
+| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                 |
+| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                 |
 | 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                                            |
 | 9.5  | `routes/agent.js` acessa campos privados via cast `any`   | Médio                       | `routes/agent.js`                            | ✅ **Corrigido** — casts `@type {any}` removidos; usa `.sessionId`, `.toolsRegistry`, `.telemetry` |
 | 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                                           |
@@ -867,8 +876,8 @@ remoção.
 
 ### Ativos (canônicos)
 
-| Arquivo                            | Camada | Status               |
-| ---------------------------------- | ------ | -------------------- |
+| Arquivo                            | Camada | Status              |
+| ---------------------------------- | ------ | ------------------- |
 | `agent/entry.js`                   | 12     | ✅ Ativo             |
 | `agent/always-alive.js`            | 3      | ✅ Crítico           |
 | `agent/session-manager.js`         | 3      | ✅ Ativo             |
