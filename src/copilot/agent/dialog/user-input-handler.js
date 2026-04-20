@@ -13,9 +13,12 @@
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { DialogProtocol } from './protocol.js';
 
 /**
  * @typedef {import('../types.js').PendingQuestion} PendingQuestion
+ *
+ * @typedef {import('../types.js').PendingQuestionKind} PendingQuestionKind
  */
 
 /**
@@ -71,6 +74,33 @@ function trackPersistedUserInputState(ctx, data, meta) {
 }
 
 /**
+ * @param {PendingQuestionKind} kind
+ * @returns {boolean}
+ */
+function shouldPersistPendingQuestion(kind) {
+    return kind === 'question' || kind === 'ready';
+}
+
+/**
+ * @param {{
+ *     kind: PendingQuestionKind;
+ *     askedAt: number;
+ *     allowFreeform: boolean;
+ *     choices?: string[];
+ * }} input
+ * @returns {import('../types.js').PendingQuestionMeta}
+ */
+function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
+    return {
+        kind,
+        askedAt,
+        allowFreeform,
+        protocolControlled: kind !== 'question',
+        ...(choices !== undefined ? { choices } : {}),
+    };
+}
+
+/**
  * Handler principal chamado pelo SDK quando o modelo usa `ask_user`.
  *
  * Delega para o handler especializado conforme o modo ativo:
@@ -105,12 +135,10 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
  * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
  */
 function handleDialogLoopInput({ question, allowFreeform }, ctx) {
+    const kind = DialogProtocol.classify(question);
     ctx.handleProtocolInput({ question });
 
-    const isProtocolMessage =
-        question.startsWith('READY') || question.startsWith('REPLY:') || question.startsWith('STOPPED');
-
-    return handleInteractiveQuestion({ question, allowFreeform, skipPersist: isProtocolMessage }, ctx);
+    return handleInteractiveQuestion({ question, allowFreeform, kind }, ctx);
 }
 
 /**
@@ -119,13 +147,14 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
  * Suspende a execução até que `answerPendingQuestion()` seja chamado via API HTTP. Define `status='waiting_for_input'`
  * e persiste a pergunta no estado para recovery.
  *
- * @param {{ question: string; choices?: string[]; allowFreeform: boolean; skipPersist?: boolean }} input
+ * @param {{ question: string; choices?: string[]; allowFreeform: boolean; kind?: PendingQuestionKind }} input
  * @param {UserInputContext} ctx
  * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
  */
-function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersist = false }, ctx) {
+function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'question' }, ctx) {
     ctx.setStatus('waiting_for_input');
     const askedAt = Date.now();
+    const questionKind = kind;
 
     return new Promise((resolve) => {
         /** @type {PendingQuestion} */
@@ -133,6 +162,8 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
             question,
             allowFreeform,
             askedAt,
+            kind: questionKind,
+            protocolControlled: questionKind !== 'question',
             ...(choices !== undefined && { choices }),
             resolve: (/** @type {string} */ answer) => {
                 ctx.setStatus('processing');
@@ -140,15 +171,24 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, skipPersi
             },
         };
         ctx.setPendingQuestion(pq);
-        // F44.3 + F56.2: fora do protocolo interno do dialog loop, persistimos pergunta pendente + timestamp do ask_user
-        // em uma única operação com policy canônica, evitando write duplicado e ruído em sessões longas.
-        if (!skipPersist) {
+        // Persistimos perguntas normais e estados READY do dialog loop com metadados semânticos.
+        // REPLY/STOPPED seguem em memória apenas para não gerar I/O redundante a cada turno.
+        if (shouldPersistPendingQuestion(questionKind)) {
             trackPersistedUserInputState(
                 ctx,
-                { pendingQuestion: question, lastAskUserAt: askedAt },
+                {
+                    pendingQuestion: question,
+                    pendingQuestionMeta: buildPendingQuestionMeta({
+                        kind: questionKind,
+                        askedAt,
+                        allowFreeform,
+                        ...(choices !== undefined ? { choices } : {}),
+                    }),
+                    lastAskUserAt: askedAt,
+                },
                 {
                     label: 'question.persist.pending',
-                    description: 'Persist pendingQuestion + lastAskUserAt',
+                    description: 'Persist pendingQuestion + pendingQuestionMeta + lastAskUserAt',
                 },
             );
         }

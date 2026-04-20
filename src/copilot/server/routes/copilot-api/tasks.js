@@ -108,7 +108,7 @@ export function registerTaskRoutes(bridge, agent) {
                 () => {
                     settled = true;
                 },
-                (e) => {
+                (/** @type {unknown} */ e) => {
                     settled = true;
                     earlyCatch = e;
                     return null;
@@ -120,8 +120,8 @@ export function registerTaskRoutes(bridge, agent) {
                 return res.status(projection.status).json(projection.body);
             }
             // Erros tardios apenas logados
-            sendPromise.catch((e) => {
-                log('WARN', `[copilot-api/tasks/send] Tarefa assíncrona falhou: ${e.message}`);
+            sendPromise.catch((/** @type {unknown} */ e) => {
+                log('WARN', `[copilot-api/tasks/send] Tarefa assíncrona falhou: ${toError(e).message}`);
             });
             return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
         } catch (e) {
@@ -150,5 +150,25 @@ export function registerTaskRoutes(bridge, agent) {
             return res.status(409).json({ ok: false, error: 'Não há pergunta pendente do modelo no momento.' });
         }
         return res.json({ ok: true, message: 'Resposta enviada ao modelo.' });
+    });
+
+    // ─── POST /answer/clear-shadow ───────────────────────────────────────────
+
+    /**
+     * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
+     */
+    bridge.post('/answer/clear-shadow', (_req, /** @type {Res} */ res) => {
+        if (typeof agent.clearPendingQuestionShadow !== 'function') {
+            return res.status(501).json({
+                ok: false,
+                error: 'Esta instância do agente não suporta limpeza explícita de shadow ask_user.',
+            });
+        }
+
+        const cleared = agent.clearPendingQuestionShadow();
+        if (!cleared) {
+            return res.status(409).json({ ok: false, error: 'Não há shadow persistida do modelo no momento.' });
+        }
+        return res.json({ ok: true, message: 'Shadow persistida de ask_user limpa.' });
     });
 }

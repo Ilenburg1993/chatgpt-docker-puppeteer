@@ -373,7 +373,10 @@ export function answerPendingQuestion(ctx, host, answer) {
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.resolvePendingQuestion(answer);
     void ctx.backgroundTasks.track(
-        persistStateWithPolicy({ pendingQuestion: null }, { label: 'question.clear.pending' }).then((result) => {
+        persistStateWithPolicy(
+            { pendingQuestion: null, pendingQuestionMeta: null },
+            { label: 'question.clear.pending' },
+        ).then((result) => {
             if (!result.ok) {
                 throw result.error;
             }

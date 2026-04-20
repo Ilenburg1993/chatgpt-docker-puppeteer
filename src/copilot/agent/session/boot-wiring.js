@@ -66,6 +66,10 @@ import {
  * @property {() => boolean} dialogLoopActive — Retorna true se dialog loop ativo
  * @property {() => string | null} getSessionId — Retorna sessionId
  * @property {() => string} getStatus — Retorna status atual do agente
+ * @property {() => boolean} hasPendingQuestion — Indica se há pergunta viva do SDK
+ * @property {() => boolean} hasPendingQuestionShadow — Indica se há shadow persistida restaurada
+ * @property {() => boolean} isPendingQuestionShadowExpired — Indica se a shadow persistida já expirou
+ * @property {() => void} clearPendingQuestionShadow — Limpa a shadow persistida restaurada do disco
  * @property {DialogLoopManager} dialogLoop — Referência ao DialogLoopManager
  * @property {SessionKeepalive} keepalive — Referência ao SessionKeepalive
  * @property {HandoffManager} handoff — Referência ao HandoffManager

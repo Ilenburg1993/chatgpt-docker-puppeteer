@@ -9,6 +9,7 @@
 import { emitNerv } from '#copilot/bridges';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     getTerminalAgentRuntime,
@@ -20,8 +21,8 @@ import {
     clearAttachments,
     getAttachmentQueue,
     getHubSessionId,
-    getPlanMode,
     getRl,
+    getShowStreaming,
     getShowThinking,
     getShowUsage,
     setBusy,
@@ -29,13 +30,12 @@ import {
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
-    PLAN_PREFIX,
-    PROMPT_USER,
-    PROMPT_WAITING,
-    SEPARATOR,
-    TURN_TIMEOUT_MS,
+    buildUserPrompt,
+    buildWaitingPrompt,
     printExchange,
     println,
+    SEPARATOR,
+    TURN_TIMEOUT_MS,
 } from './output.js';
 import { broadcastSse } from './sse.js';
 import {
@@ -132,6 +132,10 @@ async function _tryStartDialogLoop() {
     const agent = getTerminalAgentRuntime();
     const status = agent.status;
     if (status === 'stopped') {
+        recordTerminalActivity('boot', 'Iniciando agente', {
+            detail: 'AlwaysAliveAgent start()',
+            source: 'dialog',
+        });
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
         await agent.start();
         await new Promise((resolve, reject) => {
@@ -149,6 +153,10 @@ async function _tryStartDialogLoop() {
     }
 
     if (agent.status === 'processing') {
+        recordTerminalActivity('boot', 'Aguardando agente ficar idle', {
+            detail: 'Há trabalho em andamento antes do dialog loop',
+            source: 'dialog',
+        });
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(
@@ -171,6 +179,10 @@ async function _tryStartDialogLoop() {
         });
     }
 
+    recordTerminalActivity('boot', 'Conectando ao dialog loop', {
+        detail: 'Iniciando protocolo READY/REPLY do terminal',
+        source: 'dialog',
+    });
     println('\x1b[90m  Conectando ao agente…\x1b[0m');
     await startTerminalDialogMode(BOOT_PROMPT ?? undefined, {
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
@@ -232,13 +244,17 @@ async function _executeTurn(message, actor) {
     }
 
     setBusy(true);
+    recordTerminalActivity('turn', actor === 'llm-a' ? 'Processando mensagem da LLM-A' : 'Processando mensagem', {
+        detail: message.slice(0, 120),
+        source: 'dialog',
+    });
     broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
     if (rl) {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
         process.stdout.write(`  \x1b[90m⏳ aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m…\x1b[0m`);
-        rl.setPrompt(PROMPT_WAITING);
+        rl.setPrompt(buildWaitingPrompt());
     }
 
     let enrichedMessage = message;
@@ -253,10 +269,6 @@ async function _executeTurn(message, actor) {
         } catch (embedErr) {
             println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${toError(embedErr).message}\x1b[0m`);
         }
-    }
-
-    if (getPlanMode()) {
-        enrichedMessage = PLAN_PREFIX + enrichedMessage;
     }
 
     const t0 = Date.now();
@@ -281,7 +293,12 @@ async function _executeTurn(message, actor) {
         const showThinking = getShowThinking();
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
-        const displayState = createDisplayState({ model, effort, turnStartTime: t0 });
+        const displayState = createDisplayState({
+            model,
+            effort,
+            turnStartTime: t0,
+            showStreaming: getShowStreaming(),
+        });
 
         /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
         const onReasoning = showThinking ? createReasoningCallback(displayState) : undefined;
@@ -344,6 +361,11 @@ async function _executeTurn(message, actor) {
 
         return reply;
     } catch (e) {
+        recordTerminalActivity('error', 'Erro no turno', {
+            detail: toError(e).message,
+            severity: 'error',
+            source: 'dialog',
+        });
         println(`[erro] ${toError(e).message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
         if (!agent.dialogLoopActive) {
@@ -357,10 +379,13 @@ async function _executeTurn(message, actor) {
         return null;
     } finally {
         setBusy(false);
+        if (agent.dialogLoopActive) {
+            markTerminalActivityIdle();
+        }
         broadcastSse('busy', { busy: false });
         const rl = getRl();
         if (rl) {
-            rl.setPrompt(PROMPT_USER);
+            rl.setPrompt(buildUserPrompt());
             rl.prompt();
         }
     }

@@ -10,7 +10,7 @@
  */
 
 import {
-    AGENT_EVENTS,
+    EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_DIALOG_LOOP_CHANGED,
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
@@ -18,13 +18,11 @@ import {
     EMITTER_DIALOG_STOPPED,
     EMITTER_SESSION_FATAL,
     EMITTER_SESSION_USAGE,
-    EMITTER_TASK_COMPLETED,
-    EMITTER_TASK_DELTA,
-    EMITTER_TASK_ERROR,
-    EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../core/error-handlers.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from './activity-state.js';
+import { registerUnhandledAgentSseFallback } from './agent-sse-fallback.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog.js';
 import {
     getTerminalAgentRuntime,
@@ -35,6 +33,7 @@ import {
     writeTerminalHubSystemTurn,
 } from './frontend/llm-b-runtime.js';
 import { getHubSessionId } from './state.js';
+import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;
@@ -52,6 +51,11 @@ export function registerAgentEventListeners(printBanner) {
     const agent = getTerminalAgentRuntime();
     agent.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
+        recordTerminalActivity('system', 'Watchdog disparou', {
+            detail: `${secs}s sem progresso`,
+            severity: 'warn',
+            source: 'watchdog',
+        });
         log('WARN', `[TerminalServer] Watchdog disparou (${secs}s inativo).`);
 
         // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
@@ -62,7 +66,7 @@ export function registerAgentEventListeners(printBanner) {
         const recovered = await new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(false), 5_000);
             const check = () => {
-                if (readTerminalRuntimeState().pendingQuestion) {
+                if (readTerminalRuntimeState().pendingQuestionKind === 'ready') {
                     clearTimeout(timeout);
                     resolve(true);
                 }
@@ -71,7 +75,7 @@ export function registerAgentEventListeners(printBanner) {
             check();
             const interval = setInterval(() => {
                 check();
-                if (readTerminalRuntimeState().pendingQuestion) clearInterval(interval);
+                if (readTerminalRuntimeState().pendingQuestionKind === 'ready') clearInterval(interval);
             }, 500);
             setTimeout(() => clearInterval(interval), 5_100);
         });
@@ -129,10 +133,22 @@ export function registerAgentEventListeners(printBanner) {
     });
     agent.on(EMITTER_DIALOG_READY, () => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+        markTerminalActivityIdle('Aguardando próxima mensagem');
         broadcastSse('dialog.ready', {
             timestamp: Date.now(),
             model,
             reasoningEffort,
+        });
+    });
+    agent.on(EMITTER_ASSISTANT_STREAMING_DELTA, (/** @type {{ totalResponseSizeBytes?: number }} */ evt) => {
+        const totalBytes = Number(evt?.totalResponseSizeBytes ?? 0);
+        if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+            return;
+        }
+        recordTerminalActivity('streaming', 'Transmitindo resposta', {
+            detail: `${Math.round(totalBytes / 1024)} KB recebidos`,
+            source: 'sdk',
+            recordHistory: false,
         });
     });
 
@@ -141,6 +157,10 @@ export function registerAgentEventListeners(printBanner) {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
+            recordTerminalActivity('system', 'Dialog loop encerrado', {
+                detail: 'Parado por autorização explícita do usuário',
+                source: 'dialog',
+            });
             println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
             broadcastSse('dialog.stopped', { authorized: true, reason });
@@ -149,6 +169,10 @@ export function registerAgentEventListeners(printBanner) {
 
         // T-15: respeitar pausa intencional do usuário — não reiniciar se dialogPaused
         if (readTerminalRuntimeState().dialogPaused) {
+            recordTerminalActivity('system', 'Dialog loop pausado', {
+                detail: `Encerrado enquanto pausado (${reason})`,
+                source: 'dialog',
+            });
             println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
             broadcastSse('dialog.stopped', { reason, paused: true });
@@ -157,6 +181,11 @@ export function registerAgentEventListeners(printBanner) {
 
         const isWatchdog = reason === 'watchdog_restart';
         const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+        recordTerminalActivity('system', 'Reiniciando dialog loop', {
+            detail: label,
+            severity: 'warn',
+            source: 'dialog',
+        });
         println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
         log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
         broadcastSse('dialog.stopped', { reason, restarting: true });
@@ -219,65 +248,7 @@ export function registerAgentEventListeners(printBanner) {
         }
     });
 
-    // ── F36.3: Terminal buffer para task streaming ─────────────────────────
-    // Quando task.delta/task.reasoning são emitidos fora do dialog loop, renderiza no terminal.
-    // Rastreia a task ativa por ID para evitar estado inconsistente com tasks concorrentes.
-
-    /** @type {string | null} ID da task com streaming ativo */
-    let _activeTaskId = null;
-
-    /**
-     * Inicia o bloco visual de task streaming (se não houver um ativo).
-     *
-     * @param {string | null} taskId
-     */
-    const _startTaskBlock = (taskId) => {
-        if (_activeTaskId) return; // já há um streaming ativo
-        _activeTaskId = taskId ?? '__anonymous__';
-        println('');
-        println(`  \x1b[90m┌── task streaming${taskId ? ` (${taskId})` : ''} ──┐\x1b[0m`);
-        process.stdout.write('  \x1b[90m│\x1b[0m  ');
-    };
-
-    /**
-     * Escreve texto no bloco de streaming (com word-wrap por linhas).
-     *
-     * @param {string} text
-     */
-    const _writeTaskChunk = (text) => {
-        const lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (i > 0) process.stdout.write('\n  \x1b[90m│\x1b[0m  ');
-            process.stdout.write(/** @type {string} */ (lines[i]));
-        }
-    };
-
-    agent.on(EMITTER_TASK_DELTA, (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
-        const chunk = evt?.chunk ?? '';
-        if (!chunk) return;
-        _startTaskBlock(evt.taskId ?? null);
-        _writeTaskChunk(chunk);
-    });
-    agent.on(EMITTER_TASK_REASONING, (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
-        const text = evt?.text ?? '';
-        if (!text) return;
-        _startTaskBlock(evt.taskId ?? null);
-        _writeTaskChunk(`\x1b[2m${text}\x1b[22m`); // dim text para reasoning
-    });
-    agent.on(EMITTER_TASK_COMPLETED, () => {
-        if (_activeTaskId) {
-            process.stdout.write('\n');
-            println('  \x1b[90m└── task complete ───┘\x1b[0m');
-            _activeTaskId = null;
-        }
-    });
-    agent.on(EMITTER_TASK_ERROR, () => {
-        if (_activeTaskId) {
-            process.stdout.write('\n');
-            println('  \x1b[31m└── task error ──────┘\x1b[0m');
-            _activeTaskId = null;
-        }
-    });
+    setupTerminalTaskStreamListeners({ agent });
 
     // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
     // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
@@ -291,6 +262,32 @@ export function registerAgentEventListeners(printBanner) {
         'dialog.stopped',
         'session.usage',
         'session.compaction_complete',
+        'question.pending',
+        'stopped',
+        'tool.execution_start',
+        'tool.execution_partial_result',
+        'tool.execution_progress',
+        'tool.execution_complete',
+        'session.error',
+        'session.info',
+        'session.warning',
+        'session.model_changed',
+        'session.context_changed',
+        'session.mode_changed',
+        'session.plan_changed',
+        'session.task_complete',
+        'session.truncation',
+        'session.snapshot_rewind',
+        'session.shutdown',
+        'session.handoff',
+        'session.workspace_file_changed',
+        'exit_plan_mode.completed',
+        'session.compaction_start',
+        'assistant.intent',
+        'assistant.reasoning_complete',
+        'subagent.started',
+        'subagent.completed',
+        'subagent.failed',
         'ready',
         'session.fatal',
         'task.delta',
@@ -298,11 +295,5 @@ export function registerAgentEventListeners(printBanner) {
         'task.error',
         'task.reasoning',
     ]);
-    for (const evt of AGENT_EVENTS) {
-        if (!handledEvents.has(evt)) {
-            agent.on(evt, (/** @type {unknown} */ data) => {
-                broadcastSse(evt, /** @type {object} */ (data ?? {}));
-            });
-        }
-    }
+    registerUnhandledAgentSseFallback({ agent, handledEvents });
 }

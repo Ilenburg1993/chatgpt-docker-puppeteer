@@ -123,7 +123,7 @@
 /**
  * @typedef {object} ErrorOccurredHookInput
  * @property {string} error
- * @property {'model_call' | 'tool_execution' | 'system' | 'user_input'} errorContext
+ * @property {string} errorContext
  * @property {boolean} recoverable
  * @property {number} timestamp
  * @property {string} cwd
@@ -327,3 +327,5 @@
  * @typedef {object} AuditRingBufferConfig
  * @property {number} [capacity] - Tamanho máximo do buffer (default: 500)
  */
+
+export {};

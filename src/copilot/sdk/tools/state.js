@@ -55,6 +55,10 @@ export async function loadToolsConfigAsync() {
             log('WARN', '[tools-state] tools-config.json schema inválido — mantendo defaults.');
         }
     } catch (e) {
+        if (/** @type {NodeJS.ErrnoException} */ (e)?.code === 'ENOENT') {
+            log('DEBUG', '[tools-state] tools-config.json ausente — usando defaults em memória.');
+            return;
+        }
         logSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }

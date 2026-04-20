@@ -24,6 +24,24 @@
  */
 export const KNOWN_MODELS = Object.freeze([
     {
+        id: 'gpt-5',
+        costTier: /** @type {CostTier} */ ('high'),
+        speedTier: /** @type {SpeedTier} */ ('medium'),
+        contextWindow: 128_000,
+        supportsReasoning: true,
+        supportsVision: false,
+        aliases: ['gpt5'],
+    },
+    {
+        id: 'gpt-5-mini',
+        costTier: /** @type {CostTier} */ ('low'),
+        speedTier: /** @type {SpeedTier} */ ('fast'),
+        contextWindow: 128_000,
+        supportsReasoning: true,
+        supportsVision: false,
+        aliases: ['gpt5-mini', '5-mini'],
+    },
+    {
         id: 'gpt-4.1',
         costTier: /** @type {CostTier} */ ('medium'),
         speedTier: /** @type {SpeedTier} */ ('fast'),

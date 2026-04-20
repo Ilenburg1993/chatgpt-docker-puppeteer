@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -75,6 +76,14 @@ export function createSafePreset(opts = {}) {
         },
     });
 
+    const onErrorOccurred = createErrorHandler({
+        maxRetries: 2,
+        strategy: (input) => (input.recoverable ? 'retry' : 'abort'),
+        onError: (input) => {
+            log('WARN', `[preset/safe] error [${input.errorContext}]: ${input.error}`);
+        },
+    });
+
     /** @type {SessionHooks} */
     const hooks = {
         async onPreToolUse(input, invocation) {
@@ -121,13 +130,7 @@ export function createSafePreset(opts = {}) {
             log('INFO', '[preset/safe] session ended');
         },
 
-        async onErrorOccurred(input) {
-            log('WARN', `[preset/safe] error [${input.errorContext}]: ${input.error}`);
-            if (input.recoverable) {
-                return { errorHandling: /** @type {'retry'} */ ('retry'), retryCount: 2 };
-            }
-            return { errorHandling: /** @type {'abort'} */ ('abort') };
-        },
+        onErrorOccurred,
     };
 
     return { hooks, onPermissionRequest };

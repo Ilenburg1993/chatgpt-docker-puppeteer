@@ -12,8 +12,10 @@ import {
     TERMINAL_MAX_ATTACHMENTS,
     TERMINAL_MAX_INJECT_HISTORY,
     TERMINAL_MAX_LISTENERS,
+    TERMINAL_SHOW_INTENT_ACTIVITY,
     TERMINAL_SHOW_STREAMING,
     TERMINAL_SHOW_THINKING,
+    TERMINAL_SHOW_TOOL_ACTIVITY,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
 import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
@@ -38,9 +40,13 @@ stateEmitter.setMaxListeners(TERMINAL_MAX_LISTENERS);
 export const TERMINAL_EVENTS = /** @type {const} */ ({
     HUB_SESSION_CHANGED: 'hubSessionId:changed',
     BUSY_CHANGED: 'busy:changed',
+    SDK_SESSION_MODE_CHANGED: 'sdkSessionMode:changed',
+    SDK_PLAN_OPERATION_CHANGED: 'sdkPlanOperation:changed',
     SHOW_THINKING_CHANGED: 'showThinking:changed',
     SHOW_USAGE_CHANGED: 'showUsage:changed',
     SHOW_STREAMING_CHANGED: 'showStreaming:changed',
+    SHOW_TOOL_ACTIVITY_CHANGED: 'showToolActivity:changed',
+    SHOW_INTENT_ACTIVITY_CHANGED: 'showIntentActivity:changed',
 });
 
 // ─── Estado compartilhado ────────────────────────────────────────────────────
@@ -59,8 +65,14 @@ let _attachmentQueue = [];
 // T-22: limite máximo da fila de attachments (configurável via ENV)
 const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
 
-/** Modo planejamento: prefaça mensagens com instrução de plano antes de enviar. @type {boolean} */
-let _planMode = false;
+/** @type {'interactive' | 'plan' | 'autopilot' | 'shell' | null} */
+let _sdkSessionMode = null;
+
+/** @type {'create' | 'update' | 'delete' | null} */
+let _sdkPlanOperation = null;
+
+/** @type {number | null} */
+let _sdkPlanChangedAt = null;
 
 // ─── Getters / setters ───────────────────────────────────────────────────────
 
@@ -135,16 +147,45 @@ export function clearAttachments() {
     _attachmentQueue = [];
 }
 
-// ─── Plan mode ───────────────────────────────────────────────────────────────
-
-/** @returns {boolean} */
-export function getPlanMode() {
-    return _planMode;
+/** @returns {'interactive' | 'plan' | 'autopilot' | 'shell' | null} */
+export function getSdkSessionMode() {
+    return _sdkSessionMode;
 }
 
-/** @param {boolean} value @returns {void} */
-export function setPlanMode(value) {
-    _planMode = value;
+/**
+ * @param {'interactive' | 'plan' | 'autopilot' | 'shell' | null} value
+ * @returns {void}
+ */
+export function setSdkSessionMode(value) {
+    const prev = _sdkSessionMode;
+    _sdkSessionMode = value;
+    if (prev !== value) {
+        stateEmitter.emit(TERMINAL_EVENTS.SDK_SESSION_MODE_CHANGED, value, prev);
+    }
+}
+
+/** @returns {'create' | 'update' | 'delete' | null} */
+export function getLastSdkPlanOperation() {
+    return _sdkPlanOperation;
+}
+
+/** @returns {number | null} */
+export function getLastSdkPlanChangedAt() {
+    return _sdkPlanChangedAt;
+}
+
+/**
+ * @param {'create' | 'update' | 'delete' | null} value
+ * @param {number} [timestamp]
+ * @returns {void}
+ */
+export function setLastSdkPlanOperation(value, timestamp = Date.now()) {
+    const prev = _sdkPlanOperation;
+    _sdkPlanOperation = value;
+    _sdkPlanChangedAt = value === null ? null : timestamp;
+    if (prev !== value) {
+        stateEmitter.emit(TERMINAL_EVENTS.SDK_PLAN_OPERATION_CHANGED, value, prev);
+    }
 }
 
 // ─── Thinking display (F18.2) ────────────────────────────────────────────────
@@ -208,6 +249,46 @@ export function getShowStreaming() {
 export function setShowStreaming(value) {
     _showStreaming = value;
     stateEmitter.emit(TERMINAL_EVENTS.SHOW_STREAMING_CHANGED, value);
+}
+
+// ─── Tool activity display ───────────────────────────────────────────────────
+
+/**
+ * Exibe atividade de tools em tempo real (start/complete/progress).
+ *
+ * @type {boolean}
+ */
+let _showToolActivity = TERMINAL_SHOW_TOOL_ACTIVITY;
+
+/** @returns {boolean} */
+export function getShowToolActivity() {
+    return _showToolActivity;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setShowToolActivity(value) {
+    _showToolActivity = value;
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_TOOL_ACTIVITY_CHANGED, value);
+}
+
+// ─── Intent display ──────────────────────────────────────────────────────────
+
+/**
+ * Exibe intents do assistente em tempo real durante turnos.
+ *
+ * @type {boolean}
+ */
+let _showIntentActivity = TERMINAL_SHOW_INTENT_ACTIVITY;
+
+/** @returns {boolean} */
+export function getShowIntentActivity() {
+    return _showIntentActivity;
+}
+
+/** @param {boolean} value @returns {void} */
+export function setShowIntentActivity(value) {
+    _showIntentActivity = value;
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_INTENT_ACTIVITY_CHANGED, value);
 }
 
 // ─── Inject history (F16.3) ──────────────────────────────────────────────────

@@ -12,6 +12,18 @@
 import { getMcpStatus } from '#copilot/bridges';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { getDefaultAgentRuntimeId } from '../../presentation/agent-runtime.js';
+import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
+import {
+    getLastSdkPlanChangedAt,
+    getLastSdkPlanOperation,
+    getSdkSessionMode,
+    getShowIntentActivity,
+    getShowStreaming,
+    getShowThinking,
+    getShowToolActivity,
+    getShowUsage,
+} from '../state.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 import {
     canSearchTerminalHubTurns,
@@ -34,6 +46,12 @@ import {
     seedTerminalHistoryFeed,
     storeTerminalHubMemory,
 } from './llm-b-runtime.js';
+import {
+    deleteTerminalSdkPlanProjection as deleteTerminalSdkPlanProjectionImpl,
+    readTerminalSdkSessionProjection as readTerminalSdkSessionProjectionImpl,
+    setTerminalSdkModeProjection as setTerminalSdkModeProjectionImpl,
+    updateTerminalSdkPlanProjection as updateTerminalSdkPlanProjectionImpl,
+} from './sdk-session-projection.js';
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection
@@ -42,6 +60,7 @@ import {
 /**
  * @typedef {{
  *     agent: import('#copilot/agent').AlwaysAliveAgent;
+ *     runtimeId: string;
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
@@ -75,6 +94,7 @@ export function normalizeContextWindowProjection(raw) {
  */
 export function readTerminalRuntimeBase() {
     const agent = getTerminalAgentRuntime();
+    const runtimeId = getDefaultAgentRuntimeId();
     const snap = /** @type {Record<string, unknown>} */ (agent.getStatusSnapshot());
     const health = typeof agent.getHealthSnapshot === 'function' ? agent.getHealthSnapshot() : null;
     const binding = readTerminalSessionBinding();
@@ -84,7 +104,7 @@ export function readTerminalRuntimeBase() {
         binding.sdkSessionId ??
         null;
     const contextWindow = normalizeContextWindowProjection(snap['contextWindow'] ?? snap['contextState'] ?? null);
-    return { agent, snap, health, binding, runtimeSessionId, contextWindow };
+    return { agent, runtimeId, snap, health, binding, runtimeSessionId, contextWindow };
 }
 
 /**
@@ -95,26 +115,113 @@ export function readTerminalRuntimeBase() {
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
  *     dialogLoopActive: boolean;
+ *     pendingQuestion: boolean;
+ *     pendingQuestionKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionText: string | null;
+ *     pendingQuestionShadow: boolean;
+ *     pendingQuestionShadowKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('#copilot/agent/types').PendingQuestionShadowState | null;
+ *     pendingQuestionShadowText: string | null;
+ *     pendingQuestionShadowExpired: boolean;
+ *     pendingQuestionShadowAgeMs: number | null;
+ *     pendingQuestionShadowExpiresAt: number | null;
+ *     pendingQuestionShadowRemainingMs: number | null;
+ *     recommendedAction: import('#copilot/agent/types').AgentRecommendedAction | null;
+ *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
+ *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
+ *     sdkPlanChangedAt: number | null;
  *     injectPort: number | null;
  *     hubSessionId: string | null;
  *     sdkSessionId: string | null;
+ *     runtimeId: string;
  *     runtimeSessionId: string | null;
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
+ *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  * }}
  */
 export function readTerminalStatusProjection({ hubSessionId = null, injectPort } = {}) {
     const base = readTerminalRuntimeBase();
+    const pendingQuestion = base.agent.pendingQuestion ?? null;
+    const pendingQuestionShadow = base.agent.pendingQuestionShadow ?? null;
+    const pendingQuestionKind =
+        base.agent.pendingQuestionKind ??
+        (pendingQuestion && typeof pendingQuestion === 'object' && typeof pendingQuestion.kind === 'string'
+            ? pendingQuestion.kind
+            : null);
+    const pendingQuestionShadowKind =
+        base.agent.pendingQuestionShadowKind ??
+        (pendingQuestionShadow &&
+        typeof pendingQuestionShadow === 'object' &&
+        pendingQuestionShadow.meta &&
+        typeof pendingQuestionShadow.meta === 'object' &&
+        typeof pendingQuestionShadow.meta.kind === 'string'
+            ? pendingQuestionShadow.meta.kind
+            : null);
+    const pendingQuestionShadowState =
+        base.agent.pendingQuestionShadowState ??
+        (pendingQuestionShadow !== null ? (base.agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
+    const recommendedAction = /** @type {import('#copilot/agent/types').AgentRecommendedAction | null} */ (
+        typeof base.health?.recommendedAction === 'string' ? base.health.recommendedAction : null
+    );
     return {
         snap: base.snap,
         health: base.health,
         dialogLoopActive: base.agent.dialogLoopActive,
+        pendingQuestion: pendingQuestion !== null,
+        pendingQuestionKind,
+        pendingQuestionText: pendingQuestion?.question ?? null,
+        pendingQuestionShadow: pendingQuestionShadow !== null,
+        pendingQuestionShadowKind,
+        pendingQuestionShadowState,
+        pendingQuestionShadowText: pendingQuestionShadow?.question ?? null,
+        pendingQuestionShadowExpired: Boolean(base.agent.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: base.agent.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: base.agent.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: base.agent.pendingQuestionShadowRemainingMs ?? null,
+        recommendedAction,
+        sdkSessionMode: getSdkSessionMode(),
+        sdkPlanOperation: getLastSdkPlanOperation(),
+        sdkPlanChangedAt: getLastSdkPlanChangedAt(),
         injectPort: typeof injectPort === 'number' ? injectPort : null,
         hubSessionId: hubSessionId ?? base.binding.hubSessionId ?? null,
         sdkSessionId: base.binding.sdkSessionId,
+        runtimeId: base.runtimeId,
         runtimeSessionId: base.runtimeSessionId,
         workspace: getWorkspaceContext(),
         turnCount: readTerminalTurnCount(),
+        activity: readTerminalActivitySnapshot(),
+    };
+}
+
+/**
+ * Projeção da atividade atual e do histórico recente do terminal.
+ *
+ * @param {number} [limit=10] Default is `10`
+ * @returns {{
+ *     current: import('../activity-state.js').TerminalActivitySnapshot;
+ *     history: import('../activity-state.js').TerminalActivityHistoryEntry[];
+ * }}
+ */
+export function readTerminalActivityProjection(limit = 10) {
+    return {
+        current: readTerminalActivitySnapshot(),
+        history: readTerminalActivityHistory(limit),
+    };
+}
+
+/**
+ * Estado atual dos toggles de exibição do terminal.
+ *
+ * @returns {{ thinking: boolean; streaming: boolean; usage: boolean; tools: boolean; intent: boolean }}
+ */
+export function readTerminalDisplayProjection() {
+    return {
+        thinking: getShowThinking(),
+        streaming: getShowStreaming(),
+        usage: getShowUsage(),
+        tools: getShowToolActivity(),
+        intent: getShowIntentActivity(),
     };
 }
 
@@ -124,7 +231,16 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort }
  * @returns {{
  *     currentModel: string;
  *     currentReasoningEffort: string;
- *     modelMeta: { costTier?: string; speedTier?: string; contextWindow?: number } | null;
+ *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
+ *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
+ *     sdkPlanChangedAt: number | null;
+ *     modelMeta: {
+ *         costTier?: string;
+ *         speedTier?: string;
+ *         contextWindow?: number;
+ *         supportsReasoning?: boolean;
+ *         supportsVision?: boolean;
+ *     } | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
  *     runtimeSessionId: string | null;
  * }}
@@ -137,11 +253,16 @@ export function readTerminalConfigProjection() {
     return {
         currentModel,
         currentReasoningEffort,
+        sdkSessionMode: getSdkSessionMode(),
+        sdkPlanOperation: getLastSdkPlanOperation(),
+        sdkPlanChangedAt: getLastSdkPlanChangedAt(),
         modelMeta: rawMeta
             ? {
                   costTier: rawMeta.costTier,
                   speedTier: rawMeta.speedTier,
                   contextWindow: rawMeta.contextWindow,
+                  supportsReasoning: rawMeta.supportsReasoning,
+                  supportsVision: rawMeta.supportsVision,
               }
             : null,
         binding: base.binding,
@@ -182,17 +303,47 @@ export function readTerminalModelStatsProjection() {
  * @param {string} modelId
  * @returns {{
  *     previousModel: string;
+ *     previousReasoningEffort: string;
  *     currentModel: string;
+ *     currentReasoningEffort: string;
+ *     reasoningAdjusted: boolean;
+ *     modelMeta: {
+ *         costTier?: string;
+ *         speedTier?: string;
+ *         contextWindow?: number;
+ *         supportsReasoning?: boolean;
+ *         supportsVision?: boolean;
+ *     } | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
  * }}
  */
 export function setTerminalModelProjection(modelId) {
     const { agent, binding } = readTerminalRuntimeBase();
     const previousModel = String(agent.model ?? 'unknown');
+    const previousReasoningEffort = String(agent.reasoningEffort ?? 'off');
+    const rawMeta = modelRegistry.get(modelId);
     agent.setModel(modelId);
+    let reasoningAdjusted = false;
+    if (rawMeta?.supportsReasoning === false && agent.reasoningEffort !== undefined) {
+        agent.setReasoningEffort(undefined);
+        reasoningAdjusted = true;
+    }
+    const currentReasoningEffort = reasoningAdjusted ? 'off' : String(agent.reasoningEffort ?? 'off');
     return {
         previousModel,
+        previousReasoningEffort,
         currentModel: modelId,
+        currentReasoningEffort,
+        reasoningAdjusted,
+        modelMeta: rawMeta
+            ? {
+                  costTier: rawMeta.costTier,
+                  speedTier: rawMeta.speedTier,
+                  contextWindow: rawMeta.contextWindow,
+                  supportsReasoning: rawMeta.supportsReasoning,
+                  supportsVision: rawMeta.supportsVision,
+              }
+            : null,
         binding,
     };
 }
@@ -319,6 +470,16 @@ export function answerPendingTerminalQuestion(answer) {
 }
 
 /**
+ * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
+ *
+ * @returns {boolean}
+ */
+export function clearPendingTerminalQuestionShadow() {
+    const agent = readTerminalRuntimeBase().agent;
+    return typeof agent.clearPendingQuestionShadow === 'function' ? agent.clearPendingQuestionShadow() : false;
+}
+
+/**
  * Lê turnos persistidos da hub session atual.
  *
  * @param {{ hubSessionId?: string | null; limit?: number; offset?: number }} input
@@ -407,6 +568,12 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
  */
 export async function saveTerminalSnapshotProjection(reason) {
     const { agent, snap } = readTerminalRuntimeBase();
+    const pendingQuestion =
+        agent.pendingQuestion && typeof agent.pendingQuestion === 'object' ? agent.pendingQuestion : null;
+    const pendingQuestionShadow =
+        agent.pendingQuestionShadow && typeof agent.pendingQuestionShadow === 'object'
+            ? agent.pendingQuestionShadow
+            : null;
     const data = createTerminalSnapshot({
         sessionId: agent.sessionId ?? null,
         model: String(snap['model'] ?? 'unknown'),
@@ -415,6 +582,33 @@ export async function saveTerminalSnapshotProjection(reason) {
         dialogLoopActive: agent.dialogLoopActive,
         dialogPaused: Boolean(snap['dialogPaused']),
         pendingQuestion: snap['pendingQuestion'] ? String(snap['pendingQuestion']) : null,
+        pendingQuestionMeta:
+            pendingQuestion !== null
+                ? {
+                      kind: pendingQuestion.kind,
+                      askedAt: pendingQuestion.askedAt,
+                      allowFreeform: pendingQuestion.allowFreeform,
+                      protocolControlled: pendingQuestion.protocolControlled,
+                      ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
+                  }
+                : null,
+        pendingQuestionShadow:
+            pendingQuestionShadow !== null
+                ? {
+                      question: pendingQuestionShadow.question,
+                      meta: {
+                          kind: pendingQuestionShadow.meta.kind,
+                          askedAt: pendingQuestionShadow.meta.askedAt,
+                          allowFreeform: pendingQuestionShadow.meta.allowFreeform,
+                          protocolControlled: pendingQuestionShadow.meta.protocolControlled,
+                          ...(pendingQuestionShadow.meta.choices !== undefined
+                              ? { choices: pendingQuestionShadow.meta.choices }
+                              : {}),
+                      },
+                      restoredAt: pendingQuestionShadow.restoredAt,
+                      expiresAt: pendingQuestionShadow.expiresAt,
+                  }
+                : null,
         prMetrics: agent.dialogPrMetrics ?? null,
         reason: reason || 'manual',
     });
@@ -442,6 +636,52 @@ export async function loadTerminalSnapshotProjection(snapshotId) {
 }
 
 /**
+ * Lê o estado vanilla de mode/plan da sessão SDK.
+ *
+ * @returns {Promise<{
+ *     currentMode: 'interactive' | 'plan' | 'autopilot';
+ *     plan: import('#copilot/sdk/types').PlanReadResult;
+ *     lastObservedPlanOperation: 'create' | 'update' | 'delete' | null;
+ *     lastObservedPlanChangedAt: number | null;
+ * }>}
+ */
+export async function readTerminalPlanProjection() {
+    return readTerminalSdkSessionProjectionImpl();
+}
+
+/**
+ * Altera o modo vanilla da sessão SDK e devolve a projeção antes/depois.
+ *
+ * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @returns {Promise<{
+ *     previousMode: 'interactive' | 'plan' | 'autopilot';
+ *     currentMode: 'interactive' | 'plan' | 'autopilot';
+ * }>}
+ */
+export async function setTerminalPlanModeProjection(mode) {
+    return setTerminalSdkModeProjectionImpl(mode);
+}
+
+/**
+ * Atualiza o plan.md vanilla da sessão SDK.
+ *
+ * @param {string} content
+ * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ */
+export async function updateTerminalPlanProjection(content) {
+    return updateTerminalSdkPlanProjectionImpl(content);
+}
+
+/**
+ * Remove o plan.md vanilla da sessão SDK e retorna o estado atualizado.
+ *
+ * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ */
+export async function deleteTerminalPlanProjection() {
+    return deleteTerminalSdkPlanProjectionImpl();
+}
+
+/**
  * Lê a projeção diagnóstica consolidada do terminal.
  *
  * @param {{ hubSessionId?: string | null }} input
@@ -450,6 +690,7 @@ export async function loadTerminalSnapshotProjection(snapshotId) {
  *     health: Record<string, any> | null;
  *     dialogLoopActive: boolean;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
+ *     runtimeId: string;
  *     runtimeSessionId: string | null;
  *     mcp: ReturnType<typeof getMcpStatus>;
  *     memMB: number;
@@ -457,6 +698,11 @@ export async function loadTerminalSnapshotProjection(snapshotId) {
  *     hub: { ready: boolean; activeHubSessionId: string | null; summary: string };
  *     todos: { id: string; title: string; status: string }[];
  *     topToolStats: [string, Record<string, any>][];
+ *     activity: import('../activity-state.js').TerminalActivitySnapshot;
+ *     display: ReturnType<typeof readTerminalDisplayProjection>;
+ *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
+ *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
+ *     sdkPlanChangedAt: number | null;
  * }>}
  */
 export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
@@ -498,6 +744,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
         health: base.health,
         dialogLoopActive: base.agent.dialogLoopActive,
         binding: base.binding,
+        runtimeId: base.runtimeId,
         runtimeSessionId: base.runtimeSessionId,
         mcp,
         memMB,
@@ -509,6 +756,11 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
         },
         todos,
         topToolStats,
+        activity: readTerminalActivitySnapshot(),
+        display: readTerminalDisplayProjection(),
+        sdkSessionMode: getSdkSessionMode(),
+        sdkPlanOperation: getLastSdkPlanOperation(),
+        sdkPlanChangedAt: getLastSdkPlanChangedAt(),
     };
 }
 
@@ -526,6 +778,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
  *     toolCallCount: number;
  *     toolErrorCount: number;
  *     errorStats: { total: number; buffered: number };
+ *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  * }}
  */
 export function readTerminalMetricsProjection() {
@@ -552,6 +805,7 @@ export function readTerminalMetricsProjection() {
         turnCount: readTerminalTurnCount(),
         toolCallCount,
         toolErrorCount,
+        activity: readTerminalActivitySnapshot(),
         errorStats: {
             total: Number(errorStats.total ?? 0),
             buffered: Number(errorStats.buffered ?? 0),

@@ -17,6 +17,16 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive }) {
     return [
+        session.on(SESSION_EVENTS.ASSISTANT_STREAMING_DELTA, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const totalResponseSizeBytes = /** @type {number | undefined} */ (data['totalResponseSizeBytes']);
+            if (typeof totalResponseSizeBytes === 'number') {
+                emit('assistant.streaming_delta', {
+                    totalResponseSizeBytes,
+                    ts: evt?.timestamp ?? Date.now(),
+                });
+            }
+        }),
         session.on(SESSION_EVENTS.ASSISTANT_REASONING_DELTA, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const chunk = /** @type {string} */ (data['deltaContent'] ?? '');

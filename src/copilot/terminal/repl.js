@@ -18,11 +18,13 @@ import readline from 'node:readline';
 import { logSwallowed } from '../core/error-handlers.js';
 import { resolve } from './alias-store.js';
 import {
+    cmdActivity as _cmdActivity,
     cmdAlias as _cmdAlias,
     cmdAnswer as _cmdAnswer,
     cmdAttach as _cmdAttach,
     cmdAudit as _cmdAudit,
     cmdClear as _cmdClear,
+    cmdClearShadow as _cmdClearShadow,
     cmdCompact as _cmdCompact,
     cmdContext as _cmdContext,
     cmdCount as _cmdCount,
@@ -55,7 +57,7 @@ import {
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
 } from './commands/index.js';
-import { ensureDialogLoop, println, sendTurn } from './dialog.js';
+import { buildUserPrompt, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
 import {
     getTerminalAgentRuntime,
@@ -70,15 +72,15 @@ import { setupAgentListeners } from './repl-listeners.js';
 import { addAttachment, getHubSessionId, setRl } from './state.js';
 
 const INJECT_PORT = LLM_B_TERMINAL_PORT;
-const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 
 const BANNER = `
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
 \x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
 \x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
-  \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/restart\x1b[0m
+    \x1b[33m/status\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/clear-shadow\x1b[0m · \x1b[33m/restart\x1b[0m
+    \x1b[33m/activity [n]\x1b[0m \x1b[90m← atividade atual + timeline\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
-  \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
+    \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
   \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
@@ -113,6 +115,7 @@ const BANNER = `
  */
 const CMD_ROUTES = [
     [['status'], (ctx) => _cmdStatus({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println })],
+    [['activity'], (_, arg) => _cmdActivity({ println }, arg)],
     [['diagnose', 'diag'], (ctx) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println })],
     [['history'], (_, arg) => _cmdHistory({ println }, Number(arg) || 10)],
     [
@@ -127,6 +130,7 @@ const CMD_ROUTES = [
     [['who'], (ctx) => _cmdWho({ injectPort: ctx.injectPort, println })],
     [['clear'], () => _cmdClear({ println })],
     [['answer'], (_, arg) => _cmdAnswer({ println }, arg)],
+    [['clear-shadow'], () => _cmdClearShadow({ println })],
     [['count'], (ctx) => _cmdCount({ hubSessionId: ctx.hubSessionId, println })],
     [['restart'], () => _cmdRestart()],
     [['emergency-reset', 'ereset'], () => _cmdEmergencyReset()],
@@ -346,7 +350,7 @@ export async function startRepl(injectServer) {
         input: process.stdin,
         output: process.stdout,
         terminal: true,
-        prompt: PROMPT_USER,
+        prompt: buildUserPrompt(),
         completer: _completer,
     });
     setRl(rl);
@@ -363,6 +367,7 @@ export async function startRepl(injectServer) {
         log('ERROR', `[TerminalServer] Boot error: ${toError(e).message}`);
     }
 
+    rl.setPrompt(buildUserPrompt());
     rl.prompt();
 
     // F37.6: Buffer para multiline input via backslash continuation
@@ -384,11 +389,12 @@ export async function startRepl(injectServer) {
             _multilineBuffer.push(line);
             line = _multilineBuffer.join('\n');
             _multilineBuffer = [];
-            rl.setPrompt(PROMPT_USER);
+            rl.setPrompt(buildUserPrompt());
         }
 
         const trimmed = line.trim();
         if (!trimmed) {
+            rl.setPrompt(buildUserPrompt());
             rl.prompt();
             return;
         }
@@ -398,6 +404,7 @@ export async function startRepl(injectServer) {
             const [cmd, ...rest] = resolved.slice(1).split(' ');
             const arg = rest.join(' ');
             await dispatchCmd(cmd ?? '', arg, rest, rl, injectServer, cleanup);
+            rl.setPrompt(buildUserPrompt());
             rl.prompt();
             return;
         }
@@ -425,6 +432,7 @@ export async function startRepl(injectServer) {
         // propagar AbortController de sendTurn → sendMessage (infra AbortSignal já existe
         // em message-queue.js). Candidato a upgrade P4 futuro.
         println('\n[terminal] Ctrl+C detectado. Dialog loop mantido ativo. Use /quit para encerrar.');
+        rl.setPrompt(buildUserPrompt());
         rl.prompt();
     });
 }

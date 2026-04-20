@@ -26,12 +26,14 @@ export function cmdHelp({ injectPort, println }) {
 
   \x1b[1mComandos de Sessão\x1b[0m
   \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning
+  \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente
   \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
   \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
   \x1b[33m/db-sessions [n]\x1b[0m                     — últimas N sessões hub
   \x1b[33m/who\x1b[0m                                 — atores e canais ativos
   \x1b[33m/count\x1b[0m                               — estatísticas da sessão
   \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
+  \x1b[33m/clear-shadow\x1b[0m                        — limpa shadow persistida de ask_user restaurada do disco
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
   \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa rate limiters + reinicia loop
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
@@ -39,7 +41,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[1mConfiguração do Modelo\x1b[0m
   \x1b[33m/model\x1b[0m                               — exibe modelo ativo
   \x1b[33m/model list\x1b[0m                          — lista modelos disponíveis (via SDK)
-  \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model gpt-4.1)
+  \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model gpt-5-mini)
   \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
   \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 
@@ -50,13 +52,13 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m@<caminho>\x1b[0m (inline)                  — embed automático: @src/foo.js no texto da mensagem
   \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão
   \x1b[33m/compact\x1b[0m                             — compacta histórico em resumo técnico denso
-  \x1b[33m/plan [on|off]\x1b[0m                       — ativa/desativa modo de planejamento passo-a-passo
+  \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m — controla o mode/plan vanilla da sessão SDK
   \x1b[33m/thinking [on|off]\x1b[0m                   — toggle exibição de thinking/reasoning da LLM-B
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
   \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
-  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage)
+  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)
   \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing)
   \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
   \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)

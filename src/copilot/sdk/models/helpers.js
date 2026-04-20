@@ -134,11 +134,11 @@ export function pickModel(models, criteria = {}) {
  *
  * @param {ModelInfo[]} models - Lista de modelos disponíveis
  * @param {string} preferred - ID do modelo preferido
- * @param {string} [fallback='gpt-4.1'] - Modelo de fallback se o preferido não estiver disponível. Default is
- *   `'gpt-4.1'`
+ * @param {string} [fallback='gpt-5-mini'] - Modelo de fallback se o preferido não estiver disponível. Default is
+ *   `'gpt-5-mini'`
  * @returns {string} ID do modelo a usar
  */
-export function resolveModelId(models, preferred, fallback = 'gpt-4.1') {
+export function resolveModelId(models, preferred, fallback = 'gpt-5-mini') {
     const enabled = filterEnabledModels(models);
     const found = enabled.find((m) => m.id === preferred);
     return found ? found.id : fallback;
@@ -176,8 +176,8 @@ export function getSupportedReasoningEfforts(model) {
  * erro se effort for inválido para o modelo.
  *
  * @example
- *     const config = buildReasoningConfig(models, 'gpt-4.1', 'high');
- *     // => { model: 'gpt-4.1', reasoningEffort: 'high' }
+ *     const config = buildReasoningConfig(models, 'gpt-5-mini', 'high');
+ *     // => { model: 'gpt-5-mini', reasoningEffort: 'high' }
  *
  * @param {ModelInfo[]} models - Lista de modelos disponíveis
  * @param {string} modelId - ID do modelo a usar

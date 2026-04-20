@@ -9,7 +9,9 @@
  */
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { readTerminalDialogStreamMeta } from '../frontend/llm-b-runtime.js';
+import { readTerminalActivitySnapshot } from '../activity-state.js';
+import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/llm-b-runtime.js';
+import { getSdkSessionMode } from '../state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -19,13 +21,73 @@ export const TURN_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 export const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 export const PROMPT_WAITING = '     ';
 
+/**
+ * Limita o tamanho de detalhes embutidos no prompt.
+ *
+ * @param {string} value
+ * @param {number} [max=18] Default is `18`
+ * @returns {string}
+ */
+function shortenPromptToken(value, max = 18) {
+    return value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * Constrói o prompt interativo dinâmico do terminal.
+ *
+ * @returns {string}
+ */
+export function buildUserPrompt() {
+    const state = readTerminalRuntimeState();
+    const { model, reasoningEffort } = state;
+    /** @type {string[]} */
+    const tags = [];
+
+    if (!state.dialogLoopActive) {
+        tags.push('\x1b[31m[NOLOOP]\x1b[0m');
+    }
+    const sdkMode = getSdkSessionMode();
+    if (sdkMode && sdkMode !== 'interactive') {
+        tags.push(`\x1b[35m[MODE:${sdkMode.toUpperCase()}]\x1b[0m`);
+    }
+    if (state.dialogPaused) {
+        tags.push('\x1b[31m[PAUSED]\x1b[0m');
+    }
+    if (state.queueSize > 0) {
+        tags.push(`\x1b[90m[Q:${state.queueSize}]\x1b[0m`);
+    }
+    if (state.pendingQuestion && state.pendingQuestionKind) {
+        tags.push(`\x1b[36m[ASK:${state.pendingQuestionKind.toUpperCase()}]\x1b[0m`);
+    } else if (state.pendingQuestionShadowState) {
+        const shadowTag =
+            state.pendingQuestionShadowState === 'expired'
+                ? '\x1b[31m[SHADOW:EXPIRED]\x1b[0m'
+                : state.pendingQuestionShadowState === 'expiring_soon'
+                  ? '\x1b[33m[SHADOW:SOON]\x1b[0m'
+                  : state.pendingQuestionShadowState === 'fresh'
+                    ? '\x1b[36m[SHADOW:FRESH]\x1b[0m'
+                    : '\x1b[33m[SHADOW]\x1b[0m';
+        tags.push(shadowTag);
+    }
+
+    return `\x1b[32mvocê\x1b[0m\x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m${tags.join('')}\x1b[90m›\x1b[0m `;
+}
+
+/**
+ * Constrói o prompt exibido enquanto o terminal está aguardando a resposta da LLM-B.
+ *
+ * @returns {string}
+ */
+export function buildWaitingPrompt() {
+    const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+    const activity = readTerminalActivitySnapshot();
+    const phase = shortenPromptToken(activity.phase.toUpperCase(), 10);
+    const label = shortenPromptToken(activity.label, 16);
+    return `\x1b[90m⏳[${phase}:${label}]\x1b[0m \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
+}
+
 /** Separador visual entre turnos — 72 colunas. */
 export const SEPARATOR = '\x1b[90m  ' + '─'.repeat(70) + '\x1b[0m';
-
-/** Prefácio injetado antes das mensagens quando /plan mode está ativo. */
-export const PLAN_PREFIX =
-    '[MODO PLANEJAMENTO] Antes de responder, elabore um plano detalhado passo-a-passo. ' +
-    'Não pule para a resposta diretamente. Liste dependências, riscos e alternativas.\n\n';
 
 /**
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente

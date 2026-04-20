@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { readTerminalMetricsProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} MetricsContext
@@ -23,8 +23,19 @@ import { readTerminalMetricsProjection } from '../frontend/index.js';
  */
 export function cmdMetrics({ println }) {
     const projection = readTerminalMetricsProjection();
-    const { snap, pr, turnCount, contextWindow, toolCallCount, toolErrorCount, errorStats, binding, runtimeSessionId } =
-        projection;
+    const configProjection = readTerminalConfigProjection();
+    const {
+        snap,
+        pr,
+        turnCount,
+        contextWindow,
+        toolCallCount,
+        toolErrorCount,
+        errorStats,
+        binding,
+        runtimeSessionId,
+        activity,
+    } = projection;
 
     // ── Session info ─────────────────────────────────────────────────
     const model = snap['model'] ?? '?';
@@ -55,6 +66,8 @@ export function cmdMetrics({ println }) {
     hub sessão  \x1b[90m${binding.hubSessionId ?? '(sem hub)'}\x1b[0m
   status      ${status}
   modelo      \x1b[36m${model}\x1b[0m
+  modo sdk    ${configProjection.sdkSessionMode ?? 'interactive'}
+  plan file   ${configProjection.sdkPlanOperation ?? '(sem alterações)'}
 
   \x1b[35m📊 Uso\x1b[0m
   ─────────────────────────────────────
@@ -71,6 +84,12 @@ export function cmdMetrics({ println }) {
   ─────────────────────────────────────
   total       ${errorStats.total > 0 ? `\x1b[31m${errorStats.total}\x1b[0m` : '\x1b[32m0\x1b[0m'}
   buffer      ${errorStats.buffered}
+
+  \x1b[35m🎛️  Atividade\x1b[0m
+  ─────────────────────────────────────
+  fase        ${activity.phase}
+  label       ${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}
+  detalhe     ${activity.detail ?? '\x1b[90m(nenhum)\x1b[0m'}
   ═════════════════════════════════════
 `);
 }

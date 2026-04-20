@@ -36,6 +36,10 @@ const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
  * @property {boolean} dialogLoopActive - Se o dialog loop estava ativo
  * @property {boolean} dialogPaused - Se o dialog loop estava pausado
  * @property {string | null} pendingQuestion - Pergunta pendente (se houver)
+ * @property {import('../types.js').PendingQuestionMeta | null} [pendingQuestionMeta] - Metadados semânticos da pergunta
+ *   pendente
+ * @property {import('../types.js').PendingQuestionShadow | null} [pendingQuestionShadow] - Shadow persistida do
+ *   `ask_user`, quando houver
  * @property {Record<string, unknown> | null} stateSnapshot - Estado completo do state-io
  * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} prMetrics
  * @property {string} [reason] - Motivo do snapshot (manual, auto-save, handoff)
@@ -52,6 +56,8 @@ const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     pendingQuestion: string | null;
+ *     pendingQuestionMeta?: import('../types.js').PendingQuestionMeta | null;
+ *     pendingQuestionShadow?: import('../types.js').PendingQuestionShadow | null;
  *     prMetrics?: { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null;
  *     reason?: string;
  * }} opts
@@ -72,6 +78,8 @@ export function createSnapshot(opts) {
         dialogLoopActive: opts.dialogLoopActive,
         dialogPaused: opts.dialogPaused,
         pendingQuestion: opts.pendingQuestion,
+        pendingQuestionMeta: opts.pendingQuestionMeta ?? null,
+        pendingQuestionShadow: opts.pendingQuestionShadow ?? null,
         stateSnapshot: state ?? null,
         prMetrics: opts.prMetrics ?? null,
         reason: opts.reason ?? 'manual',

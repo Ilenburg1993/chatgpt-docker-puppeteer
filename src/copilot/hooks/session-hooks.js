@@ -20,6 +20,7 @@ import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
 import { modelSelector } from '#copilot/sdk';
 import { hostname } from 'node:os';
+import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
 
 /**
@@ -51,6 +52,54 @@ import { log } from './logger.js';
 export function createSessionHooks(ctx) {
     const { emitWebhook, getModel, scheduleFallback, emit, getContextSnapshot } = ctx;
     const metrics = ctx.metrics ?? null;
+
+    const onErrorOccurred = createErrorHandler({
+        maxRetries: 3,
+        strategy: (input) => (input.recoverable ? 'retry' : 'abort'),
+        onError: (input, invocation) => {
+            const sessionId = invocation?.sessionId ?? '';
+            log(
+                'WARN',
+                `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
+            );
+
+            defaultAuditLog.record({
+                type: 'session.error',
+                sessionId,
+                data: {
+                    errorContext: input.errorContext,
+                    recoverable: input.recoverable,
+                },
+            });
+
+            const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
+            if (isRateOrQuotaError) {
+                const currentModel = getModel() ?? 'unknown';
+                const envFallback = getCopilotFallbackModel();
+                const fallbackModel =
+                    envFallback && envFallback !== currentModel
+                        ? envFallback
+                        : (modelSelector.suggestFallback(currentModel)?.id ?? null);
+                if (fallbackModel && fallbackModel !== currentModel) {
+                    log(
+                        'WARN',
+                        `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão usará model fallback: ${fallbackModel}`,
+                    );
+                    scheduleFallback(fallbackModel);
+                } else {
+                    log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
+                }
+            }
+
+            emit('error', {
+                hookType: 'errorOccurred',
+                errorMessage: input.error,
+                errorContext: input.errorContext,
+                recoverable: input.recoverable,
+                sessionId,
+            });
+        },
+    });
 
     /**
      * @param {import('./types.js').SessionStartHookInput} input
@@ -96,61 +145,25 @@ export function createSessionHooks(ctx) {
         await emitWebhook('session.end', { sessionId });
     }
 
-    /**
-     * @param {{ error: string; errorContext: string; recoverable: boolean }} input
-     * @param {import('./types.js').InvocationContext} invocation
-     * @returns {void}
-     */
-    function onErrorOccurred(input, invocation) {
-        log(
-            'WARN',
-            `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
-        );
-
-        const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
-        if (isRateOrQuotaError) {
-            const currentModel = getModel() ?? 'unknown';
-            // F40.3: priorizar env var explícita; se ausente, usar ModelSelector dinâmico
-            const envFallback = getCopilotFallbackModel();
-            const fallbackModel =
-                envFallback && envFallback !== currentModel
-                    ? envFallback
-                    : (modelSelector.suggestFallback(currentModel)?.id ?? null);
-            if (fallbackModel && fallbackModel !== currentModel) {
-                log(
-                    'WARN',
-                    `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão usará model fallback: ${fallbackModel}`,
-                );
-                scheduleFallback(fallbackModel);
-            } else {
-                log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
-            }
-        }
-
-        emit('error', {
-            hookType: 'errorOccurred',
-            errorMessage: input.error,
-            errorContext: input.errorContext,
-            recoverable: input.recoverable,
-            sessionId: invocation.sessionId,
-        });
-    }
-
     return { onSessionStart, onSessionEnd, onErrorOccurred };
 }
 
 /**
- * E2.2 — Cria um handler `onSessionEnd` que executa callbacks de cleanup em sequência.
- * Erros em um cleanup não impedem a execução dos demais (fail-safe).
+ * E2.2 — Cria um handler `onSessionEnd` que executa callbacks de cleanup em sequência. Erros em um cleanup não impedem
+ * a execução dos demais (fail-safe).
  *
  * @example
  *     const cleanup = createCleanupHandler([
- *         async (sessionId) => { await db.close(sessionId); },
- *         async (sessionId) => { cache.purge(sessionId); },
+ *         async (sessionId) => {
+ *             await db.close(sessionId);
+ *         },
+ *         async (sessionId) => {
+ *             cache.purge(sessionId);
+ *         },
  *     ]);
  *     const hooks = createHooks({ onSessionEnd: cleanup });
  *
- * @param {Array<(sessionId: string, reason: string) => void | Promise<void>>} cleanupFns
+ * @param {((sessionId: string, reason: string) => void | Promise<void>)[]} cleanupFns
  * @param {{ label?: string }} [opts]
  * @returns {import('./types.js').SessionEndHandler}
  */

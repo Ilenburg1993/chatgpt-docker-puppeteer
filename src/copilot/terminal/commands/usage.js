@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { readTerminalUsageNowProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
 import { getShowUsage, setShowUsage } from '../state.js';
 
 /**
@@ -35,6 +35,7 @@ export function cmdUsage({ println }, arg) {
 
     if (trimmed === 'now') {
         const projection = readTerminalUsageNowProjection();
+        const configProjection = readTerminalConfigProjection();
         const ctx = projection.contextWindow;
         if (ctx) {
             const pct = (ctx.utilization * 100).toFixed(0);
@@ -56,6 +57,9 @@ export function cmdUsage({ println }, arg) {
                 `      Binding: runtime=\x1b[90m${projection.runtimeSessionId ?? '-'}\x1b[0m · sdk=\x1b[90m${projection.binding.sdkSessionId ?? '-'}\x1b[0m · hub=\x1b[90m${projection.binding.hubSessionId ?? '-'}\x1b[0m`,
             );
         }
+        println(
+            `      Modo: sdk=\x1b[90m${configProjection.sdkSessionMode ?? 'interactive'}\x1b[0m · planFile=\x1b[90m${configProjection.sdkPlanOperation ?? '(sem alterações)'}\x1b[0m`,
+        );
         println('');
         return;
     }

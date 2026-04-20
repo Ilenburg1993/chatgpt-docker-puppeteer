@@ -7,10 +7,11 @@
  *   transversais em cada arquivo.
  */
 
-import { createSnapshot, getAgent, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
+import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getSharedSessionBinding } from '#copilot/core';
+import { getDefaultAgentRuntime, getDefaultAgentRuntimeId } from '../../presentation/agent-runtime.js';
 
 /**
  * Retorna a instância singleton canônica do runtime do agente.
@@ -18,13 +19,14 @@ import { getSharedSessionBinding } from '#copilot/core';
  * @returns {import('#copilot/agent').AlwaysAliveAgent}
  */
 export function getTerminalAgentRuntime() {
-    return getAgent();
+    return getDefaultAgentRuntime();
 }
 
 /**
  * Lê o estado mínimo do runtime para exibição/streaming no terminal.
  *
  * @returns {{
+ *     runtimeId: string;
  *     model: string;
  *     reasoningEffort: string;
  *     status: string;
@@ -33,19 +35,55 @@ export function getTerminalAgentRuntime() {
  *     dialogPaused: boolean;
  *     queueSize: number;
  *     pendingQuestion: import('#copilot/agent/types').PendingQuestion | null;
+ *     pendingQuestionKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionShadow: import('#copilot/agent/types').PendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('#copilot/agent/types').PendingQuestionShadowState | null;
+ *     pendingQuestionShadowExpired: boolean;
+ *     pendingQuestionShadowAgeMs: number | null;
+ *     pendingQuestionShadowExpiresAt: number | null;
+ *     pendingQuestionShadowRemainingMs: number | null;
  * }}
  */
 export function readTerminalRuntimeState() {
-    const agent = getAgent();
+    const agent = getTerminalAgentRuntime();
+    const pendingQuestion = agent.pendingQuestion ?? null;
+    const pendingQuestionShadow = agent.pendingQuestionShadow ?? null;
+    const pendingQuestionKind =
+        agent.pendingQuestionKind ??
+        (pendingQuestion && typeof pendingQuestion === 'object' && typeof pendingQuestion.kind === 'string'
+            ? pendingQuestion.kind
+            : null);
+    const pendingQuestionShadowKind =
+        agent.pendingQuestionShadowKind ??
+        (pendingQuestionShadow &&
+        typeof pendingQuestionShadow === 'object' &&
+        pendingQuestionShadow.meta &&
+        typeof pendingQuestionShadow.meta === 'object' &&
+        typeof pendingQuestionShadow.meta.kind === 'string'
+            ? pendingQuestionShadow.meta.kind
+            : null);
+    const pendingQuestionShadowState =
+        agent.pendingQuestionShadowState ??
+        (pendingQuestionShadow !== null ? (agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
     return {
+        runtimeId: getDefaultAgentRuntimeId(),
         model: String(agent.model ?? 'unknown'),
-        reasoningEffort: String(agent.reasoningEffort ?? 'high'),
+        reasoningEffort: String(agent.reasoningEffort ?? 'off'),
         status: String(agent.status ?? 'unknown'),
         sessionId: agent.sessionId ?? null,
         dialogLoopActive: agent.dialogLoopActive,
         dialogPaused: Boolean(agent.dialogPaused),
         queueSize: Number(agent.queueSize ?? 0),
-        pendingQuestion: agent.pendingQuestion ?? null,
+        pendingQuestion,
+        pendingQuestionKind,
+        pendingQuestionShadow,
+        pendingQuestionShadowKind,
+        pendingQuestionShadowState,
+        pendingQuestionShadowExpired: Boolean(agent.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: agent.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: agent.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: agent.pendingQuestionShadowRemainingMs ?? null,
     };
 }
 
@@ -77,7 +115,7 @@ export function readTerminalDialogStreamMeta() {
  * @returns {import('../../agent/infra/handoff-manager.js').HandoffRequest[]}
  */
 export function readTerminalHandoffHistory() {
-    return getAgent().getHandoffManager?.()?.getHistory?.() ?? [];
+    return getTerminalAgentRuntime().getHandoffManager?.()?.getHistory?.() ?? [];
 }
 
 /**
@@ -86,7 +124,7 @@ export function readTerminalHandoffHistory() {
  * @returns {void}
  */
 export function pingTerminalDialogWatchdog() {
-    getAgent().pingDialogWatchdog();
+    getTerminalAgentRuntime().pingDialogWatchdog();
 }
 
 /**
@@ -95,7 +133,7 @@ export function pingTerminalDialogWatchdog() {
  * @returns {Promise<void>}
  */
 export async function pauseTerminalDialogLoop() {
-    await getAgent().pauseDialogLoop();
+    await getTerminalAgentRuntime().pauseDialogLoop();
 }
 
 /**
@@ -104,7 +142,7 @@ export async function pauseTerminalDialogLoop() {
  * @returns {Promise<void>}
  */
 export async function resumeTerminalDialogLoop() {
-    await getAgent().resumeDialogLoop();
+    await getTerminalAgentRuntime().resumeDialogLoop();
 }
 
 /**
@@ -113,7 +151,54 @@ export async function resumeTerminalDialogLoop() {
  * @returns {Promise<void>}
  */
 export async function stopTerminalAgentRuntime() {
-    await getAgent().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+    await getTerminalAgentRuntime().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+}
+
+/**
+ * Lê o modo vanilla atual da sessão SDK.
+ *
+ * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ */
+export async function getTerminalSdkSessionMode() {
+    return getTerminalAgentRuntime().getSdkSessionMode();
+}
+
+/**
+ * Altera o modo vanilla da sessão SDK.
+ *
+ * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ */
+export async function setTerminalSdkSessionMode(mode) {
+    return getTerminalAgentRuntime().setSdkSessionMode(mode);
+}
+
+/**
+ * Lê o plan.md vanilla da sessão SDK.
+ *
+ * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ */
+export async function readTerminalSdkPlan() {
+    return getTerminalAgentRuntime().readSdkPlan();
+}
+
+/**
+ * Atualiza o plan.md vanilla da sessão SDK.
+ *
+ * @param {string} content
+ * @returns {Promise<object>}
+ */
+export async function updateTerminalSdkPlan(content) {
+    return getTerminalAgentRuntime().updateSdkPlan(content);
+}
+
+/**
+ * Remove o plan.md vanilla da sessão SDK.
+ *
+ * @returns {Promise<object>}
+ */
+export async function deleteTerminalSdkPlan() {
+    return getTerminalAgentRuntime().deleteSdkPlan();
 }
 
 /**

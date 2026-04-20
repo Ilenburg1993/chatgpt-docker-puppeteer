@@ -358,7 +358,7 @@
  *
  * @typedef {BaseHookInput & {
  *     error: string;
- *     errorContext: 'model_call' | 'tool_execution' | 'system' | 'user_input';
+ *     errorContext: string;
  *     recoverable: boolean;
  * }} ErrorOccurredHookInput
  */
@@ -638,7 +638,7 @@
 /**
  * Resultado de plan.read() — conteúdo do plan.md da sessão.
  *
- * @typedef {{ content: string; [k: string]: unknown }} PlanReadResult
+ * @typedef {{ exists: boolean; content: string | null; path: string | null; [k: string]: unknown }} PlanReadResult
  */
 
 /**

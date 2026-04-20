@@ -82,7 +82,7 @@ function extractModule(relPath) {
 function resolveTarget(spec, fileModule) {
     // Alias #copilot/xxx
     const aliasMatch = spec.match(/^#copilot\/([^/]+)/);
-    if (aliasMatch) return aliasMatch[1];
+    if (aliasMatch) return aliasMatch[1] ?? null;
 
     // Relative imports que saem do módulo
     if (spec.startsWith('../')) {

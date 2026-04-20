@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -55,6 +56,13 @@ export function createDenyAllPreset(opts = {}) {
                   },
               });
 
+    const onErrorOccurred = createErrorHandler({
+        strategy: 'abort',
+        onError: (input) => {
+            log('ERROR', `[preset/deny-all] error [${input.errorContext}]: ${input.error}`);
+        },
+    });
+
     /** @type {SessionHooks} */
     const hooks = {
         async onPreToolUse(input, invocation) {
@@ -84,10 +92,7 @@ export function createDenyAllPreset(opts = {}) {
             log('INFO', '[preset/deny-all] session ended');
         },
 
-        async onErrorOccurred(input) {
-            log('ERROR', `[preset/deny-all] error [${input.errorContext}]: ${input.error}`);
-            return { errorHandling: /** @type {'abort'} */ ('abort') };
-        },
+        onErrorOccurred,
     };
 
     return { hooks, onPermissionRequest };

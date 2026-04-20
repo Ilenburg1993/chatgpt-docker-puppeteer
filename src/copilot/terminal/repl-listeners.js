@@ -9,21 +9,11 @@
  * @see EventBus
  */
 
-import {
-    EMITTER_ASSISTANT_INTENT,
-    EMITTER_QUESTION_PENDING,
-    EMITTER_SESSION_COMPACTION_COMPLETE,
-    EMITTER_SESSION_COMPACTION_START,
-    EMITTER_SESSION_ERROR,
-    EMITTER_STOPPED,
-    EMITTER_SUBAGENT_COMPLETED,
-    EMITTER_SUBAGENT_FAILED,
-    EMITTER_SUBAGENT_STARTED,
-    EMITTER_TOOL_EXECUTION_COMPLETE,
-    EMITTER_TOOL_EXECUTION_START,
-} from '#copilot/events';
-import { broadcastSse, println } from './dialog.js';
+import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
+import { buildUserPrompt } from './dialog.js';
 import { getTerminalAgentRuntime } from './frontend/llm-b-runtime.js';
+import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
+import { getBusy } from './state.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.
@@ -33,129 +23,19 @@ import { getTerminalAgentRuntime } from './frontend/llm-b-runtime.js';
  */
 export function setupAgentListeners(rl) {
     const agent = getTerminalAgentRuntime();
-    const onQuestion = (/** @type {Record<string, unknown>} */ evt) => {
-        const q = /** @type {string} */ (evt?.['question'] ?? '');
-        const choices = /** @type {string[]} */ (evt?.['choices'] ?? []);
-
-        if (/^(READY[:\s]|REPLY[:\s]|DONE[:\s]|STOPPED|STOP_DIALOG)/i.test(q.trim())) {
-            return;
-        }
-
-        rl.pause();
-        println(`\n⚡ LLM-B perguntou: "${q}"`);
-        if (choices.length > 0) {
-            println(`   Opções: ${choices.join(' | ')}`);
-        }
-        println('   → Responda digitando normalmente. Sua próxima mensagem será a resposta.');
-        rl.resume();
+    const refreshPromptIfIdle = () => {
+        if (getBusy()) return;
+        rl.setPrompt(buildUserPrompt());
         rl.prompt();
     };
-
-    const onStopped = () => {
-        println('[llm-b] ⚠️  Agente parado. Use /restart para reiniciar.');
-    };
-
-    /** @type {Map<string, { name: string; t0: number }>} */
-    const _activeTools = new Map();
-
-    const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
-        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-        _activeTools.set(toolCallId, { name, t0: Date.now() });
-        println(`  \x1b[90m🔧 ${name}\x1b[0m \x1b[33m(executando…)\x1b[0m`);
-        broadcastSse('tool.start', { toolCallId, toolName: name });
-    };
-
-    const onToolComplete = (/** @type {Record<string, unknown>} */ evt) => {
-        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const success = Boolean(evt?.['success']);
-        const entry = _activeTools.get(toolCallId);
-        _activeTools.delete(toolCallId);
-        const name = entry?.name ?? 'tool';
-        const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
-        const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
-        println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m(${dur}s)\x1b[0m`);
-        broadcastSse('tool.complete', {
-            toolCallId,
-            toolName: name,
-            success,
-            durationMs: entry ? Date.now() - entry.t0 : 0,
-        });
-    };
-
-    const onSessionError = (/** @type {Record<string, unknown>} */ evt) => {
-        const msg = /** @type {string} */ (evt?.['message'] ?? 'unknown error');
-        const errorType = /** @type {string} */ (evt?.['errorType'] ?? 'error');
-        println(`\n  \x1b[31m⚠️  Erro de sessão [${errorType}]: ${msg}\x1b[0m`);
-        broadcastSse('session.error', { errorType, message: msg });
-    };
-
-    const onCompactionStart = () => {
-        println(`  \x1b[33m🗜️  Compactando context window…\x1b[0m`);
-        broadcastSse('compaction.start', {});
-    };
-
-    const onCompactionComplete = (/** @type {Record<string, unknown>} */ evt) => {
-        const pre = /** @type {number | undefined} */ (evt?.['preCompactionTokens']);
-        const post = /** @type {number | undefined} */ (evt?.['postCompactionTokens']);
-        const success = Boolean(evt?.['success']);
-        if (success && pre !== undefined && post !== undefined) {
-            const pct = ((1 - post / pre) * 100).toFixed(0);
-            println(
-                `  \x1b[32m🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)\x1b[0m`,
-            );
-        } else if (!success) {
-            println(`  \x1b[31m🗜️  Compactação falhou\x1b[0m`);
-        }
-        broadcastSse('compaction.complete', { success, pre, post });
-    };
-
-    const onIntent = (/** @type {Record<string, unknown>} */ evt) => {
-        const intent = /** @type {string} */ (evt?.['intent'] ?? '');
-        if (intent) {
-            process.stdout.write(`\r  \x1b[90m⏳ ${intent}\x1b[0m\x1b[K`);
-        }
-    };
-
-    const onSubagentStarted = (/** @type {Record<string, unknown>} */ evt) => {
-        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
-        println(`  \x1b[36m🤖 Sub-agente iniciado: ${name}\x1b[0m`);
-    };
-
-    const onSubagentCompleted = (/** @type {Record<string, unknown>} */ evt) => {
-        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
-        println(`  \x1b[32m🤖 Sub-agente concluído: ${name}\x1b[0m`);
-    };
-
-    const onSubagentFailed = (/** @type {Record<string, unknown>} */ evt) => {
-        const name = /** @type {string} */ (evt?.['agentName'] ?? 'sub-agent');
-        const error = /** @type {string} */ (evt?.['error'] ?? 'unknown');
-        println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
-    };
-
-    agent.on(EMITTER_QUESTION_PENDING, onQuestion);
-    agent.once(EMITTER_STOPPED, onStopped);
-    agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
-    agent.on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
-    agent.on(EMITTER_SESSION_ERROR, onSessionError);
-    agent.on(EMITTER_SESSION_COMPACTION_START, onCompactionStart);
-    agent.on(EMITTER_SESSION_COMPACTION_COMPLETE, onCompactionComplete);
-    agent.on(EMITTER_ASSISTANT_INTENT, onIntent);
-    agent.on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
-    agent.on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
-    agent.on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
+    const cleanupAgentRuntimeEvents = setupTerminalAgentRuntimeEventListeners({ agent, rl });
+    const cleanupSdkSessionEvents = setupTerminalSdkSessionEventListeners({
+        agent,
+        refreshPromptIfIdle,
+    });
 
     return () => {
-        agent.off('question.pending', onQuestion);
-        agent.off('stopped', onStopped);
-        agent.off('tool.execution_start', onToolStart);
-        agent.off('tool.execution_complete', onToolComplete);
-        agent.off('session.error', onSessionError);
-        agent.off('session.compaction_start', onCompactionStart);
-        agent.off('session.compaction_complete', onCompactionComplete);
-        agent.off('assistant.intent', onIntent);
-        agent.off('subagent.started', onSubagentStarted);
-        agent.off('subagent.completed', onSubagentCompleted);
-        agent.off('subagent.failed', onSubagentFailed);
+        cleanupAgentRuntimeEvents();
+        cleanupSdkSessionEvents();
     };
 }

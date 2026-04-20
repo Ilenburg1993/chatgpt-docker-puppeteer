@@ -11,6 +11,7 @@
 
 import {
     COPILOT_MODEL as _COPILOT_MODEL,
+    COPILOT_REASONING_EFFORT as _COPILOT_REASONING_EFFORT,
     AGENT_HOOK_CONTEXT_MAX_BYTES,
     AGENT_KEEPALIVE_IDLE_MS,
     AGENT_KEEPALIVE_MS,
@@ -33,7 +34,6 @@ import {
     AGENT_TASK_TIMEOUT_MS,
     AGENT_TOOL_AUDIT_MAX_LOG_BYTES,
     COPILOT_AUDIT_LOG_PATH,
-    COPILOT_REASONING_EFFORT,
     COPILOT_RESTART_DELAY_MS,
     COPILOT_TOOL_PERMISSIONS_LOG,
     COPILOT_WORKING_DIRECTORY,
@@ -117,10 +117,16 @@ export const STATE_FILE = AGENT_STATE_FILE;
 
 /** Delay de restart (ms) */
 export const RESTART_DELAY_MS = COPILOT_RESTART_DELAY_MS;
+/** Modelo default canônico do runtime LLM-B. */
+export const DEFAULT_COPILOT_MODEL = 'gpt-5-mini';
+/** Reasoning effort default canônico do runtime LLM-B. */
+export const DEFAULT_COPILOT_REASONING_EFFORT = 'high';
 /** Modelo Copilot */
-export const COPILOT_MODEL = _COPILOT_MODEL ?? 'gpt-4.1';
+export const COPILOT_MODEL = _COPILOT_MODEL ?? DEFAULT_COPILOT_MODEL;
 /** Reasoning effort */
-export { COPILOT_REASONING_EFFORT };
+export const COPILOT_REASONING_EFFORT = /** @type {'low' | 'medium' | 'high' | 'xhigh'} */ (
+    _COPILOT_REASONING_EFFORT ?? DEFAULT_COPILOT_REASONING_EFFORT
+);
 
 // ── Always-Alive Agent ───────────────────────────────────────
 
@@ -191,6 +197,16 @@ export const DRAIN_WRITES_TIMEOUT_MS = 3_000;
 export const PING_TIMEOUT_MS = 5_000;
 /** Timeout para aguardar question.pending em resume (ms) */
 export const RESUME_QUESTION_WAIT_MS = 5_000;
+/** TTL da shadow persistida de ask_user do tipo `ready` (ms) */
+export const PENDING_QUESTION_SHADOW_TTL_READY_MS = 5 * 60 * 1000;
+/** TTL da shadow persistida de ask_user do tipo `question` (ms) */
+export const PENDING_QUESTION_SHADOW_TTL_QUESTION_MS = 15 * 60 * 1000;
+/** TTL default/back-compat da shadow persistida de ask_user restaurada do disco (ms) */
+export const PENDING_QUESTION_SHADOW_TTL_MS = PENDING_QUESTION_SHADOW_TTL_QUESTION_MS;
+/** Janela em que uma shadow recém-restaurada ainda é tratada como "fresh" (ms) */
+export const PENDING_QUESTION_SHADOW_FRESH_MS = 30_000;
+/** Piso mínimo para classificar uma shadow como "expiring_soon" (ms) */
+export const PENDING_QUESTION_SHADOW_EXPIRING_SOON_MIN_MS = 60_000;
 
 // ── Boot ─────────────────────────────────────────────────────
 

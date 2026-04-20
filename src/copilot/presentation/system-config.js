@@ -8,7 +8,7 @@
  *   terminal para health/config.
  */
 
-import { getAgent, setBackgroundCompactionThreshold } from '#copilot/agent';
+import { setBackgroundCompactionThreshold } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
@@ -28,7 +28,8 @@ import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../core/safe-json.js';
 import { getSseClients, getSseCriticalClients } from '../infra/sse/state.js';
 import { getFileCacheStats } from '../terminal/file-context.js';
-import { getBusy, getHubSessionId, getPlanMode } from '../terminal/state.js';
+import { getBusy, getHubSessionId, getLastSdkPlanOperation, getSdkSessionMode } from '../terminal/state.js';
+import { getDefaultAgentRuntime, getDefaultAgentRuntimeId, listKnownAgentRuntimes } from './agent-runtime.js';
 
 /**
  * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
@@ -42,7 +43,9 @@ import { getBusy, getHubSessionId, getPlanMode } from '../terminal/state.js';
  * @returns {HandlerResult}
  */
 export function handleHealth() {
-    const agent = getAgent();
+    const agent = getDefaultAgentRuntime();
+    const runtimeId = getDefaultAgentRuntimeId();
+    const agentRuntimes = listKnownAgentRuntimes();
     const snapshot = agent.getStatusSnapshot();
     const health = typeof agent.getHealthSnapshot === 'function' ? agent.getHealthSnapshot() : null;
     const metricsSummary = (() => {
@@ -73,6 +76,8 @@ export function handleHealth() {
             issues: health?.issues ?? [],
             dialogLoopActive: agent.dialogLoopActive,
             agentStatus: agent.status,
+            runtimeId,
+            agentRuntimes,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),
             sseClients: getSseClients().size,
@@ -124,16 +129,21 @@ export function getSseClientSets() {
  * @returns {HandlerResult}
  */
 export function handleGetConfig() {
-    const agent = getAgent();
+    const agent = getDefaultAgentRuntime();
+    const runtimeId = getDefaultAgentRuntimeId();
+    const agentRuntimes = listKnownAgentRuntimes();
     const snapshot = agent.getStatusSnapshot();
     return {
         status: 200,
         cors: true,
         body: {
             ok: true,
+            runtimeId,
+            agentRuntimes,
             model: agent.model,
             reasoningEffort: agent.reasoningEffort ?? 'high',
-            planMode: getPlanMode(),
+            sdkSessionMode: getSdkSessionMode(),
+            sdkPlanOperation: getLastSdkPlanOperation(),
             dialogLoopActive: agent.dialogLoopActive,
             busy: getBusy(),
             hubSessionId: getHubSessionId(),

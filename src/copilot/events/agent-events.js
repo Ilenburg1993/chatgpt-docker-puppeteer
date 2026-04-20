@@ -143,6 +143,8 @@ export const AGENT_ASSISTANT_TURN_END = 'agent:assistant:turn_end';
 /** @readonly */
 export const AGENT_ASSISTANT_INTENT = 'agent:assistant:intent';
 /** @readonly */
+export const AGENT_ASSISTANT_STREAMING_DELTA = 'agent:assistant:streaming_delta';
+/** @readonly */
 export const AGENT_ASSISTANT_REASONING_COMPLETE = 'agent:assistant:reasoning_complete';
 
 // ─── FAIXA-L9: Session (SDK forwarded, previously unbridged) ──────────────────
@@ -290,6 +292,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'external_tool.completed',
     // ── streaming & SDK responses ────────────────────────────────────────
     'assistant.intent',
+    'assistant.streaming_delta',
     'assistant.reasoning_complete',
     'session.context_changed',
     'abort',
@@ -358,5 +361,12 @@ export const DIALOG_LOOP_EVENTS = /** @type {ReadonlySet<string>} */ (
  * @type {ReadonlySet<AgentEventName>}
  */
 export const HIGH_FREQUENCY_EVENTS = /** @type {ReadonlySet<AgentEventName>} */ (
-    new Set(['task.delta', 'task.reasoning', 'session.usage', 'dialog.turn_start', 'dialog.turn_end'])
+    new Set([
+        'task.delta',
+        'task.reasoning',
+        'session.usage',
+        'dialog.turn_start',
+        'dialog.turn_end',
+        'assistant.streaming_delta',
+    ])
 );

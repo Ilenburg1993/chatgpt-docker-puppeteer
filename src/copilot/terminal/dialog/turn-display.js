@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { recordTerminalActivity } from '../activity-state.js';
 import { SEPARATOR, println } from './output.js';
 import { broadcastSse } from './sse.js';
 
@@ -26,15 +27,16 @@ import { broadcastSse } from './sse.js';
  * @property {number} turnStartTime
  * @property {string} model
  * @property {string} effort
+ * @property {boolean} showStreaming
  */
 
 /**
  * Cria estado inicial para display de turno.
  *
- * @param {{ model: string; effort: string; turnStartTime: number }} opts
+ * @param {{ model: string; effort: string; turnStartTime: number; showStreaming: boolean }} opts
  * @returns {TurnDisplayState}
  */
-export function createDisplayState({ model, effort, turnStartTime }) {
+export function createDisplayState({ model, effort, turnStartTime, showStreaming }) {
     return {
         reasoningStarted: false,
         reasoningChars: 0,
@@ -47,6 +49,7 @@ export function createDisplayState({ model, effort, turnStartTime }) {
         turnStartTime,
         model,
         effort,
+        showStreaming,
     };
 }
 
@@ -61,6 +64,10 @@ export function createReasoningCallback(state) {
         if (!state.reasoningStarted) {
             state.reasoningStarted = true;
             state.reasoningId = rId;
+            recordTerminalActivity('thinking', 'Raciocinando', {
+                detail: `${state.model} · ${state.effort}`,
+                source: 'dialog',
+            });
             process.stdout.write('\r\x1b[K');
             const tsNow = new Date().toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
@@ -91,9 +98,28 @@ export function createReasoningCallback(state) {
  */
 export function createDeltaCallback(state) {
     return (chunk) => {
+        if (state.firstChunkTime === 0) {
+            state.firstChunkTime = Date.now();
+        }
+        state.streamingChars += chunk.length;
+        broadcastSse('delta', { chunk });
+
+        if (!state.showStreaming) {
+            recordTerminalActivity('streaming', 'Gerando resposta', {
+                detail: `${state.model} · ${state.effort}`,
+                source: 'dialog',
+                recordHistory: false,
+            });
+            return;
+        }
+
         if (!state.streamingStarted) {
             state.streamingStarted = true;
-            state.firstChunkTime = Date.now();
+            state.firstChunkTime = state.firstChunkTime || Date.now();
+            recordTerminalActivity('streaming', 'Transmitindo resposta', {
+                detail: `${state.model} · ${state.effort}`,
+                source: 'dialog',
+            });
             if (state.reasoningStarted) {
                 process.stdout.write('\x1b[0m\n');
                 const thinkSecs = ((Date.now() - state.thinkingStartTime) / 1000).toFixed(1);
@@ -120,13 +146,11 @@ export function createDeltaCallback(state) {
             println('');
             process.stdout.write('  \x1b[32m│\x1b[0m  ');
         }
-        state.streamingChars += chunk.length;
         const lines = chunk.split('\n');
         for (let i = 0; i < lines.length; i++) {
             if (i > 0) process.stdout.write('\n  \x1b[32m│\x1b[0m  ');
             process.stdout.write(/** @type {string} */ (lines[i]));
         }
-        broadcastSse('delta', { chunk });
     };
 }
 
@@ -137,6 +161,12 @@ export function createDeltaCallback(state) {
  * @param {number} durationMs
  */
 export function renderStreamingFooter(state, durationMs) {
+    if (state.firstChunkTime > 0) {
+        recordTerminalActivity('system', 'Resposta concluída', {
+            detail: `${(durationMs / 1000).toFixed(1)}s`,
+            source: 'dialog',
+        });
+    }
     if (state.streamingStarted) {
         const secs = (durationMs / 1000).toFixed(1);
         const secsNum = durationMs / 1000;

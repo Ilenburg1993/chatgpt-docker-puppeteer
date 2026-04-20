@@ -87,9 +87,11 @@ export function buildStatusSnapshot(params) {
         pendingQuestion: pendingQuestion
             ? {
                   question: pendingQuestion.question,
-                  choices: pendingQuestion.choices,
+                  ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
                   allowFreeform: pendingQuestion.allowFreeform,
                   askedAt: pendingQuestion.askedAt,
+                  kind: pendingQuestion.kind,
+                  protocolControlled: pendingQuestion.protocolControlled,
               }
             : null,
         isResumed,

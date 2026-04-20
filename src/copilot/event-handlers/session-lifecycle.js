@@ -22,6 +22,16 @@ export function wireSessionLifecycleEvents(session, { emit }) {
             emit('session.idle', { ts: evt?.timestamp ?? Date.now() });
         }),
 
+        // ── session.info ─────────────────────────────────────────────────
+        session.on(SESSION_EVENTS.SESSION_INFO, (evt) => {
+            const data = evt?.data ?? {};
+            const infoType = /** @type {string | undefined} */ (data['infoType']);
+            const message = /** @type {string | undefined} */ (data['message']);
+            const url = /** @type {string | undefined} */ (data['url']);
+            log('INFO', `[session-lifecycle] session.info[${infoType ?? 'unknown'}]: ${message ?? ''}`);
+            emit('session.info', { infoType, message, url, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
         // ── session.error ────────────────────────────────────────────────
         session.on(SESSION_EVENTS.SESSION_ERROR, (evt) => {
             const data = evt?.data ?? {};
@@ -34,9 +44,11 @@ export function wireSessionLifecycleEvents(session, { emit }) {
         // ── session.warning ──────────────────────────────────────────────
         session.on(SESSION_EVENTS.SESSION_WARNING, (evt) => {
             const data = evt?.data ?? {};
+            const warningType = /** @type {string | undefined} */ (data['warningType']);
             const message = /** @type {string | undefined} */ (data['message']);
+            const url = /** @type {string | undefined} */ (data['url']);
             log('WARN', `[session-lifecycle] session.warning: ${message ?? '(sem mensagem)'}`);
-            emit('session.warning', { message, data, ts: evt?.timestamp ?? Date.now() });
+            emit('session.warning', { warningType, message, url, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
         // ── session.model_change ─────────────────────────────────────────
@@ -44,8 +56,14 @@ export function wireSessionLifecycleEvents(session, { emit }) {
             const data = evt?.data ?? {};
             const previousModel = /** @type {string | undefined} */ (data['previousModel']);
             const newModel = /** @type {string | undefined} */ (data['newModel']);
+            const reasoningEffort = /** @type {string | undefined} */ (data['reasoningEffort']);
             log('INFO', `[session-lifecycle] model_change: ${previousModel ?? '?'} → ${newModel ?? '?'}`);
-            emit('session.model_changed', { previousModel, newModel, ts: evt?.timestamp ?? Date.now() });
+            emit('session.model_changed', {
+                previousModel,
+                newModel,
+                reasoningEffort,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
 
         // ── session.tools_updated ────────────────────────────────────────

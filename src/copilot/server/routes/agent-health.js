@@ -9,6 +9,14 @@
  */
 
 /**
+ * @param {unknown} value
+ * @returns {import('../../agent/types.js').PendingQuestionKind | null}
+ */
+function normalizePendingQuestionKind(value) {
+    return value === 'ready' || value === 'reply' || value === 'stopped' || value === 'question' ? value : null;
+}
+
+/**
  * Normaliza o snapshot de health do agente, usando a implementação canônica quando disponível e aplicando fallback de
  * compatibilidade quando necessário.
  *
@@ -45,6 +53,14 @@ export function buildAgentModuleHealth(agent) {
             dialogLoopActive: health.dialogLoopActive,
             dialogAttached: health.checks.dialog.attached,
             dialogPaused: health.checks.dialog.paused,
+            pendingQuestionKind: health.pendingQuestionKind,
+            pendingQuestionShadow: health.pendingQuestionShadow,
+            pendingQuestionShadowKind: health.pendingQuestionShadowKind,
+            pendingQuestionShadowState: health.pendingQuestionShadowState,
+            pendingQuestionShadowExpired: health.pendingQuestionShadowExpired,
+            pendingQuestionShadowAgeMs: health.pendingQuestionShadowAgeMs,
+            pendingQuestionShadowExpiresAt: health.pendingQuestionShadowExpiresAt,
+            pendingQuestionShadowRemainingMs: health.pendingQuestionShadowRemainingMs,
             model: health.model,
             queueSize: health.queueSize,
             oldestTaskWaitMs: health.oldestTaskWaitMs,
@@ -93,6 +109,17 @@ export function buildLegacyAgentHealth(agent) {
         reasoningEffort: undefined,
         dialogLoopActive: Boolean(agent.dialogLoopActive),
         pendingQuestion: snap.pendingQuestion !== null,
+        pendingQuestionKind:
+            snap.pendingQuestion && typeof snap.pendingQuestion === 'object'
+                ? normalizePendingQuestionKind(/** @type {{ kind?: unknown }} */ (snap.pendingQuestion).kind ?? null)
+                : null,
+        pendingQuestionShadow: false,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
         queueSize: snap.queueSize,
         oldestTaskWaitMs: snap.oldestTaskWaitMs,
         starvationAlert: snap.starvationAlert,
@@ -133,6 +160,19 @@ export function buildLegacyAgentHealth(agent) {
             io: {
                 ok: true,
                 pendingQuestion: snap.pendingQuestion !== null,
+                pendingQuestionKind:
+                    snap.pendingQuestion && typeof snap.pendingQuestion === 'object'
+                        ? normalizePendingQuestionKind(
+                              /** @type {{ kind?: unknown }} */ (snap.pendingQuestion).kind ?? null,
+                          )
+                        : null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
                 waitingForInput: snap.status === 'waiting_for_input',
                 keepaliveRunning: false,
                 backgroundPendingCount: 0,

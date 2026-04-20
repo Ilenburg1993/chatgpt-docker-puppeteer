@@ -18,7 +18,7 @@
  * @see EventBus
  */
 
-import { readTerminalDiagnoseProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} DiagnoseContext
@@ -45,6 +45,7 @@ const C = {
  * @returns {Promise<void>}
  */
 export async function cmdDiagnose({ hubSessionId, println }) {
+    const configProjection = readTerminalConfigProjection();
     const {
         snap,
         health,
@@ -57,6 +58,8 @@ export async function cmdDiagnose({ hubSessionId, println }) {
         hub,
         todos,
         topToolStats,
+        activity,
+        display,
     } = await readTerminalDiagnoseProjection({ hubSessionId: hubSessionId ?? null });
 
     const agentStatusColor =
@@ -91,6 +94,32 @@ export async function cmdDiagnose({ hubSessionId, println }) {
                       return `  ${C.grey}•${C.reset} ${name.padEnd(30)} ${col}${rate}%${C.reset} avg ${stat['avgLatencyMs'] ?? 0}ms (${calls} calls)`;
                   })
                   .join('\n');
+    const activityColor = activity.severity === 'error' ? C.red : activity.severity === 'warn' ? C.yellow : C.green;
+    const activityDetail = activity.detail
+        ? `${C.grey}${activity.detail}${C.reset}`
+        : `${C.grey}(sem detalhe)${C.reset}`;
+    const actionLine = health?.['recommendedAction']
+        ? `${C.yellow}${health['recommendedAction']}${C.reset}`
+        : `${C.grey}none${C.reset}`;
+    const askUserLine = health?.['pendingQuestion']
+        ? `${C.green}vivo${C.reset}${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
+        : health?.['pendingQuestionShadow']
+          ? `${health?.['pendingQuestionShadowExpired'] ? `${C.red}shadow expirada${C.reset}` : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? `${C.yellow}shadow expirando${C.reset}` : health?.['pendingQuestionShadowState'] === 'fresh' ? `${C.cyan}shadow fresh${C.reset}` : `${C.yellow}shadow ativa${C.reset}`}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
+          : `${C.grey}nenhum${C.reset}`;
+    const askUserAgeLine =
+        typeof health?.['pendingQuestionShadowAgeMs'] === 'number'
+            ? `${Math.round(Number(health['pendingQuestionShadowAgeMs']) / 1000)}s`
+            : `${C.grey}-${C.reset}`;
+    const askUserRemainingLine =
+        typeof health?.['pendingQuestionShadowRemainingMs'] === 'number'
+            ? `${Math.round(Number(health['pendingQuestionShadowRemainingMs']) / 1000)}s`
+            : `${C.grey}-${C.reset}`;
+    const sdkModeLine = configProjection.sdkSessionMode
+        ? `${C.magenta}${configProjection.sdkSessionMode}${C.reset}`
+        : `${C.grey}desconhecido${C.reset}`;
+    const planOpLine = configProjection.sdkPlanOperation
+        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${new Date(configProjection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}${C.reset}` : ''}`
+        : `${C.grey}(sem alteração)${C.reset}`;
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -101,7 +130,9 @@ ${C.cyan}  AGENTE${C.reset}
     health        ${health ? `${health['status'] === 'healthy' ? C.green : health['status'] === 'degraded' ? C.yellow : C.red}${health['status']}${C.reset}` : `${C.grey}n/d${C.reset}`}
     dialog loop   ${dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
-    reasoning     ${C.magenta}${snap['reasoningEffort'] ?? 'high'}${C.reset}
+    reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
+    modo sdk      ${sdkModeLine}
+    plan arquivo  ${planOpLine}
     runtime       ${runtimeSessionId ? `${C.grey}${runtimeSessionId}${C.reset}` : `${C.grey}(sem runtime)${C.reset}`}
     sdk session   ${binding.sdkSessionId ? `${C.grey}${binding.sdkSessionId}${C.reset}` : `${C.grey}(sem sdk)${C.reset}`}
     hub session   ${hub.activeHubSessionId ? `${C.grey}${hub.activeHubSessionId}${C.reset}` : `${C.grey}(sem hub)${C.reset}`}
@@ -109,6 +140,13 @@ ${C.cyan}  AGENTE${C.reset}
     keepalive     ${health?.['checks']?.['io']?.['keepaliveRunning'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
     quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
     issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
+    ação          ${actionLine}
+    ask_user      ${askUserLine}
+    shadow idade  ${askUserAgeLine}
+    shadow rest.  ${askUserRemainingLine}
+    atividade     ${activityColor}${activity.label}${C.reset}${typeof activity.progress === 'number' ? ` ${C.grey}(${activity.progress}%)${C.reset}` : ''}
+    detalhe       ${activityDetail}
+    display       ${C.grey}thinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}${C.reset}
 
 ${C.cyan}  INFRAESTRUTURA${C.reset}
     MCP bridge    ${mcpLine}

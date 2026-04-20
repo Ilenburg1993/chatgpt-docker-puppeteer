@@ -84,6 +84,9 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {boolean} */
     #stopping = false;
 
+    /** @type {boolean} Estado canônico de pause em memória; bootstrap inicial vem do estado persistido. */
+    #paused = false;
+
     /** @type {boolean} F42.6 (BUG-SD-007 fix): guard atômico para prevenir interleaving entre resume/start */
     #resuming = false;
 
@@ -131,7 +134,9 @@ export class DialogLoopManager extends EventEmitter {
         });
 
         // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
-        const saved = readState()?.prMetrics;
+        const persistedState = readState();
+        this.#paused = Boolean(persistedState?.dialogPaused);
+        const saved = persistedState?.prMetrics;
         if (saved && typeof saved === 'object') {
             this.#prMetrics = {
                 boots: Number(saved.boots) || 0,
@@ -219,7 +224,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {boolean}
      */
     get paused() {
-        return readState()?.dialogPaused ?? false;
+        return this.#paused;
     }
 
     /**
@@ -246,9 +251,10 @@ export class DialogLoopManager extends EventEmitter {
         }
 
         this.#active = true;
+        this.#paused = false;
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
         void this.#trackPersistedState(
-            { dialogLoopActive: true },
+            { dialogLoopActive: true, dialogPaused: false },
             {
                 label: 'dialog.state.active',
                 description: 'Persist dialogLoopActive=true',
@@ -427,6 +433,7 @@ export class DialogLoopManager extends EventEmitter {
             { dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true },
             'dialog.state.pause',
         );
+        this.#paused = true;
         // F31: pausar watchdog durante pause para evitar falsos-positivos de stall
         this.#watchdog?.stop();
         log('INFO', `[DialogLoopManager] Dialog loop pausado. SessionId: ${sessionId}.`);
@@ -445,7 +452,7 @@ export class DialogLoopManager extends EventEmitter {
             return;
         }
         const state = await readStateAsync();
-        if (!state?.dialogPaused) {
+        if (!this.#paused && !state?.dialogPaused) {
             log('WARN', '[DialogLoopManager] resume() sem dialogPaused=true — ignorado.');
             return;
         }
@@ -453,6 +460,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#resuming = true;
         try {
             await this.#persistStateNow({ dialogPaused: false }, 'dialog.state.resume');
+            this.#paused = false;
 
             // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
             if (this.#host?.getPendingQuestion()) {
@@ -507,6 +515,7 @@ export class DialogLoopManager extends EventEmitter {
             this.#watchdog?.stop();
             this.#watchdog = null;
             this.#active = false;
+            this.#paused = false;
             const deactivated = await persistStateWithPolicy(
                 { dialogLoopActive: false },
                 { label: 'dialog.state.resume_restart' },

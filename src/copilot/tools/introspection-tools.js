@@ -166,7 +166,7 @@ const getAgentInfoTool = createTool({
         return {
             sdkVersion,
             nodeVersion: process.version,
-            model: COPILOT_MODEL ?? 'gpt-4.1',
+            model: COPILOT_MODEL ?? 'gpt-5-mini',
             pid: process.pid,
             uptime: Math.round(process.uptime()),
             toolsRegistered: _registeredTools.length,

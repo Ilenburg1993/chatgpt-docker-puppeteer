@@ -228,7 +228,7 @@ export async function startAgentLoop() {
     }
 
     // Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.
-    if (COPILOT_MODEL && COPILOT_MODEL !== 'gpt-4.1') {
+    if (COPILOT_MODEL && COPILOT_MODEL !== 'gpt-5-mini') {
         try {
             const { listModels } = await import('../../sdk/models/helpers.js');
             const models = await listModels();

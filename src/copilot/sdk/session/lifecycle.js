@@ -216,7 +216,7 @@ function buildSessionConfig(opts, mode) {
  * Cria uma nova sessao com o cliente SDK.
  *
  * @example
- *     const { session } = await createSession(client, { model: 'gpt-4.1' });
+ *     const { session } = await createSession(client, { model: 'gpt-5-mini' });
  *
  * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {SessionCreateOptions} [opts] - Opcoes de configuracao
@@ -225,7 +225,7 @@ function buildSessionConfig(opts, mode) {
  */
 export async function createSession(client, opts) {
     const options = opts ?? {};
-    const model = options.model ?? 'gpt-4.1';
+    const model = options.model ?? 'gpt-5-mini';
     const config = buildSessionConfig({ ...options, model }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);

@@ -112,5 +112,14 @@ export function wireInteractionEvents(session, { emit }) {
             log('DEBUG', `[interaction-events] subagent.deselected: ${agentName ?? '?'}`);
             emit('subagent.deselected', { agentName, data, ts: evt?.timestamp ?? Date.now() });
         }),
+
+        // ── exit_plan_mode.completed ───────────────────────────────────
+        session.on(SESSION_EVENTS.EXIT_PLAN_MODE_COMPLETED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            log('INFO', `[interaction-events] exit_plan_mode.completed requestId=${requestId ?? '?'}`);
+            emit('exit_plan_mode.completed', { requestId, data, ts: evt?.timestamp ?? Date.now() });
+        }),
     ];
 }

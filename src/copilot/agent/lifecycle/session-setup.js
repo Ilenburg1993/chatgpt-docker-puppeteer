@@ -15,7 +15,7 @@
 import { SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
-import { createRegistry } from '#copilot/sdk';
+import { createRegistry, modelRegistry } from '#copilot/sdk';
 import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
 import { buildMcpConfig } from '../../config/mcp-servers.js';
 
@@ -117,7 +117,20 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     }
 
     if (configState.reasoningEffort) {
-        builder.reasoningEffort(configState.reasoningEffort);
+        const modelMeta = modelRegistry.get(configState.model);
+        if (modelMeta?.supportsReasoning === false) {
+            log(
+                'INFO',
+                `[session-setup] reasoningEffort omitido para '${configState.model}' — modelo sem suporte explícito a reasoning.`,
+            );
+            if (typeof ctx.setReasoningEffort === 'function') {
+                ctx.setReasoningEffort(undefined);
+            } else {
+                ctx.reasoningEffort = undefined;
+            }
+        } else {
+            builder.reasoningEffort(configState.reasoningEffort);
+        }
     }
 
     builder.onUserInputRequest((input) =>
@@ -125,7 +138,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             {
                 question: input.question,
                 ...(input.choices !== undefined && { choices: input.choices }),
-                allowFreeform: input.allowFreeform === true,
+                allowFreeform: input.allowFreeform !== false,
             },
             {
                 isDialogLoopActive: () => ctx.dialogLoop.active,

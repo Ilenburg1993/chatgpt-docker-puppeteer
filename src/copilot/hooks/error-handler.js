@@ -35,7 +35,8 @@ import { log } from './logger.js';
  * @property {number} [maxRetries] - Máximo de tentativas de retry antes de abortar. Padrão: 3
  * @property {string[]} [recoverableContexts] - Contextos de erro que devem ser tratados como recuperáveis
  * @property {string[]} [abortContexts] - Contextos de erro que devem abortar imediatamente
- * @property {(input: ErrorOccurredHookInput) => void} [onError] - Callback chamado para cada erro
+ * @property {(input: ErrorOccurredHookInput, invocation?: InvocationContext) => void} [onError] - Callback chamado para
+ *   cada erro
  */
 
 /**
@@ -44,7 +45,8 @@ import { log } from './logger.js';
  * @property {number} [resetAfterMs] - Milissegundos antes de fechar o circuito novamente. Padrão: 30000
  * @property {(context: string) => void} [onTrip] - Callback quando o circuito é aberto
  * @property {(context: string) => void} [onReset] - Callback quando o circuito é fechado
- * @property {(input: ErrorOccurredHookInput) => void} [onError] - Callback chamado para cada erro (ex: tracking)
+ * @property {(input: ErrorOccurredHookInput, invocation?: InvocationContext) => void} [onError] - Callback chamado para
+ *   cada erro (ex: tracking)
  * @property {string[]} [fatalPatterns] - Substrings no campo `error` que forçam abort imediato
  * @property {string[]} [transientPatterns] - Substrings no campo `error` que tratam como recuperável mesmo quando
  *   `recoverable=false`
@@ -55,6 +57,17 @@ import { log } from './logger.js';
  * @property {number} failures - Número de falhas consecutivas
  * @property {number | null} openedAt - Timestamp de quando o circuito foi aberto, ou null se fechado
  */
+
+/**
+ * @param {string} contextKey
+ * @param {InvocationContext | undefined} invocation
+ * @returns {string}
+ */
+function buildScopedContextKey(contextKey, invocation) {
+    const sessionId =
+        typeof invocation?.sessionId === 'string' && invocation.sessionId.trim() ? invocation.sessionId : 'global';
+    return `${sessionId}:${contextKey}`;
+}
 
 /**
  * Cria um handler `onErrorOccurred` com estratégia configurável.
@@ -81,20 +94,21 @@ export function createErrorHandler(opts = {}) {
     /** @type {Map<string, number>} */
     const retryCounts = new Map();
 
-    return function onErrorOccurred(input) {
+    return function onErrorOccurred(input, invocation) {
         const { error, errorContext, recoverable } = input;
         const contextKey = errorContext ?? 'unknown';
+        const scopedContextKey = buildScopedContextKey(contextKey, invocation);
 
         if (onError) {
             try {
-                onError(input);
+                onError(input, invocation);
             } catch (_) {
                 // ignora erros no callback de notificação
             }
         }
 
         // Verificar se atingiu o limite de retries para este contexto
-        const currentRetries = retryCounts.get(contextKey) ?? 0;
+        const currentRetries = retryCounts.get(scopedContextKey) ?? 0;
 
         if (strategy !== null) {
             /** @type {ErrorStrategy} */
@@ -109,18 +123,24 @@ export function createErrorHandler(opts = {}) {
                 if (currentRetries >= maxRetries) {
                     log(
                         'WARN',
-                        `[hooks/error-handler] maxRetries(${maxRetries}) atingido para '${contextKey}' — abort`,
+                        `[hooks/error-handler] maxRetries(${maxRetries}) atingido para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) — abort`,
                     );
-                    retryCounts.delete(contextKey);
+                    retryCounts.delete(scopedContextKey);
                     return { errorHandling: 'abort' };
                 }
-                retryCounts.set(contextKey, currentRetries + 1);
-                log('DEBUG', `[hooks/error-handler] retry ${currentRetries + 1}/${maxRetries} para '${contextKey}'`);
+                retryCounts.set(scopedContextKey, currentRetries + 1);
+                log(
+                    'DEBUG',
+                    `[hooks/error-handler] retry ${currentRetries + 1}/${maxRetries} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
+                );
                 return { errorHandling: 'retry', retryCount: currentRetries + 1 };
             }
 
-            retryCounts.delete(contextKey);
-            log('DEBUG', `[hooks/error-handler] ${decided} para '${contextKey}'`);
+            retryCounts.delete(scopedContextKey);
+            log(
+                'DEBUG',
+                `[hooks/error-handler] ${decided} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
+            );
             return { errorHandling: decided };
         }
 
@@ -133,14 +153,17 @@ export function createErrorHandler(opts = {}) {
         const isRecoverable = recoverable || recoverableContexts.includes(contextKey);
         if (isRecoverable) {
             if (currentRetries >= maxRetries) {
-                log('WARN', `[hooks/error-handler] maxRetries(${maxRetries}) atingido para '${contextKey}' — abort`);
-                retryCounts.delete(contextKey);
+                log(
+                    'WARN',
+                    `[hooks/error-handler] maxRetries(${maxRetries}) atingido para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) — abort`,
+                );
+                retryCounts.delete(scopedContextKey);
                 return { errorHandling: 'abort' };
             }
-            retryCounts.set(contextKey, currentRetries + 1);
+            retryCounts.set(scopedContextKey, currentRetries + 1);
             log(
                 'DEBUG',
-                `[hooks/error-handler] recuperável: retry ${currentRetries + 1}/${maxRetries} para '${contextKey}'`,
+                `[hooks/error-handler] recuperável: retry ${currentRetries + 1}/${maxRetries} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
             );
             return { errorHandling: 'retry', retryCount: currentRetries + 1 };
         }
@@ -202,16 +225,17 @@ export function createCircuitBreakerHandler(opts = {}) {
         return patterns.some((p) => lower.includes(p.toLowerCase()));
     }
 
-    return function onErrorOccurred(input) {
+    return function onErrorOccurred(input, invocation) {
         const { error, errorContext, recoverable } = input;
         const contextKey = errorContext ?? 'unknown';
-        const state = getState(contextKey);
+        const scopedContextKey = buildScopedContextKey(contextKey, invocation);
+        const state = getState(scopedContextKey);
         const now = Date.now();
 
         // Notificar callback de tracking (ErrorTracker, etc.)
         if (onError) {
             try {
-                onError(input);
+                onError(input, invocation);
             } catch (_) {
                 // ignora erros no callback
             }
@@ -229,12 +253,15 @@ export function createCircuitBreakerHandler(opts = {}) {
             if (elapsed < resetAfterMs) {
                 log(
                     'WARN',
-                    `[hooks/circuit-breaker] circuito ABERTO para '${contextKey}' — ${Math.round((resetAfterMs - elapsed) / 1000)}s restantes`,
+                    `[hooks/circuit-breaker] circuito ABERTO para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) — ${Math.round((resetAfterMs - elapsed) / 1000)}s restantes`,
                 );
                 return { errorHandling: 'abort' };
             }
             // Reset automático
-            log('INFO', `[hooks/circuit-breaker] circuito FECHANDO para '${contextKey}' após reset`);
+            log(
+                'INFO',
+                `[hooks/circuit-breaker] circuito FECHANDO para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) após reset`,
+            );
             state.openedAt = null;
             state.failures = 0;
             if (onReset) {
@@ -251,10 +278,13 @@ export function createCircuitBreakerHandler(opts = {}) {
             if (transientPatterns.length > 0 && matchesAny(error, transientPatterns)) {
                 log(
                     'DEBUG',
-                    `[hooks/circuit-breaker] padrão transiente detectado em '${contextKey}' — tratando como recuperável`,
+                    `[hooks/circuit-breaker] padrão transiente detectado em '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) — tratando como recuperável`,
                 );
             } else {
-                log('WARN', `[hooks/circuit-breaker] irrecuperável '${contextKey}': ${error} — abort`);
+                log(
+                    'WARN',
+                    `[hooks/circuit-breaker] irrecuperável '${contextKey}' (session=${invocation?.sessionId ?? 'global'}): ${error} — abort`,
+                );
                 return { errorHandling: 'abort' };
             }
         }
@@ -263,7 +293,10 @@ export function createCircuitBreakerHandler(opts = {}) {
 
         if (state.failures >= maxRetries) {
             state.openedAt = now;
-            log('WARN', `[hooks/circuit-breaker] circuito ABRINDO para '${contextKey}' após ${state.failures} falhas`);
+            log(
+                'WARN',
+                `[hooks/circuit-breaker] circuito ABRINDO para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) após ${state.failures} falhas`,
+            );
             if (onTrip) {
                 try {
                     onTrip(contextKey);
@@ -274,7 +307,10 @@ export function createCircuitBreakerHandler(opts = {}) {
             return { errorHandling: 'abort' };
         }
 
-        log('DEBUG', `[hooks/circuit-breaker] retry ${state.failures}/${maxRetries} para '${contextKey}'`);
+        log(
+            'DEBUG',
+            `[hooks/circuit-breaker] retry ${state.failures}/${maxRetries} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
+        );
         return { errorHandling: 'retry', retryCount: state.failures };
     };
 }

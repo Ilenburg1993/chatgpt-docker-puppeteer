@@ -51,6 +51,9 @@ export async function cmdModel({ println }, arg) {
             const contextWindowLabel =
                 typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
             println(`  \x1b[90m    cost=${meta.costTier}  speed=${meta.speedTier}  ctx=${contextWindowLabel}\x1b[0m`);
+            println(
+                `  \x1b[90m    caps: reasoning=${meta.supportsReasoning ? 'yes' : 'no'}  vision=${meta.supportsVision ? 'yes' : 'no'}\x1b[0m`,
+            );
         }
         println(`  \x1b[90mUso: /model list | stats | <id>\x1b[0m\n`);
         return;
@@ -102,8 +105,25 @@ export async function cmdModel({ println }, arg) {
     }
 
     // Troca de modelo
-    const { previousModel: previous } = setTerminalModelProjection(trimmed);
+    const {
+        previousModel: previous,
+        previousReasoningEffort,
+        currentReasoningEffort,
+        reasoningAdjusted,
+        modelMeta,
+    } = setTerminalModelProjection(trimmed);
     println(`\n  🔄  Modelo trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
+    if (modelMeta) {
+        const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
+        println(
+            `  \x1b[90mCapabilities: reasoning=${modelMeta.supportsReasoning ? 'yes' : 'no'} · vision=${modelMeta.supportsVision ? 'yes' : 'no'} · ctx=${ctxLabel}\x1b[0m`,
+        );
+    }
+    if (reasoningAdjusted) {
+        println(
+            `  \x1b[33mReasoning ajustado: ${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a reasoning effort).\x1b[0m`,
+        );
+    }
     println('  \x1b[90mEfetivo no próximo turno. Use /restart para reiniciar o loop com o novo modelo.\x1b[0m\n');
 }
 

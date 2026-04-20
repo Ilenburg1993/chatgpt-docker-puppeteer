@@ -136,5 +136,17 @@ export function wireSdkResponseEvents(session, { emit }) {
                 `[session-event-wirer] session.handoff: ${d['fromAgent'] ?? '?'} → ${d['toAgent'] ?? '?'} (reason: ${d['reason'] ?? '?'})`,
             );
         }),
+        session.on(SESSION_EVENTS.SESSION_WORKSPACE_FILE_CHANGED, (evt) => {
+            const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            emit('session.workspace_file_changed', {
+                path: d['path'] ?? null,
+                operation: d['operation'] ?? 'unknown',
+                ts: Date.now(),
+            });
+            log(
+                'INFO',
+                `[session-event-wirer] session.workspace_file_changed: ${d['operation'] ?? '?'} ${d['path'] ?? '?'}`,
+            );
+        }),
     ];
 }

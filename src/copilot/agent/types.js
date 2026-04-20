@@ -26,12 +26,39 @@
 // ─── PendingQuestion ──────────────────────────────────────────────────────────
 
 /**
+ * @typedef {'ready' | 'reply' | 'stopped' | 'question'} PendingQuestionKind
+ */
+
+/**
+ * @typedef {'fresh' | 'active' | 'expiring_soon' | 'expired'} PendingQuestionShadowState
+ */
+
+/**
+ * @typedef {Object} PendingQuestionMeta
+ * @property {PendingQuestionKind} kind - Semântica observável do ask_user atual.
+ * @property {number} askedAt - Timestamp em ms em que a pergunta foi recebida.
+ * @property {boolean} allowFreeform - Se o SDK aceita resposta livre.
+ * @property {boolean} protocolControlled - `true` quando a pergunta faz parte do protocolo do dialog loop.
+ * @property {string[]} [choices] - Opções disponíveis (se houver).
+ */
+
+/**
+ * @typedef {Object} PendingQuestionShadow
+ * @property {string} question - Texto persistido da pergunta pendente.
+ * @property {PendingQuestionMeta} meta - Metadados semânticos persistidos para recovery/observabilidade.
+ * @property {number} restoredAt - Timestamp em ms do momento em que a shadow foi restaurada no boot atual.
+ * @property {number} expiresAt - Timestamp em ms após o qual a shadow é considerada expirada/não respondível.
+ */
+
+/**
  * @typedef {Object} PendingQuestion
  * @property {string} question - Texto da pergunta
  * @property {string[]} [choices] - Opções disponíveis (se houver)
  * @property {boolean} allowFreeform - Se permite resposta livre
  * @property {(answer: string) => void} resolve - Resolver a Promise do SDK
  * @property {number} askedAt - Timestamp em ms
+ * @property {PendingQuestionKind} kind - Classificação semântica da pergunta no protocolo do dialog loop.
+ * @property {boolean} protocolControlled - `true` quando a pergunta foi emitida como parte do protocolo READY/REPLY.
  */
 
 // ─── AgentContext Partitioning (K1a) ───────────────────────────────────────
@@ -53,6 +80,8 @@
  *
  * @typedef {Object} AgentDialogState
  * @property {PendingQuestion | null} pendingQuestion - Pergunta pendente do SDK aguardando resposta.
+ * @property {PendingQuestionShadow | null} pendingQuestionShadow - Sombra persistida de `ask_user`, restaurada do
+ *   state-io apenas para observabilidade/recovery hints.
  * @property {boolean} dialogLoopAttached - Flag de idempotência do wiring do dialog loop.
  */
 
@@ -140,7 +169,16 @@
  * @property {number} queueSize - Número de tarefas na fila
  * @property {number} oldestTaskWaitMs - Tempo de espera da tarefa mais antiga em ms
  * @property {boolean} starvationAlert - true se há tarefa esperando > 60s
- * @property {object | null} pendingQuestion - Pergunta pendente do modelo (ou null)
+ * @property {{
+ *     question: string;
+ *     choices?: string[];
+ *     allowFreeform: boolean;
+ *     askedAt: number;
+ *     kind: PendingQuestionKind;
+ *     protocolControlled: boolean;
+ * } | null} pendingQuestion
+ *   - Pergunta pendente viva do modelo (ou null)
+ *
  * @property {boolean} isResumed - true se a sessão foi retomada
  * @property {number} resumeCount - Número de retomadas desde o início
  * @property {number} sendCount - Total de mensagens enviadas
@@ -161,6 +199,9 @@
  *     | 'session.missing'
  *     | 'dialog.detached'
  *     | 'io.pending_question_drift'
+ *     | 'io.pending_question_shadow'
+ *     | 'io.pending_question_shadow_expiring_soon'
+ *     | 'io.pending_question_shadow_expired'
  *     | 'io.keepalive_stopped'
  *     | 'background.backlog_high'
  *     | 'boot.failed'
@@ -176,6 +217,8 @@
  *     | 'recreate_session'
  *     | 'reattach_dialog'
  *     | 'resolve_pending_question'
+ *     | 'review_pending_question_shadow'
+ *     | 'clear_pending_question_shadow'
  *     | 'restart_keepalive'
  *     | 'drain_background_tasks'
  *     | 'inspect_boot_report'
@@ -278,6 +321,15 @@
  * @property {string | undefined} reasoningEffort - Nível de raciocínio configurado.
  * @property {boolean} dialogLoopActive - Indica se o dialog loop está ativo.
  * @property {boolean} pendingQuestion - Indica se há pergunta pendente aguardando resposta.
+ * @property {PendingQuestionKind | null} pendingQuestionKind - Classificação da pergunta pendente, quando houver.
+ * @property {boolean} pendingQuestionShadow - Indica se existe sombra persistida de `ask_user` restaurada do disco.
+ * @property {PendingQuestionKind | null} pendingQuestionShadowKind - Classificação da sombra persistida, quando houver.
+ * @property {PendingQuestionShadowState | null} pendingQuestionShadowState - Estado semântico atual da shadow
+ *   persistida.
+ * @property {boolean} pendingQuestionShadowExpired - Indica se a shadow persistida já expirou e não é mais respondível.
+ * @property {number | null} pendingQuestionShadowAgeMs - Idade atual da shadow persistida em ms.
+ * @property {number | null} pendingQuestionShadowExpiresAt - Timestamp em ms de expiração da shadow persistida.
+ * @property {number | null} pendingQuestionShadowRemainingMs - Tempo restante em ms até a expiração da shadow.
  * @property {number} queueSize - Tamanho atual da fila do agente.
  * @property {number} oldestTaskWaitMs - Idade da tarefa mais antiga na fila.
  * @property {boolean} starvationAlert - Indica se a fila entrou em starvation.
@@ -297,6 +349,14 @@
  *     io: {
  *         ok: boolean;
  *         pendingQuestion: boolean;
+ *         pendingQuestionKind: PendingQuestionKind | null;
+ *         pendingQuestionShadow: boolean;
+ *         pendingQuestionShadowKind: PendingQuestionKind | null;
+ *         pendingQuestionShadowState: PendingQuestionShadowState | null;
+ *         pendingQuestionShadowExpired: boolean;
+ *         pendingQuestionShadowAgeMs: number | null;
+ *         pendingQuestionShadowExpiresAt: number | null;
+ *         pendingQuestionShadowRemainingMs: number | null;
  *         waitingForInput: boolean;
  *         keepaliveRunning: boolean;
  *         backgroundPendingCount: number;
@@ -375,6 +435,21 @@
  * @property {string} status - Status operacional atual do agente
  * @property {string | null} sessionId - ID da sessão ativa (null quando não conectado)
  * @property {number} queueSize - Número de tasks na fila
+ * @property {PendingQuestion | null | undefined} [pendingQuestion] - Pergunta viva do SDK, quando houver.
+ * @property {PendingQuestionShadow | null | undefined} [pendingQuestionShadow] - Sombra persistida do ask_user, quando
+ *   houver.
+ * @property {PendingQuestionKind | null | undefined} [pendingQuestionKind] - Classificação da pergunta viva atual.
+ * @property {PendingQuestionKind | null | undefined} [pendingQuestionShadowKind] - Classificação da sombra persistida
+ *   restaurada.
+ * @property {PendingQuestionShadowState | null | undefined} [pendingQuestionShadowState] - Estado semântico atual da
+ *   shadow persistida.
+ * @property {boolean | undefined} [pendingQuestionShadowExpired] - Indica se a shadow persistida já expirou.
+ * @property {number | null | undefined} [pendingQuestionShadowAgeMs] - Idade atual da shadow persistida em ms.
+ * @property {number | null | undefined} [pendingQuestionShadowExpiresAt] - Timestamp de expiração da shadow, quando
+ *   houver.
+ * @property {number | null | undefined} [pendingQuestionShadowRemainingMs] - Tempo restante até a expiração da shadow.
+ * @property {(() => boolean) | undefined} [clearPendingQuestionShadow] - Limpa a shadow persistida de `ask_user`
+ *   restaurada do disco.
  * @property {boolean} [dialogLoopActive] - Indica se o dialog loop está ativo
  * @property {() => AgentStatusSnapshot} getStatusSnapshot - Retorna o snapshot completo do status
  * @property {(() => AgentHealthSnapshot) | undefined} getHealthSnapshot - Retorna o snapshot consolidado de health
@@ -384,15 +459,26 @@
  * @property {boolean | undefined} [dialogPaused] - Indica se o dialog loop está pausado
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
+ * @property {(() => Promise<import('#copilot/sdk/types').ModeResult>) | undefined} getSdkSessionMode - Retorna o modo
+ *   vanilla atual da sessão SDK
+ * @property {((mode: 'interactive' | 'plan' | 'autopilot') => Promise<import('#copilot/sdk/types').ModeResult>)
+ *     | undefined} setSdkSessionMode
+ *   - Altera o modo vanilla da sessão SDK
+ *
+ * @property {(() => Promise<import('#copilot/sdk/types').PlanReadResult>) | undefined} readSdkPlan - Lê o plan.md
+ *   vanilla da sessão SDK
+ * @property {((content: string) => Promise<object>) | undefined} updateSdkPlan - Atualiza o plan.md vanilla da sessão
+ *   SDK
+ * @property {(() => Promise<object>) | undefined} deleteSdkPlan - Remove o plan.md vanilla da sessão SDK
  * @property {(
  *     message: string,
  *     opts?: {
  *         timeoutMs?: number;
- *         attachments?: import('@github/copilot-sdk').MessageOptions['attachments'];
+ *         attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *         signal?: AbortSignal;
  *         taskId?: string;
  *     },
- * ) => Promise<unknown>} sendMessage
+ * ) => Promise<string>} sendMessage
  *   - Envia mensagem ao agente
  *
  * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot

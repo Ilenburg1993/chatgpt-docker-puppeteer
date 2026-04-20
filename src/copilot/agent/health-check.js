@@ -22,6 +22,8 @@ const BACKGROUND_PENDING_WARN_THRESHOLD = 8;
  *     dialogOk: boolean;
  *     queueOk: boolean;
  *     ioOk: boolean;
+ *     pendingQuestionShadow: boolean;
+ *     pendingQuestionShadowExpired: boolean;
  *     keepaliveOk: boolean;
  *     backgroundOk: boolean;
  *     bootOk: boolean;
@@ -36,6 +38,8 @@ function selectRecommendedAction(state) {
     if (!state.sessionActive) return 'recreate_session';
     if (!state.dialogOk) return 'reattach_dialog';
     if (!state.ioOk) return 'resolve_pending_question';
+    if (state.pendingQuestionShadowExpired) return 'clear_pending_question_shadow';
+    if (state.pendingQuestionShadow) return 'review_pending_question_shadow';
     if (!state.keepaliveOk) return 'restart_keepalive';
     if (!state.bootOk || state.bootNeedsAttention) return 'inspect_boot_report';
     if (!state.quotaOk) return 'restart_quota_monitor';
@@ -67,6 +71,14 @@ export function getAgentHealthSnapshot(ctx, host) {
     const dialogOk = !dialogActive || dialogAttached;
     const queueOk = !snap.starvationAlert;
     const hasPendingQuestion = ctx.hasPendingQuestion();
+    const pendingQuestionKind = ctx.getPendingQuestionKind();
+    const hasPendingQuestionShadow = ctx.hasPendingQuestionShadow();
+    const pendingQuestionShadowKind = ctx.getPendingQuestionShadowKind();
+    const pendingQuestionShadowState = ctx.getPendingQuestionShadowState();
+    const pendingQuestionShadowExpired = ctx.isPendingQuestionShadowExpired();
+    const pendingQuestionShadowAgeMs = ctx.getPendingQuestionShadowAgeMs();
+    const pendingQuestionShadowExpiresAt = ctx.getPendingQuestionShadowExpiresAt();
+    const pendingQuestionShadowRemainingMs = ctx.getPendingQuestionShadowRemainingMs();
     const waitingForInput = snap.status === 'waiting_for_input';
     const ioOk = !hasPendingQuestion || waitingForInput || dialogActive;
     const keepaliveRunning = ctx.keepalive.running;
@@ -111,6 +123,17 @@ export function getAgentHealthSnapshot(ctx, host) {
     if (!ioOk) {
         issues.push('io.pending_question_mismatch');
         riskFlags.push('io.pending_question_drift');
+    }
+    if (!hasPendingQuestion && hasPendingQuestionShadow) {
+        issues.push('io.pending_question_shadow');
+        riskFlags.push('io.pending_question_shadow');
+        if (pendingQuestionShadowExpired) {
+            issues.push('io.pending_question_shadow_expired');
+            riskFlags.push('io.pending_question_shadow_expired');
+        } else if (pendingQuestionShadowState === 'expiring_soon') {
+            issues.push('io.pending_question_shadow_expiring_soon');
+            riskFlags.push('io.pending_question_shadow_expiring_soon');
+        }
     }
     if (!keepaliveOk) {
         issues.push('io.keepalive_stopped');
@@ -157,6 +180,8 @@ export function getAgentHealthSnapshot(ctx, host) {
         dialogOk,
         queueOk,
         ioOk,
+        pendingQuestionShadow: hasPendingQuestionShadow,
+        pendingQuestionShadowExpired,
         keepaliveOk,
         backgroundOk,
         bootOk,
@@ -174,6 +199,14 @@ export function getAgentHealthSnapshot(ctx, host) {
         reasoningEffort: snap.reasoningEffort,
         dialogLoopActive: dialogActive,
         pendingQuestion: hasPendingQuestion,
+        pendingQuestionKind,
+        pendingQuestionShadow: hasPendingQuestionShadow,
+        pendingQuestionShadowKind,
+        pendingQuestionShadowState,
+        pendingQuestionShadowExpired,
+        pendingQuestionShadowAgeMs,
+        pendingQuestionShadowExpiresAt,
+        pendingQuestionShadowRemainingMs,
         queueSize: snap.queueSize,
         oldestTaskWaitMs: snap.oldestTaskWaitMs,
         starvationAlert: snap.starvationAlert,
@@ -214,6 +247,14 @@ export function getAgentHealthSnapshot(ctx, host) {
             io: {
                 ok: ioOk && keepaliveOk,
                 pendingQuestion: hasPendingQuestion,
+                pendingQuestionKind,
+                pendingQuestionShadow: hasPendingQuestionShadow,
+                pendingQuestionShadowKind,
+                pendingQuestionShadowState,
+                pendingQuestionShadowExpired,
+                pendingQuestionShadowAgeMs,
+                pendingQuestionShadowExpiresAt,
+                pendingQuestionShadowRemainingMs,
                 waitingForInput,
                 keepaliveRunning,
                 backgroundPendingCount,

@@ -3,7 +3,7 @@
  * src/copilot/terminal/commands/session.js
  *
  * Comandos de sessão do REPL terminal LLM-B: /status, /history, /db-history, /db-sessions, /who, /count, /clear,
- * /answer, /restart, /quit, /exit
+ * /answer, /clear-shadow, /restart, /quit, /exit
  *
  * @module copilot/terminal/commands/session
  * @see EventBus
@@ -12,12 +12,16 @@
 import { toError } from '#copilot/core';
 import {
     answerPendingTerminalQuestion,
+    clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
     listTerminalSnapshotsProjection,
     loadTerminalSnapshotProjection,
+    readTerminalActivityProjection,
+    readTerminalConfigProjection,
     readTerminalCountProjection,
     readTerminalDbHistoryProjection,
     readTerminalDbSessionsProjection,
+    readTerminalDisplayProjection,
     readTerminalHistoryProjection,
     readTerminalStatusProjection,
     saveTerminalSnapshotProjection,
@@ -40,6 +44,8 @@ import {
  * @returns {void}
  */
 export function cmdStatus({ hubSessionId, injectPort, println }) {
+    const configProjection = readTerminalConfigProjection();
+    const activityProjection = readTerminalActivityProjection(3);
     const projection = readTerminalStatusProjection({
         hubSessionId: hubSessionId ?? null,
         ...(typeof injectPort === 'number' ? { injectPort } : {}),
@@ -48,32 +54,118 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
     const active = projection.dialogLoopActive;
     const statusColor =
         snap['status'] === 'waiting_for_input' ? '\x1b[32m' : snap['status'] === 'idle' ? '\x1b[33m' : '\x1b[31m';
-    const effort = snap['reasoningEffort'] ?? 'high';
+    const effort = configProjection.currentReasoningEffort;
+    const sdkMode = projection.sdkSessionMode ?? 'interactive';
+    const sdkModeColor = sdkMode === 'plan' ? '\x1b[35m' : sdkMode === 'autopilot' ? '\x1b[36m' : '\x1b[90m';
+    const sdkPlanOpLabel = projection.sdkPlanOperation
+        ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${new Date(projection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}` : ''}`
+        : '\x1b[90m(sem alterações)\x1b[0m';
     const healthColor =
         health?.['status'] === 'healthy' ? '\x1b[32m' : health?.['status'] === 'degraded' ? '\x1b[33m' : '\x1b[31m';
     const ws = projection.workspace;
     const branchStr = ws.currentBranch ? `\x1b[32m${ws.currentBranch}\x1b[0m` : '\x1b[90m(sem branch)\x1b[0m';
+    const shadowState = projection.pendingQuestionShadowState;
+    const askUserStatus = projection.pendingQuestion
+        ? `\x1b[32mvivo\x1b[0m${projection.pendingQuestionKind ? ` [${projection.pendingQuestionKind}]` : ''}`
+        : projection.pendingQuestionShadowExpired
+          ? '\x1b[31mshadow expirada\x1b[0m'
+          : projection.pendingQuestionShadow
+            ? `${shadowState === 'expired' ? '\x1b[31mshadow expirada\x1b[0m' : shadowState === 'expiring_soon' ? '\x1b[33mshadow expirando\x1b[0m' : shadowState === 'fresh' ? '\x1b[36mshadow recém-restaurada\x1b[0m' : '\x1b[33mshadow restaurada\x1b[0m'}${projection.pendingQuestionShadowKind ? ` [${projection.pendingQuestionShadowKind}]` : ''}`
+            : '\x1b[90m(nenhum)\x1b[0m';
+    const pendingPreview = projection.pendingQuestionText
+        ? projection.pendingQuestionText.slice(0, 80) + (projection.pendingQuestionText.length > 80 ? '…' : '')
+        : projection.pendingQuestionShadowText
+          ? projection.pendingQuestionShadowText.slice(0, 80) +
+            (projection.pendingQuestionShadowText.length > 80 ? '…' : '')
+          : null;
+    const shadowExpiry =
+        typeof projection.pendingQuestionShadowExpiresAt === 'number'
+            ? new Date(projection.pendingQuestionShadowExpiresAt).toISOString()
+            : null;
+    const shadowAgeLabel =
+        typeof projection.pendingQuestionShadowAgeMs === 'number'
+            ? `${Math.round(projection.pendingQuestionShadowAgeMs / 1000)}s`
+            : null;
+    const shadowRemainingLabel =
+        typeof projection.pendingQuestionShadowRemainingMs === 'number'
+            ? `${Math.round(projection.pendingQuestionShadowRemainingMs / 1000)}s`
+            : null;
+    const activity = projection.activity;
+    const modelMeta = configProjection.modelMeta;
+    const display = readTerminalDisplayProjection();
+    const activitySeverityColor =
+        activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
+    const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
   agente           ${statusColor}${snap['status']}\x1b[0m
         health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
+  ask_user         ${askUserStatus}
   modelo           \x1b[36m${snap['model']}\x1b[0m
   reasoning        \x1b[35m${effort}\x1b[0m
+    modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
+    plan arquivo     ${sdkPlanOpLabel}
         bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
         issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
+        ação sugerida    ${projection.recommendedAction ?? 'none'}
     runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos (memória) ${projection.turnCount}
     inject port      ${projection.injectPort}
+        atividade atual  ${activitySeverityColor}${activity.label}\x1b[0m${activityProgress}
+        fase/source      \x1b[90m${activity.phase} · ${activity.source}\x1b[0m
+        display          \x1b[90mthinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}\x1b[0m
+        perfil modelo    \x1b[90m${modelMeta ? `cost=${modelMeta.costTier ?? 'n/a'} · speed=${modelMeta.speedTier ?? 'n/a'} · ctx=${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadata local)'}\x1b[0m
   ─────────────────────────────────────
   workspace        \x1b[90m${ws.cwd}\x1b[0m
   git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
   branch           ${branchStr}
   ─────────────────────────────────────
 `);
+    if (pendingPreview) {
+        println(`  pergunta/shadow  \x1b[90m${pendingPreview}\x1b[0m`);
+    }
+    if (shadowExpiry) {
+        println(`  shadow expira em \x1b[90m${shadowExpiry}\x1b[0m`);
+    }
+    if (shadowAgeLabel) {
+        println(`  shadow idade    \x1b[90m${shadowAgeLabel}\x1b[0m`);
+    }
+    if (shadowRemainingLabel && !projection.pendingQuestionShadowExpired) {
+        println(`  shadow restante \x1b[90m${shadowRemainingLabel}\x1b[0m`);
+    }
+    if (activity.detail) {
+        println(`  atividade info  \x1b[90m${activity.detail}\x1b[0m`);
+    }
+    if (activityProjection.history.length > 0) {
+        println(
+            '  atividade rec.  \x1b[90m' +
+                activityProjection.history
+                    .map((entry) => {
+                        const progress = typeof entry.progress === 'number' ? ` ${entry.progress}%` : '';
+                        return `${entry.phase}:${entry.label}${progress}`;
+                    })
+                    .join('  •  ') +
+                '\x1b[0m',
+        );
+    }
+    if (projection.pendingQuestionShadowExpired) {
+        println(
+            '  \x1b[33mDica: a shadow restaurada não é mais respondível; mantenha a limpeza no próximo fluxo operacional.\x1b[0m',
+        );
+    } else if (projection.pendingQuestionShadowState === 'expiring_soon') {
+        println(
+            '  \x1b[33mDica: a shadow restaurada está perto de expirar; revise ou limpe antes que o estado fique ambíguo.\x1b[0m',
+        );
+    }
+    if (projection.sdkSessionMode === 'plan') {
+        println(
+            '  \x1b[90mNota: a sessão SDK está em plan mode vanilla; use /plan off para voltar a interactive.\x1b[0m',
+        );
+    }
 }
 
 /**
@@ -180,11 +272,12 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
  * @returns {void}
  */
 export function cmdWho({ injectPort, println }) {
+    const { currentModel, currentReasoningEffort } = readTerminalConfigProjection();
     println(`
   \x1b[36mAtores ativos nesta sessão:\x1b[0m
   👤  \x1b[32mVocê\x1b[0m          — stdin (digitar diretamente aqui)
   🤖  \x1b[34mLLM-A\x1b[0m         — POST http://localhost:${injectPort}/inject
-  🧠  \x1b[35mLLM-B\x1b[0m         — AlwaysAliveAgent (GPT-4.1 Copilot SDK)
+    🧠  \x1b[35mLLM-B\x1b[0m         — AlwaysAliveAgent (Copilot SDK · ${currentModel} · ${currentReasoningEffort})
   📡  \x1b[90mSSE stream\x1b[0m    — GET  http://localhost:${injectPort}/events
 `);
 }
@@ -233,7 +326,31 @@ export function cmdClear({ println }) {
  */
 export function cmdAnswer({ println }, arg) {
     const ok = answerPendingTerminalQuestion(arg);
-    println(ok ? `[answer] Resposta enviada: "${arg}"` : '[answer] Nenhuma pergunta pendente.');
+    if (ok) {
+        println(`[answer] Resposta enviada: "${arg}"`);
+        return;
+    }
+    const projection = readTerminalStatusProjection();
+    if (projection.pendingQuestionShadowExpired) {
+        println('[answer] Nenhuma pergunta viva. Há uma shadow expirada de ask_user pendente de limpeza.');
+        return;
+    }
+    println('[answer] Nenhuma pergunta pendente.');
+}
+
+/**
+ * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
+ *
+ * @param {SessionContext} ctx
+ * @returns {void}
+ */
+export function cmdClearShadow({ println }) {
+    const ok = clearPendingTerminalQuestionShadow();
+    println(
+        ok
+            ? '[clear-shadow] Shadow persistida de ask_user limpa.'
+            : '[clear-shadow] Nenhuma shadow persistida do ask_user no momento.',
+    );
 }
 
 /**
@@ -268,7 +385,9 @@ export async function cmdSessionList({ println }) {
             typeof createdAt === 'number' || typeof createdAt === 'string'
                 ? new Date(createdAt).toISOString().replace('T', ' ').slice(0, 19)
                 : 'invalid-date';
-        println(`    ${String(s['snapshotId'] ?? '')}  ${date}  model=${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`);
+        println(
+            `    ${String(s['snapshotId'] ?? '')}  ${date}  model=${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
+        );
     }
 }
 
@@ -295,15 +414,42 @@ export async function cmdSessionRestore({ println }, snapshotId) {
     println(`\x1b[36m  Snapshot: ${String(snap['snapshotId'] ?? '(sem id)')}\x1b[0m`);
     const createdAt = snap['createdAt'];
     const createdAtIso =
-        typeof createdAt === 'number' || typeof createdAt === 'string' ? new Date(createdAt).toISOString() : 'invalid-date';
+        typeof createdAt === 'number' || typeof createdAt === 'string'
+            ? new Date(createdAt).toISOString()
+            : 'invalid-date';
     println(`    Criado: ${createdAtIso}`);
     println(`    Session: ${String(snap['sessionId'] ?? '(none)')}`);
     println(`    Model: ${String(snap['model'] ?? 'unknown')}  Status: ${String(snap['status'] ?? 'unknown')}`);
     println(`    Send count: ${Number(snap['sendCount'] ?? 0)}`);
-    println(`    Dialog loop: ${snap['dialogLoopActive'] ? 'active' : 'inactive'}${snap['dialogPaused'] ? ' (paused)' : ''}`);
-    if (snap['pendingQuestion']) println(`    Pending question: ${String(snap['pendingQuestion'])}`);
+    println(
+        `    Dialog loop: ${snap['dialogLoopActive'] ? 'active' : 'inactive'}${snap['dialogPaused'] ? ' (paused)' : ''}`,
+    );
+    if (snap['pendingQuestion']) {
+        const pendingMeta =
+            snap['pendingQuestionMeta'] && typeof snap['pendingQuestionMeta'] === 'object'
+                ? /** @type {{ kind?: string }} */ (snap['pendingQuestionMeta'])
+                : null;
+        const pendingKind = pendingMeta?.kind ? ` [${pendingMeta.kind}]` : '';
+        println(`    Pending question${pendingKind}: ${String(snap['pendingQuestion'])}`);
+    }
+    if (snap['pendingQuestionShadow'] && typeof snap['pendingQuestionShadow'] === 'object') {
+        const shadow =
+            /** @type {{ question?: unknown; meta?: { kind?: unknown }; restoredAt?: unknown; expiresAt?: unknown }} */ (
+                snap['pendingQuestionShadow']
+            );
+        const shadowKind = typeof shadow.meta?.kind === 'string' ? ` [${shadow.meta.kind}]` : '';
+        println(`    Pending shadow${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
+        if (typeof shadow.restoredAt === 'number') {
+            println(`    Shadow restoredAt: ${new Date(shadow.restoredAt).toISOString()}`);
+        }
+        if (typeof shadow.expiresAt === 'number') {
+            println(`    Shadow expiresAt: ${new Date(shadow.expiresAt).toISOString()}`);
+        }
+    }
     if (snap['prMetrics']) {
-        const prMetrics = /** @type {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number }} */ (snap['prMetrics']);
+        const prMetrics = /** @type {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number }} */ (
+            snap['prMetrics']
+        );
         println(
             `    PR metrics: boots=${Number(prMetrics.boots ?? 0)} resumePR=${Number(prMetrics.resumesWithPR ?? 0)} zeroPR=${Number(prMetrics.resumesZeroPR ?? 0)}`,
         );

@@ -37,6 +37,7 @@ import { logSwallowed } from '../../core/error-handlers.js';
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
 import { setExperimentalSession, setSessionRpc } from '../../tools/bootstrap.js';
+import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -194,6 +195,10 @@ export async function agentStart(ctx, host) {
                 dialogLoopActive: () => ctx.dialogLoop?.active ?? false,
                 getSessionId: () => host.sessionId,
                 getStatus: () => ctx.status,
+                hasPendingQuestion: () => ctx.hasPendingQuestion(),
+                hasPendingQuestionShadow: () => ctx.hasPendingQuestionShadow(),
+                isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
+                clearPendingQuestionShadow: () => ctx.clearPendingQuestionShadow(),
                 dialogLoop: ctx.dialogLoop,
                 keepalive: ctx.keepalive,
                 handoff: ctx.handoff,
@@ -233,7 +238,29 @@ export async function agentStart(ctx, host) {
         }
 
         ctx.setStatus('idle', host);
-        ctx.setSendCount((await readStateAsync())?.sendCount ?? 0);
+        const persistedState = await readStateAsync();
+        ctx.setSendCount(persistedState?.sendCount ?? 0);
+        if (persistedState?.pendingQuestion && persistedState.pendingQuestionMeta) {
+            const pendingQuestionShadow = createPendingQuestionShadow(
+                persistedState.pendingQuestion,
+                persistedState.pendingQuestionMeta,
+            );
+            ctx.setPendingQuestionShadow(pendingQuestionShadow);
+            if (isPendingQuestionShadowExpired(pendingQuestionShadow)) {
+                void ctx.backgroundTasks.track(
+                    persistStateWithPolicy(
+                        { pendingQuestion: null, pendingQuestionMeta: null },
+                        { label: 'state.pendingQuestionShadow.expire' },
+                    ).then(() => undefined),
+                    {
+                        label: 'state.pendingQuestionShadow.expire',
+                        description: 'Clear expired ask_user shadow from persisted state',
+                    },
+                );
+            }
+        } else {
+            ctx.clearPendingQuestionShadow();
+        }
 
         log(
             'INFO',
@@ -323,6 +350,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         try {
+            const pendingQuestion = dialogState.pendingQuestion ?? ctx.pendingQuestion;
             const snap = createSnapshot({
                 sessionId: host.sessionId ?? null,
                 model: configState.model ?? ctx.model,
@@ -330,7 +358,17 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 sendCount: metricsState.sendCount ?? ctx.sendCount,
                 dialogLoopActive: false,
                 dialogPaused: ctx.dialogLoop.paused,
-                pendingQuestion: dialogState.pendingQuestion?.question ?? ctx.pendingQuestion?.question ?? null,
+                pendingQuestion: pendingQuestion?.question ?? null,
+                pendingQuestionMeta:
+                    pendingQuestion !== null
+                        ? {
+                              kind: pendingQuestion.kind,
+                              askedAt: pendingQuestion.askedAt,
+                              allowFreeform: pendingQuestion.allowFreeform,
+                              protocolControlled: pendingQuestion.protocolControlled,
+                              ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
+                          }
+                        : null,
                 prMetrics: host.dialogPrMetrics,
                 reason: 'auto-shutdown',
             });

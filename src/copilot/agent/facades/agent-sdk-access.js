@@ -13,7 +13,18 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { deselectAgent, getCurrentAgent, listAgents, reloadAgents, selectAgent } from '#copilot/sdk';
+import {
+    deselectAgent,
+    getCurrentAgent,
+    listAgents,
+    modeGet,
+    modeSet,
+    planDelete,
+    planRead,
+    planUpdate,
+    reloadAgents,
+    selectAgent,
+} from '#copilot/sdk';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -185,6 +196,54 @@ export async function getForegroundSdkSessionId(ctx) {
  */
 export async function setForegroundSdkSessionId(ctx, sessionId) {
     await requireClient(ctx, 'setForegroundSdkSessionId').setForegroundSessionId(sessionId);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ */
+export async function getSdkSessionMode(ctx) {
+    return /** @type {Promise<import('#copilot/sdk/types').ModeResult>} */ (
+        modeGet(requireSession(ctx, 'getSdkSessionMode'))
+    );
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ */
+export async function setSdkSessionMode(ctx, mode) {
+    return /** @type {Promise<import('#copilot/sdk/types').ModeResult>} */ (
+        modeSet(requireSession(ctx, 'setSdkSessionMode'), mode)
+    );
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ */
+export async function readSdkPlan(ctx) {
+    return /** @type {Promise<import('#copilot/sdk/types').PlanReadResult>} */ (
+        planRead(requireSession(ctx, 'readSdkPlan'))
+    );
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} content
+ * @returns {Promise<object>}
+ */
+export async function updateSdkPlan(ctx, content) {
+    return planUpdate(requireSession(ctx, 'updateSdkPlan'), content);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<object>}
+ */
+export async function deleteSdkPlan(ctx) {
+    return planDelete(requireSession(ctx, 'deleteSdkPlan'));
 }
 
 /**

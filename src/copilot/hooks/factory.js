@@ -13,8 +13,9 @@
  * @see module:copilot/hooks/composer
  */
 
-import { log } from './logger.js';
 import { toError } from '../core/error-handlers.js';
+import { createErrorHandler } from './error-handler.js';
+import { log } from './logger.js';
 import { isDynamicOnly } from './tool-filter.js';
 
 /**
@@ -170,9 +171,8 @@ function buildPreToolUseHandler({
 }
 
 /**
- * E1.2 — Handler simplificado para cenários onde o filtering estático foi extraído
- * para `availableTools`/`excludedTools` do SDK. Mantém apenas lógica dinâmica:
- * askHandler, argsModifier e audit logging.
+ * E1.2 — Handler simplificado para cenários onde o filtering estático foi extraído para
+ * `availableTools`/`excludedTools` do SDK. Mantém apenas lógica dinâmica: askHandler, argsModifier e audit logging.
  *
  * @param {object} opts
  * @param {boolean} opts.auditLog
@@ -230,29 +230,36 @@ function buildDynamicOnlyPreToolUseHandler({ auditLog, debugTools, askHandler, a
  * @returns {ErrorOccurredHandler}
  */
 function buildErrorOccurredHandler() {
-    const fn = async (/** @type {ErrorOccurredHookInput} */ input, /** @type {InvocationContext} */ invocation) => {
-        const { error, errorContext, recoverable } = input ?? {};
-        if (recoverable && errorContext === 'model_call') {
+    return createErrorHandler({
+        maxRetries: 3,
+        strategy: (input) => {
+            if (input.recoverable && input.errorContext === 'tool_execution') {
+                return 'skip';
+            }
+            return input.recoverable ? 'retry' : 'abort';
+        },
+        onError: (input, invocation) => {
+            const { error, errorContext, recoverable } = input;
+            if (recoverable && errorContext === 'tool_execution') {
+                log(
+                    'WARN',
+                    `[hooks/factory] onErrorOccurred tool recuperável: ${error} — skip sessionId='${invocation?.sessionId}'`,
+                );
+                return;
+            }
+            if (recoverable) {
+                log(
+                    'WARN',
+                    `[hooks/factory] onErrorOccurred recuperável (${errorContext}): ${error} — retry automático sessionId='${invocation?.sessionId}'`,
+                );
+                return;
+            }
             log(
                 'WARN',
-                `[hooks/factory] onErrorOccurred recuperável (${errorContext}): ${error} — retry automático sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onErrorOccurred não-recuperável (${errorContext}): ${error} — abort sessionId='${invocation?.sessionId}'`,
             );
-            return { errorHandling: /** @type {'retry'} */ ('retry'), retryCount: 3 };
-        }
-        if (recoverable && errorContext === 'tool_execution') {
-            log(
-                'WARN',
-                `[hooks/factory] onErrorOccurred tool recuperável: ${error} — skip sessionId='${invocation?.sessionId}'`,
-            );
-            return { errorHandling: /** @type {'skip'} */ ('skip') };
-        }
-        log(
-            'WARN',
-            `[hooks/factory] onErrorOccurred não-recuperável (${errorContext}): ${error} — abort sessionId='${invocation?.sessionId}'`,
-        );
-        return { errorHandling: /** @type {'abort'} */ ('abort') };
-    };
-    return /** @type {ErrorOccurredHandler} */ (fn);
+        },
+    });
 }
 
 // ─── Factory principal ───────────────────────────────────────────────────────

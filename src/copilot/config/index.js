@@ -55,7 +55,12 @@ export {
     removeCustomAgent
 } from './custom-agents.js';
 
-export { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from './agent.js';
+export {
+    CONTEXT_UTIL_BLOCK_THRESHOLD,
+    CONTEXT_UTIL_WARN_THRESHOLD,
+    DEFAULT_COPILOT_MODEL,
+    DEFAULT_COPILOT_REASONING_EFFORT,
+} from './agent.js';
 
 // ─── Session Config Builder (Faixa C) ────────────────────────────────────────
 export { SessionConfigBuilder } from './session-config.js';

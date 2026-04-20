@@ -28,6 +28,7 @@ import { container } from '../core/di-container.js';
 import { registerTimer } from '../core/timer-registry.js';
 import { startCopilotServer } from '../server/index.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
+import { recordTerminalActivity, terminalActivityEmitter } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
 import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
@@ -120,11 +121,17 @@ function startReflectionLoop() {
  * @returns {Promise<void>}
  */
 export async function startTerminalServer() {
+    recordTerminalActivity('boot', 'Inicializando terminal', {
+        detail: 'Preparando aliases, DI, hub e servidor HTTP',
+        source: 'terminal',
+    });
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
 
+    recordTerminalActivity('boot', 'Carregando aliases', { source: 'terminal', recordHistory: false });
     await loadAliasesAsync();
 
     // DI wiring extraído para di-wiring.js — registra tokens agent/tools e injeta setters legados
+    recordTerminalActivity('boot', 'Configurando DI do terminal', { source: 'terminal', recordHistory: false });
     wireTerminalDI();
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
@@ -134,7 +141,13 @@ export async function startTerminalServer() {
         resolve(_root, '.github', 'skills'),
         resolve(_root, '.github', 'instructions'),
     ]);
+    recordTerminalActivity('boot', 'Carregando arquivos pinados', { source: 'terminal', recordHistory: false });
     await pinnedLoader.start().catch((e) => {
+        recordTerminalActivity('system', 'Pinned files indisponíveis', {
+            detail: e.message,
+            severity: 'warn',
+            source: 'terminal',
+        });
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
 
@@ -165,8 +178,21 @@ export async function startTerminalServer() {
     };
     pinnedLoader.on('changed', pinnedFilesChangedHandler);
 
+    const activityChangedHandler = (
+        /** @type {import('./activity-state.js').TerminalActivitySnapshot} */ current,
+        /** @type {import('./activity-state.js').TerminalActivitySnapshot | undefined} */ previous,
+    ) => {
+        broadcastSse('activity.changed', {
+            current,
+            previous: previous ?? null,
+            timestamp: Date.now(),
+        });
+    };
+    terminalActivityEmitter.on('activity:changed', activityChangedHandler);
+
     // Criar hub_session permanente (best-effort)
     try {
+        recordTerminalActivity('boot', 'Inicializando conversation hub', { source: 'terminal', recordHistory: false });
         await initTerminalConversationHub();
         const sdkSessionId = getSharedSdkSessionId();
         const hubSessionId = createTerminalHubSession({
@@ -177,6 +203,11 @@ export async function startTerminalServer() {
         setHubSessionId(hubSessionId);
         log('INFO', `[TerminalServer] Hub session criada: ${hubSessionId}`);
     } catch (e) {
+        recordTerminalActivity('system', 'Hub storage indisponível', {
+            detail: toError(e).message,
+            severity: 'warn',
+            source: 'terminal',
+        });
         log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${toError(e).message}`);
     }
 
@@ -189,10 +220,19 @@ export async function startTerminalServer() {
         _serverOpts.orchestrator = readTerminalHubOrchestrator();
         _serverOpts.store = readTerminalHubStore();
     }
+    recordTerminalActivity('boot', 'Subindo servidor copilot', { source: 'terminal', recordHistory: false });
     const copilotServer = await startCopilotServer(_serverOpts);
 
     registerAgentEventListeners(printStandaloneBanner);
     startReflectionLoop();
+
+    const onActivityChanged = (
+        /** @type {import('./activity-state.js').TerminalActivitySnapshot} */ activity,
+        /** @type {import('./activity-state.js').TerminalActivitySnapshot | undefined} */ _,
+    ) => {
+        broadcastSse('terminal.activity', activity);
+    };
+    terminalActivityEmitter.on('activity:changed', onActivityChanged);
 
     // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
     // F152: registrar no timer-registry para evitar leak (handle era descartado)
@@ -221,6 +261,7 @@ export async function startTerminalServer() {
         'terminal.pinnedFilesLoader',
         async () => {
             disposePinnedBridge?.();
+            terminalActivityEmitter.off('activity:changed', activityChangedHandler);
             if (typeof pinnedLoader.off === 'function') {
                 pinnedLoader.off('changed', pinnedFilesChangedHandler);
             } else {
@@ -232,6 +273,15 @@ export async function startTerminalServer() {
             log('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
         },
         15,
+    );
+
+    registerShutdownHandler(
+        'terminal.activityEmitter',
+        async () => {
+            terminalActivityEmitter.off('activity:changed', onActivityChanged);
+            log('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
+        },
+        16,
     );
 
     // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)

@@ -8,21 +8,18 @@
  *   e estado legítimo do terminal.
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
 import { container, toError } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../infra/sse/state.js';
 import { getInjectHistory } from '../terminal/state.js';
+import { getDefaultAgentRuntime } from './agent-runtime.js';
 import { clearRateLimiters } from './realtime.js';
 
 /**
  * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
  */
-
-/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
-const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
 
 /**
  * Endpoint `/metrics` compatível com Prometheus.
@@ -30,7 +27,7 @@ const getAgent = () => container.resolve(ALWAYS_ALIVE_AGENT);
  * @returns {{ status: number; contentType: string; body: string }}
  */
 export function handleMetrics() {
-    const snapshot = getAgent().getStatusSnapshot();
+    const snapshot = getDefaultAgentRuntime().getStatusSnapshot();
     const statusValue = snapshot.status !== 'stopped' ? 1 : 0;
     const queueSize = snapshot.queueSize ?? 0;
     const sendCount = snapshot.sendCount ?? 0;
@@ -331,15 +328,16 @@ export async function handleGitLog({ n = 20 } = {}) {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetQuota() {
-    const snapshot = getAgent().getStatusSnapshot();
-    const prInfo = getAgent().lastPrInfo ?? null;
+    const agent = getDefaultAgentRuntime();
+    const snapshot = agent.getStatusSnapshot();
+    const prInfo = agent.lastPrInfo ?? null;
     return {
         status: 200,
         body: {
             ok: true,
             sendCount: snapshot?.sendCount ?? 0,
-            dialogLoopActive: getAgent().dialogLoopActive,
-            sessionId: getAgent().sessionId ?? null,
+            dialogLoopActive: agent.dialogLoopActive,
+            sessionId: agent.sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,
             lastPrModel: prInfo?.model ?? null,
             lastPrCost: prInfo?.cost ?? null,
@@ -354,17 +352,18 @@ export function handleGetQuota() {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetPrBudget() {
-    const prMetrics = getAgent().dialogPrMetrics;
-    const prInfo = getAgent().lastPrInfo ?? null;
-    const snapshot = getAgent().getStatusSnapshot();
+    const agent = getDefaultAgentRuntime();
+    const prMetrics = agent.dialogPrMetrics;
+    const prInfo = agent.lastPrInfo ?? null;
+    const snapshot = agent.getStatusSnapshot();
     return {
         status: 200,
         body: {
             ok: true,
             prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
             sendCount: snapshot?.sendCount ?? 0,
-            dialogLoopActive: getAgent().dialogLoopActive,
-            sessionId: getAgent().sessionId ?? null,
+            dialogLoopActive: agent.dialogLoopActive,
+            sessionId: agent.sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,
             lastPrModel: prInfo?.model ?? null,
             lastPrCost: prInfo?.cost ?? null,

@@ -90,7 +90,7 @@ async function _readRegistryFile() {
 export const BUILTIN_HANDLER_MAP = new Map([
     [
         'echo',
-        (args) => {
+        (/** @type {Record<string, unknown>} */ args) => {
             const text = typeof args['text'] === 'string' ? args['text'] : JSON.stringify(args);
             return `echo: ${text}`;
         },
@@ -98,7 +98,7 @@ export const BUILTIN_HANDLER_MAP = new Map([
     ['timestamp', () => new Date().toISOString()],
     [
         'env_read',
-        (args) => {
+        (/** @type {Record<string, unknown>} */ args) => {
             const key = typeof args['key'] === 'string' ? args['key'] : '';
             if (!key) return '(key ausente)';
             // C12-02: allowlist explícita — bloquear exposição de tokens/secrets ao modelo
@@ -146,7 +146,7 @@ export const BUILTIN_HANDLER_MAP = new Map([
     ],
     [
         'math_eval',
-        (args) => {
+        (/** @type {Record<string, unknown>} */ args) => {
             const expr = typeof args['expression'] === 'string' ? args['expression'].trim() : '';
             if (!expr) return '(expressão ausente)';
             // Suporta expressões simples: um operador entre dois números (ex: "42 + 58", "10 * 3.5").

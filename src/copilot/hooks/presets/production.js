@@ -18,6 +18,7 @@
  * @see EventBus
  */
 
+import { defaultAuditLog } from '#copilot/audit';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
@@ -97,7 +98,8 @@ function _matchPermanentDenyPattern(toolName, toolArgs) {
  * @property {{ emit: (event: HookBusEvent) => void } | null} [bus] - HookBus para observabilidade.
  * @property {number} [circuitBreakerMaxRetries] - Máx retries antes de abrir o circuit. Padrão: 3.
  * @property {number} [circuitBreakerResetMs] - Tempo de reset do circuit em ms. Padrão: 60000.
- * @property {(entry: ProductionAuditEntry) => void} [auditSink] - Destino do audit log. Padrão: core/logger.
+ * @property {(entry: ProductionAuditEntry) => void} [auditSink] - Destino do audit log. Padrão: `defaultAuditLog`
+ *   estruturado.
  * @property {(toolName: string) => boolean} [isToolDisabled] - Predicate para verificar se tool foi desabilitada em
  *   runtime. Padrão: sempre false.
  */
@@ -162,9 +164,11 @@ export function createProductionHooks(opts = {}) {
                 );
             }
         } else {
-            console.info(
-                `[preset/production] ${entry.hookName}${entry.toolName ? ` tool='${entry.toolName}'` : ''}${entry.decision ? ` decision=${entry.decision}` : ''}${entry.sessionId ? ` session=${entry.sessionId}` : ''}`,
-            );
+            defaultAuditLog.record({
+                type: 'hooks.production',
+                ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+                data: entry,
+            });
         }
     }
 
@@ -193,8 +197,6 @@ export function createProductionHooks(opts = {}) {
         const explicitlyAllowed = toolAllowList.includes(toolName);
         const isSensitiveTool = SENSITIVE_TOOL_NAMES.has(toolName);
         const matchedPermanentDenyPattern = _matchPermanentDenyPattern(toolName, toolArgs);
-
-        audit({ ts: Date.now(), hookName: 'onPreToolUse', sessionId: invocation?.sessionId, toolName });
         emitBus({
             hookName: 'pre_tool_use',
             sessionId: invocation?.sessionId ?? '',
@@ -210,6 +212,7 @@ export function createProductionHooks(opts = {}) {
                 sessionId: invocation?.sessionId,
                 toolName,
                 decision: 'deny',
+                meta: { reason: 'runtime_disabled' },
             });
             return { permissionDecision: 'deny' };
         }
@@ -221,6 +224,7 @@ export function createProductionHooks(opts = {}) {
                 sessionId: invocation?.sessionId,
                 toolName,
                 decision: 'deny',
+                meta: { reason: 'deny_list' },
             });
             return { permissionDecision: 'deny' };
         }
@@ -263,9 +267,19 @@ export function createProductionHooks(opts = {}) {
                 sessionId: invocation?.sessionId,
                 toolName,
                 decision: 'ask',
+                meta: { reason: 'not_in_allow_list' },
             });
             return { permissionDecision: 'ask' };
         }
+
+        audit({
+            ts: Date.now(),
+            hookName: 'onPreToolUse',
+            sessionId: invocation?.sessionId,
+            toolName,
+            decision: 'allow',
+            meta: { reason: explicitlyAllowed ? 'allow_list' : 'default_allow' },
+        });
 
         return { permissionDecision: 'allow' };
     }

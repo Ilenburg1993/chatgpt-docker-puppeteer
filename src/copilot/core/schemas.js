@@ -13,6 +13,21 @@
 
 import { z } from 'zod';
 
+export const PendingQuestionMetaSchema = z.object({
+    kind: z.enum(['ready', 'reply', 'stopped', 'question']),
+    askedAt: z.number(),
+    allowFreeform: z.boolean(),
+    protocolControlled: z.boolean(),
+    choices: z.array(z.string()).optional(),
+});
+
+export const PendingQuestionShadowSchema = z.object({
+    question: z.string(),
+    meta: PendingQuestionMetaSchema,
+    restoredAt: z.number(),
+    expiresAt: z.number(),
+});
+
 // ─── Snapshot (session/snapshot.js) ──────────────────────────────────────────
 
 /**
@@ -39,6 +54,8 @@ export const SessionSnapshotDataSchema = z.object({
     dialogLoopActive: z.boolean(),
     dialogPaused: z.boolean(),
     pendingQuestion: z.string().nullable(),
+    pendingQuestionMeta: PendingQuestionMetaSchema.nullable().optional(),
+    pendingQuestionShadow: PendingQuestionShadowSchema.nullable().optional(),
     stateSnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
     prMetrics: z
         .object({
@@ -67,6 +84,7 @@ export const AliveAgentStateSchema = z
         sendCount: z.number(),
         model: z.string(),
         pendingQuestion: z.string().nullable(),
+        pendingQuestionMeta: PendingQuestionMetaSchema.nullable().optional(),
     })
     .passthrough();
 

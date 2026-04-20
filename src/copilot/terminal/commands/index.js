@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+export { cmdActivity } from './activity.js';
 export { cmdAlias } from './alias.js';
 export { cmdAttach } from './attach.js';
 export { cmdAudit } from './audit.js';
@@ -28,6 +29,7 @@ export { cmdSearch } from './search.js';
 export {
     cmdAnswer,
     cmdClear,
+    cmdClearShadow,
     cmdCount,
     cmdDbHistory,
     cmdDbSessions,

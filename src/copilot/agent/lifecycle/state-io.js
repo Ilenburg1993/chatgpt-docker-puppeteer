@@ -41,6 +41,15 @@ const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : join(STATE_DIR, 
  * @property {number} sendCount - Total de mensagens enviadas na sessão (tracking externo)
  * @property {string} model - Modelo configurado para esta sessão
  * @property {string | null} pendingQuestion - Texto da pergunta pendente do modelo, ou null
+ * @property {{
+ *     kind: import('../types.js').PendingQuestionKind;
+ *     askedAt: number;
+ *     allowFreeform: boolean;
+ *     protocolControlled: boolean;
+ *     choices?: string[];
+ * } | null} [pendingQuestionMeta]
+ *   - Metadados semânticos da pergunta pendente
+ *
  * @property {boolean} [dialogLoopActive] - Se o dialog loop estava ativo no snapshot
  * @property {boolean} [dialogPaused] - `true` se pause explícito foi emitido via `pauseDialogLoop()`
  * @property {number} [pausedAt] - Timestamp do pause (ms)
@@ -331,7 +340,8 @@ function _defaultState() {
         resumedAt: Date.now(),
         resumeCount: 0,
         sendCount: 0,
-        model: 'gpt-4.1',
+        model: 'gpt-5-mini',
         pendingQuestion: null,
+        pendingQuestionMeta: null,
     };
 }

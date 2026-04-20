@@ -19,11 +19,12 @@ export {
 } from './engine.js';
 export {
     BOOT_PROMPT,
-    PLAN_PREFIX,
     PROMPT_USER,
     PROMPT_WAITING,
     SEPARATOR,
     TURN_TIMEOUT_MS,
+    buildUserPrompt,
+    buildWaitingPrompt,
     printExchange,
     println,
 } from './output.js';

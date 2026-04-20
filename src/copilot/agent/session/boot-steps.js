@@ -60,6 +60,10 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => boolean} dialogLoopActive
  * @property {() => string | null} getSessionId
  * @property {() => string} getStatus
+ * @property {() => boolean} hasPendingQuestion
+ * @property {() => boolean} hasPendingQuestionShadow
+ * @property {() => boolean} isPendingQuestionShadowExpired
+ * @property {() => void} clearPendingQuestionShadow
  * @property {DialogLoopManager} dialogLoop
  * @property {SessionKeepalive} keepalive
  * @property {HandoffManager} handoff
@@ -282,11 +286,44 @@ export function stepStartMetricsTimer(ctx, state) {
     }
 
     const metricsTimer = setInterval(() => {
+        reapExpiredPendingQuestionShadow(ctx);
         ctx.emit(EMITTER_AGENT_METRICS, ctx.getStatusSnapshot());
     }, METRICS_INTERVAL_MS);
     metricsTimer.unref();
     registerTimer('agent.metricsEmit', 'interval', metricsTimer);
     state.metricsTimer = metricsTimer;
+}
+
+/**
+ * Reap contínuo da shadow persistida de `ask_user` quando ela já expirou em runtime.
+ *
+ * Mantém a regra: nunca limpar pergunta viva do SDK; apenas a shadow restaurada do disco.
+ *
+ * @param {BootWiringContext} ctx
+ * @returns {boolean}
+ */
+export function reapExpiredPendingQuestionShadow(ctx) {
+    if (ctx.hasPendingQuestion() || !ctx.hasPendingQuestionShadow() || !ctx.isPendingQuestionShadowExpired()) {
+        return false;
+    }
+
+    ctx.clearPendingQuestionShadow();
+    void ctx.backgroundTasks.track(
+        persistStateWithPolicy(
+            { pendingQuestion: null, pendingQuestionMeta: null },
+            { label: 'state.pendingQuestionShadow.reap' },
+        ).then((result) => {
+            if (!result.ok) {
+                throw result.error;
+            }
+            return undefined;
+        }),
+        {
+            label: 'state.pendingQuestionShadow.reap',
+            description: 'Reap expired ask_user shadow during runtime metrics tick',
+        },
+    );
+    return true;
 }
 
 /**

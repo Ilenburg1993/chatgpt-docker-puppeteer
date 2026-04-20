@@ -8,9 +8,10 @@
  * @see EventBus
  */
 
-import { toError, SessionError } from '#copilot/core';
+import { SessionError, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { COPILOT_MODEL } from '../config/agent.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 
 /**
@@ -64,7 +65,7 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
 
     const useStructured = opts.useStructured !== false;
     const timeoutMs = opts.timeoutMs ?? 120_000;
-    const modelLabel = opts.model ?? 'gpt-4.1';
+    const modelLabel = opts.model ?? COPILOT_MODEL;
 
     const messageContent = typeof message === 'string' ? message : JSON.stringify(message);
 

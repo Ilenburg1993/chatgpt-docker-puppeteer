@@ -34,7 +34,7 @@ import { approveAll } from '@github/copilot-sdk';
  *
  * @type {string}
  */
-export const DEFAULT_MODEL = 'gpt-4.1';
+export const DEFAULT_MODEL = 'gpt-5-mini';
 
 /**
  * Modelo leve para diagnósticos e testes.

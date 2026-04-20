@@ -25,7 +25,7 @@ import {
     dialogStart,
     dialogStop,
 } from './dialog/agent-dialog-controller.js';
-import { readState } from './lifecycle/state-io.js';
+import { persistStateWithPolicy, readState } from './lifecycle/state-io.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
 import { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
@@ -51,6 +51,7 @@ import {
     setReasoningEffort,
 } from './facades/agent-model-config.js';
 import {
+    deleteSdkPlan,
     deselectSdkAgent,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
@@ -58,13 +59,17 @@ import {
     getSdkAuthStatus,
     getSdkHandles,
     getSdkResourceSnapshot,
+    getSdkSessionMode,
     getSdkStatus,
     listSdkAgents,
     listSdkSessions,
     pingSdk,
+    readSdkPlan,
     reloadSdkAgents,
     selectSdkAgent,
     setForegroundSdkSessionId,
+    setSdkSessionMode,
+    updateSdkPlan,
 } from './facades/agent-sdk-access.js';
 import {
     abortCurrentMessage,
@@ -73,6 +78,7 @@ import {
     sessionLog,
 } from './facades/agent-session-ops.js';
 import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agent-webhook-ops.js';
+import { registerAgentRuntime, unregisterAgentRuntime } from './runtime-registry.js';
 
 /**
  * @typedef {import('./types.js').CopilotSession} CopilotSession
@@ -220,6 +226,106 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     get pendingQuestion() {
         return this.ctx.pendingQuestion;
+    }
+
+    /**
+     * Retorna a classificação semântica da pergunta viva atual, quando houver.
+     *
+     * @returns {import('./types.js').PendingQuestionKind | null}
+     */
+    get pendingQuestionKind() {
+        return this.ctx.pendingQuestion?.kind ?? null;
+    }
+
+    /**
+     * Retorna a sombra persistida de `ask_user` restaurada do disco, quando houver.
+     *
+     * @returns {import('./types.js').PendingQuestionShadow | null}
+     */
+    get pendingQuestionShadow() {
+        return this.ctx.getPendingQuestionShadowSnapshot();
+    }
+
+    /**
+     * Retorna a classificação semântica da sombra persistida de `ask_user`, quando houver.
+     *
+     * @returns {import('./types.js').PendingQuestionKind | null}
+     */
+    get pendingQuestionShadowKind() {
+        return this.ctx.getPendingQuestionShadowKind();
+    }
+
+    /**
+     * Retorna o estado semântico atual da shadow persistida.
+     *
+     * @returns {import('./types.js').PendingQuestionShadowState | null}
+     */
+    get pendingQuestionShadowState() {
+        return this.ctx.getPendingQuestionShadowState();
+    }
+
+    /**
+     * Indica se a shadow persistida já expirou.
+     *
+     * @returns {boolean}
+     */
+    get pendingQuestionShadowExpired() {
+        return this.ctx.isPendingQuestionShadowExpired();
+    }
+
+    /**
+     * Retorna a idade atual da shadow persistida, em ms, quando houver.
+     *
+     * @returns {number | null}
+     */
+    get pendingQuestionShadowAgeMs() {
+        return this.ctx.getPendingQuestionShadowAgeMs();
+    }
+
+    /**
+     * Retorna o timestamp de expiração da shadow persistida, quando houver.
+     *
+     * @returns {number | null}
+     */
+    get pendingQuestionShadowExpiresAt() {
+        return this.ctx.getPendingQuestionShadowExpiresAt();
+    }
+
+    /**
+     * Retorna o tempo restante até a expiração da shadow persistida.
+     *
+     * @returns {number | null}
+     */
+    get pendingQuestionShadowRemainingMs() {
+        return this.ctx.getPendingQuestionShadowRemainingMs();
+    }
+
+    /**
+     * Limpa a shadow persistida de `ask_user` restaurada do disco e agenda a persistência canônica do cleanup.
+     *
+     * @returns {boolean}
+     */
+    clearPendingQuestionShadow() {
+        if (!this.ctx.hasPendingQuestionShadow()) {
+            return false;
+        }
+        this.ctx.clearPendingQuestionShadow();
+        void this.ctx.backgroundTasks.track(
+            persistStateWithPolicy(
+                { pendingQuestion: null, pendingQuestionMeta: null },
+                { label: 'state.pendingQuestionShadow.clear' },
+            ).then((result) => {
+                if (!result.ok) {
+                    throw result.error;
+                }
+                return undefined;
+            }),
+            {
+                label: 'state.pendingQuestionShadow.clear',
+                description: 'Clear ask_user shadow from persisted state',
+            },
+        );
+        return true;
     }
 
     /**
@@ -442,6 +548,53 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async listSdkSessions(filter) {
         return listSdkSessions(this.ctx, filter);
+    }
+
+    /**
+     * Retorna o modo vanilla atual da sessão SDK (`interactive`, `plan`, `autopilot`).
+     *
+     * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+     */
+    async getSdkSessionMode() {
+        return getSdkSessionMode(this.ctx);
+    }
+
+    /**
+     * Altera o modo vanilla da sessão SDK.
+     *
+     * @param {'interactive' | 'plan' | 'autopilot'} mode
+     * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+     */
+    async setSdkSessionMode(mode) {
+        return setSdkSessionMode(this.ctx, mode);
+    }
+
+    /**
+     * Lê o plan.md vanilla da sessão SDK.
+     *
+     * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+     */
+    async readSdkPlan() {
+        return readSdkPlan(this.ctx);
+    }
+
+    /**
+     * Atualiza o plan.md vanilla da sessão SDK.
+     *
+     * @param {string} content
+     * @returns {Promise<object>}
+     */
+    async updateSdkPlan(content) {
+        return updateSdkPlan(this.ctx, content);
+    }
+
+    /**
+     * Remove o plan.md vanilla da sessão SDK.
+     *
+     * @returns {Promise<object>}
+     */
+    async deleteSdkPlan() {
+        return deleteSdkPlan(this.ctx);
     }
 
     /**
@@ -712,6 +865,9 @@ let _alwaysAliveAgent = null;
  * @returns {void}
  */
 export function resetAgent() {
+    if (_alwaysAliveAgent) {
+        unregisterAgentRuntime();
+    }
     _alwaysAliveAgent = null;
     resetAgentEventBusBridgeWiring();
 }
@@ -777,6 +933,7 @@ export function getAgent() {
     if (!_alwaysAliveAgent) {
         _alwaysAliveAgent = new AlwaysAliveAgent();
     }
+    registerAgentRuntime(_alwaysAliveAgent);
     ensureAgentEventBusBridge(_alwaysAliveAgent, {
         isCurrentAgent: (agent) => agent === _alwaysAliveAgent,
     });

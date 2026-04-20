@@ -73,6 +73,7 @@ export const EMITTER_TASK_REASONING = 'task.reasoning';
 
 // ── Tool ─────────────────────────────────────────────────────
 export const EMITTER_TOOL_EXECUTION_START = 'tool.execution_start';
+export const EMITTER_TOOL_EXECUTION_PROGRESS = 'tool.execution_progress';
 export const EMITTER_TOOL_EXECUTION_COMPLETE = 'tool.execution_complete';
 
 // ── Question/Answer ──────────────────────────────────────────
@@ -97,6 +98,7 @@ export const EMITTER_SUBAGENT_FAILED = 'subagent.failed';
 
 // ── Assistant ────────────────────────────────────────────────
 export const EMITTER_ASSISTANT_INTENT = 'assistant.intent';
+export const EMITTER_ASSISTANT_STREAMING_DELTA = 'assistant.streaming_delta';
 
 // ── Steering ─────────────────────────────────────────────────
 export const EMITTER_STEERING_SENT = 'steering.sent';

@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -68,6 +69,14 @@ export function createInteractivePreset(opts = {}) {
         },
     });
 
+    const onErrorOccurred = createErrorHandler({
+        maxRetries: 1,
+        strategy: (input) => (input.recoverable ? 'retry' : 'skip'),
+        onError: (input) => {
+            log('WARN', `[preset/interactive] error [${input.errorContext}]: ${input.error}`);
+        },
+    });
+
     /** @type {SessionHooks} */
     const hooks = {
         async onPreToolUse(input, invocation) {
@@ -111,13 +120,7 @@ export function createInteractivePreset(opts = {}) {
             log('INFO', '[preset/interactive] session ended');
         },
 
-        async onErrorOccurred(input) {
-            log('WARN', `[preset/interactive] error [${input.errorContext}]: ${input.error}`);
-            if (input.recoverable) {
-                return { errorHandling: /** @type {'retry'} */ ('retry'), retryCount: 1 };
-            }
-            return { errorHandling: /** @type {'skip'} */ ('skip') };
-        },
+        onErrorOccurred,
     };
 
     return { hooks, onPermissionRequest };

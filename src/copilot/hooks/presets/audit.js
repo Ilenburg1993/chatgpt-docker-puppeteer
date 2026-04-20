@@ -13,6 +13,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -80,6 +81,16 @@ export function createHooksAuditPreset(options = {}) {
             auditMode: true,
         });
 
+    const onErrorOccurred = createErrorHandler({
+        strategy: 'skip',
+        onError: (input, invocation) => {
+            record('onErrorOccurred', invocation?.sessionId, {
+                ctx: input.errorContext,
+                recoverable: input.recoverable,
+            });
+        },
+    });
+
     /** @type {SessionHooks} */
     const hooks = {
         async onPreToolUse(input, invocation) {
@@ -104,13 +115,7 @@ export function createHooksAuditPreset(options = {}) {
         async onSessionEnd(input, invocation) {
             record('onSessionEnd', invocation.sessionId, { reason: input.reason });
         },
-        async onErrorOccurred(input, invocation) {
-            record('onErrorOccurred', invocation.sessionId, {
-                ctx: input.errorContext,
-                recoverable: input.recoverable,
-            });
-            return { errorHandling: /** @type {'skip'} */ ('skip') };
-        },
+        onErrorOccurred,
     };
 
     return {

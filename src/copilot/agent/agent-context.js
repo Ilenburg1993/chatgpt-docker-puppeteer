@@ -23,6 +23,13 @@ import { PermissionController } from '../hooks/permission-controller.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
+import {
+    getPendingQuestionShadowAgeMs,
+    getPendingQuestionShadowExpiresAt,
+    getPendingQuestionShadowRemainingMs,
+    getPendingQuestionShadowState,
+    isPendingQuestionShadowExpired,
+} from './dialog/pending-question-shadow.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { SessionMessagesCache } from './session/history-sync.js';
@@ -124,6 +131,7 @@ export class AgentContext {
 
         this.dialogState = {
             pendingQuestion: null,
+            pendingQuestionShadow: null,
             dialogLoopAttached: false,
         };
 
@@ -729,6 +737,7 @@ export class AgentContext {
      */
     setPendingQuestion(question) {
         this.dialogState.pendingQuestion = question;
+        this.dialogState.pendingQuestionShadow = null;
         this.invalidateStatusSnapshot();
     }
 
@@ -742,6 +751,30 @@ export class AgentContext {
             return;
         }
         this.dialogState.pendingQuestion = null;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Atualiza a sombra persistida de `ask_user` restaurada do state-io.
+     *
+     * @param {import('./types.js').PendingQuestionShadow | null} shadow
+     * @returns {void}
+     */
+    setPendingQuestionShadow(shadow) {
+        this.dialogState.pendingQuestionShadow = shadow;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Limpa a sombra persistida de `ask_user`.
+     *
+     * @returns {void}
+     */
+    clearPendingQuestionShadow() {
+        if (this.dialogState.pendingQuestionShadow === null) {
+            return;
+        }
+        this.dialogState.pendingQuestionShadow = null;
         this.invalidateStatusSnapshot();
     }
 
@@ -796,6 +829,111 @@ export class AgentContext {
      */
     hasPendingQuestion() {
         return this.dialogState.pendingQuestion !== null;
+    }
+
+    /**
+     * Indica se existe sombra persistida de `ask_user` restaurada do state-io.
+     *
+     * @returns {boolean}
+     */
+    hasPendingQuestionShadow() {
+        return this.dialogState.pendingQuestionShadow !== null;
+    }
+
+    /**
+     * Retorna a classificação semântica da pergunta pendente atual.
+     *
+     * @returns {import('./types.js').PendingQuestionKind | null}
+     */
+    getPendingQuestionKind() {
+        return this.dialogState.pendingQuestion?.kind ?? null;
+    }
+
+    /**
+     * Retorna a classificação semântica da sombra persistida de `ask_user`.
+     *
+     * @returns {import('./types.js').PendingQuestionKind | null}
+     */
+    getPendingQuestionShadowKind() {
+        return this.dialogState.pendingQuestionShadow?.meta.kind ?? null;
+    }
+
+    /**
+     * Retorna uma cópia defensiva da shadow persistida de `ask_user`, quando houver.
+     *
+     * @returns {import('./types.js').PendingQuestionShadow | null}
+     */
+    getPendingQuestionShadowSnapshot() {
+        const shadow = this.dialogState.pendingQuestionShadow;
+        if (shadow === null) {
+            return null;
+        }
+        return {
+            ...shadow,
+            meta: {
+                ...shadow.meta,
+                ...(shadow.meta.choices !== undefined ? { choices: [...shadow.meta.choices] } : {}),
+            },
+        };
+    }
+
+    /**
+     * Retorna a idade da shadow persistida de `ask_user`, em ms.
+     *
+     * @param {number} [now]
+     * @returns {number | null}
+     */
+    getPendingQuestionShadowAgeMs(now = Date.now()) {
+        return this.dialogState.pendingQuestionShadow
+            ? getPendingQuestionShadowAgeMs(this.dialogState.pendingQuestionShadow, now)
+            : null;
+    }
+
+    /**
+     * Retorna o timestamp de expiração da shadow persistida.
+     *
+     * @returns {number | null}
+     */
+    getPendingQuestionShadowExpiresAt() {
+        return this.dialogState.pendingQuestionShadow
+            ? getPendingQuestionShadowExpiresAt(this.dialogState.pendingQuestionShadow)
+            : null;
+    }
+
+    /**
+     * Retorna o tempo restante da shadow persistida até expirar.
+     *
+     * @param {number} [now]
+     * @returns {number | null}
+     */
+    getPendingQuestionShadowRemainingMs(now = Date.now()) {
+        return this.dialogState.pendingQuestionShadow
+            ? getPendingQuestionShadowRemainingMs(this.dialogState.pendingQuestionShadow, now)
+            : null;
+    }
+
+    /**
+     * Retorna o estado semântico da shadow persistida.
+     *
+     * @param {number} [now]
+     * @returns {import('./dialog/pending-question-shadow.js').PendingQuestionShadowState | null}
+     */
+    getPendingQuestionShadowState(now = Date.now()) {
+        return this.dialogState.pendingQuestionShadow
+            ? getPendingQuestionShadowState(this.dialogState.pendingQuestionShadow, { now })
+            : null;
+    }
+
+    /**
+     * Indica se a shadow persistida já expirou.
+     *
+     * @param {number} [now]
+     * @returns {boolean}
+     */
+    isPendingQuestionShadowExpired(now = Date.now()) {
+        return this.dialogState.pendingQuestionShadow
+            ? isPendingQuestionShadowExpired(this.dialogState.pendingQuestionShadow, { now })
+            : false;
     }
 
     /**

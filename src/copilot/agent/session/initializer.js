@@ -18,7 +18,7 @@
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import { DEFAULT_MODEL, getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
@@ -107,7 +107,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  *
  * @param {CopilotClient} client - Instância do CopilotClient
  * @param {object} sessionOptions - Opções para createSession/resumeSession
- * @param {string} [sessionOptions.model] - Modelo a usar (default: 'gpt-4.1')
+ * @param {string} [sessionOptions.model] - Modelo a usar (default: 'gpt-5-mini')
  * @param {'low' | 'medium' | 'high' | 'xhigh'} [sessionOptions.reasoningEffort] - Esforço de raciocínio para o3/o4-mini
  * @param {import('#copilot/sdk/types').PermissionHandler} [sessionOptions.onPermissionRequest]
  * @param {Function} [sessionOptions.onUserInputRequest]
@@ -120,7 +120,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  */
 export async function initOrResumeSession(client, sessionOptions) {
     const state = await _readStateAsync();
-    const model = sessionOptions.model ?? 'gpt-4.1';
+    const model = sessionOptions.model ?? DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
@@ -198,6 +198,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 sendCount: 0,
                 model,
                 pendingQuestion: null,
+                pendingQuestionMeta: null,
             },
             { label: 'session.initializer.create' },
         );

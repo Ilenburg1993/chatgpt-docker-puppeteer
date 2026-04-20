@@ -11,7 +11,7 @@
  */
 
 import { buildHookContextAppendMessage } from '#copilot/config';
-import { approveAll } from '#copilot/sdk';
+import { approveAll, DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk';
 import { createHooks } from '../factory.js';
 import { createApproveAllPermission, createAuditOnlyPermission, createSafePermission } from '../permission-handler.js';
 
@@ -44,7 +44,7 @@ const BASE_CONFIG = {
  * - context hook injetado no systemMessage
  *
  * @param {object} options
- * @param {string} [options.model='gpt-4.1'] - Modelo a usar. Default is `'gpt-4.1'`
+ * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
  * @param {PermissionHandler} [options.onPermissionRequest] - Override do handler de permissões (default: approveAll)
  * @param {Function} [options.onUserInputRequest] - Handler para perguntas do modelo
@@ -53,7 +53,7 @@ const BASE_CONFIG = {
  */
 export function buildAlwaysAliveConfig(options = {}) {
     const {
-        model = 'gpt-4.1',
+        model = DEFAULT_MODEL,
         tools = [],
         onPermissionRequest = approveAll,
         onUserInputRequest,
@@ -99,12 +99,12 @@ export function buildAlwaysAliveConfig(options = {}) {
  * - Adequado para análise/exploração sem side-effects
  *
  * @param {object} [options={}] Default is `{}`
- * @param {string} [options.model='gpt-4.1'] - Modelo a usar. Default is `'gpt-4.1'`
+ * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
  * @param {Tool[]} [options.tools=[]] - Custom tools (readonly) a registrar. Default is `[]`
  * @returns {SessionConfig}
  */
 export function buildReadOnlyConfig(options = {}) {
-    const { model = 'gpt-4.1', tools = [] } = options;
+    const { model = DEFAULT_MODEL, tools = [] } = options;
 
     return /** @type {SessionConfig} */ ({
         ...BASE_CONFIG,
@@ -123,14 +123,14 @@ export function buildReadOnlyConfig(options = {}) {
  * - Adequado para agentes que precisam de validação humana em modificações
  *
  * @param {object} [options={}] Default is `{}`
- * @param {string} [options.model='gpt-4.1'] - Modelo a usar. Default is `'gpt-4.1'`
+ * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
  * @param {string[]} [options.denyTools=[]] - Nomes de tools que devem ser bloqueadas (restante aprovado). Default is
  *   `[]`
  * @returns {SessionConfig}
  */
 export function buildFullAccessConfig(options = {}) {
-    const { model = 'gpt-4.1', tools = [], denyTools = [] } = options;
+    const { model = DEFAULT_MODEL, tools = [], denyTools = [] } = options;
 
     return /** @type {SessionConfig} */ ({
         ...BASE_CONFIG,
@@ -156,7 +156,7 @@ export function buildFullAccessConfig(options = {}) {
  * @returns {SessionConfig}
  */
 export function buildDiagnosticConfig(options = {}) {
-    const { model = 'gpt-4.1-mini', tools = [] } = options;
+    const { model = DEFAULT_DIAGNOSTIC_MODEL, tools = [] } = options;
 
     return /** @type {SessionConfig} */ ({
         model,

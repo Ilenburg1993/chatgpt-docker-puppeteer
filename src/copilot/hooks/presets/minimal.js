@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
 import { createPermissionHandler } from '../permission-handler.js';
 
@@ -31,6 +32,12 @@ import { createPermissionHandler } from '../permission-handler.js';
  */
 export function createMinimalPreset() {
     const onPermissionRequest = createPermissionHandler({ allowAll: true });
+    const onErrorOccurred = createErrorHandler({
+        strategy: 'skip',
+        onError: (input) => {
+            log('WARN', `[preset/minimal] error [${input.errorContext}]: ${input.error}`);
+        },
+    });
 
     /** @type {SessionHooks} */
     const hooks = {
@@ -53,10 +60,7 @@ export function createMinimalPreset() {
         async onSessionEnd() {
             log('INFO', '[preset/minimal] session ended');
         },
-        async onErrorOccurred(input) {
-            log('WARN', `[preset/minimal] error [${input.errorContext}]: ${input.error}`);
-            return { errorHandling: /** @type {'skip'} */ ('skip') };
-        },
+        onErrorOccurred,
     };
 
     return { hooks, onPermissionRequest };

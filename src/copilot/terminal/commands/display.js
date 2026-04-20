@@ -11,11 +11,15 @@
  */
 
 import {
+    getShowIntentActivity,
     getShowStreaming,
     getShowThinking,
+    getShowToolActivity,
     getShowUsage,
+    setShowIntentActivity,
     setShowStreaming,
     setShowThinking,
+    setShowToolActivity,
     setShowUsage,
 } from '../state.js';
 
@@ -29,6 +33,12 @@ const TOGGLES = {
     thinking: { get: getShowThinking, set: setShowThinking, label: '💭 Thinking (raciocínio)' },
     streaming: { get: getShowStreaming, set: setShowStreaming, label: '📡 Streaming (resposta incremental)' },
     usage: { get: getShowUsage, set: setShowUsage, label: '📊 Usage (tokens pós-turno)' },
+    tools: { get: getShowToolActivity, set: setShowToolActivity, label: '🔧 Tool activity (início/fim/progresso)' },
+    intent: {
+        get: getShowIntentActivity,
+        set: setShowIntentActivity,
+        label: '🧭 Intent (o que a LLM-B está tentando fazer)',
+    },
 };
 
 /**
