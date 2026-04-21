@@ -32,10 +32,7 @@
               "type": "schema",
               "config": {
                 "schema_type": "json",
-                "required_fields": [
-                  "chapters",
-                  "total_pages_estimate"
-                ]
+                "required_fields": ["chapters", "total_pages_estimate"]
               }
             },
             {
@@ -322,11 +319,7 @@
               "type": "schema",
               "config": {
                 "schema_type": "json",
-                "required_fields": [
-                  "consistency_score",
-                  "issues",
-                  "recommendations"
-                ]
+                "required_fields": ["consistency_score", "issues", "recommendations"]
               }
             }
           ]

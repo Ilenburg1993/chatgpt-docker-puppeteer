@@ -1,9 +1,9 @@
 {
-    "sessionId": "",
-    "startedAt": 1776196564840,
-    "resumedAt": 1776196564840,
-    "resumeCount": 0,
-    "sendCount": 0,
-    "model": "gpt-4.1",
-    "pendingQuestion": null
+  "sessionId": "",
+  "startedAt": 1776196564840,
+  "resumedAt": 1776196564840,
+  "resumeCount": 0,
+  "sendCount": 0,
+  "model": "gpt-4.1",
+  "pendingQuestion": null
 }
