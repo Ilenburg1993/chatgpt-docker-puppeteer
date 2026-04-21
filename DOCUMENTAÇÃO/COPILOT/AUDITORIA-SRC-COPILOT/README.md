@@ -22,6 +22,6 @@
 ## Convenções desta auditoria
 
 - `Confirmado`: achado sustentado por leitura direta do código e/ou validação local.
-- `Alto indício`: problema muito provável, com evidência estrutural forte, mas sem reprodução completa nesta rodada.
+- `Alto indício`: problema muito provável, com evidência estrutural forte, mas sem reprodução
+  completa nesta rodada.
 - `Heurístico`: sinal de risco ou gap; precisa triagem adicional antes de virar bug confirmado.
-

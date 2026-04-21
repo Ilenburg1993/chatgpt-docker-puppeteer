@@ -1,9 +1,8 @@
 # PARTE-17C — Roadmap de Transformação Arquitetural: SDK Facade
 
-**Data**: 2026-03-20 (rev.3 — transformação arquitetural completa)
-**Escopo**: TODO `src/copilot/` (263 arquivos, ~46.525 linhas)
-**Pré-requisitos**: PARTE-17A rev.3 + PARTE-17B rev.3
-**Autor**: Auditoria automatizada PARTE-17
+**Data**: 2026-03-20 (rev.3 — transformação arquitetural completa) **Escopo**: TODO `src/copilot/`
+(263 arquivos, ~46.525 linhas) **Pré-requisitos**: PARTE-17A rev.3 + PARTE-17B rev.3 **Autor**:
+Auditoria automatizada PARTE-17
 
 ---
 
@@ -37,9 +36,8 @@ compatibility até a faixa final de cleanup.
 
 ## Faixa 1 — SDK Facade: Novos Módulos
 
-**Objetivo**: Criar os novos arquivos da facade sem quebrar nada existente.
-**Dependência**: Nenhuma.
-**Impacto**: Aditivo (zero breaking changes).
+**Objetivo**: Criar os novos arquivos da facade sem quebrar nada existente. **Dependência**:
+Nenhuma. **Impacto**: Aditivo (zero breaking changes).
 
 ### Fases
 
@@ -57,6 +55,7 @@ compatibility até a faixa final de cleanup.
 **Subtotal**: 8 fases, ~25 testes
 
 ### Critério de Aceite
+
 - Todos os novos módulos exportam corretamente
 - `npm run test:unit` continua passando (zero regressão)
 - `npm run typecheck:node` sem erros novos
@@ -65,8 +64,8 @@ compatibility até a faixa final de cleanup.
 
 ## Faixa 2 — defineTool Migration
 
-**Objetivo**: Migrar 10 arquivos que usam `defineTool` diretamente de `@github/copilot-sdk` para `#copilot/sdk/tools`.
-**Dependência**: Faixa 1 (F1: `sdk/tools.js` deve existir).
+**Objetivo**: Migrar 10 arquivos que usam `defineTool` diretamente de `@github/copilot-sdk` para
+`#copilot/sdk/tools`. **Dependência**: Faixa 1 (F1: `sdk/tools.js` deve existir).
 
 ### Fases
 
@@ -75,7 +74,7 @@ compatibility até a faixa final de cleanup.
 | F9  | Migrate tools/git + shell          | `tools/git/index.js`, `tools/shell/index.js`                                        | 2        | 4      |
 | F10 | Migrate tools/session + rpc        | `tools/session-tools.js`, `tools/session-rpc-tools.js`                              | 2        | 4      |
 | F11 | Migrate tools/task + introspection | `tools/task-tools.js`, `tools/introspection-tools.js`                               | 2        | 4      |
-| F12 | Migrate tools/todo/*               | `tools/todo/crud-tools.js`, `tools/todo/bulk-tools.js`, `tools/todo/query-tools.js` | 3        | 4      |
+| F12 | Migrate tools/todo/\*              | `tools/todo/crud-tools.js`, `tools/todo/bulk-tools.js`, `tools/todo/query-tools.js` | 3        | 4      |
 | F13 | Migrate bridges/mcp-tool-bridge    | `bridges/mcp-tool-bridge.js`                                                        | 1        | 4      |
 
 **Subtotal**: 5 fases, ~20 testes
@@ -83,6 +82,7 @@ compatibility até a faixa final de cleanup.
 ### Padrão de Migração
 
 Cada fase segue o mesmo padrão:
+
 1. Alterar import: `@github/copilot-sdk` → `#copilot/sdk/tools`
 2. Verificar que a tool continua funcionando via testes existentes
 3. Adicionar smoke test se não houver cobertura
@@ -92,8 +92,8 @@ Cada fase segue o mesmo padrão:
 
 ## Faixa 3 — approveAll Migration
 
-**Objetivo**: Migrar 5 arquivos que importam `approveAll` diretamente.
-**Dependência**: Faixa 1 (F2: `sdk/permissions.js` deve existir).
+**Objetivo**: Migrar 5 arquivos que importam `approveAll` diretamente. **Dependência**: Faixa 1 (F2:
+`sdk/permissions.js` deve existir).
 
 ### Fases
 
@@ -127,11 +127,15 @@ Cada fase segue o mesmo padrão:
 
 ### Decisão Arquitetural (F21)
 
-**Opção A — Agent usa `getClient()` singleton**: Mais simples. Agent e API compartilham a mesma instância. Registry unificado naturalmente. Risco: se o agent crashar o client, a API também perde acesso.
+**Opção A — Agent usa `getClient()` singleton**: Mais simples. Agent e API compartilham a mesma
+instância. Registry unificado naturalmente. Risco: se o agent crashar o client, a API também perde
+acesso.
 
-**Opção B — Agent usa `createClient()` factory**: Mais isolado. Cada camada tem sua instância. Requer `registerExternalSession()` para unificar registries. Mais resiliente a crashes isolados.
+**Opção B — Agent usa `createClient()` factory**: Mais isolado. Cada camada tem sua instância.
+Requer `registerExternalSession()` para unificar registries. Mais resiliente a crashes isolados.
 
-**Recomendação**: Opção B (factory) com `registerExternalSession()` — mantém isolamento de fault domains enquanto unifica observabilidade via registry.
+**Recomendação**: Opção B (factory) com `registerExternalSession()` — mantém isolamento de fault
+domains enquanto unifica observabilidade via registry.
 
 ---
 
@@ -199,8 +203,8 @@ Cada fase segue o mesmo padrão:
 
 ## Faixa 8 — Config Barrel Cleanup
 
-**Objetivo**: Remover re-exports de SDK de `config/index.js` — resolver P3.
-**Dependência**: Faixas 1, 5.
+**Objetivo**: Remover re-exports de SDK de `config/index.js` — resolver P3. **Dependência**: Faixas
+1, 5.
 
 ### Fases
 
@@ -217,8 +221,8 @@ Cada fase segue o mesmo padrão:
 
 ## Faixa 9 — Hooks Type Alignment
 
-**Objetivo**: Alinhar `hooks/types.js` com tipos do SDK — resolver P4.
-**Dependência**: Faixa 5 (`sdk/types.js` deve estar pronto).
+**Objetivo**: Alinhar `hooks/types.js` com tipos do SDK — resolver P4. **Dependência**: Faixa 5
+(`sdk/types.js` deve estar pronto).
 
 ### Fases
 
@@ -236,8 +240,8 @@ Cada fase segue o mesmo padrão:
 
 ## Faixa 10 — ESLint Enforcement
 
-**Objetivo**: Garantir que nenhum novo import direto de `@github/copilot-sdk` seja adicionado fora de `sdk/`.
-**Dependência**: Faixas 2-4 (migrações de import concluídas), Faixa 8 (config cleanup).
+**Objetivo**: Garantir que nenhum novo import direto de `@github/copilot-sdk` seja adicionado fora
+de `sdk/`. **Dependência**: Faixas 2-4 (migrações de import concluídas), Faixa 8 (config cleanup).
 
 ### Fases
 
@@ -440,4 +444,5 @@ Cada faixa deve satisfazer antes de commit:
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.3. Roadmap de transformação arquitetural para SDK Facade.*
+_Documento gerado pela auditoria PARTE-17, rev.3. Roadmap de transformação arquitetural para SDK
+Facade._

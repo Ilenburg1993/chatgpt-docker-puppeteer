@@ -1,14 +1,16 @@
 # R-01 — Auditoria Profunda: Resumo Executivo
 
-**Data**: 2026-04-15
-**Status**: concluída
-**Escopo**: `src/copilot/` inteiro, com ênfase em `src/copilot/agent/`
+**Data**: 2026-04-15 **Status**: concluída **Escopo**: `src/copilot/` inteiro, com ênfase em
+`src/copilot/agent/`
 
 ---
 
 ## 1. Resumo em uma frase
 
-`src/copilot/` tem base funcional forte e muita evolução incremental já entregue, mas continua operando com **ownership difuso entre `agent/`, `sdk/`, `observability/`, `server/` e `terminal/`**, o que torna o próximo ciclo necessariamente mais profundo do que uma simples continuação do plano anterior.
+`src/copilot/` tem base funcional forte e muita evolução incremental já entregue, mas continua
+operando com **ownership difuso entre `agent/`, `sdk/`, `observability/`, `server/` e `terminal/`**,
+o que torna o próximo ciclo necessariamente mais profundo do que uma simples continuação do plano
+anterior.
 
 ---
 
@@ -33,7 +35,8 @@ Mesmo com esse progresso, o sistema ainda sofre com:
 
 1. **muitos imports transversais diretos**, especialmente para `sdk`, `observability` e `agent`;
 2. **ownership de sessão e lifecycle ainda distribuído demais**;
-3. **observability onipresente demais** para um módulo que deveria ser infraestrutura transversal, não dependência banalizada;
+3. **observability onipresente demais** para um módulo que deveria ser infraestrutura transversal,
+   não dependência banalizada;
 4. **fronteira server/terminal ainda porosa**;
 5. **event model ainda grande demais e pouco governado**;
 6. **dívida de compatibilidade ainda ativa** em pontos que já deveriam estar na fila de remoção;
@@ -117,11 +120,13 @@ Mesmo mais fino do que antes, ele ainda agrega:
 
 ### 4.3 `session/` e `dialog/` continuam sendo os subdomínios mais caros
 
-Isso sugere que a próxima grande redução de custo cognitivo virá mais de **ownership e separação interna** do que de micro-refactors de barrel.
+Isso sugere que a próxima grande redução de custo cognitivo virá mais de **ownership e separação
+interna** do que de micro-refactors de barrel.
 
 ### 4.4 `turn-executor` não deve ser confundido com a fila
 
-A auditoria reafirma a decisão recente: fundir `turn-executor.js` com o executor da fila seria um erro conceitual.
+A auditoria reafirma a decisão recente: fundir `turn-executor.js` com o executor da fila seria um
+erro conceitual.
 
 ---
 
@@ -133,8 +138,10 @@ A situação ideal revisada para `src/copilot/` é:
 - `sdk/` como **camada fina e stateless**, com ownership de sessão fora dele;
 - `observability/` como **infra transversal governada**, e não dependência direta de meio sistema;
 - `events/` como **contrato governado**, não apenas catálogo volumoso;
-- `server/`, `terminal/`, `channel/` e `conversation-hub/` com **limites de apresentação e orquestração mais claros**;
-- `tools/`, `config/`, `core/`, `infra/` e `types/` operando como plataformas de suporte, não como acumuladores silenciosos de dívida;
+- `server/`, `terminal/`, `channel/` e `conversation-hub/` com **limites de apresentação e
+  orquestração mais claros**;
+- `tools/`, `config/`, `core/`, `infra/` e `types/` operando como plataformas de suporte, não como
+  acumuladores silenciosos de dívida;
 - um backlog separado em:
   - base estrutural;
   - qualidade/governança;
@@ -177,8 +184,10 @@ Esta auditoria profunda alimenta diretamente os próximos documentos da série c
 
 ## 8. Conclusão
 
-O sistema já tem massa crítica, mas ainda opera com um custo arquitetural alto demais para continuar crescendo de forma saudável só na força de correções incrementais isoladas.
+O sistema já tem massa crítica, mas ainda opera com um custo arquitetural alto demais para continuar
+crescendo de forma saudável só na força de correções incrementais isoladas.
 
 A boa notícia é que a base já foi mexida o suficiente para permitir uma reestruturação séria.
 
-A má notícia — que também é a notícia honesta — é que essa reestruturação precisa ser planejada como **programa amplo de rearquitetura**, não como sequência de pequenos tickets desconectados.
+A má notícia — que também é a notícia honesta — é que essa reestruturação precisa ser planejada como
+**programa amplo de rearquitetura**, não como sequência de pequenos tickets desconectados.

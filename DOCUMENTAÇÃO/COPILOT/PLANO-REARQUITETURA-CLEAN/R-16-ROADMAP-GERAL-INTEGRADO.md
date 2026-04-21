@@ -156,7 +156,8 @@ Leitura prática:
 - A5/F0.5 permanece contínua, conectada a `R-04A`, `R-05`, `R-07C` e `R-15`.
 
 Além disso, a linha clean agora ganhou um artefato específico para responder “qual é exatamente a
-arquitetura ideal e como saberemos que chegamos lá?” sem espalhar essa resposta por cinco documentos:
+arquitetura ideal e como saberemos que chegamos lá?” sem espalhar essa resposta por cinco
+documentos:
 
 - `R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`.
 
@@ -235,7 +236,8 @@ Esse espalhamento começou a acontecer:
 
 `B1.3` também já começou a sair da fase “mapeamento” e entrar em código real:
 
-- surgiu `src/copilot/presentation/agent-http-errors.js` como projeção HTTP canônica dos erros do runtime do agente;
+- surgiu `src/copilot/presentation/agent-http-errors.js` como projeção HTTP canônica dos erros do
+  runtime do agente;
 - a nova projeção consome `agent/error-policy.js` e fecha a tradução de códigos operacionais como:
   - `QUEUE_FULL`
   - `DIALOG_NOT_ACTIVE`
@@ -244,15 +246,17 @@ Esse espalhamento começou a acontecer:
   - `NO_SESSION`
   - `AGENT_STOPPED`
   - `SESSION_FATAL`
-- `copilot-api/tasks.js`, `copilot-api/dialog.js` e `copilot-api/control.js` passaram a consumir essa mesma projeção;
-- `presentation/agent-control.js` também convergiu para o mesmo mecanismo em `inject`, `pipeline` e `pause/resume`.
+- `copilot-api/tasks.js`, `copilot-api/dialog.js` e `copilot-api/control.js` passaram a consumir
+  essa mesma projeção;
+- `presentation/agent-control.js` também convergiu para o mesmo mecanismo em `inject`, `pipeline` e
+  `pause/resume`.
 
 Leitura prática:
 
 - a política de erro do runtime deixou de viver só dentro de `messaging`/`reconnect-policy`;
 - o sistema agora já tem uma SSOT de semântica de erro atravessando runtime e borda HTTP;
-- o próximo passo de `B1.3` é espalhar essa mesma taxonomia para outras bordas sensíveis (ex.: camadas SDK/Socket)
-  antes de aceitar novos handlers ad hoc.
+- o próximo passo de `B1.3` é espalhar essa mesma taxonomia para outras bordas sensíveis (ex.:
+  camadas SDK/Socket) antes de aceitar novos handlers ad hoc.
 
 ## Fase B2 — Reestruturação de `session/`
 
@@ -271,15 +275,17 @@ Leitura prática:
 - `core/shared-state.js` passou a manter explicitamente o binding `hubSessionId ↔ sdkSessionId`;
 - `agent/session/ownership.js` virou o helper canônico de sincronização/persistência desse vínculo;
 - `agent-lifecycle.js` publica e limpa o `sdkSessionId` ativo no ciclo real da sessão SDK;
-- `conversation-hub/orchestrator.js`, `terminal/index.js` e `server/routes/sessions.js` já consomem a mesma SSOT;
-- `presentation/sdk-sessions.js` agora estende essa mesma regra para `server/routes/sdk/*`, evitando que o server
-  trate “sessão SDK ativa” como detalhe local de cada rota.
+- `conversation-hub/orchestrator.js`, `terminal/index.js` e `server/routes/sessions.js` já consomem
+  a mesma SSOT;
+- `presentation/sdk-sessions.js` agora estende essa mesma regra para `server/routes/sdk/*`, evitando
+  que o server trate “sessão SDK ativa” como detalhe local de cada rota.
 
 Leitura prática:
 
-- o vínculo ativo entre sessão SDK e conversa persistida deixou de depender só de snapshot e inferência;
-- o próximo passo útil de `B2` é continuar desmontando coordenação implícita entre `initializer`, `state-io`,
-  `snapshot`, `keepalive` e os consumidores remanescentes de sessão no server.
+- o vínculo ativo entre sessão SDK e conversa persistida deixou de depender só de snapshot e
+  inferência;
+- o próximo passo útil de `B2` é continuar desmontando coordenação implícita entre `initializer`,
+  `state-io`, `snapshot`, `keepalive` e os consumidores remanescentes de sessão no server.
 
 ## Fase B3 — Endurecimento de `dialog/`
 
@@ -328,15 +334,16 @@ O primeiro corte de `C1` já está operacional:
 - existe uma SSOT explícita do binding `hubSessionId ↔ sdkSessionId` em `core/shared-state.js`;
 - esse vínculo é persistido no `ConversationStore` quando o hub ativo já existe;
 - `server/routes/sessions.js` passou a herdar o `sdkSessionId` compartilhado por default;
-- `server/routes/sdk/session-crud.js` e `session-messaging.js` passaram a publicar a mesma projeção de ownership,
-  incluindo `sharedBinding`, `boundHubSessionId` e `canonicalSessionId`.
-- `server/routes/sdk/client.js` e `agent.js` passaram a consumir a mesma runtime projection canônica, reduzindo drift
-  entre as superfícies de inspeção e controle do SDK.
+- `server/routes/sdk/session-crud.js` e `session-messaging.js` passaram a publicar a mesma projeção
+  de ownership, incluindo `sharedBinding`, `boundHubSessionId` e `canonicalSessionId`.
+- `server/routes/sdk/client.js` e `agent.js` passaram a consumir a mesma runtime projection
+  canônica, reduzindo drift entre as superfícies de inspeção e controle do SDK.
 
 Leitura prática:
 
 - `agent/`, `sdk/` e `conversation-hub/` ainda não têm ownership totalmente separado;
-- porém, o sistema já deixou de depender de “quem lembra primeiro da sessão atual” em várias bordas críticas.
+- porém, o sistema já deixou de depender de “quem lembra primeiro da sessão atual” em várias bordas
+  críticas.
 
 ## Fase C2 — Registry e replay
 
@@ -381,22 +388,29 @@ Leitura prática:
 
 `D1` saiu da fase exclusivamente analítica e já teve o primeiro corte estrutural entregue:
 
-- surgiu `src/copilot/infra/sdk-session-registry.js` como registry canônico das sessões SDK ativas no processo;
-- `sdk/session/client.js` deixou de manter `_sessions` como estado privado e passou a delegar esse registry à nova camada de `infra`;
-- a superfície pública do wrapper foi preservada, então `server/routes/sdk/*` e demais consumidores continuam usando a mesma API por enquanto;
+- surgiu `src/copilot/infra/sdk-session-registry.js` como registry canônico das sessões SDK ativas
+  no processo;
+- `sdk/session/client.js` deixou de manter `_sessions` como estado privado e passou a delegar esse
+  registry à nova camada de `infra`;
+- a superfície pública do wrapper foi preservada, então `server/routes/sdk/*` e demais consumidores
+  continuam usando a mesma API por enquanto;
 - o barrel `infra/index.js` agora exporta a nova superfície de registry;
-- aliases compatíveis `loadCustomTools` e `loadToolsConfig` foram restaurados no barrel `#copilot/sdk` para evitar regressão lateral de compatibilidade.
+- aliases compatíveis `loadCustomTools` e `loadToolsConfig` foram restaurados no barrel
+  `#copilot/sdk` para evitar regressão lateral de compatibilidade.
 
 Leitura prática:
 
-- o SDK ainda não está stateless, mas já deixou de concentrar um dos bolsões mais explícitos de estado operacional local;
-- `server/routes/sdk/*` deixou de ser apenas consumidor passivo do wrapper e agora já conversa com uma projeção SSOT de
-  ownership em `presentation/sdk-sessions.js`;
-- `sdk/client` e `sdk/agent` agora também compartilham uma runtime projection única para state, binding e sessão
-  canônica, em vez de projetarem versões locais de “sessão atual”;
-- `client/force-stop` foi realinhado para a superfície canônica do wrapper, evitando stale state local em shutdown forçado;
-- o próximo passo útil de `D1` é alinhar os consumidores principais restantes e decidir qual parte do ownership de
-  sessão continua no wrapper e qual deve migrar de vez para a camada convergente entre `agent`, `hub` e server.
+- o SDK ainda não está stateless, mas já deixou de concentrar um dos bolsões mais explícitos de
+  estado operacional local;
+- `server/routes/sdk/*` deixou de ser apenas consumidor passivo do wrapper e agora já conversa com
+  uma projeção SSOT de ownership em `presentation/sdk-sessions.js`;
+- `sdk/client` e `sdk/agent` agora também compartilham uma runtime projection única para state,
+  binding e sessão canônica, em vez de projetarem versões locais de “sessão atual”;
+- `client/force-stop` foi realinhado para a superfície canônica do wrapper, evitando stale state
+  local em shutdown forçado;
+- o próximo passo útil de `D1` é alinhar os consumidores principais restantes e decidir qual parte
+  do ownership de sessão continua no wrapper e qual deve migrar de vez para a camada convergente
+  entre `agent`, `hub` e server.
 
 ## Fase D2 — Consolidação de config e builders
 
@@ -561,7 +575,8 @@ Próxima fila prática de F1:
 - F5.2 reduzir o uso difuso de container/DI em comandos, handlers e costuras do terminal
 - F5.2.a consolidar `terminal/frontend/*` como consumer layer principal da LLM-B
 - F5.2.b migrar `/status`, `/diagnose`, `/metrics`, `/usage` e flows de sessão para essa camada
-- F5.2.c migrar progressivamente os demais comandos acoplados (`memory`, `resume`, `search`, `config`)
+- F5.2.c migrar progressivamente os demais comandos acoplados (`memory`, `resume`, `search`,
+  `config`)
 - F5.3 extrair projections/serviços hoje importados pelo `server/` a partir de `terminal/`
 - F5.4 reorganizar `commands/` por domínio e por nível de acoplamento ao runtime
 - F5.5 reorganizar `handlers/` como adapters HTTP finos, desacoplados do `server/`
@@ -598,26 +613,38 @@ transitórios enquanto a migração acontece.
 
 Os cinco primeiros subcortes já foram executados em `health/config`, `sessions/memory/hub-health`,
 `SSE/rate-limiter-state`, `observability/git/quota/pr-budget` e `agent-control`; o próximo foco
-recomendado agora é a consolidação de `terminal/frontend/*` como camada interna do frontend principal da LLM-B,
-seguida da redução de DI interna do terminal e do endurecimento de contract tests do P4.
+recomendado agora é a consolidação de `terminal/frontend/*` como camada interna do frontend
+principal da LLM-B, seguida da redução de DI interna do terminal e do endurecimento de contract
+tests do P4.
 
 Esse foco também já começou a se materializar:
 
-- surgiu `src/copilot/terminal/frontend/llm-b-frontend.js` como consumer layer principal da LLM-B dentro do terminal;
-- `commands/session.js`, `commands/diagnose.js`, `commands/metrics.js`, `commands/usage.js`, `commands/memory.js`, `commands/resume.js` e `commands/search.js` já migraram para essa camada;
-- `commands/config.js`, `commands/context.js` e `commands/errors.js` também já migraram para essa camada;
-- `commands/export.js` também passou a consumir a seam runtime compartilhada, sem abrir `channel/` diretamente;
+- surgiu `src/copilot/terminal/frontend/llm-b-frontend.js` como consumer layer principal da LLM-B
+  dentro do terminal;
+- `commands/session.js`, `commands/diagnose.js`, `commands/metrics.js`, `commands/usage.js`,
+  `commands/memory.js`, `commands/resume.js` e `commands/search.js` já migraram para essa camada;
+- `commands/config.js`, `commands/context.js` e `commands/errors.js` também já migraram para essa
+  camada;
+- `commands/export.js` também passou a consumir a seam runtime compartilhada, sem abrir `channel/`
+  diretamente;
 - o recorte de DI direta em `terminal/commands/` caiu de **22** para **0** ocorrências;
-- surgiu `src/copilot/terminal/frontend/llm-b-runtime.js` como gateway runtime do terminal para `agent/`, `channel/` e `conversation-hub`;
-- `llm-b-frontend.js` deixou de importar diretamente `#copilot/agent`, `#copilot/channel`, `#copilot/conversation-hub` e `#copilot/core`, passando a consumir runtime/hub/transporte apenas via `llm-b-runtime.js`;
-- `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`, `dialog/engine-persistence.js`, `terminal-agent-wiring.js` e `index.js` passaram a consumir esse gateway;
-- o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências, com apenas **1** remanescente no runtime do módulo;
+- surgiu `src/copilot/terminal/frontend/llm-b-runtime.js` como gateway runtime do terminal para
+  `agent/`, `channel/` e `conversation-hub`;
+- `llm-b-frontend.js` deixou de importar diretamente `#copilot/agent`, `#copilot/channel`,
+  `#copilot/conversation-hub` e `#copilot/core`, passando a consumir runtime/hub/transporte apenas
+  via `llm-b-runtime.js`;
+- `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`,
+  `dialog/engine-persistence.js`, `terminal-agent-wiring.js` e `index.js` passaram a consumir esse
+  gateway;
+- o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências,
+  com apenas **1** remanescente no runtime do módulo;
 - validação focada mais recente do slice terminal-first:
   - **44/44** testes verdes em `vitest` no slice de comandos/frontend;
   - **14/14** testes verdes em `node:test` nos contratos de `dialog`/`repl`/`wiring`/`index`;
   - **26/26** testes verdes em `vitest` na rodada do gateway runtime.
 - a próxima fila recomendada passa a ser:
-  1. refinamento residual de `dialog/`, `repl.js` e `repl-listeners.js` em torno do gateway runtime já extraído;
+  1. refinamento residual de `dialog/`, `repl.js` e `repl-listeners.js` em torno do gateway runtime
+     já extraído;
   2. contract tests ampliados do frontend principal e do boundary P4;
   3. documentação local do terminal e backlog de UX local remanescente.
 

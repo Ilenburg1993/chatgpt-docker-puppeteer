@@ -1,9 +1,9 @@
 # PARTE-22A — Situação Atual: Auditoria Rigorosa Pós-Parte-21
 
-**Data**: 2026-04-12 | **Status**: BASELINE (pós-Wave 5 W5-4) | **Versão**: 1.0
-**Scope**: Todo `src/copilot` — 313 arquivos `.js`, 53.815 LoC, 19 módulos
-**Precedente**: PARTE-21A~F (executados integralmente até `35bf45da`)
-**Critério**: Diagnóstico rigoroso — sem relativizar, sem aceitar "bom o suficiente"
+**Data**: 2026-04-12 | **Status**: BASELINE (pós-Wave 5 W5-4) | **Versão**: 1.0 **Scope**: Todo
+`src/copilot` — 313 arquivos `.js`, 53.815 LoC, 19 módulos **Precedente**: PARTE-21A~F (executados
+integralmente até `35bf45da`) **Critério**: Diagnóstico rigoroso — sem relativizar, sem aceitar "bom
+o suficiente"
 
 ---
 
@@ -24,34 +24,34 @@
 
 ### 1.2 O Que AINDA É Problemático (Diagnóstico Honesto)
 
-> O health score **95/100 (A)** reflete métricas que foram calibradas progressivamente.
-> O problema real é que o score não penaliza: tamanho de arquivo individual, falta de testes por módulo,
+> O health score **95/100 (A)** reflete métricas que foram calibradas progressivamente. O problema
+> real é que o score não penaliza: tamanho de arquivo individual, falta de testes por módulo,
 > cobertura funcional de EventBus, e acoplamento de estado global em padrões específicos.
 
 **Problemas estruturais remanescentes (grau de severidade):**
 
 | #   | Problema                                                          | Severidade | Módulos Afetados                    |
 | --- | ----------------------------------------------------------------- | ---------- | ----------------------------------- |
-| 1   | **23 arquivos >350 LoC com múltiplos concerns**                   | 🔴 Alto     | agent, sdk, terminal, observability |
-| 2   | **EventEmitter direto em 8 módulos** (vs EventBus)                | 🔴 Alto     | agent, hooks, api, config, terminal |
-| 3   | **53 singletons module-scope** que não são DI-ready               | 🔴 Alto     | bridges, terminal, tools, agent     |
-| 4   | **EventBus adotado em apenas 13 arquivos** (vs 313)               | 🔴 Alto     | Sistema todo                        |
-| 5   | **services/ anêmico** — 5 arquivos, 509 LoC                       | 🟡 Médio    | services/                           |
-| 6   | **4 deep imports reais** ainda violam F21                         | 🟡 Médio    | Específicos                         |
-| 7   | **Falta de testes por módulo** (195 arquivos, 133 mods sem teste) | 🔴 Alto     | Geral                               |
-| 8   | **Sem health checks funcional** no runtime                        | 🟡 Médio    | api/, terminal/                     |
-| 9   | **agent/always-alive.js (623 LoC)** — hub de estado               | 🔴 Alto     | agent/                              |
-| 10  | **loop-manager.js (599 LoC)** — múltiplos protocolos              | 🔴 Alto     | agent/dialog/                       |
-| 11  | **Sem rate limiting** na injeção de mensagens                     | 🟡 Médio    | terminal/, api/                     |
-| 12  | **DI Container subutilizado** — apenas 13 tokens                  | 🟡 Médio    | Geral                               |
-| 13  | **Sem circuit breaker** nas chamadas SDK                          | 🔴 Alto     | sdk/                                |
-| 14  | **Telemetria OpenTelemetry só esqueleto (otel.js)**               | 🟡 Médio    | observability/                      |
-| 15  | **Sem event sourcing** no audit pipeline                          | 🟡 Médio    | audit/                              |
-| 16  | **plugins/ proto-embrionário** — 2 arquivos, 253 LoC              | 🟡 Médio    | plugins/                            |
-| 17  | **Sem multi-agent isolation** — estado global compartilhado       | 🔴 Alto     | agent/, terminal/                   |
-| 18  | **Falta cache manager** — lazy inits espalhados                   | 🟡 Médio    | sdk/, observability/, bridges/      |
-| 19  | **Watchdog só em dialog** — sem watchdog global                   | 🟡 Médio    | agent/, bridges/                    |
-| 20  | **16 typecheck errors** baseline (rpc-ops, rpc-session)           | 🟡 Médio    | sdk/                                |
+| 1   | **23 arquivos >350 LoC com múltiplos concerns**                   | 🔴 Alto    | agent, sdk, terminal, observability |
+| 2   | **EventEmitter direto em 8 módulos** (vs EventBus)                | 🔴 Alto    | agent, hooks, api, config, terminal |
+| 3   | **53 singletons module-scope** que não são DI-ready               | 🔴 Alto    | bridges, terminal, tools, agent     |
+| 4   | **EventBus adotado em apenas 13 arquivos** (vs 313)               | 🔴 Alto    | Sistema todo                        |
+| 5   | **services/ anêmico** — 5 arquivos, 509 LoC                       | 🟡 Médio   | services/                           |
+| 6   | **4 deep imports reais** ainda violam F21                         | 🟡 Médio   | Específicos                         |
+| 7   | **Falta de testes por módulo** (195 arquivos, 133 mods sem teste) | 🔴 Alto    | Geral                               |
+| 8   | **Sem health checks funcional** no runtime                        | 🟡 Médio   | api/, terminal/                     |
+| 9   | **agent/always-alive.js (623 LoC)** — hub de estado               | 🔴 Alto    | agent/                              |
+| 10  | **loop-manager.js (599 LoC)** — múltiplos protocolos              | 🔴 Alto    | agent/dialog/                       |
+| 11  | **Sem rate limiting** na injeção de mensagens                     | 🟡 Médio   | terminal/, api/                     |
+| 12  | **DI Container subutilizado** — apenas 13 tokens                  | 🟡 Médio   | Geral                               |
+| 13  | **Sem circuit breaker** nas chamadas SDK                          | 🔴 Alto    | sdk/                                |
+| 14  | **Telemetria OpenTelemetry só esqueleto (otel.js)**               | 🟡 Médio   | observability/                      |
+| 15  | **Sem event sourcing** no audit pipeline                          | 🟡 Médio   | audit/                              |
+| 16  | **plugins/ proto-embrionário** — 2 arquivos, 253 LoC              | 🟡 Médio   | plugins/                            |
+| 17  | **Sem multi-agent isolation** — estado global compartilhado       | 🔴 Alto    | agent/, terminal/                   |
+| 18  | **Falta cache manager** — lazy inits espalhados                   | 🟡 Médio   | sdk/, observability/, bridges/      |
+| 19  | **Watchdog só em dialog** — sem watchdog global                   | 🟡 Médio   | agent/, bridges/                    |
+| 20  | **16 typecheck errors** baseline (rpc-ops, rpc-session)           | 🟡 Médio   | sdk/                                |
 
 ---
 
@@ -117,7 +117,8 @@
 ### 3.1 Dimensão: Tamanho e Coesão de Arquivos
 
 **Estado atual:** 23 arquivos com ≥380 LoC. Muitos têm múltiplos concerns mascarados por JSDoc.
-**Critério rigoroso:** Nenhum arquivo de lógica deve exceder 250 LoC. Arquivos de 300+ com ≥2 concerns = god file.
+**Critério rigoroso:** Nenhum arquivo de lógica deve exceder 250 LoC. Arquivos de 300+ com ≥2
+concerns = god file.
 
 | Categoria                    | Count | Ação Necessária       |
 | ---------------------------- | ----- | --------------------- |
@@ -141,12 +142,13 @@
 | `config/pinned-files.js`           | `extends EventEmitter` | Watcher de arquivos pinados        |
 | `terminal/state.js`                | `new EventEmitter()`   | Terminal state via emitter         |
 
-**EventBus adotado em apenas 13 arquivos** num sistema de 313. A infraestrutura foi criada na Faixa M mas não expandida.
+**EventBus adotado em apenas 13 arquivos** num sistema de 313. A infraestrutura foi criada na Faixa
+M mas não expandida.
 
 ### 3.3 Dimensão: Singletons e Estado Global
 
-**Estado atual:** 73 module-scope `let` declarações (53 após exclusões legítimas).
-Os **53 refined** incluem padrões genuinamente problemáticos:
+**Estado atual:** 73 module-scope `let` declarações (53 após exclusões legítimas). Os **53 refined**
+incluem padrões genuinamente problemáticos:
 
 | Categoria                          | Count | Problema                       |
 | ---------------------------------- | ----- | ------------------------------ |
@@ -158,6 +160,7 @@ Os **53 refined** incluem padrões genuinamente problemáticos:
 | Outros flags e counters relevantes | 11    | Variam por tipo                |
 
 **Padrão crítico em `bridges/nerv-bridge.js`** (5 module-scope lets):
+
 ```
 let _agent = null
 let _nerv = null
@@ -165,23 +168,24 @@ let _inboundUnsub = null
 let _beforeStopRegistered = false
 let _pendingReadyHandler = null
 ```
+
 Não testável em isolamento — qualquer teste de bridge exige mocking global.
 
 ### 3.4 Dimensão: Cobertura de Testes
 
-**Estado atual:** 195 arquivos de teste para 313 arquivos de produção.
-**Problema real:** Os 195 test files não distribuem uniformemente:
+**Estado atual:** 195 arquivos de teste para 313 arquivos de produção. **Problema real:** Os 195
+test files não distribuem uniformemente:
 
 | Módulo      | Arquivos prod | Test files estimados | Cobertura modulada |
 | ----------- | ------------- | -------------------- | ------------------ |
-| `terminal/` | 47            | ~8                   | 17% ⚠️              |
-| `agent/`    | 54            | ~12                  | 22% ⚠️              |
-| `bridges/`  | 12            | ~3                   | 25% ⚠️              |
-| `sdk/`      | 42            | ~3                   | 7% 🔴               |
-| `tools/`    | 28            | ~6                   | 21% ⚠️              |
-| `services/` | 5             | ~0                   | 0% 🔴               |
-| `plugins/`  | 2             | ~0                   | 0% 🔴               |
-| `types/`    | 2             | ~0                   | 0% 🔴               |
+| `terminal/` | 47            | ~8                   | 17% ⚠️             |
+| `agent/`    | 54            | ~12                  | 22% ⚠️             |
+| `bridges/`  | 12            | ~3                   | 25% ⚠️             |
+| `sdk/`      | 42            | ~3                   | 7% 🔴              |
+| `tools/`    | 28            | ~6                   | 21% ⚠️             |
+| `services/` | 5             | ~0                   | 0% 🔴              |
+| `plugins/`  | 2             | ~0                   | 0% 🔴              |
+| `types/`    | 2             | ~0                   | 0% 🔴              |
 
 ### 3.5 Dimensão: DI Container Subutilizado
 
@@ -201,9 +205,10 @@ Não testável em isolamento — qualquer teste de bridge exige mocking global.
 | PERMISSION_AGENT  | Agent ref     | hooks/factory      | tools/permission      |
 | SESSION_RPC       | RPC facade    | terminal/boot      | sdk/rpc-session       |
 | NERV_BRIDGE_AGENT | Agent ref     | bridges/boot       | bridges/nerv          |
-| EVENT_BUS         | EventBus      | observability/boot | services/*            |
+| EVENT_BUS         | EventBus      | observability/boot | services/\*           |
 
-**Lacunas severas:** Nenhum token para: `ConversationStore`, `MetricsStore`, `AuditPipeline`, `DialogLoopManager`, `AlwaysAliveAgent`, `InjectServer`, `SocketNamespace`, `RateLimiter`.
+**Lacunas severas:** Nenhum token para: `ConversationStore`, `MetricsStore`, `AuditPipeline`,
+`DialogLoopManager`, `AlwaysAliveAgent`, `InjectServer`, `SocketNamespace`, `RateLimiter`.
 
 ### 3.6 Dimensão: Profundidade de Grafo (Coupling)
 
@@ -220,6 +225,7 @@ bridges (5):   agent, config, core, observability, sdk
 ```
 
 **Problema de coupling cluster:**
+
 - `observability` é importado por TODOS os 10 módulos acima — impede testabilidade
 - `core` é importado por 8 módulos — é um "god L0"
 - `config` é importado por 7 módulos — 43 deep imports restantes (env.js)
@@ -228,6 +234,7 @@ bridges (5):   agent, config, core, observability, sdk
 ### 3.7 Dimensão: Qualidade do Código por God Files
 
 **`agent/always-alive.js` (623 LoC) — Análise de Concerns:**
+
 - Concern 1: Delegação de métodos (`sendMessage`, `steerMessage`, etc.) — 80 LoC
 - Concern 2: EventEmitter + EventBus bridge — 30 LoC
 - Concern 3: `starts()` / `stop()` — 40 LoC
@@ -241,6 +248,7 @@ bridges (5):   agent, config, core, observability, sdk
 **Veredicto:** 9 concerns distintos. Deveria ser reduzido a ≤200 LoC como puro orchestrator.
 
 **`agent/dialog/loop-manager.js` (599 LoC) — Análise de Concerns:**
+
 - Concern 1: Turn queue + backpressure — 80 LoC
 - Concern 2: Watchdog (stall detection) — 60 LoC
 - Concern 3: DialogProtocol state machine — 100 LoC
@@ -250,7 +258,8 @@ bridges (5):   agent, config, core, observability, sdk
 - Concern 7: Event emission — 80 LoC
 - Concern 8: Mutex serialization — 40 LoC
 
-**Veredicto:** 8 concerns. Já tem `watchdog.js`, `backpressure.js`, `protocol.js` separados mas `loop-manager.js` ainda orquestra tudo.
+**Veredicto:** 8 concerns. Já tem `watchdog.js`, `backpressure.js`, `protocol.js` separados mas
+`loop-manager.js` ainda orquestra tudo.
 
 ---
 
@@ -259,6 +268,7 @@ bridges (5):   agent, config, core, observability, sdk
 ### 4.1 Padrão Misto de Bootstrap
 
 O sistema tem 4 formas diferentes de inicializar dependências:
+
 1. **DI Container** (`container.register + container.resolve`) — 13 tokens
 2. **wireLegacySetters** (`setBridgeAgent`, `setHub`, etc.) — ~8 setters
 3. **Singleton direto** (`let x = null; export function init(val){ x = val; }`) — ~15 padrões
@@ -266,11 +276,14 @@ O sistema tem 4 formas diferentes de inicializar dependências:
 
 ### 4.2 Typedefs Sem Arquivo `.d.ts`
 
-`sdk/types.js` tem 569 LoC de `@typedef`. São usados como se fossem tipos TS via JSDoc, mas não geram `.d.ts` real. TypeScript resolve via `tsconfig.base.json` com `allowJs`, mas 16 erros persistem porque alguns tipos não são acessíveis via `#copilot/sdk`.
+`sdk/types.js` tem 569 LoC de `@typedef`. São usados como se fossem tipos TS via JSDoc, mas não
+geram `.d.ts` real. TypeScript resolve via `tsconfig.base.json` com `allowJs`, mas 16 erros
+persistem porque alguns tipos não são acessíveis via `#copilot/sdk`.
 
 ### 4.3 Inconsistência de Nomenclatura de Eventos
 
 3 sistemas de eventos paralelos com namespaces sobrepostos:
+
 - **`HUB_EVENTS`** (conversation-hub/events.js): `SESSION_CREATED`, `TURN_SENT`, etc.
 - **`AGENT_EVENTS`** (core/constants.js): `AGENT_READY`, `AGENT_STOPPED`, etc.
 - **Strings literais** espalhadas: `'phase:changed'`, `'error'`, `'connected'`, etc.
@@ -280,6 +293,7 @@ Nenhum schema central de eventos typed.
 ### 4.4 Audit Pipeline sem Event Sourcing
 
 `audit/pipeline.js` usa um ring buffer em memória + flush periódico para disco. Não tem:
+
 - Imutabilidade (pode ser overwritten)
 - Replay de eventos
 - Compactação/archival
@@ -288,6 +302,7 @@ Nenhum schema central de eventos typed.
 ### 4.5 SSE Fanout sem Backpressure
 
 `api/sse/fanout.js` usa EventEmitter direto. Não tem:
+
 - Backpressure para clientes lentos
 - Max concurrent connections
 - Health monitoring por conexão
@@ -315,11 +330,12 @@ Nenhum schema central de eventos typed.
 
 ### 5.1 Score PARTE-22 (Critérios Rigorosos Novos)
 
-O health score do `arch-health.mjs` foi calibrado progressivamente. Para a PARTE-22, adotamos **critérios sem relativização**:
+O health score do `arch-health.mjs` foi calibrado progressivamente. Para a PARTE-22, adotamos
+**critérios sem relativização**:
 
 | Critério                 | Peso | Score Atual | Nota                   |
 | ------------------------ | ---- | ----------- | ---------------------- |
-| Sem god files (>300 LoC) | 20%  | 0/20        | 🔴 0 god files aceitos  |
+| Sem god files (>300 LoC) | 20%  | 0/20        | 🔴 0 god files aceitos |
 | EventBus primário        | 15%  | 3/15        | EventEmitter em 8 mods |
 | DI completo (≥40 tokens) | 15%  | 5/15        | 13 tokens vs 40+ ideal |
 | Test coverage ≥70%       | 20%  | 6/20        | ~30% atual             |
@@ -328,8 +344,8 @@ O health score do `arch-health.mjs` foi calibrado progressivamente. Para a PARTE
 | Services cobertura total | 10%  | 3/10        | 20% coverage           |
 | **TOTAL**                |      | **24/100**  | **F**                  |
 
-**Diagnóstico real: 24/100 (F) nos critérios PARTE-22, não 95/100 (A) antigo.**
-Isso é o ponto de partida honesto para a PARTE-22.
+**Diagnóstico real: 24/100 (F) nos critérios PARTE-22, não 95/100 (A) antigo.** Isso é o ponto de
+partida honesto para a PARTE-22.
 
 ---
 
@@ -353,17 +369,17 @@ Os seguintes itens do roadmap PARTE-21C **NÃO foram executados** e devem ser pr
 
 | Item | Descrição                                 | Status PARTE-21C |
 | ---- | ----------------------------------------- | ---------------- |
-| W4-3 | Migrar 31 deep imports reais (não-logger) | ❌ Não feito      |
-| W5-1 | Extract terminal facades (fan-out 19→12)  | ❌ Não feito      |
-| W5-2 | Domain Event Bus por módulo               | ❌ Não feito      |
-| W5-3 | Event sourcing para audit pipeline        | ❌ Não feito      |
-| W5-5 | Mutex pool com timeout                    | ❌ Não feito      |
-| W5-6 | Timer manager com cleanup                 | ❌ Não feito      |
-| W5-7 | Split `agent/always-alive.js`             | ❌ Não feito      |
-| W5-8 | Split `agent/dialog/loop-manager.js`      | ❌ Não feito      |
-| W5-9 | DI.fork() para multi-agent prep           | ❌ Não feito      |
-| W6-5 | Resolver 16 typecheck errors (rpc-*.js)   | ❌ Não feito      |
-| W6-6 | Observable-first metrics (OpenTelemetry)  | ❌ Não feito      |
+| W4-3 | Migrar 31 deep imports reais (não-logger) | ❌ Não feito     |
+| W5-1 | Extract terminal facades (fan-out 19→12)  | ❌ Não feito     |
+| W5-2 | Domain Event Bus por módulo               | ❌ Não feito     |
+| W5-3 | Event sourcing para audit pipeline        | ❌ Não feito     |
+| W5-5 | Mutex pool com timeout                    | ❌ Não feito     |
+| W5-6 | Timer manager com cleanup                 | ❌ Não feito     |
+| W5-7 | Split `agent/always-alive.js`             | ❌ Não feito     |
+| W5-8 | Split `agent/dialog/loop-manager.js`      | ❌ Não feito     |
+| W5-9 | DI.fork() para multi-agent prep           | ❌ Não feito     |
+| W6-5 | Resolver 16 typecheck errors (rpc-\*.js)  | ❌ Não feito     |
+| W6-6 | Observable-first metrics (OpenTelemetry)  | ❌ Não feito     |
 
 ---
 

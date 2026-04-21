@@ -12,7 +12,8 @@ Esta rodada encontrou um conjunto consistente de problemas em cinco frentes:
 - observabilidade e falhas silenciosas;
 - governança de testes/documentação.
 
-O problema principal não é “um arquivo ruim”; é um acúmulo de fissuras pequenas em um subsistema de alta complexidade operacional.
+O problema principal não é “um arquivo ruim”; é um acúmulo de fissuras pequenas em um subsistema de
+alta complexidade operacional.
 
 ## Achados priorizados
 
@@ -32,7 +33,8 @@ Problema:
 
 Impacto:
 
-- redirecionamento operacional do agente por requisição HTTP não autenticada no nível administrativo;
+- redirecionamento operacional do agente por requisição HTTP não autenticada no nível
+  administrativo;
 - quebra de simetria de segurança do plano de controle.
 
 Proposta:
@@ -80,7 +82,8 @@ Proposta:
 Problema:
 
 - `chat()` usa listeners globais `once/on` em `task.queued`, `task.delta` e `question.pending`;
-- o comentário diz que isso evita contaminação concorrente, mas não há correlação forte entre chamada e evento antes da captura do `taskId`.
+- o comentário diz que isso evita contaminação concorrente, mas não há correlação forte entre
+  chamada e evento antes da captura do `taskId`.
 
 Impacto:
 
@@ -106,7 +109,8 @@ Proposta:
 Problema:
 
 - `closeSession()` marca a sessão como fechada e limpa mapas locais;
-- porém `executeSendToLlmB()` continua podendo gravar turnos `llm_b`/erro após o fechamento se a chamada já estava em andamento;
+- porém `executeSendToLlmB()` continua podendo gravar turnos `llm_b`/erro após o fechamento se a
+  chamada já estava em andamento;
 - `writeTurn()` não valida status `active`.
 
 Impacto:
@@ -131,7 +135,8 @@ Proposta:
 Problema:
 
 - `Access-Control-Allow-Origin: http://localhost:*` não é um valor válido para browser;
-- quando `origin` é array, o middleware junta com vírgula, o que também não é semântica válida de CORS.
+- quando `origin` é array, o middleware junta com vírgula, o que também não é semântica válida de
+  CORS.
 
 Impacto:
 
@@ -205,7 +210,8 @@ Proposta:
 Problema:
 
 - `setInterval` dispara `#tick()` assíncrono sem trava de reentrância;
-- se `ping()` ou `session.send()` atrasarem mais que o intervalo, múltiplos heartbeats podem coexistir.
+- se `ping()` ou `session.send()` atrasarem mais que o intervalo, múltiplos heartbeats podem
+  coexistir.
 
 Impacto:
 
@@ -297,7 +303,8 @@ Proposta:
 
 Problema:
 
-- `appendFileSync`, `statSync`, `renameSync`, `readdirSync`, `unlinkSync` em cada trilha de log/rotação.
+- `appendFileSync`, `statSync`, `renameSync`, `readdirSync`, `unlinkSync` em cada trilha de
+  log/rotação.
 
 Impacto:
 
@@ -386,7 +393,8 @@ Proposta:
 
 - Evidência: `src/copilot/core/retry.js:65-80`
 - Problema:
-  - cada tentativa adiciona `signal.addEventListener('abort', ...)` sem remoção explícita quando o timer resolve.
+  - cada tentativa adiciona `signal.addEventListener('abort', ...)` sem remoção explícita quando o
+    timer resolve.
 - Impacto:
   - vazamento de listeners em sinais long-lived.
 
@@ -432,7 +440,8 @@ Proposta:
   - `src/copilot/sdk/tools/custom.js:158-177`
   - `src/copilot/sdk/tools/state.js:37-59`
 - Problema:
-  - falta de arquivo opcional gera `logSwallowed`, não um fluxo normal de “arquivo opcional ausente”.
+  - falta de arquivo opcional gera `logSwallowed`, não um fluxo normal de “arquivo opcional
+    ausente”.
 - Impacto:
   - ruído recorrente em teste/boot;
   - observabilidade poluída.
@@ -564,12 +573,13 @@ Gap:
 
 ## Veredito final
 
-`src/copilot` não parece um módulo “colapsado”, mas sim um módulo que cresceu rápido e agora acumula:
+`src/copilot` não parece um módulo “colapsado”, mas sim um módulo que cresceu rápido e agora
+acumula:
 
 - dívida de coordenação concorrente;
 - dívida de segurança por autorização incompleta;
 - dívida de runtime por timers e fallbacks silenciosos;
 - dívida de governança por teste/documentação em drift.
 
-Há achados suficientes para justificar múltiplas ondas de correção, começando por segurança e integridade de sessão.
-
+Há achados suficientes para justificar múltiplas ondas de correção, começando por segurança e
+integridade de sessão.

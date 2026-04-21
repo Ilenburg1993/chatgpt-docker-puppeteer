@@ -13,7 +13,8 @@ O bootstrap factual do sistema parte de `src/copilot/bootstrap.js`.
 
 ### Implicação arquitetural
 
-O sistema hoje é **terminal-first**. Isso não é detalhe: significa que a LLM-B é tratada como ferramenta contínua de desenvolvimento, não como serviço de produção independente.
+O sistema hoje é **terminal-first**. Isso não é detalhe: significa que a LLM-B é tratada como
+ferramenta contínua de desenvolvimento, não como serviço de produção independente.
 
 ## 2. Fluxo de runtime principal
 
@@ -27,7 +28,8 @@ O sistema hoje é **terminal-first**. Isso não é detalhe: significa que a LLM-
 
 ### Leitura
 
-O runtime está mais modular do que em versões anteriores, mas ainda é **o coração de coordenação do sistema**.
+O runtime está mais modular do que em versões anteriores, mas ainda é **o coração de coordenação do
+sistema**.
 
 ## 3. Fluxo de borda HTTP/SSE/Socket
 
@@ -78,7 +80,8 @@ O terminal hoje executa:
 
 ### Leitura
 
-O terminal é hoje a **interface contínua operacional da LLM-B**, tanto para usuário humano quanto para LLM-A.
+O terminal é hoje a **interface contínua operacional da LLM-B**, tanto para usuário humano quanto
+para LLM-A.
 
 ## 5. Fluxo de sessão conversacional
 
@@ -140,7 +143,8 @@ O `sdk/` já deixou de ser só thin wrapper. Hoje ele é uma combinação de:
 
 ### Leitura
 
-`tools/` funciona como marketplace/runtime surface de capacidades do agente. Isso é útil, mas também explica por que o módulo é enorme.
+`tools/` funciona como marketplace/runtime surface de capacidades do agente. Isso é útil, mas também
+explica por que o módulo é enorme.
 
 ## 8. Fluxo de hooks
 
@@ -155,7 +159,8 @@ Os hooks de sessão hoje:
 
 ### Leitura
 
-`hooks/` está mais próximo de camada de política e transformação do que de runtime — que é exatamente onde ele deveria convergir.
+`hooks/` está mais próximo de camada de política e transformação do que de runtime — que é
+exatamente onde ele deveria convergir.
 
 ## 9. Fluxo de observabilidade
 
@@ -169,7 +174,8 @@ Esse arquivo é especialmente revelador porque ele mostra um crossing intenciona
 
 ### Leitura
 
-Esse bootstrap é arquiteturalmente necessário hoje, mas também evidencia que `observability/` não é apenas um sink passivo; ele participa ativamente da estrutura do runtime.
+Esse bootstrap é arquiteturalmente necessário hoje, mas também evidencia que `observability/` não é
+apenas um sink passivo; ele participa ativamente da estrutura do runtime.
 
 ## 10. Ciclos e semi-ciclos arquiteturais
 
@@ -199,7 +205,8 @@ Isso é aceitável, desde que o terminal continue sendo frontend e não passe a 
 server -> presentation -> agent/hub/core/shared-state/sdk
 ```
 
-Esse ciclo é o desejado entre bordas compartilhadas, contanto que `presentation/` permaneça projeção e não absorva orchestration.
+Esse ciclo é o desejado entre bordas compartilhadas, contanto que `presentation/` permaneça projeção
+e não absorva orchestration.
 
 ## 11. Conclusão dos fluxos
 
@@ -212,4 +219,5 @@ O sistema atual já tem uma direção arquitetural clara:
 - **sdk** como boundary do vendor;
 - **presentation** como camada de projeção entre bordas.
 
-O problema não é a ausência de direção. O problema é que ainda existem trilhas onde duas ou três camadas fazem partes parecidas do mesmo trabalho.
+O problema não é a ausência de direção. O problema é que ainda existem trilhas onde duas ou três
+camadas fazem partes parecidas do mesmo trabalho.

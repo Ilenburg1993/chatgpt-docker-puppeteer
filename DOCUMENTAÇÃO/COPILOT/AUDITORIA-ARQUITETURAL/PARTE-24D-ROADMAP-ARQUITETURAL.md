@@ -1,17 +1,15 @@
 # ROADMAP ARQUITETURAL — `src/copilot`
 
-> **Documento**: PARTE-24D-ROADMAP-ARQUITETURAL.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Roadmap detalhado de execução para transformar a arquitetura atual em ideal
-> **Pré-requisito**: PARTE-24A, 24B, 24C
-> **Faixas**: L39–L82 (continuação de L1–L38 do events schema system)
+> **Documento**: PARTE-24D-ROADMAP-ARQUITETURAL.md **Versão**: 1.0 **Data**: 2026-04-12 **Escopo**:
+> Roadmap detalhado de execução para transformar a arquitetura atual em ideal **Pré-requisito**:
+> PARTE-24A, 24B, 24C **Faixas**: L39–L82 (continuação de L1–L38 do events schema system)
 
 ---
 
 ## 1. Visão Global
 
-O roadmap está organizado em **6 Ondas** de execução, cada uma com **faixas** (`L39`–`L82`). Ondas são dependentes: cada onda só inicia após a anterior estar ≥80% completa.
+O roadmap está organizado em **6 Ondas** de execução, cada uma com **faixas** (`L39`–`L82`). Ondas
+são dependentes: cada onda só inicia após a anterior estar ≥80% completa.
 
 ```
 ONDA 1 — FOUNDATION CLEANUP     (L39–L46)    ~800 LOC alteradas    ✅ CONCLUÍDA
@@ -27,9 +25,11 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ## 2. ONDA 1 — Foundation Cleanup ✅ CONCLUÍDA
 
-> **Objetivo**: Remover lixo técnico, shims, duplicações e código legado. Base limpa para as ondas seguintes.
+> **Objetivo**: Remover lixo técnico, shims, duplicações e código legado. Base limpa para as ondas
+> seguintes.
 >
-> **Status**: 100% concluída. Commits: `f8b217e4` (L39+L40), `599d8c0e` (L41+L42), `10b831f4` (L43+L44), `2a4850cd` (L45+L46).
+> **Status**: 100% concluída. Commits: `f8b217e4` (L39+L40), `599d8c0e` (L41+L42), `10b831f4`
+> (L43+L44), `2a4850cd` (L45+L46).
 
 ### L39 — ✅ Remover `core/events.js` (legado)
 
@@ -63,11 +63,11 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ### L42 — ✅ Limpar referências a nerv-bridge.js
 
-| Item           | Detalhe                                                                                                                                             |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **O que**      | Remover menções a `nerv-bridge.js` de comentários e docs                                                                                            |
-| **Subfases**   | 1. Grep por `nerv-bridge` excluindo PARTE-23L e PARTE-24*<br>2. Atualizar comentários referentes<br>3. Atualizar `nerv-event-bus-adapter.js` header |
-| **Acceptance** | Zero menções a nerv-bridge em src/                                                                                                                  |
+| Item           | Detalhe                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **O que**      | Remover menções a `nerv-bridge.js` de comentários e docs                                                                                             |
+| **Subfases**   | 1. Grep por `nerv-bridge` excluindo PARTE-23L e PARTE-24\*<br>2. Atualizar comentários referentes<br>3. Atualizar `nerv-event-bus-adapter.js` header |
+| **Acceptance** | Zero menções a nerv-bridge em src/                                                                                                                   |
 
 ### L43 — ✅ Consolidar `core/constants.js` + `core/shared-state.js`
 
@@ -103,6 +103,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Score impact** | core: 7.5→8                                                                                                                                                                                                                |
 
 **Onda 1 — Critérios de conclusão**:
+
 - Zero código legado/shims
 - core/ sem deps de camadas superiores no token file
 - All tests green + lint clean
@@ -111,7 +112,8 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ## 3. ONDA 2 — Autonomy ✅ CONCLUÍDA
 
-> **Objetivo**: Eliminar as 2 dependências externas e garantir que src/copilot funcione como pacote autônomo.
+> **Objetivo**: Eliminar as 2 dependências externas e garantir que src/copilot funcione como pacote
+> autônomo.
 >
 > **Status**: 100% concluída. Commit: `8d1b8487` (L47-L53).
 
@@ -153,7 +155,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **O que**      | Server não importa módulos copilot diretamente — usa `bootCopilot({ mode: 'server' })`                                                                                              |
 | **Subfases**   | 1. Substituir 5+ dynamic imports por `bootCopilot({ mode: 'server', express: app })`<br>2. Bridge retorna handlers registrados no DI<br>3. Manter backward compat durante transição |
-| **Acceptance** | Server inicia normalmente. Rotas /api/copilot/* functam. Tests green                                                                                                                |
+| **Acceptance** | Server inicia normalmente. Rotas /api/copilot/\* functam. Tests green                                                                                                               |
 
 ### L52 — ✅ Mover package.json imports para src/copilot
 
@@ -173,6 +175,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Score impact** | db: 5→7, conversation-hub: 5→6.5                                                                                                                                   |
 
 **Onda 2 — Critérios de conclusão**:
+
 - Zero dependências externas
 - Boot standalone funcional (terminal e server)
 - Teste de autonomia no CI
@@ -209,11 +212,11 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 
 ### L57 — Quebrar ciclo `hooks ↔ observability` via DI
 
-| Item           | Detalhe                                                                                                                                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **O que**      | OTel facade via DI token. Hook bus consumido via EventBus                                                                                                                                                    |
-| **Subfases**   | 1. Criar DI token OTEL_TRACER<br>2. `hooks/factory.js` resolve via DI, não import direto<br>3. `observability/` consome HookBus events via EventBus (HOOK_*)<br>4. Remover import direto observability→hooks |
-| **Acceptance** | Zero ciclos bidirecionais no sistema. Verificar com cycle-analysis.mjs                                                                                                                                       |
+| Item           | Detalhe                                                                                                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **O que**      | OTel facade via DI token. Hook bus consumido via EventBus                                                                                                                                                     |
+| **Subfases**   | 1. Criar DI token OTEL*TRACER<br>2. `hooks/factory.js` resolve via DI, não import direto<br>3. `observability/` consome HookBus events via EventBus (HOOK*\*)<br>4. Remover import direto observability→hooks |
+| **Acceptance** | Zero ciclos bidirecionais no sistema. Verificar com cycle-analysis.mjs                                                                                                                                        |
 
 ### L58 — Eliminar violação `config → sdk` (L1→L2)
 
@@ -249,6 +252,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Score impact** | hooks: 6.2→7.5                                                                                                                                                  |
 
 **Onda 3 — Critérios de conclusão**:
+
 - Zero ciclos bidirecionais (verificado por script)
 - Zero violações de camada
 - Layer model de 6 camadas enforced
@@ -333,6 +337,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Score impact** | global: +0.5                                                                                                                                                                                                                |
 
 **Onda 4 — Critérios de conclusão**:
+
 - Zero God Modules (>400 LOC com múltiplas responsabilidades)
 - Todos barrels limpos
 - Tests green em todos os módulos afetados
@@ -393,6 +398,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Score impact** | global: +0.8                                                                                                                                                                          |
 
 **Onda 5 — Critérios de conclusão**:
+
 - DI Module pattern em todos os módulos L1+
 - Bootstrap sequence funcional e testada
 - Zero hacks de injeção (setters eliminados)
@@ -452,6 +458,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | **Acceptance** | Score global ≥8.5. Zero ciclos. Zero deps externas                                                                                                                                                       |
 
 **Onda 6 — Critérios de conclusão**:
+
 - Nenhum módulo com 0 testes
 - TypeCheck strict 0 erros
 - Score global ≥8.5/10
@@ -475,7 +482,7 @@ ONDA 6 — TEST & POLISH          (L77–L82)    ~2500 LOC alteradas
 | L49   | Criar bootstrap.js canônico          | 2    | P0         | copilot root                  |
 | L50   | Criar terminal/bootstrap.js          | 2    | P0         | terminal                      |
 | L51   | Adaptar server para bootstrap        | 2    | P1         | server                        |
-| L52   | Validar aliases #copilot/*           | 2    | P1         | package.json                  |
+| L52   | Validar aliases #copilot/\*          | 2    | P1         | package.json                  |
 | L53   | Smoke test de autonomia              | 2    | P0         | tests/                        |
 | L54   | Quebrar ciclo core↔config            | 3    | P0         | core, config, types           |
 | L55   | Quebrar ciclo config↔observability   | 3    | P0         | config, observability         |
@@ -544,7 +551,7 @@ ONDA 4: God Modules   ONDA 5: Boot & Wiring
 | Módulos com 0 testes      | 3     | 3      | 3      | 3      | 3      | 3      | **0**   |
 | Shims sem deadline        | 5     | **0**  | 0      | 0      | 0      | 0      | 0       |
 | Arquivos sem JSDoc (>100) | 13    | **0**  | 0      | 0      | 0      | 0      | 0       |
-| Boot standalone           | ❌     | ❌      | **✅**  | ✅      | ✅      | ✅      | ✅       |
+| Boot standalone           | ❌    | ❌     | **✅** | ✅     | ✅     | ✅     | ✅      |
 | **Score Global**          | 5.9   | 6.3    | 6.8    | 7.5    | 7.9    | 8.2    | **8.7** |
 
 ---

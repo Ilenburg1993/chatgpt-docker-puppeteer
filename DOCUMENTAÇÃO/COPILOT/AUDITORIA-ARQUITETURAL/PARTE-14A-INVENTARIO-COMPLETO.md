@@ -1,9 +1,7 @@
 # PARTE 14A — Inventário Completo de `src/copilot/agent/`
 
-**Data**: 2026-03-15
-**Baseline**: commit `54c135c4` (pós-F44)
-**Total de arquivos**: 37 (36 `.js` + 1 `messaging/`)
-**Total de linhas**: ~7.200L
+**Data**: 2026-03-15 **Baseline**: commit `54c135c4` (pós-F44) **Total de arquivos**: 37 (36 `.js` +
+1 `messaging/`) **Total de linhas**: ~7.200L
 
 ---
 
@@ -237,6 +235,7 @@ session/initializer.js ───────────────────
 | **TOTAL**                              | **46** | **6 de 37 arquivos**              |
 
 **Cobertura**: 16,2% dos arquivos têm testes unitários. Nenhuma cobertura para:
+
 - dialog/loop-manager.js (661L — o mais complexo)
 - dialog/turn-executor.js (361L — race conditions)
 - session/event-wirer.js (591L — maior arquivo)

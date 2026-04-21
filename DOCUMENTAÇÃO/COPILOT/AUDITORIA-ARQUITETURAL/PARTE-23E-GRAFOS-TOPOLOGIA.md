@@ -1,8 +1,8 @@
 # PARTE-23E — Grafos de Dependência, Acoplamento e Topologia de Eventos
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Grafos reais de dependência inter-módulo, fan-in/fan-out, ciclos, event topology
-**Precedente**: PARTE-22D (grafos parciais), PARTE-23A/B (diagnóstico + eventos)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Grafos reais de dependência
+inter-módulo, fan-in/fan-out, ciclos, event topology **Precedente**: PARTE-22D (grafos parciais),
+PARTE-23A/B (diagnóstico + eventos)
 
 ---
 
@@ -110,11 +110,12 @@ db/ ──→ (nenhum — leaf module) ✅
 
 | Ciclo                                | Tipo                     | Severidade |
 | ------------------------------------ | ------------------------ | ---------- |
-| `config/ → observability/ → config/` | Circular                 | 🟡 Médio    |
-| `tools/ → bridges/ → tools/`         | Potencial (via indirect) | 🟢 Baixo    |
-| `hooks/ → tools/ → hooks/`           | Potencial (via configs)  | 🟢 Baixo    |
+| `config/ → observability/ → config/` | Circular                 | 🟡 Médio   |
+| `tools/ → bridges/ → tools/`         | Potencial (via indirect) | 🟢 Baixo   |
+| `hooks/ → tools/ → hooks/`           | Potencial (via configs)  | 🟢 Baixo   |
 
-**Ciclo real confirmado**: `config/env.js` importa de `observability/` para logging, e `observability/` importa de `config/` para configuração. Quebrar via DI injection.
+**Ciclo real confirmado**: `config/env.js` importa de `observability/` para logging, e
+`observability/` importa de `config/` para configuração. Quebrar via DI injection.
 
 ---
 
@@ -213,8 +214,8 @@ Centralidade (betweenness):
   pinned-files.js    ████          1 listener
 ```
 
-**Problema**: Nenhum centralidad real. São 7 "mini event buses" desconectados entre si.
-Um subscriber de um emissor não consegue observar eventos de outro.
+**Problema**: Nenhum centralidad real. São 7 "mini event buses" desconectados entre si. Um
+subscriber de um emissor não consegue observar eventos de outro.
 
 ### 3.3 Topologia Ideal (com EventBus centralizado + bridges)
 
@@ -245,7 +246,8 @@ Um subscriber de um emissor não consegue observar eventos de outro.
                     audit/* ──→ subscribe('*') // all events
 ```
 
-Nesta topologia, **qualquer subscriber pode observar qualquer evento** sem acoplamento direto com o emissor.
+Nesta topologia, **qualquer subscriber pode observar qualquer evento** sem acoplamento direto com o
+emissor.
 
 ---
 
@@ -275,36 +277,42 @@ Nesta topologia, **qualquer subscriber pode observar qualquer evento** sem acopl
 | metricsStore     | Média            | Importado por 6+ arquivos sem DI     |
 | sqliteDb         | Média            | Lifetime diferente (boot-time)       |
 
-**Dos 25 singletons, ~12 já têm DI tokens criados mas continuam usando pattern `let X = null`**.
-O DI token existe, mas ninguém usa `container.resolve(TOKEN)` para obtê-los.
+**Dos 25 singletons, ~12 já têm DI tokens criados mas continuam usando pattern `let X = null`**. O
+DI token existe, mas ninguém usa `container.resolve(TOKEN)` para obtê-los.
 
 ---
 
 ## 5. Dependency Clusters (Módulos Fortemente Acoplados)
 
 ### Cluster 1: Agent ↔ SDK ↔ Tools ↔ Hooks
+
 ```
 agent/ ←→ sdk/ ←→ tools/ ←→ hooks/
   │              ↑            │
   └──────────────┘────────────┘
 ```
+
 - 4 módulos mutuamente dependentes
 - Fan-out total: 26 edges dentro do cluster
 - **Risco**: Mudança em sdk/ propaga para agent/, tools/, hooks/
 
 ### Cluster 2: Services ↔ Agent ↔ Conversation-Hub
+
 ```
 services/ ←→ agent/ ←→ conversation-hub/
      └────→ conversation-hub/
 ```
+
 - 3 módulos, services/ deveria mediar, mas agent/ e conv-hub/ exportam direto
 
 ### Cluster 3: Observability ↔ Config ↔ Audit
+
 ```
 observability/ ←→ config/ (CICLO!)
        └────→ audit/
        └────→ db/
 ```
+
 - Ciclo real: config importa observability para logging, observability importa config para setup
 
 ---

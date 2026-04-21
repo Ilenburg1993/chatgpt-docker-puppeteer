@@ -1,8 +1,7 @@
 # PARTE 11A — Análise Arquitetural Completa de `src/copilot`
 
-**Data**: 2026-07-21
-**Escopo**: Mapeamento exaustivo de pastas, arquivos, responsabilidades, fronteiras e relações.
-**Tamanho total**: ~42.600 linhas em ~170 arquivos JS.
+**Data**: 2026-07-21 **Escopo**: Mapeamento exaustivo de pastas, arquivos, responsabilidades,
+fronteiras e relações. **Tamanho total**: ~42.600 linhas em ~170 arquivos JS.
 
 ---
 
@@ -138,8 +137,7 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 **Problemas identificados**:
 
-- `pinned-files-loader.js` (268 lines) faz fs.watch + parse — poderia ser melhor
-  categorizado
+- `pinned-files-loader.js` (268 lines) faz fs.watch + parse — poderia ser melhor categorizado
 - Naming confuso: `config/tools/registry.js` ≠ `lib/tools-registry.js` (propósitos diferentes)
 
 ### 2.6 `hooks/` — Sistema de Hooks SDK (3.634 lines, 19 files)
@@ -171,8 +169,7 @@ Coleção de funções utilitárias e abstrações pure-function sobre o Copilot
 
 - **`hooks/audit.js`** vs **`observability/audit-log.js`**: dois sistemas de auditoria paralelos
   (hooks registra tool calls via onPostToolUse; observability registra em JSONL com I/O)
-- **`agent/infra/tool-audit-logger.js`**: terceiro ponto de auditoria de tools — gera overlap
-  triplo
+- **`agent/infra/tool-audit-logger.js`**: terceiro ponto de auditoria de tools — gera overlap triplo
 
 ### 2.7 `observability/` — Observabilidade & Telemetria (4.453 lines, 10 files)
 
@@ -218,8 +215,7 @@ O núcleo do sistema. Já reestruturado (R1-R18) em subdiretórios.
 
 - `always-alive.js` (1.613 lines) — ainda é God Class, apesar de extrações
 - `events.js` — re-export de compatibilidade que pode ser eliminado
-- `infra/tool-audit-logger.js` — tem overlap com `hooks/audit.js` e
-  `observability/audit-log.js`
+- `infra/tool-audit-logger.js` — tem overlap com `hooks/audit.js` e `observability/audit-log.js`
 
 ### 2.9 `api/` — HTTP Bridge REST (1.289 lines, 9 files)
 
@@ -308,8 +304,7 @@ Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 **Problemas identificados**:
 
 - `store.js` (737 lines) + `store-helpers.js` (162 lines) — grande
-- `orchestrator.js` (646 lines) importa de `channel/client.js` —
-  acoplamento com channel
+- `orchestrator.js` (646 lines) importa de `channel/client.js` — acoplamento com channel
 
 ### 2.14 `terminal/` — Terminal Permanente LLM-B (7.276 lines, 38 files)
 
@@ -328,7 +323,7 @@ Rotas Express montadas em `/api/sdk/*` via `sdk-api.js`.
 | `state.js`              | 268    | Estado global compartilhado                                 |
 | `handlers-dialog.js`    | 161    | Handlers de sessão/memória/turnos                           |
 | `workspace-context.js`  | 92     | Detecção de workspace (cwd, git root, branch)               |
-| `http-handlers.js`      | 59     | **@deprecated** barrel → handlers-*.js                      |
+| `http-handlers.js`      | 59     | **@deprecated** barrel → handlers-\*.js                     |
 | `bootstrap.js`          | 34     | **@deprecated** wrapper → index.js                          |
 | `rate-limiter-state.js` | 34     | Bridge para reset de rate limiters                          |
 | `handlers-shared.js`    | 16     | Tipos compartilhados                                        |
@@ -511,8 +506,8 @@ Três lugares para gerenciar tools.
 
 ### 6.7 `process.env` Espalhados
 
-41 arquivos leem `process.env` diretamente fora do `agent/config.js`. A centralização que fizemos
-em R15 foi apenas para `agent/`. O resto do sistema não tem config centralizada.
+41 arquivos leem `process.env` diretamente fora do `agent/config.js`. A centralização que fizemos em
+R15 foi apenas para `agent/`. O resto do sistema não tem config centralizada.
 
 ---
 

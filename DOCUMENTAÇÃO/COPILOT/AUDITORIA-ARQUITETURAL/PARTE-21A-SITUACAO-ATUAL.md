@@ -1,12 +1,12 @@
 # PARTE-21A — Situação Atual: Auditoria Arquitetural Profunda de `src/copilot`
 
-**Data**: 2026-04-12 | **Status**: BASELINE (congelado pré-Faixa H) | **Versão**: 2.0
-**Scope**: Todo o diretório `src/copilot` — 287 arquivos `.js`, ~51.600 LoC (inclui JSDoc robusto)
+**Data**: 2026-04-12 | **Status**: BASELINE (congelado pré-Faixa H) | **Versão**: 2.0 **Scope**:
+Todo o diretório `src/copilot` — 287 arquivos `.js`, ~51.600 LoC (inclui JSDoc robusto)
 **Precedente**: PARTE-20A (análise pré-roadmap), PARTE-20C (roadmap executado, v1.5 CONCLUÍDO)
 
-> **⚠️ ATENÇÃO**: Este documento é o **baseline pré-execução** das Faixas H–N.
-> Para o estado atual (pós-execução), ver **PARTE-21F-STATUS-POS-EXECUCAO.md**.
-> Métricas atuais: 313 arquivos, 53.815 LoC, 17 módulos, 108 testes, Health Score 65/100.
+> **⚠️ ATENÇÃO**: Este documento é o **baseline pré-execução** das Faixas H–N. Para o estado atual
+> (pós-execução), ver **PARTE-21F-STATUS-POS-EXECUCAO.md**. Métricas atuais: 313 arquivos, 53.815
+> LoC, 17 módulos, 108 testes, Health Score 65/100.
 
 ---
 
@@ -14,12 +14,14 @@
 
 O roadmap PARTE-20 foi **completamente executado** (Faixas A–G). O sistema `src/copilot` passou de
 um estado com 27 violações de camada, god objects, duplicações e fronteiras indefinidas para um
-estado com **0 violações detectadas pelo CI**, JSDoc robusto, READMEs completos e testes de contrato.
+estado com **0 violações detectadas pelo CI**, JSDoc robusto, READMEs completos e testes de
+contrato.
 
 Porém, esta auditoria profunda revela problemas estruturais significativos que vão além das
 violações de camada:
 
-1. **Script de CI com gap de regex** — ignora `export { } from`, ocultando 9+ re-exports cross-module
+1. **Script de CI com gap de regex** — ignora `export { } from`, ocultando 9+ re-exports
+   cross-module
 2. **233 imports profundos** (72% do total) bypassam barrels, gerando acoplamento fino
 3. **25 arquivos >400 LoC (raw)** com god objects disfarçados por JSDoc volumoso
 4. **~30 singletons com estado global mutável** espalhados por 10+ módulos
@@ -28,8 +30,8 @@ violações de camada:
 7. **api/** com fan-out de 11 módulos — mega-aggregator sem camada de serviço
 
 Estas descobertas indicam que, embora a superfície (camadas, JSDoc, READMEs) esteja limpa, a
-**microarquitetura interna** tem dívida técnica substancial que limita testabilidade, refatoração
-e evolução para upgrades futuros significativos.
+**microarquitetura interna** tem dívida técnica substancial que limita testabilidade, refatoração e
+evolução para upgrades futuros significativos.
 
 ---
 
@@ -59,21 +61,21 @@ e evolução para upgrades futuros significativos.
 
 | Métrica                          | PARTE-20 (antes) | Atual (pós-roadmap) | Meta ideal |
 | -------------------------------- | ---------------- | ------------------- | ---------- |
-| Violações de camada (CI)         | 27               | **0** ✅             | 0          |
-| Re-exports cross-layer (ocultos) | —                | **9+** 🔴            | 0          |
-| Arquivos >400 LoC (raw)          | —                | **25** 🔴            | ≤5         |
-| Arquivos >300 LoC (código ativo) | —                | **9** ⚠️             | ≤5         |
-| Duplicações de responsabilidade  | 6                | **0** ✅             | 0          |
-| Módulos sem README               | 14               | **0** ✅             | 0          |
-| Módulos com JSDoc barrel         | 0                | **14/14** ✅         | 14/14      |
-| CI gates (automação)             | 0                | **2** ✅             | 5+         |
-| Testes de contrato               | 0                | **6** ✅             | 20+        |
+| Violações de camada (CI)         | 27               | **0** ✅            | 0          |
+| Re-exports cross-layer (ocultos) | —                | **9+** 🔴           | 0          |
+| Arquivos >400 LoC (raw)          | —                | **25** 🔴           | ≤5         |
+| Arquivos >300 LoC (código ativo) | —                | **9** ⚠️            | ≤5         |
+| Duplicações de responsabilidade  | 6                | **0** ✅            | 0          |
+| Módulos sem README               | 14               | **0** ✅            | 0          |
+| Módulos com JSDoc barrel         | 0                | **14/14** ✅        | 14/14      |
+| CI gates (automação)             | 0                | **2** ✅            | 5+         |
+| Testes de contrato               | 0                | **6** ✅            | 20+        |
 
 ### 2.3 Saúde Micro (novos indicadores)
 
-| Métrica                             | Valor         | Avaliação       | Meta ideal  |
-| ----------------------------------- | ------------- | --------------- | ----------- |
-| Imports cross-module (total)        | **389**       | —               | —           |
+| Métrica                             | Valor         | Avaliação        | Meta ideal  |
+| ----------------------------------- | ------------- | ---------------- | ----------- |
+| Imports cross-module (total)        | **389**       | —                | —           |
 | Barrel imports (via index)          | **88** (23%)  | 🔴 Baixo         | ≥80%        |
 | Deep imports (bypassing barrel)     | **233** (60%) | 🔴 Alto          | ≤20%        |
 | Re-export imports                   | **68** (17%)  | ⚠️               | ≤10%        |
@@ -98,9 +100,9 @@ e evolução para upgrades futuros significativos.
 | channel/       | 5                      | 2%         |                                         |
 | db/            | 2                      | 1%         |                                         |
 
-**Observação crítica**: `observability/logger` sozinho recebe 134 deep imports. Este padrão,
-embora aceitável para logger (performance/DX), estabelece precedente que se espalha e enfraquece
-o valor dos barrels.
+**Observação crítica**: `observability/logger` sozinho recebe 134 deep imports. Este padrão, embora
+aceitável para logger (performance/DX), estabelece precedente que se espalha e enfraquece o valor
+dos barrels.
 
 ---
 
@@ -129,10 +131,10 @@ L0  db/                  — SQLite
 
 | Módulo              | Fan-in | Fan-out | Estabilidade (I) | Classificação           |
 | ------------------- | ------ | ------- | ---------------- | ----------------------- |
-| `core/`             | 12     | 1 ⚠️     | 0.92             | Leaf node (quase puro)  |
+| `core/`             | 12     | 1 ⚠️    | 0.92             | Leaf node (quase puro)  |
 | `db/`               | 3      | 1       | 0.75             | Leaf node               |
 | `audit/`            | 6      | 2       | 0.75             | Estável                 |
-| `sdk/`              | 10     | 3 ⚠️     | 0.77             | Alta dependência in     |
+| `sdk/`              | 10     | 3 ⚠️    | 0.77             | Alta dependência in     |
 | `config/`           | 11     | 3       | 0.79             | Hub de configuração     |
 | `observability/`    | 10     | 4       | 0.71             | Hub de logging          |
 | `hooks/`            | 3      | 5       | 0.38             | Alta dependência out    |
@@ -148,6 +150,7 @@ L0  db/                  — SQLite
 > poucos deps). Valores baixos = módulos instáveis (poucas deps in, muitas out).
 
 **Observações**:
+
 - `api/` com fan-out de **11 módulos** é mega-aggregator — potencial god module
 - `core/` com fan-out 1 deveria ser **0** (leaf node absoluto)
 - `hooks/` e `tools/` estabilidade ~0.33 — vulneráveis a cascading changes
@@ -161,11 +164,13 @@ L0  db/                  — SQLite
 #### 4.1.1 Script de CI com regex incompleta
 
 O `scripts/check-layer-violations.mjs` usa:
+
 ```js
 const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
 ```
 
 **Não detecta**:
+
 - `export { X } from '...'` — re-export nomeado (9 instâncias encontradas)
 - `export * from '...'` — re-export total (0 instâncias hoje)
 - `import('...')` — dynamic import
@@ -175,17 +180,17 @@ const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
 
 | #   | Fonte                          | Target                                 | Dir   | Sev |
 | --- | ------------------------------ | -------------------------------------- | ----- | --- |
-| 1   | `core/constants.js`            | `#copilot/config/env`                  | L0→L2 | 🔴   |
-| 2   | `sdk/index.js`                 | `#copilot/hooks/factory`               | L1→L3 | 🔴   |
-| 3   | `sdk/index.js`                 | `#copilot/hooks/permission`            | L1→L3 | 🔴   |
-| 4   | `sdk/config.js`                | `#copilot/config/session-config` (×2)  | L1→L2 | 🟠   |
-| 5   | `sdk/index.js`                 | `#copilot/core/security/url-validator` | L1→L0 | ✅   |
-| 6   | `hooks/index.js`               | `#copilot/audit`                       | L3→L1 | ✅   |
-| 7   | `observability/index.js`       | `#copilot/audit/pipeline`              | L2→L1 | ✅   |
-| 8   | `agent/infra/index.js`         | `#copilot/audit/pipeline`              | L4→L1 | ✅   |
-| 9   | `agent/infra/index.js`         | `#copilot/core/security/url-validator` | L4→L0 | ✅   |
-| 10  | `agent/infra/url-validator.js` | `#copilot/core/security/url-validator` | L4→L0 | ✅   |
-| 11  | `agent/infra/tools-bootstrap`  | `#copilot/tools/index`                 | L4→L3 | ✅   |
+| 1   | `core/constants.js`            | `#copilot/config/env`                  | L0→L2 | 🔴  |
+| 2   | `sdk/index.js`                 | `#copilot/hooks/factory`               | L1→L3 | 🔴  |
+| 3   | `sdk/index.js`                 | `#copilot/hooks/permission`            | L1→L3 | 🔴  |
+| 4   | `sdk/config.js`                | `#copilot/config/session-config` (×2)  | L1→L2 | 🟠  |
+| 5   | `sdk/index.js`                 | `#copilot/core/security/url-validator` | L1→L0 | ✅  |
+| 6   | `hooks/index.js`               | `#copilot/audit`                       | L3→L1 | ✅  |
+| 7   | `observability/index.js`       | `#copilot/audit/pipeline`              | L2→L1 | ✅  |
+| 8   | `agent/infra/index.js`         | `#copilot/audit/pipeline`              | L4→L1 | ✅  |
+| 9   | `agent/infra/index.js`         | `#copilot/core/security/url-validator` | L4→L0 | ✅  |
+| 10  | `agent/infra/url-validator.js` | `#copilot/core/security/url-validator` | L4→L0 | ✅  |
+| 11  | `agent/infra/tools-bootstrap`  | `#copilot/tools/index`                 | L4→L3 | ✅  |
 
 **Violações reais** (import ascendente): #1 (L0→L2), #2-3 (L1→L3), #4 (L1→L2) = **4 violações**
 
@@ -193,33 +198,33 @@ const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
 
 #### Todos os 25 arquivos com análise de concerns
 
-| #   | Arquivo                                 | LoC | Concerns                       | Ação recomendada                  |
-| --- | --------------------------------------- | --- | ------------------------------ | --------------------------------- |
-| 1   | `agent/always-alive.js`                 | 603 | Classe + singleton + lifecycle | Split: class / singleton          |
-| 2   | `agent/dialog/loop-manager.js`          | 600 | Classe monolítica              | Split: control / events           |
-| 3   | `sdk/types.js`                          | 569 | Typedefs JSDoc only            | Split por domain                  |
-| 4   | `conversation-hub/store.js`             | 562 | Class + singleton + queries    | Split: store / queries            |
+| #   | Arquivo                                 | LoC | Concerns                       | Ação recomendada                   |
+| --- | --------------------------------------- | --- | ------------------------------ | ---------------------------------- |
+| 1   | `agent/always-alive.js`                 | 603 | Classe + singleton + lifecycle | Split: class / singleton           |
+| 2   | `agent/dialog/loop-manager.js`          | 600 | Classe monolítica              | Split: control / events            |
+| 3   | `sdk/types.js`                          | 569 | Typedefs JSDoc only            | Split por domain                   |
+| 4   | `conversation-hub/store.js`             | 562 | Class + singleton + queries    | Split: store / queries             |
 | 5   | `audit/pipeline.js`                     | 559 | 9 exports multi-concern        | 🔴 Split: pipeline / audit-helpers |
-| 6   | `channel/client.js`                     | 557 | Classe + DI setter             | Split: class / connection         |
+| 6   | `channel/client.js`                     | 557 | Classe + DI setter             | Split: class / connection          |
 | 7   | `terminal/index.js`                     | 494 | Bootstrap + lifecycle + timer  | 🔴 Split: bootstrap / lifecycle    |
-| 8   | `sdk/rpc.js`                            | 484 | Facade grande                  | Split: rpc-core / rpc-ops         |
-| 9   | `conversation-hub/socket-ns.js`         | 482 | 5 exports (mount/bcast)        | Split: mount / broadcast          |
+| 8   | `sdk/rpc.js`                            | 484 | Facade grande                  | Split: rpc-core / rpc-ops          |
+| 9   | `conversation-hub/socket-ns.js`         | 482 | 5 exports (mount/bcast)        | Split: mount / broadcast           |
 | 10  | `tools/todo/crud-tools.js`              | 459 | 6 tool definitions             | 🔴 Split por tool pair             |
-| 11  | `terminal/server.js`                    | 452 | Server factory                 | Split: http / ws                  |
-| 12  | `channel/inject.js`                     | 451 | Subscribe + handlers           | Split: subscribe / handle         |
-| 13  | `conversation-hub/orchestrator.js`      | 438 | Class Orchestrator + DI        | Avaliar: single concern?          |
-| 14  | `terminal/repl.js`                      | 437 | REPL loop + handlers           | Split: repl / handlers            |
-| 15  | `bridges/nerv-bridge.js`                | 434 | 8 exports multi-concern        | Split: bridge / events            |
-| 16  | `bridges/mcp-tool-bridge.js`            | 433 | MCP integration                | Split: bridge / reconnect         |
-| 17  | `bridges/git-bridge.js`                 | 428 | 3 formatters + bridge          | Split: format / exec              |
-| 18  | `observability/metrics.js`              | 426 | MetricsStore + factory         | Avaliar coesão                    |
-| 19  | `observability/observers/dialog-task-*` | 424 | Handler bundle                 | Split por event type              |
-| 20  | `tools/todo/store.js`                   | 423 | TodoStore + schemas + helpers  | Split: store / schema             |
-| 21  | `sdk/client.js`                         | 416 | Client singleton + ops         | Split: client / client-ops        |
-| 22  | `hooks/factory.js`                      | 416 | 7 factory functions            | Split: create / compose           |
-| 23  | `tools/introspection-tools.js`          | 409 | Tool definitions               | Split: session / system           |
-| 24  | `tools/file/read-tools.js`              | 405 | Tool definitions               | Split: read / list                |
-| 25  | `observability/event-collector.js`      | 405 | Event collection               | Split: collect / dispatch         |
+| 11  | `terminal/server.js`                    | 452 | Server factory                 | Split: http / ws                   |
+| 12  | `channel/inject.js`                     | 451 | Subscribe + handlers           | Split: subscribe / handle          |
+| 13  | `conversation-hub/orchestrator.js`      | 438 | Class Orchestrator + DI        | Avaliar: single concern?           |
+| 14  | `terminal/repl.js`                      | 437 | REPL loop + handlers           | Split: repl / handlers             |
+| 15  | `bridges/nerv-bridge.js`                | 434 | 8 exports multi-concern        | Split: bridge / events             |
+| 16  | `bridges/mcp-tool-bridge.js`            | 433 | MCP integration                | Split: bridge / reconnect          |
+| 17  | `bridges/git-bridge.js`                 | 428 | 3 formatters + bridge          | Split: format / exec               |
+| 18  | `observability/metrics.js`              | 426 | MetricsStore + factory         | Avaliar coesão                     |
+| 19  | `observability/observers/dialog-task-*` | 424 | Handler bundle                 | Split por event type               |
+| 20  | `tools/todo/store.js`                   | 423 | TodoStore + schemas + helpers  | Split: store / schema              |
+| 21  | `sdk/client.js`                         | 416 | Client singleton + ops         | Split: client / client-ops         |
+| 22  | `hooks/factory.js`                      | 416 | 7 factory functions            | Split: create / compose            |
+| 23  | `tools/introspection-tools.js`          | 409 | Tool definitions               | Split: session / system            |
+| 24  | `tools/file/read-tools.js`              | 405 | Tool definitions               | Split: read / list                 |
+| 25  | `observability/event-collector.js`      | 405 | Event collection               | Split: collect / dispatch          |
 
 **Candidatos a split imediato** (multi-concern claro): #5, #7, #10, #20
 
@@ -228,14 +233,16 @@ const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
 **Ratio barrel vs deep**: 88 barrel (23%) vs 233 deep (60%) vs 68 re-export (17%)
 
 **Consequências**:
+
 1. Qualquer renomeação/move de arquivo interno quebra 233 importadores externos
 2. Testes precisam mockar paths internos em vez de barrels
 3. O investimento em barrels/JSDoc perde valor prático
 4. Refactors ficam exponencialmente mais caros
 
 **Análise de viabilidade de migração para barrels**:
-- `observability/logger` (134 deep) → **Trade-off**: performance vs encapsulamento. Logger é o
-  caso mais justificável para deep import. Criar `#copilot/observability/logger` alias no package.json?
+
+- `observability/logger` (134 deep) → **Trade-off**: performance vs encapsulamento. Logger é o caso
+  mais justificável para deep import. Criar `#copilot/observability/logger` alias no package.json?
 - `config/env` (43 deep) → Deveria migrar para barrel `#copilot/config`
 - `core/*` (57 deep) → Deveria migrar para barrel `#copilot/core`
 
@@ -263,6 +270,7 @@ const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
 **70 arquivos** usam EventEmitter diretamente.
 
 Distribuição por módulo:
+
 - `agent/` → 20 arquivos (session handlers, lifecycle, dialog)
 - `observability/` → 9 arquivos (observers, collectors)
 - `terminal/` → 5 arquivos (repl, server, state)
@@ -342,17 +350,17 @@ terminal   → {agent, api, audit, bridges, channel, config, conversation-hub, c
 
 | #   | Fonte            | Target                  | Dir   | Tipo          | Sev |
 | --- | ---------------- | ----------------------- | ----- | ------------- | --- |
-| 1   | `core/constants` | `config/env`            | L0→L2 | export...from | 🔴   |
-| 2   | `sdk/index`      | `hooks/factory`         | L1→L3 | export...from | 🔴   |
-| 3   | `sdk/index`      | `hooks/permission`      | L1→L3 | export...from | 🔴   |
-| 4   | `sdk/config`     | `config/session-config` | L1→L2 | export+import | 🟠   |
+| 1   | `core/constants` | `config/env`            | L0→L2 | export...from | 🔴  |
+| 2   | `sdk/index`      | `hooks/factory`         | L1→L3 | export...from | 🔴  |
+| 3   | `sdk/index`      | `hooks/permission`      | L1→L3 | export...from | 🔴  |
+| 4   | `sdk/config`     | `config/session-config` | L1→L2 | export+import | 🟠  |
 
 ---
 
 ## 6. Conquistas do PARTE-20
 
-| Faixa | Tema                     | Status                                |
-| ----- | ------------------------ | ------------------------------------- |
+| Faixa | Tema                     | Status                                 |
+| ----- | ------------------------ | -------------------------------------- |
 | A     | Violações de camada      | ✅ 27→0 (DI injection)                 |
 | B     | God objects              | ✅ Todos avaliados como coesos/facades |
 | C     | Duplicações              | ✅ 6 issues resolvidos                 |
@@ -369,11 +377,11 @@ terminal   → {agent, api, audit, bridges, channel, config, conversation-hub, c
 
 | Gate                     | Script                          | Status | Observação             |
 | ------------------------ | ------------------------------- | ------ | ---------------------- |
-| Layer violations         | `check-layer-violations.mjs`    | ⚠️      | Não cobre export..from |
-| File size (código ativo) | `check-file-size.mjs`           | ✅      | 0 erros, 9 warnings    |
-| Contract tests           | `test_barrel_contracts.spec.js` | ✅      | 6/6                    |
-| Typecheck                | `npm run typecheck:node`        | ✅      | 0 erros                |
-| Lint                     | `npm run lint`                  | ✅      | 0 erros, 1 warning     |
+| Layer violations         | `check-layer-violations.mjs`    | ⚠️     | Não cobre export..from |
+| File size (código ativo) | `check-file-size.mjs`           | ✅     | 0 erros, 9 warnings    |
+| Contract tests           | `test_barrel_contracts.spec.js` | ✅     | 6/6                    |
+| Typecheck                | `npm run typecheck:node`        | ✅     | 0 erros                |
+| Lint                     | `npm run lint`                  | ✅     | 0 erros, 1 warning     |
 
 ### 7.2 Gates ausentes (recomendados)
 
@@ -407,8 +415,8 @@ terminal   → {agent, api, audit, bridges, channel, config, conversation-hub, c
 
 ### 9.1 Resumo de findings
 
-| #   | Problema                        | Impacto   | Esforço | Prioridade  |
-| --- | ------------------------------- | --------- | ------- | ----------- |
+| #   | Problema                        | Impacto    | Esforço | Prioridade  |
+| --- | ------------------------------- | ---------- | ------- | ----------- |
 | 1   | Gap de regex no CI              | 🔴 Crítico | Baixo   | P0 Imediata |
 | 2   | 4 violações topológicas ocultas | 🔴 Alto    | Médio   | P0 Imediata |
 | 3   | 233 deep imports (72%)          | 🔴 Alto    | Alto    | P1 Curto    |

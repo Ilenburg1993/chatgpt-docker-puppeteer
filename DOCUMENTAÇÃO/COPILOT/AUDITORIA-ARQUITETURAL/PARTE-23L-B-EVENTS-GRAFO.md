@@ -1,7 +1,7 @@
 # PARTE-23L-B — Events System: Grafos de Topologia v2.0
 
-**Data**: 2026-04-12 | **Status**: Auditoria | **Versão**: 2.0 (pós-FAIXA-L1 a L8)
-**Precedente**: Commit `b3284b0a` | **Companion**: PARTE-23L-A v2.0
+**Data**: 2026-04-12 | **Status**: Auditoria | **Versão**: 2.0 (pós-FAIXA-L1 a L8) **Precedente**:
+Commit `b3284b0a` | **Companion**: PARTE-23L-A v2.0
 
 ---
 
@@ -222,16 +222,16 @@ agent-messaging.js
 
 ### Diferenças Chave Atual → Ideal:
 
-| Aspecto                  | Atual (v2.0)             | Ideal                         |
-|--------------------------|--------------------------|-------------------------------|
-| SDK→EventBus caminhos    | 2 (A + B duplicados)     | 1 (event-handlers único)      |
-| Events perdidos (agent)  | 28                       | 0                             |
-| NERV outbound caminhos   | 2 (legado + adapter)     | 1 (adapter único)             |
-| NERV envelope duplicação | 38 duplos                | 0 duplos                      |
-| Observer acoplamento     | 2 (EB direto + EventBus) | 1 (EventBus único)            |
-| Namespace separator      | 4 formatos (:, ., _, /)  | 1 formato (`:` SSOT)          |
-| Event types no EventBus  | ~90 (com duplos)         | ~82 (sem duplos)              |
-| Bus-observers ação       | log only                 | métricas + health + alertas   |
+| Aspecto                  | Atual (v2.0)             | Ideal                       |
+| ------------------------ | ------------------------ | --------------------------- |
+| SDK→EventBus caminhos    | 2 (A + B duplicados)     | 1 (event-handlers único)    |
+| Events perdidos (agent)  | 28                       | 0                           |
+| NERV outbound caminhos   | 2 (legado + adapter)     | 1 (adapter único)           |
+| NERV envelope duplicação | 38 duplos                | 0 duplos                    |
+| Observer acoplamento     | 2 (EB direto + EventBus) | 1 (EventBus único)          |
+| Namespace separator      | 4 formatos (:, ., \_, /) | 1 formato (`:` SSOT)        |
+| Event types no EventBus  | ~90 (com duplos)         | ~82 (sem duplos)            |
+| Bus-observers ação       | log only                 | métricas + health + alertas |
 
 ---
 
@@ -314,22 +314,21 @@ EventBus namespace tree:
 
 ## 6. Matriz de Cobertura por Módulo
 
-| Módulo           | Emitidos | Bridgeados | Perdidos | Cobertura |
-|------------------|----------|------------|----------|-----------|
-| agent/lifecycle  | 8        | 6          | 2        | 75%       |
-| agent/dialog     | 13       | 13         | 0        | 100%      |
-| agent/session    | 16       | 8          | 8        | 50%       |
-| agent/messaging  | 2        | 0          | 2        | 0%        |
-| agent/infra      | 7        | 6          | 1        | 86%       |
-| hooks            | 6        | 6          | 0        | 100%      |
-| hub              | 6        | 6          | 0        | 100%      |
-| services         | 5        | 5          | 0        | 100%      |
-| system           | 5        | 5          | 0        | 100%      |
-| **TOTAL**        | **68**   | **55**     | **13**   | **81%**   |
+| Módulo          | Emitidos | Bridgeados | Perdidos | Cobertura |
+| --------------- | -------- | ---------- | -------- | --------- |
+| agent/lifecycle | 8        | 6          | 2        | 75%       |
+| agent/dialog    | 13       | 13         | 0        | 100%      |
+| agent/session   | 16       | 8          | 8        | 50%       |
+| agent/messaging | 2        | 0          | 2        | 0%        |
+| agent/infra     | 7        | 6          | 1        | 86%       |
+| hooks           | 6        | 6          | 0        | 100%      |
+| hub             | 6        | 6          | 0        | 100%      |
+| services        | 5        | 5          | 0        | 100%      |
+| system          | 5        | 5          | 0        | 100%      |
+| **TOTAL**       | **68**   | **55**     | **13**   | **81%**   |
 
-> Nota: Os 28 "perdidos" incluem variantes internas (__processQueue, status)
-> e eventos que não precisam de bridge (dialog.pre_stall_warning).
-> Cobertura real após exclusão de internos: **~85%**
+> Nota: Os 28 "perdidos" incluem variantes internas (\_\_processQueue, status) e eventos que não
+> precisam de bridge (dialog.pre_stall_warning). Cobertura real após exclusão de internos: **~85%**
 
 ---
 

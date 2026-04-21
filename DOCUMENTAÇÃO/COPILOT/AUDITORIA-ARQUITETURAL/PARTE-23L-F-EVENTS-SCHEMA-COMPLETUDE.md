@@ -1,8 +1,7 @@
 # PARTE-23L-F — Events: Schema 100%, Rastreio Centralizado & Tratamento
 
-**Data**: 2026-04-12 | **Status**: ✅ CONCLUÍDO | **Versão**: 2.0
-**Precedente**: PARTE-23L-E v5.1 (L19-L28 concluídas, Score 96/100)
-**Commits**: `e571fbd4` (L29-L32), `338e5dae` (L33-L35+L38)
+**Data**: 2026-04-12 | **Status**: ✅ CONCLUÍDO | **Versão**: 2.0 **Precedente**: PARTE-23L-E v5.1
+(L19-L28 concluídas, Score 96/100) **Commits**: `e571fbd4` (L29-L32), `338e5dae` (L33-L35+L38)
 
 ---
 
@@ -47,8 +46,8 @@ Estes 13 schemas foram registrados com types que não correspondem a nenhuma con
 
 ### 1.3 Emitter Events Não-Bridgeados (5)
 
-| Constante                        | Valor               | Ação                                                    |
-| -------------------------------- | ------------------- | ------------------------------------------------------- |
+| Constante                        | Valor               | Ação                                                     |
+| -------------------------------- | ------------------- | -------------------------------------------------------- |
 | `EMITTER_PROCESS_QUEUE`          | `__processQueue`    | ❌ Internal — não bridgear (ok)                          |
 | `EMITTER_TURN_START`             | `turn_start`        | ❌ Já bridgeado via `dialog.turn_start` (ok)             |
 | `EMITTER_TURN_END`               | `turn_end`          | ❌ Já bridgeado via `dialog.turn_end` (ok)               |
@@ -57,8 +56,8 @@ Estes 13 schemas foram registrados com types que não correspondem a nenhuma con
 
 ### 1.4 Hardcoded Strings Residuais
 
-| Local                         | String                  | Tipo       | Ação          |
-| ----------------------------- | ----------------------- | ---------- | ------------- |
+| Local                         | String                  | Tipo       | Ação           |
+| ----------------------------- | ----------------------- | ---------- | -------------- |
 | `config/pinned-files.js` (×2) | `'changed'`             | Local      | ❌ Legítimo    |
 | `terminal/state.js`           | `'phase:changed'`       | Local      | ❌ Legítimo    |
 | `bridges/nerv-bridge.js`      | `'before-stop'/'ready'` | DEPRECATED | 🔸 Delete file |
@@ -70,6 +69,7 @@ Estes 13 schemas foram registrados com types que não correspondem a nenhuma con
 ### 2.1 Schema Coverage: 100%
 
 Todos os 120 bus events SSOT devem ter um schema com:
+
 - `type`: correspondendo exatamente à constante SSOT
 - `required`: campos mínimos obrigatórios
 - `fields`: tipagem de campos (`string`, `number`, `boolean`, `object`, `array`)
@@ -77,7 +77,8 @@ Todos os 120 bus events SSOT devem ter um schema com:
 
 ### 2.2 Schema Orphan: 0
 
-Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan devem ser corrigidos ou removidos.
+Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan devem ser corrigidos
+ou removidos.
 
 ### 2.3 Rastreio Fino Centralizado
 
@@ -106,9 +107,12 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Corrigir os 13 schemas orphan para que apontem para constantes SSOT válidas.
 
 **Subfases**:
+
 1. **L29.1** — Renomear 7 schemas com type errado para o SSOT correto
-2. **L29.2** — Criar constantes SSOT faltantes para 3 schemas legítimos (`agent:streaming:*`) ou remover se não usados
-3. **L29.3** — Remover 3 schemas obsoletos (`memory:compaction_complete`, `hook:registered`, `agent:tool:error`)
+2. **L29.2** — Criar constantes SSOT faltantes para 3 schemas legítimos (`agent:streaming:*`) ou
+   remover se não usados
+3. **L29.3** — Remover 3 schemas obsoletos (`memory:compaction_complete`, `hook:registered`,
+   `agent:tool:error`)
 4. **L29.4** — Testes de regressão: todos schemas devem matchar SSOT
 
 **Critério**: `schemaCount()` = N onde N = schemas com match SSOT 1:1
@@ -118,20 +122,25 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Criar schemas para todos os 79 agent-events.
 
 **Subfases**:
-1. **L30.1** — agent:dialog domain (8 events sem schema: boot_recovery, compaction:requested, delta, paused, ready, reply, resumed, stopped)
+
+1. **L30.1** — agent:dialog domain (8 events sem schema: boot_recovery, compaction:requested, delta,
+   paused, ready, reply, resumed, stopped)
 2. **L30.2** — agent:session domain (16 events sem schema)
 3. **L30.3** — agent:assistant domain (4 events)
 4. **L30.4** — agent:task domain (2 events: delta, reasoning)
 5. **L30.5** — agent:tool domain (3 events: execution_start, execution_complete, execution_progress)
-6. **L30.6** — Remaining agent events (abort, background, context, elicitation, emitter:error, exit_plan_mode, external_tool, mcp, pending_messages, pr, question, quota, sdk, shell, status, steering, subagent, system:message)
+6. **L30.6** — Remaining agent events (abort, background, context, elicitation, emitter:error,
+   exit_plan_mode, external_tool, mcp, pending_messages, pr, question, quota, sdk, shell, status,
+   steering, subagent, system:message)
 
-**Critério**: Todos os 79 agent:* events têm schema
+**Critério**: Todos os 79 agent:\* events têm schema
 
 #### FAIXA-L31 — Non-Agent Event Schemas (41 → 100%) ✅ CONCLUÍDO (`e571fbd4`)
 
 **Objetivo**: Criar schemas para todos os 41 non-agent bus events.
 
 **Subfases**:
+
 1. **L31.1** — audit events (4): entry, flush, log, quick
 2. **L31.2** — bridge events (3): mcp:reconnected, nerv:connected, nerv:disconnected
 3. **L31.3** — config events (1): changed
@@ -155,6 +164,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Bridgear os 2 emitter events candidatos + criar constantes SSOT.
 
 **Subfases**:
+
 1. **L32.1** — Criar `AGENT_DIALOG_PRE_STALL_WARNING` em agent-events.js
 2. **L32.2** — Criar `AGENT_SESSION_IDLE` em agent-events.js
 3. **L32.3** — Adicionar bridge entries em always-alive.js
@@ -167,8 +177,10 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Ativar validação de schema em runtime com tratamento adequado.
 
 **Subfases**:
+
 1. **L33.1** — schema-validator middleware: log warning para events sem schema (dev mode)
-2. **L33.2** — schema-validator middleware: validar payload contra schema (dev mode → warn, prod mode → silent)
+2. **L33.2** — schema-validator middleware: validar payload contra schema (dev mode → warn, prod
+   mode → silent)
 3. **L33.3** — Expor métricas de validação: total validated, total failed, total no-schema
 4. **L33.4** — Dashboard endpoint `/api/events/schema-health` com coverage stats
 
@@ -179,9 +191,11 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Aprimorar rastreio de events sem subscribers.
 
 **Subfases**:
+
 1. **L34.1** — event-bus.js: detectar emit sem nenhum subscriber ativo → registrar dead letter
 2. **L34.2** — event-catalog.js: dead letter agora inclui timestamp, payload hash, correlation_id
-3. **L34.3** — Bus-action dead-letter-tracker: subscribe wildcard `*`, verificar se existem outros subscribers
+3. **L34.3** — Bus-action dead-letter-tracker: subscribe wildcard `*`, verificar se existem outros
+   subscribers
 4. **L34.4** — Dashboard endpoint `/api/events/dead-letters` com lista paginada
 
 **Critério**: Zero events silenciados; todos dead letters rastreados
@@ -191,7 +205,9 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Registrar graph de causalidade event→event.
 
 **Subfases**:
-1. **L35.1** — Novo middleware `causality-enricher`: quando event A causa emit de event B, registrar `B._causedBy = A.correlation_id`
+
+1. **L35.1** — Novo middleware `causality-enricher`: quando event A causa emit de event B, registrar
+   `B._causedBy = A.correlation_id`
 2. **L35.2** — Bus-action flow-recorder: registrar edges A→B num Map por session
 3. **L35.3** — `event-catalog.js`: `getCausalityGraph(sessionId)` retorna edges
 4. **L35.4** — Dashboard endpoint `/api/events/flow/:sessionId` com Mermaid graph
@@ -205,6 +221,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Remover arquivo legado.
 
 **Subfases**:
+
 1. **L36.1** — Verificar zero imports ativos de nerv-bridge.js
 2. **L36.2** — Remover arquivo + atualizar bridges/index.js
 3. **L36.3** — Atualizar NERV adapter docs
@@ -216,6 +233,7 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Zero erros TS em todos os arquivos do event system.
 
 **Subfases**:
+
 1. **L37.1** — Fix JSDoc tipos em todos os emit/on/once call-sites
 2. **L37.2** — Adicionar `@template T` generics nos bus.on<T>
 3. **L37.3** — Tipar todos os EventSchema.fields com precisão
@@ -228,7 +246,9 @@ Todos os schemas devem corresponder a uma constante SSOT válida. Schemas orphan
 **Objetivo**: Script automatizado que falha se schema coverage < 100%.
 
 **Subfases**:
-1. **L38.1** — `scripts/check-schema-coverage.mjs`: lista todos SSOT, verifica schema, exit 1 se faltando
+
+1. **L38.1** — `scripts/check-schema-coverage.mjs`: lista todos SSOT, verifica schema, exit 1 se
+   faltando
 2. **L38.2** — npm script `analyze:events:schema-coverage`
 3. **L38.3** — Integrar no `validate:all` task
 
@@ -263,8 +283,8 @@ START ──→ L29 (Orphan Fix) ──→ L30 (Agent Schemas) ──→ L33 (St
 
 ## 5. Ordem de Execução Recomendada
 
-| Seq | Faixa | Risco     | Prioridade | Dependência | Esforço |
-| --- | ----- | --------- | ---------- | ----------- | ------- |
+| Seq | Faixa | Risco      | Prioridade | Dependência | Esforço |
+| --- | ----- | ---------- | ---------- | ----------- | ------- |
 | 1   | L29   | 🔴 CRÍTICO | ALTA       | Nenhuma     | Baixo   |
 | 2   | L30   | 🔴 CRÍTICO | ALTA       | L29         | Alto    |
 | 3   | L31   | 🟡 MÉDIO   | MÉDIA      | L29         | Médio   |

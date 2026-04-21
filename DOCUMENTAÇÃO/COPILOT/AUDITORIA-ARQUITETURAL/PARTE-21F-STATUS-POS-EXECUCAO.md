@@ -1,53 +1,55 @@
 # PARTE-21F — Status Pós-Execução: Auditoria Completa Atualizada
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.2
-**Scope**: Resultado completo das Faixas H–N + Wave 4 (W4-1~W4-9) + Wave 5 W5-4
-**Precedente**: PARTE-21A (baseline pré-execução), PARTE-21C (roadmap)
-**Último commit**: `35bf45da` (origin/main)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.2 **Scope**: Resultado completo das
+Faixas H–N + Wave 4 (W4-1~W4-9) + Wave 5 W5-4 **Precedente**: PARTE-21A (baseline pré-execução),
+PARTE-21C (roadmap) **Último commit**: `35bf45da` (origin/main)
 
 ---
 
 ## 1. Resumo Executivo
 
-Todas as 7 faixas do roadmap PARTE-21C (H–N) foram **executadas e pushed**. A execução da **Wave 4** foi concluída (W4-1 a W4-9), e a **Wave 5 W5-4** resolveu o gargalo de fan-out. O sistema está em Health Score **A (95/100)**.
+Todas as 7 faixas do roadmap PARTE-21C (H–N) foram **executadas e pushed**. A execução da **Wave 4**
+foi concluída (W4-1 a W4-9), e a **Wave 5 W5-4** resolveu o gargalo de fan-out. O sistema está em
+Health Score **A (95/100)**.
 
 ### 1.1 O que foi feito (Wave 4 completa)
 
-| Item  | Descrição                                        | Resultado                                       |
-| ----- | ------------------------------------------------ | ----------------------------------------------- |
-| W4-1  | arch-health: singletons + deep imports refinados | Score 65→75, contagem real                      |
-| W4-2  | ESLint F21: allow-list logger/sdk/types          | 0 lint errors, regex negative lookahead         |
-| W4-3  | Excluir JSDoc do deep import count               | Deep total: 165→40, refined: 40→4               |
+| Item  | Descrição                                        | Resultado                                        |
+| ----- | ------------------------------------------------ | ------------------------------------------------ |
+| W4-1  | arch-health: singletons + deep imports refinados | Score 65→75, contagem real                       |
+| W4-2  | ESLint F21: allow-list logger/sdk/types          | 0 lint errors, regex negative lookahead          |
+| W4-3  | Excluir JSDoc do deep import count               | Deep total: 165→40, refined: 40→4                |
 | W4-4  | split conversation-hub/store.js                  | ✅ Já estava split (store-queries/memories/sync) |
 | W4-5  | split hooks/factory.js                           | ✅ Já estava split (composer.js existia)         |
 | W4-6  | terminal/server.js HTTP vs WS                    | ✅ Arquivo é HTTP-only, sem WS                   |
-| W4-7  | split dialog-task-handlers.js                    | Deferido — shared state impede split seguro     |
+| W4-7  | split dialog-task-handlers.js                    | Deferido — shared state impede split seguro      |
 | W4-8  | DI tokens para 14 setters restantes              | ✅ Identificado: são state setters, não DI       |
 | W4-9  | +10 contract tests                               | ✅ +28 testes (test_arch_contracts.spec.js)      |
 | W4-10 | fan-out api/terminal ≤16                         | ✅ Terminal/index.js=19 é esperado (root node)   |
-| W5-4  | arch-health: fan-out inter-módulo + singleton    | Score 84→**95 (A)**: fanOut usa #copilot/ only  |
+| W5-4  | arch-health: fan-out inter-módulo + singleton    | Score 84→**95 (A)**: fanOut usa #copilot/ only   |
 
 ### 1.2 Métricas atuais vs baseline vs target
 
-| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | **Wave 4 (atual)**   | Target (21B)            |
-| --------------------- | -------------- | ------------------- | -------------------- | ----------------------- |
-| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | Wave 4 (1.1)         | **Wave 5 (atual)**      | Target (21B) |
-| --------------------- | -------------- | -------------       | -------------------- | ----------------------  | ------------ |
+| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | **Wave 4 (atual)**   | Target (21B)             |
+| --------------------- | -------------- | ------------------- | -------------------- | ------------------------ | ------------ |
+| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | Wave 4 (1.1)         | **Wave 5 (atual)**       | Target (21B) |
+| --------------------- | -------------- | -------------       | -------------------- | ----------------------   | ------------ |
 | **Health Score**      | D (35/100)     | D (65/100)          | B (84/100)           | **A (95/100)** ✅        | A (85+)      |
-| Layer violations (CI) | 0              | 0 ✅                 | 0 ✅                  | **0** ✅                 | 0            |
-| Barrel coverage       | 23%            | 100% ✅              | 100% ✅               | **100%** ✅              | ≥90%         |
-| Deep imports (total)  | 233            | 165                 | 40 ✅                 | **40** ✅                | ≤50          |
-| Deep imports (real)   | —              | 40 (refined)        | 4 (refined) ✅        | **4** (refined) ✅       | ≤10          |
-| Files >400 LoC        | 25             | 18                  | 18 ⚠️                 | **18** ⚠️                | ≤5           |
+| Layer violations (CI) | 0              | 0 ✅                | 0 ✅                 | **0** ✅                 | 0            |
+| Barrel coverage       | 23%            | 100% ✅             | 100% ✅              | **100%** ✅              | ≥90%         |
+| Deep imports (total)  | 233            | 165                 | 40 ✅                | **40** ✅                | ≤50          |
+| Deep imports (real)   | —              | 40 (refined)        | 4 (refined) ✅       | **4** (refined) ✅       | ≤10          |
+| Files >400 LoC        | 25             | 18                  | 18 ⚠️                | **18** ⚠️                | ≤5           |
 | Singletons (refined)  | ~30            | 73                  | 66 (refined)         | **53 (refined)** ✅      | ≤10          |
-| DI tokens             | 0              | 13 ✅                | 13 ✅                 | **13** ✅                | —            |
+| DI tokens             | 0              | 13 ✅               | 13 ✅                | **13** ✅                | —            |
 | Fan-out max (real)    | 11 (api)       | 19 (medição errada) | 19 (errado)          | **10** (inter-módulo) ✅ | ≤8           |
-| Contract tests        | 6              | 108                 | 136 ✅                | **136** ✅               | 20+          |
-| Módulos totais        | 14             | 17 ✅                | 17 ✅                 | **17** ✅                | 17           |
+| Contract tests        | 6              | 108                 | 136 ✅               | **136** ✅               | 20+          |
+| Módulos totais        | 14             | 17 ✅               | 17 ✅                | **17** ✅                | 17           |
 
 ### 1.3 Análise do Health Score Wave 5
 
 O score **95/100 (A)** é calculado pelo `scripts/arch-health.mjs` (refinado em W4-1/W4-3/W5-4):
+
 - Barrel coverage: 100% → 0 penalidade (máximo)
 - Singletons: 53 refined → penalidade `min(15, (53-20)*0.5) = 15`
 - **Fan-out real: max 10** → penalidade `min(15, (10-8)*2) = 4` (era 15 com medição errada)
@@ -57,10 +59,15 @@ O score **95/100 (A)** é calculado pelo `scripts/arch-health.mjs` (refinado em 
 
 **Score final**: 100 - 0 - 15 - 4 - 0 - 1 + 5 + 10 = **95** ✅
 
-**Bug corrigido em W5-4**: O `fanOut()` capturava imports relativos intra-módulo (`../state.js`, `../alias-store.js` dentro de `terminal/`) como dependências externas. O regex foi corrigido para contar apenas `#copilot/MODULE` (inter-módulo). Fan-out real: 19→**10**.
+**Bug corrigido em W5-4**: O `fanOut()` capturava imports relativos intra-módulo (`../state.js`,
+`../alias-store.js` dentro de `terminal/`) como dependências externas. O regex foi corrigido para
+contar apenas `#copilot/MODULE` (inter-módulo). Fan-out real: 19→**10**.
 
 **Gargalos remanescentes** (impacto mínimo em score A):
-1. **Singletons (53 refined)** — ainda inclui lazy inits legítimos (`_stateCache`, `_writeQueue`, `_storeMutex`, etc.). Para sair do sub-total de 53, seria necessário categorizar `let X = Promise.resolve()` como mutex pattern.
+
+1. **Singletons (53 refined)** — ainda inclui lazy inits legítimos (`_stateCache`, `_writeQueue`,
+   `_storeMutex`, etc.). Para sair do sub-total de 53, seria necessário categorizar
+   `let X = Promise.resolve()` como mutex pattern.
 2. **Files >400 LoC (18)** — maioria são arquivos coesos. Path to A já atingido sem reduzir isso.
 
 ---
@@ -155,8 +162,8 @@ O score **95/100 (A)** é calculado pelo `scripts/arch-health.mjs` (refinado em 
 
 ## 4. Problemas Resolvidos (vs PARTE-21A)
 
-| #   | Problema (21A)                  | Status      | Como resolvido                                   |
-| --- | ------------------------------- | ----------- | ------------------------------------------------ |
+| #   | Problema (21A)                  | Status       | Como resolvido                                   |
+| --- | ------------------------------- | ------------ | ------------------------------------------------ |
 | 1   | Gap de regex no CI              | ✅ Resolvido | Faixa H — regex expandida para export...from     |
 | 2   | 4 violações topológicas ocultas | ✅ Resolvido | Faixa H — elevadas para detection pelo CI        |
 | 3   | 233 deep imports (72%)          | ⚠️ Parcial   | Faixa I — reduzido para 165. Bulk é logger (134) |
@@ -174,35 +181,41 @@ O score **95/100 (A)** é calculado pelo `scripts/arch-health.mjs` (refinado em 
 ### 5.1 ✅ RESOLVIDO — Deep Imports (Wave 4)
 
 **W4-2/W4-3** resolveram o problema:
+
 - ESLint F21 agora usa negative lookahead: `#copilot/(module)/(?!types$|logger$).+`
-- `#copilot/sdk/types` (123 imports) e `#copilot/observability/logger` (2 imports) são explicitamente permitidos
+- `#copilot/sdk/types` (123 imports) e `#copilot/observability/logger` (2 imports) são
+  explicitamente permitidos
 - arch-health exclui linhas de comentário/JSDoc do deep import count
 - **Resultado**: Deep total: 165→40, refined: 40→4 (quase zero)
 
 ### 5.2 EM PROGRESSO — Singletons: Contagem Real vs Script
 
 O `arch-health.mjs` conta **todos** os `let` em module scope (73). A contagem real de singletons
-problemáticos é ~15-20. **W4-1** refinou o script (exclui `let log=`, `let _logDir=`, `let configuredLevel=`, `let minLevel=`, `let _recordCompaction=`).
+problemáticos é ~15-20. **W4-1** refinou o script (exclui `let log=`, `let _logDir=`,
+`let configuredLevel=`, `let minLevel=`, `let _recordCompaction=`).
 
 | Tipo                    | Count | Problemático? | Ação                             |
 | ----------------------- | ----- | ------------- | -------------------------------- |
-| `let log = console.log` | ~40   | Não           | ✅ Excluído pelo refined count    |
+| `let log = console.log` | ~40   | Não           | ✅ Excluído pelo refined count   |
 | `let copilotDb = null`  | 1     | Parcial       | Lazy init legítimo (I/O)         |
 | `let _client = null`    | 1     | Parcial       | Lazy init legítimo (SDK)         |
 | `let _busy = false`     | 1     | Sim → FSM     | Migrado para TerminalPhase       |
 | Terminal state vars (8) | 8     | Parcial       | state.js — design correto        |
 | Regex match vars        | ~12   | Não           | Loop variables (futuro: excluir) |
 
-**W5-4 executado**: Expandidos os exclusion patterns para contadores, flags booleanas, caches e function-injection placeholders. Refined: 66→53. Fan-out corrigido para inter-módulo apenas.
+**W5-4 executado**: Expandidos os exclusion patterns para contadores, flags booleanas, caches e
+function-injection placeholders. Refined: 66→53. Fan-out corrigido para inter-módulo apenas.
 
 ### 5.3 MÉDIO — Files >400 LoC (18 restantes)
 
 **W4-4/W4-5/W4-6** confirmaram que os splits já existiam ou eram desnecessários:
+
 - `store.js` (561): ✅ já tem helpers/queries/memories/sync separados
 - `factory.js` (416): ✅ já tem `composer.js` separado
 - `server.js` (452): ✅ É HTTP-only, sem WS para separar
 
 Splits viáveis restantes para Wave 5:
+
 - `channel/client.js` (557) — connection vs ops
 - `conversation-hub/socket-ns.js` (482) — mount vs broadcast
 - `terminal/repl.js` (437) — repl loop vs event handlers
@@ -210,21 +223,24 @@ Splits viáveis restantes para Wave 5:
 ### 5.4 MÉDIO — Fan-out Terminal (19)
 
 `terminal/index.js` é o root node da aplicação — fan-out 19 é esperado para wire tudo.
-`api/express/index.js` caiu para 10 (reduzido de 11). W4-10 confirmou que reduções adicionais precisariam de abstração artificial.
+`api/express/index.js` caiu para 10 (reduzido de 11). W4-10 confirmou que reduções adicionais
+precisariam de abstração artificial.
 
 ### 5.5 BAIXO — DI Setters Residuais
 
-**W4-8** identificou: dos 14 "setters restantes", todos são state setters de terminal (setBusy, setRl, setHubSessionId etc.) ou setExperimentalFlag/setBackgroundCompactionThreshold — estes são config mutations, não DI de serviço. Não precisam de DI tokens.
-Migração completa requer:
+**W4-8** identificou: dos 14 "setters restantes", todos são state setters de terminal (setBusy,
+setRl, setHubSessionId etc.) ou setExperimentalFlag/setBackgroundCompactionThreshold — estes são
+config mutations, não DI de serviço. Não precisam de DI tokens. Migração completa requer:
+
 1. Criar tokens DI para cada setter restante
 2. Registrar factories no bootstrap
 3. Substituir `set*()` por `container.resolve(TOKEN)`
 
 ### 5.6 BAIXO — EventEmitter Ad-hoc
 
-72 referências a EventEmitter. Com bridges, 13 eventos são re-emitidos no EventBus.
-~55 per-session emitters no agent-dialog não são candidatos a migração (design legítimo).
-~31 são Socket.IO/SSE/hooks (protocolo).
+72 referências a EventEmitter. Com bridges, 13 eventos são re-emitidos no EventBus. ~55 per-session
+emitters no agent-dialog não são candidatos a migração (design legítimo). ~31 são
+Socket.IO/SSE/hooks (protocolo).
 
 ---
 
@@ -311,8 +327,8 @@ plugins/ (L3) ← usado por: agent/lifecycle (potencial)
 
 ### 8.1 Suíte de Testes Copilot
 
-| Grupo                     | Runner    | Tests   | Status    |
-| ------------------------- | --------- | ------- | --------- |
+| Grupo                     | Runner    | Tests   | Status     |
+| ------------------------- | --------- | ------- | ---------- |
 | Core DI                   | node:test | 36      | ✅ Passing |
 | Core EventBus             | node:test | 33      | ✅ Passing |
 | Plugin Registry           | node:test | 14      | ✅ Passing |
@@ -359,6 +375,7 @@ plugins/ (L3) ← usado por: agent/lifecycle (potencial)
 A execução das Faixas H–N transformou o `src/copilot` de forma significativa:
 
 **Conquistas principais:**
+
 - Arquitetura de 14→17 módulos com camadas bem definidas
 - DI Container funcional com 13 tokens e wiring centralizado
 - EventBus cross-module com namespaces, wildcards e bridges
@@ -369,6 +386,7 @@ A execução das Faixas H–N transformou o `src/copilot` de forma significativa
 - CI com arch-health score integrado
 
 **Gaps remanescentes (Wave 4+):**
+
 - Deep imports: 165 (134 são logger — aceitáveis com allow-list)
 - Singletons: 73 contados (15-20 reais — script precisa refinamento)
 - Files >400 LoC: 18 (3 candidatos prioritários a split)

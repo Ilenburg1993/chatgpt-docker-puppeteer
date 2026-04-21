@@ -271,8 +271,8 @@ delicada pois modifica o god object.
 
 As fases originais foram ajustadas durante a execução para melhor aderência ao código real:
 
-| Fase | Descrição Original                            | Descrição Executada                                     | Status          | Commit                  |
-| ---- | --------------------------------------------- | ------------------------------------------------------- | --------------- | ----------------------- |
+| Fase | Descrição Original                            | Descrição Executada                                     | Status           | Commit                  |
+| ---- | --------------------------------------------- | ------------------------------------------------------- | ---------------- | ----------------------- |
 | R1   | Tipos centralizados                           | Criar types.js, remover agent-contract.js               | ✅               | `7756e2ec`              |
 | R2   | Subdiretório dialog/                          | 5 arquivos + absorver wirer em loop-manager             | ✅               | `03f7a23f`              |
 | R3   | Subdiretório session/                         | 6 arquivos + sub-barrel                                 | ✅               | `47f2465e` + `4a2c1684` |
@@ -523,8 +523,8 @@ git push origin main
 
 ## Resumo de Fases (Atualizado)
 
-| Fase | Descrição                    | Risco | Status          |
-| ---- | ---------------------------- | ----- | --------------- |
+| Fase | Descrição                    | Risco | Status           |
+| ---- | ---------------------------- | ----- | ---------------- |
 | R1   | Tipos centralizados          | BAIXO | ✅               |
 | R2   | Subdiretório dialog/         | MÉDIO | ✅               |
 | R3   | Subdiretório session/        | MÉDIO | ✅               |
@@ -549,8 +549,8 @@ sempre última.
 
 As fases originais foram ajustadas durante a execução para melhor aderência ao código real:
 
-| Fase | Descrição Original                            | Descrição Executada                                     | Status          | Commit                  |
-| ---- | --------------------------------------------- | ------------------------------------------------------- | --------------- | ----------------------- |
+| Fase | Descrição Original                            | Descrição Executada                                     | Status           | Commit                  |
+| ---- | --------------------------------------------- | ------------------------------------------------------- | ---------------- | ----------------------- |
 | R1   | Tipos centralizados                           | Criar types.js, remover agent-contract.js               | ✅               | `7756e2ec`              |
 | R2   | Subdiretório dialog/                          | 5 arquivos + absorver wirer em loop-manager             | ✅               | `03f7a23f`              |
 | R3   | Subdiretório session/                         | 6 arquivos + sub-barrel                                 | ✅               | `47f2465e` + `4a2c1684` |

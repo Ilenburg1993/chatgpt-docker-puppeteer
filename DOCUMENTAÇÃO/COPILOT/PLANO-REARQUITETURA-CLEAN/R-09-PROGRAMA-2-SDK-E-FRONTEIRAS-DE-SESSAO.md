@@ -1,8 +1,7 @@
 # R-09 — Programa 2: SDK e fronteiras de sessão
 
-**Programa**: P2
-**Prioridade**: alta
-**Foco**: transformar `sdk/` em camada fina e corrigir ownership de sessão entre `sdk/`, `agent/` e `conversation-hub/`
+**Programa**: P2 **Prioridade**: alta **Foco**: transformar `sdk/` em camada fina e corrigir
+ownership de sessão entre `sdk/`, `agent/` e `conversation-hub/`
 
 ---
 
@@ -21,7 +20,8 @@ Isso precisa mudar para que o `agent/` e o `conversation-hub/` possam amadurecer
 ### Sinais principais
 
 - `sdk/` ainda soma **7.913 linhas**;
-- `sdk/session/client.js` ainda concentra parte do lifecycle do wrapper, mas o primeiro bolsão de estado já começou a sair;
+- `sdk/session/client.js` ainda concentra parte do lifecycle do wrapper, mas o primeiro bolsão de
+  estado já começou a sair;
 - **96 arquivos fora de `sdk/`** importam `sdk` diretamente;
 - ainda há resquícios de duplicação/configuração entre `sdk/` e `config/`.
 
@@ -30,18 +30,24 @@ Isso precisa mudar para que o `agent/` e o `conversation-hub/` possam amadurecer
 O programa já não está mais em fase puramente diagnóstica:
 
 - surgiu `infra/sdk-session-registry.js` como SSOT de sessões SDK ativas no processo;
-- o registry `_sessions` saiu de `sdk/session/client.js` e passou a ser delegado para a nova camada de `infra/`;
-- a API pública do wrapper foi preservada (`createClientSession`, `resumeClientSession`, `getClientSession`,
-	`listActiveClientSessions`, `incrementSessionMessageCount`, `getActiveSessionCount`), mas o statefulness do módulo foi reduzido;
+- o registry `_sessions` saiu de `sdk/session/client.js` e passou a ser delegado para a nova camada
+  de `infra/`;
+- a API pública do wrapper foi preservada (`createClientSession`, `resumeClientSession`,
+  `getClientSession`, `listActiveClientSessions`, `incrementSessionMessageCount`,
+  `getActiveSessionCount`), mas o statefulness do módulo foi reduzido;
 - o barrel `infra/index.js` agora exporta explicitamente essa nova superfície canônica;
-- aliases compatíveis `loadCustomTools` e `loadToolsConfig` foram restaurados no barrel `#copilot/sdk`, evitando ruído de regressão enquanto o programa avança.
+- aliases compatíveis `loadCustomTools` e `loadToolsConfig` foram restaurados no barrel
+  `#copilot/sdk`, evitando ruído de regressão enquanto o programa avança.
 
 Leitura prática:
 
-- o SDK ainda não está “fino” o suficiente, mas o primeiro pedaço do ownership operacional de sessão já saiu do wrapper;
-- isso abre caminho para que `agent/`, `server/routes/sdk/*` e `conversation-hub/` passem a conversar com um registry mais neutro e menos vendor-shaped.
-- além disso, a costura entre `sdkSessionId` e `hubSessionId` deixou de depender só de inferência local:
-	`agent/session/ownership.js` + `core/shared-state.js` já começam a formar uma SSOT explícita desse vínculo.
+- o SDK ainda não está “fino” o suficiente, mas o primeiro pedaço do ownership operacional de sessão
+  já saiu do wrapper;
+- isso abre caminho para que `agent/`, `server/routes/sdk/*` e `conversation-hub/` passem a
+  conversar com um registry mais neutro e menos vendor-shaped.
+- além disso, a costura entre `sdkSessionId` e `hubSessionId` deixou de depender só de inferência
+  local: `agent/session/ownership.js` + `core/shared-state.js` já começam a formar uma SSOT
+  explícita desse vínculo.
 
 ---
 
@@ -66,12 +72,13 @@ Os primeiros cortes de `F2.1` já começaram:
 
 - o registry de sessões ativas deixou de ser um `Map` privado em `sdk/session/client.js`;
 - `infra/sdk-session-registry.js` passou a centralizar:
-	- registro de sessão ativa;
-	- leitura/listagem do registry;
-	- contagem de sessões;
-	- contagem de mensagens por sessão;
-	- remoção/reset do estado em memória;
-- `sdk/session/client.js` agora funciona como fachada sobre esse registry externo, em vez de ser o dono do estado.
+  - registro de sessão ativa;
+  - leitura/listagem do registry;
+  - contagem de sessões;
+  - contagem de mensagens por sessão;
+  - remoção/reset do estado em memória;
+- `sdk/session/client.js` agora funciona como fachada sobre esse registry externo, em vez de ser o
+  dono do estado.
 
 Validação focada do corte:
 
@@ -80,23 +87,27 @@ Validação focada do corte:
 
 Próxima regra prática de `F2.1`:
 
-- usar a externalização do registry para começar a limpar ownership residual entre `sdk/session/client.js`,
-	`server/routes/sdk/*` e as superfícies de sessão do `agent/`, em vez de apenas mover mapas de lugar.
+- usar a externalização do registry para começar a limpar ownership residual entre
+  `sdk/session/client.js`, `server/routes/sdk/*` e as superfícies de sessão do `agent/`, em vez de
+  apenas mover mapas de lugar.
 
 ### Avanço adicional conectado a `F2.1.d`
 
-- o `sdkSessionId` ativo agora é publicado em estado compartilhado cross-layer e sincronizado com o hub conversacional;
-- isso reduz a necessidade de que `conversation-hub/` e `server/` redescubram o vínculo via snapshots ou wiring informal;
-- `presentation/sdk-sessions.js` passou a concentrar essa projeção de ownership para as rotas SDK, reduzindo lógica
-	duplicada em `session-crud.js` e `session-messaging.js`;
+- o `sdkSessionId` ativo agora é publicado em estado compartilhado cross-layer e sincronizado com o
+  hub conversacional;
+- isso reduz a necessidade de que `conversation-hub/` e `server/` redescubram o vínculo via
+  snapshots ou wiring informal;
+- `presentation/sdk-sessions.js` passou a concentrar essa projeção de ownership para as rotas SDK,
+  reduzindo lógica duplicada em `session-crud.js` e `session-messaging.js`;
 - `server/routes/sdk/*` agora já usa a SSOT compartilhada para:
-	- publicar `canonicalSessionId`, `sharedBinding` e `boundHubSessionId`;
-	- sincronizar a sessão SDK ativa em operações de `create`, `resume` e `setForeground`;
-	- limpar o binding compartilhado quando a sessão ativa é `disconnect`/`delete`.
-- `server/routes/sdk/client.js` e `server/routes/sdk/agent.js` passaram a consumir a mesma runtime projection canônica,
-	reduzindo drift entre inspeção de runtime, inspeção do wrapper e ownership de sessão;
-- `POST /client/force-stop` deixou de chamar diretamente o método do client e passou a usar a superfície canônica do
-	wrapper, limpando também o binding compartilhado da sessão SDK.
+  - publicar `canonicalSessionId`, `sharedBinding` e `boundHubSessionId`;
+  - sincronizar a sessão SDK ativa em operações de `create`, `resume` e `setForeground`;
+  - limpar o binding compartilhado quando a sessão ativa é `disconnect`/`delete`.
+- `server/routes/sdk/client.js` e `server/routes/sdk/agent.js` passaram a consumir a mesma runtime
+  projection canônica, reduzindo drift entre inspeção de runtime, inspeção do wrapper e ownership de
+  sessão;
+- `POST /client/force-stop` deixou de chamar diretamente o método do client e passou a usar a
+  superfície canônica do wrapper, limpando também o binding compartilhado da sessão SDK.
 
 Validação incremental adicional:
 
@@ -105,8 +116,8 @@ Validação incremental adicional:
 
 Próximo passo natural:
 
-- revisar quais consumidores fora de `server/routes/sdk/*` ainda falam em “sessão SDK ativa” sem distinguir claramente
-	hub, runtime e wrapper, para continuar a dieta de ownership difuso.
+- revisar quais consumidores fora de `server/routes/sdk/*` ainda falam em “sessão SDK ativa” sem
+  distinguir claramente hub, runtime e wrapper, para continuar a dieta de ownership difuso.
 
 ## F2.2 — Consolidação de config builders e superfícies duplicadas
 

@@ -1,10 +1,8 @@
 # PRÉ-AUDITORIA ARQUITETURAL PROFUNDA — `src/copilot`
 
-> **Documento**: PARTE-24A-PRE-AUDITORIA-ARQUITETURAL.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Planejamento completo da auditoria arquitetural profunda de `src/copilot/`
-> **Status**: EM EXECUÇÃO
+> **Documento**: PARTE-24A-PRE-AUDITORIA-ARQUITETURAL.md **Versão**: 1.0 **Data**: 2026-04-12
+> **Escopo**: Planejamento completo da auditoria arquitetural profunda de `src/copilot/` **Status**:
+> EM EXECUÇÃO
 
 ---
 
@@ -91,10 +89,10 @@ types         → core
 
 | Par                      | Gravidade |
 | ------------------------ | --------- |
-| `config ↔ core`          | 🔴 ALTA    |
-| `config ↔ observability` | 🔴 ALTA    |
-| `events ↔ observability` | 🟡 MÉDIA   |
-| `hooks ↔ observability`  | 🟡 MÉDIA   |
+| `config ↔ core`          | 🔴 ALTA   |
+| `config ↔ observability` | 🔴 ALTA   |
+| `events ↔ observability` | 🟡 MÉDIA  |
+| `hooks ↔ observability`  | 🟡 MÉDIA  |
 
 ### 3.3. Ciclos Transitivos Principais
 
@@ -135,8 +133,8 @@ L0 (Foundation)    : types, events, core
 
 ### 4.1. Imports de fora do workspace copilot
 
-| Arquivo                         | Import             | Peso   |
-| ------------------------------- | ------------------ | ------ |
+| Arquivo                         | Import             | Peso    |
+| ------------------------------- | ------------------ | ------- |
 | `conversation-hub/socket-ns.js` | `#core/jwt_config` | 🔴 ALTO |
 | `db/sqlite.js`                  | `#core/config`     | 🔴 ALTO |
 
@@ -150,7 +148,8 @@ L0 (Foundation)    : types, events, core
 | `src/server/controllers/health.js`     | `#copilot/core`                           | Alias      |
 | `src/server/main.js`                   | `#copilot/bridges`, `#copilot/core`, etc. | Alias (5+) |
 
-**Conclusão**: `src/copilot` **NÃO é autônomo** — depende de `#core/jwt_config` e `#core/config` do workspace pai. E o workspace pai depende fortemente de `src/copilot`.
+**Conclusão**: `src/copilot` **NÃO é autônomo** — depende de `#core/jwt_config` e `#core/config` do
+workspace pai. E o workspace pai depende fortemente de `src/copilot`.
 
 ---
 
@@ -163,7 +162,9 @@ npm run terminal:llm-b
   └→ node --strip-types src/copilot/terminal/bootstrap.js   ⚠️ ARQUIVO NÃO EXISTE!
 ```
 
-**ACHADO CRÍTICO**: O npm script `terminal:llm-b` referencia `src/copilot/terminal/bootstrap.js` que **não existe no filesystem**. Isso significa que o terminal LLM-B **não pode ser iniciado via este script**.
+**ACHADO CRÍTICO**: O npm script `terminal:llm-b` referencia `src/copilot/terminal/bootstrap.js` que
+**não existe no filesystem**. Isso significa que o terminal LLM-B **não pode ser iniciado via este
+script**.
 
 ### 5.2. Caminho via Server
 
@@ -194,8 +195,8 @@ src/server/main.js
 
 ## 6. Achados Críticos (Pré-Auditoria)
 
-| #   | Achado                                           | Gravidade | Módulo          |
-| --- | ------------------------------------------------ | --------- | --------------- |
+| #   | Achado                                           | Gravidade  | Módulo          |
+| --- | ------------------------------------------------ | ---------- | --------------- |
 | A1  | `bootstrap.js` faltando → terminal não inicia    | 🔴 CRÍTICO | terminal        |
 | A2  | 4 ciclos bidirecionais de dependência            | 🔴 CRÍTICO | core/config/obs |
 | A3  | 7 violações de camada (L0→L1, L1→L2, L2→L3)      | 🔴 ALTO    | cross-module    |
@@ -212,13 +213,16 @@ src/server/main.js
 ## 7. Etapas da Auditoria
 
 ### Fase A — PRÉ-AUDITORIA (este documento) ✅
+
 - Inventário global, grafos, achados iniciais
 - Planejamento das próximas fases
 
 ### Fase B — ANÁLISE ATUAL (próximo documento)
+
 **Arquivo**: `PARTE-24B-SITUACAO-ATUAL.md`
 
 Conteúdo obrigatório:
+
 1. **Mapa de cada módulo** — propósito, responsabilidades, arquivos, API pública
 2. **Função de cada arquivo** — descrição em 1 linha de cada um dos 345 arquivos
 3. **Contratos inter-módulo** — quais exports cada módulo expõe e quem consome
@@ -230,9 +234,11 @@ Conteúdo obrigatório:
 9. **Score por módulo** — nota individual de cada módulo (1-10)
 
 ### Fase C — SITUAÇÃO IDEAL (documento separado)
+
 **Arquivo**: `PARTE-24C-SITUACAO-IDEAL.md`
 
 Conteúdo obrigatório:
+
 1. **Arquitetura alvo** — camadas, módulos, fronteiras
 2. **Eliminação de ciclos** — estratégia para cada ciclo
 3. **Autonomia completa** — `src/copilot` como módulo auto-contido
@@ -245,9 +251,11 @@ Conteúdo obrigatório:
 10. **API pública estável** — versionamento, breaking changes
 
 ### Fase D — ROADMAP COMPLETO
+
 **Arquivo**: `PARTE-24D-ROADMAP-ARQUITETURAL.md`
 
 Conteúdo obrigatório:
+
 1. **Ondas de execução** (4-6 ondas, cada uma com faixas)
 2. **Faixas detalhadas** (L39+, cada uma com subfases)
 3. **Dependências entre faixas**
@@ -334,8 +342,8 @@ plugins          ← 1 módulo  (7%)
 
 ### 9.3. Instabilidade Métrica (Fan-out / (Fan-in + Fan-out))
 
-| Módulo          | Fan-in | Fan-out | Instabilidade | Categoria  |
-| --------------- | ------ | ------- | ------------- | ---------- |
+| Módulo          | Fan-in | Fan-out | Instabilidade | Categoria   |
+| --------------- | ------ | ------- | ------------- | ----------- |
 | `sdk`           | 7      | 1       | 0.13          | Estável ✅  |
 | `core`          | 14     | 2       | 0.13          | Estável ✅  |
 | `events`        | 11     | 2       | 0.15          | Estável ✅  |
@@ -351,7 +359,8 @@ plugins          ← 1 módulo  (7%)
 | `services`      | 2      | 9       | 0.82          | Instável 🔴 |
 | `agent`         | 3      | 10      | 0.77          | Instável 🔴 |
 
-> Módulos L3/L4 (terminal, services, agent) DEVEM ser instáveis (dependem de muitos, poucos dependem deles) — isso é correto. O problema é quando módulos L0/L1/L2 são instáveis.
+> Módulos L3/L4 (terminal, services, agent) DEVEM ser instáveis (dependem de muitos, poucos dependem
+> deles) — isso é correto. O problema é quando módulos L0/L1/L2 são instáveis.
 
 ---
 
@@ -359,26 +368,27 @@ plugins          ← 1 módulo  (7%)
 
 | Módulo           | Arquivos Fonte | Testes Dedicados | Ratio | Score |
 | ---------------- | -------------- | ---------------- | ----- | ----- |
-| sdk              | 42             | 39               | 0.93  | ✅     |
-| terminal         | 47             | 10               | 0.21  | 🔴     |
-| observability    | 31             | 8                | 0.26  | 🟡     |
-| tools            | 28             | 10               | 0.36  | 🟡     |
-| conversation-hub | 12             | 6                | 0.50  | 🟡     |
-| hooks            | 21             | 2                | 0.10  | 🔴     |
-| bridges          | 12             | 4                | 0.33  | 🟡     |
-| api              | 21             | 4                | 0.19  | 🔴     |
-| events           | 17             | 2                | 0.12  | 🔴     |
-| agent            | 57             | 2+~20*           | 0.39  | 🟡     |
-| core             | 23             | ~10*             | 0.43  | 🟡     |
-| config           | 7              | 1                | 0.14  | 🔴     |
-| channel          | 7              | 2                | 0.29  | 🟡     |
-| audit            | 8              | 1                | 0.13  | 🔴     |
-| services         | 5              | 0                | 0.00  | 🔴     |
-| db               | 3              | 1                | 0.33  | 🟡     |
-| plugins          | 2              | 0                | 0.00  | 🔴     |
-| types            | 2              | 0                | 0.00  | 🔴     |
+| sdk              | 42             | 39               | 0.93  | ✅    |
+| terminal         | 47             | 10               | 0.21  | 🔴    |
+| observability    | 31             | 8                | 0.26  | 🟡    |
+| tools            | 28             | 10               | 0.36  | 🟡    |
+| conversation-hub | 12             | 6                | 0.50  | 🟡    |
+| hooks            | 21             | 2                | 0.10  | 🔴    |
+| bridges          | 12             | 4                | 0.33  | 🟡    |
+| api              | 21             | 4                | 0.19  | 🔴    |
+| events           | 17             | 2                | 0.12  | 🔴    |
+| agent            | 57             | 2+~20\*          | 0.39  | 🟡    |
+| core             | 23             | ~10\*            | 0.43  | 🟡    |
+| config           | 7              | 1                | 0.14  | 🔴    |
+| channel          | 7              | 2                | 0.29  | 🟡    |
+| audit            | 8              | 1                | 0.13  | 🔴    |
+| services         | 5              | 0                | 0.00  | 🔴    |
+| db               | 3              | 1                | 0.33  | 🟡    |
+| plugins          | 2              | 0                | 0.00  | 🔴    |
+| types            | 2              | 0                | 0.00  | 🔴    |
 
-> \* Vários testes de agent e core estão no nível raiz de tests/unit/copilot/ (não em pastas dedicadas)
+> \* Vários testes de agent e core estão no nível raiz de tests/unit/copilot/ (não em pastas
+> dedicadas)
 
 ---
 

@@ -1,8 +1,7 @@
 # R-12 — Programa 5: `tools/`, `config/`, `core/`, `infra/`, `types/` e `plugins/`
 
-**Programa**: P5
-**Prioridade**: média-alta
-**Foco**: consolidar a plataforma interna que sustenta o runtime, as policies e os contratos compartilhados
+**Programa**: P5 **Prioridade**: média-alta **Foco**: consolidar a plataforma interna que sustenta o
+runtime, as policies e os contratos compartilhados
 
 ---
 
@@ -10,7 +9,8 @@
 
 P5 existe para evitar que a base interna do sistema continue crescendo por acúmulo silencioso.
 
-Se P1–P4 cuidam dos grandes fluxos e fronteiras, P5 cuida da plataforma que esses fluxos usam o tempo todo.
+Se P1–P4 cuidam dos grandes fluxos e fronteiras, P5 cuida da plataforma que esses fluxos usam o
+tempo todo.
 
 ---
 
@@ -48,7 +48,8 @@ Se P1–P4 cuidam dos grandes fluxos e fronteiras, P5 cuida da plataforma que es
 
 - F5.2.a — separar builders, defaults e runtime state de configuração
 - F5.2.b — consolidar relação entre `config/`, `sdk/` e `agent/`
-- F5.2.c — revisar system prompt, pinned files, MCP config e registry de tools sob a ótica da nova arquitetura
+- F5.2.c — revisar system prompt, pinned files, MCP config e registry de tools sob a ótica da nova
+  arquitetura
 
 ### Resultado esperado
 
@@ -133,4 +134,5 @@ Menos espaços mortos e menos “promessa de módulo” sem programa de maturaç
 
 ## 7. Resultado esperado
 
-Ao concluir P5, `src/copilot/` terá uma base de plataforma interna muito mais nítida, com menos espalhamento silencioso de contratos e menos crescimento “natural” por conveniência.
+Ao concluir P5, `src/copilot/` terá uma base de plataforma interna muito mais nítida, com menos
+espalhamento silencioso de contratos e menos crescimento “natural” por conveniência.

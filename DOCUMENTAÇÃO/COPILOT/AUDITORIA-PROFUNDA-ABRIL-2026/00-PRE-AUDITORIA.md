@@ -1,10 +1,9 @@
 # Pré-Auditoria Profunda — `src/copilot`
 
-**Data**: 2026-04-17
-**Auditor**: GitHub Copilot (Claude Sonnet 4.6) — LLM-A
-**Escopo**: `src/copilot/` completo + avaliação do entry point `terminal:llm-b`
-**Diretório de saída**: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/`
-**Status**: Pré-auditoria concluída — Auditoria profunda em andamento
+**Data**: 2026-04-17 **Auditor**: GitHub Copilot (Claude Sonnet 4.6) — LLM-A **Escopo**:
+`src/copilot/` completo + avaliação do entry point `terminal:llm-b` **Diretório de saída**:
+`DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/` **Status**: Pré-auditoria concluída —
+Auditoria profunda em andamento
 
 ---
 
@@ -13,16 +12,21 @@
 Esta auditoria tem três objetivos simultâneos:
 
 1. **Varredura completa de bugs e gaps** em todo `src/copilot` (421 arquivos JS, ~21 módulos)
-2. **Conformidade com o SDK** `@github/copilot-sdk` — verificar se os contratos do SDK são respeitados em toda a base de código
-3. **Avaliação do entry point `terminal:llm-b`** — o ponto de início da execução da LLM-B, sua sequência de boot, robustez e gaps
+2. **Conformidade com o SDK** `@github/copilot-sdk` — verificar se os contratos do SDK são
+   respeitados em toda a base de código
+3. **Avaliação do entry point `terminal:llm-b`** — o ponto de início da execução da LLM-B, sua
+   sequência de boot, robustez e gaps
 
-Ao final, esta auditoria alimentará diretamente a **fase de uso da LLM-B**, com o sistema em estado mais confiável e corrigido.
+Ao final, esta auditoria alimentará diretamente a **fase de uso da LLM-B**, com o sistema em estado
+mais confiável e corrigido.
 
 ---
 
 ## 2. Contexto e Auditorias Anteriores
 
-Existe documentação de auditoria prévia em `DOCUMENTAÇÃO/COPILOT/AUDITORIA-SRC-COPILOT/`, produzida por outra LLM (sessão anterior). Os achados confirmados nessa auditoria são **incorporados como baseline** desta auditoria, não são refeitos do zero.
+Existe documentação de auditoria prévia em `DOCUMENTAÇÃO/COPILOT/AUDITORIA-SRC-COPILOT/`, produzida
+por outra LLM (sessão anterior). Os achados confirmados nessa auditoria são **incorporados como
+baseline** desta auditoria, não são refeitos do zero.
 
 ### Achados já confirmados pelo catálogo anterior (`02-CATALOGO-DE-ACHADOS-E-GAPS-SRC-COPILOT-2026-04-17.md`)
 
@@ -46,9 +50,16 @@ Existe documentação de auditoria prévia em `DOCUMENTAÇÃO/COPILOT/AUDITORIA-
 
 ### Reavaliações desta auditoria (achados do catálogo anterior que mudaram)
 
-**CAT-005 (CORS)**: A versão atual de `server/middleware/cors.js` usa `http://localhost:*` como default — mais restrito que `*`. O problema original de "CORS wildcard" foi **parcialmente corrigido**. Porém, o pattern `http://localhost:*` não é um valor válido para `Access-Control-Allow-Origin` (globs não são suportados pelo protocolo CORS). Portanto, o achado persiste com forma diferente.
+**CAT-005 (CORS)**: A versão atual de `server/middleware/cors.js` usa `http://localhost:*` como
+default — mais restrito que `*`. O problema original de "CORS wildcard" foi **parcialmente
+corrigido**. Porém, o pattern `http://localhost:*` não é um valor válido para
+`Access-Control-Allow-Origin` (globs não são suportados pelo protocolo CORS). Portanto, o achado
+persiste com forma diferente.
 
-**CAT-010 (storage não-atômico)**: A versão atual de `infra/storage.js` usa `writeFile` direto, **sem** write-to-temp + rename. O comentário JSDoc diz "usa escrita em arquivo temporário + rename para atomicidade (quando possível)" — mas a implementação NÃO faz isso. É uma **mentira documental ativa** que pode enganar desenvolvedores.
+**CAT-010 (storage não-atômico)**: A versão atual de `infra/storage.js` usa `writeFile` direto,
+**sem** write-to-temp + rename. O comentário JSDoc diz "usa escrita em arquivo temporário + rename
+para atomicidade (quando possível)" — mas a implementação NÃO faz isso. É uma **mentira documental
+ativa** que pode enganar desenvolvedores.
 
 ---
 
@@ -66,8 +77,8 @@ Existe documentação de auditoria prévia em `DOCUMENTAÇÃO/COPILOT/AUDITORIA-
 
 ### 3.2 Distribuição por módulo (arquivos .js)
 
-| Módulo              | Arquivos | Risco preliminar                 |
-| ------------------- | -------- | -------------------------------- |
+| Módulo              | Arquivos | Risco preliminar                  |
+| ------------------- | -------- | --------------------------------- |
 | `terminal/`         | 50       | 🔴 Crítico — entry point LLM-B    |
 | `agent/`            | 50       | 🔴 Crítico — lifecycle core       |
 | `server/`           | 41       | 🟠 Alto — superfície HTTP/WS      |
@@ -144,12 +155,14 @@ npm run terminal:llm-b
 ### 4.3 Avaliação da `startTerminalServer()`
 
 **Pontos positivos**:
+
 - Sequência bem estruturada e comentada
 - `PinnedFilesLoader` e ConversationHub são best-effort (falhas não travam o boot)
 - `registerTimer()` centraliza cleanup de timers
 - Graceful shutdown via `registerShutdownHandler()` (verificar se está completo)
 
 **Pontos de atenção**:
+
 - `copilotServerPromise` não é aguardada — **GAP-BOOT-02**
 - PinnedFilesLoader listener direto sem cleanup — **GAP-BOOT-03**
 
@@ -159,17 +172,19 @@ npm run terminal:llm-b
 
 ### 5.1 `core/event-bus.js` — CAT-007 confirmado
 
-O método `#deliver()` executa handlers com `void handler(event)` dentro de try/catch que engolha tudo silenciosamente:
+O método `#deliver()` executa handlers com `void handler(event)` dentro de try/catch que engolha
+tudo silenciosamente:
 
 ```js
 try {
-    void handler(event);
+  void handler(event);
 } catch (_) {
-    /* handler errors are swallowed */
+  /* handler errors are swallowed */
 }
 ```
 
-Problema: handlers **assíncronos** (que retornam Promise) não têm seu `void` capturado pelo catch. A promise rejeitada se torna uma **unhandled rejection** que pode derrubar o processo no Node.js 24+.
+Problema: handlers **assíncronos** (que retornam Promise) não têm seu `void` capturado pelo catch. A
+promise rejeitada se torna uma **unhandled rejection** que pode derrubar o processo no Node.js 24+.
 
 **Severidade**: Alta (CAT-007 confirmado e reavaliado como mais grave que o original)
 
@@ -189,19 +204,25 @@ Isso é um bug documental ativo que pode enganar consumidores do módulo.
 
 ### 5.3 `server/middleware/cors.js` — CAT-005 PERSISTENTE
 
-O origin padrão `http://localhost:*` não é um valor válido para o header `Access-Control-Allow-Origin`. O protocolo HTTP/CORS não suporta globs em valores de origin. Navegadores vão rejeitar esse header.
+O origin padrão `http://localhost:*` não é um valor válido para o header
+`Access-Control-Allow-Origin`. O protocolo HTTP/CORS não suporta globs em valores de origin.
+Navegadores vão rejeitar esse header.
 
 **Severidade**: Alta — funcionalidade CORS quebrada para clientes browser
 
 ### 5.4 `channel/inject.js` — Rate Limiter com Memoria Infinita
 
-O array `_injectTimestamps` usa sliding window de 1s, mas a limpeza de entradas expiradas usa `shift()` (O(n)) em loop, e não há cap máximo para crescimento do array. Em rate limite elevado, o array pode crescer indefinidamente.
+O array `_injectTimestamps` usa sliding window de 1s, mas a limpeza de entradas expiradas usa
+`shift()` (O(n)) em loop, e não há cap máximo para crescimento do array. Em rate limite elevado, o
+array pode crescer indefinidamente.
 
 **Severidade**: Baixa (rate limiter é 30 req/s, array tiny; mas é leak técnico)
 
 ### 5.5 `agent/session/keepalive.js` — CAT-008 Análise
 
-A implementação tem proteção básica (`if (this.#running) return` no `start()`), mas o método `#tick()` é `async` e pode ainda estar em execução quando o próximo `setInterval` dispara. Não há guard para overlap de `#tick()` assíncrono.
+A implementação tem proteção básica (`if (this.#running) return` no `start()`), mas o método
+`#tick()` é `async` e pode ainda estar em execução quando o próximo `setInterval` dispara. Não há
+guard para overlap de `#tick()` assíncrono.
 
 **Severidade**: Alta — múltiplos heartbeats simultâneos podem travar a sessão
 
@@ -214,7 +235,7 @@ A implementação tem proteção básica (`if (this.#running) return` no `start(
 Com base no repositório de memória e análise do código:
 
 | Contrato          | Descrição                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | ------ | --------- |
 | `onErrorOccurred` | Recebe `{error: string, errorContext: string, recoverable: boolean}`, retorna `{errorHandling: 'retry' | 'skip' | 'abort'}` |
 | `client.stop()`   | Retorna `Promise<Error[]>`                                                                             |
 | Erros do SDK      | NÃO são typed — sempre `Error` genérico com `message: string`                                          |
@@ -247,9 +268,10 @@ Esta auditoria segue a metodologia da skill `copilot-full-audit` v2.0 **adaptada
 
 Formato: `{TIPO}-{MOD}-{SEQ}`
 
-**Tipos**: `BUG` | `RACE` | `LEAK` | `SEC` | `PERF` | `GAP` | `INC` | `DEAD` | `ARCH`
-**Módulos**: `BOOT` | `AGENT` | `API` | `BRDG` | `CHAN` | `CONF` | `CONV` | `CORE` | `DB` | `HOOK` | `OBS` | `ROUTE` | `TERM` | `TOOLS` | `INFRA` | `SDK`
-**Severidades**: `P0` (crítica) | `P1` (alta) | `P2` (média) | `P3` (baixa)
+**Tipos**: `BUG` | `RACE` | `LEAK` | `SEC` | `PERF` | `GAP` | `INC` | `DEAD` | `ARCH` **Módulos**:
+`BOOT` | `AGENT` | `API` | `BRDG` | `CHAN` | `CONF` | `CONV` | `CORE` | `DB` | `HOOK` | `OBS` |
+`ROUTE` | `TERM` | `TOOLS` | `INFRA` | `SDK` **Severidades**: `P0` (crítica) | `P1` (alta) | `P2`
+(média) | `P3` (baixa)
 
 ### 7.3 Ordem de prioridade de análise
 
@@ -290,8 +312,8 @@ Formato: `{TIPO}-{MOD}-{SEQ}`
 
 Com base em `npm run audit:preflight` (informado pela auditoria anterior):
 
-| Sistema | Estado       | Impacto                            |
-| ------- | ------------ | ---------------------------------- |
+| Sistema | Estado        | Impacto                            |
+| ------- | ------------- | ---------------------------------- |
 | PM2     | ✅ OK         | Terminal LLM-B pode ser gerenciado |
 | MCP     | ❌ Não pronto | Tools externas indisponíveis       |
 | RAG     | ❌ Não pronto | Contexto semântico indisponível    |
@@ -331,4 +353,4 @@ Com base em `npm run audit:preflight` (informado pela auditoria anterior):
 
 ---
 
-*Próximos documentos: `01-TERMINAL-LLM-B.md` → auditoria detalhada do entry point.*
+_Próximos documentos: `01-TERMINAL-LLM-B.md` → auditoria detalhada do entry point._

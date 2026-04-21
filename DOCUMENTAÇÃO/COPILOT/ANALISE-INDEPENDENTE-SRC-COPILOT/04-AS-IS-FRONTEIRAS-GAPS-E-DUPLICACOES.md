@@ -10,7 +10,8 @@ Hoje existem pelo menos três famílias de responsabilidade tocando o mesmo univ
 - reação semântica (`event-handlers/`)
 - coleta/alerta/health/metrics (`observability/`)
 
-**Problema:** a separação de intenção ainda não é suficientemente rígida. Em vários lugares, observers e collectors fazem trabalho que se aproxima demais de reação de domínio.
+**Problema:** a separação de intenção ainda não é suficientemente rígida. Em vários lugares,
+observers e collectors fazem trabalho que se aproxima demais de reação de domínio.
 
 ### 1.2 `sdk/` vs `config/`
 
@@ -47,11 +48,15 @@ O movimento recente de convergência foi correto, mas ainda está em curso.
 
 ### 2.1 Health projections múltiplas (agora parcialmente resolvidas)
 
-Historicamente, `server`, `terminal` e `agent` produziam health em mais de um lugar. A extração para `presentation/` melhorou muito esse cenário, mas o risco ainda existe para métricas e diagnósticos futuros.
+Historicamente, `server`, `terminal` e `agent` produziam health em mais de um lugar. A extração para
+`presentation/` melhorou muito esse cenário, mas o risco ainda existe para métricas e diagnósticos
+futuros.
 
 ### 2.2 Ownership de sessão distribuído demais
 
-Antes da introdução de `core/shared-state.js` como binding explícito, `sdkSessionId` e `hubSessionId` podiam ser inferidos em lugares diferentes. Isso começou a ser corrigido, mas a arquitetura atual ainda tem sinais de coordenação implícita remanescente.
+Antes da introdução de `core/shared-state.js` como binding explícito, `sdkSessionId` e
+`hubSessionId` podiam ser inferidos em lugares diferentes. Isso começou a ser corrigido, mas a
+arquitetura atual ainda tem sinais de coordenação implícita remanescente.
 
 ### 2.3 Runtime state + snapshot + store + shared-state
 
@@ -62,11 +67,14 @@ Hoje coexistem, com finalidades diferentes, mas ainda parcialmente sobrepostas:
 - `core/shared-state.js`
 - `conversation-hub/store*`
 
-**Risco:** leitura incorreta de qual estado é operacional, qual é persistido, qual é binding, qual é replay.
+**Risco:** leitura incorreta de qual estado é operacional, qual é persistido, qual é binding, qual é
+replay.
 
 ### 2.4 `presentation/` como cura e risco
 
-`presentation/` foi a escolha certa para centralizar projections comuns entre `server` e `terminal`. Mas se ela começar a receber lógica demais, o sistema apenas trocará “terminal pseudo-backend” por “presentation pseudo-orchestrator”.
+`presentation/` foi a escolha certa para centralizar projections comuns entre `server` e `terminal`.
+Mas se ela começar a receber lógica demais, o sistema apenas trocará “terminal pseudo-backend” por
+“presentation pseudo-orchestrator”.
 
 ## 3. Gaps de ownership
 
@@ -87,7 +95,8 @@ Hoje o sistema aponta nessa direção, mas ainda com exceções suficientes para
 
 ### 4.1 `container.resolve()` demais
 
-Quando DI aparece em 26 arquivos operacionais, ela corre o risco de deixar de ser **wiring** e virar **atalho**.
+Quando DI aparece em 26 arquivos operacionais, ela corre o risco de deixar de ser **wiring** e virar
+**atalho**.
 
 ### 4.2 `Map()` demais
 
@@ -100,7 +109,8 @@ Com 45 arquivos contendo `new Map()`, o sistema precisa de uma política muito c
 
 ### 4.3 compatibilidade residual demais
 
-18 arquivos marcados como `@deprecated` é um número alto para um sistema que já está tentando convergir para uma arquitetura limpa.
+18 arquivos marcados como `@deprecated` é um número alto para um sistema que já está tentando
+convergir para uma arquitetura limpa.
 
 ## 5. Problemas estruturais prioritários
 
@@ -110,15 +120,18 @@ Se não for reduzida, ela continuará atrasando a separação de responsabilidad
 
 ### Prioridade 2 — boundary do SDK ainda espesso
 
-Sem consolidar o boundary do vendor, toda a discussão de ownership de sessão/modelo continua ficando vulnerável a reaberturas laterais.
+Sem consolidar o boundary do vendor, toda a discussão de ownership de sessão/modelo continua ficando
+vulnerável a reaberturas laterais.
 
 ### Prioridade 3 — duplicação residual de handlers/eventos
 
-A coexistência de dois lugares fazendo o mesmo trabalho semântico ainda é um custo arquitetural real.
+A coexistência de dois lugares fazendo o mesmo trabalho semântico ainda é um custo arquitetural
+real.
 
 ### Prioridade 4 — terminal grande, mas finalmente corrigível
 
-Agora que `server -> terminal` foi zerado e `frontend/*` existe, o terminal já está em posição muito melhor para terminar a própria convergência interna.
+Agora que `server -> terminal` foi zerado e `frontend/*` existe, o terminal já está em posição muito
+melhor para terminar a própria convergência interna.
 
 ## 6. Resumo do estado atual
 

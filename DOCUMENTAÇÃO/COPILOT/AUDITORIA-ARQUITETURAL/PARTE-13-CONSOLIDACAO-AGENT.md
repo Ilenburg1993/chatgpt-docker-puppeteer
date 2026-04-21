@@ -1,8 +1,8 @@
 # PARTE 13 — Auditoria Profunda agent/ & Consolidação
 
-**Criação**: 2026-07-23 | **Revisão 3 (Pós-F39)**: 2026-07-24
-**Escopo**: Análise completa de `src/copilot/agent/` (36 arquivos, 7.078L) com foco na
-decomposição estrutural de `always-alive.js` (1.348L → 660L atingido, meta <800L superada).
+**Criação**: 2026-07-23 | **Revisão 3 (Pós-F39)**: 2026-07-24 **Escopo**: Análise completa de
+`src/copilot/agent/` (36 arquivos, 7.078L) com foco na decomposição estrutural de `always-alive.js`
+(1.348L → 660L atingido, meta <800L superada).
 
 ---
 
@@ -48,11 +48,13 @@ responsabilidades podem ser agrupadas em 7 domínios:
 ### 1.4 Campos Privados que Bloqueiam Extração
 
 A classe usa `#private` fields extensivamente. Isso impede delegação por função pura EXCETO quando:
+
 1. O campo é passado como parâmetro (ex: `this.#session` → `session`)
 2. O método acessa campos via getters já expostos (ex: `this.sessionId`)
 3. O bloco inteiro pode ser encapsulado com uma interface de callbacks
 
 Campos críticos (usados por >5 métodos):
+
 - `#session` — 15 refs
 - `#status` — 12 refs (via `#setStatus()`)
 - `#client` — 6 refs
@@ -67,7 +69,7 @@ caem em 4 categorias:
 
 1. **Streaming** (task.delta, task.queued, task.completed) → ~120L
 2. **Sessão/Lifecycle** (session.compaction, session.idle, usage_info) → ~150L
-3. **Logging/Audit** (assistant.message, tool.*, error) → ~200L
+3. **Logging/Audit** (assistant.message, tool.\*, error) → ~200L
 4. **Billing/Metering** (assistant.usage, quota) → ~80L
 
 ---
@@ -195,8 +197,8 @@ de start/stop como funções puras. Custo: criação de adapter layer.
 
 ### 6.1 Fases Executadas
 
-| Fase | Status      | Descrição                                                                                                  | Commit     |
-| ---- | ----------- | ---------------------------------------------------------------------------------------------------------- | ---------- |
+| Fase | Status       | Descrição                                                                                                  | Commit     |
+| ---- | ------------ | ---------------------------------------------------------------------------------------------------------- | ---------- |
 | F29  | ✅ Concluída | Extrair boot wiring → `session/boot-wiring.js` (225L)                                                      | `4a38c0ed` |
 | F30  | ⏭️ Skipped   | stop() acessa 16 campos #private — custo/benefício baixo                                                   | —          |
 | F31  | ✅ Concluída | Extrair user input handlers → `dialog/user-input-handler.js` (106L)                                        | `0bb17694` |
@@ -225,14 +227,14 @@ de start/stop como funções puras. Custo: criação de adapter layer.
 
 **F30 (stop()):** O método `stop()` acessa 16 campos #private. A extração exigiria um
 `ShutdownContext` com 16+ propriedades callback/referência, produzindo ~30L de criação do contexto
-+ ~131L na função externa — sem redução líquida e com aumento de indireção.
 
-**F33 (event-wirer.js):** O arquivo já possui decomposição interna exemplar: 8 sub-funções
-nomeadas e documentadas (`_wireCompactionEvents`, `_wireStreamingEvents`,
-`_wireTokenBudgetEvents`, etc.), cada uma com interface uniforme `(session, callbacks)`.
-A constante `KNOWN_SDK_EVENTS` (105L) é dados, não lógica. Fragmentar em 4-5 arquivos separados
-(`session/wirers/`) adicionaria overhead de importação e gerenciamento sem ganho real de coesão
-ou manutenibilidade.
+- ~131L na função externa — sem redução líquida e com aumento de indireção.
+
+**F33 (event-wirer.js):** O arquivo já possui decomposição interna exemplar: 8 sub-funções nomeadas
+e documentadas (`_wireCompactionEvents`, `_wireStreamingEvents`, `_wireTokenBudgetEvents`, etc.),
+cada uma com interface uniforme `(session, callbacks)`. A constante `KNOWN_SDK_EVENTS` (105L) é
+dados, não lógica. Fragmentar em 4-5 arquivos separados (`session/wirers/`) adicionaria overhead de
+importação e gerenciamento sem ganho real de coesão ou manutenibilidade.
 
 ### 6.5 Padrão Arquitetural Consolidado
 
@@ -252,8 +254,8 @@ await performBootWiring(session, isResumed, {
 });
 ```
 
-Este padrão preserva encapsulamento (#private fields) enquanto permite extração de lógica
-para módulos puros testáveis.
+Este padrão preserva encapsulamento (#private fields) enquanto permite extração de lógica para
+módulos puros testáveis.
 
 ---
 
@@ -364,6 +366,7 @@ Mapeamento de todos os usos do singleton `alwaysAliveAgent` fora do agent/:
 | `getHandoffManager()` | 4             | handlers                            |
 
 **Insight**: O agente é consumido fundamentalmente como:
+
 1. **Event Source** — EventEmitter (48 refs on/off)
 2. **Status Provider** — getStatusSnapshot + getters read-only
 3. **Lifecycle Controller** — start/stop/pause/resume
@@ -376,11 +379,12 @@ Mapeamento de todos os usos do singleton `alwaysAliveAgent` fora do agent/:
 ### 8.1 Problema Central: God Object com Estado Difuso
 
 O `AlwaysAliveAgent` é um **God Object** clássico:
+
 - 32 campos #private com 176 acessos
 - `stop()` e `start()` acessam 17 campos **cada**
 - A classe acumula 7+ domínios distintos (lifecycle, dialog, config, queue, observability, etc.)
-- Os clusters de coesão mostram grupos internos fracamente acoplados entre si, mas
-  fortemente acoplados ao `this`
+- Os clusters de coesão mostram grupos internos fracamente acoplados entre si, mas fortemente
+  acoplados ao `this`
 
 ### 8.2 Estratégia: AgentContext como Mediador
 
@@ -399,39 +403,39 @@ A solução é criar um **objeto de contexto compartilhado** (`AgentContext`) qu
 
 ```js
 /**
- * Contexto compartilhado entre todos os módulos do agente.
- * Substitui os 32 campos #private espalhados pelo always-alive.js.
+ * Contexto compartilhado entre todos os módulos do agente. Substitui os 32 campos #private espalhados pelo
+ * always-alive.js.
  */
 export class AgentContext {
-    /** @type {CopilotClient | null} */
-    client = null;
+  /** @type {CopilotClient | null} */
+  client = null;
 
-    /** @type {CopilotSession | null} */
-    session = null;
+  /** @type {CopilotSession | null} */
+  session = null;
 
-    /** @type {AgentStatus} */
-    status = 'stopped';
+  /** @type {AgentStatus} */
+  status = 'stopped';
 
-    /** @type {boolean} */
-    isReconnecting = false;
+  /** @type {boolean} */
+  isReconnecting = false;
 
-    /** @type {string} */
-    model;
+  /** @type {string} */
+  model;
 
-    /** @type {'low'|'medium'|'high'|'xhigh'|undefined} */
-    reasoningEffort;
+  /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */
+  reasoningEffort;
 
-    /** @type {boolean} */
-    isResumed = false;
+  /** @type {boolean} */
+  isResumed = false;
 
-    /** @type {number} */
-    sendCount = 0;
+  /** @type {number} */
+  sendCount = 0;
 
-    // ... mais campos, todos mutáveis via acesso direto
-    // ao invés de getters/setters internos
+  // ... mais campos, todos mutáveis via acesso direto
+  // ao invés de getters/setters internos
 
-    /** @type {EventEmitter} */
-    emitter; // referência ao AlwaysAliveAgent para emit()
+  /** @type {EventEmitter} */
+  emitter; // referência ao AlwaysAliveAgent para emit()
 }
 ```
 
@@ -451,6 +455,7 @@ export class AgentContext {
 ### 8.5 Compatibilidade e API de Superfície
 
 A API pública permanece **100% inalterada**:
+
 - `class AlwaysAliveAgent extends EventEmitter` — mesma interface
 - `alwaysAliveAgent` singleton — mesmo export
 - `getAgent()` accessor — mesmo export
@@ -474,8 +479,8 @@ A mudança é **puramente interna**: campos #private → AgentContext público (
 ### F35: Criar AgentContext
 
 1. **F35.1** — Criar `state/agent-context.js` com `AgentContext` class
-2. **F35.2** — Migrar campos de always-alive.js: SDK (session, client), State (status),
-   Config (model, reasoningEffort), Counters (sendCount, contextState, lastPrInfo, etc.)
+2. **F35.2** — Migrar campos de always-alive.js: SDK (session, client), State (status), Config
+   (model, reasoningEffort), Counters (sendCount, contextState, lastPrInfo, etc.)
 3. **F35.3** — Instanciar `this.ctx = new AgentContext(this)` no constructor
 4. **F35.4** — Migrar getters simples para ler de `this.ctx` em vez de `this.#field`
 5. **F35.5** — Validar: lint + typecheck 0 erros + wc -l
@@ -549,8 +554,8 @@ F35 (AgentContext) → F36 (Lifecycle) → F37 (Dialog) → F38 (Messaging) → 
      =                = ~1024L          = ~880L        = ~747L          = ~400L
 ```
 
-**Dependências**: F35 deve ser executado primeiro (pré-requisito de todos). F36-F39 podem ser
-feitos em qualquer ordem MAS a sequência proposta minimiza conflitos de merge.
+**Dependências**: F35 deve ser executado primeiro (pré-requisito de todos). F36-F39 podem ser feitos
+em qualquer ordem MAS a sequência proposta minimiza conflitos de merge.
 
 **Cada fase é independente e funcional**: após cada fase, o agente deve continuar funcionando
 exatamente como antes (zero mudanças na API pública).
@@ -567,11 +572,11 @@ exatamente como antes (zero mudanças na API pública).
 
 | Fase | Status | Descrição                                               | Commit     | ΔL always-alive   |
 | ---- | ------ | ------------------------------------------------------- | ---------- | ----------------- |
-| F35  | ✅      | AgentContext — 26 campos #private → ctx                 | `ddd3c7b6` | 1348→1197 (-151L) |
-| F36  | ✅      | AgentLifecycle — start/stop/initSession/tryReconnect    | `604b9878` | 1197→858 (-339L)  |
-| F37  | ✅      | AgentDialogController — dialog start/stop/resume/ensure | `7e3e39ac` | 858→776 (-82L)    |
-| F38  | ✅      | AgentMessaging — sendMessage/steer/answer/enqueue       | `4a34d3e6` | 776→702 (-74L)    |
-| F39  | ✅      | AgentState — getStatusSnapshot/listenerDiagnostics      | `e2ff5693` | 702→660 (-42L)    |
+| F35  | ✅     | AgentContext — 26 campos #private → ctx                 | `ddd3c7b6` | 1348→1197 (-151L) |
+| F36  | ✅     | AgentLifecycle — start/stop/initSession/tryReconnect    | `604b9878` | 1197→858 (-339L)  |
+| F37  | ✅     | AgentDialogController — dialog start/stop/resume/ensure | `7e3e39ac` | 858→776 (-82L)    |
+| F38  | ✅     | AgentMessaging — sendMessage/steer/answer/enqueue       | `4a34d3e6` | 776→702 (-74L)    |
+| F39  | ✅     | AgentState — getStatusSnapshot/listenerDiagnostics      | `e2ff5693` | 702→660 (-42L)    |
 
 ### 7.2 Módulos Criados (F35-F39)
 
@@ -604,6 +609,7 @@ F35-F39: agentStart(ctx, host)  // ctx = AgentContext, host = AlwaysAliveAgent (
 ```
 
 Cada módulo extraído recebe `(ctx, host)`:
+
 - **ctx** — `AgentContext` com todos os campos de estado mutável
 - **host** — `AlwaysAliveAgent extends EventEmitter` (para emit/on/off e getters)
 
@@ -613,6 +619,7 @@ que o host deve satisfazer, documentadas via JSDoc @typedef.
 ### 7.5 always-alive.js — Estado Atual (660L)
 
 Composição restante:
+
 - **Imports + typedefs**: ~100L
 - **Constructor**: ~15L
 - **Thin getters/setters**: ~200L (19 getters, 3 setters, todos 1-3L de corpo)
@@ -622,9 +629,11 @@ Composição restante:
 - **Singleton + Dispose**: ~50L
 
 Os 3 métodos privados que **devem** permanecer na classe:
+
 1. `#setStatus(status)` — muta ctx.status + invalida cache + emit
 2. `#processQueue()` — loop de processamento com referência circular (#setStatus, #tryReconnect)
-3. `#tryReconnect(err, opts)` — delega para agentTryReconnect (thin wrapper preservando contexto `this`)
+3. `#tryReconnect(err, opts)` — delega para agentTryReconnect (thin wrapper preservando contexto
+   `this`)
 
 ## 8. Auditoria Pós-F39 — agent/ Completo
 
@@ -665,6 +674,7 @@ Os 3 métodos privados que **devem** permanecer na classe:
 ### 8.4 API Pública — Consumo Externo (inalterado)
 
 ~20 consumidores via `#copilot/agent` barrel. Interface 100% retrocompatível:
+
 - Event Source (48 refs on/off)
 - Status Provider (getStatusSnapshot + getters)
 - Lifecycle Controller (start/stop/pause/resume)
@@ -683,8 +693,8 @@ Os 3 métodos privados que **devem** permanecer na classe:
 | agent-messaging.js         | **NENHUM**                 | ⚠ Sem cobertura                                           |
 | agent-state.js             | **NENHUM**                 | ⚠ Sem cobertura                                           |
 
-**Risco**: 5 módulos extraídos (F35-F39) sem testes unitários diretos.
-Cobertura indireta existe (spec files de always-alive testam delegação), mas é frágil.
+**Risco**: 5 módulos extraídos (F35-F39) sem testes unitários diretos. Cobertura indireta existe
+(spec files de always-alive testam delegação), mas é frágil.
 
 ## 9. Novo Roadmap — F41+
 
@@ -706,6 +716,7 @@ Cobertura indireta existe (spec files de always-alive testam delegação), mas �
 #### Fase A: Segurança de Regressão (F41 + F46)
 
 **F41: Testes unitários para módulos extraídos**
+
 1. F41.1 — test_agent_context.spec.js (construção, setStatus, bridge MessageQueue)
 2. F41.2 — test_agent_lifecycle.spec.js (agentStart, agentStop, initSession, tryReconnect)
 3. F41.3 — test_agent_messaging.spec.js (sendMessage guards, enqueueTask, answerPendingQuestion)
@@ -713,6 +724,7 @@ Cobertura indireta existe (spec files de always-alive testam delegação), mas �
 5. F41.5 — test_agent_dialog_controller.spec.js (dialogStart preconditions, dialogStop)
 
 **F46: Testes de delegação always-alive.js**
+
 1. F46.1 — Verificar que cada método delegado chama o módulo correto
 2. F46.2 — Verificar que thin getters retornam ctx.field correto
 3. F46.3 — Atualizar testes source-scan existentes
@@ -722,32 +734,38 @@ Cobertura indireta existe (spec files de always-alive testam delegação), mas �
 #### Fase B: Hardening Types (F45 + F48)
 
 **F45: Host interface typedefs**
+
 1. F45.1 — Unificar LifecycleHost, DialogHost, MessagingHost, StateHost em types.js
 2. F45.2 — AlwaysAliveAgent implements all Host interfaces (JSDoc @implements)
 3. F45.3 — Validar typecheck:strict
 
 **F48: Exportar typedefs compartilhados**
+
 1. F48.1 — Exportar AgentContext, AgentStatusSnapshot, AgentTask via barrel
 2. F48.2 — Documentar interfaces para consumidores internos
 
 #### Fase C: Decomposição Opcional (F42 + F43)
 
 **F42: Decompor event-wirer.js**
+
 1. F42.1 — Criar session/wirers/ com streaming.js, lifecycle.js, audit.js, billing.js
 2. F42.2 — event-wirer.js vira compositor (~180L)
 3. F42.3 — Validar
 
 **F43: Separar initializer.js**
+
 1. F43.1 — Extrair resume-session logic para session/resume.js
 2. F43.2 — initializer.js fica com createSession (~200L)
 
 #### Fase D: Limpeza (F44 + F47)
 
 **F44: JSDoc cleanup**
+
 1. F44.1 — Remover JSDoc orphan em always-alive.js
 2. F44.2 — Remover duplicações nos módulos extraídos
 
 **F47: webhook-manager.js modularização**
+
 1. F47.1 — Avaliar se classe é MCP-agnostic
 2. F47.2 — Extrair se aplicável
 

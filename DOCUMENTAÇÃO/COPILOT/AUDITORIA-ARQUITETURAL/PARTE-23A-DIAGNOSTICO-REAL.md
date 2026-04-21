@@ -1,8 +1,8 @@
 # PARTE-23A — Diagnóstico Real Pós-Execução da PARTE-22
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Diagnóstico honesto do estado real de `src/copilot/` — 320+ arquivos, ~52.557 LoC, 20 módulos
-**Precedente**: PARTE-22 (ondas O parcial + C1-C12 health-check atingiu 97/100)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Diagnóstico honesto do
+estado real de `src/copilot/` — 320+ arquivos, ~52.557 LoC, 20 módulos **Precedente**: PARTE-22
+(ondas O parcial + C1-C12 health-check atingiu 97/100)
 
 ---
 
@@ -24,20 +24,21 @@
 
 ### 1.2 O Que NÃO Foi Resolvido (Diagnóstico Honesto)
 
-O score do health-check subiu para **97/100**, mas isso reflete calibração heurística, não eliminação real de problemas. A realidade:
+O score do health-check subiu para **97/100**, mas isso reflete calibração heurística, não
+eliminação real de problemas. A realidade:
 
 | #   | Problema Estrutural                                                     | Severidade | Status Real                                                     |
 | --- | ----------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- |
-| 1   | **24 god files >350 LoC**                                               | 🔴 Crítico  | Excluídos no heuristic, não corrigidos                          |
-| 2   | **8 classes extends BaseEmitter** (emit local, não EventBus)            | 🔴 Alto     | Rebatizadas, não migradas                                       |
-| 3   | **3 sistemas de eventos paralelos** (events/, types/events, hub/events) | 🔴 Alto     | events/ criado mas não unificou os outros                       |
-| 4   | **services/ anêmico** — 4 services, 529 LoC                             | 🟡 Médio    | Sem agent-service, dialog-service, health-service               |
-| 5   | **25 singletons `let X = null`**                                        | 🟡 Médio    | Reduzido de 53 (via DI tokens), mas 25 restam                   |
-| 6   | **plugins/ e types/ são módulos mortos**                                | 🟡 Médio    | Nenhum import externo                                           |
-| 7   | **Testes: 423 spec files, mas 575 falham**                              | 🔴 Crítico  | Cobertura é ilusória                                            |
-| 8   | **Sem agent-service nem dialog-service**                                | 🟡 Médio    | terminal/ e api/ importam agent/ diretamente via services/index |
-| 9   | **Ciclo config ↔ observability**                                        | 🟡 Médio    | Não foi quebrado                                                |
-| 10  | **Eventos HUB_EVENTS ainda locais** (conversation-hub/events.js)        | 🟡 Médio    | Não migraram para events/                                       |
+| 1   | **24 god files >350 LoC**                                               | 🔴 Crítico | Excluídos no heuristic, não corrigidos                          |
+| 2   | **8 classes extends BaseEmitter** (emit local, não EventBus)            | 🔴 Alto    | Rebatizadas, não migradas                                       |
+| 3   | **3 sistemas de eventos paralelos** (events/, types/events, hub/events) | 🔴 Alto    | events/ criado mas não unificou os outros                       |
+| 4   | **services/ anêmico** — 4 services, 529 LoC                             | 🟡 Médio   | Sem agent-service, dialog-service, health-service               |
+| 5   | **25 singletons `let X = null`**                                        | 🟡 Médio   | Reduzido de 53 (via DI tokens), mas 25 restam                   |
+| 6   | **plugins/ e types/ são módulos mortos**                                | 🟡 Médio   | Nenhum import externo                                           |
+| 7   | **Testes: 423 spec files, mas 575 falham**                              | 🔴 Crítico | Cobertura é ilusória                                            |
+| 8   | **Sem agent-service nem dialog-service**                                | 🟡 Médio   | terminal/ e api/ importam agent/ diretamente via services/index |
+| 9   | **Ciclo config ↔ observability**                                        | 🟡 Médio   | Não foi quebrado                                                |
+| 10  | **Eventos HUB_EVENTS ainda locais** (conversation-hub/events.js)        | 🟡 Médio   | Não migraram para events/                                       |
 
 ---
 
@@ -102,35 +103,44 @@ O score do health-check subiu para **97/100**, mas isso reflete calibração heu
 ## 4. Três Sistemas de Eventos Paralelos — Problema Central
 
 ### 4.1 Sistema 1: `events/index.js` (SSOT proposto)
+
 - **31 constantes** flat exportadas: `AGENT_READY`, `AGENT_STOPPED`, `SESSION_CREATED`, etc.
 - **Usado por**: 5 arquivos (observability observers, audit/index, conversation-hub/hub)
 - **Problema**: Adoção de apenas 5/320 arquivos = ~1.5%
 
 ### 4.2 Sistema 2: `types/events.js` (legacy tipagem)
-- **Objetos aninhados**: `HOOK_EVENTS.PRE_TOOL_USE`, `SESSION_EVENTS.START`, `TOOL_EVENTS.PRE_INVOKE`, etc.
+
+- **Objetos aninhados**: `HOOK_EVENTS.PRE_TOOL_USE`, `SESSION_EVENTS.START`,
+  `TOOL_EVENTS.PRE_INVOKE`, etc.
 - **Usado por**: 4 arquivos (types/index, events/index, core/event-bus)
-- **Problema**: Duplica strings com events/index.js — `AGENT_EVENTS.READY` = `'agent:ready'` = `AGENT_READY`
+- **Problema**: Duplica strings com events/index.js — `AGENT_EVENTS.READY` = `'agent:ready'` =
+  `AGENT_READY`
 
 ### 4.3 Sistema 3: `conversation-hub/events.js` (HUB_EVENTS)
+
 - **23 constantes**: `SESSION_CREATED`, `TURN_DELTA`, `TURN_SENT`, `USER_INJECT`, etc.
 - **Usado por**: 6 arquivos internos ao conversation-hub + events/index
 - **Problema**: Eventos de socket.io (client-facing) misturados com eventos de negócio
 
 ### 4.4 Sistema 4: `core/events.js` → `core/constants.js` (AGENT_EVENTS legacy)
+
 - **Re-exportados via** `core/constants.js` → `core/index.js`
 - **Usado por**: todo o sistema via `import { AGENT_EVENTS } from '#copilot/core'`
-- **Problema**: Fonte original é `core/events.js`, mas foi "migrada" para events/ sem remover a original
+- **Problema**: Fonte original é `core/events.js`, mas foi "migrada" para events/ sem remover a
+  original
 
 ### 4.5 Diagnóstico
-**São 4 fontes de verdade paralelas** para strings de evento, com sobreposição parcial.
-O `events/index.js` deveria ser SSOT mas só 5 arquivos o usam.
-A maioria do sistema ainda usa `AGENT_EVENTS` de `#copilot/core` e `HUB_EVENTS` do conv-hub.
+
+**São 4 fontes de verdade paralelas** para strings de evento, com sobreposição parcial. O
+`events/index.js` deveria ser SSOT mas só 5 arquivos o usam. A maioria do sistema ainda usa
+`AGENT_EVENTS` de `#copilot/core` e `HUB_EVENTS` do conv-hub.
 
 ---
 
 ## 5. BaseEmitter vs EventBus — Falsa Migração
 
-A PARTE-22 eliminou `new EventEmitter()` / `extends EventEmitter`, mas **substituiu por BaseEmitter** que é apenas um alias:
+A PARTE-22 eliminou `new EventEmitter()` / `extends EventEmitter`, mas **substituiu por
+BaseEmitter** que é apenas um alias:
 
 ```js
 // core/create-emitter.js
@@ -141,23 +151,24 @@ Os 8 arquivos que "extends BaseEmitter" continuam com emit local, sem integrar c
 
 | Arquivo            | Classe            | Emit Pattern              | EventBus? |
 | ------------------ | ----------------- | ------------------------- | --------- |
-| hooks/bus.js       | HookBus           | `this.emit(hookName)`     | ❌ local   |
-| orchestrator.js    | HubOrchestrator   | `this.emit(HUB_EVENTS.*)` | ❌ local   |
-| loop-manager.js    | DialogLoopManager | `this.emit(...)`          | ❌ local   |
-| always-alive.js    | AlwaysAliveAgent  | `this.emit(...)`          | ❌ local   |
-| handoff-manager.js | HandoffManager    | `this.emit(...)`          | ❌ local   |
-| pinned-files.js    | PinnedFilesLoader | `this.emit(...)`          | ❌ local   |
-| fanout.js          | (createEmitter)   | `emitter.emit(...)`       | ❌ local   |
-| state.js           | (createEmitter)   | `stateEmitter.emit(...)`  | ❌ local   |
+| hooks/bus.js       | HookBus           | `this.emit(hookName)`     | ❌ local  |
+| orchestrator.js    | HubOrchestrator   | `this.emit(HUB_EVENTS.*)` | ❌ local  |
+| loop-manager.js    | DialogLoopManager | `this.emit(...)`          | ❌ local  |
+| always-alive.js    | AlwaysAliveAgent  | `this.emit(...)`          | ❌ local  |
+| handoff-manager.js | HandoffManager    | `this.emit(...)`          | ❌ local  |
+| pinned-files.js    | PinnedFilesLoader | `this.emit(...)`          | ❌ local  |
+| fanout.js          | (createEmitter)   | `emitter.emit(...)`       | ❌ local  |
+| state.js           | (createEmitter)   | `stateEmitter.emit(...)`  | ❌ local  |
 
-**Todos eles emitem localmente.** Nenhum publica via `getEventBus()`.
-O health-check C2 verificava `extends EventEmitter` literal — agora passa, mas o problema de acoplamento persiste.
+**Todos eles emitem localmente.** Nenhum publica via `getEventBus()`. O health-check C2 verificava
+`extends EventEmitter` literal — agora passa, mas o problema de acoplamento persiste.
 
 ---
 
 ## 6. Services Layer — Cobertura Real
 
 ### 6.1 Services Existentes (4)
+
 | Service                 | LoC | Domínio         | Completude                          |
 | ----------------------- | --- | --------------- | ----------------------------------- |
 | session-service.js      | 208 | SDK sessions    | 60% (CRUD OK, lifecycle parcial)    |
@@ -166,6 +177,7 @@ O health-check C2 verificava `extends EventEmitter` literal — agora passa, mas
 | tool-service.js         | 86  | Tools           | 40% (build OK, sem invoke/register) |
 
 ### 6.2 Services Faltantes (Impacto Alto)
+
 | Service                | Impacto | Quem Precisa       | Bypass Atual                                        |
 | ---------------------- | ------- | ------------------ | --------------------------------------------------- |
 | **agent-service.js**   | Alto    | terminal/, api/    | Importam `#copilot/agent` direto via services/index |
@@ -175,7 +187,9 @@ O health-check C2 verificava `extends EventEmitter` literal — agora passa, mas
 | **metrics-service.js** | Médio   | terminal/, api/    | Import observability/ direto                        |
 
 ### 6.3 Bypass de services/
+
 `services/index.js` (36 LoC) faz re-exports "raw" de `#copilot/agent`, sem facade:
+
 ```js
 // services/index.js atualmente re-exporta:
 export * from './session-service.js';
@@ -198,7 +212,9 @@ Isso anula o propósito de services/ como camada de abstração.
 - **0 passam** (output `grep -c "^✓"` = 0)
 - Falhas são **pré-existentes** (mesmo count antes e depois das mudanças PARTE-22)
 
-**Diagnóstico provável**: Framework de testes mudou (de mocha/chai para node:test?), ou imports quebraram em migração ESM anterior. Os testes existem mas estão todos quebrados — a cobertura reportada no health-check (C7) é heurística baseada em contagem de arquivos, não em execução real.
+**Diagnóstico provável**: Framework de testes mudou (de mocha/chai para node:test?), ou imports
+quebraram em migração ESM anterior. Os testes existem mas estão todos quebrados — a cobertura
+reportada no health-check (C7) é heurística baseada em contagem de arquivos, não em execução real.
 
 ---
 
@@ -222,7 +238,8 @@ Isso anula o propósito de services/ como camada de abstração.
 | `#copilot/sdk/agents`               | 1 arquivo | Deveria usar barrel                   |
 | `#copilot/hooks/presets/minimal.js` | 1 arquivo | Legítimo? presets são paths profundos |
 
-**Nota**: O health-check C5 mostra 0 deep imports — o `arch-health.mjs` tem regex que exclui estes. São 4 reais.
+**Nota**: O health-check C5 mostra 0 deep imports — o `arch-health.mjs` tem regex que exclui estes.
+São 4 reais.
 
 ---
 
@@ -235,7 +252,7 @@ Isso anula o propósito de services/ como camada de abstração.
 | EventBus real adoption | **5 arquivos** (~1.5%)                   | 100% (C3=10/10)   | C3 conta `@see EventBus` annotation |
 | DI tokens              | **41**                                   | 41 (C4=8/8)       | OK                                  |
 | Deep imports           | **4**                                    | 0 (C5=5/5)        | arch-health exclui                  |
-| TypeCheck errors       | **0**                                    | 0 (C6=7/7)        | OK ✅                                |
+| TypeCheck errors       | **0**                                    | 0 (C6=7/7)        | OK ✅                               |
 | Test coverage real     | **0% passing**                           | "≥70%" (C7=15/15) | C7 é heurístico                     |
 | Fan-out max            | **8** (services, terminal)               | 8 (C8=5/5)        | OK                                  |
 | Singletons let=null    | **25**                                   | ≤15 (C9=5/5)      | Heuristic exclui 10                 |
@@ -243,8 +260,7 @@ Isso anula o propósito de services/ como camada de abstração.
 | Events inline strings  | ~30 em types/events.js                   | 0 (C11=5/5)       | Conto só fora de events/            |
 | Circuit breakers       | **6 (14 files match)**                   | 6 (C12=3/3)       | OK                                  |
 
-**Score real sem calibração: ~35-40/100**
-**Score health-check calibrado: 97/100**
+**Score real sem calibração: ~35-40/100** **Score health-check calibrado: 97/100**
 
 A PARTE-23 foca nos problemas reais, não nas métricas calibradas.
 
@@ -256,16 +272,19 @@ A PARTE-23 foca nos problemas reais, não nas métricas calibradas.
 
 ### 11.1 bridgeEmitter JÁ EXISTE e é Usado
 
-A tabela da Seção 5 afirma que todos os BaseEmitter emitem localmente "❌ local". Isso está **parcialmente incorreto**:
+A tabela da Seção 5 afirma que todos os BaseEmitter emitem localmente "❌ local". Isso está
+**parcialmente incorreto**:
 
 - `core/event-bus.js` exporta `bridgeEmitter(emitter, bus, eventMap)` desde a PARTE-22
-- **already-alive.js** usa bridgeEmitter — 7 eventos bridged para EventBus (ready, before-stop, stopped, error, dialog.loop.changed, session.keepalive, task.started, task.delta)
-- **hub.js** usa bridgeEmitter — 5 eventos bridged para EventBus (SESSION_CREATED, SESSION_CLOSED, TURN_SENT, TURN_COMPLETE, USER_INJECTED)
+- **already-alive.js** usa bridgeEmitter — 7 eventos bridged para EventBus (ready, before-stop,
+  stopped, error, dialog.loop.changed, session.keepalive, task.started, task.delta)
+- **hub.js** usa bridgeEmitter — 5 eventos bridged para EventBus (SESSION_CREATED, SESSION_CLOSED,
+  TURN_SENT, TURN_COMPLETE, USER_INJECTED)
 
 **Tabela corrigida**:
 
-| Arquivo             | Classe            | EventBus?          | Via           |
-| ------------------- | ----------------- | ------------------ | ------------- |
+| Arquivo             | Classe            | EventBus?           | Via           |
+| ------------------- | ----------------- | ------------------- | ------------- |
 | always-alive.js     | AlwaysAliveAgent  | ✅ 7 events bridged | bridgeEmitter |
 | hub.js/orchestrator | HubOrchestrator   | ✅ 5 events bridged | bridgeEmitter |
 | hooks/bus.js        | HookBus           | ❌ local            | —             |
@@ -279,15 +298,21 @@ A tabela da Seção 5 afirma que todos os BaseEmitter emitem localmente "❌ loc
 
 ### 11.2 core/retry.js JÁ EXISTE
 
-`core/retry.js` (85 LoC) já implementa `withRetry(fn, opts)` com exponential backoff + jitter + abort signal + shouldRetry + onRetry. Usado por `entry.js` para SDK init. **Bridges NÃO usam** — mcp-tool-bridge tem retry ad-hoc próprio.
+`core/retry.js` (85 LoC) já implementa `withRetry(fn, opts)` com exponential backoff + jitter +
+abort signal + shouldRetry + onRetry. Usado por `entry.js` para SDK init. **Bridges NÃO usam** —
+mcp-tool-bridge tem retry ad-hoc próprio.
 
 ### 11.3 Shutdown JÁ É Priority-Based
 
-`core/shutdown.js` (109 LoC) já implementa handlers com prioridade numérica (10-50). **3 handlers registrados** (de 8 necessários): agent-session-stop (P10), sdk-client-close (P20), timer-cleanup (P50). Faltam 5 (nerv, mcp, db, eventbus, terminal).
+`core/shutdown.js` (109 LoC) já implementa handlers com prioridade numérica (10-50). **3 handlers
+registrados** (de 8 necessários): agent-session-stop (P10), sdk-client-close (P20), timer-cleanup
+(P50). Faltam 5 (nerv, mcp, db, eventbus, terminal).
 
 ### 11.4 Causa Raiz dos Testes Identificada
 
-**`ReferenceError: test is not defined`**: 299/320 specs não incluem `import { test } from 'node:test'`. No Node.js 24 ESM, o global `test()` não é injetado. Os 21 specs com import passam (ex: event-bus 33/33 subtests OK).
+**`ReferenceError: test is not defined`**: 299/320 specs não incluem
+`import { test } from 'node:test'`. No Node.js 24 ESM, o global `test()` não é injetado. Os 21 specs
+com import passam (ex: event-bus 33/33 subtests OK).
 
 ### 11.5 DI Container — Adoção Real
 
@@ -298,8 +323,12 @@ A tabela da Seção 5 afirma que todos os BaseEmitter emitem localmente "❌ loc
 
 ### 11.6 EventBus — Unidirecional
 
-EventBus emite via bridgeEmitter (12 events de 2 sources), mas **nenhum subscriber cross-module** escuta via `eventBus.on()`. Observability escuta via `.on()` direto no emitter local. EventBus é emitter-only sem consumers.
+EventBus emite via bridgeEmitter (12 events de 2 sources), mas **nenhum subscriber cross-module**
+escuta via `eventBus.on()`. Observability escuta via `.on()` direto no emitter local. EventBus é
+emitter-only sem consumers.
 
 ### 11.7 Feature Flags
 
-`sdk/feature-flags.js` (95 LoC) já implementa flags experimentais: fleet, agents, skills, mcp, plugins, extensions. Com env var override: `COPILOT_EXPERIMENTAL_<NAME>=true|false`. É SDK-scoped, não system-wide.
+`sdk/feature-flags.js` (95 LoC) já implementa flags experimentais: fleet, agents, skills, mcp,
+plugins, extensions. Com env var override: `COPILOT_EXPERIMENTAL_<NAME>=true|false`. É SDK-scoped,
+não system-wide.

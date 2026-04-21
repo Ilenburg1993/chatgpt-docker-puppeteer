@@ -1,8 +1,8 @@
 # PARTE-22C — Roadmap v3: 4 Ondas, 22 Faixas, Transformação Profunda
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Roadmap executável de `src/copilot` — da situação atual (22A) à ideal (22B)
-**Critério**: Zero relativização — cada faixa tem critérios de conclusão mensuráveis e verificáveis
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Roadmap executável de
+`src/copilot` — da situação atual (22A) à ideal (22B) **Critério**: Zero relativização — cada faixa
+tem critérios de conclusão mensuráveis e verificáveis
 
 ---
 
@@ -57,9 +57,9 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O1 — Zero Deep Imports (4 → 0)
 
-**Objetivo**: Eliminar os 4 deep imports reais restantes que bypassam barrels
-**Dependências**: Nenhuma
-**Critério de conclusão**: `node scripts/arch-health.mjs --json | jq '.deepImports.refined'` retorna `0`
+**Objetivo**: Eliminar os 4 deep imports reais restantes que bypassam barrels **Dependências**:
+Nenhuma **Critério de conclusão**: `node scripts/arch-health.mjs --json | jq '.deepImports.refined'`
+retorna `0`
 
 | Sub  | Arquivo com deep import   | Import problemático                 | Solução                     | Risco |
 | ---- | ------------------------- | ----------------------------------- | --------------------------- | ----- |
@@ -75,9 +75,9 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O2 — Expandir DI Tokens (13 → 30)
 
-**Objetivo**: Registrar os serviços mais críticos no container DI
-**Dependências**: Nenhuma (incremento sobre Faixa K existente)
-**Critério de conclusão**: `node scripts/arch-health.mjs --json | jq '.diTokens'` retorna ≥30
+**Objetivo**: Registrar os serviços mais críticos no container DI **Dependências**: Nenhuma
+(incremento sobre Faixa K existente) **Critério de conclusão**:
+`node scripts/arch-health.mjs --json | jq '.diTokens'` retorna ≥30
 
 | Sub   | Token a criar                                        | Módulo destino                | Quem injeta        | Quem resolve      | Risco |
 | ----- | ---------------------------------------------------- | ----------------------------- | ------------------ | ----------------- | ----- |
@@ -104,9 +104,8 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O3 — Split `agent/always-alive.js` (623 → ≤150 LoC)
 
-**Objetivo**: Eliminar o maior god file do sistema
-**Dependências**: O2 (para wiring DI)
-**Critério de conclusão**: `wc -l src/copilot/agent/always-alive.js` ≤ 150
+**Objetivo**: Eliminar o maior god file do sistema **Dependências**: O2 (para wiring DI) **Critério
+de conclusão**: `wc -l src/copilot/agent/always-alive.js` ≤ 150
 
 | Sub  | Ação                                                | Destino                                            | Risco |
 | ---- | --------------------------------------------------- | -------------------------------------------------- | ----- |
@@ -123,9 +122,8 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O4 — Split `agent/dialog/loop-manager.js` (599 → ≤150 LoC)
 
-**Objetivo**: Decompor o segundo maior god file
-**Dependências**: O3
-**Critério de conclusão**: `wc -l src/copilot/agent/dialog/loop-manager.js` ≤ 150
+**Objetivo**: Decompor o segundo maior god file **Dependências**: O3 **Critério de conclusão**:
+`wc -l src/copilot/agent/dialog/loop-manager.js` ≤ 150
 
 | Sub  | Ação                                           | Destino                                  | Risco |
 | ---- | ---------------------------------------------- | ---------------------------------------- | ----- |
@@ -141,11 +139,11 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O5 — Zero TypeCheck Errors (16 → 0)
 
-**Objetivo**: Resolver todos os erros de typecheck baseline
-**Dependências**: Nenhuma
-**Critério de conclusão**: `npm run typecheck:node` retorna 0 errors
+**Objetivo**: Resolver todos os erros de typecheck baseline **Dependências**: Nenhuma **Critério de
+conclusão**: `npm run typecheck:node` retorna 0 errors
 
 **Arquivos com erros:**
+
 - `src/copilot/sdk/rpc-ops.js`: 7 erros (tipos faltando: `ShellExecResult`, etc.)
 - `src/copilot/sdk/rpc-session.js`: 9 erros (tipos faltando: `ModelSwitchResult`, etc.)
 
@@ -163,8 +161,7 @@ Onda R: Events Schema + Multi-Agent Prep + Polish (faixas R1-R3)
 
 ### Faixa O6 — Infra Core: Cache, Mutex, Timer Registry
 
-**Objetivo**: Criar infraestrutura para eliminar singletons lazy-init
-**Dependências**: Nenhuma
+**Objetivo**: Criar infraestrutura para eliminar singletons lazy-init **Dependências**: Nenhuma
 **Critério de conclusão**: 3 novos módulos com tests ≥5 each, usados em ≥5 locais
 
 #### O6-1: `core/cache.js` — LRU/TTL Cache Manager
@@ -179,15 +176,15 @@ export function createCache({ maxSize = 100, ttlMs = 0 } = {}) {
 // Substituirá: _modelsCache, _rgAvailable, _zodToJsonSchema, etc.
 ```
 
-| Sub   | Ação                                          | Risco |
-| ----- | --------------------------------------------- | ----- |
-| O6-1a | Criar `core/cache.js` (≤150 LoC)              | Baixo |
-| O6-1b | Criar 8+ testes unitários para CacheManager   | Baixo |
-| O6-1c | Exportar via `core/index.js`                  | Baixo |
-| O6-1d | Migrar `sdk/models/helpers.js` (_modelsCache) | Baixo |
-| O6-1e | Migrar `sdk/tools.js` (_zodToJsonSchema)      | Baixo |
-| O6-1f | Migrar `tools/file/shared.js` (_rgAvailable)  | Baixo |
-| O6-1g | Adicionar DI token `CACHE_MANAGER` (O2)       | Baixo |
+| Sub   | Ação                                           | Risco |
+| ----- | ---------------------------------------------- | ----- |
+| O6-1a | Criar `core/cache.js` (≤150 LoC)               | Baixo |
+| O6-1b | Criar 8+ testes unitários para CacheManager    | Baixo |
+| O6-1c | Exportar via `core/index.js`                   | Baixo |
+| O6-1d | Migrar `sdk/models/helpers.js` (\_modelsCache) | Baixo |
+| O6-1e | Migrar `sdk/tools.js` (\_zodToJsonSchema)      | Baixo |
+| O6-1f | Migrar `tools/file/shared.js` (\_rgAvailable)  | Baixo |
+| O6-1g | Adicionar DI token `CACHE_MANAGER` (O2)        | Baixo |
 
 #### O6-2: `core/mutex.js` — Mutex Pool com Timeout
 
@@ -199,14 +196,14 @@ export function createMutex(timeoutMs = 30000) {
 // Substituirá: _storeMutex, _sendTurnMutex, _writeQueue promise chains, etc.
 ```
 
-| Sub   | Ação                                                | Risco |
-| ----- | --------------------------------------------------- | ----- |
-| O6-2a | Criar `core/mutex.js` (≤120 LoC)                    | Baixo |
-| O6-2b | Criar 6+ testes unitários                           | Baixo |
-| O6-2c | Exportar via barrel                                 | Baixo |
-| O6-2d | Migrar `tools/todo/store.js` (_storeMutex)          | Médio |
-| O6-2e | Migrar `terminal/dialog/engine.js` (_sendTurnMutex) | Alto  |
-| O6-2f | Migrar `agent/lifecycle/state-io.js` (_writeQueue)  | Alto  |
+| Sub   | Ação                                                 | Risco |
+| ----- | ---------------------------------------------------- | ----- |
+| O6-2a | Criar `core/mutex.js` (≤120 LoC)                     | Baixo |
+| O6-2b | Criar 6+ testes unitários                            | Baixo |
+| O6-2c | Exportar via barrel                                  | Baixo |
+| O6-2d | Migrar `tools/todo/store.js` (\_storeMutex)          | Médio |
+| O6-2e | Migrar `terminal/dialog/engine.js` (\_sendTurnMutex) | Alto  |
+| O6-2f | Migrar `agent/lifecycle/state-io.js` (\_writeQueue)  | Alto  |
 
 #### O6-3: `core/timer-registry.js` — Timer Lifecycle Manager
 
@@ -226,23 +223,23 @@ export function createTimerRegistry() {
 | O6-3a | Criar `core/timer-registry.js` (≤120 LoC)          | Baixo |
 | O6-3b | Criar 6+ testes unitários                          | Baixo |
 | O6-3c | Exportar via barrel                                | Baixo |
-| O6-3d | Migrar `terminal/index.js` (_reflectionTimer)      | Médio |
+| O6-3d | Migrar `terminal/index.js` (\_reflectionTimer)     | Médio |
 | O6-3e | Integrar com `shutdown.js` (cancelAll em shutdown) | Baixo |
 
 ---
 
 ### Faixa O7 — Circuit Breakers: SDK, NERV, Webhooks
 
-**Objetivo**: Proteger todas as dependências externas com circuit breakers
-**Dependências**: O6 (para infraestrutura de estado)
-**Critério de conclusão**: 6 circuit breakers ativos, cada um com testes
+**Objetivo**: Proteger todas as dependências externas com circuit breakers **Dependências**: O6
+(para infraestrutura de estado) **Critério de conclusão**: 6 circuit breakers ativos, cada um com
+testes
 
 | Sub  | Ação                                              | Destino                                   | Risco |
 | ---- | ------------------------------------------------- | ----------------------------------------- | ----- |
 | O7-1 | Circuit breaker no SDK client (sdk/client.js)     | Usa `core/circuit-breaker.js` (já existe) | Alto  |
 | O7-2 | Circuit breaker no NERV bridge (nerv-bridge.js)   | Adaptar CB existente do MCP               | Alto  |
 | O7-3 | Circuit breaker em webhooks (error-alerting.js)   | Novo CB para HTTP calls                   | Médio |
-| O7-4 | Circuit breaker em GitHub CLI (bridges/gh/*)      | Novo CB para gh commands                  | Médio |
+| O7-4 | Circuit breaker em GitHub CLI (bridges/gh/\*)     | Novo CB para gh commands                  | Médio |
 | O7-5 | Circuit breaker em SSE fanout (api/sse/fanout.js) | CB por connection + global                | Médio |
 | O7-6 | Circuit breaker em SQLite writes (db/sqlite.js)   | CB para disk errors                       | Médio |
 | O7-7 | Health endpoint para status de CBs                | `api/bridge/health.js`                    | Baixo |
@@ -255,9 +252,8 @@ export function createTimerRegistry() {
 
 ### Faixa P1 — `events/` Module — Schema Central
 
-**Objetivo**: Criar SSOT para todos os eventos do sistema
-**Dependências**: O1, O2
-**Critério de conclusão**: `src/copilot/events/` criado, todos os HUB_EVENTS/AGENT_EVENTS importados de lá
+**Objetivo**: Criar SSOT para todos os eventos do sistema **Dependências**: O1, O2 **Critério de
+conclusão**: `src/copilot/events/` criado, todos os HUB_EVENTS/AGENT_EVENTS importados de lá
 
 | Sub   | Ação                                                         | Risco |
 | ----- | ------------------------------------------------------------ | ----- |
@@ -279,9 +275,9 @@ export function createTimerRegistry() {
 
 ### Faixa P2 — Migrar EventEmitter Direto → EventBus (8 → 0 arquivos)
 
-**Objetivo**: Eliminar todos os EventEmitter diretos cross-module
-**Dependências**: P1 (events/ module), O2 (DI tokens)
-**Critério de conclusão**: `grep -r 'new EventEmitter\|extends EventEmitter' src/copilot/ | wc -l` = 0
+**Objetivo**: Eliminar todos os EventEmitter diretos cross-module **Dependências**: P1 (events/
+module), O2 (DI tokens) **Critério de conclusão**:
+`grep -r 'new EventEmitter\|extends EventEmitter' src/copilot/ | wc -l` = 0
 
 | Sub  | Arquivo                                                  | Solução EventBus                                 | Risco |
 | ---- | -------------------------------------------------------- | ------------------------------------------------ | ----- |
@@ -299,9 +295,9 @@ export function createTimerRegistry() {
 
 ### Faixa P3 — `services/` Completo (5 novos services)
 
-**Objetivo**: services/ deve cobrir 100% dos casos de uso de L5/L6
-**Dependências**: O2 (DI tokens para services)
-**Critério de conclusão**: 9 services totais, api/ e terminal/ importam APENAS de services/
+**Objetivo**: services/ deve cobrir 100% dos casos de uso de L5/L6 **Dependências**: O2 (DI tokens
+para services) **Critério de conclusão**: 9 services totais, api/ e terminal/ importam APENAS de
+services/
 
 | Sub   | Service                                                 | Ação                                           | Risco |
 | ----- | ------------------------------------------------------- | ---------------------------------------------- | ----- |
@@ -321,9 +317,9 @@ export function createTimerRegistry() {
 
 ### Faixa P4 — Split `conversation-hub/` God Files
 
-**Objetivo**: Nenhum arquivo em conv-hub com >250 LoC
-**Dependências**: P1, P2
-**Critério de conclusão**: `find src/copilot/conversation-hub/ -name '*.js' | xargs wc -l | awk '$1>250' | grep -v total` vazio
+**Objetivo**: Nenhum arquivo em conv-hub com >250 LoC **Dependências**: P1, P2 **Critério de
+conclusão**:
+`find src/copilot/conversation-hub/ -name '*.js' | xargs wc -l | awk '$1>250' | grep -v total` vazio
 
 | Sub  | Arquivo                                       | LoC | Splits                                                            | Risco |
 | ---- | --------------------------------------------- | --- | ----------------------------------------------------------------- | ----- |
@@ -337,9 +333,9 @@ export function createTimerRegistry() {
 
 ### Faixa P5 — Split `terminal/` God Files
 
-**Objetivo**: server.js, repl.js, handlers/ abaixo de 250 LoC
-**Dependências**: P3 (para usar dialog-service no repl)
-**Critério de conclusão**: Todos os arquivos de lógica em terminal/ ≤ 250 LoC
+**Objetivo**: server.js, repl.js, handlers/ abaixo de 250 LoC **Dependências**: P3 (para usar
+dialog-service no repl) **Critério de conclusão**: Todos os arquivos de lógica em terminal/ ≤ 250
+LoC
 
 | Sub  | Arquivo                            | LoC | Ação                                        | Risco |
 | ---- | ---------------------------------- | --- | ------------------------------------------- | ----- |
@@ -356,9 +352,8 @@ export function createTimerRegistry() {
 
 ### Faixa P6 — Split `observability/` God Files
 
-**Objetivo**: metrics.js, event-collector.js, observers abaixo de 250 LoC
-**Dependências**: O6 (cache e mutex para metrics)
-**Critério de conclusão**: Todos os arquivos observability/ ≤ 250 LoC
+**Objetivo**: metrics.js, event-collector.js, observers abaixo de 250 LoC **Dependências**: O6
+(cache e mutex para metrics) **Critério de conclusão**: Todos os arquivos observability/ ≤ 250 LoC
 
 | Sub  | Arquivo                                         | LoC | Ação                                                 | Risco |
 | ---- | ----------------------------------------------- | --- | ---------------------------------------------------- | ----- |
@@ -373,8 +368,7 @@ export function createTimerRegistry() {
 
 ### Faixa P7 — Split `hooks/` + `tools/` God Files
 
-**Objetivo**: factory.js, introspection-tools.js abaixo de 250 LoC
-**Dependências**: Nenhuma
+**Objetivo**: factory.js, introspection-tools.js abaixo de 250 LoC **Dependências**: Nenhuma
 **Critério de conclusão**: Todos arquivos logic ≤ 250 LoC
 
 | Sub  | Arquivo                                  | LoC | Ação                                                     | Risco |
@@ -391,9 +385,8 @@ export function createTimerRegistry() {
 
 ### Faixa P8 — `api/` Routing-Only Refactor
 
-**Objetivo**: api/ routes apenas chamam services/ — sem lógica de negócio inline
-**Dependências**: P3 (services completos)
-**Critério de conclusão**: Nenhum arquivo em `api/express/` >150 LoC
+**Objetivo**: api/ routes apenas chamam services/ — sem lógica de negócio inline **Dependências**:
+P3 (services completos) **Critério de conclusão**: Nenhum arquivo em `api/express/` >150 LoC
 
 | Sub  | Ação                                                                            | Risco |
 | ---- | ------------------------------------------------------------------------------- | ----- |
@@ -410,9 +403,9 @@ export function createTimerRegistry() {
 
 ### Faixa Q1 — Cobertura agent/ (0% → ≥70%)
 
-**Objetivo**: Escrita de testes unitários reais para agent/
-**Dependências**: O3, O4 (god files split — necessário para testabilidade)
-**Critério de conclusão**: Coverage ≥70% nos arquivos críticos de agent/
+**Objetivo**: Escrita de testes unitários reais para agent/ **Dependências**: O3, O4 (god files
+split — necessário para testabilidade) **Critério de conclusão**: Coverage ≥70% nos arquivos
+críticos de agent/
 
 | Sub   | Arquivo/Grupo                         | Testes necessários                           | Risco |
 | ----- | ------------------------------------- | -------------------------------------------- | ----- |
@@ -431,8 +424,8 @@ export function createTimerRegistry() {
 
 ### Faixa Q2 — Cobertura terminal/ + api/ (0% → ≥70%)
 
-**Dependências**: P5 (terminal split), P8 (api routing-only)
-**Critério de conclusão**: Coverage ≥70% em arquivos de lógica
+**Dependências**: P5 (terminal split), P8 (api routing-only) **Critério de conclusão**: Coverage
+≥70% em arquivos de lógica
 
 | Sub  | Módulo/Grupo                            | Quantidade testes                  | Risco |
 | ---- | --------------------------------------- | ---------------------------------- | ----- |
@@ -447,8 +440,8 @@ export function createTimerRegistry() {
 
 ### Faixa Q3 — Cobertura sdk/ + bridges/ + observability/ (0-7% → ≥70%)
 
-**Dependências**: O5 (typecheck zero), O7 (circuit breakers)
-**Critério de conclusão**: Coverage ≥70% nas áreas críticas
+**Dependências**: O5 (typecheck zero), O7 (circuit breakers) **Critério de conclusão**: Coverage
+≥70% nas áreas críticas
 
 | Sub  | Módulo/Grupo                         | Quantidade testes                            | Risco |
 | ---- | ------------------------------------ | -------------------------------------------- | ----- |
@@ -465,8 +458,7 @@ export function createTimerRegistry() {
 
 ### Faixa Q4 — Audit Pipeline: Event Sourcing
 
-**Objetivo**: audit/ imutável, replay, query por range
-**Dependências**: P1 (audit-events schema)
+**Objetivo**: audit/ imutável, replay, query por range **Dependências**: P1 (audit-events schema)
 **Critério de conclusão**: audit/pipeline implementa append-only + replay + query
 
 | Sub  | Ação                                             | Risco |
@@ -484,9 +476,9 @@ export function createTimerRegistry() {
 
 ### Faixa Q5 — OpenTelemetry Completo + `health/` Module
 
-**Objetivo**: Telemetria real + health probes funcionais
-**Dependências**: O2 (OTEL_TRACER token), P3 (health-service)
-**Critério de conclusão**: otel.js integrado em ≥5 módulos, health endpoint retorna JSON estruturado
+**Objetivo**: Telemetria real + health probes funcionais **Dependências**: O2 (OTEL_TRACER token),
+P3 (health-service) **Critério de conclusão**: otel.js integrado em ≥5 módulos, health endpoint
+retorna JSON estruturado
 
 | Sub  | Ação                                                                          | Risco |
 | ---- | ----------------------------------------------------------------------------- | ----- |
@@ -504,9 +496,9 @@ export function createTimerRegistry() {
 
 ### Faixa R1 — events/ Module — Adoção 100%
 
-**Objetivo**: ZERO strings literais de eventos em código de produção
-**Dependências**: P1 (criação), P2 (migração parcial)
-**Critério de conclusão**: Nenhuma string inline de evento em módulos de produção
+**Objetivo**: ZERO strings literais de eventos em código de produção **Dependências**: P1 (criação),
+P2 (migração parcial) **Critério de conclusão**: Nenhuma string inline de evento em módulos de
+produção
 
 | Sub  | Ação                                                                 | Risco |
 | ---- | -------------------------------------------------------------------- | ----- |
@@ -519,9 +511,9 @@ export function createTimerRegistry() {
 
 ### Faixa R2 — Multi-Agent Prep: DI.fork() + Worker Isolation
 
-**Objetivo**: Preparar arquitetura para múltiplos agentes simultâneos
-**Dependências**: O2, O3, O4, P2
-**Critério de conclusão**: `container.fork()` funciona, AlwaysAliveAgent não usa module-scope state
+**Objetivo**: Preparar arquitetura para múltiplos agentes simultâneos **Dependências**: O2, O3, O4,
+P2 **Critério de conclusão**: `container.fork()` funciona, AlwaysAliveAgent não usa module-scope
+state
 
 | Sub  | Ação                                                               | Risco |
 | ---- | ------------------------------------------------------------------ | ----- |
@@ -536,12 +528,11 @@ export function createTimerRegistry() {
 
 ### Faixa R3 — Validação Final + Polish
 
-**Objetivo**: Verificar que todos os critérios PARTE-22 foram atingidos
-**Dependências**: Todas as faixas anteriores
-**Critério de conclusão**: Score PARTE-22 ≥ 90/100
+**Objetivo**: Verificar que todos os critérios PARTE-22 foram atingidos **Dependências**: Todas as
+faixas anteriores **Critério de conclusão**: Score PARTE-22 ≥ 90/100
 
 | Sub   | Verificação                               | Script/Método                             |
-| ----- | ----------------------------------------- | ----------------------------------------- |
+| ----- | ----------------------------------------- | ----------------------------------------- | ----------- | ------------- |
 | R3-1  | Zero god files (>300 LoC lógica)          | `find src/                                | xargs wc -l | awk '$1>300'` |
 | R3-2  | Zero EventEmitter direto                  | `grep -r 'new EventEmitter' src/copilot/` |
 | R3-3  | DI tokens ≥ 40                            | `arch-health.mjs --json`                  |
@@ -583,11 +574,13 @@ Q5 → R3
 ```
 
 **Caminho crítico** (depende de mais coisas):
+
 ```
 O1 → O2 → O3 → O4 → P2 → Q1 → R2 → R3
 ```
 
 **Faixas paralelizáveis:**
+
 - O1, O5, O6 (podem rodar em paralelo — independentes)
 - P4, P5, P6, P7 (podem rodar em paralelo após O1/O2)
 - Q1, Q2, Q3 (podem rodar em paralelo após respectivos splits)
@@ -622,30 +615,31 @@ O1 → O2 → O3 → O4 → P2 → Q1 → R2 → R3
 
 **Score atual**: 36/100 (36.0%) — Nota: F  
 **Último commit**: ver `git log --oneline -8`  
-**Critérios verdes**: C4 (DI tokens), C5 (deep imports), C6 (typecheck), C11 (events/), C12 (circuit breakers)
+**Critérios verdes**: C4 (DI tokens), C5 (deep imports), C6 (typecheck), C11 (events/), C12 (circuit
+breakers)
 
-| Faixa | Status        | Commit      | Observação                                         |
-| ----- | ------------- | ----------- | -------------------------------------------------- |
-| O1    | ✅ Concluída   | `e7ed35b8`  | 4 deep imports → 0; arch-health refined=0          |
-| O2    | ✅ Concluída   | `e7ed35b8`  | DI tokens 13→40; C4 verde                         |
-| O3    | ✅ Parcial     | `053604f7`  | facades extraídas; always-alive ainda >250 LoC     |
-| O4    | ⏳ Pendente   | —           | loop-manager.js 599 LoC — próxima                  |
-| O5    | ✅ Concluída   | `5c4255de`  | 16 typecheck errors → 0; C6 verde                 |
-| O6    | ✅ Concluída   | `41ee410e`  | core/cache.js + core/mutex.js criados              |
-| O7    | ✅ Concluída   | `41ee410e`  | sdkConnectionCircuitBreaker; 5→6 CBs; C12 verde   |
-| P1    | ✅ Concluída   | see C11     | src/copilot/events/ criado; 31 strings migradas    |
-| P2    | ⏳ Pendente   | —           | 8 arquivos EventEmitter → EventBus                 |
-| P3    | ⏳ Pendente   | —           | —                                                  |
-| P4    | ⏳ Pendente | —      | —                  |
-| P5    | ⏳ Pendente | —      | —                  |
-| P6    | ⏳ Pendente | —      | —                  |
-| P7    | ⏳ Pendente | —      | —                  |
-| P8    | ⏳ Pendente | —      | —                  |
-| Q1    | ⏳ Pendente | —      | —                  |
-| Q2    | ⏳ Pendente | —      | —                  |
-| Q3    | ⏳ Pendente | —      | —                  |
-| Q4    | ⏳ Pendente | —      | —                  |
-| Q5    | ⏳ Pendente | —      | —                  |
-| R1    | ⏳ Pendente | —      | —                  |
-| R2    | ⏳ Pendente | —      | —                  |
-| R3    | ⏳ Pendente | —      | —                  |
+| Faixa | Status       | Commit     | Observação                                      |
+| ----- | ------------ | ---------- | ----------------------------------------------- |
+| O1    | ✅ Concluída | `e7ed35b8` | 4 deep imports → 0; arch-health refined=0       |
+| O2    | ✅ Concluída | `e7ed35b8` | DI tokens 13→40; C4 verde                       |
+| O3    | ✅ Parcial   | `053604f7` | facades extraídas; always-alive ainda >250 LoC  |
+| O4    | ⏳ Pendente  | —          | loop-manager.js 599 LoC — próxima               |
+| O5    | ✅ Concluída | `5c4255de` | 16 typecheck errors → 0; C6 verde               |
+| O6    | ✅ Concluída | `41ee410e` | core/cache.js + core/mutex.js criados           |
+| O7    | ✅ Concluída | `41ee410e` | sdkConnectionCircuitBreaker; 5→6 CBs; C12 verde |
+| P1    | ✅ Concluída | see C11    | src/copilot/events/ criado; 31 strings migradas |
+| P2    | ⏳ Pendente  | —          | 8 arquivos EventEmitter → EventBus              |
+| P3    | ⏳ Pendente  | —          | —                                               |
+| P4    | ⏳ Pendente  | —          | —                                               |
+| P5    | ⏳ Pendente  | —          | —                                               |
+| P6    | ⏳ Pendente  | —          | —                                               |
+| P7    | ⏳ Pendente  | —          | —                                               |
+| P8    | ⏳ Pendente  | —          | —                                               |
+| Q1    | ⏳ Pendente  | —          | —                                               |
+| Q2    | ⏳ Pendente  | —          | —                                               |
+| Q3    | ⏳ Pendente  | —          | —                                               |
+| Q4    | ⏳ Pendente  | —          | —                                               |
+| Q5    | ⏳ Pendente  | —          | —                                               |
+| R1    | ⏳ Pendente  | —          | —                                               |
+| R2    | ⏳ Pendente  | —          | —                                               |
+| R3    | ⏳ Pendente  | —          | —                                               |

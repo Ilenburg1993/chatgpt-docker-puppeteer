@@ -1,7 +1,7 @@
 # PARTE-23 — Índice
 
-**Data**: 2026-04-12 | **Versão**: 2.0 (expandido)
-**Scope**: Auditoria profunda pós-PARTE-22, propostas de upgrade, roadmap completo
+**Data**: 2026-04-12 | **Versão**: 2.0 (expandido) **Scope**: Auditoria profunda pós-PARTE-22,
+propostas de upgrade, roadmap completo
 
 ---
 
@@ -26,7 +26,9 @@
 ## Resumo de Achados (Atualizado v2.0)
 
 ### Descobertas Críticas da Auditoria Profunda
-- **bridgeEmitter JÁ EXISTE** em `core/event-bus.js` e é usado em 2/8 emitters (always-alive: 7 events, hub: 5 events)
+
+- **bridgeEmitter JÁ EXISTE** em `core/event-bus.js` e é usado em 2/8 emitters (always-alive: 7
+  events, hub: 5 events)
 - **core/retry.js JÁ EXISTE** (85 LoC) com withRetry() — bridges NÃO usam (retry ad-hoc)
 - **Shutdown JÁ É priority-based** (10-50) — só 3/8 handlers registrados
 - **Feature flags JÁ EXISTEM** em sdk/ (6 flags experimentais, env var override)
@@ -36,6 +38,7 @@
 - **EventBus unidirecional**: emite 12 events via bridge, 0 subscribers cross-module
 
 ### Métricas Consolidadas
+
 | Métrica                   | Valor                      |
 | ------------------------- | -------------------------- |
 | Score calibrado           | 97/100                     |
@@ -50,7 +53,9 @@
 | Event SSOT adoption       | 5/320 arquivos (1.5%)      |
 
 ### Mudança de Paradigma: ADOÇÃO > CRIAÇÃO
+
 A maioria dos sistemas "faltantes" JÁ EXISTE em core/ — o problema é que ninguém os usa:
+
 - retry → existe, bridges ignoram
 - shutdown priorities → existem, 5 módulos não registram
 - bridgeEmitter → existe, 6 emitters não usam
@@ -63,4 +68,6 @@ O roadmap v2 (23I) reflete isso: 26 subfases são [ADOÇÃO] vs 36 [CRIAÇÃO].
 
 ## Relação com PARTE-22
 
-A PARTE-22 elevou o score **calibrado** para 97/100 e criou infraestrutura real (EventBus, DI, retry, shutdown, bridgeEmitter). A PARTE-23 diagnostica que essa infraestrutura existe mas está **sub-adotada**, e propõe um roadmap de ADOÇÃO + EXPANSÃO com 7 faixas, 24 fases e 135 subfases.
+A PARTE-22 elevou o score **calibrado** para 97/100 e criou infraestrutura real (EventBus, DI,
+retry, shutdown, bridgeEmitter). A PARTE-23 diagnostica que essa infraestrutura existe mas está
+**sub-adotada**, e propõe um roadmap de ADOÇÃO + EXPANSÃO com 7 faixas, 24 fases e 135 subfases.

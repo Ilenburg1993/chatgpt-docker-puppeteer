@@ -1,8 +1,8 @@
 # PARTE 11B — Situação Ideal: Arquitetura-Alvo para `src/copilot`
 
-**Data**: 2026-07-21
-**Pré-requisito**: [PARTE-11A](PARTE-11A-ANALISE-ARQUITETURAL-COMPLETA.md) — análise do estado atual.
-**Objetivo**: descrever a arquitetura ideal, com princípios, proposta de fusões/separações/centralizações.
+**Data**: 2026-07-21 **Pré-requisito**: [PARTE-11A](PARTE-11A-ANALISE-ARQUITETURAL-COMPLETA.md) —
+análise do estado atual. **Objetivo**: descrever a arquitetura ideal, com princípios, proposta de
+fusões/separações/centralizações.
 
 ---
 
@@ -238,25 +238,25 @@ Criar `config/env.js` como single source of truth:
 ```js
 // config/env.js
 export const ENV = {
-    // Runtime
-    NODE_ENV: process.env.NODE_ENV ?? 'development',
-    COPILOT_SDK_ENABLED: process.env.COPILOT_SDK_ENABLED === 'true',
+  // Runtime
+  NODE_ENV: process.env.NODE_ENV ?? 'development',
+  COPILOT_SDK_ENABLED: process.env.COPILOT_SDK_ENABLED === 'true',
 
-    // Network
-    COPILOT_CLI_URL: process.env.COPILOT_CLI_URL,
-    LLM_B_TERMINAL_PORT: Number(process.env.LLM_B_TERMINAL_PORT) || 3009,
-    COPILOT_BRIDGE_PORT: Number(process.env.COPILOT_BRIDGE_PORT) || 3008,
+  // Network
+  COPILOT_CLI_URL: process.env.COPILOT_CLI_URL,
+  LLM_B_TERMINAL_PORT: Number(process.env.LLM_B_TERMINAL_PORT) || 3009,
+  COPILOT_BRIDGE_PORT: Number(process.env.COPILOT_BRIDGE_PORT) || 3008,
 
-    // Models
-    COPILOT_MODEL: process.env.COPILOT_MODEL ?? 'claude-sonnet-4',
-    COPILOT_REASONING_EFFORT: process.env.COPILOT_REASONING_EFFORT ?? 'medium',
+  // Models
+  COPILOT_MODEL: process.env.COPILOT_MODEL ?? 'claude-sonnet-4',
+  COPILOT_REASONING_EFFORT: process.env.COPILOT_REASONING_EFFORT ?? 'medium',
 
-    // Security
-    COPILOT_HIGH_RISK_TOOLS: process.env.COPILOT_HIGH_RISK_TOOLS,
-    AGENT_DENY_SHELL_TOOLS: process.env.AGENT_DENY_SHELL_TOOLS,
-    WEBHOOK_ALLOW_PRIVATE_HOSTS: process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true',
+  // Security
+  COPILOT_HIGH_RISK_TOOLS: process.env.COPILOT_HIGH_RISK_TOOLS,
+  AGENT_DENY_SHELL_TOOLS: process.env.AGENT_DENY_SHELL_TOOLS,
+  WEBHOOK_ALLOW_PRIVATE_HOSTS: process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS === 'true',
 
-    // ... todas as demais
+  // ... todas as demais
 };
 ```
 

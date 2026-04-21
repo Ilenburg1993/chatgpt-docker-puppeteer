@@ -1,8 +1,7 @@
 # R-07A — Tabela-Base Oficial do Ciclo Clean
 
-**Programa**: P0 / Faixa A
-**Data-base factual**: 2026-04-16
-**Status**: ativo e canônico para comparação entre checkpoints
+**Programa**: P0 / Faixa A **Data-base factual**: 2026-04-16 **Status**: ativo e canônico para
+comparação entre checkpoints
 
 ---
 

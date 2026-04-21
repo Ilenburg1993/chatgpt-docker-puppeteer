@@ -1,9 +1,7 @@
 # PARTE-15B — Relatório Comparativo: PARTE-14E (F49-F120)
 
-**Data**: 2026-04-08
-**Escopo**: Consolidação completa do `src/copilot/agent` + hardening do módulo copilot
-**Commits**: `ad5401b2` (Faixa 1) → `aa6b43a7` (Faixa 14)
-**Branch**: `main`
+**Data**: 2026-04-08 **Escopo**: Consolidação completa do `src/copilot/agent` + hardening do módulo
+copilot **Commits**: `ad5401b2` (Faixa 1) → `aa6b43a7` (Faixa 14) **Branch**: `main`
 
 ---
 
@@ -154,8 +152,8 @@ modules"), mas candidatos para revisão futura:
 | Vitest (test files)    | 257 passed, 34 skipped        |
 | Pre-commit gates       | lint ✓, typecheck informativo |
 
-> \* Warning pre-existente em `debug-conflicts.mjs` (unused var)
-> \*\* Formatação de documentação/JSON, não código funcional
+> \* Warning pre-existente em `debug-conflicts.mjs` (unused var) \*\* Formatação de
+> documentação/JSON, não código funcional
 
 ---
 
@@ -181,7 +179,7 @@ modules"), mas candidatos para revisão futura:
 ## 8. Conclusão
 
 O PARTE-14E está **100% completo**. Todas as 14 faixas foram executadas, testadas e pushadas para
-`main` sem regressões. O módulo `src/copilot/` saiu de um estado monolítico (24 god modules,
-tipagem fraca, sem CI typecheck) para uma arquitetura modular com 260 arquivos organizados em 42
-diretórios, hierarquia de erros unificada, observabilidade cross-módulo, shutdown centralizado e CI
-com typecheck gate.
+`main` sem regressões. O módulo `src/copilot/` saiu de um estado monolítico (24 god modules, tipagem
+fraca, sem CI typecheck) para uma arquitetura modular com 260 arquivos organizados em 42 diretórios,
+hierarquia de erros unificada, observabilidade cross-módulo, shutdown centralizado e CI com
+typecheck gate.

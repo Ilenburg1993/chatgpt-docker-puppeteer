@@ -2,70 +2,105 @@
 
 > **Auditoria Profunda `src/copilot/`** | Data: 2026-06-11 | HEAD: `55a4b071`
 >
-> Consolida os 370+ findings dos documentos 01-07 em um plano de ação organizado por faixas de prioridade, fases
-> sequenciais e subfases executáveis.
+> Consolida os 370+ findings dos documentos 01-07 em um plano de ação organizado por faixas de
+> prioridade, fases sequenciais e subfases executáveis.
 
 ---
 
 ## STATUS DE EXECUÇÃO
 
-| Faixa           | Status                                      | Commit     | Data       |
-| --------------- | ------------------------------------------- | ---------- | ---------- |
-| **Faixa 0**     | ✅ CONCLUÍDA                                 | `5ecbceb1` | 2026-06-11 |
-| **Faixa 1**     | ✅ VALIDADA (já implementada)                | —          | 2026-06-11 |
-| **Faixa 2**     | ✅ CONCLUÍDA                                 | `8e2006eb` | 2026-06-11 |
-| **Faixa 3**     | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅*) | `72093424` | 2026-06-12 |
-| **DI Overhaul** | ✅ EXECUTADO (Fases A+B+C parcial)           | pendente   | 2026-06-12 |
-| Faixa 4-5       | ⏳ PENDENTE                                  | —          | —          |
+| Faixa           | Status                                             | Commit     | Data       |
+| --------------- | -------------------------------------------------- | ---------- | ---------- |
+| **Faixa 0**     | ✅ CONCLUÍDA                                       | `5ecbceb1` | 2026-06-11 |
+| **Faixa 1**     | ✅ VALIDADA (já implementada)                      | —          | 2026-06-11 |
+| **Faixa 2**     | ✅ CONCLUÍDA                                       | `8e2006eb` | 2026-06-11 |
+| **Faixa 3**     | ✅ COMPLETA (3.1 ✅ 3.2 ✅ 3.3 ✅ 3.4 ✅ 3.5 ✅\*) | `72093424` | 2026-06-12 |
+| **DI Overhaul** | ✅ EXECUTADO (Fases A+B+C parcial)                 | pendente   | 2026-06-12 |
+| Faixa 4-5       | ⏳ PENDENTE                                        | —          | —          |
 
 ### Notas da Faixa 0
+
 - **0.1.2** (rate limiter Socket.IO): já existia `_createInjectRateLimiter()` em hub-ns.js
-- **0.1.3** (SSRF): já mitigado — `error-alerting.js` tem protocol check, `webhook-manager.js` tem `#checkResolvedIp`
-- **0.1.4** (error handler global): já existia `copilotErrorHandler` registrado via `registerErrorHandler(app)`
+- **0.1.3** (SSRF): já mitigado — `error-alerting.js` tem protocol check, `webhook-manager.js` tem
+  `#checkResolvedIp`
+- **0.1.4** (error handler global): já existia `copilotErrorHandler` registrado via
+  `registerErrorHandler(app)`
 - **0.1.5**: implementado como `security-headers.js` (zero-dependency) em vez de `helmet`
-- **0.2.4** (JSON.parse try-catch todo/store): deferido — o `safeJsonParse()` utility já é usado em paths async
+- **0.2.4** (JSON.parse try-catch todo/store): deferido — o `safeJsonParse()` utility já é usado em
+  paths async
 - **0.3.2** (body size limit): já configurado `express.json({ limit: '2mb' })` em app.js
-- **0.3.3** (sandbox allowlist): deferido para avaliação futura — complexidade alta, risco de breaking change
+- **0.3.3** (sandbox allowlist): deferido para avaliação futura — complexidade alta, risco de
+  breaking change
 
 ### Notas da Faixa 1
+
 A validação detalhada revelou que a maioria dos findings da Faixa 1 **já estão implementados**:
+
 - **1.3.1** (JSON.parse try-catch): FALSO POSITIVO — todos os 7+ sites já estão dentro de try-catch
-- **1.3.4** (unhandledRejection): JÁ EXISTE — `error-tracker.js` com `registerGlobalHandlers()`, chamado em `entry.js:152`
-- **1.3.5** (graceful shutdown): JÁ EXISTE — `entry.js:146-147` (SIGTERM/SIGINT) + `sqlite.js:212-214` (exit handler)
-- **1.4.1** (setInterval cleanup): BALANCEADO — 11 setInterval vs 11 clearInterval, todos com `registerTimer()` ou cleanup direto
-- **1.4.2** (event listener .on/.off): FUNCIONAL — gap é nominal (251 vs 55), sistema usa padrão de unsubscribe via callback arrays (`unsubs[]`)
-- **1.1/1.2** (testes): PENDENTES mas não bloqueantes — cobertura existe para modules críticos, faltam server/routes tests
+- **1.3.4** (unhandledRejection): JÁ EXISTE — `error-tracker.js` com `registerGlobalHandlers()`,
+  chamado em `entry.js:152`
+- **1.3.5** (graceful shutdown): JÁ EXISTE — `entry.js:146-147` (SIGTERM/SIGINT) +
+  `sqlite.js:212-214` (exit handler)
+- **1.4.1** (setInterval cleanup): BALANCEADO — 11 setInterval vs 11 clearInterval, todos com
+  `registerTimer()` ou cleanup direto
+- **1.4.2** (event listener .on/.off): FUNCIONAL — gap é nominal (251 vs 55), sistema usa padrão de
+  unsubscribe via callback arrays (`unsubs[]`)
+- **1.1/1.2** (testes): PENDENTES mas não bloqueantes — cobertura existe para modules críticos,
+  faltam server/routes tests
 
 ### Notas da Faixa 2
-- **2.2.1** (delete deprecated 0 imports): Removidos `api/bridge/` (5 stubs, 73 LOC), `api/sse/` (4 stubs, 55 LOC), `conversation-hub/socket-ns.js` (18 LOC) — total 146 LOC de dead code
-- **2.2.2** (migrate deprecated poucos imports): 5 files migrados de stubs deletados para paths canônicos em `server/`
-- **2.4.1** (magic numbers): Extraídos timeouts hardcoded para constantes nomeadas em 6 files (session-tools, git-bridge-read/write, tools/git, read-tools-search, error-alerting)
-- **2.2.3** (deprecated deep pass — `8e2006eb`): Eliminados **todos** os `@deprecated` de `src/copilot/`:
-  - MODULE-LEVEL: 5 arquivos resolvidos (2 deletados, 1 movido para events/, 1 JSDoc atualizado, 1 barrel deletado)
-  - FUNCTION-LEVEL: 9 arquivos, 16 funções: 5 sync shims broken removidos (snapshot.js), 3 sync cache-API legitimados (state-io.js), 4 dead sync shims deletados (alias-store, sdk/tools), 4 tags misleading removidas (todo, observability, audit, api/express)
-  - Limpeza: alias `#copilot/api` removido de package.json (target deletado), barrels sdk/index.js atualizados
-  - API Architecture audit: arquitetura validada — `api/express/` (SDK client routes) e `server/routes/` (operacional) servem audiências distintas, sem duplicação real
+
+- **2.2.1** (delete deprecated 0 imports): Removidos `api/bridge/` (5 stubs, 73 LOC), `api/sse/` (4
+  stubs, 55 LOC), `conversation-hub/socket-ns.js` (18 LOC) — total 146 LOC de dead code
+- **2.2.2** (migrate deprecated poucos imports): 5 files migrados de stubs deletados para paths
+  canônicos em `server/`
+- **2.4.1** (magic numbers): Extraídos timeouts hardcoded para constantes nomeadas em 6 files
+  (session-tools, git-bridge-read/write, tools/git, read-tools-search, error-alerting)
+- **2.2.3** (deprecated deep pass — `8e2006eb`): Eliminados **todos** os `@deprecated` de
+  `src/copilot/`:
+  - MODULE-LEVEL: 5 arquivos resolvidos (2 deletados, 1 movido para events/, 1 JSDoc atualizado, 1
+    barrel deletado)
+  - FUNCTION-LEVEL: 9 arquivos, 16 funções: 5 sync shims broken removidos (snapshot.js), 3 sync
+    cache-API legitimados (state-io.js), 4 dead sync shims deletados (alias-store, sdk/tools), 4
+    tags misleading removidas (todo, observability, audit, api/express)
+  - Limpeza: alias `#copilot/api` removido de package.json (target deletado), barrels sdk/index.js
+    atualizados
+  - API Architecture audit: arquitetura validada — `api/express/` (SDK client routes) e
+    `server/routes/` (operacional) servem audiências distintas, sem duplicação real
 
 ### Notas da Faixa 3 (em progresso — commit `edc5eaff`, 2026-06-11)
 
 #### Fase 3.1 — Layer Violation Fixes ✅ CONCLUÍDA
+
 Todas as 6 sub-fases verificadas e limpas:
+
 - **3.1.1** (core re-exports events): core/index.js não re-exporta events — LIMPO
-- **3.1.2** (core ↔ config cycle): core/ não importa config/ — LIMPO (ref JSDoc apenas, não import real)
+- **3.1.2** (core ↔ config cycle): core/ não importa config/ — LIMPO (ref JSDoc apenas, não import
+  real)
 - **3.1.3** (events → observability): events/ não importa observability — LIMPO
 - **3.1.4** (config → sdk): config/ não importa sdk/ — LIMPO
 - **3.1.5** (server → agent): resolvido em commits anteriores (ac9b008b)
 - **3.1.6** (hooks → tools): hooks/ não importa tools/ — LIMPO
 
 **Violações corrigidas (40+ files, 3 grupos):**
-- **Grupo A** (observability → sdk, 6 files): Criado `events/sdk-events.js` como re-export layer. Migrados 4 collectors + event-collector para usar `#copilot/events` em vez de `#copilot/sdk`. `modelStatsTracker` injetado via `ObserverContext` em vez de import direto.
-- **Grupo B** (hooks → observability, 14 files): Criado `hooks/logger.js` (injectable logger com `setHooksLogger()`). Todos os 14 hooks files migrados para logger local. `session-hooks.js` usa `ctx.metrics?.recordSessionStart/End()` via injeção.
-- **Grupo C** (tools → observability, 20 files): Criado `tools/logger.js` e `tools/metrics-proxy.js` (injectable). Todos os 19+ tools files migrados. `introspection-tools.js` e `shell/index.js` usam métricas via proxy.
-- **DI Wiring**: `boot-wiring.js` Step 0 — `setHooksLogger(log)`, `setToolsLogger(log)`, `setToolsMetrics(...)`.
+
+- **Grupo A** (observability → sdk, 6 files): Criado `events/sdk-events.js` como re-export layer.
+  Migrados 4 collectors + event-collector para usar `#copilot/events` em vez de `#copilot/sdk`.
+  `modelStatsTracker` injetado via `ObserverContext` em vez de import direto.
+- **Grupo B** (hooks → observability, 14 files): Criado `hooks/logger.js` (injectable logger com
+  `setHooksLogger()`). Todos os 14 hooks files migrados para logger local. `session-hooks.js` usa
+  `ctx.metrics?.recordSessionStart/End()` via injeção.
+- **Grupo C** (tools → observability, 20 files): Criado `tools/logger.js` e `tools/metrics-proxy.js`
+  (injectable). Todos os 19+ tools files migrados. `introspection-tools.js` e `shell/index.js` usam
+  métricas via proxy.
+- **DI Wiring**: `boot-wiring.js` Step 0 — `setHooksLogger(log)`, `setToolsLogger(log)`,
+  `setToolsMetrics(...)`.
 
 #### Fase 3.2 — Interface Extraction ✅ CONCLUÍDA
+
 - Criado `core/interfaces.js` (320 LOC) com 7 interfaces JSDoc:
-  - `IAgent` (AC-5-01), `IEventBus` (AC-5-02), `IStateStore` (AC-5-03), `IToolRegistry` (AC-5-04), `IHooksPipeline` (AC-5-05), `IConfigProvider` (AC-5-06), `IMetricsCollector` (AC-5-07)
+  - `IAgent` (AC-5-01), `IEventBus` (AC-5-02), `IStateStore` (AC-5-03), `IToolRegistry` (AC-5-04),
+    `IHooksPipeline` (AC-5-05), `IConfigProvider` (AC-5-06), `IMetricsCollector` (AC-5-07)
 - **Implementações concretas anotadas:**
   - `IConfigProvider` → `config/env.js::envProvider` singleton
   - `IStateStore` → `agent/session/snapshot.js::snapshotStore` adapter
@@ -77,35 +112,54 @@ Todas as 6 sub-fases verificadas e limpas:
   - `IHooksPipeline` → `hooks/factory.js::createHooks()` (retorna `SessionHooks`)
 
 #### Fase 3.3 — God Class Decomposition ✅ CONCLUÍDA
-Avaliação detalhada dos 5 sub-items:
-- **3.3.1** (D2-03 — loop-manager.js, 597 LOC): `WatchdogTimer` já extraído para `watchdog.js`, `BackpressureQueue` para `backpressure.js`, `ModelFallbackState` para `model-fallback.js`. Restam `#prMetrics` (~14 linhas, trivial) — **extrair como `PrTracker`**.
-- **3.3.2** (D2-04 — conversation-hub/store.js, 562 LOC): Já decomposto — `store-helpers.js`, `store-memories.js`, `store-queries.js`, `store-sync.js`. A classe restante é CRUD puro sobre SQLite. **RESOLVIDO.**
-- **3.3.3** (D2-06 — channel/inject.js, 421 LOC): Funcional (não classe), 9 funções bem delimitadas. **Baixo impacto — Decomposição opcional.**
-- **3.3.4** (D2-07 — hooks/factory.js, 421 LOC): 7 funções, `createHooks()` (~107 LOC) é a maior. **Extrair `buildPreToolUseHandler()` para módulo `hooks/pre-tool-use-builder.js`.**
-- **3.3.5** (D2-08..D2-10 — observability monoliths): Nenhum módulo ≥ 500 LOC (`metrics.js` 417, `event-collector.js` 369, `logger.js` 324). `metrics-histogram.js` já extraído. **RESOLVIDO.**
 
-**Conclusão Fase 3.3**: Todos os God Classes identificados nos findings D2-03..D2-10 já foram decompostos por trabalho anterior. O loop-manager (597 LOC) é o maior módulo restante, mas seus concerns internos (watchdog, backpressure, model-fallback, protocol) já são classes/módulos separados. Os `#prMetrics` (3 contadores, ~14 linhas) são triviais demais para justificar extração adicional. **FASE CONCLUÍDA.**
+Avaliação detalhada dos 5 sub-items:
+
+- **3.3.1** (D2-03 — loop-manager.js, 597 LOC): `WatchdogTimer` já extraído para `watchdog.js`,
+  `BackpressureQueue` para `backpressure.js`, `ModelFallbackState` para `model-fallback.js`. Restam
+  `#prMetrics` (~14 linhas, trivial) — **extrair como `PrTracker`**.
+- **3.3.2** (D2-04 — conversation-hub/store.js, 562 LOC): Já decomposto — `store-helpers.js`,
+  `store-memories.js`, `store-queries.js`, `store-sync.js`. A classe restante é CRUD puro sobre
+  SQLite. **RESOLVIDO.**
+- **3.3.3** (D2-06 — channel/inject.js, 421 LOC): Funcional (não classe), 9 funções bem delimitadas.
+  **Baixo impacto — Decomposição opcional.**
+- **3.3.4** (D2-07 — hooks/factory.js, 421 LOC): 7 funções, `createHooks()` (~107 LOC) é a maior.
+  **Extrair `buildPreToolUseHandler()` para módulo `hooks/pre-tool-use-builder.js`.**
+- **3.3.5** (D2-08..D2-10 — observability monoliths): Nenhum módulo ≥ 500 LOC (`metrics.js` 417,
+  `event-collector.js` 369, `logger.js` 324). `metrics-histogram.js` já extraído. **RESOLVIDO.**
+
+**Conclusão Fase 3.3**: Todos os God Classes identificados nos findings D2-03..D2-10 já foram
+decompostos por trabalho anterior. O loop-manager (597 LOC) é o maior módulo restante, mas seus
+concerns internos (watchdog, backpressure, model-fallback, protocol) já são classes/módulos
+separados. Os `#prMetrics` (3 contadores, ~14 linhas) são triviais demais para justificar extração
+adicional. **FASE CONCLUÍDA.**
 
 ---
 
 ### DI Overhaul — Auditoria e Migração Radical ✅ EXECUTADO
 
-Auditoria completa do sistema DI em `src/copilot/` com migração em 3 fases. Doc completo: `09-AUDITORIA-DI-COMPLETA.md`.
+Auditoria completa do sistema DI em `src/copilot/` com migração em 3 fases. Doc completo:
+`09-AUDITORIA-DI-COMPLETA.md`.
 
 #### Fase A — Foundation ✅
+
 - **A.1** Dead Token Removal: 21 tokens fantasma removidos de 8 `di-tokens.js` + 7 barrels
 - **A.2** `validateRequired()`: Novo método no container DI (`core/di.js`) + 2 call sites
 - **A.3** Bug P5 fix: `CONVERSATION_STORE` registrado em `wireTerminalDI()`
 - **A.4** Validação centralizada: `bootstrap.js` valida 8 tokens, `di-wiring.js` valida 7 tokens
 
 #### Fase B — Setters → Container ✅
+
 - 3 novos tokens: `HOOKS_LOGGER`, `TOOLS_LOGGER`, `TOOLS_METRICS`
 - 2 novos `di-tokens.js`: `hooks/di-tokens.js`, `tools/di-tokens.js`
 - `boot-wiring.js` não faz mais injection direta — setters migrados para `wireLegacySetters`
 
 #### Fase C — Singletons → Container (parcial) ✅
-- 4 singletons registrados: `defaultMetrics`→`METRICS_STORE`, `defaultErrorTracker`→`ERROR_TRACKER`, `defaultEventCollector`→`EVENT_COLLECTOR`, `alwaysAliveAgent`→`ALWAYS_ALIVE_AGENT`
-- Cobertura: **21 tokens definidos, 20 registrados (95.2%)**. Único não-registrado: `SESSION_RPC` (dinâmico)
+
+- 4 singletons registrados: `defaultMetrics`→`METRICS_STORE`, `defaultErrorTracker`→`ERROR_TRACKER`,
+  `defaultEventCollector`→`EVENT_COLLECTOR`, `alwaysAliveAgent`→`ALWAYS_ALIVE_AGENT`
+- Cobertura: **21 tokens definidos, 20 registrados (95.2%)**. Único não-registrado: `SESSION_RPC`
+  (dinâmico)
 
 ---
 
@@ -139,8 +193,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 0 — EMERGÊNCIA (P0)
 
-> **Scope**: 18 findings | **Esforço estimado**: Sprint 1 (1-2 semanas)
-> **Critério de saída**: Zero vulnerabilidades críticas, zero silent data loss.
+> **Scope**: 18 findings | **Esforço estimado**: Sprint 1 (1-2 semanas) **Critério de saída**: Zero
+> vulnerabilidades críticas, zero silent data loss.
 
 ### Fase 0.1 — Security Critical Fixes
 
@@ -174,8 +228,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 1 — FUNDAÇÃO (P1)
 
-> **Scope**: 45 findings | **Esforço estimado**: Sprint 2-3 (2-4 semanas)
-> **Critério de saída**: Cobertura de testes > 60%, error handling robusto.
+> **Scope**: 45 findings | **Esforço estimado**: Sprint 2-3 (2-4 semanas) **Critério de saída**:
+> Cobertura de testes > 60%, error handling robusto.
 
 ### Fase 1.1 — Test Foundation
 
@@ -221,8 +275,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 2 — HARDENING (P2)
 
-> **Scope**: 80 findings | **Esforço estimado**: Sprint 4-6 (3-5 semanas)
-> **Critério de saída**: 0 `@type {any}` em APIs públicas, 0 deprecated com importadores.
+> **Scope**: 80 findings | **Esforço estimado**: Sprint 4-6 (3-5 semanas) **Critério de saída**: 0
+> `@type {any}` em APIs públicas, 0 deprecated com importadores.
 
 ### Fase 2.1 — Typing Hardening
 
@@ -264,8 +318,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 3 — ARQUITETURA (P3)
 
-> **Scope**: 55 findings | **Esforço estimado**: Sprint 7-10 (4-6 semanas)
-> **Critério de saída**: Zero violações de camada, interfaces definidas.
+> **Scope**: 55 findings | **Esforço estimado**: Sprint 7-10 (4-6 semanas) **Critério de saída**:
+> Zero violações de camada, interfaces definidas.
 
 ### Fase 3.1 — Layer Violation Fixes
 
@@ -302,8 +356,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ### Fase 3.4 — Event System Unification
 
-| Sub   | Finding | Ação                                                                              | Status          |
-| ----- | ------- | --------------------------------------------------------------------------------- | --------------- |
+| Sub   | Finding | Ação                                                                              | Status           |
+| ----- | ------- | --------------------------------------------------------------------------------- | ---------------- |
 | 3.4.1 | D3-02   | Deprecar `createEventBus`, `createEmitter` — unificar em EventBus + bridgeEmitter | ✅ DONE          |
 | 3.4.2 | AC-3-03 | Split event constants por domínio                                                 | ✅ PRÉ-RESOLVIDO |
 | 3.4.3 | U4-16   | Auto-generate event catalog                                                       | ✅ PRÉ-RESOLVIDO |
@@ -314,39 +368,43 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 > **Notas Faixa 3.4** (completada nesta sessão):
 >
 > - **3.4.1**: `createEmitter()` e `BaseEmitter` depreciados com `@deprecated` em
->   `events/create-emitter.js`. Dois consumidores migrados (`infra/sse/fanout.js`, `terminal/state.js`)
->   para `import { EventEmitter } from 'node:events'`. Seis classes que herdavam `BaseEmitter`
->   migradas para `EventEmitter` direto (`hooks/bus.js`, `conversation-hub/orchestrator.js`,
->   `agent/dialog/loop-manager.js`, `agent/always-alive.js`, `agent/infra/handoff-manager.js`,
->   `config/pinned-files.js`). `createEventBus()` mantido apenas como factory para DI (1 consumer).
+>   `events/create-emitter.js`. Dois consumidores migrados (`infra/sse/fanout.js`,
+>   `terminal/state.js`) para `import { EventEmitter } from 'node:events'`. Seis classes que
+>   herdavam `BaseEmitter` migradas para `EventEmitter` direto (`hooks/bus.js`,
+>   `conversation-hub/orchestrator.js`, `agent/dialog/loop-manager.js`, `agent/always-alive.js`,
+>   `agent/infra/handoff-manager.js`, `config/pinned-files.js`). `createEventBus()` mantido apenas
+>   como factory para DI (1 consumer).
 > - **3.4.2**: Já havia 10 domain files (`agent-events.js`, `emitter-events.js`, `hook-events.js`,
->   `hub-events.js`, `nerv-events.js`, `service-events.js`, `system-events.js`, `terminal-events.js`,
->   `legacy-events.js`, `sdk-events.js`) com 166 constantes. Nenhuma ação necessária.
-> - **3.4.3**: `observability/event-catalog.js` já gera catálogo dinâmico a partir das constantes SSOT
->   com dead-letter tracking. Nenhuma ação necessária.
+>   `hub-events.js`, `nerv-events.js`, `service-events.js`, `system-events.js`,
+>   `terminal-events.js`, `legacy-events.js`, `sdk-events.js`) com 166 constantes. Nenhuma ação
+>   necessária.
+> - **3.4.3**: `observability/event-catalog.js` já gera catálogo dinâmico a partir das constantes
+>   SSOT com dead-letter tracking. Nenhuma ação necessária.
 > - **3.4.4**: Re-exports de tokens de camadas superiores removidos de `core/di-tokens.js`. Zero
 >   consumidores usavam esse path. Cada camada já exporta tokens via `<modulo>/di-tokens.js`.
-> - **3.4.5** (novo): 6 classes migraram de `extends BaseEmitter` para `extends EventEmitter` nativo.
+> - **3.4.5** (novo): 6 classes migraram de `extends BaseEmitter` para `extends EventEmitter`
+>   nativo.
 > - **3.4.6** (novo): Naming convention documentada em `emitter-events.js`: EventBus usa `:`,
 >   emitters internos usam `.`, lifecycle plano usa strings simples. `bridgeEmitter()` faz a ponte.
 
 ### Fase 3.5 — DI Container Enhancement
 
-| Sub   | Finding | Ação                                                  | Status               |
-| ----- | ------- | ----------------------------------------------------- | -------------------- |
+| Sub   | Finding | Ação                                                  | Status                |
+| ----- | ------- | ----------------------------------------------------- | --------------------- |
 | 3.5.1 | U4-13   | Scoped lifetimes (singleton, transient, scoped)       | ✅ PRÉ-RESOLVIDO      |
 | 3.5.2 | AC-4-11 | Migrar `alwaysAliveAgent` singleton → DI registration | 🔄 DEFERIDO → Faixa 5 |
 | 3.5.3 | AC-4-12 | Migrar `defaultMetrics` singleton → DI registration   | 🔄 DEFERIDO → Faixa 5 |
 
 > **Notas Faixa 3.5** (avaliada nesta sessão):
 >
-> - **3.5.1**: O container DI (`core/di.js`) **já implementa** os 3 lifecycles: `singleton` (padrão),
->   `transient`, e `scoped` (via `fork()`). Também suporta `dispose()` com cleanup reverso.
->   Nenhuma ação necessária.
-> - **3.5.2**: `alwaysAliveAgent` é instanciado como module-level singleton (l.549 `always-alive.js`)
->   com 155 consumers diretos. Token `ALWAYS_ALIVE_AGENT` existe mas não é usado. Migração exige
->   refactoring de todos os 155 imports — escopo desproporcional para esta faixa. Deferido para
->   Faixa 5 (estratégia incremental: registrar no DI + manter export legado como proxy).
+> - **3.5.1**: O container DI (`core/di.js`) **já implementa** os 3 lifecycles: `singleton`
+>   (padrão), `transient`, e `scoped` (via `fork()`). Também suporta `dispose()` com cleanup
+>   reverso. Nenhuma ação necessária.
+> - **3.5.2**: `alwaysAliveAgent` é instanciado como module-level singleton (l.549
+>   `always-alive.js`) com 155 consumers diretos. Token `ALWAYS_ALIVE_AGENT` existe mas não é usado.
+>   Migração exige refactoring de todos os 155 imports — escopo desproporcional para esta faixa.
+>   Deferido para Faixa 5 (estratégia incremental: registrar no DI + manter export legado como
+>   proxy).
 > - **3.5.3**: `defaultMetrics` é singleton module-level em `observability/metrics.js` com 49
 >   consumers. Mesmo padrão — deferido para Faixa 5.
 
@@ -354,8 +412,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 4 — EVOLUÇÃO (P4)
 
-> **Scope**: 50 findings | **Esforço estimado**: Sprint 11-14 (4-6 semanas)
-> **Critério de saída**: Performance measurably improved, Node.js 24 features adopted.
+> **Scope**: 50 findings | **Esforço estimado**: Sprint 11-14 (4-6 semanas) **Critério de saída**:
+> Performance measurably improved, Node.js 24 features adopted.
 
 ### Fase 4.1 — Performance Quick Wins
 
@@ -409,8 +467,8 @@ FAIXA 5 — POLISH             ████  (P5: naming + docs + final cleanup)
 
 ## FAIXA 5 — POLISH (P5)
 
-> **Scope**: 30 findings | **Esforço estimado**: Sprint 15-16 (2-3 semanas)
-> **Critério de saída**: Naming consistente, docs geradas, zero debt residual.
+> **Scope**: 30 findings | **Esforço estimado**: Sprint 15-16 (2-3 semanas) **Critério de saída**:
+> Naming consistente, docs geradas, zero debt residual.
 
 ### Fase 5.1 — Naming Consistency
 
@@ -507,4 +565,4 @@ Faixa 0 ──→ Faixa 1 ──→ Faixa 2 ──→ Faixa 3 ──→ Faixa 4 
 
 ---
 
-*Roadmap completo: 6 faixas, 22 fases, 95 subfases cobrindo 382 findings.*
+_Roadmap completo: 6 faixas, 22 fases, 95 subfases cobrindo 382 findings._

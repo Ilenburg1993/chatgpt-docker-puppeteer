@@ -1,23 +1,21 @@
 # M-00 — Visão Geral: Plano de Migração Arquitetural de src/copilot/
 
-**Data**: 2026-03-21
-**Versão**: 2.7
-**Autor**: GitHub Copilot Agent (Claude Opus 4.6)
-**Escopo**: Migração completa de `src/copilot/` da situação atual para a arquitetura ideal
+**Data**: 2026-03-21 **Versão**: 2.7 **Autor**: GitHub Copilot Agent (Claude Opus 4.6) **Escopo**:
+Migração completa de `src/copilot/` da situação atual para a arquitetura ideal
 
-> **Nota de sucessão clean (2026-04-15)**: para o próximo macrociclo de planejamento e execução,
-> a referência canônica passou a ser
-> [`../PLANO-REARQUITETURA-CLEAN/README.md`](../PLANO-REARQUITETURA-CLEAN/README.md).
-> A série `M-00`–`M-07` permanece como trilha histórica e como registro da primeira grande linha de
+> **Nota de sucessão clean (2026-04-15)**: para o próximo macrociclo de planejamento e execução, a
+> referência canônica passou a ser
+> [`../PLANO-REARQUITETURA-CLEAN/README.md`](../PLANO-REARQUITETURA-CLEAN/README.md). A série
+> `M-00`–`M-07` permanece como trilha histórica e como registro da primeira grande linha de
 > migração, mas o roadmap operacional novo foi reorganizado na série `R-00`–`R-15`.
 
 ---
 
 ## 1. Propósito
 
-Este documento é o **ponto de entrada** para o plano de migração arquitetural de `src/copilot/`.
-Ele substitui o papel do antigo `07-ROADMAP-MASTER.md` como master plan, consolidando
-todas as faixas de trabalho em um plano unificado, sequenciado e autocontido.
+Este documento é o **ponto de entrada** para o plano de migração arquitetural de `src/copilot/`. Ele
+substitui o papel do antigo `07-ROADMAP-MASTER.md` como master plan, consolidando todas as faixas de
+trabalho em um plano unificado, sequenciado e autocontido.
 
 ### Documentos da série
 
@@ -46,18 +44,18 @@ Todos em `DOCUMENTAÇÃO/COPILOT/AUDITORIA-SDK-COPILOT/`:
 
 ### Addendum de auditoria — 2026-04-15
 
-Este plano foi escrito sobre um snapshot de 2026-03-21. Desde então, a árvore real de
-`src/copilot/` divergiu parcialmente. Em caso de conflito entre o texto original e este addendum,
-**prevalece este addendum**.
+Este plano foi escrito sobre um snapshot de 2026-03-21. Desde então, a árvore real de `src/copilot/`
+divergiu parcialmente. Em caso de conflito entre o texto original e este addendum, **prevalece este
+addendum**.
 
-| Métrica auditada em 2026-04-15                | Valor           |
-| --------------------------------------------- | --------------- |
-| Arquivos JS                                   | 420             |
-| Linhas de código                              | 63.681          |
-| Diretórios top-level em disco                 | 20              |
-| Módulos arquiteturais ativos                  | 18              |
-| `src/copilot/api/`                            | removido        |
-| `src/copilot/services/`                       | removido        |
+| Métrica auditada em 2026-04-15                | Valor            |
+| --------------------------------------------- | ---------------- |
+| Arquivos JS                                   | 420              |
+| Linhas de código                              | 63.681           |
+| Diretórios top-level em disco                 | 20               |
+| Módulos arquiteturais ativos                  | 18               |
+| `src/copilot/api/`                            | removido         |
+| `src/copilot/services/`                       | removido         |
 | Testes focados M-02/F19                       | 19/19 ✅         |
 | Testes focados M-03/L2.1                      | 50/50 ✅         |
 | Testes focados M-03/K8                        | 52/52 ✅         |
@@ -79,55 +77,62 @@ Este plano foi escrito sobre um snapshot de 2026-03-21. Desde então, a árvore 
 Leituras objetivas desta auditoria:
 
 - **M-02 / Cleanup**: estruturalmente muito avançada. `api/` e `services/` já não existem;
-    `config/agent.js`, `types/contracts/`, `infra/webhooks.js`, `hooks/permission-controller.js`,
-    `tools/bootstrap.js` e `observability/snapshots.js` estão no lugar correto. Falta apenas manter
-    validação global (`lint` + suíte unitária completa) em um checkpoint dedicado.
+  `config/agent.js`, `types/contracts/`, `infra/webhooks.js`, `hooks/permission-controller.js`,
+  `tools/bootstrap.js` e `observability/snapshots.js` estão no lugar correto. Falta apenas manter
+  validação global (`lint` + suíte unitária completa) em um checkpoint dedicado.
 - **M-03 / Agent Refactor**: há groundwork parcial no baseline (`AgentContext` extraído,
-    `event-wirer.js` modularizado, `getAgent()` público), e agora as subfases **L2.1** e **K8** já foram
-    iniciadas/concluídas incrementalmente, com avanço adicional em **L2.3**:
-    a implementação real mora em `src/copilot/event-handlers/`, com compat shims mantidos em
-    `agent/session/event-handlers/`; além disso, `alwaysAliveAgent` agora é lazy via `getAgent()` + proxy
-    compatível; e `processQueue()` agora vive canonicamente em `agent-messaging.js`, deixando
-    `queue-processor.js` como shim de 15 linhas; e `executeTask()` também passou a viver canonicamente em
-    `agent-messaging.js`, deixando `task-executor.js` como shim de 14 linhas. Além disso, **K5** já começou de forma
-    incremental: `performBootWiring()` agora usa `createBootWiringSteps()` + `runBootPipeline()` com 12 etapas
-    explícitas. E **K6** também já começou de forma incremental: `always-alive.js` consome mapas declarativos via
-    `agent/event-bridge-map.js` para o bridge lazy com o EventBus. **K6b** agora também entrou em execução incremental:
-    o wiring lazy saiu de `always-alive.js` e foi extraído para `agent/event-bridge-wiring.js`, reduzindo a fachada
-    principal para **638L**. **K1a** agora também entrou em execução incremental:
-    `AgentContext` foi repartido em subestados nomeados com accessors compatíveis, `agent-state.js` e
-    `facades/agent-model-config.js` já migraram para a nova forma, e a validação focada do corte passou com **58/58**.
-    **K5b** também já entrou em execução incremental: `session/boot-wiring.js` caiu para **263L** e a lógica operacional
-    das steps foi majoritariamente extraída para `session/boot-steps.js` (**321L**), preservando em `boot-wiring.js` os
-    pontos canônicos visíveis de lifecycle/quota por compatibilidade estrutural do repositório. **K1b** agora também já
-    começou com um lote seguro: `session-setup.js`, `agent-messaging.js`, `agent-dialog-controller.js` e
-    `agent-session-ops.js` passaram a consumir subestados diretamente, com **47/47** testes focados verdes e mais
-    **28/28** em contratos adjacentes de lifecycle/shutdown. Desde então, `K1b` também avançou sobre
-    `lifecycle/agent-lifecycle.js` e sobre getters públicos da fachada `always-alive.js`, com **96/96** testes focados
-    verdes e mais **23/23** em contratos adjacentes de quota monitor/dialog loop. Ainda assim, o alvo central segue
-    pendente: `agent/` ainda tem 8.248L; o ganho destas passadas foi principalmente
-    de legibilidade/testabilidade e desacoplamento, não de redução líquida de volume, e a migração completa dos
-    consumers do contexto segue aberta apenas como limpeza residual de compatibilidade.
-- **K4 / Background Task Tracker**: já entrou em execução incremental. `agent/background-tasks.js` agora existe,
-    `AgentContext` instancia `backgroundTasks`, `agent-lifecycle` já usa `track()` e `drain(5000)` no shutdown, e o
-    primeiro lote de integrações fire-and-forget já alcançou `session-setup`, `user-input-handler`,
-    `agent-messaging`, `boot-steps` e `loop-manager`, com **99/99** testes em `node:test` e **28/28** em Vitest.
-- **K7 / Health Check Formal**: já entrou em execução incremental. `agent/health-check.js` agora existe,
-    `AlwaysAliveAgent` expõe `getHealthSnapshot()`, `GET /health/agent` retorna o snapshot canônico e
-    `GET /health` em `copilot-api/control` passou a reutilizar a mesma fonte, com **6/6** testes focados verdes.
-- **M-03A / Auditoria complementar do agent**: a revisão geral do subsistema confirmou que o maior bloqueio estrutural
-    agora já não é mais iniciar `K1b`, e sim fechar `K4`, abrir `K7` e só então apertar a remoção de compatibilidade
-    residual; `session/` e `dialog/` continuam concentrando o maior custo remanescente; e a próxima onda ótima foi
-    recalibrada para **K4 (expandir/fechar) → K7 → limpeza residual de compatibilidade/shims**.
-- **K3 / Error Policy**: já entrou em execução incremental. `agent/error-policy.js` existe e a política central já foi
-    conectada ao executor canônico da fila e à política de reconexão, com **32/32** testes focados verdes.
-- **M-04 / SDK Stateless**: ainda pendente. `sdk/session/client.js` continua stateful
-    (`_client` + `_sessions`), `sdk/config.js` ainda existe (embora deprecated), e
-    `sdk/agent/agents.js` segue presente.
-- **M-05 / Event Unification**: ainda pendente. O backbone de EventBus existe, mas
-    `HookBus`, `agent/session/event-handlers/` e as bridges manuais ainda não foram eliminados.
+  `event-wirer.js` modularizado, `getAgent()` público), e agora as subfases **L2.1** e **K8** já
+  foram iniciadas/concluídas incrementalmente, com avanço adicional em **L2.3**: a implementação
+  real mora em `src/copilot/event-handlers/`, com compat shims mantidos em
+  `agent/session/event-handlers/`; além disso, `alwaysAliveAgent` agora é lazy via `getAgent()` +
+  proxy compatível; e `processQueue()` agora vive canonicamente em `agent-messaging.js`, deixando
+  `queue-processor.js` como shim de 15 linhas; e `executeTask()` também passou a viver canonicamente
+  em `agent-messaging.js`, deixando `task-executor.js` como shim de 14 linhas. Além disso, **K5** já
+  começou de forma incremental: `performBootWiring()` agora usa `createBootWiringSteps()` +
+  `runBootPipeline()` com 12 etapas explícitas. E **K6** também já começou de forma incremental:
+  `always-alive.js` consome mapas declarativos via `agent/event-bridge-map.js` para o bridge lazy
+  com o EventBus. **K6b** agora também entrou em execução incremental: o wiring lazy saiu de
+  `always-alive.js` e foi extraído para `agent/event-bridge-wiring.js`, reduzindo a fachada
+  principal para **638L**. **K1a** agora também entrou em execução incremental: `AgentContext` foi
+  repartido em subestados nomeados com accessors compatíveis, `agent-state.js` e
+  `facades/agent-model-config.js` já migraram para a nova forma, e a validação focada do corte
+  passou com **58/58**. **K5b** também já entrou em execução incremental: `session/boot-wiring.js`
+  caiu para **263L** e a lógica operacional das steps foi majoritariamente extraída para
+  `session/boot-steps.js` (**321L**), preservando em `boot-wiring.js` os pontos canônicos visíveis
+  de lifecycle/quota por compatibilidade estrutural do repositório. **K1b** agora também já começou
+  com um lote seguro: `session-setup.js`, `agent-messaging.js`, `agent-dialog-controller.js` e
+  `agent-session-ops.js` passaram a consumir subestados diretamente, com **47/47** testes focados
+  verdes e mais **28/28** em contratos adjacentes de lifecycle/shutdown. Desde então, `K1b` também
+  avançou sobre `lifecycle/agent-lifecycle.js` e sobre getters públicos da fachada
+  `always-alive.js`, com **96/96** testes focados verdes e mais **23/23** em contratos adjacentes de
+  quota monitor/dialog loop. Ainda assim, o alvo central segue pendente: `agent/` ainda tem 8.248L;
+  o ganho destas passadas foi principalmente de legibilidade/testabilidade e desacoplamento, não de
+  redução líquida de volume, e a migração completa dos consumers do contexto segue aberta apenas
+  como limpeza residual de compatibilidade.
+- **K4 / Background Task Tracker**: já entrou em execução incremental. `agent/background-tasks.js`
+  agora existe, `AgentContext` instancia `backgroundTasks`, `agent-lifecycle` já usa `track()` e
+  `drain(5000)` no shutdown, e o primeiro lote de integrações fire-and-forget já alcançou
+  `session-setup`, `user-input-handler`, `agent-messaging`, `boot-steps` e `loop-manager`, com
+  **99/99** testes em `node:test` e **28/28** em Vitest.
+- **K7 / Health Check Formal**: já entrou em execução incremental. `agent/health-check.js` agora
+  existe, `AlwaysAliveAgent` expõe `getHealthSnapshot()`, `GET /health/agent` retorna o snapshot
+  canônico e `GET /health` em `copilot-api/control` passou a reutilizar a mesma fonte, com **6/6**
+  testes focados verdes.
+- **M-03A / Auditoria complementar do agent**: a revisão geral do subsistema confirmou que o maior
+  bloqueio estrutural agora já não é mais iniciar `K1b`, e sim fechar `K4`, abrir `K7` e só então
+  apertar a remoção de compatibilidade residual; `session/` e `dialog/` continuam concentrando o
+  maior custo remanescente; e a próxima onda ótima foi recalibrada para **K4 (expandir/fechar) → K7
+  → limpeza residual de compatibilidade/shims**.
+- **K3 / Error Policy**: já entrou em execução incremental. `agent/error-policy.js` existe e a
+  política central já foi conectada ao executor canônico da fila e à política de reconexão, com
+  **32/32** testes focados verdes.
+- **M-04 / SDK Stateless**: ainda pendente. `sdk/session/client.js` continua stateful (`_client` +
+  `_sessions`), `sdk/config.js` ainda existe (embora deprecated), e `sdk/agent/agents.js` segue
+  presente.
+- **M-05 / Event Unification**: ainda pendente. O backbone de EventBus existe, mas `HookBus`,
+  `agent/session/event-handlers/` e as bridges manuais ainda não foram eliminados.
 - **M-06 / Observability + Errors**: ainda pendente. `error-tracker.js`, `error-alerting.js`,
-    `bus-actions/` e `event-catalog.js` continuam no baseline.
+  `bus-actions/` e `event-catalog.js` continuam no baseline.
 
 ---
 
@@ -266,20 +271,20 @@ As seguintes faixas já foram implementadas, testadas e pushadas:
 
 O roadmap original (07) tinha 12 faixas (A-L). Esta nova série consolida assim:
 
-| Faixa Original          | Status      | Onde ficou                                                                    |
-| ----------------------- | ----------- | ----------------------------------------------------------------------------- |
+| Faixa Original          | Status       | Onde ficou                                                                    |
+| ----------------------- | ------------ | ----------------------------------------------------------------------------- |
 | A (Bug Fixes)           | ✅ Concluída | Referência histórica em M-00 §5                                               |
 | B (Event Handlers)      | ✅ Concluída | Referência histórica em M-00 §5                                               |
 | C (Config Builders)     | ✅ Concluída | Referência histórica em M-00 §5                                               |
-| D (Experimental RPC)    | Pendente    | **M-07** (features futuras)                                                   |
+| D (Experimental RPC)    | Pendente     | **M-07** (features futuras)                                                   |
 | E (Hooks Optimization)  | ✅ Concluída | Referência histórica em M-00 §5                                               |
-| F (Observabilidade SDK) | Pendente    | **M-06** (parcial) + **M-07** (telemetry)                                     |
-| G (Arch Refactoring)    | Pendente    | **G1→M-03**, G2→M-07, **G3→M-05**, **G4→M-02**                                |
-| H (TSServer)            | Pendente    | **M-07** (features futuras)                                                   |
+| F (Observabilidade SDK) | Pendente     | **M-06** (parcial) + **M-07** (telemetry)                                     |
+| G (Arch Refactoring)    | Pendente     | **G1→M-03**, G2→M-07, **G3→M-05**, **G4→M-02**                                |
+| H (TSServer)            | Pendente     | **M-07** (features futuras)                                                   |
 | I (System Prompt)       | ✅ Concluída | Referência histórica em M-00 §5                                               |
-| J (SDK Gateway)         | Pendente    | **J1→M-04**, **J2→M-02**, J3→M-07                                             |
-| K (Agent Refactoring)   | Pendente    | **M-03** (integral)                                                           |
-| L (Consolidação Arch)   | Pendente    | **M-02** (L1) + **M-03** (L2) + **M-04** (L3) + **M-05** (L4) + **M-06** (L5) |
+| J (SDK Gateway)         | Pendente     | **J1→M-04**, **J2→M-02**, J3→M-07                                             |
+| K (Agent Refactoring)   | Pendente     | **M-03** (integral)                                                           |
+| L (Consolidação Arch)   | Pendente     | **M-02** (L1) + **M-03** (L2) + **M-04** (L3) + **M-05** (L4) + **M-06** (L5) |
 
 ---
 
@@ -309,8 +314,8 @@ npm run test:integration
 
 ## 8. Tracker de Progresso
 
-| #   | Fase              | Doc  | Status                                                                                                                                                                       | Início     | Conclusão |
-| --- | ----------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| #   | Fase              | Doc  | Status                                                                                                                                                                        | Início     | Conclusão |
+| --- | ----------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
 | 1   | Cleanup           | M-02 | 🟨 Estruturalmente executada; validação global pendente                                                                                                                       | 2026-03-21 | —         |
 | 2   | Agent Refactor    | M-03 | 🟨 Em execução incremental; L2.1 + K8 concluídas, L2.3/K3/K5/K6 executadas incrementalmente, K1 avançada até lifecycle/fachada, K4 iniciada e K7 já entregue incrementalmente | 2026-04-15 | —         |
 | 3   | SDK Stateless     | M-04 | ⬜ Não iniciado estruturalmente                                                                                                                                               | —          | —         |

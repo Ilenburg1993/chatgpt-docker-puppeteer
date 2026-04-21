@@ -1,17 +1,17 @@
 # R-06 — Roadmap Master da Rearquitetura Clean de `src/copilot/`
 
-**Data**: 2026-04-15
-**Status**: canônico para o próximo ciclo
+**Data**: 2026-04-15 **Status**: canônico para o próximo ciclo
 
-> **Expansão operacional**: este documento é a espinha dorsal do roadmap. O detalhamento expandido por
-> faixas, fases e subfases está em
+> **Expansão operacional**: este documento é a espinha dorsal do roadmap. O detalhamento expandido
+> por faixas, fases e subfases está em
 > [`R-16-ROADMAP-GERAL-INTEGRADO.md`](./R-16-ROADMAP-GERAL-INTEGRADO.md).
 
 ---
 
 ## 1. Visão geral
 
-Este roadmap reorganiza o backlog inteiro de `src/copilot/` em **programas**, **ondas**, **fases** e **subfases**.
+Este roadmap reorganiza o backlog inteiro de `src/copilot/` em **programas**, **ondas**, **fases** e
+**subfases**.
 
 Ele substitui, para fins operacionais, a navegação por múltiplas séries históricas dispersas.
 
@@ -20,7 +20,8 @@ Leitura complementar obrigatória para evitar drift do alvo:
 - [`R-04-ARQUITETURA-ALVO-E-PRINCIPIOS.md`](./R-04-ARQUITETURA-ALVO-E-PRINCIPIOS.md)
 - [`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md)
 
-`R-06` e `R-16` dizem **como avançar**; `R-04` e `R-04A` deixam explícito **para onde** a linha clean deve convergir.
+`R-06` e `R-16` dizem **como avançar**; `R-04` e `R-04A` deixam explícito **para onde** a linha
+clean deve convergir.
 
 ---
 
@@ -60,7 +61,8 @@ Inclui:
 
 ## Onda B — Fronteiras de sessão, eventos e observabilidade
 
-**Objetivo**: reduzir o custo sistêmico que hoje emana do `agent/` para `sdk/`, `events/`, `hooks/` e `observability/`.
+**Objetivo**: reduzir o custo sistêmico que hoje emana do `agent/` para `sdk/`, `events/`, `hooks/`
+e `observability/`.
 
 Inclui:
 
@@ -90,7 +92,8 @@ Inclui:
 
 ## Onda E — Capacidades avançadas
 
-**Objetivo**: só depois de base saudável, expandir UX, RPC, TSServer, multi-session, plugins e outras capabilities grandes.
+**Objetivo**: só depois de base saudável, expandir UX, RPC, TSServer, multi-session, plugins e
+outras capabilities grandes.
 
 Inclui:
 
@@ -130,19 +133,25 @@ Onda E
 ## P0 — Governança e baseline
 
 ### F0.1 — congelar leitura factual do baseline
+
 ### F0.2 — consolidar hubs documentais canônicos
+
 ### F0.3 — fechar matriz de métricas e indicadores
+
 ### F0.4 — alinhar gates mínimos de qualidade e segurança
+
 ### F0.5 — definir critérios de aceitação por programa
 
 ## P1 — Agent core e lifecycle
 
 ### F1.1 — fechar backlog residual do `agent/` atual
+
 - background tasks
 - health runtime
 - compat residual imediata
 
 ### F1.2 — decompor melhor `session/` e `lifecycle/`
+
 - boot
 - setup
 - snapshot
@@ -150,12 +159,14 @@ Onda E
 - state IO
 
 ### F1.3 — consolidar `dialog/` como domínio explícito
+
 - loop manager
 - turn control
 - watchdog
 - streaming/abort/retry quando fizer sentido estrutural
 
 ### F1.4 — slim da fachada pública
+
 - `always-alive.js`
 - API pública do módulo
 - pontos de fan-in externos
@@ -165,52 +176,79 @@ Onda E
 ## P2 — SDK e fronteiras de sessão
 
 ### F2.1 — retirar ownership de sessão do SDK fino
+
 ### F2.2 — consolidar config builders e remover duplicação
+
 ### F2.3 — reduzir imports diretos de `sdk` fora do módulo
+
 ### F2.4 — alinhar `custom-agents`, contratos e barrels
+
 ### F2.5 — hardening de typing/documentação do wrapper
 
 ## P3 — Eventos, hooks e observabilidade
 
 ### F3.1 — governança do event model
+
 ### F3.2 — unificação prática de bridges e naming
+
 ### F3.3 — consolidar `event-handlers/`, observers e collectors
+
 ### F3.4 — fechar error pipeline e health projections
+
 ### F3.5 — reduzir fan-out de `observability/`
 
 ## P4 — Server, terminal, channel e hub
 
 ### F4.1 — desacoplar `server` de `terminal`
+
 ### F4.2 — alinhar rotas, handlers, health e realtime
+
 ### F4.3 — fortalecer `channel/` como contrato de comunicação
+
 ### F4.4 — formalizar lifecycle do `conversation-hub`
+
 ### F4.5 — estabilizar ownership de sessão conversacional
 
 ## P5 — Tools, config, core, infra e types
 
 ### F5.1 — governança da plataforma de tools
+
 ### F5.2 — reorganizar config e bootstrap runtime
+
 ### F5.3 — endurecer `core/` e fronteiras de utilidades centrais
+
 ### F5.4 — revisar `infra/`, storage, timers, queues e locks
+
 ### F5.5 — elevar `types/` a camada contratual mais relevante
+
 ### F5.6 — decidir destino de `plugins/` e `logs/`
 
 ## P6 — Segurança, qualidade e governança
 
 ### F6.1 — autenticação, autorização, validação e superfícies HTTP
+
 ### F6.2 — matriz de testes por domínio
+
 ### F6.3 — typing, JSDoc e contratos compartilhados
+
 ### F6.4 — performance, leaks e timers
+
 ### F6.5 — limpeza de deprecateds, dead code e taxonomias mortas
+
 ### F6.6 — documentação e índices canônicos
 
 ## P7 — Capacidades avançadas
 
 ### F7.1 — terminal UX avançado
+
 ### F7.2 — extensões RPC e orchestration avançada
+
 ### F7.3 — TSServer/context intelligence
+
 ### F7.4 — multi-session e session operations avançadas
+
 ### F7.5 — plugins e ecossistema de extensões
+
 ### F7.6 — dashboards e telemetria expandida
 
 ---
@@ -287,7 +325,8 @@ Onda E
 
 ## 9. Leitura final do roadmap
 
-O ponto central deste roadmap é que o próximo ciclo não será bem-sucedido se continuar tratando cada documento antigo como mini-roadmap independente.
+O ponto central deste roadmap é que o próximo ciclo não será bem-sucedido se continuar tratando cada
+documento antigo como mini-roadmap independente.
 
 A rearquitetura clean exige:
 

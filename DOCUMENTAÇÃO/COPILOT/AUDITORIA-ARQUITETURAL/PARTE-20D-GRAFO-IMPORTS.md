@@ -1,7 +1,7 @@
 # PARTE-20D — Grafo de Imports: Situação Atual e Ideal
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.1
-**Última atualização**: 2026-04-12 — Pós-execução do roadmap PARTE-20C (violations 27→0)
+**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.1 **Última atualização**: 2026-04-12 —
+Pós-execução do roadmap PARTE-20C (violations 27→0)
 
 ---
 
@@ -15,7 +15,8 @@
 ✅ →    dependência correta e esperada
 ```
 
-Cada nó representa um **módulo de nível 1** de `src/copilot`. Arestas com número indicam quantidade de cross-module import edges.
+Cada nó representa um **módulo de nível 1** de `src/copilot`. Arestas com número indicam quantidade
+de cross-module import edges.
 
 ---
 
@@ -99,8 +100,8 @@ Cada nó representa um **módulo de nível 1** de `src/copilot`. Arestas com nú
 
 ### 2.2 Tabela Resumo de Arestas Cross-Module
 
-| De               | Para             | Edges | Status                      |
-| ---------------- | ---------------- | ----- | --------------------------- |
+| De               | Para             | Edges | Status                       |
+| ---------------- | ---------------- | ----- | ---------------------------- |
 | agent            | core             | 12    | ✅                           |
 | terminal         | core             | 9     | ✅                           |
 | sdk              | core             | 7     | ✅                           |
@@ -260,21 +261,23 @@ L6  terminal/      ← depende de tudo —  camada de apresentação
 
 | Métrica                                 | Pré-Refatoração | Pós-Roadmap        | Ideal |
 | --------------------------------------- | --------------- | ------------------ | ----- |
-| Violações de camada                     | 3 (real: 27)    | **0** ✅            | 0     |
-| Ciclos arquiteturais (nível módulo)     | 3               | **0** ✅            | 0     |
+| Violações de camada                     | 3 (real: 27)    | **0** ✅           | 0     |
+| Ciclos arquiteturais (nível módulo)     | 3               | **0** ✅           | 0     |
 | Cross-module dependency edges           | 26              | ~20                | ≤ 16  |
-| Módulos com dependência bidirecional    | 3               | **0** ✅            | 0     |
+| Módulos com dependência bidirecional    | 3               | **0** ✅           | 0     |
 | Módulos com import de singleton mutable | 8+              | ~4 (api factories) | 0     |
 
 ---
 
 ## 6. Nota Pós-Refatoração (2026-04-12)
 
-> O grafo "Atual" na seção 2 reflete o estado **pré-refatoração** (2026-04-10).
-> As seguintes mudanças foram aplicadas pelo roadmap PARTE-20C:
+> O grafo "Atual" na seção 2 reflete o estado **pré-refatoração** (2026-04-10). As seguintes
+> mudanças foram aplicadas pelo roadmap PARTE-20C:
 
 ### Violações Eliminadas
-- **`core` → `observability`**: Resolvido via DI — `observability/bootstrap.js` injeta logger/tracker em core
+
+- **`core` → `observability`**: Resolvido via DI — `observability/bootstrap.js` injeta
+  logger/tracker em core
 - **`agent` → `terminal`**: Resolvido — `getHubSessionId` movido para `core/shared-state.js`
 - **`bridges` → `agent`**: Resolvido — `createNervBridge(agent)` factory, bridge não importa agent
 - **`sdk/` → `observability/logger`** (×12): Proxy `sdk/logger.js` + `setSdkLogger(log)`
@@ -283,6 +286,7 @@ L6  terminal/      ← depende de tudo —  camada de apresentação
 - **`audit/` → agent/config, hooks/bus, config/env, observability**: Proxy `audit/logger.js` + DI
 
 ### Hierarquia Atualizada
+
 - `channel/` reclassificado de L5 para L4 (mesmo nível de `conversation-hub` e `agent`)
 - Enforcement via CI: `npm run check:layers` (script `scripts/check-layer-violations.mjs`)
 - JSDoc type-only imports (`@typedef`) filtrados automaticamente (não são runtime violations)

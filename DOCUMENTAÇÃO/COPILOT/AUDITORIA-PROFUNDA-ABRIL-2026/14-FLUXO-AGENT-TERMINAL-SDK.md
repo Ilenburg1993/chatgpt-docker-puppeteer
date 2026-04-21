@@ -1,7 +1,8 @@
 # 14-FLUXO-AGENT-TERMINAL-SDK — Mapa canônico de fluxo
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Escopo**: `src/copilot/agent/*`, `src/copilot/sdk/*`, `src/copilot/event-handlers/*`, `src/copilot/terminal/*`, `src/copilot/observability/*`
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Escopo**: `src/copilot/agent/*`,
+`src/copilot/sdk/*`, `src/copilot/event-handlers/*`, `src/copilot/terminal/*`,
+`src/copilot/observability/*`
 
 ---
 
@@ -9,8 +10,8 @@
 
 Este documento existe para responder, de forma direta:
 
-> quando um evento ou capability nasce no SDK, por quais camadas ele passa até aparecer no agent, no terminal,
-> na observability e nas rotas compartilhadas?
+> quando um evento ou capability nasce no SDK, por quais camadas ele passa até aparecer no agent, no
+> terminal, na observability e nas rotas compartilhadas?
 
 Também explicita uma regra nova de governança:
 
@@ -29,6 +30,16 @@ Copilot SDK (client/session/rpc/generated events)
   -> src/copilot/agent/session/event-wirer.js
      -> callbacks.emit(...)
   -> AlwaysAliveAgent (EventEmitter + facades + health)
+     -> presentation/agent-runtime.js
+         -> presentation/runtime-controls.js
+         -> presentation/runtime-health.js
+         -> presentation/runtime-ownership.js
+     -> presentation/runtime-overview.js
+     -> presentation/runtime-status.js
+   -> presentation/runtime-targeting.js
+   -> presentation/runtime-request.js
+         -> presentation/runtime-ui-state.js
+         -> presentation/runtime-dialog.js
      -> terminal/frontend/           (consumer layer / projections)
      -> terminal/sdk-session-events.js
      -> terminal/repl-listeners.js
@@ -85,7 +96,8 @@ Responsável por:
 - estado compartilhado (`AgentContext`);
 - API pública do runtime (`AlwaysAliveAgent`).
 
-Mas o agent **não** deve reinventar contratos que já existem no SDK; ele deve expô-los por facade quando isso for útil.
+Mas o agent **não** deve reinventar contratos que já existem no SDK; ele deve expô-los por facade
+quando isso for útil.
 
 ### 3.4 `terminal/frontend/`
 
@@ -102,6 +114,86 @@ Exemplos:
 - `llm-b-runtime.js` = gateway de runtime
 - `llm-b-frontend.js` = projections orientadas à UX
 - `sdk-session-projection.js` = projeção vanilla de `mode/plan`
+
+### 3.4.1 `presentation/runtime-overview.js`
+
+É a projection compartilhada de leitura rica do runtime default.
+
+Responsável por concentrar:
+
+- `runtimeId`
+- `agentRuntimes`
+- `snap`
+- `health`
+- `runtimeSessionId`
+- `contextWindow` normalizado
+
+Regra:
+
+- terminal e server preferem ler essa base em vez de remontar `getStatusSnapshot()` +
+  `getHealthSnapshot()` por conta própria.
+
+### 3.4.2 `presentation/runtime-status.js`
+
+É a payload layer compartilhada para bordas HTTP/SSE.
+
+Responsável por pequenos payloads repetitivos como:
+
+- `/status`
+- `/session`
+- SSE `connected`
+
+Regra:
+
+- rotas não devem continuar montando esses payloads ad hoc quando essa camada já existir.
+
+### 3.4.3 `presentation/runtime-controls.js`
+
+Concentra mutações/controles compartilhados do runtime default:
+
+- pause/resume/stop/ping do dialog loop;
+- handoff manager/history;
+- snapshots do runtime;
+- background compaction threshold.
+
+### 3.4.3b `presentation/runtime-targeting.js`
+
+É a camada de normalização compartilhada de `runtimeId` entre HTTP, REPL e accessors.
+
+Responsável por:
+
+- `normalizeRuntimeId()`
+- `pickRuntimeId()`
+- leitura canônica de `runtimeId` em payloads compartilhados.
+
+Regra:
+
+- nenhuma borda nova deve voltar a reimplementar trim/empty/fallback de `runtimeId` por conta
+  própria.
+
+### 3.4.4 `presentation/runtime-health.js`
+
+Concentra a projection de health compartilhada do runtime:
+
+- fallback legado;
+- shape HTTP-safe;
+- projeção para registry de módulos.
+
+### 3.4.5 `presentation/runtime-ownership.js`
+
+Concentra o vínculo canônico entre sessão SDK ativa e hub session, reduzindo imports diretos de
+ownership fora da camada compartilhada.
+
+### 3.4.6 `presentation/runtime-ui-state.js` / `runtime-dialog.js`
+
+São façades de transição arquitetural.
+
+Objetivo:
+
+- impedir que `presentation/` volte a importar `terminal/state.js`, `terminal/file-context.js` e
+  `terminal/dialog.js` diretamente em múltiplos arquivos;
+- concentrar esse boundary em dois pontos explícitos, enquanto o eventual estado ainda vive no
+  terminal.
 
 ### 3.5 `terminal/dialog/`
 
@@ -143,7 +235,8 @@ Fica com a cola REPL/runtime de alto nível:
 - subagentes;
 - stop/watchdog.
 
-Ele não deve ser o lugar principal de reinterpretar payload vanilla do SDK quando já existir um módulo dedicado.
+Ele não deve ser o lugar principal de reinterpretar payload vanilla do SDK quando já existir um
+módulo dedicado.
 
 ### 3.8 `terminal/terminal-agent-wiring.js`
 
@@ -191,6 +284,18 @@ As principais fontes de confusão eram:
 - `/plan` usa apenas o SDK vanilla;
 - `sdk-session-projection.js` separa `mode/plan` do restante do frontend;
 - `sdk-session-events.js` separa sinais vanilla da sessão SDK da cola REPL genérica;
+- `runtime-overview.js` separa a leitura compartilhada do runtime default das projections locais do
+  terminal;
+- `runtime-status.js` separa payloads HTTP/SSE repetitivos das rotas de controle/stream;
+- `runtime-targeting.js` separa a semântica compartilhada de `runtimeId` entre HTTP, REPL e
+  accessors;
+- `runtime-controls.js` separa controles/mutações compartilhadas do runtime das bordas concretas;
+- `runtime-health.js` tira do `server/routes/*` a montagem compartilhada de health do agent;
+- `runtime-ownership.js` separa o vínculo SDK↔hub da montagem das rotas SDK;
+- `runtime-ui-state.js` e `runtime-dialog.js` reduzem o leak estrutural de `presentation/` para
+  `terminal/*`;
+- projections de status/config/health já distinguem também `requestedRuntimeId`, `runtimeFound` e
+  `usedDefaultRuntimeFallback` quando uma borda pede um runtime inexistente;
 - o terminal já surfaca vários sinais vanilla antes invisíveis;
 - os READMEs locais passaram a explicar melhor as fronteiras de responsabilidade.
 

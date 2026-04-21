@@ -1,8 +1,7 @@
 # R-03 — Auditoria de `src/copilot/agent/` e das suas integrações
 
-**Data**: 2026-04-15
-**Status**: concluída
-**Foco**: `src/copilot/agent/` no contexto do restante de `src/copilot/`
+**Data**: 2026-04-15 **Status**: concluída **Foco**: `src/copilot/agent/` no contexto do restante de
+`src/copilot/`
 
 ---
 
@@ -20,7 +19,8 @@ Ele concentra, ao mesmo tempo:
 - background tasks e health runtime;
 - parte da relação com `conversation-hub`, `server`, `terminal` e `channel`.
 
-Essa concentração explica por que o módulo continua sendo o maior hotspot do sistema mesmo após diversas melhorias incrementais.
+Essa concentração explica por que o módulo continua sendo o maior hotspot do sistema mesmo após
+diversas melhorias incrementais.
 
 ---
 
@@ -46,7 +46,8 @@ Essa concentração explica por que o módulo continua sendo o maior hotspot do 
 
 ### Leitura honesta
 
-O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demais em **coordenação de fronteiras**.
+O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demais em **coordenação
+de fronteiras**.
 
 ---
 
@@ -62,7 +63,8 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 
 - ciclo de vida de sessão fica difuso;
 - muito código precisa conhecer detalhes do wrapper SDK;
-- a redução do `agent/` fica limitada porque parte da coordenação ainda depende de uma base SDK não suficientemente encapsulada.
+- a redução do `agent/` fica limitada porque parte da coordenação ainda depende de uma base SDK não
+  suficientemente encapsulada.
 
 ### Situação ideal
 
@@ -78,7 +80,8 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 
 - `agent/` importa `observability` em muitos pontos relevantes;
 - health, metrics, tracing, logs e spans atravessam o runtime principal;
-- `observability/` já tem papel fundamental, mas ainda funciona mais como dependência onipresente do que como plataforma transversal governada.
+- `observability/` já tem papel fundamental, mas ainda funciona mais como dependência onipresente do
+  que como plataforma transversal governada.
 
 ### Consequências
 
@@ -139,7 +142,8 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 
 ### Estado atual
 
-- `agent-lifecycle` e rotas/serviços em torno do hub ainda compartilham ownership de sessão e estado conversacional;
+- `agent-lifecycle` e rotas/serviços em torno do hub ainda compartilham ownership de sessão e estado
+  conversacional;
 - `conversation-hub/` ainda não assumiu plenamente seu papel em lifecycle e replay.
 
 ### Consequências
@@ -160,7 +164,8 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 ### Estado atual
 
 - o terminal e o server continuam se cruzando mais do que o ideal;
-- `channel/` participa da comunicação LLM-A ↔ LLM-B, mas ainda depende de fronteiras que não estão completamente explícitas;
+- `channel/` participa da comunicação LLM-A ↔ LLM-B, mas ainda depende de fronteiras que não estão
+  completamente explícitas;
 - `agent/` segue sendo o pivô do runtime consumido por esses lados.
 
 ### Consequências
@@ -181,8 +186,10 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 
 ### Estado atual
 
-- `agent/` ainda depende bastante de bootstrap, config builders, core utilities, timers, storage e tipos vindos de vários lugares;
-- essa dependência não é errada por si só, mas a concentração simultânea de muitas delas na fachada principal aumenta o fan-in do módulo.
+- `agent/` ainda depende bastante de bootstrap, config builders, core utilities, timers, storage e
+  tipos vindos de vários lugares;
+- essa dependência não é errada por si só, mas a concentração simultânea de muitas delas na fachada
+  principal aumenta o fan-in do módulo.
 
 ### Situação ideal
 
@@ -211,7 +218,8 @@ O `agent/` melhorou bastante em **estrutura interna**, mas continua pesado demai
 2. diminuir o fan-in da fachada `always-alive.js`;
 3. retirar ownership indevido do `sdk/` e consolidar fronteiras de sessão;
 4. reorganizar o ecossistema de eventos/observabilidade em torno de contratos mais governáveis;
-5. desacoplar melhor `server/`, `terminal/`, `channel/` e `conversation-hub` do runtime central do agente.
+5. desacoplar melhor `server/`, `terminal/`, `channel/` e `conversation-hub` do runtime central do
+   agente.
 
 ---
 
@@ -233,10 +241,12 @@ O `agent/` ideal desta linha clean deve ser:
 
 ## 12. Conclusão
 
-A auditoria de `agent/` confirma que o módulo não precisa de “mais do mesmo”, e sim de um programa de rearquitetura que trate:
+A auditoria de `agent/` confirma que o módulo não precisa de “mais do mesmo”, e sim de um programa
+de rearquitetura que trate:
 
 - o módulo em si;
 - as suas fronteiras principais;
 - e o custo de coordenação que ele impõe ao resto de `src/copilot/`.
 
-Por isso, o novo roadmap clean não terá apenas uma “fase do agent”, mas sim vários programas coordenados que partem dele e reorganizam as bordas sistêmicas ao seu redor.
+Por isso, o novo roadmap clean não terá apenas uma “fase do agent”, mas sim vários programas
+coordenados que partem dele e reorganizam as bordas sistêmicas ao seu redor.

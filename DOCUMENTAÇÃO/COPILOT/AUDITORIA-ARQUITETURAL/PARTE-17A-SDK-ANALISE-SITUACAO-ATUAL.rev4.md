@@ -1,19 +1,19 @@
 # PARTE-17A — Análise Arquitetural Profunda: Situação Atual do SDK
 
-**Data**: 2026-03-20 (rev.4 — inventário completo da API Surface do SDK + gap analysis)
-**Escopo**: TODO `src/copilot/` (263 arquivos, ~46.525 linhas) + API Surface completa do `@github/copilot-sdk@0.2.0`
-**SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado) | `0.2.1` (NPM latest)
-**Autor**: Auditoria automatizada PARTE-17
+**Data**: 2026-03-20 (rev.4 — inventário completo da API Surface do SDK + gap analysis) **Escopo**:
+TODO `src/copilot/` (263 arquivos, ~46.525 linhas) + API Surface completa do
+`@github/copilot-sdk@0.2.0` **SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado) | `0.2.1` (NPM
+latest) **Autor**: Auditoria automatizada PARTE-17
 
 ---
 
 ## Sumário Executivo
 
-A revisão rev.4 expande significativamente a análise da rev.3 com a **leitura completa de todos os
-9 arquivos de type declarations do SDK oficial** (`index.d.ts`, `client.d.ts`, `session.d.ts`,
+A revisão rev.4 expande significativamente a análise da rev.3 com a **leitura completa de todos os 9
+arquivos de type declarations do SDK oficial** (`index.d.ts`, `client.d.ts`, `session.d.ts`,
 `types.d.ts` — 1040 linhas, `telemetry.d.ts`, `extension.d.ts`, `generated/rpc.d.ts` — 1061 linhas,
-`generated/session-events.d.ts` — 3404 linhas, `sdkProtocolVersion.d.ts`). Essa leitura revelou
-que a superfície real do SDK é **vastamente maior** do que o inventariado na rev.3:
+`generated/session-events.d.ts` — 3404 linhas, `sdkProtocolVersion.d.ts`). Essa leitura revelou que
+a superfície real do SDK é **vastamente maior** do que o inventariado na rev.3:
 
 | Métrica                        | Rev.3 (estimava) | Rev.4 (real) |
 | ------------------------------ | :--------------: | :----------: |
@@ -26,11 +26,11 @@ que a superfície real do SDK é **vastamente maior** do que o inventariado na r
 | Session Event types            |   não contado    |   **70+**    |
 | Campos SessionConfig           |       ~17        |   **23+**    |
 
-A conclusão central da rev.3 permanece válida (wrapper incompleto + 20 bypasses), mas o **escopo
-da transformação é MUITO maior** do que estimado: não basta migrar 20 imports — é necessário
-também **expor ~50 métodos RPC, tipificar ~90 interfaces, e wrappar features inteiramente
-ausentes** do projeto atual (fleet mode, extensions, plugins, compaction, shell via RPC, UI
-elicitation, model switching, account quota, mode switching, plan management, etc.).
+A conclusão central da rev.3 permanece válida (wrapper incompleto + 20 bypasses), mas o **escopo da
+transformação é MUITO maior** do que estimado: não basta migrar 20 imports — é necessário também
+**expor ~50 métodos RPC, tipificar ~90 interfaces, e wrappar features inteiramente ausentes** do
+projeto atual (fleet mode, extensions, plugins, compaction, shell via RPC, UI elicitation, model
+switching, account quota, mode switching, plan management, etc.).
 
 ---
 
@@ -100,103 +100,103 @@ elicitation, model switching, account quota, mode switching, plan management, et
 
 | Export                   | Tipo               | Descrição                                           | Usado no projeto? |
 | ------------------------ | ------------------ | --------------------------------------------------- | :---------------: |
-| `CopilotClient`          | Classe             | Client principal — gerencia CLI, conexão, sessões   |         ✅         |
-| `CopilotSession`         | Classe             | Sessão de conversa — events, tools, send, RPC       |         ✅         |
-| `defineTool`             | Função             | Helper para definir tool com type inference via Zod |         ✅         |
-| `approveAll`             | PermissionHandler  | Aprova todas as permissões automaticamente          |         ✅         |
-| `SYSTEM_PROMPT_SECTIONS` | Constante (Record) | Seções nomeadas do system prompt (10 seções)        |         ✅         |
-| `AssistantMessageEvent`  | Tipo (re-export)   | Tipo extraído de `session.d.ts`                     |         ❌         |
-| `getTraceContext`        | Função (telemetry) | Obtém W3C Trace Context do provider                 |         ❌         |
-| `joinSession`            | Função (extension) | Joins foreground session (para extensions)          |         ❌         |
+| `CopilotClient`          | Classe             | Client principal — gerencia CLI, conexão, sessões   |        ✅         |
+| `CopilotSession`         | Classe             | Sessão de conversa — events, tools, send, RPC       |        ✅         |
+| `defineTool`             | Função             | Helper para definir tool com type inference via Zod |        ✅         |
+| `approveAll`             | PermissionHandler  | Aprova todas as permissões automaticamente          |        ✅         |
+| `SYSTEM_PROMPT_SECTIONS` | Constante (Record) | Seções nomeadas do system prompt (10 seções)        |        ✅         |
+| `AssistantMessageEvent`  | Tipo (re-export)   | Tipo extraído de `session.d.ts`                     |        ❌         |
+| `getTraceContext`        | Função (telemetry) | Obtém W3C Trace Context do provider                 |        ❌         |
+| `joinSession`            | Função (extension) | Joins foreground session (para extensions)          |        ❌         |
 
 ### 2.2 CopilotClient — Métodos Públicos Completos
 
-| Método                                   | Descrição                               | Wrapped em sdk/?  | Usado fora de sdk/? |
-| ---------------------------------------- | --------------------------------------- | :---------------: | :-----------------: |
-| `constructor(options?)`                  | Cria instância com CopilotClientOptions |    ✅ getClient    |     ✅ lifecycle     |
+| Método                                   | Descrição                               |  Wrapped em sdk/?  | Usado fora de sdk/? |
+| ---------------------------------------- | --------------------------------------- | :----------------: | :-----------------: |
+| `constructor(options?)`                  | Cria instância com CopilotClientOptions |    ✅ getClient    |    ✅ lifecycle     |
 | `start()`                                | Inicia CLI server + conexão             |    ✅ (interno)    |          —          |
 | `stop()`                                 | Graceful shutdown                       |  ✅ stopClient()   |          —          |
 | `forceStop()`                            | Force kill                              | ✅ forceStopClient |          —          |
 | `createSession(config)`                  | Cria nova sessão                        |   ✅ createSess    |          —          |
 | `resumeSession(id, config)`              | Retoma sessão existente                 |   ✅ resumeSess    |          —          |
 | `getState()`                             | Estado de conexão                       | ✅ getClientState  |          —          |
-| `ping(message?)`                         | Verifica conectividade CLI server       |         ❌         |          ❌          |
-| `getStatus()`                            | Versão CLI + protocolo                  |         ❌         |          ❌          |
-| `getAuthStatus()`                        | Status de autenticação GitHub           |         ❌         |          ❌          |
+| `ping(message?)`                         | Verifica conectividade CLI server       |         ❌         |         ❌          |
+| `getStatus()`                            | Versão CLI + protocolo                  |         ❌         |         ❌          |
+| `getAuthStatus()`                        | Status de autenticação GitHub           |         ❌         |         ❌          |
 | `listModels()`                           | Lista modelos disponíveis com metadata  |    ✅ (models/)    |          —          |
-| `getLastSessionId()`                     | ID da sessão mais recente               |         ❌         |   ✅ session-crud    |
-| `deleteSession(id)`                      | Deleta sessão e dados permanentemente   |         ❌         |          ❌          |
-| `listSessions(filter?)`                  | Lista sessões com filtro                |  ✅ (session.js)   |   ✅ session-crud    |
-| `getForegroundSessionId()`               | ID da sessão em foreground (TUI mode)   |         ❌         |   ✅ session-crud    |
-| `setForegroundSessionId(id)`             | Muda sessão foreground                  |         ❌         |   ✅ session-crud    |
-| `on(eventType, handler)` / `on(handler)` | Subscribe lifecycle events              |         ❌         |    ✅ boot-wiring    |
-| `rpc` (getter)                           | Server-scoped RPC methods               |         ❌         |          ❌          |
+| `getLastSessionId()`                     | ID da sessão mais recente               |         ❌         |   ✅ session-crud   |
+| `deleteSession(id)`                      | Deleta sessão e dados permanentemente   |         ❌         |         ❌          |
+| `listSessions(filter?)`                  | Lista sessões com filtro                |  ✅ (session.js)   |   ✅ session-crud   |
+| `getForegroundSessionId()`               | ID da sessão em foreground (TUI mode)   |         ❌         |   ✅ session-crud   |
+| `setForegroundSessionId(id)`             | Muda sessão foreground                  |         ❌         |   ✅ session-crud   |
+| `on(eventType, handler)` / `on(handler)` | Subscribe lifecycle events              |         ❌         |   ✅ boot-wiring    |
+| `rpc` (getter)                           | Server-scoped RPC methods               |         ❌         |         ❌          |
 
 **Server RPC (client.rpc) — NÃO exposto pelo wrapper:**
 
 | RPC                      | Descrição                                       | Usado? |
 | ------------------------ | ----------------------------------------------- | :----: |
-| `rpc.ping(params)`       | Ping com timestamp                              |   ❌    |
-| `rpc.models.list()`      | Lista modelos (alternativa a client.listModels) |   ❌    |
-| `rpc.tools.list(params)` | Lista tools built-in por modelo                 |   ❌    |
-| `rpc.account.getQuota()` | Quota da conta GitHub Copilot                   |   ❌    |
+| `rpc.ping(params)`       | Ping com timestamp                              |   ❌   |
+| `rpc.models.list()`      | Lista modelos (alternativa a client.listModels) |   ❌   |
+| `rpc.tools.list(params)` | Lista tools built-in por modelo                 |   ❌   |
+| `rpc.account.getQuota()` | Quota da conta GitHub Copilot                   |   ❌   |
 
 ### 2.3 CopilotSession — Métodos Públicos Completos
 
 | Método                                   | Descrição                             | Wrapped? |       Onde?       |
 | ---------------------------------------- | ------------------------------------- | :------: | :---------------: |
-| `send(options)`                          | Envia mensagem (não espera idle)      |    ✅     |     messaging     |
-| `sendAndWait(options, timeout?)`         | Envia e espera resposta completa      |    ✅     |  always-alive.js  |
-| `on(eventType, handler)` / `on(handler)` | Subscribe session events              |    ✅     |  event-wirer.js   |
-| `disconnect()`                           | Libera recursos in-memory             |    ✅     |  agent-lifecycle  |
-| `destroy()` ⚠️ DEPRECATED                 | Alias de disconnect                   |    ❌     |         —         |
-| `abort()`                                | Cancela mensagem em processamento     |    ❌     |         —         |
-| `setModel(model, options?)`              | Muda modelo mid-session               |    ❌     |         —         |
-| `log(message, options?)`                 | Log na timeline da sessão             |    ✅     |  always-alive.js  |
-| `getMessages()`                          | Retorna todo histórico da sessão      |    ❌     |         —         |
+| `send(options)`                          | Envia mensagem (não espera idle)      |    ✅    |     messaging     |
+| `sendAndWait(options, timeout?)`         | Envia e espera resposta completa      |    ✅    |  always-alive.js  |
+| `on(eventType, handler)` / `on(handler)` | Subscribe session events              |    ✅    |  event-wirer.js   |
+| `disconnect()`                           | Libera recursos in-memory             |    ✅    |  agent-lifecycle  |
+| `destroy()` ⚠️ DEPRECATED                | Alias de disconnect                   |    ❌    |         —         |
+| `abort()`                                | Cancela mensagem em processamento     |    ❌    |         —         |
+| `setModel(model, options?)`              | Muda modelo mid-session               |    ❌    |         —         |
+| `log(message, options?)`                 | Log na timeline da sessão             |    ✅    |  always-alive.js  |
+| `getMessages()`                          | Retorna todo histórico da sessão      |    ❌    |         —         |
 | `registerTools(tools?)`                  | Registra tools (interno)              |    —     |     (interno)     |
 | `registerPermissionHandler(handler?)`    | Registra permission handler (interno) |    —     |     (interno)     |
 | `registerUserInputHandler(handler?)`     | Registra user input handler (interno) |    —     |     (interno)     |
 | `registerHooks(hooks?)`                  | Registra hooks (interno)              |    —     |     (interno)     |
 | `registerTransformCallbacks(cbs?)`       | Registra section transform callbacks  |    —     |     (interno)     |
-| `workspacePath` (getter)                 | Path do workspace da sessão           |    ❌     |         —         |
+| `workspacePath` (getter)                 | Path do workspace da sessão           |    ❌    |         —         |
 | `rpc` (getter)                           | Session-scoped RPC methods            | parcial  | session-rpc-tools |
-| `sessionId` (readonly)                   | ID da sessão                          |    ✅     |      vários       |
-| `[Symbol.asyncDispose]()`                | Suporte a `await using session`       |    ❌     |         —         |
+| `sessionId` (readonly)                   | ID da sessão                          |    ✅    |      vários       |
+| `[Symbol.asyncDispose]()`                | Suporte a `await using session`       |    ❌    |         —         |
 
 ### 2.4 Session RPC — 17 Subsistemas (via `session.rpc`)
 
-Este é o inventário mais significativamente **AUSENTE** da rev.3. O SDK expõe **17 subsistemas
-RPC** através de `session.rpc`:
+Este é o inventário mais significativamente **AUSENTE** da rev.3. O SDK expõe **17 subsistemas RPC**
+através de `session.rpc`:
 
 | Subsistema        | Métodos                                                               | Status       | Usado? |
 | ----------------- | --------------------------------------------------------------------- | ------------ | :----: |
-| `rpc.model`       | `getCurrent()`, `switchTo({modelId, reasoningEffort})`                | Estável      |   ❌    |
-| `rpc.mode`        | `get()`, `set({mode})` [interactive/plan/autopilot]                   | Estável      |   ❌    |
-| `rpc.plan`        | `read()`, `update({content})`, `delete()`                             | Estável      |   ❌    |
-| `rpc.workspace`   | `listFiles()`, `readFile({path})`, `createFile({path,content})`       | Estável      |   ❌    |
-| `rpc.fleet`       | `start({prompt?})`                                                    | EXPERIMENTAL |   ❌    |
-| `rpc.agent`       | `list()`, `getCurrent()`, `select({name})`, `deselect()`, `reload()`  | EXPERIMENTAL |   ❌    |
-| `rpc.skills`      | `list()`, `enable({name})`, `disable({name})`, `reload()`             | EXPERIMENTAL |   ❌    |
-| `rpc.mcp`         | `list()`, `enable({serverName})`, `disable({serverName})`, `reload()` | EXPERIMENTAL |   ❌    |
-| `rpc.plugins`     | `list()`                                                              | EXPERIMENTAL |   ❌    |
-| `rpc.extensions`  | `list()`, `enable({id})`, `disable({id})`, `reload()`                 | EXPERIMENTAL |   ❌    |
-| `rpc.compaction`  | `compact()` → `{success, tokensRemoved, messagesRemoved}`             | EXPERIMENTAL |   ❌    |
-| `rpc.tools`       | `handlePendingToolCall({requestId, result, error})`                   | Estável      |   ❌    |
-| `rpc.commands`    | `handlePendingCommand({requestId, error?})`                           | Estável      |   ❌    |
-| `rpc.ui`          | `elicitation({message, requestedSchema})`                             | Estável      |   ❌    |
-| `rpc.permissions` | `handlePendingPermissionRequest({requestId, result})`                 | Estável      |   ❌    |
-| `rpc.log`         | `log({message, level?, ephemeral?, url?})`                            | Estável      |   ✅    |
-| `rpc.shell`       | `exec({command, cwd?, timeout?})`, `kill({processId, signal?})`       | Estável      |   ❌    |
+| `rpc.model`       | `getCurrent()`, `switchTo({modelId, reasoningEffort})`                | Estável      |   ❌   |
+| `rpc.mode`        | `get()`, `set({mode})` [interactive/plan/autopilot]                   | Estável      |   ❌   |
+| `rpc.plan`        | `read()`, `update({content})`, `delete()`                             | Estável      |   ❌   |
+| `rpc.workspace`   | `listFiles()`, `readFile({path})`, `createFile({path,content})`       | Estável      |   ❌   |
+| `rpc.fleet`       | `start({prompt?})`                                                    | EXPERIMENTAL |   ❌   |
+| `rpc.agent`       | `list()`, `getCurrent()`, `select({name})`, `deselect()`, `reload()`  | EXPERIMENTAL |   ❌   |
+| `rpc.skills`      | `list()`, `enable({name})`, `disable({name})`, `reload()`             | EXPERIMENTAL |   ❌   |
+| `rpc.mcp`         | `list()`, `enable({serverName})`, `disable({serverName})`, `reload()` | EXPERIMENTAL |   ❌   |
+| `rpc.plugins`     | `list()`                                                              | EXPERIMENTAL |   ❌   |
+| `rpc.extensions`  | `list()`, `enable({id})`, `disable({id})`, `reload()`                 | EXPERIMENTAL |   ❌   |
+| `rpc.compaction`  | `compact()` → `{success, tokensRemoved, messagesRemoved}`             | EXPERIMENTAL |   ❌   |
+| `rpc.tools`       | `handlePendingToolCall({requestId, result, error})`                   | Estável      |   ❌   |
+| `rpc.commands`    | `handlePendingCommand({requestId, error?})`                           | Estável      |   ❌   |
+| `rpc.ui`          | `elicitation({message, requestedSchema})`                             | Estável      |   ❌   |
+| `rpc.permissions` | `handlePendingPermissionRequest({requestId, result})`                 | Estável      |   ❌   |
+| `rpc.log`         | `log({message, level?, ephemeral?, url?})`                            | Estável      |   ✅   |
+| `rpc.shell`       | `exec({command, cwd?, timeout?})`, `kill({processId, signal?})`       | Estável      |   ❌   |
 
-**Observação critica**: `session.rpc.log` é o ÚNICO subsistema RPC em uso — via `session.log()`
-que é um convenience wrapper do SDK. O `session-rpc-tools.js` expõe ALGUMAS operações como
-tools ao agente, mas faz isso via chamadas ad-hoc, sem wrappers centralizados no `sdk/`.
+**Observação critica**: `session.rpc.log` é o ÚNICO subsistema RPC em uso — via `session.log()` que
+é um convenience wrapper do SDK. O `session-rpc-tools.js` expõe ALGUMAS operações como tools ao
+agente, mas faz isso via chamadas ad-hoc, sem wrappers centralizados no `sdk/`.
 
 ### 2.5 Session Events — 70+ Tipos (via `generated/session-events.d.ts`)
 
-O SDK define **70+ tipos** de session events em `generated/session-events.d.ts` (3404 linhas).
-Cada tipo possui payload específico com campos tipados.
+O SDK define **70+ tipos** de session events em `generated/session-events.d.ts` (3404 linhas). Cada
+tipo possui payload específico com campos tipados.
 
 | Categoria            | Eventos                                                                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -224,36 +224,36 @@ Cada tipo possui payload específico com campos tipados.
 | **Command**          | `command.queued`, `command.execute`, `command.completed`, `commands.changed`                                                         |
 | **Plan Exit**        | `exit_plan_mode.requested`, `exit_plan_mode.completed`                                                                               |
 
-**Status no projeto**: O `observability/event-collector.js` registra listeners para a maioria
-destes eventos. O `bridges/nerv-bridge.js` mapeia ~55 event types para o bus NERV. Mas o
-**modelo de dados dos eventos NÃO está tipificado** — handlers usam `event.data` como `any`.
+**Status no projeto**: O `observability/event-collector.js` registra listeners para a maioria destes
+eventos. O `bridges/nerv-bridge.js` mapeia ~55 event types para o bus NERV. Mas o **modelo de dados
+dos eventos NÃO está tipificado** — handlers usam `event.data` como `any`.
 
 ### 2.6 SessionConfig — Campos COMPLETOS (23+ campos)
 
 | Campo                 | Tipo SDK                           | Em wrapper? | Em agent? | Em API? | Análise                                         |
 | --------------------- | ---------------------------------- | :---------: | :-------: | :-----: | ----------------------------------------------- |
-| `sessionId`           | `string?`                          |      ❌      |     ❌     |    ✅    | API passa, agent não (gerado pelo SDK)          |
-| `clientName`          | `string?`                          |      ❌      |     ❌     |    ✅    | Apenas API usa; deveria ser default no agent    |
-| `model`               | `string?`                          |      ✅      |     ✅     |    ✅    | OK                                              |
-| `reasoningEffort`     | `ReasoningEffort?`                 |      ✅      |     ✅     |    ✅    | OK                                              |
-| `configDir`           | `string?`                          |      ❌      |     ❌     |    ❌    | Não usado em nenhum lugar                       |
-| `tools`               | `Tool<any>[]?`                     |      ✅      |     ✅     |    ❌    | API não injeta tools — só agent                 |
-| `systemMessage`       | `SystemMessageConfig?`             |      ✅      |     ✅     |    ✅    | OK mas modo `customize` não explorado           |
-| `availableTools`      | `string[]?`                        |      ❌      |     ✅     |    ✅    | Agent e API usam, mas wrapper não aceita        |
-| `excludedTools`       | `string[]?`                        |      ❌      |     ✅     |    ✅    | Agent e API usam, mas wrapper não aceita        |
-| `provider`            | `ProviderConfig?`                  |      ❌      |     ❌     |    ✅    | Só API (BYOK); deveria estar no wrapper         |
-| `onPermissionRequest` | `PermissionHandler`                |      ✅      |     ✅     |    ✅    | OK — obrigatório                                |
-| `onUserInputRequest`  | `UserInputHandler?`                |      ✅      |     ✅     |    ❌    | Agent usa; API não                              |
-| `hooks`               | `SessionHooks?`                    |      ✅      |     ✅     |    ❌    | Agent usa; API não                              |
-| `workingDirectory`    | `string?`                          |      ✅      |     ✅     |    ✅    | OK                                              |
-| `streaming`           | `boolean?`                         |      ✅      |     ✅     |    ✅    | OK                                              |
-| `mcpServers`          | `Record<string, MCPServerConfig>?` |      ✅      |     ✅     |    ❌    | Agent usa; API não                              |
-| `customAgents`        | `CustomAgentConfig[]?`             |      ✅      |     ✅     |    ✅    | OK                                              |
-| `agent`               | `string?`                          |      ❌      |     ❌     |    ❌    | Nome do custom agent ativo — NÃO USADO          |
-| `skillDirectories`    | `string[]?`                        |      ❌      |     ✅     |    ❌    | Agent usa; wrapper ignora                       |
-| `disabledSkills`      | `string[]?`                        |      ❌      |     ❌     |    ❌    | NÃO USADO em nenhum lugar                       |
-| `infiniteSessions`    | `InfiniteSessionConfig?`           |      ✅      |     ✅     |    ✅    | OK mas thresholds não padronizados centralmente |
-| `onEvent`             | `SessionEventHandler?`             |      ❌      |     ❌     |    ❌    | Handler de events early-binding — NÃO USADO     |
+| `sessionId`           | `string?`                          |     ❌      |    ❌     |   ✅    | API passa, agent não (gerado pelo SDK)          |
+| `clientName`          | `string?`                          |     ❌      |    ❌     |   ✅    | Apenas API usa; deveria ser default no agent    |
+| `model`               | `string?`                          |     ✅      |    ✅     |   ✅    | OK                                              |
+| `reasoningEffort`     | `ReasoningEffort?`                 |     ✅      |    ✅     |   ✅    | OK                                              |
+| `configDir`           | `string?`                          |     ❌      |    ❌     |   ❌    | Não usado em nenhum lugar                       |
+| `tools`               | `Tool<any>[]?`                     |     ✅      |    ✅     |   ❌    | API não injeta tools — só agent                 |
+| `systemMessage`       | `SystemMessageConfig?`             |     ✅      |    ✅     |   ✅    | OK mas modo `customize` não explorado           |
+| `availableTools`      | `string[]?`                        |     ❌      |    ✅     |   ✅    | Agent e API usam, mas wrapper não aceita        |
+| `excludedTools`       | `string[]?`                        |     ❌      |    ✅     |   ✅    | Agent e API usam, mas wrapper não aceita        |
+| `provider`            | `ProviderConfig?`                  |     ❌      |    ❌     |   ✅    | Só API (BYOK); deveria estar no wrapper         |
+| `onPermissionRequest` | `PermissionHandler`                |     ✅      |    ✅     |   ✅    | OK — obrigatório                                |
+| `onUserInputRequest`  | `UserInputHandler?`                |     ✅      |    ✅     |   ❌    | Agent usa; API não                              |
+| `hooks`               | `SessionHooks?`                    |     ✅      |    ✅     |   ❌    | Agent usa; API não                              |
+| `workingDirectory`    | `string?`                          |     ✅      |    ✅     |   ✅    | OK                                              |
+| `streaming`           | `boolean?`                         |     ✅      |    ✅     |   ✅    | OK                                              |
+| `mcpServers`          | `Record<string, MCPServerConfig>?` |     ✅      |    ✅     |   ❌    | Agent usa; API não                              |
+| `customAgents`        | `CustomAgentConfig[]?`             |     ✅      |    ✅     |   ✅    | OK                                              |
+| `agent`               | `string?`                          |     ❌      |    ❌     |   ❌    | Nome do custom agent ativo — NÃO USADO          |
+| `skillDirectories`    | `string[]?`                        |     ❌      |    ✅     |   ❌    | Agent usa; wrapper ignora                       |
+| `disabledSkills`      | `string[]?`                        |     ❌      |    ❌     |   ❌    | NÃO USADO em nenhum lugar                       |
+| `infiniteSessions`    | `InfiniteSessionConfig?`           |     ✅      |    ✅     |   ✅    | OK mas thresholds não padronizados centralmente |
+| `onEvent`             | `SessionEventHandler?`             |     ❌      |    ❌     |   ❌    | Handler de events early-binding — NÃO USADO     |
 
 **`ResumeSessionConfig`** é `Pick<SessionConfig, ...>` + `{ disableResume?: boolean }` — aceita
 quase todos os campos exceto `sessionId`.
@@ -261,22 +261,27 @@ quase todos os campos exceto `sessionId`.
 ### 2.7 Tipos/Interfaces Completos Exportados pelo SDK (~90+)
 
 #### Core
+
 - `CopilotClientOptions`, `SessionConfig`, `ResumeSessionConfig`, `MessageOptions`
 - `ConnectionState` ("disconnected"|"connecting"|"connected"|"error")
 - `ReasoningEffort` ("low"|"medium"|"high"|"xhigh")
 
 #### Tools
+
 - `Tool<T>`, `ToolHandler<T>`, `ToolInvocation`, `ToolResult`, `ToolResultType`
 - `ToolResultObject`, `ToolBinaryResult` (data, mimeType, type, description)
 - `ToolCallRequestPayload`, `ToolCallResponsePayload`, `ZodSchema`
 
 #### Permission
+
 - `PermissionHandler`, `PermissionRequest` (6 kinds), `PermissionRequestResult`
 
 #### User Input
+
 - `UserInputHandler`, `UserInputRequest`, `UserInputResponse`
 
 #### System Message
+
 - `SystemMessageConfig` (union de 3 modos)
 - `SystemMessageAppendConfig`, `SystemMessageReplaceConfig`, `SystemMessageCustomizeConfig`
 - `SystemPromptSection` (10 seções: identity, tone, guidelines, codeGeneration, testing, tools,
@@ -285,6 +290,7 @@ quase todos os campos exceto `sessionId`.
 - `SectionTransformFn`
 
 #### Hooks (6 tipos completos com I/O)
+
 - `SessionHooks`, `BaseHookInput`
 - `PreToolUseHandler` + `PreToolUseHookInput` + `PreToolUseHookOutput`
 - `PostToolUseHandler` + `PostToolUseHookInput` + `PostToolUseHookOutput`
@@ -294,46 +300,60 @@ quase todos os campos exceto `sessionId`.
 - `ErrorOccurredHandler` + `ErrorOccurredHookInput` + `ErrorOccurredHookOutput`
 
 #### Session Events
+
 - `SessionEvent` (union de 70+ tipos), `SessionEventType`
 - `SessionEventPayload<T>`, `SessionEventHandler`, `TypedSessionEventHandler<T>`
 - `AssistantMessageEvent`
 
 #### Session Lifecycle
-- `SessionLifecycleEvent`, `SessionLifecycleEventType` (5 tipos: created/deleted/updated/foreground/background)
+
+- `SessionLifecycleEvent`, `SessionLifecycleEventType` (5 tipos:
+  created/deleted/updated/foreground/background)
 - `SessionLifecycleHandler`, `TypedSessionLifecycleHandler<K>`
 
 #### Model
-- `ModelInfo` (id, name, capabilities, policy, billing, supportedReasoningEfforts, defaultReasoningEffort)
+
+- `ModelInfo` (id, name, capabilities, policy, billing, supportedReasoningEfforts,
+  defaultReasoningEffort)
 - `ModelCapabilities` (supports: vision + reasoningEffort; limits: maxTokens + maxVisionImages)
 - `ModelPolicy` (state: enabled|disabled|unconfigured; terms)
 - `ModelBilling` (multiplier)
 
 #### MCP
+
 - `MCPServerConfig` (union), `MCPLocalServerConfig` (command, args, env, cwd)
 - `MCPRemoteServerConfig` (url, headers, type: "http"|"sse")
 
 #### Custom Agents
+
 - `CustomAgentConfig` (name, displayName, description, tools, prompt, mcpServers, infer)
 
 #### Sessions Metadata
+
 - `SessionContext` (cwd, gitRoot, repository, branch)
 - `SessionMetadata` (sessionId, startTime, modifiedTime, summary, isRemote, context)
 - `SessionListFilter` (cwd, gitRoot, repository, branch)
 - `ForegroundSessionInfo` (sessionId, workspacePath)
-- `InfiniteSessionConfig` (enabled, backgroundCompactionThreshold: 0.80, bufferExhaustionThreshold: 0.95)
+- `InfiniteSessionConfig` (enabled, backgroundCompactionThreshold: 0.80, bufferExhaustionThreshold:
+  0.95)
 
 #### Provider (BYOK)
-- `ProviderConfig` (type: "openai"|"azure"|"anthropic"; wireApi, baseUrl, apiKey, bearerToken; azure-specific fields)
+
+- `ProviderConfig` (type: "openai"|"azure"|"anthropic"; wireApi, baseUrl, apiKey, bearerToken;
+  azure-specific fields)
 
 #### Telemetry
+
 - `TelemetryConfig` (otlpEndpoint, filePath, exporterType, sourceName, captureContent)
 - `TraceContext` (traceparent, tracestate), `TraceContextProvider`
 
 #### Status/Auth
+
 - `GetStatusResponse` (version, protocolVersion)
 - `GetAuthStatusResponse` (isAuthenticated, authType, host, login, statusMessage)
 
 #### Extension
+
 - `JoinSessionConfig` (Omit<ResumeSessionConfig, ...>)
 
 ### 2.8 Exports NÃO Usados pelo Projeto (GAP List Prioriziada)
@@ -382,12 +402,13 @@ quase todos os campos exceto `sessionId`.
 #### P1 — Dois Caminhos de Configuração de Sessão
 
 Existem 3 config builders concorrentes:
+
 1. `config/session-config.js` → `buildSessionConfig()` — usado pelo agent/lifecycle (10+ consumers)
 2. `sdk/session.js` (chamada interna ao SDK) — adiciona defaults do SDK
 3. `api/routes/sessions.js` → inline config building — ignora `buildSessionConfig()`
 
-**Efeito**: É possível criar sessões com configs diferentes dependendo do entry point (agent vs API),
-levando a comportamento inconsistente em hooks, systemMessage, e tools.
+**Efeito**: É possível criar sessões com configs diferentes dependendo do entry point (agent vs
+API), levando a comportamento inconsistente em hooks, systemMessage, e tools.
 
 #### P2 — Dois Registros de Sessão Paralelos
 
@@ -398,17 +419,18 @@ Consumidores diferentes usam caminhos diferentes para acessar a "mesma" sessão.
 
 #### P11 — 15 Subsistemas RPC Não-Expostos pelo Wrapper (NOVO rev.4)
 
-O SDK expõe 17 subsistemas RPC via `session.rpc` e 4 RPCs server-scope via `client.rpc`.
-O projeto só usa `session.rpc.log()` (via `session.log()` convenience). **15/17 subsistemas
-são completamente inacessíveis** via wrapper. Features como mode switching (plan/autopilot),
-plan management, workspace files, extensions, plugins, skills, compaction, shell execution,
-UI elicitation e account quota — **não existem** para o projeto.
+O SDK expõe 17 subsistemas RPC via `session.rpc` e 4 RPCs server-scope via `client.rpc`. O projeto
+só usa `session.rpc.log()` (via `session.log()` convenience). **15/17 subsistemas são completamente
+inacessíveis** via wrapper. Features como mode switching (plan/autopilot), plan management,
+workspace files, extensions, plugins, skills, compaction, shell execution, UI elicitation e account
+quota — **não existem** para o projeto.
 
 ### 🔴 ALTO
 
 #### P3 — Config Barrel Viola Fronteiras de Módulo
 
-`config/index.js` re-exporta de `sdk/` → violação de dependency rule (config não deve depender de sdk).
+`config/index.js` re-exporta de `sdk/` → violação de dependency rule (config não deve depender de
+sdk).
 
 #### P4 — Sistema de Tipos Paralelo para Hooks
 
@@ -418,8 +440,8 @@ campos faltantes), causando inconsistência na interface de hooks.
 
 #### P12 — 70+ Event Types Sem Tipagem Forte (NOVO rev.4)
 
-O SDK define 70+ tipos de session events com payloads específicos. O projeto registra listeners
-via `session.on(handler)` com handler genérico — os payloads são `event.data` sem tipo. O
+O SDK define 70+ tipos de session events com payloads específicos. O projeto registra listeners via
+`session.on(handler)` com handler genérico — os payloads são `event.data` sem tipo. O
 `nerv-bridge.js` mapeia ~55 event types para NERV, sem type-safety nos payloads. O
 `event-collector.js` coleta events para observabilidade, sem contracts nos dados.
 
@@ -437,8 +459,8 @@ bypassing o wrapper `sdk/tools-registry.js`.
 
 #### P7 — CopilotClient Instanciado Diretamente no Agent
 
-`agent/lifecycle/initializer.js` e `agent/always-alive.js` instanciam `CopilotClient`
-diretamente, bypassing o wrapper `sdk/client.js`.
+`agent/lifecycle/initializer.js` e `agent/always-alive.js` instanciam `CopilotClient` diretamente,
+bypassing o wrapper `sdk/client.js`.
 
 #### P8 — API Routes Usam Features Não-Wrapped
 
@@ -448,10 +470,11 @@ diretamente, bypassing o wrapper `sdk/client.js`.
 #### P13 — SystemMessage `customize` Mode Não Utilizado (NOVO rev.4)
 
 O SDK suporta 3 modos de system message:
+
 1. `append` (default) — **usado** ✅
 2. `replace` — disponível mas perigoso (remove guardrails de segurança)
-3. `customize` — **NÃO utilizado** — permite override por seção individual com 5 actions
-   (prepend, append, replace, remove, wrap) + transform functions
+3. `customize` — **NÃO utilizado** — permite override por seção individual com 5 actions (prepend,
+   append, replace, remove, wrap) + transform functions
 
 O modo `customize` é o mais poderoso e seguro para customização granular. Permite alterar seções
 específicas (identity, tone, guidelines, codeGeneration, etc.) sem tocar nas guardrails.
@@ -459,20 +482,20 @@ específicas (identity, tone, guidelines, codeGeneration, etc.) sem tocar nas gu
 #### P14 — Nenhum Health Check do CLI Server (NOVO rev.4)
 
 O SDK expõe `client.ping()` e `client.getStatus()` para verificar saúde da conexão. O projeto
-implementa keepalive de sessão em `agent/infra/session-keepalive.js`, mas NÃO verifica a saúde
-do CLI server. Se o CLI crashar, o sistema detecta apenas quando a próxima operação falha.
+implementa keepalive de sessão em `agent/infra/session-keepalive.js`, mas NÃO verifica a saúde do
+CLI server. Se o CLI crashar, o sistema detecta apenas quando a próxima operação falha.
 
 #### P15 — Sem Verificação de Autenticação no Boot (NOVO rev.4)
 
-`client.getAuthStatus()` retorna `{ isAuthenticated, authType, login, host, statusMessage }`.
-O projeto NÃO verifica autenticação no boot — assume que está autenticado. Token expirado ou
+`client.getAuthStatus()` retorna `{ isAuthenticated, authType, login, host, statusMessage }`. O
+projeto NÃO verifica autenticação no boot — assume que está autenticado. Token expirado ou
 inexistente causa falhas silenciosas na criação de sessão.
 
 #### P16 — Account Quota Não Monitorada (NOVO rev.4)
 
 `client.rpc.account.getQuota()` retorna snapshots de quota por tipo (chat, completions,
-premium_interactions) com: `entitlementRequests`, `usedRequests`, `remainingPercentage`,
-`overage`, `resetDate`. O projeto opera 24/7 com múltiplas sessões mas NÃO monitora quota.
+premium_interactions) com: `entitlementRequests`, `usedRequests`, `remainingPercentage`, `overage`,
+`resetDate`. O projeto opera 24/7 com múltiplas sessões mas NÃO monitora quota.
 
 ### 🟢 BAIXO
 
@@ -570,6 +593,7 @@ CopilotClient.rpc (4 métodos):
 ### 5.1 `defineTool` (11 arquivos)
 
 Todos em `src/copilot/tools/` e `bridges/`:
+
 1. `tools/file-tools.js`
 2. `tools/search-tools.js`
 3. `tools/shell-tools.js`
@@ -602,6 +626,7 @@ Todos em `src/copilot/tools/` e `bridges/`:
 ### 5.5 SessionConfig campos sem wrapper (bypass implícito)
 
 Estes campos são passados ao SDK sem intermediação do wrapper `sdk/`:
+
 - `sessionId` — passado pela API diretamente
 - `clientName` — hardcoded na API
 - `availableTools` — construído ad-hoc no agent e API
@@ -710,24 +735,24 @@ Estas features do SDK NÃO existem no projeto — nem no wrapper, nem como bypas
 
 | ID  | Severidade | Achado                                                          | Arquivos Impactados |
 | --- | :--------: | --------------------------------------------------------------- | :-----------------: |
-| P1  | 🔴 CRÍTICO  | Dois caminhos de config: buildSessionConfig vs initializer.js   |          3          |
-| P2  | 🔴 CRÍTICO  | Dois registros de sessão: client.js Map vs session.js stateless |  2 + consumidores   |
-| P11 | 🔴 CRÍTICO  | 15 subsistemas RPC não expostos pelo wrapper                    |  sdk/ + consumers   |
-| P3  |   🔴 ALTO   | Config barrel importa de sdk/ — violação de boundaries          |  1 + consumidores   |
-| P4  |   🔴 ALTO   | Tipos de hooks paralelos a tipos SDK                            | 1 + 19 hooks files  |
-| P12 |   🔴 ALTO   | 70+ event types sem tipagem forte nos payloads                  | event handlers all  |
-| P5  |  🟡 MÉDIO   | `defineTool` usado diretamente em 11 arquivos                   |         11          |
-| P6  |  🟡 MÉDIO   | `approveAll` importado diretamente em 5 arquivos                |          5          |
-| P7  |  🟡 MÉDIO   | `CopilotClient` instanciado fora do wrapper                     |          2          |
-| P8  |  🟡 MÉDIO   | API routes usam features SDK não-wrapped                        |          2          |
-| P13 |  🟡 MÉDIO   | SystemMessage `customize` mode não utilizado                    |   config/system-*   |
-| P14 |  🟡 MÉDIO   | Nenhum health check do CLI server                               |     agent/infra     |
-| P15 |  🟡 MÉDIO   | Sem verificação de autenticação no boot                         |     agent/boot      |
-| P16 |  🟡 MÉDIO   | Account quota não monitorada (operação 24/7)                    |    observability    |
-| P9  |  🟢 BAIXO   | `SYSTEM_PROMPT_SECTIONS` importado diretamente                  |          1          |
-| P10 |  🟢 BAIXO   | `core/sdk-types.js` duplica tipos já em hooks/types.js          |          2          |
-| P17 |  🟢 BAIXO   | `session.abort()` não exposto                                   |          —          |
-| P18 |  🟢 BAIXO   | `joinSession()` extension API ignorada                          |          —          |
+| P1  | 🔴 CRÍTICO | Dois caminhos de config: buildSessionConfig vs initializer.js   |          3          |
+| P2  | 🔴 CRÍTICO | Dois registros de sessão: client.js Map vs session.js stateless |  2 + consumidores   |
+| P11 | 🔴 CRÍTICO | 15 subsistemas RPC não expostos pelo wrapper                    |  sdk/ + consumers   |
+| P3  |  🔴 ALTO   | Config barrel importa de sdk/ — violação de boundaries          |  1 + consumidores   |
+| P4  |  🔴 ALTO   | Tipos de hooks paralelos a tipos SDK                            | 1 + 19 hooks files  |
+| P12 |  🔴 ALTO   | 70+ event types sem tipagem forte nos payloads                  | event handlers all  |
+| P5  |  🟡 MÉDIO  | `defineTool` usado diretamente em 11 arquivos                   |         11          |
+| P6  |  🟡 MÉDIO  | `approveAll` importado diretamente em 5 arquivos                |          5          |
+| P7  |  🟡 MÉDIO  | `CopilotClient` instanciado fora do wrapper                     |          2          |
+| P8  |  🟡 MÉDIO  | API routes usam features SDK não-wrapped                        |          2          |
+| P13 |  🟡 MÉDIO  | SystemMessage `customize` mode não utilizado                    |  config/system-\*   |
+| P14 |  🟡 MÉDIO  | Nenhum health check do CLI server                               |     agent/infra     |
+| P15 |  🟡 MÉDIO  | Sem verificação de autenticação no boot                         |     agent/boot      |
+| P16 |  🟡 MÉDIO  | Account quota não monitorada (operação 24/7)                    |    observability    |
+| P9  |  🟢 BAIXO  | `SYSTEM_PROMPT_SECTIONS` importado diretamente                  |          1          |
+| P10 |  🟢 BAIXO  | `core/sdk-types.js` duplica tipos já em hooks/types.js          |          2          |
+| P17 |  🟢 BAIXO  | `session.abort()` não exposto                                   |          —          |
+| P18 |  🟢 BAIXO  | `joinSession()` extension API ignorada                          |          —          |
 
 ---
 
@@ -741,21 +766,22 @@ A análise rev.4 revela que o problema é **significativamente maior** do que es
 4. **A transformação não é apenas de imports** — é uma **expansão massiva de funcionalidade**
 
 A proposta da PARTE-17B rev.4 deve:
-1. *(da rev.3)* Completar o wrapper com TODOS os símbolos SDK usados
-2. *(da rev.3)* Tornar o wrapper o ÚNICO ponto de acesso
-3. *(da rev.3)* Unificar configuração de sessão e registros
-4. *(da rev.3)* Consolidar tipos
+
+1. _(da rev.3)_ Completar o wrapper com TODOS os símbolos SDK usados
+2. _(da rev.3)_ Tornar o wrapper o ÚNICO ponto de acesso
+3. _(da rev.3)_ Unificar configuração de sessão e registros
+4. _(da rev.3)_ Consolidar tipos
 5. **(NOVO)** Expor todos os 17 subsistemas RPC via wrappers ergonômicos
 6. **(NOVO)** Tipar todos os 70+ event types com typed handlers
-7. **(NOVO)** Implementar novas features: auth checking, quota monitoring, health checks,
-   abort support, model switching, mode control, plan management
+7. **(NOVO)** Implementar novas features: auth checking, quota monitoring, health checks, abort
+   support, model switching, mode control, plan management
 8. **(NOVO)** Criar infraestrutura de extensibilidade para features experimentais do SDK
 
-**Estimativa revisada**: sdk/ precisa crescer de ~3.252 para **~5.500-6.500 linhas**.
-~50-60 arquivos precisam de mudanças. 15+ novos módulos/wrappers no sdk/.
+**Estimativa revisada**: sdk/ precisa crescer de ~3.252 para **~5.500-6.500 linhas**. ~50-60
+arquivos precisam de mudanças. 15+ novos módulos/wrappers no sdk/.
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.4. Base: leitura completa de 263 arquivos de
+_Documento gerado pela auditoria PARTE-17, rev.4. Base: leitura completa de 263 arquivos de
 src/copilot/ + leitura completa de 9 arquivos de type declarations do SDK oficial (4.498 linhas).
-Revisões anteriores preservadas em .rev2.md e .rev3.md.*
+Revisões anteriores preservadas em .rev2.md e .rev3.md._

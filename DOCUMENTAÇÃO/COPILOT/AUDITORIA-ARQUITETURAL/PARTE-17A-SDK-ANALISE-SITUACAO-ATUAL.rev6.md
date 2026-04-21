@@ -1,16 +1,16 @@
 # PARTE-17A — Análise Arquitetural Profunda: Situação Atual do SDK (rev.6)
 
-**Data**: 2026-10-10 (rev.6 — auditoria pós-conclusão das Faixas 43-50)
-**Escopo**: TODO `src/copilot/` (281 arquivos JS, ~51.142 linhas) + suíte de testes
-**SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado)
-**Autor**: Auditoria automatizada PARTE-17, rev.6
-**Base**: Rev.5 + resultados Faixas 43-50 do roadmap SDK Hardening
+**Data**: 2026-10-10 (rev.6 — auditoria pós-conclusão das Faixas 43-50) **Escopo**: TODO
+`src/copilot/` (281 arquivos JS, ~51.142 linhas) + suíte de testes **SDK oficial**:
+`@github/copilot-sdk@0.2.0` (instalado) **Autor**: Auditoria automatizada PARTE-17, rev.6 **Base**:
+Rev.5 + resultados Faixas 43-50 do roadmap SDK Hardening
 
 ---
 
 ## Sumário Executivo
 
-A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 faixas, 164 testes novos):
+A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 faixas, 164 testes
+novos):
 
 | Métrica                     |         Rev.5 |         Rev.6 |          Δ |
 | --------------------------- | ------------: | ------------: | ---------: |
@@ -29,7 +29,8 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 1. **F43** — Event handlers + history-sync: 25 testes (agent/session events, wirer, sync)
 2. **F44** — Hook-context + WebhookManager: 28 testes (mode-and-tools, hook lifecycle)
-3. **F45** — Data structures & metrics: 29 testes (histogram, ring-buffer, KNOWN_MODELS, stats-tracker)
+3. **F45** — Data structures & metrics: 29 testes (histogram, ring-buffer, KNOWN_MODELS,
+   stats-tracker)
 4. **F46** — Code-tools + permission-tools: 13 testes (DI bridge, lint_check real exec)
 5. **F47** — Custom-agents registry: 17 testes (CRUD, validation, SDK config builder)
 6. **F48** — Observability collectors: 18 testes (tool/assistant/interaction event handlers)
@@ -120,12 +121,12 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 ### 3.2 Áreas cobertas vs não-cobertas (estimativa)
 
-| Categoria                           |   Linhas |    % |
-| ----------------------------------- | -------: | ---: |
-| Com testes diretos (spec existente) | ~33.000L |  65% |
-| Cobertura indireta (via consumidor) |  ~8.000L |  16% |
-| Sem cobertura (testável)            |  ~6.000L |  12% |
-| Sem cobertura (typedef/shim/REPL)   |  ~4.000L |   7% |
+| Categoria                           |   Linhas |   % |
+| ----------------------------------- | -------: | --: |
+| Com testes diretos (spec existente) | ~33.000L | 65% |
+| Cobertura indireta (via consumidor) |  ~8.000L | 16% |
+| Sem cobertura (testável)            |  ~6.000L | 12% |
+| Sem cobertura (typedef/shim/REPL)   |  ~4.000L |  7% |
 
 ### 3.3 Próximos Passos Recomendados
 
@@ -136,6 +137,6 @@ A rev.6 atualiza os números após **conclusão integral das Faixas 43-50** (8 f
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.6. Base: 281 arquivos JS em `src/copilot/`,
-~186 specs, **4.496 testes passando**, 0 erros de typecheck. Continuação da rev.5.
-Revisões anteriores: rev1-rev5.*
+_Documento gerado pela auditoria PARTE-17, rev.6. Base: 281 arquivos JS em `src/copilot/`, ~186
+specs, **4.496 testes passando**, 0 erros de typecheck. Continuação da rev.5. Revisões anteriores:
+rev1-rev5._

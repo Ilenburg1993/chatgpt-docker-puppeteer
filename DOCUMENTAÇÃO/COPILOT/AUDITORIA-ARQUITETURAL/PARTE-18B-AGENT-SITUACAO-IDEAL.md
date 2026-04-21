@@ -1,7 +1,7 @@
 # PARTE-18B — Auditoria `src/copilot/agent/` — Situação Ideal
 
-> **Data**: 2026-06-28 | **Baseline**: PARTE-18A
-> **Objetivo**: Descrever o estado-alvo arquitetural do módulo agent após a resolução de todos os bugs, gaps e smells.
+> **Data**: 2026-06-28 | **Baseline**: PARTE-18A **Objetivo**: Descrever o estado-alvo arquitetural
+> do módulo agent após a resolução de todos os bugs, gaps e smells.
 
 ---
 
@@ -10,7 +10,8 @@
 1. **Zero sync I/O**: Todas as operações de arquivo e estado são async
 2. **Boundary discipline**: Agent importa apenas de `#copilot/{core,sdk,config,observability}`
 3. **Trace coverage**: Toda operação observável tem OTEL span
-4. **Single-purpose modules**: Nenhum arquivo > 400 linhas; cada módulo tem uma responsabilidade clara
+4. **Single-purpose modules**: Nenhum arquivo > 400 linhas; cada módulo tem uma responsabilidade
+   clara
 5. **Encapsulated state**: AgentContext expõe getters/setters com validação, não campos abertos
 6. **No deprecated paths**: APIs deprecated removidas ou desabilitadas em runtime
 
@@ -23,17 +24,20 @@
 **Atual**: `persistState()` sync (13 chamadas) + `writeStateAsync()` (11 chamadas) coexistem.
 
 **Ideal**:
+
 - `persistState()` removido — todo caller migrado para `writeStateAsync()`
 - `readState()` removido — todo caller migrado para `readStateAsync()`
 - `clearState()` removido — todo caller migrado para `clearStateAsync()` (já concluído)
 - Módulo `state-io.js` exporta apenas as versões async
-- Callers sync substituídos por fire-and-forget `void writeStateAsync(...)` onde não precisam de await
+- Callers sync substituídos por fire-and-forget `void writeStateAsync(...)` onde não precisam de
+  await
 
 ### 2.2 Snapshot
 
 **Atual**: 4 funções sync deprecated + 4 funções async. `loadLatestSnapshot()` está quebrada.
 
 **Ideal**:
+
 - Funções sync (`saveSnapshot`, `listSnapshots`, `loadSnapshot`, `pruneSnapshots`) removidas
 - `loadLatestSnapshot()` corrigido para usar `listSnapshotsAsync()`
 - Export barrel atualizado para expor apenas versões async
@@ -75,14 +79,17 @@ NÃO pode importar de:
 **Atual**: Agent puxa dados do ConversationStore e TerminalState.
 
 **Ideal**: `history-sync.js` recebe as dependências via callbacks registrados em `boot-wiring.js`:
+
 ```js
 // boot-wiring.js
 ctx.historySyncDeps = {
-    getConversationStore: () => conversationStore,
-    getHubSessionId: () => getHubSessionId(),
+  getConversationStore: () => conversationStore,
+  getHubSessionId: () => getHubSessionId(),
 };
 ```
-Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: quem possui o store faz o sync).
+
+Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: quem possui o store faz
+o sync).
 
 ---
 
@@ -102,9 +109,11 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 
 ### 4.2 Dialog Loop Duration
 
-**Atual**: `copilot.dialog.loop` span é criado no start mas endSpan não é chamado com atributos de métricas finais.
+**Atual**: `copilot.dialog.loop` span é criado no start mas endSpan não é chamado com atributos de
+métricas finais.
 
 **Ideal**: No stop/forceDeactivate, o span é encerrado com:
+
 - `totalTurns`
 - `totalDurationMs`
 - `prMetrics` (boots, resumes)
@@ -118,25 +127,29 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 
 **Atual**: Agent muda `ctx.model` mas não notifica o SDK via `setSessionModel()`.
 
-**Ideal**: `setRuntimeModel()` no agent chama `setSessionModel()` depois de atualizar `ctx.model`, garantindo que o servidor SDK reflete o modelo ativo.
+**Ideal**: `setRuntimeModel()` no agent chama `setSessionModel()` depois de atualizar `ctx.model`,
+garantindo que o servidor SDK reflete o modelo ativo.
 
 ### 5.2 `listAvailableModels()` — Model Discovery
 
 **Atual**: Fallback de modelo é estático (config env).
 
-**Ideal**: `ModelFallbackState.schedule()` consulta `listAvailableModels()` para validar que o modelo de fallback existe e está disponível antes de agendar.
+**Ideal**: `ModelFallbackState.schedule()` consulta `listAvailableModels()` para validar que o
+modelo de fallback existe e está disponível antes de agendar.
 
 ### 5.3 Feature Flags
 
 **Atual**: `sdk/feature-flags.js` exporta `isExperimentalEnabled()` mas agent nunca consulta.
 
-**Ideal**: `boot-wiring.js` consulta feature flags no início para habilitar/desabilitar capabilities experimentais (ex: handoff, multi-agent, snapshot_rewind).
+**Ideal**: `boot-wiring.js` consulta feature flags no início para habilitar/desabilitar capabilities
+experimentais (ex: handoff, multi-agent, snapshot_rewind).
 
 ### 5.4 Typed Event Filters
 
 **Atual**: Event handlers fazem `session.on('event.name', ...)` com strings manuais.
 
-**Ideal**: Usar `SESSION_EVENTS` constants do SDK em todos os handlers (parcialmente feito em compaction.js e streaming.js, mas não em sdk-responses.js).
+**Ideal**: Usar `SESSION_EVENTS` constants do SDK em todos os handlers (parcialmente feito em
+compaction.js e streaming.js, mas não em sdk-responses.js).
 
 ---
 
@@ -147,16 +160,19 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 **Atual**: 600 linhas com 5+ responsabilidades.
 
 **Ideal** (meta ≤ 400L):
+
 - **FSM + start/stop**: permanece em `loop-manager.js`
 - **Boot logic** (sendBoot, handleReady): já parcialmente em `turn-executor.js` — ampliar
 - **PR metrics tracking**: extrair para `dialog/pr-metrics.js` (~50L)
-- **Compaction handling** (`handleTokenBudget`, `resetCompactionFlag`): extrair para `dialog/compaction-handler.js` (~40L)
+- **Compaction handling** (`handleTokenBudget`, `resetCompactionFlag`): extrair para
+  `dialog/compaction-handler.js` (~40L)
 
 ### 6.2 `hook-context.js` — Redução de I/O
 
 **Atual**: Lê 4 fontes de I/O (briefing, session.json, skills, todos).
 
 **Ideal**:
+
 - TODO count removido (não é responsabilidade do system prompt do agent)
 - Skills loading via callback ou pre-cached no boot-wiring
 - Briefing e session.json consolidados num único read (ou cached com TTL)
@@ -165,18 +181,21 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 
 **Atual**: `answerPendingQuestion()` chama `resolveUserInput()` de `tools/hook-tools.js`.
 
-**Ideal**: Hook-tools registra um listener em `host.on('question.answered')` — o agent apenas emite o evento, hook-tools reage. Zero import cross-boundary.
+**Ideal**: Hook-tools registra um listener em `host.on('question.answered')` — o agent apenas emite
+o evento, hook-tools reage. Zero import cross-boundary.
 
 ---
 
 ## 7. Singleton Pattern
 
 ### 7.1 Estado Atual
+
 - `alwaysAliveAgent` instanciado no module scope (cold start)
 - `getAgent()` retorna a mesma instância
 - Consumers mistos (import direto vs `getAgent()`)
 
 ### 7.2 Estado Ideal
+
 - Instanciação lazy: `getAgent()` cria na primeira chamada (não no import)
 - Export nomeado apenas `getAgent()` (sem export default do singleton)
 - Consumers uniformizados para usar `getAgent()`
@@ -187,10 +206,12 @@ Ou melhor: mover `history-sync` para `conversation-hub/` (ownership correto: que
 ## 8. Metrics Double-Recording
 
 ### 8.1 Atual
+
 - `recordSessionRotation()` chamado em `rotation.js` (decisão) E `initializer.js` (execução)
 - Resulta em contagem duplicada
 
 ### 8.2 Ideal
+
 - Métrica emitida apenas no ponto de execução (`initializer.js`)
 - `rotation.js` retorna decisão pura sem side-effects de métricas
 - `shouldRotateSession()` é pure function

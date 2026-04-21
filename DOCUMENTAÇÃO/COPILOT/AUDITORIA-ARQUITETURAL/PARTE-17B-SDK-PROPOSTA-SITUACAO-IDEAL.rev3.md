@@ -1,8 +1,7 @@
 # PARTE-17B — Proposta de Situação Ideal: SDK Facade Centralizado
 
-**Data**: 2026-03-20 (rev.3 — transformação arquitetural completa)
-**Escopo**: TODO `src/copilot/` (263 arquivos, ~46.525 linhas)
-**Pré-requisito**: PARTE-17A rev.3 (análise de situação atual)
+**Data**: 2026-03-20 (rev.3 — transformação arquitetural completa) **Escopo**: TODO `src/copilot/`
+(263 arquivos, ~46.525 linhas) **Pré-requisito**: PARTE-17A rev.3 (análise de situação atual)
 **Autor**: Auditoria automatizada PARTE-17
 
 ---
@@ -10,11 +9,12 @@
 ## Sumário Executivo
 
 A proposta é transformar o módulo `sdk/` de um wrapper parcial (que cobre ~52% dos acessos ao SDK)
-em uma **SDK Facade completa** que seja o **ÚNICO** ponto de interação com `@github/copilot-sdk`
-em todo o `src/copilot/`. Isso resolve os 10 problemas identificados na PARTE-17A, elimina os
-20 pontos de bypass, e cria um contrato estável que isola o projeto de mudanças breaking no SDK.
+em uma **SDK Facade completa** que seja o **ÚNICO** ponto de interação com `@github/copilot-sdk` em
+todo o `src/copilot/`. Isso resolve os 10 problemas identificados na PARTE-17A, elimina os 20 pontos
+de bypass, e cria um contrato estável que isola o projeto de mudanças breaking no SDK.
 
 A transformação é feita em **3 camadas** concêntricas:
+
 1. **Core Facade** — re-exportar TODOS os símbolos SDK usados pelo projeto
 2. **Config Unification** — unificar os 3 caminhos de configuração em 1
 3. **Registry Merge** — unificar os 2 registros de sessão em 1
@@ -69,8 +69,10 @@ A transformação é feita em **3 camadas** concêntricas:
 ### 1.2 Princípios da Facade
 
 1. **Single Gateway**: Toda interação com `@github/copilot-sdk` passa por `sdk/`
-2. **Re-export First**: Símbolos simples (tipos, constantes, funções puras) são re-exportados sem wrapper lógico
-3. **Wrap When Needed**: Símbolos que requerem lógica adicional (singleton, telemetria, registry) são wrapped
+2. **Re-export First**: Símbolos simples (tipos, constantes, funções puras) são re-exportados sem
+   wrapper lógico
+3. **Wrap When Needed**: Símbolos que requerem lógica adicional (singleton, telemetria, registry)
+   são wrapped
 4. **Lint Enforcement**: ESLint rule proíbe `from '@github/copilot-sdk'` fora de `src/copilot/sdk/`
 5. **Type Consolidation**: Um único `sdk/types.js` como fonte canônica de tipos SDK
 
@@ -89,6 +91,7 @@ export { buildTool, withSkipPermission } from '#copilot/tools/tool-factory';
 ```
 
 **Motivação**: Centralizar o acesso a `defineTool` permite:
+
 - Trocar por uma implementação instrumentada no futuro
 - Aplicar políticas globais (logging obrigatório, rate limit)
 - Manter um único import path para todos os tools files
@@ -99,11 +102,11 @@ export { buildTool, withSkipPermission } from '#copilot/tools/tool-factory';
 // sdk/permissions.js — Re-exporta approveAll e presets de permissão
 export { approveAll } from '@github/copilot-sdk';
 export {
-    createPermissionHandler,
-    createApproveAllPermission,
-    createAuditOnlyPermission,
-    createRestrictedPermission,
-    createSafePermission,
+  createPermissionHandler,
+  createApproveAllPermission,
+  createAuditOnlyPermission,
+  createRestrictedPermission,
+  createSafePermission,
 } from '#copilot/hooks/permission';
 ```
 
@@ -142,7 +145,8 @@ Fonte canônica única para TODOS os tipos SDK usados no projeto:
 export {};
 ```
 
-**Migração**: `core/sdk-types.js` será deprecated (re-exporta de `sdk/types.js`). Tipos que `hooks/types.js` define em paralelo ao SDK serão gradualmente realinhados.
+**Migração**: `core/sdk-types.js` será deprecated (re-exporta de `sdk/types.js`). Tipos que
+`hooks/types.js` define em paralelo ao SDK serão gradualmente realinhados.
 
 ### 2.5 `sdk/config.js` (NOVO — Unified Session Config Builder, ~200 linhas)
 
@@ -152,11 +156,11 @@ O config builder unificado que substitui os 3 caminhos atuais:
 /**
  * sdk/config.js — Unified Session Config Builder
  *
- * ÚNICO ponto de construção de SessionConfig para todo o src/copilot/.
- * Substitui:
- *   - sdk/session.js::buildSessionConfig() (removido)
- *   - config/session-config.js::buildAlwaysAliveConfig() (deprecated)
- *   - agent/session/initializer.js config manual (migrado para usar este)
+ * ÚNICO ponto de construção de SessionConfig para todo o src/copilot/. Substitui:
+ *
+ * - sdk/session.js::buildSessionConfig() (removido)
+ * - config/session-config.js::buildAlwaysAliveConfig() (deprecated)
+ * - agent/session/initializer.js config manual (migrado para usar este)
  */
 
 /**
@@ -176,7 +180,7 @@ O config builder unificado que substitui os 3 caminhos atuais:
  * @property {import('@github/copilot-sdk').SystemMessageConfig} [systemMessage]
  * @property {import('@github/copilot-sdk').PermissionHandler} [onPermissionRequest]
  * @property {Function} [onUserInputRequest]
- * @property {'low'|'medium'|'high'|'xhigh'} [reasoningEffort]
+ * @property {'low' | 'medium' | 'high' | 'xhigh'} [reasoningEffort]
  * @property {boolean} [disableResume]
  * @property {Function} [onEvent]
  * @property {Function} [onElicitationRequest]
@@ -190,26 +194,25 @@ O config builder unificado que substitui os 3 caminhos atuais:
  * Presets de configuração reutilizáveis.
  */
 export const CONFIG_PRESETS = {
-    DEFAULTS: {
-        streaming: true,
-        infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
-    },
-    EXCLUDED_TOOLS_DEFAULT: ['powershell', 'web_fetch', 'web_search', 'memory'],
-    SKILL_DIRECTORIES_DEFAULT: ['.github/skills'],
-    WORKING_DIRECTORY_DEFAULT: '/workspaces/chatgpt-docker-puppeteer',
+  DEFAULTS: {
+    streaming: true,
+    infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.75 },
+  },
+  EXCLUDED_TOOLS_DEFAULT: ['powershell', 'web_fetch', 'web_search', 'memory'],
+  SKILL_DIRECTORIES_DEFAULT: ['.github/skills'],
+  WORKING_DIRECTORY_DEFAULT: '/workspaces/chatgpt-docker-puppeteer',
 };
 
 /**
- * Constrói SessionConfig completa com defaults canônicos.
- * TODOS os campos suportados pelo SDK são aceitos.
+ * Constrói SessionConfig completa com defaults canônicos. TODOS os campos suportados pelo SDK são aceitos.
  *
  * @param {UnifiedSessionConfigOptions} opts
- * @param {'create' | 'resume'} [mode='create']
+ * @param {'create' | 'resume'} [mode='create'] Default is `'create'`
  * @returns {import('@github/copilot-sdk').SessionConfig}
  */
 export function buildUnifiedSessionConfig(opts, mode = 'create') {
-    // ... merge opts com DEFAULTS, aplicar excludedTools/availableTools,
-    // ... adicionar skillDirectories, workingDirectory, etc.
+  // ... merge opts com DEFAULTS, aplicar excludedTools/availableTools,
+  // ... adicionar skillDirectories, workingDirectory, etc.
 }
 ```
 
@@ -248,13 +251,13 @@ const _sessions = new Map(); // já existe
 
 // Nova função: registerExternalSession()
 export function registerExternalSession(session, meta = {}) {
-    _sessions.set(session.sessionId, {
-        session,
-        model: meta.model ?? 'unknown',
-        createdAt: Date.now(),
-        messagesCount: 0,
-        source: meta.source ?? 'external', // 'agent' | 'api' | 'external'
-    });
+  _sessions.set(session.sessionId, {
+    session,
+    model: meta.model ?? 'unknown',
+    createdAt: Date.now(),
+    messagesCount: 0,
+    source: meta.source ?? 'external', // 'agent' | 'api' | 'external'
+  });
 }
 
 // Atualizar resumeOrCreate em sdk/session.js para chamar registerExternalSession()
@@ -297,28 +300,28 @@ CopilotClient ─────┤                                             UNI
 
 // Agent (AlwaysAlive) — config completo com hooks, tools, skills, MCP
 const agentConfig = buildUnifiedSessionConfig({
-    model: 'gpt-4.1',
-    preset: 'always-alive', // aplica defaults: skills, excludedTools, infiniteSessions
-    hooks: busHooks,
-    tools: bootstrappedTools,
-    mcpServers: buildMcpConfig(),
-    onPermissionRequest: auditingHandler,
-    onUserInputRequest: dialogHandler,
-    systemMessage: hookContextMessage,
-    customAgents: buildCustomAgentsConfig(),
+  model: 'gpt-4.1',
+  preset: 'always-alive', // aplica defaults: skills, excludedTools, infiniteSessions
+  hooks: busHooks,
+  tools: bootstrappedTools,
+  mcpServers: buildMcpConfig(),
+  onPermissionRequest: auditingHandler,
+  onUserInputRequest: dialogHandler,
+  systemMessage: hookContextMessage,
+  customAgents: buildCustomAgentsConfig(),
 });
 
 // API (sessão avulsa) — config mínimo com defaults de segurança
 const apiConfig = buildUnifiedSessionConfig({
-    model: 'claude-sonnet-4-5',
-    preset: 'api-default', // aplica: approveAll, streaming, infiniteSessions
-    ...userProvidedFields,
+  model: 'claude-sonnet-4-5',
+  preset: 'api-default', // aplica: approveAll, streaming, infiniteSessions
+  ...userProvidedFields,
 });
 
 // Read-Only (diagnóstico) — sem tools de escrita
 const readOnlyConfig = buildUnifiedSessionConfig({
-    model: 'gpt-4o-mini',
-    preset: 'read-only',
+  model: 'gpt-4o-mini',
+  preset: 'read-only',
 });
 ```
 
@@ -361,7 +364,8 @@ Inline @typedef em 30+ files → Importa de sdk/types.js via barrel
 + import { defineTool } from '#copilot/sdk/tools';
 ```
 
-**Opção progressiva**: Migrar para `buildTool` em vez de `defineTool` para ganhar logging automático.
+**Opção progressiva**: Migrar para `buildTool` em vez de `defineTool` para ganhar logging
+automático.
 
 ### 6.2 `approveAll` (5 arquivos → sdk/permissions.js)
 
@@ -381,10 +385,11 @@ Inline @typedef em 30+ files → Importa de sdk/types.js via barrel
 ```
 
 Nova função no wrapper:
+
 ```javascript
 // sdk/client.js — adicionar:
 export function createClient(options = {}) {
-    return new CopilotClient(options);
+  return new CopilotClient(options);
 }
 ```
 
@@ -397,7 +402,9 @@ export function createClient(options = {}) {
 
 ### 6.5 Tipos (15+ arquivos → sdk/types.js)
 
-Tipos JSDoc podem continuar referenciando `@github/copilot-sdk` em comentários (já que não geram runtime import), mas para consistência e facilidade de manutenção, recomendamos migrar para `sdk/types.js`.
+Tipos JSDoc podem continuar referenciando `@github/copilot-sdk` em comentários (já que não geram
+runtime import), mas para consistência e facilidade de manutenção, recomendamos migrar para
+`sdk/types.js`.
 
 ---
 
@@ -481,6 +488,7 @@ export { ...pinnedFiles } from './pinned-files.js';
 ### 9.1 Estratégia
 
 O `hooks/types.js` define ~30 tipos. Destes:
+
 - **12 são re-definições paralelas** de tipos SDK (SessionHooks, PreToolUseHandler, etc.)
 - **18 são tipos próprios** do projeto (HookBus, HookBusEvent, HookSchema, AuditEntry, etc.)
 
@@ -494,7 +502,9 @@ O `hooks/types.js` define ~30 tipos. Destes:
 + /** @typedef {import('#copilot/sdk/types').SessionHooks} SessionHooks */
 ```
 
-Nota: Se o SDK NÃO exporta `SessionHooks` como tipo (apenas como interface), mantemos a definição local mas adicionamos validação:
+Nota: Se o SDK NÃO exporta `SessionHooks` como tipo (apenas como interface), mantemos a definição
+local mas adicionamos validação:
+
 ```javascript
 /** @type {SessionHooks extends import('@github/copilot-sdk').SessionConfig['hooks'] ? true : false} */
 const _typeCheck = true;
@@ -506,10 +516,14 @@ const _typeCheck = true;
 
 ## §10. Impacto na Observability (§6.5 da 17A)
 
-A observability layer (`defaultEventCollector.attach()`, `wrapWithStats()`) opera diretamente sobre objetos `CopilotSession`. Isso NÃO precisa mudar — eles recebem o session object como parâmetro, não importam do SDK.
+A observability layer (`defaultEventCollector.attach()`, `wrapWithStats()`) opera diretamente sobre
+objetos `CopilotSession`. Isso NÃO precisa mudar — eles recebem o session object como parâmetro, não
+importam do SDK.
 
 A única mudança necessária é:
-- `buildTelemetryConfig()` → atualmente importa tipos do SDK inline. Migrar typedefs para `sdk/types.js`.
+
+- `buildTelemetryConfig()` → atualmente importa tipos do SDK inline. Migrar typedefs para
+  `sdk/types.js`.
 
 ---
 
@@ -538,7 +552,8 @@ A única mudança necessária é:
 
 ## §12. Impacto no Channel / Terminal / Hub
 
-Estes módulos **NÃO importam diretamente do SDK** — acessam o sdk via agent ou via API. Não requerem mudanças na migração de imports.
+Estes módulos **NÃO importam diretamente do SDK** — acessam o sdk via agent ou via API. Não requerem
+mudanças na migração de imports.
 
 ---
 
@@ -558,7 +573,7 @@ Estes módulos **NÃO importam diretamente do SDK** — acessam o sdk via agent 
 
 | Categoria                 | Arquivos | Mudança Principal                                  |
 | ------------------------- | -------: | -------------------------------------------------- |
-| tools/*.js                |       11 | `defineTool` → `#copilot/sdk/tools`                |
+| tools/\*.js               |       11 | `defineTool` → `#copilot/sdk/tools`                |
 | 5 arquivos com approveAll |        5 | `approveAll` → `#copilot/sdk/permissions`          |
 | agent lifecycle           |        3 | `CopilotClient` → `sdk/client`, config unification |
 | config/index.js           |        1 | Remover re-exports de sdk/                         |
@@ -599,10 +614,11 @@ Estes módulos **NÃO importam diretamente do SDK** — acessam o sdk via agent 
 | --------------------------------------------------- | :-----------: | ------------------------------------------------------------- |
 | Breaking changes no import refactor                 |     Alta      | Testes unitários existentes (3.101) validam cada mudança      |
 | Regressão na criação de sessão (config unification) |     Média     | Testes de integração + comparação field-by-field antes/depois |
-| SDK update quebra facade                            |     Baixa     | Facade isola — apenas sdk/*.js precisa mudar                  |
+| SDK update quebra facade                            |     Baixa     | Facade isola — apenas sdk/\*.js precisa mudar                 |
 | Consumidores external de `core/sdk-types.js`        |     Baixa     | Deprecated com re-export — backward compat total              |
 | Performance impact (re-export layers)               |     Nula      | ESM tree-shaking; re-exports são zero-cost em runtime         |
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.3. Proposta de situação ideal para SDK Facade centralizado.*
+_Documento gerado pela auditoria PARTE-17, rev.3. Proposta de situação ideal para SDK Facade
+centralizado._

@@ -1,10 +1,8 @@
 # PARTE-24E — CONSOLIDAÇÃO BOOTSTRAP & INTEGRAÇÃO PROFUNDA
 
-> **Documento**: PARTE-24E-CONSOLIDACAO-BOOTSTRAP.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Consolidação dos entry points, unificação do boot, integração robusta com server/pm2/terminal
-> **Pré-requisito**: PARTE-24A/B/C/D + Ondas 1-2 concluídas
+> **Documento**: PARTE-24E-CONSOLIDACAO-BOOTSTRAP.md **Versão**: 1.0 **Data**: 2026-04-12
+> **Escopo**: Consolidação dos entry points, unificação do boot, integração robusta com
+> server/pm2/terminal **Pré-requisito**: PARTE-24A/B/C/D + Ondas 1-2 concluídas
 
 ---
 
@@ -12,25 +10,25 @@
 
 ### 1.1. Conquistas
 
-| Conquista | Status |
-|-----------|--------|
-| Zero imports `#core/` em src/copilot/ | ✅ |
-| `bootstrap.js` canônico criado | ✅ |
-| `terminal/bootstrap.js` thin criado | ✅ |
-| `server/main.js` chama `bootCopilot` antes do wiring | ✅ |
-| Smoke test de autonomia | ✅ |
+| Conquista                                            | Status |
+| ---------------------------------------------------- | ------ |
+| Zero imports `#core/` em src/copilot/                | ✅     |
+| `bootstrap.js` canônico criado                       | ✅     |
+| `terminal/bootstrap.js` thin criado                  | ✅     |
+| `server/main.js` chama `bootCopilot` antes do wiring | ✅     |
+| Smoke test de autonomia                              | ✅     |
 
 ### 1.2. Problemas Remanescentes (Boot & Integração)
 
-| # | Problema | Gravidade | Localização |
-|---|---------|-----------|-------------|
-| B1 | **PM2 `copilot-sdk-agent` aponta para `src/copilot/agent.js` — ARQUIVO INEXISTENTE** | 🔴 CRÍTICO | ecosystem.config.cjs:411 |
-| B2 | **`agent/lifecycle/entry.js` (250 LOC) duplica boot completo** — bootstrapObservability(), bootstrapLateDeps(), setAuditBus(), DI registers, event wiring, tudo inline | 🔴 ALTO | agent/lifecycle/entry.js |
-| B3 | **`server/main.js` faz 70 LOC de wiring copilot inline** — NERV bridge, ConversationHub, AlwaysAliveAgent autostart, tudo com dynamic imports | 🟡 MÉDIO | server/main.js:732-810 |
-| B4 | **`bootstrap.js` atual é minimal** — chama `bootstrapObservability()` e delega, mas não faz DI Module registration completo | 🟡 MÉDIO | bootstrap.js |
-| B5 | **3 entry points com boot parcial/duplicado** — terminal usa bootstrap.js, server usa inline, PM2 usa entry.js | 🔴 ALTO | multi |
-| B6 | **`observability/bootstrap.js` chamada em 2 locais** — entry.js e bootstrap.js, sem idempotency guard | 🟡 MÉDIO | observability/bootstrap.js |
-| B7 | **Terminal `startTerminalServer()` faz 120+ LOC de DI wiring** — container.register(), wireLegacySetters(), PinnedFilesLoader, etc. | 🟡 MÉDIO | terminal/index.js |
+| #   | Problema                                                                                                                                                               | Gravidade  | Localização                |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------- |
+| B1  | **PM2 `copilot-sdk-agent` aponta para `src/copilot/agent.js` — ARQUIVO INEXISTENTE**                                                                                   | 🔴 CRÍTICO | ecosystem.config.cjs:411   |
+| B2  | **`agent/lifecycle/entry.js` (250 LOC) duplica boot completo** — bootstrapObservability(), bootstrapLateDeps(), setAuditBus(), DI registers, event wiring, tudo inline | 🔴 ALTO    | agent/lifecycle/entry.js   |
+| B3  | **`server/main.js` faz 70 LOC de wiring copilot inline** — NERV bridge, ConversationHub, AlwaysAliveAgent autostart, tudo com dynamic imports                          | 🟡 MÉDIO   | server/main.js:732-810     |
+| B4  | **`bootstrap.js` atual é minimal** — chama `bootstrapObservability()` e delega, mas não faz DI Module registration completo                                            | 🟡 MÉDIO   | bootstrap.js               |
+| B5  | **3 entry points com boot parcial/duplicado** — terminal usa bootstrap.js, server usa inline, PM2 usa entry.js                                                         | 🔴 ALTO    | multi                      |
+| B6  | **`observability/bootstrap.js` chamada em 2 locais** — entry.js e bootstrap.js, sem idempotency guard                                                                  | 🟡 MÉDIO   | observability/bootstrap.js |
+| B7  | **Terminal `startTerminalServer()` faz 120+ LOC de DI wiring** — container.register(), wireLegacySetters(), PinnedFilesLoader, etc.                                    | 🟡 MÉDIO   | terminal/index.js          |
 
 ### 1.3. Mapa Atual de Entry Points
 
@@ -85,11 +83,11 @@
 
 ### 2.2. Modos de Boot
 
-| Modo | Caller | Entry Point Thin | O que bootstrap.js faz |
-|------|--------|-----------------|----------------------|
-| `terminal` | `npm run terminal:llm-b` | `terminal/bootstrap.js` (3 LOC) | L0-L2 DI + startTerminalServer() |
-| `server` | `src/server/main.js` | inline `await bootCopilot()` | L0-L2 DI + retorna (server faz wiring NERV/socket) |
-| `agent` | PM2 `copilot-sdk-agent` | `src/copilot/agent.js` (3 LOC) | L0-L2 DI + agent lifecycle loop |
+| Modo       | Caller                   | Entry Point Thin                | O que bootstrap.js faz                             |
+| ---------- | ------------------------ | ------------------------------- | -------------------------------------------------- |
+| `terminal` | `npm run terminal:llm-b` | `terminal/bootstrap.js` (3 LOC) | L0-L2 DI + startTerminalServer()                   |
+| `server`   | `src/server/main.js`     | inline `await bootCopilot()`    | L0-L2 DI + retorna (server faz wiring NERV/socket) |
+| `agent`    | PM2 `copilot-sdk-agent`  | `src/copilot/agent.js` (3 LOC)  | L0-L2 DI + agent lifecycle loop                    |
 
 ### 2.3. Camadas de Boot (Sequential)
 
@@ -124,12 +122,12 @@ BOOT SEQUENCE (todas as modes):
 let _booted = false;
 
 export async function bootCopilot({ mode }) {
-    if (_booted) {
-        log('WARN', '[bootstrap] bootCopilot já executado — ignorando chamada duplicada.');
-        return;
-    }
-    _booted = true;
-    // ... boot sequence
+  if (_booted) {
+    log('WARN', '[bootstrap] bootCopilot já executado — ignorando chamada duplicada.');
+    return;
+  }
+  _booted = true;
+  // ... boot sequence
 }
 ```
 
@@ -148,9 +146,9 @@ export async function bootCopilot({ mode }) {
 ```js
 // @ts-check
 import { bootCopilot } from './bootstrap.js';
-bootCopilot({ mode: 'agent' }).catch(err => {
-    console.error('[agent] Fatal:', err);
-    process.exitCode = 1;
+bootCopilot({ mode: 'agent' }).catch((err) => {
+  console.error('[agent] Fatal:', err);
+  process.exitCode = 1;
 });
 ```
 
@@ -158,56 +156,62 @@ bootCopilot({ mode: 'agent' }).catch(err => {
 
 #### L53.2 — Expandir `bootstrap.js` com Phase 0-2
 
-**O que**: `bootCopilot()` executa L0 (kernel) + L1 (observability) + L2 (late deps) antes de delegar.
+**O que**: `bootCopilot()` executa L0 (kernel) + L1 (observability) + L2 (late deps) antes de
+delegar.
 
 ```js
 export async function bootCopilot({ mode }) {
-    if (_booted) return;
-    _booted = true;
+  if (_booted) return;
+  _booted = true;
 
-    // Phase 0: kernel — container já existe via module singletons
-    log('INFO', `[bootstrap] mode=${mode}`);
+  // Phase 0: kernel — container já existe via module singletons
+  log('INFO', `[bootstrap] mode=${mode}`);
 
-    // Phase 1: observability (idempotente)
-    bootstrapObservability();
+  // Phase 1: observability (idempotente)
+  bootstrapObservability();
 
-    // Phase 2: late deps (tools, audit bus)
-    const { buildTool } = await import('./tools/index.js');
-    const { defaultBus } = await import('./hooks/index.js');
-    bootstrapLateDeps({ buildTool });
-    container.register(AUDIT_BUS, () => defaultBus, 'singleton');
-    const { setAuditBus } = await import('./audit/index.js');
-    setAuditBus(defaultBus);
+  // Phase 2: late deps (tools, audit bus)
+  const { buildTool } = await import('./tools/index.js');
+  const { defaultBus } = await import('./hooks/index.js');
+  bootstrapLateDeps({ buildTool });
+  container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+  const { setAuditBus } = await import('./audit/index.js');
+  setAuditBus(defaultBus);
 
-    // Phase 3: mode-specific
-    if (mode === 'terminal') {
-        const { startTerminalServer } = await import('./terminal/index.js');
-        await startTerminalServer();
-    } else if (mode === 'agent') {
-        const { startAgentLoop } = await import('./agent/lifecycle/entry.js');
-        await startAgentLoop();
-    }
-    // mode='server': noop — caller (server/main.js) faz wiring NERV/socket
+  // Phase 3: mode-specific
+  if (mode === 'terminal') {
+    const { startTerminalServer } = await import('./terminal/index.js');
+    await startTerminalServer();
+  } else if (mode === 'agent') {
+    const { startAgentLoop } = await import('./agent/lifecycle/entry.js');
+    await startAgentLoop();
+  }
+  // mode='server': noop — caller (server/main.js) faz wiring NERV/socket
 }
 ```
 
-**Acceptance**: Typecheck clean. `node src/copilot/bootstrap.js` (sem args) falha graciosamente com erro claro.
+**Acceptance**: Typecheck clean. `node src/copilot/bootstrap.js` (sem args) falha graciosamente com
+erro claro.
 
 #### L53.3 — Refatorar `agent/lifecycle/entry.js` → exportar `startAgentLoop()`
 
-**O que**: entry.js perde o boot inline (bootstrapObservability, AUDIT_BUS, etc.) — agora é executado via bootstrap.js. Exports `startAgentLoop()` que faz apenas o lifecycle do agent (event wiring, retries, shutdown).
+**O que**: entry.js perde o boot inline (bootstrapObservability, AUDIT_BUS, etc.) — agora é
+executado via bootstrap.js. Exports `startAgentLoop()` que faz apenas o lifecycle do agent (event
+wiring, retries, shutdown).
 
 **Acceptance**: entry.js < 200 LOC. Zero bootstrapObservability() chamado inline.
 
 #### L53.4 — Idempotency guard em `observability/bootstrap.js`
 
-**O que**: Adicionar `if (_booted) return;` em `bootstrapObservability()` para que chamadas duplicadas sejam seguras.
+**O que**: Adicionar `if (_booted) return;` em `bootstrapObservability()` para que chamadas
+duplicadas sejam seguras.
 
 **Acceptance**: Chamar 2x não causa side-effects nem throws.
 
 #### L53.5 — Mover DI wiring de `terminal/index.js` para helpers
 
-**O que**: Os 30 LOC de `container.register()` + `wireLegacySetters()` em `startTerminalServer()` devem ficar em `terminal/di-wiring.js` (extracted helper).
+**O que**: Os 30 LOC de `container.register()` + `wireLegacySetters()` em `startTerminalServer()`
+devem ficar em `terminal/di-wiring.js` (extracted helper).
 
 **Acceptance**: `startTerminalServer()` < 180 LOC.
 
@@ -218,6 +222,7 @@ export async function bootCopilot({ mode }) {
 #### L53.7 — Smoke test dos 3 modos de boot
 
 **O que**: Expandir `check-copilot-autonomy.mjs` ou criar novo script que verifica:
+
 1. `src/copilot/agent.js` existe
 2. `src/copilot/terminal/bootstrap.js` existe
 3. `src/copilot/bootstrap.js` exporta `bootCopilot`
@@ -233,7 +238,7 @@ export async function bootCopilot({ mode }) {
 // Futuro: módulos se auto-registram via plugin pattern
 const modules = await discoverModules('./src/copilot/*/module.js');
 for (const mod of modules) {
-    await mod.register(container);
+  await mod.register(container);
 }
 ```
 
@@ -242,10 +247,10 @@ for (const mod of modules) {
 ```js
 // Futuro: boot com health checks
 await bootCopilot({
-    mode: 'server',
-    healthChecks: true,        // registra GET /health
-    metricsEndpoint: true,     // registra GET /metrics
-    gracefulShutdown: true,    // registra SIGTERM/SIGINT
+  mode: 'server',
+  healthChecks: true, // registra GET /health
+  metricsEndpoint: true, // registra GET /metrics
+  gracefulShutdown: true, // registra SIGTERM/SIGINT
 });
 ```
 
@@ -258,7 +263,8 @@ pm2 start ecosystem.config.cjs
   └─ llm-b-terminal (mode=terminal) → REPL + inject server
 ```
 
-Cada processo chama `bootCopilot()` com seu modo. O DI container é per-process (não shared). A comunicação inter-processo é via NERV/EventBus/HTTP, não via imports.
+Cada processo chama `bootCopilot()` com seu modo. O DI container é per-process (não shared). A
+comunicação inter-processo é via NERV/EventBus/HTTP, não via imports.
 
 ### 4.4. Container Scoping
 
@@ -274,10 +280,10 @@ agentScope.register(SESSION, () => new Session());
 ```js
 // Futuro: lifecycle hooks para observabilidade do boot
 bootCopilot({
-    mode: 'terminal',
-    onPhaseComplete: (phase, duration) => {
-        metrics.record('boot.phase', { phase, ms: duration });
-    },
+  mode: 'terminal',
+  onPhaseComplete: (phase, duration) => {
+    metrics.record('boot.phase', { phase, ms: duration });
+  },
 });
 ```
 
@@ -287,43 +293,43 @@ bootCopilot({
 
 ### Integração com Ondas 3-6
 
-| Onda | Impacto da consolidação |
-|------|------------------------|
-| **Onda 3** (Cycle Elimination) | Ciclo `config↔observability` mais fácil de quebrar com boot sequencial garantido |
-| **Onda 4** (God Module Decomp) | `entry.js` (250 LOC) encolhe para <200 LOC como efeito colateral |
-| **Onda 5** (Boot & Wiring) | L71-L73 ficam mais simples — bootstrap.js já é o single path. DI Module pattern se conecta naturalmente |
-| **Onda 6** (Test & Polish) | Smoke test de boot (L76) fica trivial com 3 modos testáveis |
+| Onda                           | Impacto da consolidação                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| **Onda 3** (Cycle Elimination) | Ciclo `config↔observability` mais fácil de quebrar com boot sequencial garantido                        |
+| **Onda 4** (God Module Decomp) | `entry.js` (250 LOC) encolhe para <200 LOC como efeito colateral                                        |
+| **Onda 5** (Boot & Wiring)     | L71-L73 ficam mais simples — bootstrap.js já é o single path. DI Module pattern se conecta naturalmente |
+| **Onda 6** (Test & Polish)     | Smoke test de boot (L76) fica trivial com 3 modos testáveis                                             |
 
 ### Novas Faixas Inseridas (L53.1–L53.7)
 
 Estas faixas ficam na **Onda 2.5** (entre Onda 2 e Onda 3).
 
-| Faixa | Nome | Prioridade | Módulos |
-|-------|------|-----------|---------|
-| L53.1 | Criar `src/copilot/agent.js` (PM2 thin) | P0 | copilot root |
-| L53.2 | Expandir bootstrap.js com Phase 0-2 | P0 | bootstrap |
-| L53.3 | Refatorar entry.js → exports startAgentLoop | P0 | agent/lifecycle |
-| L53.4 | Idempotency guard em observability/bootstrap | P1 | observability |
-| L53.5 | Extrair DI wiring de terminal/index.js | P1 | terminal |
-| L53.6 | Documentar boot sequence | P2 | docs |
-| L53.7 | Smoke test 3 modos de boot | P1 | tests |
+| Faixa | Nome                                         | Prioridade | Módulos         |
+| ----- | -------------------------------------------- | ---------- | --------------- |
+| L53.1 | Criar `src/copilot/agent.js` (PM2 thin)      | P0         | copilot root    |
+| L53.2 | Expandir bootstrap.js com Phase 0-2          | P0         | bootstrap       |
+| L53.3 | Refatorar entry.js → exports startAgentLoop  | P0         | agent/lifecycle |
+| L53.4 | Idempotency guard em observability/bootstrap | P1         | observability   |
+| L53.5 | Extrair DI wiring de terminal/index.js       | P1         | terminal        |
+| L53.6 | Documentar boot sequence                     | P2         | docs            |
+| L53.7 | Smoke test 3 modos de boot                   | P1         | tests           |
 
 ---
 
 ## 6. Score Projetado
 
-| Métrica | Pós-Onda 2 | Pós-Onda 2.5 |
-|---------|-----------|--------------|
-| Entry points duplicados | 3 (parcial) | **1 canônico** |
-| PM2 broken entries | 1 | **0** |
-| Boot code duplication | ~250 LOC | **<30 LOC** |
-| Idempotency guards | 0 | **2** (bootstrap + obs) |
-| Score global | 6.8 | **7.0** |
+| Métrica                 | Pós-Onda 2  | Pós-Onda 2.5            |
+| ----------------------- | ----------- | ----------------------- |
+| Entry points duplicados | 3 (parcial) | **1 canônico**          |
+| PM2 broken entries      | 1           | **0**                   |
+| Boot code duplication   | ~250 LOC    | **<30 LOC**             |
+| Idempotency guards      | 0           | **2** (bootstrap + obs) |
+| Score global            | 6.8         | **7.0**                 |
 
 ---
 
 ## 7. Changelog
 
-| Versão | Data | Mudanças |
-|--------|------|---------|
-| 1.0 | 2026-04-12 | Diagnóstico pós-Onda 2, proposta de Onda 2.5 |
+| Versão | Data       | Mudanças                                     |
+| ------ | ---------- | -------------------------------------------- |
+| 1.0    | 2026-04-12 | Diagnóstico pós-Onda 2, proposta de Onda 2.5 |

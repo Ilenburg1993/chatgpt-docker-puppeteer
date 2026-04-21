@@ -1,8 +1,8 @@
 # PARTE-22E — Critérios e Métricas: Definição Rigorosa de "Pronto"
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Definição formal de critérios de conclusão para cada dimensão arquitetural
-**Princípio**: Cada critério é verificável por script ou ferramenta — sem avaliação subjetiva
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Definição formal de
+critérios de conclusão para cada dimensão arquitetural **Princípio**: Cada critério é verificável
+por script ou ferramenta — sem avaliação subjetiva
 
 ---
 
@@ -22,9 +22,10 @@
 
 ### 1.2 Regra Primeira: Nunca Calibrar Critérios Para Cima
 
-> Uma métrica só pode ser recalibrada para ser **mais exigente**, nunca mais leniente.
-> Se um critério foi relaxado no passado (ex.: fan-out via exclusão de intra-módulo), isso é legítimo
-> SE corrigiu uma imprecisão de medição — mas NÃO se foi feito para inflar o score sem realizar trabalho.
+> Uma métrica só pode ser recalibrada para ser **mais exigente**, nunca mais leniente. Se um
+> critério foi relaxado no passado (ex.: fan-out via exclusão de intra-módulo), isso é legítimo SE
+> corrigiu uma imprecisão de medição — mas NÃO se foi feito para inflar o score sem realizar
+> trabalho.
 
 ---
 
@@ -32,19 +33,20 @@
 
 ### 2.1 CRITÉRIO C1 — Tamanho de Arquivo
 
-**Métrica:** Contagem de LoC de lógica por arquivo (`*.js` em `src/copilot/`)
-**Threshold:** `0` arquivos com **LoC > 250** (exceto tipos puros e barrels)
+**Métrica:** Contagem de LoC de lógica por arquivo (`*.js` em `src/copilot/`) **Threshold:** `0`
+arquivos com **LoC > 250** (exceto tipos puros e barrels)
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 # Verifica god files — falha se houver arquivo de lógica >250 LoC
 VIOLATIONS=0
 for file in $(find src/copilot -name "*.js" \
-    ! -name "index.js" \
-    ! -name "types.js" \
-    ! -name "*.test.js" \
-    ! -name "constants.js"); do
+  ! -name "index.js" \
+  ! -name "types.js" \
+  ! -name "*.test.js" \
+  ! -name "constants.js"); do
   LOC=$(wc -l < "$file")
   if [ "$LOC" -gt 250 ]; then
     echo "VIOLATION: $file has $LOC LoC (max 250)"
@@ -55,57 +57,64 @@ exit $VIOLATIONS
 ```
 
 **Exceções permitidas (documentadas):**
+
 - `sdk/types.js` — typedefs puros (≤600 LoC aceito)
 - `*/index.js` combarrel > 250 — só re-exports, sem lógica
 - `*/constants.js` — constantes puras
 
-**Estado atual:** 17 violações
-**Estado target:** 0 violações
+**Estado atual:** 17 violações **Estado target:** 0 violações
 
 ---
 
 ### 2.2 CRITÉRIO C2 — Zero EventEmitter Direto
 
-**Métrica:** Contagem de arquivos com `new EventEmitter()` ou `extends EventEmitter`
-**Threshold:** `0` arquivos
+**Métrica:** Contagem de arquivos com `new EventEmitter()` ou `extends EventEmitter` **Threshold:**
+`0` arquivos
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 COUNT=$(grep -rl "new EventEmitter\|extends EventEmitter" src/copilot/ \
-    --include="*.js" | grep -v "\.test\." | wc -l)
+  --include="*.js" | grep -v "\.test\." | wc -l)
 echo "EventEmitter direto: $COUNT arquivos"
-[ "$COUNT" -eq 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }
+[ "$COUNT" -eq 0 ] && echo "PASS" || {
+  echo "FAIL"
+  exit 1
+}
 ```
 
-**Estado atual:** 8 arquivos
-**Estado target:** 0
+**Estado atual:** 8 arquivos **Estado target:** 0
 
-**Nota:** `hooks/bus.js` atualmente estende EventEmitter para implementar o bus. Se o próprio bus usa EventEmitter como implementação interna (encapsulado), é aceitável — contanto que o módulo não exporte EventEmitter como interface. A checagem deve ser por interface pública, não implementação.
+**Nota:** `hooks/bus.js` atualmente estende EventEmitter para implementar o bus. Se o próprio bus
+usa EventEmitter como implementação interna (encapsulado), é aceitável — contanto que o módulo não
+exporte EventEmitter como interface. A checagem deve ser por interface pública, não implementação.
 
 ---
 
 ### 2.3 CRITÉRIO C3 — EventBus Adoption Rate
 
-**Métrica:** % de arquivos que emitem eventos cross-módulo usando `getEventBus()` vs total de arquivos que emitem eventos
-**Threshold:** ≥ 80% dos arquivos que emitem eventos cross-módulo usam EventBus
+**Métrica:** % de arquivos que emitem eventos cross-módulo usando `getEventBus()` vs total de
+arquivos que emitem eventos **Threshold:** ≥ 80% dos arquivos que emitem eventos cross-módulo usam
+EventBus
 
 **Método de verificação:**
+
 1. Listar arquivos com `emit(` → candidatos que emitem eventos
 2. De esses, contar quantos usam `getEventBus` ou `EventBus` importados
 3. Contar quantos usam EventEmitter direto cross-módulo
 
-**Estado atual:** ~13 de 21 que emitem = 62% (mas muitos emissores estão em EventEmitter)
-**Estado target:** ≥80% de todos os emissores cross-módulo
+**Estado atual:** ~13 de 21 que emitem = 62% (mas muitos emissores estão em EventEmitter) **Estado
+target:** ≥80% de todos os emissores cross-módulo
 
 ---
 
 ### 2.4 CRITÉRIO C4 — DI Container Coverage
 
-**Métrica:** Número de tokens DI registrados no container
-**Threshold:** ≥ 40 tokens
+**Métrica:** Número de tokens DI registrados no container **Threshold:** ≥ 40 tokens
 
 **Script de verificação:**
+
 ```bash
 node -e "
 import('#copilot/core').then(m => {
@@ -113,7 +122,7 @@ import('#copilot/core').then(m => {
   console.log('DI tokens:', tokens.length);
   process.exit(tokens.length >= 40 ? 0 : 1);
 });
-" 2>/dev/null || node scripts/arch-health.mjs --json | node -e "
+" 2> /dev/null || node scripts/arch-health.mjs --json | node -e "
 const d=require('fs').readFileSync('/dev/stdin','utf8');
 const j=JSON.parse(d);
 console.log('DI tokens:', j.diTokens);
@@ -121,8 +130,7 @@ process.exit(j.diTokens >= 40 ? 0 : 1);
 "
 ```
 
-**Estado atual:** 13 tokens
-**Estado target:** ≥ 40 tokens
+**Estado atual:** 13 tokens **Estado target:** ≥ 40 tokens
 
 ---
 
@@ -132,50 +140,57 @@ process.exit(j.diTokens >= 40 ? 0 : 1);
 **Threshold:** `0` deep imports em qualquer arquivo de produção
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 # Detecta imports que têm mais de 1 segmento após #copilot/
-COUNT=$(grep -rh "from '#copilot/" src/copilot/ --include="*.js" | \
-    grep -oP "from '#copilot/[^']*'" | \
-    grep -P "#copilot/[^/']+/[^'\"]+'" | \
-    grep -v "nerv-bridge" | wc -l)
+COUNT=$(grep -rh "from '#copilot/" src/copilot/ --include="*.js" \
+  | grep -oP "from '#copilot/[^']*'" \
+  | grep -P "#copilot/[^/']+/[^'\"]+'" \
+  | grep -v "nerv-bridge" | wc -l)
 echo "Deep imports: $COUNT"
-[ "$COUNT" -eq 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }
+[ "$COUNT" -eq 0 ] && echo "PASS" || {
+  echo "FAIL"
+  exit 1
+}
 ```
 
-**Estado atual:** 4 refinados
-**Estado target:** 0
+**Estado atual:** 4 refinados **Estado target:** 0
 
 ---
 
 ### 2.6 CRITÉRIO C6 — Zero TypeCheck Errors
 
-**Métrica:** Saída do `npm run typecheck:node` — contagem de erros
-**Threshold:** `0` erros (sem lista de exclusões, sem "baseline pré-existente")
+**Métrica:** Saída do `npm run typecheck:node` — contagem de erros **Threshold:** `0` erros (sem
+lista de exclusões, sem "baseline pré-existente")
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 ERRORS=$(npm run typecheck:node 2>&1 | grep "error TS" | wc -l)
 echo "TypeCheck errors: $ERRORS"
-[ "$ERRORS" -eq 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }
+[ "$ERRORS" -eq 0 ] && echo "PASS" || {
+  echo "FAIL"
+  exit 1
+}
 ```
 
-**Estado atual:** 16 erros (em rpc-ops.js, rpc-session.js)
-**Estado target:** 0
+**Estado atual:** 16 erros (em rpc-ops.js, rpc-session.js) **Estado target:** 0
 
 ---
 
 ### 2.7 CRITÉRIO C7 — Test Coverage ≥ 70% por Módulo
 
-**Métrica:** Branch/line coverage por módulo medida via vitest/c8
-**Threshold:** ≥ 70% em cada módulo com ≥ 300 LoC de lógica
-**Módulos críticos:** agent, sdk, terminal, tools, observability, hooks, bridges, api, services, conversation-hub
+**Métrica:** Branch/line coverage por módulo medida via vitest/c8 **Threshold:** ≥ 70% em cada
+módulo com ≥ 300 LoC de lógica **Módulos críticos:** agent, sdk, terminal, tools, observability,
+hooks, bridges, api, services, conversation-hub
 
 **Verificação:**
+
 ```bash
-npx vitest run --coverage --reporter=json 2>/dev/null | \
-  node -e "
+npx vitest run --coverage --reporter=json 2> /dev/null \
+  | node -e "
 const data = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
 const modules = ['agent','sdk','terminal','tools','observability','hooks','bridges','api','services'];
 let fail = false;
@@ -189,17 +204,18 @@ process.exit(fail ? 1 : 0);
 "
 ```
 
-**Estado atual:** ~30% estimado (sem measurement formal)
-**Estado target:** ≥ 70% nos módulos críticos
+**Estado atual:** ~30% estimado (sem measurement formal) **Estado target:** ≥ 70% nos módulos
+críticos
 
 ---
 
 ### 2.8 CRITÉRIO C8 — Fan-out Máximo ≤ 8
 
-**Métrica:** Fan-out inter-módulo (imports `#copilot/MODULE`) por módulo
-**Threshold:** `0` módulos com fan-out > 8
+**Métrica:** Fan-out inter-módulo (imports `#copilot/MODULE`) por módulo **Threshold:** `0` módulos
+com fan-out > 8
 
 **Script de verificação:**
+
 ```bash
 node scripts/arch-health.mjs --json | node -e "
 const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
@@ -211,30 +227,32 @@ process.exit(fail ? 1 : 0);
 "
 ```
 
-**Estado atual:** terminal=10, api=8 (borderline)
-**Estado target:** nenhum > 8
+**Estado atual:** terminal=10, api=8 (borderline) **Estado target:** nenhum > 8
 
 ---
 
 ### 2.9 CRITÉRIO C9 — Singletons Lazy-Init ≤ 15
 
-**Métrica:** Contagem de `let x = null` / `let x = false` module-scope que não são constantes nem loggers
-**Threshold:** ≤ 15 total no codebase
+**Métrica:** Contagem de `let x = null` / `let x = false` module-scope que não são constantes nem
+loggers **Threshold:** ≤ 15 total no codebase
 
 **Script de verificação:**
+
 ```bash
 # Conta singletons lazy
-COUNT=$(grep -rn "^let " src/copilot/ --include="*.js" | \
-    grep -v "\.test\." | \
-    grep -E "= null;$|= false;$|= 0;$|= \[\];$|= '';$" | \
-    grep -vE "log|logger|level|dir|exitHandlerRegistered|_?sseEventIdCounter|_recordCompaction" | \
-    wc -l)
+COUNT=$(grep -rn "^let " src/copilot/ --include="*.js" \
+  | grep -v "\.test\." \
+  | grep -E "= null;$|= false;$|= 0;$|= \[\];$|= '';$" \
+  | grep -vE "log|logger|level|dir|exitHandlerRegistered|_?sseEventIdCounter|_recordCompaction" \
+  | wc -l)
 echo "Singletons lazy-init: $COUNT"
-[ "$COUNT" -le 15 ] && echo "PASS" || { echo "FAIL (target: ≤15)"; exit 1; }
+[ "$COUNT" -le 15 ] && echo "PASS" || {
+  echo "FAIL (target: ≤15)"
+  exit 1
+}
 ```
 
-**Estado atual:** 53 refined
-**Estado target:** ≤ 15
+**Estado atual:** 53 refined **Estado target:** ≤ 15
 
 ---
 
@@ -244,21 +262,25 @@ echo "Singletons lazy-init: $COUNT"
 **Threshold:** api/ e terminal/ não importam de agent/, conversation-hub/, channel/ diretamente
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 VIOLATIONS=0
 
 echo "api/ → L4 direto:"
 grep -rn "from '#copilot/agent\|from '#copilot/conversation-hub\|from '#copilot/channel" \
-    src/copilot/api/ --include="*.js" | grep -v "\.test\." | head -10
+  src/copilot/api/ --include="*.js" | grep -v "\.test\." | head -10
 VIOLATIONS=$((VIOLATIONS + $?))
 
 echo "terminal/ → L4 direto:"
 grep -rn "from '#copilot/agent\|from '#copilot/conversation-hub\|from '#copilot/channel" \
-    src/copilot/terminal/ --include="*.js" | grep -v "\.test\." | head -10
+  src/copilot/terminal/ --include="*.js" | grep -v "\.test\." | head -10
 VIOLATIONS=$((VIOLATIONS + $?))
 
-[ "$VIOLATIONS" -eq 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }
+[ "$VIOLATIONS" -eq 0 ] && echo "PASS" || {
+  echo "FAIL"
+  exit 1
+}
 ```
 
 **Estado atual:** api/ importa agent/ em 2 arquivos, terminal/ importa agent/ em ~11 arquivos
@@ -268,30 +290,34 @@ VIOLATIONS=$((VIOLATIONS + $?))
 
 ### 2.11 CRITÉRIO C11 — events/ Module Adoption
 
-**Métrica:** % de strings de evento inline que foram migradas para `#copilot/events`
-**Threshold:** 0 strings inline de evento cross-módulo
+**Métrica:** % de strings de evento inline que foram migradas para `#copilot/events` **Threshold:**
+0 strings inline de evento cross-módulo
 
 **Script de verificação:**
+
 ```bash
 #!/bin/bash
 # Detecta strings que parecem nomes de evento (namespace:action pattern)
 INLINE=$(grep -rn "'\(agent:\|hub:\|terminal:\|system:\|dialog:\|audit:\|rpc:\)" \
-    src/copilot/ --include="*.js" | grep -v "\.test\." | grep -v "#copilot/events" | wc -l)
+  src/copilot/ --include="*.js" | grep -v "\.test\." | grep -v "#copilot/events" | wc -l)
 echo "Inline event strings: $INLINE"
-[ "$INLINE" -eq 0 ] && echo "PASS" || { echo "FAIL (target: 0)"; exit 1; }
+[ "$INLINE" -eq 0 ] && echo "PASS" || {
+  echo "FAIL (target: 0)"
+  exit 1
+}
 ```
 
-**Estado atual:** events/ não existe — 100% são inline
-**Estado target:** 0 inline
+**Estado atual:** events/ não existe — 100% são inline **Estado target:** 0 inline
 
 ---
 
 ### 2.12 CRITÉRIO C12 — Circuit Breakers ≥ 6
 
-**Métrica:** Número de circuit breakers ativos no sistema
-**Threshold:** ≥ 6 circuit breakers (um por cada dependência externa crítica)
+**Métrica:** Número de circuit breakers ativos no sistema **Threshold:** ≥ 6 circuit breakers (um
+por cada dependência externa crítica)
 
 **Verificação via health endpoint:**
+
 ```bash
 # Após startup:
 curl -s http://localhost:3001/health | node -e "
@@ -302,22 +328,21 @@ process.exit(cbs >= 6 ? 0 : 1);
 "
 ```
 
-**Dependências externas que requerem CB:** SDK calls, NERV bridge, MCP server (já existe), GitHub CLI, SSE connections, SQLite writes
-**Estado atual:** 1 (MCP)
-**Estado target:** ≥ 6
+**Dependências externas que requerem CB:** SDK calls, NERV bridge, MCP server (já existe), GitHub
+CLI, SSE connections, SQLite writes **Estado atual:** 1 (MCP) **Estado target:** ≥ 6
 
 ---
 
 ### 2.13 CRITÉRIO C13 — Zero Layer Violations (Expandido)
 
-**Métrica:** Violações de camada incluindo bypass de services/ (novo critério)
-**Threshold:** 0 violações nos dois sentidos:
+**Métrica:** Violações de camada incluindo bypass de services/ (novo critério) **Threshold:** 0
+violações nos dois sentidos:
+
 1. Violação de ordem (L5 → L3 skip — já verificado)
 2. Bypass de services/ facade (L5/L6 → L4 direto)
 
-**Script:** Os dois critérios de C10 + checagem original de `arch-health.mjs`
-**Estado atual:** 0 (ordem) + 3 (bypass services/)
-**Estado target:** 0 em ambos
+**Script:** Os dois critérios de C10 + checagem original de `arch-health.mjs` **Estado atual:** 0
+(ordem) + 3 (bypass services/) **Estado target:** 0 em ambos
 
 ---
 
@@ -362,8 +387,8 @@ Score = sum(peso_i * atingiu_i) para todo critério i
 | C12       | Circuit breakers ≥ 6     | 3    | Não       | 17%     | 0.5          |
 | **TOTAL** |                          | 100  |           |         | **13.5/100** |
 
-> **O score real da PARTE-22 antes de executar qualquer faixa é 13.5/100 (F)**
-> Isso é mais honesto que o 24/100 estimado na PARTE-22A (que ainda tinha scoring parcial).
+> **O score real da PARTE-22 antes de executar qualquer faixa é 13.5/100 (F)** Isso é mais honesto
+> que o 24/100 estimado na PARTE-22A (que ainda tinha scoring parcial).
 
 ---
 
@@ -417,67 +442,74 @@ let totalScore = 0;
 let maxScore = 0;
 
 function check(id, label, weight, fn) {
-    maxScore += weight;
-    try {
-        const { score, detail } = fn();
-        results[id] = { label, weight, score, detail, pass: score === weight };
-        totalScore += score;
-    } catch(e) {
-        results[id] = { label, weight, score: 0, detail: e.message, pass: false };
-    }
+  maxScore += weight;
+  try {
+    const { score, detail } = fn();
+    results[id] = { label, weight, score, detail, pass: score === weight };
+    totalScore += score;
+  } catch (e) {
+    results[id] = { label, weight, score: 0, detail: e.message, pass: false };
+  }
 }
 
 // C1: Zero god files >250 LoC
 check('C1', 'Zero god files >250 LoC', 20, () => {
-    const out = execSync(
-        "find src/copilot -name '*.js' ! -name 'index.js' ! -name 'types.js' ! -name 'constants.js' | " +
-        "xargs wc -l 2>/dev/null | awk '$1>250{print $2}' | grep -v total || true",
-        { encoding: 'utf8' }
-    ).trim();
-    const violations = out ? out.split('\n').filter(Boolean) : [];
-    return { score: violations.length === 0 ? 20 : 0, detail: `${violations.length} violações` };
+  const out = execSync(
+    "find src/copilot -name '*.js' ! -name 'index.js' ! -name 'types.js' ! -name 'constants.js' | " +
+      "xargs wc -l 2>/dev/null | awk '$1>250{print $2}' | grep -v total || true",
+    { encoding: 'utf8' },
+  ).trim();
+  const violations = out ? out.split('\n').filter(Boolean) : [];
+  return { score: violations.length === 0 ? 20 : 0, detail: `${violations.length} violações` };
 });
 
 // C2: Zero EventEmitter direto
 check('C2', 'Zero EventEmitter direto', 10, () => {
-    const out = execSync(
-        "grep -rl 'new EventEmitter\\|extends EventEmitter' src/copilot/ --include='*.js' | grep -v '\\.test\\.' | wc -l",
-        { encoding: 'utf8', shell: true }
-    ).trim();
-    const count = parseInt(out);
-    return { score: count === 0 ? 10 : 0, detail: `${count} arquivos` };
+  const out = execSync(
+    "grep -rl 'new EventEmitter\\|extends EventEmitter' src/copilot/ --include='*.js' | grep -v '\\.test\\.' | wc -l",
+    { encoding: 'utf8', shell: true },
+  ).trim();
+  const count = parseInt(out);
+  return { score: count === 0 ? 10 : 0, detail: `${count} arquivos` };
 });
 
 // C5: Zero deep imports
 check('C5', 'Zero deep imports', 5, () => {
-    const count = parseInt(execSync(
-        "node scripts/arch-health.mjs --json | node -e \"process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write(String(JSON.parse(d).deepImports?.refined??99)));\"",
-        { encoding: 'utf8', shell: true }
-    ).trim());
-    return { score: count === 0 ? 5 : 0, detail: `${count} deep imports` };
+  const count = parseInt(
+    execSync(
+      "node scripts/arch-health.mjs --json | node -e \"process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write(String(JSON.parse(d).deepImports?.refined??99)));\"",
+      { encoding: 'utf8', shell: true },
+    ).trim(),
+  );
+  return { score: count === 0 ? 5 : 0, detail: `${count} deep imports` };
 });
 
 // C6: Zero typecheck errors
 check('C6', 'Zero typecheck errors', 7, () => {
-    const out = execSync('npm run typecheck:node 2>&1 | grep "error TS" | wc -l', { encoding: 'utf8', shell: true }).trim();
-    const count = parseInt(out);
-    return { score: count === 0 ? 7 : 0, detail: `${count} erros` };
+  const out = execSync('npm run typecheck:node 2>&1 | grep "error TS" | wc -l', {
+    encoding: 'utf8',
+    shell: true,
+  }).trim();
+  const count = parseInt(out);
+  return { score: count === 0 ? 7 : 0, detail: `${count} erros` };
 });
 
 // C8: Fan-out máximo ≤ 8
 check('C8', 'Fan-out máximo ≤ 8', 5, () => {
-    const json = JSON.parse(execSync('node scripts/arch-health.mjs --json', { encoding: 'utf8' }));
-    const max = Math.max(...Object.values(json.fanOut?.details || { terminal: 99 }));
-    return { score: max <= 8 ? 5 : 0, detail: `max=${max}` };
+  const json = JSON.parse(execSync('node scripts/arch-health.mjs --json', { encoding: 'utf8' }));
+  const max = Math.max(...Object.values(json.fanOut?.details || { terminal: 99 }));
+  return { score: max <= 8 ? 5 : 0, detail: `max=${max}` };
 });
 
 // Imprimir resultados
 console.log('\n=== PARTE-22 HEALTH CHECK ===\n');
 Object.entries(results).forEach(([id, r]) => {
-    const icon = r.pass ? '✅' : '❌';
-    console.log(`${icon} ${id} (${r.score}/${r.weight}): ${r.label} — ${r.detail}`);
+  const icon = r.pass ? '✅' : '❌';
+  console.log(`${icon} ${id} (${r.score}/${r.weight}): ${r.label} — ${r.detail}`);
 });
-console.log(`\nSCORE: ${totalScore}/${maxScore} (${(totalScore/maxScore*100).toFixed(1)}%)\n`);
+console.log(
+  `\nSCORE: ${totalScore}/${maxScore} (${((totalScore / maxScore) * 100).toFixed(1)}%)\n`,
+);
 process.exit(totalScore >= maxScore * 0.9 ? 0 : 1);
 ```
 
@@ -502,6 +534,7 @@ process.exit(totalScore >= maxScore * 0.9 ? 0 : 1);
 ### 7.1 O Que Fazer a Cada Commit
 
 Antes de commitar qualquer alteração de código:
+
 1. Executar `npm run lint`
 2. Executar `npm run test:unit`
 3. Executar `node scripts/arch-health.mjs` — verificar que score não regrediu
@@ -512,7 +545,7 @@ Antes de commitar qualquer alteração de código:
 1. **Nunca** adicionar exclusões a `singletonCount()` para inflar o score
 2. **Nunca** calibrar thresholds de fan-out sem corrigir o problema real
 3. **Nunca** marcar faixa como "✅ concluída" sem rodar o script de verificação dessa faixa
-4. **Nunca** aceitar "já foi parcialmente feito"  — critério é binário (pass/fail)
+4. **Nunca** aceitar "já foi parcialmente feito" — critério é binário (pass/fail)
 5. **Nunca** criar deep imports temporários com "refatoro depois"
 
 ### 7.3 O Que Fazer Quando um Critério Regride
@@ -526,8 +559,8 @@ Antes de commitar qualquer alteração de código:
 
 ## 8. Relação com arch-health.mjs
 
-O `scripts/arch-health.mjs` existente mede critérios diferentes (score PARTE-21 = 95/100).
-Para a PARTE-22:
+O `scripts/arch-health.mjs` existente mede critérios diferentes (score PARTE-21 = 95/100). Para a
+PARTE-22:
 
 | arch-health.mjs (PARTE-21)     | health-check-parte22.mjs (PARTE-22)          |
 | ------------------------------ | -------------------------------------------- |

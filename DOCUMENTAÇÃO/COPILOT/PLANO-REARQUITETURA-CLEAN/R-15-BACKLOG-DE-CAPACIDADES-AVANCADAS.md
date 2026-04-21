@@ -1,8 +1,7 @@
 # R-15 — Backlog de capacidades avançadas
 
-**Programa**: P7
-**Status**: pós-base saudável
-**Objetivo**: concentrar capabilities futuras sem contaminar a fila estrutural principal
+**Programa**: P7 **Status**: pós-base saudável **Objetivo**: concentrar capabilities futuras sem
+contaminar a fila estrutural principal
 
 ---
 
@@ -10,7 +9,8 @@
 
 Este backlog **não entra antes da base estrutural estar suficientemente saudável**.
 
-Ele é importante, desejável e em vários casos estrategicamente valioso — mas deve ser atacado com as dependências certas resolvidas.
+Ele é importante, desejável e em vários casos estrategicamente valioso — mas deve ser atacado com as
+dependências certas resolvidas.
 
 ---
 
@@ -129,7 +129,8 @@ Uma capability avançada só deve subir de prioridade quando responder “sim”
 3. há testes, segurança e observability suficientes para sustentá-la?
 4. há ownership claro do módulo onde ela vai morar?
 
-Se a resposta for “não” em dois ou mais pontos, ela ainda pertence ao backlog futuro e não à fila ativa.
+Se a resposta for “não” em dois ou mais pontos, ela ainda pertence ao backlog futuro e não à fila
+ativa.
 
 ---
 
@@ -150,6 +151,7 @@ Este documento existe para proteger a disciplina do roadmap.
 Ele diz, explicitamente:
 
 - **sim**, há muito futuro interessante para `src/copilot/`;
-- **não**, isso não deve disputar a mesma prioridade da base arquitetural que ainda precisa ser fechada.
+- **não**, isso não deve disputar a mesma prioridade da base arquitetural que ainda precisa ser
+  fechada.
 
 A melhor capability avançada do mundo continua sendo um problema se ela pousar em fundação torta.

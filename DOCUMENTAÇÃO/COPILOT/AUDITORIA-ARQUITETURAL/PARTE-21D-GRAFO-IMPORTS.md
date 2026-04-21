@@ -1,12 +1,12 @@
 # PARTE-21D — Grafos de Dependências: Atual e Ideal
 
-**Data**: 2026-04-12 | **Status**: BASELINE (grafos pré-Faixa H) | **Versão**: 2.0
-**Scope**: Grafos de dependência inter-módulo de `src/copilot` — ponderados por volume de imports
-**Referência**: PARTE-21A (baseline), PARTE-21B (ideal), PARTE-21C (roadmap), PARTE-21F (atual)
+**Data**: 2026-04-12 | **Status**: BASELINE (grafos pré-Faixa H) | **Versão**: 2.0 **Scope**: Grafos
+de dependência inter-módulo de `src/copilot` — ponderados por volume de imports **Referência**:
+PARTE-21A (baseline), PARTE-21B (ideal), PARTE-21C (roadmap), PARTE-21F (atual)
 
-> **⚠️ ATENÇÃO**: Os grafos neste documento refletem o estado **pré-execução** das Faixas H–N.
-> O grafo pós-execução inclui 3 módulos novos (types, services, plugins) e 165 deep imports
-> (vs 233 original). Ver PARTE-21F para fan-out atualizado por módulo.
+> **⚠️ ATENÇÃO**: Os grafos neste documento refletem o estado **pré-execução** das Faixas H–N. O
+> grafo pós-execução inclui 3 módulos novos (types, services, plugins) e 165 deep imports (vs 233
+> original). Ver PARTE-21F para fan-out atualizado por módulo.
 
 ---
 
@@ -20,6 +20,7 @@ Este documento apresenta 4 grafos Mermaid:
 4. **Grafo Ideal — Barrel-only**: como ficaria se todos imports usassem barrels
 
 Além dos grafos, inclui análises de:
+
 - Fan-in / Fan-out / Estabilidade (métrica de Martin)
 - Coupling clusters (módulos excessivamente acoplados)
 - Violation map (arestas ilegais marcadas)
@@ -192,8 +193,8 @@ graph TD
 | 9   | terminal | agent   | 11     | Terminal controla agent lifecycle     |
 | 10  | tools    | sdk     | 10     | Tools usam SDK para configs           |
 
-**Insight**: `observability/` é o módulo mais "importado-para" com total de **146 imports recebidos**.
-É o hub gravitacional do sistema.
+**Insight**: `observability/` é o módulo mais "importado-para" com total de **146 imports
+recebidos**. É o hub gravitacional do sistema.
 
 ---
 
@@ -263,8 +264,8 @@ Imports dentro do mesmo módulo (indicam complexidade interna):
 | agent         | ~8            | lifecycle/ → session/ → dialog/ → infra/           |
 | terminal      | ~12           | commands/ → handlers/ → rendering/ → terminal-mode |
 
-> `hooks/` tem o maior número de intra-imports (22), indicando alta coesão interna —
-> os arquivos de hooks dependem fortemente uns dos outros.
+> `hooks/` tem o maior número de intra-imports (22), indicando alta coesão interna — os arquivos de
+> hooks dependem fortemente uns dos outros.
 
 ---
 
@@ -287,11 +288,11 @@ Imports dentro do mesmo módulo (indicam complexidade interna):
 | `api/`              | 1           | 41           | 0.98           | Muito instável    |
 | `terminal/`         | 0           | 71           | 1.00           | Root (leaf)       |
 
-> Ca = afferent coupling (imports recebidos de outros módulos)
-> Ce = efferent coupling (imports feitos para outros módulos)
-> I = instabilidade (0 = máxima estabilidade, 1 = máxima instabilidade)
+> Ca = afferent coupling (imports recebidos de outros módulos) Ce = efferent coupling (imports
+> feitos para outros módulos) I = instabilidade (0 = máxima estabilidade, 1 = máxima instabilidade)
 
 **Observações**:
+
 - `observability/` é o módulo mais estável (I=0.09) — praticamente read-only
 - `api/` e `terminal/` são os mais instáveis — esperado para camadas superiores
 - `tools/` com I=0.85 é surpreendentemente instável — depende de muitos módulos
@@ -301,8 +302,8 @@ Imports dentro do mesmo módulo (indicam complexidade interna):
 
 Para um design saudável (Robert C. Martin), módulos estáveis devem ser abstratos:
 
-| Módulo        | I (instab) | Abstração estimada | Zona  | Posição  |
-| ------------- | ---------- | ------------------ | ----- | -------- |
+| Módulo        | I (instab) | Abstração estimada | Zona  | Posição   |
+| ------------- | ---------- | ------------------ | ----- | --------- |
 | core          | 0.02       | Alta (contratos)   | OK    | ✅ SAP    |
 | observability | 0.09       | Média (impl+API)   | Risco | ⚠️ Rígido |
 | config        | 0.10       | Média (env+schema) | Risco | ⚠️ Rígido |
@@ -323,8 +324,8 @@ Para um design saudável (Robert C. Martin), módulos estáveis devem ser abstra
 agent/ ←(53)→ observability/ ←(16)→ hooks/ ←(5)→ agent/
 ```
 
-O triângulo `agent ↔ observability ↔ hooks` tem **74 imports** combinados.
-Este é o cluster mais acoplado do sistema. Observability é o pivot.
+O triângulo `agent ↔ observability ↔ hooks` tem **74 imports** combinados. Este é o cluster mais
+acoplado do sistema. Observability é o pivot.
 
 ### 6.2 Cluster 2: Terminal-Conversation (Orchestration Coupling)
 
@@ -335,8 +336,8 @@ terminal/ ←(8)→ bridges/
 terminal/ ←(5)→ channel/
 ```
 
-Terminal importa de 5 módulos L3-L4 para orquestrar. Isso é esperado para L6,
-mas o volume (36 imports) indica lógica de orquestração que deveria estar em `services/`.
+Terminal importa de 5 módulos L3-L4 para orquestrar. Isso é esperado para L6, mas o volume (36
+imports) indica lógica de orquestração que deveria estar em `services/`.
 
 ### 6.3 Cluster 3: Tools-SDK (Operational Coupling)
 
@@ -645,9 +646,9 @@ Para cada Wave do roadmap (PARTE-21C), o grafo deve convergir:
 ## 11. Conclusão
 
 Os grafos revelam que o sistema atual, apesar de limpo em violações de camada (pelo CI), tem
-**acoplamento fino excessivo** (233 deep imports), **clusters de coupling** fortemente acoplados,
-e **fan-out desbalanceado** (api/ com 11 deps, agent/ com 112 imports feitos).
+**acoplamento fino excessivo** (233 deep imports), **clusters de coupling** fortemente acoplados, e
+**fan-out desbalanceado** (api/ com 11 deps, agent/ com 112 imports feitos).
 
-O grafo ideal, alcançável progressivamente pelas Waves 0-3 do roadmap, elimina violações,
-introduz `services/` para absorver fan-out de api/ e terminal/, e migra para barrel-first para
-reduzir acoplamento fino a ≤20 deep imports (allow-listed).
+O grafo ideal, alcançável progressivamente pelas Waves 0-3 do roadmap, elimina violações, introduz
+`services/` para absorver fan-out de api/ e terminal/, e migra para barrel-first para reduzir
+acoplamento fino a ≤20 deep imports (allow-listed).

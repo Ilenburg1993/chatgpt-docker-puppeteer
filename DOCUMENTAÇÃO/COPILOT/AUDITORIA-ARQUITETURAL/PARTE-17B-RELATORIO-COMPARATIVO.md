@@ -1,22 +1,21 @@
 # PARTE-17B — Relatório Comparativo: PARTE-16E (F121-F250)
 
-**Data**: 2026-07-08
-**Escopo**: Hardening total do `src/copilot/` — testes, segurança, performance, consistência
-**Commits**: `667608da` (Faixa 8) → `525efd35` (Faixa 13) + Faixa 14 (este commit)
-**Branch**: `main`
-**Baseline**: PARTE-15B (pós F49-F120)
+**Data**: 2026-07-08 **Escopo**: Hardening total do `src/copilot/` — testes, segurança, performance,
+consistência **Commits**: `667608da` (Faixa 8) → `525efd35` (Faixa 13) + Faixa 14 (este commit)
+**Branch**: `main` **Baseline**: PARTE-15B (pós F49-F120)
 
 ---
 
 ## 1. Resumo Executivo
 
 O roadmap PARTE-16E executou **14 faixas** com **130 fases** (F121-F250), cobrindo hardening
-completo do módulo copilot: testes massivos, segurança, error handling, performance, FS async,
-e padronização de API.
+completo do módulo copilot: testes massivos, segurança, error handling, performance, FS async, e
+padronização de API.
 
 **Resultado**: +759 testes adicionados (2.342 → 3.101), +40 novos test files, 2 bugs críticos
 descobertos e corrigidos (askHandler bypass + regex /g stateful), 3 arquivos migrados de FS sync
-para async em runtime paths, API error responses padronizadas com CopilotError → HTTP status mapping.
+para async em runtime paths, API error responses padronizadas com CopilotError → HTTP status
+mapping.
 
 ---
 
@@ -61,8 +60,8 @@ para async em runtime paths, API error responses padronizadas com CopilotError �
 |    13 | F245-F248 | API Consistency + Error Mapping     | `525efd35` |      7 |
 |    14 | F249-F250 | Coverage Targets + Relatório Final  | (este)     |      — |
 
-**Total de testes adicionados nesta sessão**: 392 (Faixas 8-13)
-**Total acumulado PARTE-16E**: 759+ novos testes
+**Total de testes adicionados nesta sessão**: 392 (Faixas 8-13) **Total acumulado PARTE-16E**: 759+
+novos testes
 
 ---
 
@@ -94,16 +93,18 @@ Módulos que passaram de zero para cobertura substancial:
 ### 4.2 Bugs Descobertos e Corrigidos (Faixa 10)
 
 #### Bug 1: askHandler Bypass (Severidade: ALTA)
+
 - **Onde**: `src/copilot/hooks/factory.js` → `resolveToolDecision()`
-- **Problema**: Quando `askHandler` retornava `true` (aprovado pelo usuário), o fluxo caía
-  para `resolveToolDecision()` que negava a ferramenta pelos deny patterns
+- **Problema**: Quando `askHandler` retornava `true` (aprovado pelo usuário), o fluxo caía para
+  `resolveToolDecision()` que negava a ferramenta pelos deny patterns
 - **Impacto**: Ferramentas aprovadas interativamente podiam ser bloqueadas erroneamente
 - **Fix**: Early return com `{ permissionDecision: 'allow' }` após aprovação
 
 #### Bug 2: Regex /g Stateful (Severidade: MÉDIA)
+
 - **Onde**: `src/copilot/hooks/factory.js` → `resolveToolDecision()` e `askHandler` block
-- **Problema**: `denyPatterns` com flag `/g` mantinham `lastIndex` entre chamadas,
-  causando falhas intermitentes de matching
+- **Problema**: `denyPatterns` com flag `/g` mantinham `lastIndex` entre chamadas, causando falhas
+  intermitentes de matching
 - **Impacto**: Decisões de deny/allow eram inconsistentes em execuções consecutivas
 - **Fix**: `pattern.lastIndex = 0` antes de cada `test()`
 
@@ -118,6 +119,7 @@ Módulos que passaram de zero para cobertura substancial:
 | `tools/hook-tools.js`      | `existsSync` (2 handlers)     | `await access` + try/catch         |
 
 **Memory bounds auditados (todos já bounded):**
+
 - Histograms: `createHistogram(500)` ring buffer
 - Logger: `RING_BUFFER_SIZE=1000` + `rotateFile` maxSize
 - Client history: `#maxHistorySize` + auto-trim
@@ -165,22 +167,25 @@ Módulos que passaram de zero para cobertura substancial:
 |    13 |      2.720+ |       3.101 |    0 |          0 |
 |    14 |      3.000+ |       3.101 |    0 |          0 |
 
-> Nota: a contagem de testes real superou significativamente os alvos graças à execução
-> cumulativa de faixas anteriores na mesma sessão.
+> Nota: a contagem de testes real superou significativamente os alvos graças à execução cumulativa
+> de faixas anteriores na mesma sessão.
 
 ---
 
 ## 6. Qualidade do Código
 
 ### 6.1 Lint
+
 - **0 errors** (ESLint 9.39+)
 - 1 warning pré-existente: `debug-conflicts.mjs:10` — `oldEmit` não utilizado
 
 ### 6.2 Testes
+
 - **3.101 passed** | 53 skipped | **0 failed**
 - 335 arquivos de teste (301 executados, 34 skipped)
 
 ### 6.3 Segurança
+
 - JSON.parse: 100% protegidos com try/catch
 - Error sanitization: `sanitizeErrorMessage()` remove paths internos
 - HTTP status mapping: erros tipados → status codes corretos (não expõe 500 genérico)
@@ -189,11 +194,11 @@ Módulos que passaram de zero para cobertura substancial:
 
 ## 7. O Que Não Foi Feito
 
-- **God modules >400L**: 22 arquivos permanecem (mesmo número do baseline). Decomposição
-  adicional requer refatoração arquitetural significativa — mantidos como debt técnico
-  documentado para uma futura PARTE-18.
-- **Coverage provider**: `@vitest/coverage-v8` não instalado — thresholds configurados
-  mas não validados com medição real.
+- **God modules >400L**: 22 arquivos permanecem (mesmo número do baseline). Decomposição adicional
+  requer refatoração arquitetural significativa — mantidos como debt técnico documentado para uma
+  futura PARTE-18.
+- **Coverage provider**: `@vitest/coverage-v8` não instalado — thresholds configurados mas não
+  validados com medição real.
 - **FS sync calls restantes**: 61 chamadas sync restantes, maioria em init-time ou logger
   (`appendFileSync`). Todas annotadas ou justificadas.
 
@@ -209,4 +214,4 @@ Módulos que passaram de zero para cobertura substancial:
 
 ---
 
-*Relatório gerado automaticamente pela execução da Faixa 14 (F250).*
+_Relatório gerado automaticamente pela execução da Faixa 14 (F250)._

@@ -1,8 +1,8 @@
 # Análise Independente de `src/copilot`
 
-**Data-base**: 2026-04-17
-**Escopo**: árvore real de `src/copilot/`, lida e medida diretamente a partir do código
-**Objetivo**: oferecer uma leitura arquitetural completa, didática e independente da linha documental existente.
+**Data-base**: 2026-04-17 **Escopo**: árvore real de `src/copilot/`, lida e medida diretamente a
+partir do código **Objetivo**: oferecer uma leitura arquitetural completa, didática e independente
+da linha documental existente.
 
 ## Como ler esta série
 
@@ -33,14 +33,20 @@ Ela responde, em ordem, às perguntas:
 
 ## Leituras centrais desta análise
 
-- `src/copilot/` hoje é um sistema grande e funcional, mas ainda com sinais fortes de **centralização acidental** em alguns subsistemas.
-- `agent/`, `sdk/`, `tools/`, `terminal/` e `observability/` já operam como macro-blocos arquiteturais.
-- `presentation/` surgiu como correção arquitetural importante, mas ainda é uma camada **em consolidação**, não um fim de jornada.
-- `terminal/` já pode ser tratado como **frontend principal da LLM-B**, mas ainda precisa terminar a convergência interna para não continuar carregando orchestration residual.
+- `src/copilot/` hoje é um sistema grande e funcional, mas ainda com sinais fortes de
+  **centralização acidental** em alguns subsistemas.
+- `agent/`, `sdk/`, `tools/`, `terminal/` e `observability/` já operam como macro-blocos
+  arquiteturais.
+- `presentation/` surgiu como correção arquitetural importante, mas ainda é uma camada **em
+  consolidação**, não um fim de jornada.
+- `terminal/` já pode ser tratado como **frontend principal da LLM-B**, mas ainda precisa terminar a
+  convergência interna para não continuar carregando orchestration residual.
 - `observability/` segue sendo o maior polo de acoplamento transversal do sistema.
 
 ## Notas metodológicas
 
 - Os dados desta série foram extraídos do código-fonte e de medições locais de estrutura/imports.
-- A análise considera também diretórios transitórios e compat shims, porque eles impactam a arquitetura real, mesmo quando marcados como legados.
-- A pasta `src/copilot/logs/` foi tratada como **artefato operacional**, não como camada de código-fonte.
+- A análise considera também diretórios transitórios e compat shims, porque eles impactam a
+  arquitetura real, mesmo quando marcados como legados.
+- A pasta `src/copilot/logs/` foi tratada como **artefato operacional**, não como camada de
+  código-fonte.

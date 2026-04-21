@@ -1,13 +1,13 @@
 # PARTE-21C — Roadmap v2: Faixas H–N + Waves 4–6 para Upgrades de Larga Escala
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 3.0
-**Scope**: Roadmap evolutivo de `src/copilot` — da situação atual (21A) à ideal (21B)
-**Referência**: PARTE-21A (baseline), PARTE-21B (ideal), PARTE-21F (status pós-execução)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 3.0 **Scope**: Roadmap evolutivo de
+`src/copilot` — da situação atual (21A) à ideal (21B) **Referência**: PARTE-21A (baseline),
+PARTE-21B (ideal), PARTE-21F (status pós-execução)
 
 **Progresso de execução** (atualizado 2026-04-12):
 
-| Faixa | Status      | Commit                                                                                      |
-| ----- | ----------- | ------------------------------------------------------------------------------------------- |
+| Faixa | Status       | Commit                                                                                      |
+| ----- | ------------ | ------------------------------------------------------------------------------------------- |
 | H     | ✅ CONCLUÍDA | `3f4db045` — ci(copilot): Faixa H                                                           |
 | I     | ✅ CONCLUÍDA | `8407a6d5` — refactor(copilot): Faixa I (315→2 deep imp)                                    |
 | J     | ✅ CONCLUÍDA | `3aacf20b` — refactor(copilot): Faixa J (7 splits)                                          |
@@ -17,6 +17,7 @@
 | N     | ✅ CONCLUÍDA | `eb6f88a9` — refactor(copilot): Faixa N completa (Services, Plugins, Health, API migration) |
 
 **Métricas resumidas pós-Faixa N** (commit `6ebaa575`):
+
 - Health Score: **65/100 (D)** — barrel: 100%, singletons: 73, fan-out max: 19, deep: 165
 - 108 testes (91 node:test + 17 vitest), 0 erros lint, 16 erros typecheck (baseline)
 - 313 arquivos JS, 53.815 LoC, 17 módulos, 13 DI tokens
@@ -34,8 +35,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | 2    | K, L   | DI container + state mgmt   | C+→B (60→75)  | Médio prazo      |
 | 3    | M, N   | EventBus + extensibilidade  | B→A- (75→85)  | Longo prazo      |
 
-**Total de subfases**: 65
-**Dependências entre faixas**: H→I→K (caminho crítico principal), J (paralelo), L→M→N (cadeia de preparação)
+**Total de subfases**: 65 **Dependências entre faixas**: H→I→K (caminho crítico principal), J
+(paralelo), L→M→N (cadeia de preparação)
 
 ---
 
@@ -74,9 +75,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 3. Faixa H — CI Hardening & Violações Urgentes (Wave 0)
 
-**Prioridade**: P0 — Imediata
-**Dependências**: Nenhuma (standalone)
-**Critério de conclusão**: 0 violações reais, CI detecta export...from
+**Prioridade**: P0 — Imediata **Dependências**: Nenhuma (standalone) **Critério de conclusão**: 0
+violações reais, CI detecta export...from
 
 ### H-1: Expandir regex do layer check
 
@@ -114,9 +114,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 4. Faixa I — Barrel Enforcement & Deep Import Migration (Wave 1)
 
-**Prioridade**: P1 — Curto prazo
-**Dependências**: H (CI deve detectar violações antes de enforçar barrels)
-**Critério de conclusão**: Barrel ratio ≥80%, deep imports ≤50
+**Prioridade**: P1 — Curto prazo **Dependências**: H (CI deve detectar violações antes de enforçar
+barrels) **Critério de conclusão**: Barrel ratio ≥80%, deep imports ≤50
 
 ### I-1: Auditoria de barrels e re-exports
 
@@ -189,9 +188,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 5. Faixa J — Decomposição de Arquivos Grandes (Wave 1, paralela com I)
 
-**Prioridade**: P1 — Curto prazo
-**Dependências**: H (para não introduzir novas violações durante splits)
-**Critério de conclusão**: 0 arquivos >400 LoC raw com multi-concern
+**Prioridade**: P1 — Curto prazo **Dependências**: H (para não introduzir novas violações durante
+splits) **Critério de conclusão**: 0 arquivos >400 LoC raw com multi-concern
 
 ### J-1: Priority splits (multi-concern claros)
 
@@ -257,24 +255,27 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 **Resultado da execução (Faixa J)**:
 
-- **J-1a** ✅ `audit/pipeline.js` 558→39 LoC (barrel) + 3 sub-files (sdk-buffer, audit-log, permission)
+- **J-1a** ✅ `audit/pipeline.js` 558→39 LoC (barrel) + 3 sub-files (sdk-buffer, audit-log,
+  permission)
 - **J-1b** ✅ `terminal/index.js` 494→224 LoC + `terminal-agent-wiring.js` (289 LoC)
 - **J-1c** ✅ `tools/todo/crud-tools.js` 459→239 LoC + `todo-write-tools.js` (249 LoC)
 - **J-1d** ✅ `tools/todo/store.js` 423→355 LoC + `todo-schema.js` (99 LoC)
 - **J-2e** ✅ `sdk/rpc.js` 484→153 LoC + `rpc-session.js` (243 LoC) + `rpc-ops.js` (186 LoC)
-- **J-4c** ✅ `bridges/git-bridge.js` 427→30 LoC + `git-bridge-read.js` (292 LoC) + `git-bridge-write.js` (226 LoC)
-- **J-5h** ✅ `tools/file/read-tools.js` 405→26 LoC + `read-tools-io.js` (232 LoC) + `read-tools-search.js` (188 LoC)
-- **J-2a-d, J-3a** ⏸ Deferidos — classes monolíticas (AlwaysAlive, LoopManager, ConversationStore, Client)
-  requerem DI refactoring (Faixa K); types.js split causa erros TS2314 por chain de generics
+- **J-4c** ✅ `bridges/git-bridge.js` 427→30 LoC + `git-bridge-read.js` (292 LoC) +
+  `git-bridge-write.js` (226 LoC)
+- **J-5h** ✅ `tools/file/read-tools.js` 405→26 LoC + `read-tools-io.js` (232 LoC) +
+  `read-tools-search.js` (188 LoC)
+- **J-2a-d, J-3a** ⏸ Deferidos — classes monolíticas (AlwaysAlive, LoopManager, ConversationStore,
+  Client) requerem DI refactoring (Faixa K); types.js split causa erros TS2314 por chain de generics
 - **J-6** ✅ Validação: TypeCheck 258 erros (baseline inalterado), 0 novos erros introduzidos
 
 ---
 
 ## 6. Faixa K — DI Container & Singleton Elimination (Wave 2)
 
-**Prioridade**: P2 — Médio prazo
-**Dependências**: I (barrels necessários para DI saudável), J (files menores facilitam DI)
-**Critério de conclusão**: DI container funcional, ≤10 singletons, naming padronizado
+**Prioridade**: P2 — Médio prazo **Dependências**: I (barrels necessários para DI saudável), J
+(files menores facilitam DI) **Critério de conclusão**: DI container funcional, ≤10 singletons,
+naming padronizado
 
 ### K-1: Criar DI container lightweight
 
@@ -349,33 +350,39 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ### Resultados da execução (Faixa K)
 
-- **K-1** ✅ `core/di.js` (~240 LoC): `createToken`, `createContainer`, lifecycle (singleton/transient/scoped),
-  `fork()`, `dispose()` com ordered cleanup
-- **K-1f** ✅ 34 testes unitários passando (token, register/resolve, lifecycle, fork, dispose, dependency chain)
-- **K-2** ✅ `core/di-tokens.js` com 12 tokens canônicos: SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, TOOLS_BUILDER,
-  AUDIT_LOGGER, AUDIT_BUS, BRIDGE_AGENT, FALLBACK_AGENT, HUB, PERMISSION_AGENT, SESSION_RPC, NERV_BRIDGE_AGENT
-- **K-2c** ✅ `core/di-container.js` — container global singleton exportado via barrel `#copilot/core`
-- **K-3** ✅ `observability/bootstrap.js` registra SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER, AUDIT_LOGGER no container
-  (dual: setters legados + DI)
+- **K-1** ✅ `core/di.js` (~240 LoC): `createToken`, `createContainer`, lifecycle
+  (singleton/transient/scoped), `fork()`, `dispose()` com ordered cleanup
+- **K-1f** ✅ 34 testes unitários passando (token, register/resolve, lifecycle, fork, dispose,
+  dependency chain)
+- **K-2** ✅ `core/di-tokens.js` com 12 tokens canônicos: SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER,
+  TOOLS_BUILDER, AUDIT_LOGGER, AUDIT_BUS, BRIDGE_AGENT, FALLBACK_AGENT, HUB, PERMISSION_AGENT,
+  SESSION_RPC, NERV_BRIDGE_AGENT
+- **K-2c** ✅ `core/di-container.js` — container global singleton exportado via barrel
+  `#copilot/core`
+- **K-3** ✅ `observability/bootstrap.js` registra SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER,
+  AUDIT_LOGGER no container (dual: setters legados + DI)
 - **K-3f** ✅ `bootstrapLateDeps` registra TOOLS_BUILDER no container
-- **K-4** ✅ `terminal/index.js` registra HUB, PERMISSION_AGENT, FALLBACK_AGENT, BRIDGE_AGENT, NERV_BRIDGE_AGENT
+- **K-4** ✅ `terminal/index.js` registra HUB, PERMISSION_AGENT, FALLBACK_AGENT, BRIDGE_AGENT,
+  NERV_BRIDGE_AGENT
 - **K-4 (entry)** ✅ `agent/lifecycle/entry.js` registra AUDIT_BUS no container
 - **K-7** ✅ 16 contract tests (DI barrel exports + 12 tokens canônicos + distinção)
 - **K-5, K-6** ✅ Concluídos (`c7e016cd` + `26daddc9`):
-  - K-5: `wireLegacySetters()` centraliza DI→setter wiring. bootstrap.js e terminal/index.js refatorados.
-    Singletons residuais (copilotDb, _client, copilotNamespace) analisados e mantidos — são lazy singletons
-    legítimos com side effects (I/O, SDK connect). DI migration seria over-engineering.
-  - K-6: `TerminalPhase` enum (init/idle/busy/shutting_down/stopped) e `transitionTerminalPhase()` com validação.
-  - K-6c: `setBusy()` agora sincroniza com FSM em best-effort (idle↔busy). Demais vars não migradas —
-    planMode, rl, sseClients etc. são independentes da fase e não se beneficiam de FSM.
-- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 50 testes passando (34 unit + 16 contract)
+  - K-5: `wireLegacySetters()` centraliza DI→setter wiring. bootstrap.js e terminal/index.js
+    refatorados. Singletons residuais (copilotDb, \_client, copilotNamespace) analisados e mantidos
+    — são lazy singletons legítimos com side effects (I/O, SDK connect). DI migration seria
+    over-engineering.
+  - K-6: `TerminalPhase` enum (init/idle/busy/shutting_down/stopped) e `transitionTerminalPhase()`
+    com validação.
+  - K-6c: `setBusy()` agora sincroniza com FSM em best-effort (idle↔busy). Demais vars não migradas
+    — planMode, rl, sseClients etc. são independentes da fase e não se beneficiam de FSM.
+- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 50 testes passando (34 unit + 16
+  contract)
 
 ---
 
 ## 7. Faixa L — Shared Types Module & TS Preparation (Wave 2, paralela com K)
 
-**Prioridade**: P2 — Médio prazo
-**Dependências**: J (types.js splittado), I (barrels prontos)
+**Prioridade**: P2 — Médio prazo **Dependências**: J (types.js splittado), I (barrels prontos)
 **Critério de conclusão**: `types/` module criado, typedefs compartilhados centralizados
 
 ### L-1: Criar módulo types/
@@ -409,18 +416,21 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ### Resultados da execução (Faixa L)
 
-- **L-1a** ✅ `types/index.js` — barrel canônico com re-exports de DI tokens, container, event schemas
-- **L-1b** ✅ `types/events.js` — catálogo de eventos cross-module: 8 namespaces (hook, session, tool,
-  sdk, agent, api, terminal, audit), 28 event names, typedefs BaseEvent/SessionEvent/ToolEvent/SdkEvent/AuditEvent
+- **L-1a** ✅ `types/index.js` — barrel canônico com re-exports de DI tokens, container, event
+  schemas
+- **L-1b** ✅ `types/events.js` — catálogo de eventos cross-module: 8 namespaces (hook, session,
+  tool, sdk, agent, api, terminal, audit), 28 event names, typedefs
+  BaseEvent/SessionEvent/ToolEvent/SdkEvent/AuditEvent
 - **L-1c** ✅ Re-export dos 12 DI tokens canônicos via barrel `#copilot/types`
-- **L-1d** ⏸ Deferido — tipos SDK (Tool&lt;T&gt;, CopilotClient) não podem ser movidos de `sdk/types.js`
-  sem quebrar TS resolution (mesmo problema do J-3a). Tipos permanecem em `sdk/types.js` como SSOT.
+- **L-1d** ⏸ Deferido — tipos SDK (Tool&lt;T&gt;, CopilotClient) não podem ser movidos de
+  `sdk/types.js` sem quebrar TS resolution (mesmo problema do J-3a). Tipos permanecem em
+  `sdk/types.js` como SSOT.
 - **L-1e** ✅ `types/README.md` — documentação do módulo
-- **L-2** ✅ Typedefs JSDoc declarados diretamente em `events.js` (BaseEvent, SessionEvent, ToolEvent, etc.)
-  — sem necessidade de .d.ts separados
+- **L-2** ✅ Typedefs JSDoc declarados diretamente em `events.js` (BaseEvent, SessionEvent,
+  ToolEvent, etc.) — sem necessidade de .d.ts separados
 - **L-3a** ✅ `types/` registrado como L0 no LAYER_MAP (`scripts/check-layer-violations.mjs`)
-- **L-3b** ✅ `test_types_contracts.spec.js` — 6 contract tests (barrel DI re-exports, event exports,
-  namespace:action pattern, direct import resolution)
+- **L-3b** ✅ `test_types_contracts.spec.js` — 6 contract tests (barrel DI re-exports, event
+  exports, namespace:action pattern, direct import resolution)
 - **L-3c** ✅ Layer check integration: 0 violações no codebase
 - **Validação**: TypeCheck 16 erros (baseline inalterada), Lint clean, 76 testes passando
 - **tsconfig.base.json** atualizado com paths `#copilot/types` e `#copilot/types/*`
@@ -430,9 +440,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 8. Faixa M — Application Event Bus (Wave 3)
 
-**Prioridade**: P3 — Longo prazo
-**Dependências**: K (DI container), L (typed events)
-**Critério de conclusão**: EventBus cross-module funcional, ≤30 EventEmitter files ad-hoc
+**Prioridade**: P3 — Longo prazo **Dependências**: K (DI container), L (typed events) **Critério de
+conclusão**: EventBus cross-module funcional, ≤30 EventEmitter files ad-hoc
 
 ### M-1: Implementar Event Bus
 
@@ -485,32 +494,32 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
   middleware chain, error isolation, counters/stats, dispose
 - **M-1b** ✅ Wildcards implementados: `namespace:*` e `*` catch-all
 - **M-1c** ✅ Middleware chain: pipeline com `use(fn)`, suporta intercept/block/transform
-- **M-1d** ✅ Token `EVENT_BUS` criado em `core/di-tokens.js`, registrado como singleton no bootstrap
-  via `observability/bootstrap.js`
+- **M-1d** ✅ Token `EVENT_BUS` criado em `core/di-tokens.js`, registrado como singleton no
+  bootstrap via `observability/bootstrap.js`
 - **M-1e** ✅ 29 testes unitários (on/emit, unsubscribe, once, wildcards, middleware, counters,
   listenerCount, dispose, error isolation)
-- **M-2c** ✅ Catálogo de eventos publicado em `types/events.js` (28 event names, 8 namespaces,
-  5 typedefs: BaseEvent, SessionEvent, ToolEvent, SdkEvent, AuditEvent)
-- **M-2a, M-2b** ⏸ Catalogação exaustiva dos 70+ .emit() e schemas detalhados deferidos para
-  fase de migração incremental
+- **M-2c** ✅ Catálogo de eventos publicado em `types/events.js` (28 event names, 8 namespaces, 5
+  typedefs: BaseEvent, SessionEvent, ToolEvent, SdkEvent, AuditEvent)
+- **M-2a, M-2b** ⏸ Catalogação exaustiva dos 70+ .emit() e schemas detalhados deferidos para fase de
+  migração incremental
 - **M-3** ✅ `bridgeEmitter(emitter, bus, eventMap)` — utility em event-bus.js que conecta
   EventEmitter convencional ao EventBus centralizado. Retorna função de unbind.
 - **M-4** ✅ ConversationHub bridge: 5 eventos do Orchestrator re-emitidos no EventBus
   (hub:session:created, hub:session:closed, hub:turn:sent, hub:turn:complete, hub:user:injected)
-- **M-5** ✅ AlwaysAliveAgent bridge: 8 eventos lifecycle re-emitidos no EventBus
-  (agent:ready, agent:before-stop, agent:stopped, agent:error, agent:dialog:loop:changed,
-   agent:session:keepalive, agent:task:started, agent:task:delta)
-- **M-5 restante** ⏸ ~55 emitters deep agent-dialog são per-session e exigiriam refactoring invasivo.
-  31 são Socket.IO/SSE/hooks-bus (protocolo — não migráveis por design).
-- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 108 testes passando (91 node:test + 17 vitest)
+- **M-5** ✅ AlwaysAliveAgent bridge: 8 eventos lifecycle re-emitidos no EventBus (agent:ready,
+  agent:before-stop, agent:stopped, agent:error, agent:dialog:loop:changed, agent:session:keepalive,
+  agent:task:started, agent:task:delta)
+- **M-5 restante** ⏸ ~55 emitters deep agent-dialog são per-session e exigiriam refactoring
+  invasivo. 31 são Socket.IO/SSE/hooks-bus (protocolo — não migráveis por design).
+- **Validação**: TypeCheck 16 erros (baseline), Lint clean, 108 testes passando (91 node:test + 17
+  vitest)
 
 ---
 
 ## 9. Faixa N — Extensibilidade & API Services (Wave 3)
 
-**Prioridade**: P3 — Longo prazo
-**Dependências**: K (DI), L (types), M (EventBus)
-**Critério de conclusão**: services/ funcional, plugin registry básico, api/ fan-out ≤8
+**Prioridade**: P3 — Longo prazo **Dependências**: K (DI), L (types), M (EventBus) **Critério de
+conclusão**: services/ funcional, plugin registry básico, api/ fan-out ≤8
 
 ### N-1: Services layer
 
@@ -556,57 +565,76 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ### Resultados de Execução — Faixa N
 
-**N-1a**: ✅ `src/copilot/services/index.js` — barrel L4 criado, layer registrado, subpath imports OK.
+**N-1a**: ✅ `src/copilot/services/index.js` — barrel L4 criado, layer registrado, subpath imports
+OK.
 
-**N-1b**: ✅ `SessionService` — fachada para sdk sessions (create, resume, disconnect, list, foreground) com logging + EventBus.
+**N-1b**: ✅ `SessionService` — fachada para sdk sessions (create, resume, disconnect, list,
+foreground) com logging + EventBus.
 
-**N-1c**: ✅ `ToolService` — fachada para tools (buildTool, listAll, getDisabled, isDisabled) com EventBus.
+**N-1c**: ✅ `ToolService` — fachada para tools (buildTool, listAll, getDisabled, isDisabled) com
+EventBus.
 
-**N-1d**: ✅ `AuditService` — fachada para audit + observability (getTail, isHighRisk, errorTracker, metrics) com EventBus.
+**N-1d**: ✅ `AuditService` — fachada para audit + observability (getTail, isHighRisk, errorTracker,
+metrics) com EventBus.
 
-**N-1e**: ✅ `ConversationService` — fachada para conversation-hub (getHub, getStore, sendToLlmB, createHubSession).
+**N-1e**: ✅ `ConversationService` — fachada para conversation-hub (getHub, getStore, sendToLlmB,
+createHubSession).
 
 **N-2a**: ✅ `src/copilot/plugins/index.js` — barrel L3 com `CopilotPlugin` typedef.
 
-**N-2b**: ✅ `PluginRegistry` — register, install, installAll, list, has, get, size, clear. 11 testes.
+**N-2b**: ✅ `PluginRegistry` — register, install, installAll, list, has, get, size, clear. 11
+testes.
 
 **N-4a**: ✅ `scripts/arch-health.mjs` — health dashboard completo.
 
-**N-4b**: ✅ Métricas: barrel ratio, singleton count, fan-out (max/avg/details), deep imports, DI tokens, test count.
+**N-4b**: ✅ Métricas: barrel ratio, singleton count, fan-out (max/avg/details), deep imports, DI
+tokens, test count.
 
 **N-4c**: ✅ Health score A-F com fórmula ponderada.
 
-**EventBus melhoria**: `emit()` agora aceita `{type: string}` sem timestamp obrigatório — auto-preenche `Date.now()`.
+**EventBus melhoria**: `emit()` agora aceita `{type: string}` sem timestamp obrigatório —
+auto-preenche `Date.now()`.
 
 **Subfases deferidas** (alto risco / invasivas):
+
 - N-1f–N-1g: Migração api/ para services — ✅ N-1f concluída (`e20fcc96`), fan-out 11→8.
-- N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — ✅ concluídas (`eb6f88a9`).
-- N-3a–N-3d: API refactoring — ✅ Todas concluídas. N-3a via N-1f, N-3b (middleware já extraído), N-3d (fan-out ≤8 atingido).
-  N-3c: ✅ `scripts/generate-openapi.mjs` gera spec OpenAPI 3.0 a partir dos route files Express (47 paths, 50 ops). `npm run generate:openapi`.
+- N-2c–N-2e: Plugin interface contract, filesystem discovery, config-based activation — ✅
+  concluídas (`eb6f88a9`).
+- N-3a–N-3d: API refactoring — ✅ Todas concluídas. N-3a via N-1f, N-3b (middleware já extraído),
+  N-3d (fan-out ≤8 atingido). N-3c: ✅ `scripts/generate-openapi.mjs` gera spec OpenAPI 3.0 a partir
+  dos route files Express (47 paths, 50 ops). `npm run generate:openapi`.
 - N-4d: CI integration — ✅ arch-health step no code-quality.yml (`eb6f88a9`).
 
-**N-1f**: ✅ Migração de api/ para services facades — fan-out reduzido de 11→8 modules. Rotas usam SessionService, ToolService, AuditService, ConversationService.
+**N-1f**: ✅ Migração de api/ para services facades — fan-out reduzido de 11→8 modules. Rotas usam
+SessionService, ToolService, AuditService, ConversationService.
 
-**N-2c**: ✅ CopilotPlugin typedef estendido: `version`, `description`, `dependencies` opcionais. PluginRegistry valida dependências em install().
+**N-2c**: ✅ CopilotPlugin typedef estendido: `version`, `description`, `dependencies` opcionais.
+PluginRegistry valida dependências em install().
 
-**N-2d**: ✅ `discoverPlugins(baseDir, registry)` — escaneia tools/hooks/bridges/services/*.js, carrega via dynamic import, auto-infere tipo a partir do subdiretório.
+**N-2d**: ✅ `discoverPlugins(baseDir, registry)` — escaneia tools/hooks/bridges/services/\*.js,
+carrega via dynamic import, auto-infere tipo a partir do subdiretório.
 
-**N-2e**: ✅ `activatePlugins(registry, container, enabledNames?)` — whitelist-based activation; sem whitelist instala todos.
+**N-2e**: ✅ `activatePlugins(registry, container, enabledNames?)` — whitelist-based activation; sem
+whitelist instala todos.
 
-**N-3b**: ✅ Middleware já extraído em middleware.js (error handler) e session-middleware.js (rate limiting, validation).
+**N-3b**: ✅ Middleware já extraído em middleware.js (error handler) e session-middleware.js (rate
+limiting, validation).
 
-**N-3d**: ✅ api/ fan-out ≤ 8 — meta atingida na N-1f (8 modules: agent, bridges, channel, config, core, hooks, observability, services).
+**N-3d**: ✅ api/ fan-out ≤ 8 — meta atingida na N-1f (8 modules: agent, bridges, channel, config,
+core, hooks, observability, services).
 
-**N-4d**: ✅ Arch-health step integrado ao workflow code-quality.yml como step informativo (continue-on-error).
+**N-4d**: ✅ Arch-health step integrado ao workflow code-quality.yml como step informativo
+(continue-on-error).
 
-**Validação final N completa**: 22 node:test + 17 vitest = 39 testes copilot ✅ | lint 0 errors ✅ | typecheck 16 (baseline) ✅
+**Validação final N completa**: 22 node:test + 17 vitest = 39 testes copilot ✅ | lint 0 errors ✅ |
+typecheck 16 (baseline) ✅
 
 ---
 
 ## 10. Resumo de Subfases por Faixa (H–N concluídas)
 
-| Faixa | Nome                       | Subfases | Wave | Deps    | Status      |
-| ----- | -------------------------- | -------- | ---- | ------- | ----------- |
+| Faixa | Nome                       | Subfases | Wave | Deps    | Status       |
+| ----- | -------------------------- | -------- | ---- | ------- | ------------ |
 | **H** | CI Hardening + Violações   | 16       | 0    | —       | ✅ CONCLUÍDA |
 | **I** | Barrel Enforcement         | 28       | 1    | H       | ✅ CONCLUÍDA |
 | **J** | Decomposição de Arquivos   | 29       | 1    | H       | ✅ CONCLUÍDA |
@@ -620,8 +648,8 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ## 11. Waves 4–6 — Roadmap Pós-Faixa N
 
-> As Faixas H–N levaram o Health Score de D(35) para D(65). As Waves 4–6 definem o caminho
-> de D(65) para A-(90+).
+> As Faixas H–N levaram o Health Score de D(35) para D(65). As Waves 4–6 definem o caminho de D(65)
+> para A-(90+).
 
 ### 11.1 Wave 4 — Deep Cleanup (health 65→78)
 
@@ -670,7 +698,7 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 | W6-2 | Converter `core/` para .ts               | W6-1 | Alto    | Foundation TS |
 | W6-3 | tsconfig paths para barrels              | W6-1 | Médio   | TS module res |
 | W6-4 | Converter `db/` para .ts                 | W6-1 | Baixo   | Leaf .ts      |
-| W6-5 | Resolver 16 typecheck errors (rpc-*.js)  | W6-3 | Médio   | 0 errors      |
+| W6-5 | Resolver 16 typecheck errors (rpc-\*.js) | W6-3 | Médio   | 0 errors      |
 | W6-6 | Observable-first metrics (OpenTelemetry) | W5-3 | Alto    | Trace system  |
 | W6-7 | GraphQL gateway skeleton                 | W5   | Alto    | API evolution |
 | W6-8 | Horizontal scaling: worker pool draft    | W5-9 | Alto    | Scale out     |
@@ -683,15 +711,15 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 | Métrica             | Baseline | Pós W3 (atual) | Pós W4      | Pós W5      | Pós W6      |
 | ------------------- | -------- | -------------- | ----------- | ----------- | ----------- |
-| Layer violations    | 4        | **0** ✅        | 0           | 0           | 0           |
-| Barrel coverage     | 23%      | **100%** ✅     | 100%        | 100%        | 100%        |
-| Deep imports        | 233      | **165** ⚠️      | **≤50**     | ≤30         | allow-list  |
-| Files >400 LoC      | 25       | **18** ⚠️       | **≤14**     | ≤8          | ≤5          |
+| Layer violations    | 4        | **0** ✅       | 0           | 0           | 0           |
+| Barrel coverage     | 23%      | **100%** ✅    | 100%        | 100%        | 100%        |
+| Deep imports        | 233      | **165** ⚠️     | **≤50**     | ≤30         | allow-list  |
+| Files >400 LoC      | 25       | **18** ⚠️      | **≤14**     | ≤8          | ≤5          |
 | Singletons (reais)  | ~30      | **73** (15-20) | **≤15**     | ≤5          | 0 (DI)      |
-| DI setters          | 22       | **23** ⚠️       | **0** (DI)  | 0           | 0           |
+| DI setters          | 22       | **23** ⚠️      | **0** (DI)  | 0           | 0           |
 | CI gates            | 2        | **5+**         | 7+          | 10+         | 12+         |
-| Contract tests      | 6        | **108** ✅      | 120+        | 130+        | 150+        |
-| EventEmitter ad-hoc | 70       | **72** ⚠️       | 72          | **≤40**     | ≤30         |
+| Contract tests      | 6        | **108** ✅     | 120+        | 130+        | 150+        |
+| EventEmitter ad-hoc | 70       | **72** ⚠️      | 72          | **≤40**     | ≤30         |
 | Fan-out max         | 11       | **19** (term)  | **≤15**     | ≤12         | ≤8          |
 | Health Score        | D (35)   | **D (65)**     | **C+ (78)** | **B+ (85)** | **A- (90)** |
 
@@ -714,13 +742,13 @@ O roadmap v2 define **7 faixas de trabalho** (H–N) que evoluem o sistema em 4 
 
 ### Faixas H–N (✅ concluídas — Waves 0–3)
 
-153 subfases em 7 faixas executadas com sucesso. Health Score: D(35) → D(65).
-Principais conquistas: 17 módulos, DI container, EventBus, Plugin system, 108 testes, 0 violações.
+153 subfases em 7 faixas executadas com sucesso. Health Score: D(35) → D(65). Principais conquistas:
+17 módulos, DI container, EventBus, Plugin system, 108 testes, 0 violações.
 
 ### Waves 4–6 (⬜ planejadas)
 
-27 subfases adicionais que levam o sistema de D(65) a A-(90).
-Caminho crítico: W4 (cleanup → score 78) → W5 (arquitetura → score 85) → W6 (TypeScript → score 90).
+27 subfases adicionais que levam o sistema de D(65) a A-(90). Caminho crítico: W4 (cleanup →
+score 78) → W5 (arquitetura → score 85) → W6 (TypeScript → score 90).
 
-A execução pode ser incremental — cada subfase é independente e commitável.
-Detalhes de status em PARTE-21F.
+A execução pode ser incremental — cada subfase é independente e commitável. Detalhes de status em
+PARTE-21F.

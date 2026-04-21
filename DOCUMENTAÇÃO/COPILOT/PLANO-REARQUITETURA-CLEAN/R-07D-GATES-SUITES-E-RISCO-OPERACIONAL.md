@@ -1,8 +1,7 @@
 # R-07D — Gates, Suites Mínimas e Baseline de Risco Operacional
 
-**Programa**: P0 / Faixa A
-**Data-base**: 2026-04-16
-**Status**: canônico para quality/security gate do ciclo clean
+**Programa**: P0 / Faixa A **Data-base**: 2026-04-16 **Status**: canônico para quality/security gate
+do ciclo clean
 
 ---
 

@@ -1,7 +1,6 @@
 # 04-CHANNEL-COMMUNICATION — Auditoria do Módulo `channel/`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Módulo**: `src/copilot/channel/`
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Módulo**: `src/copilot/channel/`
 **Documentado em**: 2026-04-18
 
 ---
@@ -28,8 +27,8 @@ channel/
 
 ```js
 const INJECT_RATE_PER_SEC = (() => {
-    const raw = parseInt(process.env['INJECT_RATE_LIMIT_PER_SEC'] ?? '', 10);
-    return Number.isFinite(raw) && raw > 0 ? raw : 30;
+  const raw = parseInt(process.env['INJECT_RATE_LIMIT_PER_SEC'] ?? '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 30;
 })();
 ```
 
@@ -39,12 +38,12 @@ const INJECT_RATE_PER_SEC = (() => {
 
 ```js
 const DEFAULT_PORT = (() => {
-    const raw = LLM_B_TERMINAL_PORT;
-    if (!Number.isInteger(raw) || raw < 1 || raw > 65535) {
-        log('WARN', `[channel/inject] LLM_B_TERMINAL_PORT inválida (${raw}), usando 3009`);
-        return 3009;
-    }
-    return raw;
+  const raw = LLM_B_TERMINAL_PORT;
+  if (!Number.isInteger(raw) || raw < 1 || raw > 65535) {
+    log('WARN', `[channel/inject] LLM_B_TERMINAL_PORT inválida (${raw}), usando 3009`);
+    return 3009;
+  }
+  return raw;
 })();
 ```
 
@@ -91,8 +90,8 @@ if (lastEventId) headers['Last-Event-ID'] = lastEventId;
 ```js
 const MAX_BUF_BYTES = 256 * 1024; // 256KB
 if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
-    buf = '';
-    return;
+  buf = '';
+  return;
 }
 ```
 
@@ -100,8 +99,9 @@ if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
 | -------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **BUG-SSE-01** | P1  | Quando `buf` excede `MAX_BUF_BYTES`, **o buffer é silenciosamente descartado** (`buf = ''`). Eventos parcialmente recebidos são perdidos sem notificação ao caller nem evento de erro. O modelo pode receber resposta incompleta sem saber. Correto: emitir evento de erro/overflow e forçar reconexão. |
 
-> **Status de execução (2026-04-17): corrigido no código.**
-> O cliente SSE agora faz `log('WARN', ...)` e destrói a request para forçar reconexão explícita, em vez de truncar o buffer silenciosamente.
+> **Status de execução (2026-04-17): corrigido no código.** O cliente SSE agora faz
+> `log('WARN', ...)` e destrói a request para forçar reconexão explícita, em vez de truncar o buffer
+> silenciosamente.
 
 ---
 
@@ -113,7 +113,7 @@ if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
 let _agent = null;
 
 export function setBridgeAgent(agent) {
-    _agent = agent;
+  _agent = agent;
 }
 ```
 
@@ -121,7 +121,9 @@ export function setBridgeAgent(agent) {
 
 **CAT-003** do catálogo anterior refere-se a potential cross-talk entre sessões no canal. Análise:
 
-O `_agent` é um singleton global — `setBridgeAgent()` sobrescreve silenciosamente se chamado duas vezes. Em ambiente com múltiplos terminais (improvável mas possível), a segunda chamada substituiria o agente ativo sem aviso.
+O `_agent` é um singleton global — `setBridgeAgent()` sobrescreve silenciosamente se chamado duas
+vezes. Em ambiente com múltiplos terminais (improvável mas possível), a segunda chamada substituiria
+o agente ativo sem aviso.
 
 | ID                        | Sev | Descrição                                                                                                                                                                                                                 |
 | ------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -140,8 +142,9 @@ O `_agent` é um singleton global — `setBridgeAgent()` sobrescreve silenciosam
 
 ### **NOVO BUG P1 ENCONTRADO: BUG-SSE-01**
 
-Este bug era uma regressão crítica: respostas do LLM podiam ser truncadas silenciosamente se o buffer SSE excedesse 256KB. O código atual já força reconexão explícita nesse cenário.
+Este bug era uma regressão crítica: respostas do LLM podiam ser truncadas silenciosamente se o
+buffer SSE excedesse 256KB. O código atual já força reconexão explícita nesse cenário.
 
 ---
 
-*Próximo: [05-CONVERSATION-HUB.md](./05-CONVERSATION-HUB.md)*
+_Próximo: [05-CONVERSATION-HUB.md](./05-CONVERSATION-HUB.md)_

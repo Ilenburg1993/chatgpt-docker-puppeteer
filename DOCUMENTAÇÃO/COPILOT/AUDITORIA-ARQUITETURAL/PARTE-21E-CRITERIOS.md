@@ -1,9 +1,9 @@
 # PARTE-21E — Critérios e Métricas: Avaliação Profunda Pós-Roadmap
 
-**Data**: 2026-04-12 | **Status**: BASELINE (scores pré-Faixa H) | **Versão**: 2.0
-**Precedente**: PARTE-20E (critérios v1.0), PARTE-21A (baseline v2.0), PARTE-21F (estado atual)
-**Scope**: Avaliação profunda contra 13 critérios canônicos, com evidências por arquivo,
-projeções por Wave do roadmap PARTE-21C, e novos sub-critérios para preparação de upgrades vastos.
+**Data**: 2026-04-12 | **Status**: BASELINE (scores pré-Faixa H) | **Versão**: 2.0 **Precedente**:
+PARTE-20E (critérios v1.0), PARTE-21A (baseline v2.0), PARTE-21F (estado atual) **Scope**: Avaliação
+profunda contra 13 critérios canônicos, com evidências por arquivo, projeções por Wave do roadmap
+PARTE-21C, e novos sub-critérios para preparação de upgrades vastos.
 
 > **⚠️ ATENÇÃO**: Os scores neste documento refletem o estado **pré-execução** das Faixas H–N.
 > Scores atualizados pós-execução estão na PARTE-21F.
@@ -14,8 +14,8 @@ projeções por Wave do roadmap PARTE-21C, e novos sub-critérios para preparaç
 
 ### 1.1 Diferenças da v1.0
 
-A v1.0 deste documento usou o mesmo template da PARTE-20E com scores atualizados.
-A v2.0 expande radicalmente:
+A v1.0 deste documento usou o mesmo template da PARTE-20E com scores atualizados. A v2.0 expande
+radicalmente:
 
 - **Evidências por arquivo**: cada sub-critério cita os arquivos relevantes
 - **Projeção por Wave**: cada critério tem target score para W0, W1, W2, W3
@@ -41,7 +41,7 @@ L5: api   |  L6: terminal
 
 | Sub | Critério                        | Score | Evidência                                                            |
 | --- | ------------------------------- | ----- | -------------------------------------------------------------------- |
-| 1.1 | README.md com scope claro       | 4/4   | 14/14 módulos documentados ✅                                         |
+| 1.1 | README.md com scope claro       | 4/4   | 14/14 módulos documentados ✅                                        |
 | 1.2 | ≤2 responsabilidades por módulo | 3/4   | `agent/` tem 4+ (lifecycle, dialog, session, queue, infra, watchdog) |
 | 1.3 | Sem arquivo multi-concern (>3)  | 3/4   | 25 arquivos >400 LoC = potencial multi-concern (ver tabela abaixo)   |
 | 1.4 | index.js como barrel puro       | 3/4   | 3 barrels com lógica de inicialização embutida                       |
@@ -65,8 +65,8 @@ L5: api   |  L6: terminal
 | `sdk/types.js`                        | 418 | 40+ JSDoc typedefs (puro = OK)                        |
 | `bridges/mcp-tool-bridge.js`          | 415 | Protocol, transport, registration, error handling     |
 
-> `sdk/types.js` é exceção aceitável: arquivo puro de typedefs sem lógica.
-> Os demais 13 arquivos são candidatos a split na Faixa J do roadmap.
+> `sdk/types.js` é exceção aceitável: arquivo puro de typedefs sem lógica. Os demais 13 arquivos são
+> candidatos a split na Faixa J do roadmap.
 
 **Projeção**:
 
@@ -119,7 +119,7 @@ L5: api   |  L6: terminal
 
 | Sub | Critério                             | Score | Evidência                                         |
 | --- | ------------------------------------ | ----- | ------------------------------------------------- |
-| 3.1 | Entry point único (index.js)         | 4/4   | 14/14 módulos têm index.js ✅                      |
+| 3.1 | Entry point único (index.js)         | 4/4   | 14/14 módulos têm index.js ✅                     |
 | 3.2 | Sem import de internals cross-module | 1.5/4 | **233 deep imports** (73% do total cross-module!) |
 | 3.3 | JSDoc em public API (barrel exports) | 3.0/4 | 14/14 barrels, mas ~40% dos exports sem @param    |
 | 3.4 | Internals nunca expostos por barrel  | 2.5/4 | 3 barrels expõem internals desnecessariamente     |
@@ -141,8 +141,8 @@ L5: api   |  L6: terminal
 | tools            | 2              | 6            | 75%    | variado                         |
 | db               | 1              | 1            | 50%    | `db/connection.js`              |
 
-> O maior ofensor é `observability/logger.js` com 134 deep imports diretos.
-> Isso sozinho representa 57% de todos os deep imports do sistema.
+> O maior ofensor é `observability/logger.js` com 134 deep imports diretos. Isso sozinho representa
+> 57% de todos os deep imports do sistema.
 
 **Projeção**:
 
@@ -189,8 +189,8 @@ L5: api   |  L6: terminal
 | `initX()`      | 5     | `initObservability`, `initHooks`, `initTools`                   |
 | `bootstrapX()` | 3     | `bootstrapObservability`, `bootstrapLateDeps`, `bootstrapAgent` |
 
-> **Problema**: sem container DI, a ordem de chamada dos setters é implícita em `entry.js`.
-> Um reordenamento acidental causa `undefined` em runtime.
+> **Problema**: sem container DI, a ordem de chamada dos setters é implícita em `entry.js`. Um
+> reordenamento acidental causa `undefined` em runtime.
 
 **Projeção**:
 
@@ -216,8 +216,8 @@ L5: api   |  L6: terminal
 
 **Distribuição de LoC completa**:
 
-| Faixa     | Arquivos | % total | Estado       |
-| --------- | -------- | ------- | ------------ |
+| Faixa     | Arquivos | % total | Estado        |
+| --------- | -------- | ------- | ------------- |
 | ≤100 LoC  | 98       | 34%     | ✅ Saudável   |
 | 101-200   | 87       | 30%     | ✅ Saudável   |
 | 201-300   | 52       | 18%     | ✅ Saudável   |
@@ -225,7 +225,7 @@ L5: api   |  L6: terminal
 | 401-500   | 12       | 4%      | 🟠 Split      |
 | 501-600   | 10       | 3%      | 🔴 Split      |
 | >600      | 3        | 1%      | 🔴 Urgente    |
-| **Total** | **287**  | 100%    |              |
+| **Total** | **287**  | 100%    |               |
 
 **Top 5 candidatos urgentes a split**:
 
@@ -254,7 +254,7 @@ L5: api   |  L6: terminal
 
 | Sub | Critério               | Score | Evidência                                               |
 | --- | ---------------------- | ----- | ------------------------------------------------------- |
-| 6.1 | Segurança centralizada | 4/4   | `core/security/` ✅                                      |
+| 6.1 | Segurança centralizada | 4/4   | `core/security/` ✅                                     |
 | 6.2 | Config centralizada    | 3.5/4 | `config/` + `sdk/copilot-sdk-config.js` (split concern) |
 | 6.3 | Logging centralizado   | 3.0/4 | `observability/logger.js` + 134 deep imports diretos    |
 | 6.4 | Tipos centralizados    | 3.5/4 | `sdk/types.js` (40+ typedefs) mas sem `types/` L0       |
@@ -270,8 +270,9 @@ L5: api   |  L6: terminal
 | Tool schema validation      | ~3          | tools, hooks, bridges       |
 | Session context extraction  | ~4          | agent, terminal, hooks, api |
 
-> O maior DRY violation é o padrão de logger: `import { getLogger } from '#copilot/observability/logger'`
-> repetido 134 vezes. Com barrel enforcement, seria `import { getLogger } from '#copilot/observability'`.
+> O maior DRY violation é o padrão de logger:
+> `import { getLogger } from '#copilot/observability/logger'` repetido 134 vezes. Com barrel
+> enforcement, seria `import { getLogger } from '#copilot/observability'`.
 
 **Projeção**:
 
@@ -290,13 +291,14 @@ L5: api   |  L6: terminal
 
 | Sub | Critério                             | Score | Evidência                                          |
 | --- | ------------------------------------ | ----- | -------------------------------------------------- |
-| 7.1 | Sem utils/helpers/misc/shared        | 4/4   | Nenhum detectado ✅                                 |
+| 7.1 | Sem utils/helpers/misc/shared        | 4/4   | Nenhum detectado ✅                                |
 | 7.2 | Nomes refletem responsabilidade      | 3.5/4 | `lib/` em hooks/ é genérico demais                 |
-| 7.3 | Sem nomes duplicados cross-module    | 4/4   | Verificado: sem colisões ✅                         |
+| 7.3 | Sem nomes duplicados cross-module    | 4/4   | Verificado: sem colisões ✅                        |
 | 7.4 | Subpastas com substantivos concretos | 3.5/4 | `handlers/` em terminal/ é vago (handlers de quê?) |
-| 7.5 | Sufixos explícitos (-factory, etc)   | 4/4   | Padrão consistente ✅                               |
+| 7.5 | Sufixos explícitos (-factory, etc)   | 4/4   | Padrão consistente ✅                              |
 
 **Issues menores**:
+
 - `hooks/lib/` → deveria ser `hooks/matchers/` ou `hooks/evaluators/`
 - `terminal/handlers/` → deveria ser `terminal/command-handlers/` ou `terminal/metric-handlers/`
 
@@ -310,13 +312,14 @@ L5: api   |  L6: terminal
 
 | Sub | Critério                         | Score | Evidência                                                  |
 | --- | -------------------------------- | ----- | ---------------------------------------------------------- |
-| 8.1 | Tools extensíveis sem mod agent/ | 4/4   | `allTools` array + `buildTool()` ✅                         |
+| 8.1 | Tools extensíveis sem mod agent/ | 4/4   | `allTools` array + `buildTool()` ✅                        |
 | 8.2 | Bridges extensíveis              | 3.5/4 | bridges/ isolado, mas registry manual (sem autodiscovery)  |
 | 8.3 | Terminal commands extensíveis    | 3.5/4 | autoload via glob, mas sem hot-reload                      |
 | 8.4 | Hooks via registry               | 3.0/4 | registry.js, mas sem priority ordering ou middleware chain |
 | 8.5 | Observability extensível         | 3.5/4 | observers/ + collectors/, mas sem plugin interface formal  |
 
 **Gaps para extensibilidade vasta**:
+
 - Sem plugin interface formal (lifecycle: load/unload/configure)
 - Sem autodiscovery de bridges (manual array)
 - Hooks sem priority/middleware pattern
@@ -339,11 +342,11 @@ L5: api   |  L6: terminal
 
 | Sub | Critério                      | Score | Evidência                                                |
 | --- | ----------------------------- | ----- | -------------------------------------------------------- |
-| 9.1 | Tools via audit pipeline      | 4/4   | `audit/pipeline.js` ✅                                    |
-| 9.2 | Session start/end auditada    | 4/4   | Via observers ✅                                          |
+| 9.1 | Tools via audit pipeline      | 4/4   | `audit/pipeline.js` ✅                                   |
+| 9.2 | Session start/end auditada    | 4/4   | Via observers ✅                                         |
 | 9.3 | Permissões registradas        | 3.5/4 | hooks/permission + audit, mas sem structured log         |
 | 9.4 | Audit trail append-only       | 3.5/4 | Ring buffer com limit, mas sem persistence cross-restart |
-| 9.5 | session_id/turn_id correlação | 4/4   | Propagado via context ✅                                  |
+| 9.5 | session_id/turn_id correlação | 4/4   | Propagado via context ✅                                 |
 
 **Gap**: Ring buffer perde dados no restart. Event sourcing (Wave 3) resolve.
 
@@ -357,14 +360,14 @@ L5: api   |  L6: terminal
 
 | Sub  | Critério                | Score | Evidência                                            |
 | ---- | ----------------------- | ----- | ---------------------------------------------------- |
-| 10.1 | SDK via sdk/            | 4/4   | Wrapper completo ✅                                   |
+| 10.1 | SDK via sdk/            | 4/4   | Wrapper completo ✅                                  |
 | 10.2 | Git/GitHub via bridges/ | 3.5/4 | git-bridge + gh, mas 2 deep imports de core/errors   |
 | 10.3 | MCP via bridges/        | 3.0/4 | mcp-tool-bridge.js = 415 LoC (candidato split)       |
-| 10.4 | SQLite via db/          | 4/4   | better-sqlite3 isolado ✅                             |
+| 10.4 | SQLite via db/          | 4/4   | better-sqlite3 isolado ✅                            |
 | 10.5 | Env via config/env      | 2.0/4 | core/constants re-exporta de config (violação L0→L2) |
 
-**Detalhe de 10.5**: `core/constants.js` faz `export { ENV_KEYS } from '#copilot/config/env'`.
-Isso faz L0 depender de L2, violando a hierarquia. Fix: mover `ENV_KEYS` para `core/` (é constante).
+**Detalhe de 10.5**: `core/constants.js` faz `export { ENV_KEYS } from '#copilot/config/env'`. Isso
+faz L0 depender de L2, violando a hierarquia. Fix: mover `ENV_KEYS` para `core/` (é constante).
 
 **Projeção**:
 
@@ -400,7 +403,8 @@ Isso faz L0 depender de L2, violando a hierarquia. Fix: mover `ENV_KEYS` para `c
 | E2E tests          | 0       | Nenhum                        |
 
 > Este é o critério com menor score. A cobertura de testes é **virtualmente zero** em termos de
-> comportamento testado. Os 6 contract tests validam apenas que as exports existem, não que funcionam.
+> comportamento testado. Os 6 contract tests validam apenas que as exports existem, não que
+> funcionam.
 
 **Projeção**:
 
@@ -417,8 +421,8 @@ Isso faz L0 depender de L2, violando a hierarquia. Fix: mover `ENV_KEYS` para `c
 
 **Score**: 4.00/4 ✅
 
-| Sub  | Critério               | Score | Evidência        |
-| ---- | ---------------------- | ----- | ---------------- |
+| Sub  | Critério               | Score | Evidência         |
+| ---- | ---------------------- | ----- | ----------------- |
 | 12.1 | Logs fora de src/      | 4/4   | var/logs/ ✅      |
 | 12.2 | Snapshots fora de src/ | 4/4   | var/snapshots/ ✅ |
 | 12.3 | Sem .bak em src/       | 4/4   | ✅                |
@@ -436,11 +440,12 @@ Nenhuma mudança necessária.
 | ---- | ------------------------- | ----- | -------------------------------------------------------- |
 | 13.1 | MaxListeners declarado    | 3.5/4 | EventEmitter configurado; 70+ files emit sem central bus |
 | 13.2 | Timers limpos no teardown | 3.5/4 | timer-registry.js, mas ~5 setTimeout soltos detectados   |
-| 13.3 | Ring buffers com limites  | 4/4   | audit ring buffer ✅                                      |
+| 13.3 | Ring buffers com limites  | 4/4   | audit ring buffer ✅                                     |
 | 13.4 | Streams fechados em erro  | 3.5/4 | Maioria OK; 2 streams em bridges/ sem error handler      |
 | 13.5 | AbortController propagado | 3.5/4 | Propagado via context, mas 3 loops sem abort check       |
 
 **setTimeout soltos detectados** (candidatos a timer-registry):
+
 - `agent/dialog/loop-manager.js` — retry delay sem clearTimeout
 - `terminal/rendering/progress-bar.js` — animation interval
 - `hooks/session-hooks.js` — timeout guard
@@ -471,8 +476,8 @@ Nenhuma mudança necessária.
 | 14.3 | Session scoped (não global)       | 2.0/4 | Session manager existe, mas state é module-level |
 | 14.4 | Fork de contexto sem side effects | 1.5/4 | 30 singletons impedem fork limpo                 |
 
-> Multi-agent requer que cada agent instância tenha estado isolado.
-> Atualmente, o module-level `let` pattern impede instanciação paralela.
+> Multi-agent requer que cada agent instância tenha estado isolado. Atualmente, o module-level `let`
+> pattern impede instanciação paralela.
 
 **Projeção**: 1.50 → 3.50 após Wave 2 (DI Container com fork/dispose).
 
@@ -504,8 +509,8 @@ Nenhuma mudança necessária.
 | 16.3 | @ts-check em arquivos core   | 2.5/4 | Parcial; muitos arquivos sem @ts-check             |
 | 16.4 | .d.ts declarations emit      | 2.0/4 | tsconfig.declarations.json existe, mas com erros   |
 
-> O caminho de menor atrito é JSDoc-first → declarations → gradual .ts conversion.
-> O sistema é tipável (0 erros tsserver), mas @ts-check não está universalizado.
+> O caminho de menor atrito é JSDoc-first → declarations → gradual .ts conversion. O sistema é
+> tipável (0 erros tsserver), mas @ts-check não está universalizado.
 
 **Projeção**: 2.75 → 3.75 após Wave 2 (Shared types L0 + barrel-only simplifica declarations).
 
@@ -518,11 +523,12 @@ Nenhuma mudança necessária.
 | Sub  | Critério                       | Score | Evidência                                           |
 | ---- | ------------------------------ | ----- | --------------------------------------------------- |
 | 17.1 | Structured logging (JSON)      | 2.5/4 | logger.js suporta, mas nem todos os call sites usam |
-| 17.2 | Metrics collection padronizado | 3.0/4 | collectors/ pattern ✅                               |
+| 17.2 | Metrics collection padronizado | 3.0/4 | collectors/ pattern ✅                              |
 | 17.3 | Trace/Span propagation         | 1.5/4 | session_id propagado, mas sem span tree formal      |
 | 17.4 | Health check endpoints         | 3.5/4 | api/express/ tem routes, mas sem liveness/readiness |
 
-> Para horizontal scaling e API federation, observability precisa de distributed tracing (OpenTelemetry).
+> Para horizontal scaling e API federation, observability precisa de distributed tracing
+> (OpenTelemetry).
 
 **Projeção**: 2.50 → 3.75 após Wave 3 (Event bus + OpenTelemetry integration).
 
@@ -556,8 +562,8 @@ Nenhuma mudança necessária.
 
 ### 4.1 Explicação da Diferença v1.0 → v2.0
 
-A v1.0 reportava 47.0/52 (91%). A v2.0 reporta 40.5/52 (78%). A diferença **não** é regressão —
-é **rigor aumentado**:
+A v1.0 reportava 47.0/52 (91%). A v2.0 reporta 40.5/52 (78%). A diferença **não** é regressão — é
+**rigor aumentado**:
 
 | Critério | v1.0 → v2.0 | Motivo da redução                                            |
 | -------- | ----------- | ------------------------------------------------------------ |
@@ -607,15 +613,16 @@ Target W3 (C1-C17):      66.5/68  (98%)  █████████████
 
 ## 7. Conclusão
 
-A avaliação v2.0 com rigor aumentado revela que o sistema está a **78% (C1-C13)** ou **74% (C1-C17)**
-do ideal — significativamente abaixo do que a v1.0 otimista reportava (91%).
+A avaliação v2.0 com rigor aumentado revela que o sistema está a **78% (C1-C13)** ou **74%
+(C1-C17)** do ideal — significativamente abaixo do que a v1.0 otimista reportava (91%).
 
 Os **5 critérios mais distantes do ideal** são:
+
 1. **C11 Testabilidade** (2.00/4) — zero testes de comportamento
 2. **C14 Multi-Agent** (1.50/4) — singletons impedem fork
 3. **C15 Plugin Architecture** (1.75/4) — sem lifecycle/registry formal
 4. **C5 Tamanho/Coesão** (2.25/4) — 25 arquivos >400 LoC
 5. **C2 Hierarquia** (2.25/4) — CI gate com regex incompleto
 
-O roadmap PARTE-21C (Faixas H-N, 153 subfases, 4 Waves) endereça sistematicamente cada gap,
-com projeção para **99.5% (C1-C13)** e **97.8% (C1-C17)** ao fim da Wave 3.
+O roadmap PARTE-21C (Faixas H-N, 153 subfases, 4 Waves) endereça sistematicamente cada gap, com
+projeção para **99.5% (C1-C13)** e **97.8% (C1-C17)** ao fim da Wave 3.

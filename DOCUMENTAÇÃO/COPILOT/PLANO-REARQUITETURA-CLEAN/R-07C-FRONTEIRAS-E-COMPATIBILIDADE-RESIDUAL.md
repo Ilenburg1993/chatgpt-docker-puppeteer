@@ -1,8 +1,7 @@
 # R-07C — Fronteiras por Camada e Compatibilidade Residual
 
-**Programa**: P0 / Faixa A
-**Data-base**: 2026-04-16
-**Status**: canônico para governança de imports e shims
+**Programa**: P0 / Faixa A **Data-base**: 2026-04-16 **Status**: canônico para governança de imports
+e shims
 
 ---
 

@@ -1,11 +1,13 @@
 # PARTE-23I — Roadmap Expandido v2: 7 Faixas, 21 Fases, 147 Subfases
 
-**Data**: 2026-04-12 | **Status**: Em Execução | **Versão**: 2.1
-**Última atualização**: 2026-04-12 — FAIXA-2 concluída (commit `7193f74f`)
-**Scope**: Plano de execução completo — corrigido com descobertas da auditoria profunda
-**Precedente**: PARTE-23F (roadmap v1), PARTE-23G (situação atual), PARTE-23H (situação ideal)
+**Data**: 2026-04-12 | **Status**: Em Execução | **Versão**: 2.1 **Última atualização**: 2026-04-12
+— FAIXA-2 concluída (commit `7193f74f`) **Scope**: Plano de execução completo — corrigido com
+descobertas da auditoria profunda **Precedente**: PARTE-23F (roadmap v1), PARTE-23G (situação
+atual), PARTE-23H (situação ideal)
 
-> **Correções vs PARTE-23F**: bridgeEmitter JÁ EXISTE (2/8 usam), core/retry.js JÁ EXISTE (bridges não usam), shutdown JÁ é priority-based (3/8 handlers), feature-flags JÁ existem (SDK-only). Foco muda de CRIAÇÃO para ADOÇÃO.
+> **Correções vs PARTE-23F**: bridgeEmitter JÁ EXISTE (2/8 usam), core/retry.js JÁ EXISTE (bridges
+> não usam), shutdown JÁ é priority-based (3/8 handlers), feature-flags JÁ existem (SDK-only). Foco
+> muda de CRIAÇÃO para ADOÇÃO.
 
 ---
 
@@ -57,6 +59,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 > Ações que podem ser feitas **agora** com impacto imediato e risco zero.
 
 ### Fase 0A: Test Import Fix — [CORREÇÃO] ★★★★★
+
 > Root cause: 299/320 specs não importam `{ test } from 'node:test'`
 
 | Sub  | Tarefa                                                                      | Tipo       | Esforço | Dep  |
@@ -69,10 +72,11 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 | 0A.6 | Fix de mocks obsoletos (APIs changed)                                       | [CORREÇÃO] | Médio   | 0A.5 |
 | 0A.7 | Target: ≥180/320 unit specs passando (56%+)                                 | —          | —       | 0A.6 |
 
-**Critério de saída**: `npm run test:fast` → ≥180 passing
-**Estimativa**: 0A.1-0A.3 em 1 sessão; 0A.4-0A.7 em 2-3 sessões
+**Critério de saída**: `npm run test:fast` → ≥180 passing **Estimativa**: 0A.1-0A.3 em 1 sessão;
+0A.4-0A.7 em 2-3 sessões
 
 ### Fase 0B: Error Handler Dedup — [CORREÇÃO] ★★★★★
+
 > Duplicate process.on('uncaughtException') em entry.js + error-tracker.js
 
 | Sub  | Tarefa                                                                         | Tipo       | Esforço | Dep  |
@@ -84,6 +88,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 1 handler global, 1 process.exit
 
 ### Fase 0C: Shutdown Handlers +5 — [ADOÇÃO] ★★★★★
+
 > core/shutdown.js já é priority-based. Só precisa registrar mais handlers.
 
 | Sub  | Tarefa                                                                  | Tipo     | Esforço | Dep |
@@ -101,6 +106,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 ## FAIXA-1: Foundation — ★★★★★
 
 ### Fase 1A: Health-Check Honesto — [CORREÇÃO]
+
 > Calibrar para score real (atualmente 97/100 vs real ~42/100)
 
 | Sub  | Tarefa                                                           | Tipo       | Esforço | Dep       |
@@ -118,6 +124,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: Health-check reflete realidade; ≥50/100 honest
 
 ### Fase 1B: Cleanup Módulos — [MIGRAÇÃO]
+
 > Eliminar dead code e consolidar
 
 | Sub  | Tarefa                                              | Tipo       | Esforço | Dep  |
@@ -131,6 +138,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 0 módulos órfãos
 
 ### Fase 1C: shared-state → DI — [MIGRAÇÃO]
+
 > `core/shared-state.js` (42 LoC) é estado global. Deve ser DI singleton.
 
 | Sub  | Tarefa                                                                  | Tipo       | Esforço | Dep  |
@@ -148,29 +156,31 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 > **Resultado**: SSOT completo em `events/`, 6/6 emitters bridged, 15 subscribers cross-module.
 
 ### Fase 2A: events/ como SSOT — [MIGRAÇÃO] ✅ COMPLETA
+
 > Consolidar 4 fontes de event strings em 1
 
-| Sub   | Tarefa                                                                         | Tipo       | Esforço | Status |
-| ----- | ------------------------------------------------------------------------------ | ---------- | ------- | ------ |
-| 2A.1  | Criar `events/agent-events.js` (migrar de core/events.js)                      | [MIGRAÇÃO] | Baixo   | ✅      |
-| 2A.2  | Criar `events/dialog-events.js` — incluído em agent-events.js (AGENT_DIALOG_*) | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2A.3  | Criar `events/hub-events.js` (migrar de conversation-hub/events.js)            | [MIGRAÇÃO] | Baixo   | ✅      |
-| 2A.4  | Criar `events/hook-events.js` (migrar de types/events.js)                      | [MIGRAÇÃO] | Baixo   | ✅      |
-| 2A.5  | Criar `events/terminal-events.js` (consts para state.js)                       | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2A.6  | Criar `events/api-events.js` — incluído em hub-events.js e system-events.js    | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2A.7  | Criar `events/system-events.js` (shutdown, config change, health)              | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2A.8  | Atualizar `events/index.js` barrel                                             | [MIGRAÇÃO] | Baixo   | ✅      |
-| 2A.9  | Criar `events/catalog.md` — documentação de todos os eventos                   | [CRIAÇÃO]  | Médio   | ✅      |
-| 2A.10 | `AGENT_EVENTS_MAP` criado — sem conflito com array `AGENT_EVENTS`              | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2A.11 | Validação: `import('#copilot/events')` — todos os tipos corretos               | —          | Trivial | ✅      |
+| Sub   | Tarefa                                                                          | Tipo       | Esforço | Status |
+| ----- | ------------------------------------------------------------------------------- | ---------- | ------- | ------ |
+| 2A.1  | Criar `events/agent-events.js` (migrar de core/events.js)                       | [MIGRAÇÃO] | Baixo   | ✅     |
+| 2A.2  | Criar `events/dialog-events.js` — incluído em agent-events.js (AGENT*DIALOG*\*) | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2A.3  | Criar `events/hub-events.js` (migrar de conversation-hub/events.js)             | [MIGRAÇÃO] | Baixo   | ✅     |
+| 2A.4  | Criar `events/hook-events.js` (migrar de types/events.js)                       | [MIGRAÇÃO] | Baixo   | ✅     |
+| 2A.5  | Criar `events/terminal-events.js` (consts para state.js)                        | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2A.6  | Criar `events/api-events.js` — incluído em hub-events.js e system-events.js     | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2A.7  | Criar `events/system-events.js` (shutdown, config change, health)               | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2A.8  | Atualizar `events/index.js` barrel                                              | [MIGRAÇÃO] | Baixo   | ✅     |
+| 2A.9  | Criar `events/catalog.md` — documentação de todos os eventos                    | [CRIAÇÃO]  | Médio   | ✅     |
+| 2A.10 | `AGENT_EVENTS_MAP` criado — sem conflito com array `AGENT_EVENTS`               | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2A.11 | Validação: `import('#copilot/events')` — todos os tipos corretos                | —          | Trivial | ✅     |
 
 **Critério de saída**: events/ com ~60+ constantes em 7 subfiles + catálogo ✅
 
 ### Fase 2B: Migrar Importadores — [MIGRAÇÃO] ✅ COMPLETA (parcial intencional)
+
 > Deprecação das fontes paralelas; migração gradual de importadores
 
-| Sub  | Tarefa                                                                           | Tipo       | Esforço | Status   |
-| ---- | -------------------------------------------------------------------------------- | ---------- | ------- | -------- |
+| Sub  | Tarefa                                                                           | Tipo       | Esforço | Status    |
+| ---- | -------------------------------------------------------------------------------- | ---------- | ------- | --------- |
 | 2B.1 | core/events.js → `@deprecated` JSDoc + re-exports de events/agent-events.js      | [MIGRAÇÃO] | Baixo   | ✅        |
 | 2B.2 | conversation-hub/events.js → `@deprecated` (aponta para #copilot/events)         | [MIGRAÇÃO] | Baixo   | ✅        |
 | 2B.3 | Backward-compat: array AGENT_EVENTS mantido em core/events.js (3 consumers)      | —          | —       | ✅        |
@@ -179,40 +189,48 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 | 2B.6 | Migrar ~4 importadores de types/events → events/                                 | [MIGRAÇÃO] | Baixo   | ⏭ adiado |
 | 2B.7 | Grep audit: zero event strings literais fora de events/                          | —          | Baixo   | ⏭ pós-2B |
 
-> **Nota**: 2B.4-2B.7 são migração incremental de consumers — podem ser feitas em FAIXA-6 (Quality). A deprecação (2B.1-2B.3) está completa, garantindo backward-compat.
+> **Nota**: 2B.4-2B.7 são migração incremental de consumers — podem ser feitas em FAIXA-6 (Quality).
+> A deprecação (2B.1-2B.3) está completa, garantindo backward-compat.
 
 **Critério de saída**: @deprecated em fontes paralelas; re-exports backward-compat ✅
 
 ### Fase 2C: bridgeEmitter Expansion — [ADOÇÃO] ✅ COMPLETA (6/6 emitters)
-> Resultado: 6/6 emitters bridged (loop-manager, hooks/bus, handoff-manager, pinned-files, sse-fanout incluídos via bridges anteriores; pinnedLoader via FAIXA-2C)
+
+> Resultado: 6/6 emitters bridged (loop-manager, hooks/bus, handoff-manager, pinned-files,
+> sse-fanout incluídos via bridges anteriores; pinnedLoader via FAIXA-2C)
 
 | Sub  | Tarefa                                                                                       | Tipo      | Esforço | Status |
 | ---- | -------------------------------------------------------------------------------------------- | --------- | ------- | ------ |
-| 2C.1 | `loop-manager.js`: bridgeEmitter(loopManager, bus, dialogEventMap)                           | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.2 | `hooks/bus.js`: bridgeEmitter(hookBus, bus, hookEventMap)                                    | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.3 | `handoff-manager.js`: bridgeEmitter(handoff, bus, handoffMap)                                | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.4 | `config/pinned-files.js`: bridgeEmitter via terminal/index.js                                | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.5 | `api/sse/fanout.js`: bridge incluída no conjunto (2/8 → 6/6)                                 | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.6 | `terminal/state.js`: bridge via terminal/index.js + CONFIG_PINNED_FILES_CHANGED              | [ADOÇÃO]  | Baixo   | ✅      |
-| 2C.7 | Validar: 6/6 bridges funcionais, CONFIG_PINNED_FILES_CHANGED = 'config:pinned_files:changed' | —         | Trivial | ✅      |
-| 2C.8 | `CONFIG_PINNED_FILES_CHANGED` adicionado a events/system-events.js                           | [CRIAÇÃO] | Trivial | ✅      |
+| 2C.1 | `loop-manager.js`: bridgeEmitter(loopManager, bus, dialogEventMap)                           | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.2 | `hooks/bus.js`: bridgeEmitter(hookBus, bus, hookEventMap)                                    | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.3 | `handoff-manager.js`: bridgeEmitter(handoff, bus, handoffMap)                                | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.4 | `config/pinned-files.js`: bridgeEmitter via terminal/index.js                                | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.5 | `api/sse/fanout.js`: bridge incluída no conjunto (2/8 → 6/6)                                 | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.6 | `terminal/state.js`: bridge via terminal/index.js + CONFIG_PINNED_FILES_CHANGED              | [ADOÇÃO]  | Baixo   | ✅     |
+| 2C.7 | Validar: 6/6 bridges funcionais, CONFIG_PINNED_FILES_CHANGED = 'config:pinned_files:changed' | —         | Trivial | ✅     |
+| 2C.8 | `CONFIG_PINNED_FILES_CHANGED` adicionado a events/system-events.js                           | [CRIAÇÃO] | Trivial | ✅     |
 
-**Critério de saída**: 6/6 emitters bridged ✅ (vs 8/8 planejado — 2C.5/2C.6 cobertas via wiring atual)
+**Critério de saída**: 6/6 emitters bridged ✅ (vs 8/8 planejado — 2C.5/2C.6 cobertas via wiring
+atual)
 
 ### Fase 2D: EventBus Subscribers — [CRIAÇÃO] ✅ COMPLETA
+
 > Resultado: 15 subscribers cross-module em observability/event-bus-observers.js
 
 | Sub  | Tarefa                                                                        | Tipo       | Esforço | Status |
 | ---- | ----------------------------------------------------------------------------- | ---------- | ------- | ------ |
-| 2D.1 | Criar observability/event-bus-observers.js (15 subscribers)                   | [CRIAÇÃO]  | Médio   | ✅      |
-| 2D.2 | Pattern: `bus.on()` retorna `() => void` unsubscribe (não EventEmitter off()) | —          | —       | ✅      |
-| 2D.3 | audit-service: AUDIT_ENTRY handler via bus.on()                               | [MIGRAÇÃO] | Baixo   | ✅      |
-| 2D.4 | attachEventBusObservers() integrado ao bootstrapObservability()               | [ADOÇÃO]   | Baixo   | ✅      |
-| 2D.5 | detachEventBusObservers() para cleanup (idempotente)                          | [CRIAÇÃO]  | Baixo   | ✅      |
-| 2D.6 | Exportar attach/detach do barrel observability/index.js                       | —          | Trivial | ✅      |
-| 2D.7 | get_errors → "No errors found" ✅                                              | —          | Trivial | ✅      |
+| 2D.1 | Criar observability/event-bus-observers.js (15 subscribers)                   | [CRIAÇÃO]  | Médio   | ✅     |
+| 2D.2 | Pattern: `bus.on()` retorna `() => void` unsubscribe (não EventEmitter off()) | —          | —       | ✅     |
+| 2D.3 | audit-service: AUDIT_ENTRY handler via bus.on()                               | [MIGRAÇÃO] | Baixo   | ✅     |
+| 2D.4 | attachEventBusObservers() integrado ao bootstrapObservability()               | [ADOÇÃO]   | Baixo   | ✅     |
+| 2D.5 | detachEventBusObservers() para cleanup (idempotente)                          | [CRIAÇÃO]  | Baixo   | ✅     |
+| 2D.6 | Exportar attach/detach do barrel observability/index.js                       | —          | Trivial | ✅     |
+| 2D.7 | get_errors → "No errors found" ✅                                             | —          | Trivial | ✅     |
 
-> **Subscribers registrados**: AGENT_READY, AGENT_DIALOG_LOOP_CHANGED, AGENT_DIALOG_STALLED, AGENT_DIALOG_TURN_TIMEOUT, HOOK_PRE_TOOL_USE, HOOK_POST_TOOL_USE, HOOK_SESSION_START, HOOK_SESSION_END, HOOK_ERROR_OCCURRED, AGENT_HANDOFF_RECEIVED, AGENT_HANDOFF_ACCEPTED, AGENT_HANDOFF_REJECTED, HUB_SESSION_CREATED, HUB_SESSION_CLOSED, CONFIG_PINNED_FILES_CHANGED
+> **Subscribers registrados**: AGENT_READY, AGENT_DIALOG_LOOP_CHANGED, AGENT_DIALOG_STALLED,
+> AGENT_DIALOG_TURN_TIMEOUT, HOOK_PRE_TOOL_USE, HOOK_POST_TOOL_USE, HOOK_SESSION_START,
+> HOOK_SESSION_END, HOOK_ERROR_OCCURRED, AGENT_HANDOFF_RECEIVED, AGENT_HANDOFF_ACCEPTED,
+> AGENT_HANDOFF_REJECTED, HUB_SESSION_CREATED, HUB_SESSION_CLOSED, CONFIG_PINNED_FILES_CHANGED
 
 **Critério de saída**: ≥10 subscribers cross-module via EventBus ✅ (15 implementados)
 
@@ -221,6 +239,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 ## FAIXA-3: Services Expansion — ★★★★☆
 
 ### Fase 3A: Expandir Services Existentes — [CRIAÇÃO]
+
 > 4 services com métodos mínimos → métodos essenciais adicionados
 
 | Sub  | Tarefa                                                                               | Tipo       | Esforço | Dep |
@@ -234,6 +253,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 4 services com 4+ métodos cada; 0 re-exports bypass
 
 ### Fase 3B: Novos Services Core — [CRIAÇÃO]
+
 > 4 novos services para gaps críticos
 
 | Sub  | Tarefa                                                                                          | Tipo      | Esforço | Dep  |
@@ -246,6 +266,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 8 services total
 
 ### Fase 3C: Wiring API → Services — [MIGRAÇÃO]
+
 > API routes devem usar services, não imports diretos
 
 | Sub  | Tarefa                                                         | Tipo       | Esforço | Dep       |
@@ -259,6 +280,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: /health + /metrics endpoints; api/ fan-out ≤5
 
 ### Fase 3D: Wiring Terminal → Services — [MIGRAÇÃO]
+
 > terminal/ importa diretamente agent/, conv-hub/, observability/. Deve usar services.
 
 | Sub  | Tarefa                                                                 | Tipo       | Esforço | Dep       |
@@ -276,6 +298,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 ## FAIXA-4: Core Infrastructure Adoption — ★★★★☆
 
 ### Fase 4A: Bridge Retry Standardization — [ADOÇÃO] ★★★★★
+
 > core/retry.js (85 LoC) JÁ EXISTE. Bridges ignoram e usam retry ad-hoc.
 
 | Sub  | Tarefa                                                                                         | Tipo     | Esforço | Dep       |
@@ -289,6 +312,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 0 retry ad-hoc; 100% bridges usam core/retry.js
 
 ### Fase 4B: Bridge Circuit Breaker Standardization — [ADOÇÃO]
+
 > core/circuit-breaker.js (135 LoC) JÁ EXISTE
 
 | Sub  | Tarefa                                                  | Tipo     | Esforço | Dep  |
@@ -301,6 +325,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: Circuit breakers centralizados onde necessário
 
 ### Fase 4C: Context Propagation — [CRIAÇÃO]
+
 > AsyncLocalStorage inexistente em copilot/. Necessário para request-id tracing.
 
 | Sub  | Tarefa                                                        | Tipo      | Esforço | Dep  |
@@ -319,6 +344,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 ## FAIXA-5: Plugin System + DI Adoption — ★★★☆☆
 
 ### Fase 5A: Plugin System Activation — [ADOÇÃO]
+
 > PluginRegistry (225 LoC) JÁ EXISTE em plugins/. Precisa wiring no bootstrap.
 
 | Sub  | Tarefa                                                                             | Tipo      | Esforço | Dep  |
@@ -334,6 +360,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: PluginRegistry integrado; 3 builtin plugins; feature-flagged
 
 ### Fase 5B: CompositionRoot — [CRIAÇÃO]
+
 > Registrations espalhadas em 3 arquivos → 1 composition-root centralizado
 
 | Sub  | Tarefa                                                                   | Tipo       | Esforço | Dep       |
@@ -348,14 +375,15 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 1 CompositionRoot; 0 registrations ad-hoc
 
 ### Fase 5C: DI Singleton Migration — [MIGRAÇÃO]
+
 > 25 singletons `let=null` → DI singleton tokens
 
 | Sub  | Tarefa                                                          | Tipo       | Esforço | Dep       |
 | ---- | --------------------------------------------------------------- | ---------- | ------- | --------- |
 | 5C.1 | Inventariar 25 singletons: classificar migráveis vs necessários | —          | Baixo   | —         |
-| 5C.2 | nerv-bridge.js: 5 `let` vars → DI tokens NERV_*                 | [MIGRAÇÃO] | Médio   | 5B.1      |
-| 5C.3 | sdk/client.js: 5 `let` vars → DI tokens SDK_*                   | [MIGRAÇÃO] | Médio   | 5B.1      |
-| 5C.4 | db/sqlite.js: 3 `let` vars → DI tokens DB_*, MIGRATION_*        | [MIGRAÇÃO] | Baixo   | 5B.1      |
+| 5C.2 | nerv-bridge.js: 5 `let` vars → DI tokens NERV\_\*               | [MIGRAÇÃO] | Médio   | 5B.1      |
+| 5C.3 | sdk/client.js: 5 `let` vars → DI tokens SDK\_\*                 | [MIGRAÇÃO] | Médio   | 5B.1      |
+| 5C.4 | db/sqlite.js: 3 `let` vars → DI tokens DB*\*, MIGRATION*\*      | [MIGRAÇÃO] | Baixo   | 5B.1      |
 | 5C.5 | Remover 12 tokens de di-tokens.js que nunca serão usados        | [CORREÇÃO] | Baixo   | 5C.1      |
 | 5C.6 | Target: singletons ≤12 (de 25)                                  | —          | —       | 5C.2-5C.5 |
 
@@ -366,6 +394,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 ## FAIXA-6: Quality Assurance — ★★★☆☆
 
 ### Fase 6A: Layer Validator — [CRIAÇÃO]
+
 > Enforce layer rules (L0 can't import L4, etc.)
 
 | Sub  | Tarefa                                                                      | Tipo      | Esforço | Dep  |
@@ -378,6 +407,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: Layer validator funcional e no health-check
 
 ### Fase 6B: Cycle Breaking — [CORREÇÃO]
+
 > 1 ciclo real confirmado: config/ ↔ observability/
 
 | Sub  | Tarefa                                                                   | Tipo       | Esforço | Dep        |
@@ -389,6 +419,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 0 ciclos de dependência
 
 ### Fase 6C: Test Coverage — [CRIAÇÃO]
+
 > Medir e melhorar coverage
 
 | Sub  | Tarefa                                                 | Tipo      | Esforço | Dep       |
@@ -402,6 +433,7 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: Coverage medido; core/ ≥60%
 
 ### Fase 6D: CI Pipeline — [CRIAÇÃO]
+
 > GitHub Actions para automação
 
 | Sub  | Tarefa                                                          | Tipo      | Esforço | Dep  |
@@ -432,16 +464,16 @@ FAIXA-6     0A→  1A→   2C→   3C→   4B→   5B→    —
 
 ## Resumo Quantitativo
 
-| Faixa         | Fases  | Subfases | Quick Wins | Adoção | Criação | Migração | Correção | Status       |
-| ------------- | ------ | -------- | ---------- | ------ | ------- | -------- | -------- | ------------ |
-| FAIXA-0       | 3      | 15       | 15         | 5      | 1       | 0        | 9        | —            |
-| FAIXA-1       | 3      | 16       | 3          | 0      | 3       | 5        | 5        | —            |
+| Faixa          | Fases  | Subfases | Quick Wins | Adoção | Criação | Migração | Correção | Status       |
+| -------------- | ------ | -------- | ---------- | ------ | ------- | -------- | -------- | ------------ |
+| FAIXA-0        | 3      | 15       | 15         | 5      | 1       | 0        | 9        | —            |
+| FAIXA-1        | 3      | 16       | 3          | 0      | 3       | 5        | 5        | —            |
 | **FAIXA-2** ✅ | 4      | 34       | 6          | 6      | 8       | 12       | 0        | **COMPLETA** |
-| FAIXA-3       | 4      | 23       | 0          | 0      | 11      | 8        | 1        | —            |
-| FAIXA-4       | 3      | 15       | 1          | 8      | 3       | 0        | 0        | —            |
-| FAIXA-5       | 3      | 20       | 0          | 4      | 5       | 8        | 1        | —            |
-| FAIXA-6       | 4      | 16       | 0          | 3      | 7       | 2        | 0        | —            |
-| **TOTAL**     | **24** | **139**  | **25**     | **26** | **38**  | **35**   | **16**   |              |
+| FAIXA-3        | 4      | 23       | 0          | 0      | 11      | 8        | 1        | —            |
+| FAIXA-4        | 3      | 15       | 1          | 8      | 3       | 0        | 0        | —            |
+| FAIXA-5        | 3      | 20       | 0          | 4      | 5       | 8        | 1        | —            |
+| FAIXA-6        | 4      | 16       | 0          | 3      | 7       | 2        | 0        | —            |
+| **TOTAL**      | **24** | **139**  | **25**     | **26** | **38**  | **35**   | **16**   |              |
 
 ---
 
@@ -451,19 +483,19 @@ FAIXA-6     0A→  1A→   2C→   3C→   4B→   5B→    —
 | ---------------------- | -------------- | -------- | --------- | --------------- | ------------ |
 | Testes passando        | ~21/320        | ≥180/320 | ≥180/320  | ≥200/320        | ≥250/320     |
 | Health honest          | ~42/100        | ~48/100  | ≥55/100   | ≥70/100         | ≥80/100      |
-| Event sources          | **1 SSOT** ✅   | 4        | 1 SSOT    | 1               | 1            |
-| bridgeEmitter coverage | **6/6** ✅      | 2/8      | 8/8       | 8/8             | 8/8          |
-| EventBus subscribers   | **15** ✅       | 0        | 0         | ≥10             | ≥15          |
+| Event sources          | **1 SSOT** ✅  | 4        | 1 SSOT    | 1               | 1            |
+| bridgeEmitter coverage | **6/6** ✅     | 2/8      | 8/8       | 8/8             | 8/8          |
+| EventBus subscribers   | **15** ✅      | 0        | 0         | ≥10             | ≥15          |
 | Services count         | 4              | 4        | 4         | 8               | 8+           |
 | Shutdown handlers      | 3/8            | 8/8      | 8/8       | 8/8             | 8/8          |
 | DI tokens resolved     | 1              | 1        | 1         | 5+              | 15+          |
 | Singletons `let=null`  | 25             | 25       | 25        | ≤18             | ≤12          |
 | Ciclos                 | 1              | 1        | 1         | 0               | 0            |
 | Retry ad-hoc           | 2 bridges      | 2        | 2         | 0               | 0            |
-| Health endpoint        | ❌              | ❌        | ❌         | ✅               | ✅            |
-| CI pipeline            | ❌              | ❌        | ❌         | ❌               | ✅            |
+| Health endpoint        | ❌             | ❌       | ❌        | ✅              | ✅           |
+| CI pipeline            | ❌             | ❌       | ❌        | ❌              | ✅           |
 | Plugin system          | Órfão          | Órfão    | Órfão     | Feature-flagged | 3 plugins    |
-| Coverage measured      | ❌              | ❌        | ❌         | ❌               | ✅ ≥50%       |
+| Coverage measured      | ❌             | ❌       | ❌        | ❌              | ✅ ≥50%      |
 
 ---
 

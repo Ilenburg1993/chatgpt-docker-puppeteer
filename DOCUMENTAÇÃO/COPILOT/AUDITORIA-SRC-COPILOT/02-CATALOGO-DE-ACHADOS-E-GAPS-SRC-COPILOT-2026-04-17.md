@@ -18,33 +18,33 @@ Objetivo:
 
 ## 1. Catálogo de achados confirmados
 
-| ID | Severidade | Arquivos principais | Resumo |
-| --- | --- | --- | --- |
-| CAT-001 | Alta | `server/routes/copilot-api/control.js` | `/steer` sem proteção admin |
-| CAT-002 | Crítica | `server/socket/hub-ns.js` | autenticação sem autorização por sessão |
-| CAT-003 | Alta | `channel/client.js` | cross-talk possível em `chat()` concorrente |
-| CAT-004 | Alta | `conversation-hub/orchestrator.js`, `send-pipeline.js` | sessão fechada ainda recebe turnos tardios |
-| CAT-005 | Alta | `server/app.js`, `server/middleware/cors.js` | CORS default inválido e multi-origin incorreto |
-| CAT-006 | Alta | `server/app.js`, `server/router.js`, `routes/health.js` | `skipAuth` prometido, mas não efetivado no app |
-| CAT-007 | Alta | `core/event-bus.js` | handlers async podem rejeitar sem tratamento |
-| CAT-008 | Alta | `agent/session/keepalive.js` | keepalive reentrante/overlap |
-| CAT-009 | Alta | `server/routes/sdk/session-messaging.js`, `tools/session-rpc-tools.js`, `tools/experimental-rpc-tools.js` | timeouts por `Promise.race` sem cleanup |
-| CAT-010 | Alta | `infra/storage.js` | escrita JSON não é atômica apesar do contrato |
-| CAT-011 | Alta | `infra/storage.js` | leitura JSON mascara corrupção |
-| CAT-012 | Alta | `observability/logger.js` | logging síncrono em hot path |
-| CAT-013 | Alta | `observability/event-bus-runtime.js` | singleton pode reter bus/metrics antigos |
-| CAT-014 | Média-alta | `sdk/telemetry/quota-monitor.js` | falhas de quota ficam silenciosas |
-| CAT-015 | Média-alta | `tools/web-tools.js` | `web_fetch` aceita `404/500 text/*` como sucesso |
-| CAT-016 | Média | `tools/shell/executor.js` | pipeline sem tratamento adequado de spawn error |
-| CAT-017 | Média | `core/retry.js` | listeners de abort acumulam por tentativa |
-| CAT-018 | Média | `core/shutdown.js` | handlers não deduplicados |
-| CAT-019 | Média | `agent/lifecycle/entry.js` | `process.exit()` em pontos sensíveis |
-| CAT-020 | Média | `server/routes/health-registry.js` | closures assumem container sempre consistente |
-| CAT-021 | Média | `sdk/tools/custom.js`, `sdk/tools/state.js` | comentário de persistência diverge do path real |
-| CAT-022 | Média | `sdk/tools/custom.js`, `sdk/tools/state.js` | ausência de arquivo opcional tratada como erro engolido |
-| CAT-023 | Média | `src/copilot/README.md` | drift documental do módulo |
-| CAT-024 | Alta | `package.json`, `tests/unit/copilot/test_keepalive.spec.js` | runner padrão incompatível com parte da suíte |
-| CAT-025 | Alta | `tests/unit/copilot`, `tests/integration/copilot`, `tests/regression/copilot` | 39 testes skipped/pending |
+| ID      | Severidade | Arquivos principais                                                                                       | Resumo                                                  |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| CAT-001 | Alta       | `server/routes/copilot-api/control.js`                                                                    | `/steer` sem proteção admin                             |
+| CAT-002 | Crítica    | `server/socket/hub-ns.js`                                                                                 | autenticação sem autorização por sessão                 |
+| CAT-003 | Alta       | `channel/client.js`                                                                                       | cross-talk possível em `chat()` concorrente             |
+| CAT-004 | Alta       | `conversation-hub/orchestrator.js`, `send-pipeline.js`                                                    | sessão fechada ainda recebe turnos tardios              |
+| CAT-005 | Alta       | `server/app.js`, `server/middleware/cors.js`                                                              | CORS default inválido e multi-origin incorreto          |
+| CAT-006 | Alta       | `server/app.js`, `server/router.js`, `routes/health.js`                                                   | `skipAuth` prometido, mas não efetivado no app          |
+| CAT-007 | Alta       | `core/event-bus.js`                                                                                       | handlers async podem rejeitar sem tratamento            |
+| CAT-008 | Alta       | `agent/session/keepalive.js`                                                                              | keepalive reentrante/overlap                            |
+| CAT-009 | Alta       | `server/routes/sdk/session-messaging.js`, `tools/session-rpc-tools.js`, `tools/experimental-rpc-tools.js` | timeouts por `Promise.race` sem cleanup                 |
+| CAT-010 | Alta       | `infra/storage.js`                                                                                        | escrita JSON não é atômica apesar do contrato           |
+| CAT-011 | Alta       | `infra/storage.js`                                                                                        | leitura JSON mascara corrupção                          |
+| CAT-012 | Alta       | `observability/logger.js`                                                                                 | logging síncrono em hot path                            |
+| CAT-013 | Alta       | `observability/event-bus-runtime.js`                                                                      | singleton pode reter bus/metrics antigos                |
+| CAT-014 | Média-alta | `sdk/telemetry/quota-monitor.js`                                                                          | falhas de quota ficam silenciosas                       |
+| CAT-015 | Média-alta | `tools/web-tools.js`                                                                                      | `web_fetch` aceita `404/500 text/*` como sucesso        |
+| CAT-016 | Média      | `tools/shell/executor.js`                                                                                 | pipeline sem tratamento adequado de spawn error         |
+| CAT-017 | Média      | `core/retry.js`                                                                                           | listeners de abort acumulam por tentativa               |
+| CAT-018 | Média      | `core/shutdown.js`                                                                                        | handlers não deduplicados                               |
+| CAT-019 | Média      | `agent/lifecycle/entry.js`                                                                                | `process.exit()` em pontos sensíveis                    |
+| CAT-020 | Média      | `server/routes/health-registry.js`                                                                        | closures assumem container sempre consistente           |
+| CAT-021 | Média      | `sdk/tools/custom.js`, `sdk/tools/state.js`                                                               | comentário de persistência diverge do path real         |
+| CAT-022 | Média      | `sdk/tools/custom.js`, `sdk/tools/state.js`                                                               | ausência de arquivo opcional tratada como erro engolido |
+| CAT-023 | Média      | `src/copilot/README.md`                                                                                   | drift documental do módulo                              |
+| CAT-024 | Alta       | `package.json`, `tests/unit/copilot/test_keepalive.spec.js`                                               | runner padrão incompatível com parte da suíte           |
+| CAT-025 | Alta       | `tests/unit/copilot`, `tests/integration/copilot`, `tests/regression/copilot`                             | 39 testes skipped/pending                               |
 
 ## 2. Sinais de swallow/silent failure — 62 pontos
 
@@ -413,4 +413,3 @@ src/copilot/config/system-prompt/sections/last-instructions.js:11:1. Confirme qu
 - watchers/hot-reload de `PinnedFilesLoader`;
 - shell tooling e sandboxing;
 - health/metrics/public routes contract.
-

@@ -1,8 +1,7 @@
 # 03-SDK-CONFORMIDADE — Auditoria de Conformidade com `@github/copilot-sdk`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Foco**: Conformidade arquitetural e de contrato com `@github/copilot-sdk` v0.2.1
-**Documentado em**: 2026-04-18
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Foco**: Conformidade arquitetural e de
+contrato com `@github/copilot-sdk` v0.2.1 **Documentado em**: 2026-04-18
 
 ---
 
@@ -44,19 +43,22 @@ sdk/index.js (barrel)
 ### Status de Conformidade do Barrel
 
 **POSITIVO**: `sdk/session/client.js` wraps `CopilotClient` com:
+
 - Circuit breaker (`sdkConnectionCircuitBreaker`)
 - `getClient()` singleton com C13-01 anti-retry-storm
 - `stopClient()` que corretamente lida com `Promise<Error[]>` retornado por `client.stop()`
 - Registry de sessões ativas externalizado para `infra/sdk-session-registry.js`
 
-**POSITIVO**: `forceStopClient()` usa duck-typing para `forceStop` via `anyClient.forceStop?.()` — graceful fallback se SDK não expor o método.
+**POSITIVO**: `forceStopClient()` usa duck-typing para `forceStop` via `anyClient.forceStop?.()` —
+graceful fallback se SDK não expor o método.
 
 ---
 
 ## 3. Violations de Import Direto (ARCH violation — CAT-001 do catálogo anterior)
 
-> **Re-triagem em 2026-04-17:** não foi encontrado import runtime direto de `@github/copilot-sdk` fora da própria camada `src/copilot/sdk/`.
-> Os matches fora de `sdk/` são referências em JSDoc/comentários e documentação, não violações de runtime.
+> **Re-triagem em 2026-04-17:** não foi encontrado import runtime direto de `@github/copilot-sdk`
+> fora da própria camada `src/copilot/sdk/`. Os matches fora de `sdk/` são referências em
+> JSDoc/comentários e documentação, não violações de runtime.
 
 Importações diretas de `@github/copilot-sdk` fora do barrel `#copilot/sdk`:
 
@@ -114,9 +116,12 @@ agent/types.js                   → typedefs JSDoc
 ### Implementação em `hooks/error-handler.js`
 
 **CONFORME**:
-- `createErrorHandler()` → retorna `{ errorHandling: decided }` ou `{ errorHandling: 'retry', retryCount: n }`
+
+- `createErrorHandler()` → retorna `{ errorHandling: decided }` ou
+  `{ errorHandling: 'retry', retryCount: n }`
 - `createCircuitBreakerHandler()` → retorna os mesmos formatos
-- `fatalPatterns` / `transientPatterns` para classificar erros por string matching (necessário pois SDK não exporta classes de erro tipadas)
+- `fatalPatterns` / `transientPatterns` para classificar erros por string matching (necessário pois
+  SDK não exporta classes de erro tipadas)
 
 **CONFORME**: `createContextualErrorHandler()` — mapa de contexto → estratégia com fallback.
 
@@ -149,7 +154,8 @@ agent/types.js                   → typedefs JSDoc
 Auditado indiretamente via `agent/lifecycle/session-setup.js` e `sdk/session/permissions.js`:
 
 - `buildSessionHooks()` em `session-setup.js` compila hooks usando `PermissionManager`
-- `PermissionManager` (`sdk/session/permissions.js`) implementa as políticas `approve_all`, `audit_only`, `selective`
+- `PermissionManager` (`sdk/session/permissions.js`) implementa as políticas `approve_all`,
+  `audit_only`, `selective`
 
 **CONFORME**: retorna `{ approved: boolean }` corretamente.
 
@@ -166,7 +172,7 @@ Auditado indiretamente via `agent/lifecycle/session-setup.js` e `sdk/session/per
 ```js
 const errors = await _client.stop();
 if (errors.length > 0) {
-    log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
+  log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
 }
 _client = null;
 return errors;
@@ -174,7 +180,8 @@ return errors;
 
 **CONFORME**: Trata corretamente o retorno `Error[]` em vez de assumir void.
 
-**POSITIVO**: Erros são logados mas não relançados — chamador pode inspecionar o retorno de `stopClient()`.
+**POSITIVO**: Erros são logados mas não relançados — chamador pode inspecionar o retorno de
+`stopClient()`.
 
 ---
 
@@ -214,7 +221,8 @@ CopilotError (base)
 └── CircuitOpenError → circuit breaker aberto
 ```
 
-**POSITIVO**: Hierarquia clara e bem definida em `core/errors.js` — permite handling tipado mesmo sem suporte do SDK.
+**POSITIVO**: Hierarquia clara e bem definida em `core/errors.js` — permite handling tipado mesmo
+sem suporte do SDK.
 
 **ACHADO**:
 
@@ -226,8 +234,8 @@ CopilotError (base)
 
 ## 9. Resumo de Conformidade
 
-| Área                             | Status       | Detalhes                                                |
-| -------------------------------- | ------------ | ------------------------------------------------------- |
+| Área                             | Status        | Detalhes                                                |
+| -------------------------------- | ------------- | ------------------------------------------------------- |
 | `CopilotClient` wrapping         | ✅ CONFORME   | Circuit breaker, singleton, C13-01                      |
 | `client.stop()` → `Error[]`      | ✅ CONFORME   | Tratamento correto do array de erros                    |
 | `onErrorOccurred` hook           | ✅ CONFORME   | Retorno `{errorHandling}` correto                       |
@@ -248,4 +256,4 @@ CopilotError (base)
 
 ---
 
-*Próximo: [04-CHANNEL-COMMUNICATION.md](./04-CHANNEL-COMMUNICATION.md)*
+_Próximo: [04-CHANNEL-COMMUNICATION.md](./04-CHANNEL-COMMUNICATION.md)_

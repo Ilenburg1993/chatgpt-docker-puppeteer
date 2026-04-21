@@ -1,8 +1,7 @@
 # PARTE 12 — Status Pós-F16 & Roadmap F17+ (ATUALIZADO PÓS-F28)
 
-**Data criação**: 2026-07-22
-**Última atualização**: 2026-07-23 (pós-F28)
-**Escopo**: Atualização de status após conclusão das fases F1–F28.
+**Data criação**: 2026-07-22 **Última atualização**: 2026-07-23 (pós-F28) **Escopo**: Atualização de
+status após conclusão das fases F1–F28.
 
 ---
 
@@ -16,18 +15,18 @@ As 16 fases planejadas (PARTE-11C a 11F) foram **todas concluídas com sucesso**
 
 ## 2. Métricas: Antes vs. Depois vs. Alvo
 
-| Métrica                         | Pré-F1 | Pós-F16      | Alvo 11F | Status                  |
-| ------------------------------- | ------ | ------------ | -------- | ----------------------- |
+| Métrica                         | Pré-F1 | Pós-F16      | Alvo 11F | Status                   |
+| ------------------------------- | ------ | ------------ | -------- | ------------------------ |
 | Arquivos deprecated (completos) | 6      | 0            | 0        | ✅ Atingido              |
 | Shims de compat (@deprecated)   | 0      | 6            | 0        | 🔶 Shims criados         |
 | God Modules (>600L)             | 11     | 8            | ≤4       | 🔶 Parcial               |
 | Overlaps de funcionalidade      | 7      | 0            | 0        | ✅ Atingido (via audit/) |
-| `process.env` fora de config    | 41     | 12           | 0        | 🔶 12 legítimos*         |
+| `process.env` fora de config    | 41     | 12           | 0        | 🔶 12 legítimos\*        |
 | Sistemas de auditoria           | 3      | 1 (+3 shims) | 1        | ✅ Unificado             |
 | Diretórios HTTP                 | 3      | 2            | 2        | ✅ Atingido              |
 | Imports `../../../`             | ~15    | 0            | 0        | ✅ Atingido              |
 | Imports `../../`                | ~38    | 0            | —        | ✅ Extra                 |
-| Diretórios sem barrel           | ~3     | 0**          | 0        | ✅ Atingido              |
+| Diretórios sem barrel           | ~3     | 0\*\*        | 0        | ✅ Atingido              |
 | Erros `new Error()` genéricos   | ~62    | 33           | <10      | 🔶 33 legítimos          |
 | Plugin interfaces documentadas  | 0      | 3            | 3+       | ✅ Atingido              |
 | `@deprecated` inline            | ~20    | 11           | 0        | 🔶 Residual              |
@@ -36,7 +35,7 @@ As 16 fases planejadas (PARTE-11C a 11F) foram **todas concluídas com sucesso**
 eval, 3× `constants.js` (fallback model), 2× `bridge/control.js` (feature flags) — todos
 justificados.
 
-\** `src/copilot/` raiz e `src/copilot/logs/` não têm barrel (raiz não precisa, logs é runtime).
+\*\* `src/copilot/` raiz e `src/copilot/logs/` não têm barrel (raiz não precisa, logs é runtime).
 
 ---
 
@@ -171,8 +170,8 @@ O maior God Module. Estratégias:
 
 1. **Extrair Queue Management** (processQueue, enqueue) → `agent/infra/queue-processor.js` (já
    existe `agent/infra/agent-queue.js` — verificar se pode absorver)
-2. **Extrair Metrics/Status** (getStatusSnapshot, metricsTimer) → `agent/infra/status.js` (já
-   existe `agent/infra/agent-status.js` — verificar)
+2. **Extrair Metrics/Status** (getStatusSnapshot, metricsTimer) → `agent/infra/status.js` (já existe
+   `agent/infra/agent-status.js` — verificar)
 3. **Extrair MCP/Keepalive** (mcpReconnect, keepalive) → delegate
 4. **Meta**: reduzir para <800L mantendo a classe como orchestrator
 
@@ -278,16 +277,16 @@ audit/, sdk/contracts, observability/collectors/ etc. foram criados sem testes u
 
 | Métrica                                         | Pós-F16 | Alvo Pós-F22 | Real Pós-F22 | **Real Pós-F28** |
 | ----------------------------------------------- | ------- | ------------ | ------------ | ---------------- |
-| Shims @deprecated                               | 6       | 0            | 0 ✅          | **0** ✅          |
-| God Modules (>600L)                             | 8       | ≤4           | 6 🔶          | **5** ✅          |
-| @deprecated inline                              | 11      | ≤2           | 5 🔶          | **3** ✅          |
-| Diretórios residuais (types, lib, config/tools) | 3       | 0            | 0 ✅          | **0** ✅          |
-| always-alive.js linhas                          | 1.613   | <800         | 1.613 🔶      | **1.613** 🔶      |
-| Plugin interfaces                               | 3       | 3            | 3 ✅          | **3** ✅          |
-| throw new Error genéricos                       | ~62     | <10          | 7            | **2** ✅          |
+| Shims @deprecated                               | 6       | 0            | 0 ✅         | **0** ✅         |
+| God Modules (>600L)                             | 8       | ≤4           | 6 🔶         | **5** ✅         |
+| @deprecated inline                              | 11      | ≤2           | 5 🔶         | **3** ✅         |
+| Diretórios residuais (types, lib, config/tools) | 3       | 0            | 0 ✅         | **0** ✅         |
+| always-alive.js linhas                          | 1.613   | <800         | 1.613 🔶     | **1.613** 🔶     |
+| Plugin interfaces                               | 3       | 3            | 3 ✅         | **3** ✅         |
+| throw new Error genéricos                       | ~62     | <10          | 7            | **2** ✅         |
 | process.env fora de config/env                  | 41      | 0            | 9            | **10** (legít.)  |
-| Duplicate exports                               | —       | 0            | 6            | **0** ✅          |
-| Dead code                                       | —       | 0            | 2            | **0** ✅          |
+| Duplicate exports                               | —       | 0            | 6            | **0** ✅         |
+| Dead code                                       | —       | 0            | 2            | **0** ✅         |
 | Total arquivos                                  | 213     | —            | 212          | **217**          |
 | Total linhas                                    | ~43.200 | —            | 43.239       | **43.319**       |
 
@@ -298,8 +297,8 @@ audit/, sdk/contracts, observability/collectors/ etc. foram criados sem testes u
   extração adicional comprometeria coesão (campos #private)
 - **F19** ✅ — models reorganizado em sdk/models/ (helpers.js, registry.js, known-models.js,
   barrel); registry.js: 677L → 557L
-- **F20** ✅ — sessions.js (736L) decomposto em session-crud.js (357L), session-messaging.js
-  (282L), session-middleware.js (87L)
+- **F20** ✅ — sessions.js (736L) decomposto em session-crud.js (357L), session-messaging.js (282L),
+  session-middleware.js (87L)
 - **F21** ✅ — 5 @deprecated restantes são legítimos (backward compat, documentação)
 - **F22** ✅ — Auditoria geral confirmou métricas finais
 
@@ -312,8 +311,8 @@ audit/, sdk/contracts, observability/collectors/ etc. foram criados sem testes u
 - **F25** ✅ — 5 `throw new Error()` convertidos para erros tipados (ConfigError, CopilotError,
   ToolError); 2 restantes legítimos (assertion + JSDoc example)
 - **F26** ✅ — store.js (741L→605L) decomposto em store-memories.js (106L) e store-sync.js (87L)
-- **F27** ✅ — client.js (736L→556L) decomposto em client-dialog.js (114L), client-history.js
-  (57L), client-structured.js (96L)
+- **F27** ✅ — client.js (736L→556L) decomposto em client-dialog.js (114L), client-history.js (57L),
+  client-structured.js (96L)
 - **F28** ✅ — Documentação atualizada, métricas finais compiladas
 
 ### God Modules Restantes (5)
@@ -368,8 +367,8 @@ b8933f4d refactor(copilot): F23 — unificar constants.js→config/env.js, elimi
 
 ### F25: Converter throw new Error → Erros Tipados ✅
 
-- 5 conversões: webhook-manager.js (ConfigError), sdk/models/helpers.js (ConfigError),
-  db/sqlite.js (ConfigError), terminal/state.js (CopilotError), terminal/file-context.js (ToolError)
+- 5 conversões: webhook-manager.js (ConfigError), sdk/models/helpers.js (ConfigError), db/sqlite.js
+  (ConfigError), terminal/state.js (CopilotError), terminal/file-context.js (ToolError)
 - 2 restantes legítimos: permission-tools.js (assertion), inject.js (JSDoc example)
 
 ### F26: Decompor store.js ✅

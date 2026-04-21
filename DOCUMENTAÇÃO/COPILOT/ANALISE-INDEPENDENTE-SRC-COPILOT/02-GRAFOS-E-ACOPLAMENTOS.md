@@ -50,7 +50,8 @@ Isso significa que ele é tratado, ao mesmo tempo, como:
 
 ### `agent/` — orquestrador ainda dominante
 
-`agent/` concentra o coração do sistema. Isso é esperado, mas o grafo mostra que ele ainda precisa perder parte da coordenação incidental para:
+`agent/` concentra o coração do sistema. Isso é esperado, mas o grafo mostra que ele ainda precisa
+perder parte da coordenação incidental para:
 
 - `event-handlers/`;
 - `conversation-hub/`;
@@ -59,11 +60,14 @@ Isso significa que ele é tratado, ao mesmo tempo, como:
 
 ### `terminal/` — já desacoplado das bordas, ainda em consolidação interna
 
-O terminal deixou de ser pseudo-backend do `server`, mas ainda é um macro-módulo grande o bastante para exigir disciplina interna: `commands`, `dialog`, `frontend`, `handlers`, `repl` e wiring não podem voltar a se acoplar por conveniência.
+O terminal deixou de ser pseudo-backend do `server`, mas ainda é um macro-módulo grande o bastante
+para exigir disciplina interna: `commands`, `dialog`, `frontend`, `handlers`, `repl` e wiring não
+podem voltar a se acoplar por conveniência.
 
 ### `sdk/` — wrapper ainda mais espesso do que deveria
 
-O `sdk/` já ganhou uma identidade de camada própria, mas continua extenso, com muita lógica interna e alto volume de imports diretos de vendor no sistema como um todo.
+O `sdk/` já ganhou uma identidade de camada própria, mas continua extenso, com muita lógica interna
+e alto volume de imports diretos de vendor no sistema como um todo.
 
 ## 4. Smells estruturais medidos
 
@@ -81,7 +85,8 @@ Exemplos:
 - `terminal/index.js`
 - `conversation-hub/orchestrator.js`
 
-**Leitura:** ainda existe muito estado de processo pendurado em módulos, o que dificulta isolamento, replay, teardown e testes mais determinísticos.
+**Leitura:** ainda existe muito estado de processo pendurado em módulos, o que dificulta isolamento,
+replay, teardown e testes mais determinísticos.
 
 ### 4.2 Uso de `container.resolve()`
 
@@ -112,7 +117,8 @@ Mais pesados:
 - `sdk/session/client.js`
 - `config/session-config.js`
 
-**Leitura:** o wrapper está evoluindo, mas o boundary do vendor ainda não está suficientemente “encapsulado” no sentido arquitetural.
+**Leitura:** o wrapper está evoluindo, mas o boundary do vendor ainda não está suficientemente
+“encapsulado” no sentido arquitetural.
 
 ### 4.4 Estruturas mutáveis locais
 
@@ -120,7 +126,8 @@ Mais pesados:
 | ------------------------ | ----: |
 | arquivos com `new Map()` |    45 |
 
-**Leitura:** o sistema usa muitos registries/caches/índices locais. Isso não é necessariamente ruim, mas exige disciplina de TTL, limpeza e ownership.
+**Leitura:** o sistema usa muitos registries/caches/índices locais. Isso não é necessariamente ruim,
+mas exige disciplina de TTL, limpeza e ownership.
 
 ### 4.5 Código transitório / compatibilidade
 
@@ -128,7 +135,8 @@ Mais pesados:
 | -------------------------- | ----: |
 | arquivos com `@deprecated` |    18 |
 
-Essa quantidade confirma que parte do custo atual da arquitetura é carregar **estruturas antigas ainda não removidas**.
+Essa quantidade confirma que parte do custo atual da arquitetura é carregar **estruturas antigas
+ainda não removidas**.
 
 ## 5. Grafos problemáticos por tema
 
@@ -143,7 +151,8 @@ channel -> observability
 conversation-hub -> observability
 ```
 
-**Problema:** observability recebe chamadas de quase todos os lados; isso mistura coleta, reação e leitura operacional.
+**Problema:** observability recebe chamadas de quase todos os lados; isso mistura coleta, reação e
+leitura operacional.
 
 ### Grafo B — Runtime + Eventos
 
@@ -156,7 +165,8 @@ hooks -> events
 conversation-hub -> events
 ```
 
-**Problema:** a taxonomia de eventos e a reação semântica ainda não estão 100% separadas da orquestração.
+**Problema:** a taxonomia de eventos e a reação semântica ainda não estão 100% separadas da
+orquestração.
 
 ### Grafo C — Terminal como frontend principal
 
@@ -169,13 +179,15 @@ terminal -> bridges
 terminal -> core
 ```
 
-**Leitura:** esse grafo é aceitável se o terminal continuar sendo frontend principal e usar seams locais claras. Se não houver seam, ele volta a virar orquestrador acidental.
+**Leitura:** esse grafo é aceitável se o terminal continuar sendo frontend principal e usar seams
+locais claras. Se não houver seam, ele volta a virar orquestrador acidental.
 
 ## 6. Conclusões do grafo
 
 1. O sistema já avançou bastante nas bordas, principalmente ao zerar `server -> terminal`.
 2. O maior problema estrutural restante é a **centralidade excessiva de `observability/`**.
-3. O segundo problema é a **espessura combinada de `agent/` + `sdk/` + `terminal/`**, que ainda carregam parte demais da coordenação sistêmica.
+3. O segundo problema é a **espessura combinada de `agent/` + `sdk/` + `terminal/`**, que ainda
+   carregam parte demais da coordenação sistêmica.
 4. A próxima arquitetura ideal deve ser desenhada para reduzir:
    - arestas para `observability/`;
    - imports diretos de vendor SDK;

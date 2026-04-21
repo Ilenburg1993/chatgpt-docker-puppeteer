@@ -24,7 +24,8 @@ P0 existe para impedir exatamente isso.
 As fases principais de P0 deixaram de ser apenas intenção e passaram a ter artefatos canônicos
 dedicados:
 
-- [`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md) — end-state explícito e régua de convergência da arquitetura-alvo;
+- [`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md) —
+  end-state explícito e régua de convergência da arquitetura-alvo;
 - [`R-07A-TABELA-BASE-OFICIAL.md`](./R-07A-TABELA-BASE-OFICIAL.md) — baseline factual do ciclo
   clean;
 - [`R-07B-MATRIZ-DE-OWNERSHIP-E-CONTRATOS.md`](./R-07B-MATRIZ-DE-OWNERSHIP-E-CONTRATOS.md) —
@@ -40,8 +41,8 @@ Leitura prática do estado atual de P0:
 - **F0.2** materializada no hub clean e em suas pontes centrais;
 - **F0.3** materializada;
 - **F0.4** materializada;
-- **F0.5** parcialmente materializada, dividida entre `R-04A`, `R-05`, `R-15` e o registro de compatibilidade
-  residual de `R-07C`.
+- **F0.5** parcialmente materializada, dividida entre `R-04A`, `R-05`, `R-15` e o registro de
+  compatibilidade residual de `R-07C`.
 
 ---
 

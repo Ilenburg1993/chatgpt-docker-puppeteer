@@ -96,8 +96,9 @@ Sempre que um item novo surgir durante a execução, ele deve ser classificado a
 - é **ajuste local sem efeito estrutural**? não precisa inflar o roadmap master.
 
 Além disso, o gap deve ser lido contra a régua explícita de convergência em
-[`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md), para evitar
-que o backlog continue descrevendo problemas sem tornar suficientemente objetivo o estado de chegada.
+[`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md), para
+evitar que o backlog continue descrevendo problemas sem tornar suficientemente objetivo o estado de
+chegada.
 
 ---
 

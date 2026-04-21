@@ -1,8 +1,6 @@
 # PARTE 14D — Situação Atual vs. Situação Ideal
 
-**Data**: 2026-03-15
-**Baseline**: commit `54c135c4` (pós-F44)
-**Referência**: PARTE-14A/B/C
+**Data**: 2026-03-15 **Baseline**: commit `54c135c4` (pós-F44) **Referência**: PARTE-14A/B/C
 
 ---
 
@@ -200,6 +198,7 @@ src/copilot/agent/
 ## 4. Priorização de Trabalho (MoSCoW)
 
 ### Must Have (obrigatório para próxima release)
+
 - GAP-Q1: Testes loop-manager.js
 - GAP-Q2: Testes turn-executor.js
 - GAP-Q3: Testes initializer.js
@@ -207,6 +206,7 @@ src/copilot/agent/
 - GAP-R5: Fix duplicação answerPendingQuestion
 
 ### Should Have (alta prioridade)
+
 - GAP-S1: Split loop-manager.js
 - GAP-S3: Split initializer.js → hook-context.js
 - GAP-Q5: Testes message-queue.js
@@ -216,6 +216,7 @@ src/copilot/agent/
 - GAP-O1: OTEL dialog loop
 
 ### Could Have (boa prática)
+
 - GAP-S2: Decomposição event-wirer.js
 - GAP-S5: session-setup.js
 - GAP-Q4/Q7/Q8/Q9: Mais testes unitários
@@ -225,5 +226,6 @@ src/copilot/agent/
 - GAP-R3: URL validator reutilizável
 
 ### Won't Have (não planejado)
+
 - GAP-R2: Rollback transacional em boot-wiring (complexidade desproporcional)
 - GAP-R4: Migrar HandoffManager de EventEmitter para callbacks (baixo ROI)

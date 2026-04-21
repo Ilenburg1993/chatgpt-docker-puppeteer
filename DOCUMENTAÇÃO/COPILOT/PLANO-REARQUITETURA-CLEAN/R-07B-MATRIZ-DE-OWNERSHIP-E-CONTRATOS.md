@@ -1,8 +1,7 @@
 # R-07B — Matriz de Ownership e Contratos de Topo
 
-**Programa**: P0 / Faixa A
-**Data-base**: 2026-04-16
-**Status**: canônico para governança de fronteiras
+**Programa**: P0 / Faixa A **Data-base**: 2026-04-16 **Status**: canônico para governança de
+fronteiras
 
 ---
 

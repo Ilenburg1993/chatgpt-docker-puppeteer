@@ -183,7 +183,8 @@ Esses quatro domínios precisam coexistir, mas sem sobreposição de trabalho.
 
 - `terminal -> presentation`, `agent`, `channel`, `conversation-hub`, `sdk`, `config`
 - `server -> presentation`, `agent`, `conversation-hub`, `config`, `sdk`
-- `presentation -> agent`, `conversation-hub`, `core`, `bridges`, `sdk`, `observability` (somente leitura/projeção)
+- `presentation -> agent`, `conversation-hub`, `core`, `bridges`, `sdk`, `observability` (somente
+  leitura/projeção)
 - `agent -> sdk`, `core`, `events`, `event-handlers`, `hooks`, `config`, `infra`
 
 ### Proibido ou excepcional
@@ -201,7 +202,8 @@ O endstate ideal só estará atingido quando todos os itens abaixo forem verdade
 
 ### 5.1 Ownership
 
-- cada um dos domínios críticos (`runtime`, `sdk session`, `conversation session`, `transport`, `frontend`, `presentation`) possuir um owner explícito e estável;
+- cada um dos domínios críticos (`runtime`, `sdk session`, `conversation session`, `transport`,
+  `frontend`, `presentation`) possuir um owner explícito e estável;
 - nenhuma projection compartilhada existir em mais de um lugar.
 
 ### 5.2 Dependências

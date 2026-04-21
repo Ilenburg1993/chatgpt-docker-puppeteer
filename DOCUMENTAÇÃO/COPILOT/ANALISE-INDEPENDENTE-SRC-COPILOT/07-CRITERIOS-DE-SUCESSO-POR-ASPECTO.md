@@ -4,7 +4,8 @@
 
 Este documento existe para tornar a transformação menos genérica e mais executável.
 
-Ele define, por aspecto arquitetural, **critérios claros de sucesso**, **sinais de fracasso** e **evidências mínimas** esperadas.
+Ele define, por aspecto arquitetural, **critérios claros de sucesso**, **sinais de fracasso** e
+**evidências mínimas** esperadas.
 
 ## 2. Aspecto A — Ownership
 

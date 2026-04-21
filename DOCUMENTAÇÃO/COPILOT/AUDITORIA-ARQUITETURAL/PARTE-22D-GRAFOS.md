@@ -1,8 +1,8 @@
 # PARTE-22D — Análise de Grafos Profunda: Estado Atual e Ideal
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Grafo de dependências completo de `src/copilot` — atual vs ideal
-**Método**: Análise via grep dos imports `#copilot/MODULE` em todos os 313 arquivos `.js`
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Grafo de dependências
+completo de `src/copilot` — atual vs ideal **Método**: Análise via grep dos imports
+`#copilot/MODULE` em todos os 313 arquivos `.js`
 
 ---
 
@@ -30,7 +30,8 @@
 | `db/`               | **1**   | core                                                                            |
 | `types/`            | **0**   | —                                                                               |
 
-† `#copilot/nerv-bridge` é um alias para `bridges/` — é deep import de within bridges, não módulo separado.
+† `#copilot/nerv-bridge` é um alias para `bridges/` — é deep import de within bridges, não módulo
+separado.
 
 ### 1.2 Fan-in por Módulo (Quantos módulos importam cada um)
 
@@ -64,7 +65,8 @@ core           ←──── 10 módulos a importam
 config         ←──── 7 módulos a importam
 ```
 
-Qualquer mudança nesses 3 módulos tem impacto em cascata sobre todo o sistema. São hubs de acoplamento.
+Qualquer mudança nesses 3 módulos tem impacto em cascata sobre todo o sistema. São hubs de
+acoplamento.
 
 **Risco:** Uma mudança breaking em `observability/logger.js` requer atualização de 11 módulos.
 
@@ -76,7 +78,8 @@ conv-hub/       → não importado por ninguém além de services/
 plugins/        → não importado por ninguém (orphan module)
 ```
 
-`services/` foi criado para ser a fachada universal, mas terminal/ e outros ainda importam agent/ diretamente.
+`services/` foi criado para ser a fachada universal, mas terminal/ e outros ainda importam agent/
+diretamente.
 
 #### Cluster 3: "God Importer" — terminal/ + api/
 
@@ -111,14 +114,14 @@ Análise de potenciais ciclos:
 | Par/Trio               | Ciclo?    | Verificação                                              |
 | ---------------------- | --------- | -------------------------------------------------------- |
 | observability ↔ config | Potencial | config importa observability, obs importa config         |
-| core ↔ config          | ✅ CICLO   | core importa config, nada de volta (ok se unidirecional) |
+| core ↔ config          | ✅ CICLO  | core importa config, nada de volta (ok se unidirecional) |
 | agent ↔ tools          | Verificar | tools usa agent (services), agent usa tools              |
 | hooks ↔ agent          | Potencial | agent importa hooks, hooks importa agent?                |
 
 **Caso crítico: `config ↔ observability`**
 
-`config/` importa `#copilot/observability` (para logging).
-`observability/` importa `#copilot/config` (para configurações).
+`config/` importa `#copilot/observability` (para logging). `observability/` importa
+`#copilot/config` (para configurações).
 
 Isso cria um **ciclo suave** que pode causar problemas de inicialização (quem inicializa primeiro?).
 Node.js ESM resolve via hoisting em casos simples, mas pode falhar com inicialização lazy.
@@ -141,7 +144,8 @@ Node.js ESM resolve via hoisting em casos simples, mas pode falhar com inicializ
 1. **Hierarquia estrita**: camada N só importa de N-1 ou inferior
 2. **Fan-out máximo**: 6 para qualquer módulo (exceto terminal/api: máx 8)
 3. **Hub controlado**: observability e core mantêm alto fan-in, mas não criam ciclos
-4. **services/ como único portal de L5**: api/ e terminal/ importam APENAS services/, core/, config/, observability/
+4. **services/ como único portal de L5**: api/ e terminal/ importam APENAS services/, core/,
+   config/, observability/
 5. **events/ como SSOT**: zero strings de evento inline
 
 ### 3.2 Fan-out Ideal por Módulo
@@ -173,6 +177,7 @@ Node.js ESM resolve via hoisting em casos simples, mas pode falhar com inicializ
 ```
 
 **Dependências válidas (↓ apenas):**
+
 ```
 L6 terminal/ → services/ (L4), core (L0), config (L2), observability (L2)
 L5 api/      → services/ (L4), core (L0), config (L2), observability (L2)
@@ -200,23 +205,28 @@ L0 types/    → (nenhum dep)
 ### 3.4 Quebrando o Ciclo config ↔ observability
 
 **Problema atual:**
+
 ```
 config → observability (para logger)
 observability → config (para nível de log, paths)
 ```
 
 **Solução target:**
+
 ```
 config → core (apenas utilitários puros — sem logger)
 observability → core (para ler env vars diretamente)
 observability → config (apenas para configurações opcionais em runtime)
 ```
 
-Como fazer: `config/index.js` deixa de importar `observability/logger`. Em vez disso, usa `console.error()` para apenas erros críticos de parse. O logger real só é disponível após bootstrap completo.
+Como fazer: `config/index.js` deixa de importar `observability/logger`. Em vez disso, usa
+`console.error()` para apenas erros críticos de parse. O logger real só é disponível após bootstrap
+completo.
 
 ### 3.5 Comparação de Clusters: Atual vs Ideal
 
 #### Cluster observability (atual vs target)
+
 ```
 ATUAL: observability ← 11 módulos
 TARGET: observability ← 9 módulos (remove ciclo config, mantém plugins opcionais)
@@ -224,6 +234,7 @@ Impacto: -2 acoplamentos no módulo mais crítico
 ```
 
 #### Cluster services (atual vs target)
+
 ```
 ATUAL: services ← 1 módulo (api/ apenas)
 TARGET: services ← 2 módulos (api/ + terminal/)
@@ -232,6 +243,7 @@ Impacto: services se torna hub real de casos de uso
 ```
 
 #### God Importers (atual vs target)
+
 ```
 ATUAL:   terminal (10) + api (8) = 18 conexões totais para L5/L6
 TARGET:  terminal (6)  + api (6) = 12 conexões totais
@@ -304,7 +316,9 @@ terminal  X    .    .   .   .   .    X   X   X    .   .   .   .    .   .   .   X
 ```
 
 **Diferenças chave:**
-- `api` e `terminal` removem importações diretas de `agent`, `bridges`, `channel`, `hooks` — usam apenas `services/`
+
+- `api` e `terminal` removem importações diretas de `agent`, `bridges`, `channel`, `hooks` — usam
+  apenas `services/`
 - `core` remove dependência de `config` (sem ciclo)
 - `config` remove dependência de `observability` (quebra ciclo config ↔ observability)
 - `events/` aparece como módulo novo, importado por todos que emitem eventos
@@ -326,8 +340,10 @@ O `arch-health.mjs` reporta 4 deep imports. Em adição, existe 1 alias problem�
 ### 6.2 Situação Ideal
 
 Zero deep imports. Estratégia:
+
 1. `#copilot/config/custom-tools-registry` → exportar `customToolsRegistry` de `#copilot/config`
-2. `#copilot/nerv-bridge` → renomear alias para `#copilot/bridges` (já correto) OU criar module separado
+2. `#copilot/nerv-bridge` → renomear alias para `#copilot/bridges` (já correto) OU criar module
+   separado
 3. Os outros 2: migrar para barrel correto
 
 ---

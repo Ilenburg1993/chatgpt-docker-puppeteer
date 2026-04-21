@@ -1,8 +1,7 @@
 # PARTE-16C — Mapa de Fluxos e Dependências Críticas
 
-**Data**: 2026-04-08
-**Baseline**: commit `bfe96b57`
-**Referência**: PARTE-16A (inventário), PARTE-16B (dívida técnica)
+**Data**: 2026-04-08 **Baseline**: commit `bfe96b57` **Referência**: PARTE-16A (inventário),
+PARTE-16B (dívida técnica)
 
 ---
 
@@ -77,8 +76,8 @@
 
 ### 1.3 Fan-Out Crítico (dependências que mais se propagam)
 
-| Módulo Importado                          | Importado Por N Arquivos | Risco       |
-| ----------------------------------------- | -----------------------: | ----------- |
+| Módulo Importado                          | Importado Por N Arquivos | Risco        |
+| ----------------------------------------- | -----------------------: | ------------ |
 | `#copilot/observability/logger`           |                      108 | 🔴 Altíssimo |
 | `#copilot/core/errors`                    |                       26 | 🟡 Alto      |
 | `#copilot/config/env`                     |                       22 | 🟡 Alto      |
@@ -174,12 +173,12 @@ Latência estimada por estágio:
 
 | Estágio                      | Async?  | Latência Est. | Gargalo?  |
 | ---------------------------- | ------- | ------------- | --------- |
-| `LoopManager.runLoop()`      | Sim     | ~50ms         | ✅ OK      |
+| `LoopManager.runLoop()`      | Sim     | ~50ms         | ✅ OK     |
 | `SDK.createMessage()`        | Sim     | 1-30s (LLM)   | I/O bound |
 | `ToolRegistry.execute()`     | Sim     | 10ms-5s       | Variável  |
-| `ConversationHub.store()`    | Sim     | ~5ms          | ✅ OK      |
-| `EventCollector.collect()`   | **NÃO** | ~1ms          | ⚠️ Sync    |
-| `MetricsTracker.increment()` | **NÃO** | ~0.1ms        | ✅ OK      |
+| `ConversationHub.store()`    | Sim     | ~5ms          | ✅ OK     |
+| `EventCollector.collect()`   | **NÃO** | ~1ms          | ⚠️ Sync   |
+| `MetricsTracker.increment()` | **NÃO** | ~0.1ms        | ✅ OK     |
 
 ### 3.2 Background Paths
 
@@ -197,37 +196,37 @@ Latência estimada por estágio:
 
 ### 4.1 Acoplamento Aferente (Ca) — "Quem depende de mim?"
 
-| Módulo           |   Ca | Interpretação              |
-| ---------------- | ---: | -------------------------- |
-| `observability/` |  108 | ⚠️ Mudança aqui quebra tudo |
-| `core/`          |   52 | ⚠️ Foundation crítico       |
-| `config/`        |   22 | Estável (muda pouco)       |
-| `agent/session/` |   15 | Estado compartilhado       |
-| `db/`            |   10 | Interface estável          |
+| Módulo           |  Ca | Interpretação               |
+| ---------------- | --: | --------------------------- |
+| `observability/` | 108 | ⚠️ Mudança aqui quebra tudo |
+| `core/`          |  52 | ⚠️ Foundation crítico       |
+| `config/`        |  22 | Estável (muda pouco)        |
+| `agent/session/` |  15 | Estado compartilhado        |
+| `db/`            |  10 | Interface estável           |
 
 ### 4.2 Acoplamento Eferente (Ce) — "De quem eu dependo?"
 
-| Módulo              |   Ce | Interpretação                   |
-| ------------------- | ---: | ------------------------------- |
-| `terminal/`         |   45 | Depende de quase tudo           |
-| `agent/`            |   38 | Hub central, esperado           |
-| `tools/`            |   32 | Depende de agent, db, bridges   |
-| `bridges/`          |   20 | Depende de core, config, logger |
-| `conversation-hub/` |   18 | Depende de db, sockets, config  |
+| Módulo              |  Ce | Interpretação                   |
+| ------------------- | --: | ------------------------------- |
+| `terminal/`         |  45 | Depende de quase tudo           |
+| `agent/`            |  38 | Hub central, esperado           |
+| `tools/`            |  32 | Depende de agent, db, bridges   |
+| `bridges/`          |  20 | Depende de core, config, logger |
+| `conversation-hub/` |  18 | Depende de db, sockets, config  |
 
 ### 4.3 Instability Index (I = Ce / (Ca + Ce))
 
 | Módulo              |    I | Classe         | Nota                               |
 | ------------------- | ---: | -------------- | ---------------------------------- |
-| `core/`             | 0.08 | Estável        | ✅ Foundation correto               |
-| `config/`           | 0.15 | Estável        | ✅ Configuração estável             |
-| `observability/`    | 0.20 | Estável        | ✅ Logger/metrics estáveis          |
-| `db/`               | 0.30 | Semi-estável   | ✅ Interface clara                  |
+| `core/`             | 0.08 | Estável        | ✅ Foundation correto              |
+| `config/`           | 0.15 | Estável        | ✅ Configuração estável            |
+| `observability/`    | 0.20 | Estável        | ✅ Logger/metrics estáveis         |
+| `db/`               | 0.30 | Semi-estável   | ✅ Interface clara                 |
 | `hooks/`            | 0.55 | Balanceado     | OK                                 |
-| `agent/`            | 0.72 | Instável       | ⚠️ Depende de muitos módulos        |
+| `agent/`            | 0.72 | Instável       | ⚠️ Depende de muitos módulos       |
 | `bridges/`          | 0.80 | Instável       | OK (é adapter — deve ser instável) |
 | `tools/`            | 0.82 | Instável       | OK (leaf node)                     |
-| `terminal/`         | 0.90 | Muito instável | ⚠️ Acumula deps de todos            |
+| `terminal/`         | 0.90 | Muito instável | ⚠️ Acumula deps de todos           |
 | `conversation-hub/` | 0.90 | Muito instável | OK se tests existirem              |
 
 ---
@@ -236,24 +235,24 @@ Latência estimada por estágio:
 
 ### 5.1 Single Points of Failure
 
-| Componente              | Impacto se falhar                | Mitigation Atual        | Gap       |
-| ----------------------- | -------------------------------- | ----------------------- | --------- |
+| Componente              | Impacto se falhar                | Mitigation Atual        | Gap        |
+| ----------------------- | -------------------------------- | ----------------------- | ---------- |
 | `always-alive.js`       | Processo inteiro para            | withRetry no start      | ✅ OK      |
 | `sqlite.js` (DB)        | Perda de state                   | registerShutdownHandler | ✅ OK      |
 | `logger.js`             | Sem observabilidade              | Fallback console        | ✅ OK      |
-| `NervBridge`            | Sem comunicação com bus          | ❌ Sem fallback          | ⚠️ Gap     |
-| `TerminalServer`        | Sem REPL/WebSocket               | ❌ Sem fallback          | ⚠️ Gap     |
-| `ConversationHub.store` | Perda de contexto de conversação | ❌ Sem fallback          | 🔴 Crítico |
+| `NervBridge`            | Sem comunicação com bus          | ❌ Sem fallback         | ⚠️ Gap     |
+| `TerminalServer`        | Sem REPL/WebSocket               | ❌ Sem fallback         | ⚠️ Gap     |
+| `ConversationHub.store` | Perda de contexto de conversação | ❌ Sem fallback         | 🔴 Crítico |
 
 ### 5.2 Race Conditions Potenciais
 
 | ID    | Módulo                | Condição                                  | Severidade |
 | ----- | --------------------- | ----------------------------------------- | ---------- |
-| RC-01 | `state-io.js`         | Read/Write sync concorrente de state.json | 🟡 Média    |
-| RC-02 | `snapshot.js`         | Multiple snapshot writes simultâneos      | 🟡 Média    |
-| RC-03 | `store.js` (conv-hub) | INSERT concorrente no SQLite              | 🟢 Baixa    |
-| RC-04 | `alias-store.js`      | Read-modify-write sem lock                | 🟢 Baixa    |
-| RC-05 | `tools-state.js`      | File-based state sem atomicidade          | 🟢 Baixa    |
+| RC-01 | `state-io.js`         | Read/Write sync concorrente de state.json | 🟡 Média   |
+| RC-02 | `snapshot.js`         | Multiple snapshot writes simultâneos      | 🟡 Média   |
+| RC-03 | `store.js` (conv-hub) | INSERT concorrente no SQLite              | 🟢 Baixa   |
+| RC-04 | `alias-store.js`      | Read-modify-write sem lock                | 🟢 Baixa   |
+| RC-05 | `tools-state.js`      | File-based state sem atomicidade          | 🟢 Baixa   |
 
 ---
 

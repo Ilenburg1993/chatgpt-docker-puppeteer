@@ -1,17 +1,17 @@
 # 08 — Auditoria de Duplicatas, Imports e Violações de Camada
 
-**Data**: 2026-06-15
-**Autor**: Auditoria automatizada (Copilot Agent)
-**Status**: Diagnóstico completo — ações corretivas pendentes
+**Data**: 2026-06-15 **Autor**: Auditoria automatizada (Copilot Agent) **Status**: Diagnóstico
+completo — ações corretivas pendentes
 
 ---
 
 ## 1. Resumo Executivo
 
-A auditoria identificou **5 categorias de problema** na interação entre as camadas do projeto e o `@github/copilot-sdk`:
+A auditoria identificou **5 categorias de problema** na interação entre as camadas do projeto e o
+`@github/copilot-sdk`:
 
-| #   | Categoria                                                  | Severidade | Qtd de Arquivos         |
-| --- | ---------------------------------------------------------- | ---------- | ----------------------- |
+| #   | Categoria                                                  | Severidade  | Qtd de Arquivos         |
+| --- | ---------------------------------------------------------- | ----------- | ----------------------- |
 | A   | **Imports runtime diretos ao SDK fora de `sdk/`**          | 🔴 Alta     | 1 arquivo               |
 | B   | **Referências JSDoc tipadas ao SDK fora de `sdk/`**        | 🟡 Média    | 21 arquivos (40 refs)   |
 | C   | **Implementações duplicadas (código nosso × SDK wrapper)** | 🔴 Alta     | 3 implementações        |
@@ -32,19 +32,22 @@ L6: src/copilot/api/        → Express routes
 L7: src/copilot/tools/      → Custom tools
 ```
 
-**Regra fundamental**: Camadas de L2 em diante **NÃO devem importar** de `@github/copilot-sdk` — devem usar `#copilot/sdk` (`L1`).
+**Regra fundamental**: Camadas de L2 em diante **NÃO devem importar** de `@github/copilot-sdk` —
+devem usar `#copilot/sdk` (`L1`).
 
 ---
 
 ## 3. Categoria A — Imports Runtime Diretos ao SDK (fora de `sdk/`)
 
-**Princípio violado**: `sdk/session/permissions.js` declara explicitamente: _"Consumers **não** devem importar `approveAll` diretamente do `@github/copilot-sdk`."_
+**Princípio violado**: `sdk/session/permissions.js` declara explicitamente: _"Consumers **não**
+devem importar `approveAll` diretamente do `@github/copilot-sdk`."_
 
 | Arquivo                       | Import                                             | Deveria ser                                 |
 | ----------------------------- | -------------------------------------------------- | ------------------------------------------- |
 | `config/session-config.js:14` | `import { approveAll } from '@github/copilot-sdk'` | `import { approveAll } from '#copilot/sdk'` |
 
-> **Nota**: Dentro de `sdk/` (L1) os imports diretos ao SDK são **corretos e esperados**. A violação é exclusiva de `config/session-config.js`.
+> **Nota**: Dentro de `sdk/` (L1) os imports diretos ao SDK são **corretos e esperados**. A violação
+> é exclusiva de `config/session-config.js`.
 
 **Ação**: Trocar import por `#copilot/sdk`.
 
@@ -52,7 +55,8 @@ L7: src/copilot/tools/      → Custom tools
 
 ## 4. Categoria B — Referências JSDoc Tipadas ao SDK (fora de `sdk/`)
 
-40 referências em 21 arquivos usam `import('@github/copilot-sdk').TypeName` em JSDoc em vez de `import('#copilot/sdk/types.js').TypeName`.
+40 referências em 21 arquivos usam `import('@github/copilot-sdk').TypeName` em JSDoc em vez de
+`import('#copilot/sdk/types.js').TypeName`.
 
 ### 4.1. `config/` (L2) — 13 arquivos
 
@@ -91,7 +95,8 @@ L7: src/copilot/tools/      → Custom tools
 | --------------------------------- | ------ | ------------------- |
 | `tools/experimental-rpc-tools.js` | 4      | CopilotSession (×4) |
 
-**Ação**: Para cada referência, trocar `import('@github/copilot-sdk').X` por `import('#copilot/sdk/types.js').X`. Todos os tipos já estão disponíveis em `sdk/types.js`.
+**Ação**: Para cada referência, trocar `import('@github/copilot-sdk').X` por
+`import('#copilot/sdk/types.js').X`. Todos os tipos já estão disponíveis em `sdk/types.js`.
 
 ---
 
@@ -99,16 +104,20 @@ L7: src/copilot/tools/      → Custom tools
 
 ### C1. `createPermissionHandler` — DUPLICADA em 2 arquivos
 
-| Local           | Arquivo                       | Utilizado?                                                                                                |
-| --------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Local           | Arquivo                       | Utilizado?                                                                                                 |
+| --------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **hooks/** (L3) | `hooks/permission-handler.js` | ✅ Sim — todos os 8+ consumers usam este                                                                   |
 | **sdk/** (L1)   | `sdk/session/permissions.js`  | ❌ Não — dead code (só chamado por `createAllowlistPermissionHandler` do mesmo arquivo, que também é dead) |
 
 **Diferenças**:
-- `hooks/` versão: mais completa (suporta `content-exclusion-policy`, `onRequest` async + boolean return, audit-mode verboso)
-- `sdk/` versão: mais simples (sem `content-exclusion-policy`, `onRequest` retorna `PermissionRequestResult` diretamente)
 
-**Ação**: Excluir `createPermissionHandler` de `sdk/session/permissions.js`. Manter `approveAll` re-export. A versão em `hooks/` é a canônica.
+- `hooks/` versão: mais completa (suporta `content-exclusion-policy`, `onRequest` async + boolean
+  return, audit-mode verboso)
+- `sdk/` versão: mais simples (sem `content-exclusion-policy`, `onRequest` retorna
+  `PermissionRequestResult` diretamente)
+
+**Ação**: Excluir `createPermissionHandler` de `sdk/session/permissions.js`. Manter `approveAll`
+re-export. A versão em `hooks/` é a canônica.
 
 ### C2. Pre-tool-use allow/deny decision logic — 3 implementações
 
@@ -118,12 +127,16 @@ L7: src/copilot/tools/      → Custom tools
 | `hooks/presets/production.js` | `onPreToolUse()`                      | L3 — Preset production       |
 | `hooks/factory.js` (E1.2)     | `buildDynamicOnlyPreToolUseHandler()` | L3 — Hooks dynamic path      |
 
-Todos implementam lógica allow/deny/ask com campos similares (`allowTools`/`denyTools`/`denyPatterns`/`isToolDisabled`), mas em níveis diferentes:
+Todos implementam lógica allow/deny/ask com campos similares
+(`allowTools`/`denyTools`/`denyPatterns`/`isToolDisabled`), mas em níveis diferentes:
+
 - `resolveToolDecision`: estático, baseado em `HooksConfig`
 - production preset: integrado inline com audit + bus
 - dynamic-only: simplificado sem filtering estático
 
-**Ação**: Documentar intencionalmente como **3 perfis de complexidade crescente** (minimal, hooks, production). Não consolidar — são pipelines diferentes com garantias diferentes. Marcar no JSDoc a relação.
+**Ação**: Documentar intencionalmente como **3 perfis de complexidade crescente** (minimal, hooks,
+production). Não consolidar — são pipelines diferentes com garantias diferentes. Marcar no JSDoc a
+relação.
 
 ### C3. `approveAll` — Re-exportado de 3 locais
 
@@ -134,16 +147,18 @@ Todos implementam lógica allow/deny/ask com campos similares (`allowTools`/`den
 | `@github/copilot-sdk` (direto) | `config/session-config.js` (VIOLAÇÃO)                             |
 
 **Ação**:
+
 1. Fixar `config/session-config.js` → importar de `#copilot/sdk`
 2. Documentar que `#copilot/sdk` é o SSOT para `approveAll`
-3. `#copilot/services` re-export é intencional (conveniência para api/ — evita que api/ importe de L1)
+3. `#copilot/services` re-export é intencional (conveniência para api/ — evita que api/ importe de
+   L1)
 
 ---
 
 ## 6. Categoria D — Múltiplos Builders de SessionConfig
 
-| #   | Pattern                                              | Arquivo                    | Usado?                                             |
-| --- | ---------------------------------------------------- | -------------------------- | -------------------------------------------------- |
+| #   | Pattern                                              | Arquivo                    | Usado?                                              |
+| --- | ---------------------------------------------------- | -------------------------- | --------------------------------------------------- |
 | D1  | `SessionConfigBuilder` (fluent)                      | `config/session-config.js` | ✅ `session-setup.js`                               |
 | D2  | `buildSessionConfig(input, defaults)` (merge+spread) | `sdk/config.js`            | ⚠️ Exportado na barrel, mas **sem callers diretos** |
 | D3  | `buildSessionConfig(opts, mode)` (field-by-field)    | `sdk/session/lifecycle.js` | ✅ `createSession()`, `resumeSession()`             |
@@ -151,16 +166,24 @@ Todos implementam lógica allow/deny/ask com campos similares (`allowTools`/`den
 ### Análise
 
 - **D1** é o builder modern (Faixa C), agora canonical para o `agent/lifecycle`.
-- **D2** foi criado antes de D1 como uma facade de merge; agora é **dead code** (exportado mas não chamado).
-- **D3** é **interno** de `lifecycle.js` (não exportado) — construtor field-by-field para `createSession`/`resumeSession`.
+- **D2** foi criado antes de D1 como uma facade de merge; agora é **dead code** (exportado mas não
+  chamado).
+- **D3** é **interno** de `lifecycle.js` (não exportado) — construtor field-by-field para
+  `createSession`/`resumeSession`.
 
-**D2 vs D1**: D2 faz `{ ...base, ...defaults, ...input }` (shallow merge). D1 (`SessionConfigBuilder`) faz `.model()`, `.tools()`, `.build()` (builder fluent com validação). D1 subsume D2.
+**D2 vs D1**: D2 faz `{ ...base, ...defaults, ...input }` (shallow merge). D1
+(`SessionConfigBuilder`) faz `.model()`, `.tools()`, `.build()` (builder fluent com validação). D1
+subsume D2.
 
-**D3**: Função interna de `lifecycle.js` com lógica específica de `create`/`resume` mode. Não duplica D1 — opera no nível SDK lifecycle interno.
+**D3**: Função interna de `lifecycle.js` com lógica específica de `create`/`resume` mode. Não
+duplica D1 — opera no nível SDK lifecycle interno.
 
 **Ação**:
-1. Deprecar `sdk/config.js::buildSessionConfig` — marcar como `@deprecated` apontando para `SessionConfigBuilder`
-2. Manter `sdk/config.js::getProjectDefaults()`, `mergeTools()`, `mergeExcludedTools()` (são úteis e não duplicados)
+
+1. Deprecar `sdk/config.js::buildSessionConfig` — marcar como `@deprecated` apontando para
+   `SessionConfigBuilder`
+2. Manter `sdk/config.js::getProjectDefaults()`, `mergeTools()`, `mergeExcludedTools()` (são úteis e
+   não duplicados)
 3. Manter `sdk/session/lifecycle.js::buildSessionConfig` (interno, finalidade diferente)
 
 ---
@@ -184,7 +207,8 @@ Todos implementam lógica allow/deny/ask com campos similares (`allowTools`/`den
 | `server/routes/copilot-api/control.js:25` | `require('@github/copilot-sdk/package.json').version` |
 | `tools/introspection-tools.js:159`        | `require('@github/copilot-sdk/package.json').version` |
 
-**Ação**: Centralizar em `sdk/constants.js` (ex: `export const SDK_VERSION = ...`). Ou aceitar como edge-case (apenas 2 locais, ambos leitura de version).
+**Ação**: Centralizar em `sdk/constants.js` (ex: `export const SDK_VERSION = ...`). Ou aceitar como
+edge-case (apenas 2 locais, ambos leitura de version).
 
 ---
 

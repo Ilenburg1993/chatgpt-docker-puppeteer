@@ -1,9 +1,8 @@
 # PARTE-24I — SITUAÇÃO IDEAL: COPILOT COM SERVER DEDICADO E ARQUITETURA ROBUSTA
 
-> **Documento**: PARTE-24I-SITUACAO-IDEAL-COPILOT-SERVER.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Proposta de arquitetura ideal para `src/copilot` — server dedicado, socket.io, isolamento de terminal, expansibilidade máxima
+> **Documento**: PARTE-24I-SITUACAO-IDEAL-COPILOT-SERVER.md **Versão**: 1.0 **Data**: 2026-04-12
+> **Escopo**: Proposta de arquitetura ideal para `src/copilot` — server dedicado, socket.io,
+> isolamento de terminal, expansibilidade máxima
 
 ---
 
@@ -97,14 +96,14 @@ src/copilot/
 
 ### 2.1 Stack Tecnológica
 
-| Camada | Tecnologia | Justificativa |
-|--------|-----------|---------------|
-| HTTP Server | Node.js `http.createServer()` | Sem deps externas, integra nativamente com Socket.IO |
-| REST Framework | Express 4.x | Já no projeto, middleware ecosystem maduro |
-| WebSocket | Socket.IO v4 | Namespaces, rooms, JWT auth, reconnect automático |
-| SSE | Implementação nativa (mover de api/sse) | Simples, sem overhead |
-| Rate Limiting | In-memory (Redis-ready) | Atual funciona; Redis opcional para multi-instância |
-| Auth | Token via header + JWT (para socket) | Atual header auth + JWT existente em socket-ns.js |
+| Camada         | Tecnologia                              | Justificativa                                        |
+| -------------- | --------------------------------------- | ---------------------------------------------------- |
+| HTTP Server    | Node.js `http.createServer()`           | Sem deps externas, integra nativamente com Socket.IO |
+| REST Framework | Express 4.x                             | Já no projeto, middleware ecosystem maduro           |
+| WebSocket      | Socket.IO v4                            | Namespaces, rooms, JWT auth, reconnect automático    |
+| SSE            | Implementação nativa (mover de api/sse) | Simples, sem overhead                                |
+| Rate Limiting  | In-memory (Redis-ready)                 | Atual funciona; Redis opcional para multi-instância  |
+| Auth           | Token via header + JWT (para socket)    | Atual header auth + JWT existente em socket-ns.js    |
 
 ### 2.2 Diagrama de Inicialização
 
@@ -146,34 +145,35 @@ bootCopilot()
 
 ### 2.3 Socket.IO Namespaces
 
-| Namespace | Propósito | Clientes |
-|-----------|-----------|---------|
-| `/copilot` | ConversationHub — sessões, turns, mensagens | Dashboard, LLM-A, ferramentas externas |
-| `/events` | Stream de eventos copilot (substituição do SSE) | Dashboard, monitores, observadores |
-| `/agent` | Status do AlwaysAliveAgent — start/stop/estado | Dashboard |
+| Namespace  | Propósito                                       | Clientes                               |
+| ---------- | ----------------------------------------------- | -------------------------------------- |
+| `/copilot` | ConversationHub — sessões, turns, mensagens     | Dashboard, LLM-A, ferramentas externas |
+| `/events`  | Stream de eventos copilot (substituição do SSE) | Dashboard, monitores, observadores     |
+| `/agent`   | Status do AlwaysAliveAgent — start/stop/estado  | Dashboard                              |
 
 ### 2.4 Novos Endpoints REST
 
 Mantém todos os endpoints atuais + adiciona:
 
-| Método | Path | Novo? | Descrição |
-|--------|------|-------|-----------|
-| GET | /health | existente | _ |
-| GET | /ws/info | **NOVO** | Info sobre conexões socket ativas |
-| POST | /sessions/:id/send | **NOVO** | Envia mensagem para sessão do hub |
-| GET | /sessions/:id/status | **NOVO** | Status da sessão em tempo real |
-| POST | /agent/start | **NOVO** | Inicia AlwaysAliveAgent programaticamente |
-| POST | /agent/stop | **NOVO** | Para AlwaysAliveAgent |
-| GET | /agent/status | **NOVO** | Status detalhado do agente |
-| GET | /openapi.json | **NOVO** | OpenAPI spec do servidor copilot |
-| GET | /sdk/models | **NOVO** | Modelos disponíveis no SDK |
-| POST | /sdk/complete | **NOVO** | Completion direta via SDK |
+| Método | Path                 | Novo?     | Descrição                                 |
+| ------ | -------------------- | --------- | ----------------------------------------- |
+| GET    | /health              | existente | \_                                        |
+| GET    | /ws/info             | **NOVO**  | Info sobre conexões socket ativas         |
+| POST   | /sessions/:id/send   | **NOVO**  | Envia mensagem para sessão do hub         |
+| GET    | /sessions/:id/status | **NOVO**  | Status da sessão em tempo real            |
+| POST   | /agent/start         | **NOVO**  | Inicia AlwaysAliveAgent programaticamente |
+| POST   | /agent/stop          | **NOVO**  | Para AlwaysAliveAgent                     |
+| GET    | /agent/status        | **NOVO**  | Status detalhado do agente                |
+| GET    | /openapi.json        | **NOVO**  | OpenAPI spec do servidor copilot          |
+| GET    | /sdk/models          | **NOVO**  | Modelos disponíveis no SDK                |
+| POST   | /sdk/complete        | **NOVO**  | Completion direta via SDK                 |
 
 ---
 
 ## 3. COPILOT SERVER vs TERMINAL: SEPARAÇÃO DEFINITIVA
 
 ### Antes (atual):
+
 ```
 terminal/
 ├── server.js       ← servidor HTTP
@@ -186,6 +186,7 @@ terminal/
 ```
 
 ### Depois (ideal):
+
 ```
 server/                 ← INFRA DE REDE
 ├── index.js
@@ -207,22 +208,25 @@ terminal/               ← UI LAYER
 └── commands/
 ```
 
-**Regra**: `terminal/` **NUNCA** importa de `server/`. O server inicializa o terminal via callback/event.
+**Regra**: `terminal/` **NUNCA** importa de `server/`. O server inicializa o terminal via
+callback/event.
 
 ---
 
 ## 4. CONVERSATION HUB COM SOCKET.IO NATIVO
 
 ### Problema atual:
+
 `initStandalone()` omite socket.io → dashboard sem tempo real.
 
 ### Solução ideal:
+
 `init({ io })` é a forma padrão de inicialização. O server cria o socket.io e passa para o hub.
 
 ```js
 // server/index.js
 const io = createSocketIO(server);
-conversationHub.init({ io });  // hub COM socket.io — COMPLETO
+conversationHub.init({ io }); // hub COM socket.io — COMPLETO
 
 // hub/socket-ns.js → movido para server/socket.js
 // - monta namespace /copilot no io
@@ -236,34 +240,34 @@ Dashboard pode se conectar via `socket.io-client` ou HTTP — ambos funcionam.
 
 ## 5. BENEFÍCIOS DA ARQUITETURA IDEAL
 
-| Benefício | Detalhes |
-|-----------|---------|
-| **Separação limpa** | server/ cuida de rede, terminal/ cuida de UI |
-| **Socket.IO nativo** | Dashboard em tempo real sem polling |
-| **Express robusto** | Middleware ecosystem, integração fácil com SDK |
-| **Expansível** | Adicionar WebRTC, auth OAuth2, plugins de transporte sem tocar no terminal |
-| **Multi-cliente** | Múltiplos dashboards conectados ao mesmo namespace socket |
-| **Testável** | Server isolado = testável com supertest; terminal isolado = testável com mock |
-| **Standalone garantido** | copilot/server não importa nada de src/server (produção) |
-| **API clara** | /openapi.json — copilot tem spec formal |
-| **Agent control** | /agent/* — start/stop/status via REST |
-| **SDK integrado** | /sdk/* — completions diretas, não só via terminal |
+| Benefício                | Detalhes                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| **Separação limpa**      | server/ cuida de rede, terminal/ cuida de UI                                  |
+| **Socket.IO nativo**     | Dashboard em tempo real sem polling                                           |
+| **Express robusto**      | Middleware ecosystem, integração fácil com SDK                                |
+| **Expansível**           | Adicionar WebRTC, auth OAuth2, plugins de transporte sem tocar no terminal    |
+| **Multi-cliente**        | Múltiplos dashboards conectados ao mesmo namespace socket                     |
+| **Testável**             | Server isolado = testável com supertest; terminal isolado = testável com mock |
+| **Standalone garantido** | copilot/server não importa nada de src/server (produção)                      |
+| **API clara**            | /openapi.json — copilot tem spec formal                                       |
+| **Agent control**        | /agent/\* — start/stop/status via REST                                        |
+| **SDK integrado**        | /sdk/\* — completions diretas, não só via terminal                            |
 
 ---
 
 ## 6. COMPARAÇÃO ANTES x DEPOIS
 
-| Aspecto | Atual | Ideal |
-|---------|-------|-------|
-| Server HTTP | `terminal/server.js` (407 LOC, manual) | `server/app.js` + Express |
-| Socket.IO | Não inicializado no standalone | Namespace `/copilot`, `/events`, `/agent` |
-| Rotas | 38+ rotas em route-table.js | Express Router por domínio |
-| Auth | Token simples em header | Token + JWT para socket |
-| Terminal | UI + server + handlers misturados | Apenas REPL + comandos |
-| ConversationHub | initStandalone (sem socket) | init({ io }) completo |
-| `server/` | 1 arquivo deprecated | ~15 arquivos separados por responsabilidade |
-| `api/` | Órfã (era production server adapter) | Integrada ao server/ ou removida |
-| Score arquitetural | 4.7/10 | 8.5/10 |
+| Aspecto            | Atual                                  | Ideal                                       |
+| ------------------ | -------------------------------------- | ------------------------------------------- |
+| Server HTTP        | `terminal/server.js` (407 LOC, manual) | `server/app.js` + Express                   |
+| Socket.IO          | Não inicializado no standalone         | Namespace `/copilot`, `/events`, `/agent`   |
+| Rotas              | 38+ rotas em route-table.js            | Express Router por domínio                  |
+| Auth               | Token simples em header                | Token + JWT para socket                     |
+| Terminal           | UI + server + handlers misturados      | Apenas REPL + comandos                      |
+| ConversationHub    | initStandalone (sem socket)            | init({ io }) completo                       |
+| `server/`          | 1 arquivo deprecated                   | ~15 arquivos separados por responsabilidade |
+| `api/`             | Órfã (era production server adapter)   | Integrada ao server/ ou removida            |
+| Score arquitetural | 4.7/10                                 | 8.5/10                                      |
 
 ---
 
@@ -272,16 +276,19 @@ Dashboard pode se conectar via `socket.io-client` ou HTTP — ambos funcionam.
 O `src/copilot` crescerá. A arquitetura ideal deve suportar:
 
 ### Curto prazo (próximas ondas):
+
 - Dashboard UI conectada via socket.io ao copilot server
 - Múltiplas abas do dashboard recebendo o mesmo stream
 - MCP via socket além de HTTP
 
 ### Médio prazo:
+
 - Extensões de navegador se comunicando com copilot server
 - LLM-A e LLM-B em máquinas diferentes (dev remoto)
 - Plugins de terceiros se registrando via HTTP no copilot server
 
 ### Longo prazo:
+
 - Copilot server com autenticação OAuth2 (múltiplos usuários dev)
 - Audit e replay de sessões com streaming
 - Copilot como MCP server nativo (protocolo MCP via HTTP/WS)
@@ -292,6 +299,6 @@ A arquitetura ideal com `server/` dedicado prepara para todos esses cenários se
 
 ## 8. CHANGELOG
 
-| Versão | Data       | Mudanças |
-| ------ | ---------- | -------- |
+| Versão | Data       | Mudanças                               |
+| ------ | ---------- | -------------------------------------- |
 | 1.0    | 2026-04-12 | Proposta completa de arquitetura ideal |

@@ -1,7 +1,7 @@
 # PARTE-18A — Auditoria `src/copilot/agent/` — Situação Atual
 
-> **Data**: 2026-06-28 | **Escopo**: `src/copilot/agent/` deep audit
-> **Baseline**: commit `2982acda` (main)
+> **Data**: 2026-06-28 | **Escopo**: `src/copilot/agent/` deep audit **Baseline**: commit `2982acda`
+> (main)
 
 ---
 
@@ -38,32 +38,38 @@
 ## 2. Padrões Arquiteturais em Uso
 
 ### 2.1 Shared Mutable Context (`AgentContext`)
+
 - Objeto flat passado por referência a todos os sub-módulos
 - Substitui ~32 campos private que existiam antes das extrações F37-F60
 - **Vantagem**: elimina need de acessar `this.#field` em módulos extraídos
 - **Risco**: qualquer módulo pode mutar estado de outro; não há encapsulamento
 
 ### 2.2 Status FSM
+
 ```
 stopped → starting → idle → processing → waiting_for_input
                              ↑                       ↓
                              └───────────────────────┘
 (stopped reachable from any state)
 ```
+
 - Transições validadas em `AgentContext.setStatus()` — warn, não bloqueia
 - **Gap**: warn sem block pode mascarar bugs de sequenciamento em produção
 
 ### 2.3 Callback Injection (Host + Context)
+
 - Módulos extraídos recebem `(ctx, host, ...)` em vez de referências ao `this`
 - `host` é o EventEmitter (`AlwaysAliveAgent`), `ctx` é `AgentContext`
 - Padrão consistente em 100% dos módulos pós-extração
 
 ### 2.4 Dialog Protocol (ask_user hijack)
+
 - SDK `onUserInputRequest` → classificação READY/REPLY/STOPPED/QUESTION
 - Boot prompt instrui o modelo a seguir o loop infinito
 - PR-aware: tracking boots vs resumes (0-PR vs 1-PR)
 
 ### 2.5 Singleton com Accessor
+
 - `alwaysAliveAgent` instanciado no topo de `always-alive.js`
 - `getAgent()` exportado como accessor para consumers
 - Consumidores mistos: ~60% usam `getAgent()`, ~40% importam singleton direto
@@ -76,21 +82,21 @@ stopped → starting → idle → processing → waiting_for_input
 
 | Categoria SDK         | Usado | Localização no Agent                           |
 | --------------------- | :---: | ---------------------------------------------- |
-| Client lifecycle      |   ✅   | `agent-lifecycle.js`, `reconnect-policy.js`    |
-| Session create/resume |   ✅   | `initializer.js`                               |
-| Session send          |   ✅   | `task-executor.js`, `steerMessage`             |
-| Session events (16+)  |   ✅   | `event-handlers/*.js` (8 files)                |
-| Tools registry        |   ✅   | `tools-bootstrap.js`                           |
-| Permissions           |   ✅   | `permission-controller.js`, `session-setup.js` |
-| Hooks factory         |   ✅   | `session-setup.js`                             |
-| System message        |   ✅   | `hook-context.js` (via hooks)                  |
-| MCP bridge            |   ✅   | `session-setup.js`, `boot-wiring.js`           |
-| Quota monitor         |   ✅   | `boot-wiring.js` (F118)                        |
+| Client lifecycle      |  ✅   | `agent-lifecycle.js`, `reconnect-policy.js`    |
+| Session create/resume |  ✅   | `initializer.js`                               |
+| Session send          |  ✅   | `task-executor.js`, `steerMessage`             |
+| Session events (16+)  |  ✅   | `event-handlers/*.js` (8 files)                |
+| Tools registry        |  ✅   | `tools-bootstrap.js`                           |
+| Permissions           |  ✅   | `permission-controller.js`, `session-setup.js` |
+| Hooks factory         |  ✅   | `session-setup.js`                             |
+| System message        |  ✅   | `hook-context.js` (via hooks)                  |
+| MCP bridge            |  ✅   | `session-setup.js`, `boot-wiring.js`           |
+| Quota monitor         |  ✅   | `boot-wiring.js` (F118)                        |
 
 ### 3.2 Superfície NÃO Usada / Sub-utilizada
 
-| Capability SDK             | Status      | Impacto                                                       |
-| -------------------------- | ----------- | ------------------------------------------------------------- |
+| Capability SDK             | Status       | Impacto                                                       |
+| -------------------------- | ------------ | ------------------------------------------------------------- |
 | `setSessionModel()`        | ❌ Não usado | Model switch usa `ctx.model` local, sem notificar SDK         |
 | `abortSession()`           | ⚠️ Parcial   | `agent.abort()` liga para session mas sem otel span           |
 | `listAvailableModels()`    | ❌ Não usado | Model fallback usa config estático, sem discovery             |
@@ -107,13 +113,13 @@ stopped → starting → idle → processing → waiting_for_input
 
 ### 4.1 O que está instrumentado
 
-| Tipo              | Cobertura | Detalhes                                                                          |
-| ----------------- | :-------: | --------------------------------------------------------------------------------- |
-| Logger (`log()`)  |    ✅✅     | Presente em 42/54 arquivos                                                        |
-| OTEL Spans        |     ⚠️     | Apenas 5 locais: lifecycle, reconnect, turn-executor, loop-manager, task-executor |
-| Metrics (record*) |     ⚠️     | 7/17 funções usadas diretamente no agent                                          |
-| Tool stats        |     ✅     | `wrapWithStats()` em 100% das tools                                               |
-| Event observer    |     ✅     | Via `boot-wiring.js` → event-collector                                            |
+| Tipo               | Cobertura | Detalhes                                                                          |
+| ------------------ | :-------: | --------------------------------------------------------------------------------- |
+| Logger (`log()`)   |   ✅✅    | Presente em 42/54 arquivos                                                        |
+| OTEL Spans         |    ⚠️     | Apenas 5 locais: lifecycle, reconnect, turn-executor, loop-manager, task-executor |
+| Metrics (record\*) |    ⚠️     | 7/17 funções usadas diretamente no agent                                          |
+| Tool stats         |    ✅     | `wrapWithStats()` em 100% das tools                                               |
+| Event observer     |    ✅     | Via `boot-wiring.js` → event-collector                                            |
 
 ### 4.2 Métricas NÃO emitidas pelo Agent (emitidas via Observers)
 
@@ -130,24 +136,26 @@ stopped → starting → idle → processing → waiting_for_input
 | `recordToolCall`        | `wrapWithStats()` (tool-stats.js)     |
 | `recordUsage`           | `observers/` (billing event)          |
 
-**Avaliação**: A arquitetura de observers está **correta** — o agent emite eventos e os observers capturam métricas. Não é responsabilidade do agent chamar `recordX()` para tudo. Os 7 record* diretos no agent são para operações internas (keepalive, cleanup, rotation, quota).
+**Avaliação**: A arquitetura de observers está **correta** — o agent emite eventos e os observers
+capturam métricas. Não é responsabilidade do agent chamar `recordX()` para tudo. Os 7 record\*
+diretos no agent são para operações internas (keepalive, cleanup, rotation, quota).
 
 ### 4.3 Gaps de OTEL
 
 | Operação                  | Span? | Gap                             |
 | ------------------------- | :---: | ------------------------------- |
-| `agentStart()`            |   ✅   | `copilot.session.init`          |
-| `agentStop()`             |   ❌   | Shutdown sem trace              |
-| `reconnect`               |   ✅   | `copilot.reconnect`             |
-| `executeTurn`             |   ✅   | `copilot.dialog.turn`           |
-| `executeTask`             |   ✅   | `copilot.task` + `copilot.tool` |
-| `dialogLoop.start()`      |   ✅   | `copilot.dialog.loop`           |
-| `sendMessage()`           |   ❌   | Enqueue → execute sem span E2E  |
-| `steerMessage()`          |   ❌   | Steering sem trace              |
-| `answerPendingQuestion()` |   ❌   | Resposta sem trace              |
-| `cleanupStaleSessions()`  |   ❌   | Cleanup sem trace               |
-| `sessionRotation`         |   ❌   | Rotação sem trace               |
-| `snapshot save/load`      |   ❌   | Snapshot ops sem trace          |
+| `agentStart()`            |  ✅   | `copilot.session.init`          |
+| `agentStop()`             |  ❌   | Shutdown sem trace              |
+| `reconnect`               |  ✅   | `copilot.reconnect`             |
+| `executeTurn`             |  ✅   | `copilot.dialog.turn`           |
+| `executeTask`             |  ✅   | `copilot.task` + `copilot.tool` |
+| `dialogLoop.start()`      |  ✅   | `copilot.dialog.loop`           |
+| `sendMessage()`           |  ❌   | Enqueue → execute sem span E2E  |
+| `steerMessage()`          |  ❌   | Steering sem trace              |
+| `answerPendingQuestion()` |  ❌   | Resposta sem trace              |
+| `cleanupStaleSessions()`  |  ❌   | Cleanup sem trace               |
+| `sessionRotation`         |  ❌   | Rotação sem trace               |
+| `snapshot save/load`      |  ❌   | Snapshot ops sem trace          |
 
 ---
 
@@ -172,6 +180,7 @@ stopped → starting → idle → processing → waiting_for_input
 | Agent → MCP config        | `session-setup.js:17`   | Import direto de `../../config/mcp-servers.js`      |
 
 **Regra violada**: O módulo `agent/` deveria depender apenas de:
+
 - `#copilot/core/*` (contratos)
 - `#copilot/observability/*` (logging/metrics)
 - `#copilot/sdk/*` (abstração do SDK)
@@ -196,9 +205,9 @@ stopped → starting → idle → processing → waiting_for_input
 
 | ID      | Severidade | Descrição                                                                                                            | Arquivo                           |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| BUG-A01 | 🔴 Alto     | `loadLatestSnapshot()` chama `listSnapshots()` que retorna `[]` (deprecated), tornando restore inoperante            | `snapshot.js:155-163`             |
-| BUG-A02 | 🟡 Médio    | `persistState()` sync chamado 13× — race condition com `writeStateAsync()` (11×) quando ambos atuam no mesmo arquivo | `state-io.js` (múltiplos callers) |
-| BUG-A03 | 🟡 Médio    | `steerMessage()` não suporta AbortSignal — steering irrecancellable                                                  | `agent-messaging.js:124`          |
+| BUG-A01 | 🔴 Alto    | `loadLatestSnapshot()` chama `listSnapshots()` que retorna `[]` (deprecated), tornando restore inoperante            | `snapshot.js:155-163`             |
+| BUG-A02 | 🟡 Médio   | `persistState()` sync chamado 13× — race condition com `writeStateAsync()` (11×) quando ambos atuam no mesmo arquivo | `state-io.js` (múltiplos callers) |
+| BUG-A03 | 🟡 Médio   | `steerMessage()` não suporta AbortSignal — steering irrecancellable                                                  | `agent-messaging.js:124`          |
 
 ### 6.2 Deprecated APIs Ainda em Uso
 
@@ -210,7 +219,7 @@ stopped → starting → idle → processing → waiting_for_input
 | `listSnapshots()` sync  |        2 | `listSnapshotsAsync()`  |
 | `loadSnapshot()` sync   |        1 | `loadSnapshotAsync()`   |
 | `pruneSnapshots()` sync |        1 | `pruneSnapshotsAsync()` |
-| `clearState()` sync     |        0 | `clearStateAsync()` ✅   |
+| `clearState()` sync     |        0 | `clearStateAsync()` ✅  |
 
 **Total**: 30 chamadas a APIs deprecated sync vs 17 chamadas async. Ratio 64% sync.
 
@@ -243,14 +252,17 @@ stopped → starting → idle → processing → waiting_for_input
 ## 7. Cobertura de Testes
 
 - **60+ arquivos de teste** cobrem o módulo agent
-- **Pontos fortes**: lifecycle, dialog-loop, messaging, reconnect, shutdown, delegation, context, event-wiring
-- **Gap de testes**: `history-sync.js`, `hook-context.js` (I/O complexo), `cleanup.js` (integration with listSessions)
+- **Pontos fortes**: lifecycle, dialog-loop, messaging, reconnect, shutdown, delegation, context,
+  event-wiring
+- **Gap de testes**: `history-sync.js`, `hook-context.js` (I/O complexo), `cleanup.js` (integration
+  with listSessions)
 
 ---
 
 ## 8. Sumário Executivo
 
 ### Pontos Fortes
+
 1. **Facade disciplinada**: `always-alive.js` é 100% delegação pós-F37-F60
 2. **Event-driven**: 16+ eventos SDK tratados em handlers especializados
 3. **Observability distributed**: Métricas via observers (não acopladas ao agent)
@@ -259,8 +271,10 @@ stopped → starting → idle → processing → waiting_for_input
 6. **Protocol**: Dialog loop protocol bem definido e isolado
 
 ### Pontos Fracos
+
 1. **30 chamadas deprecated sync I/O** bloqueando event loop
-2. **5 violações de boundary** (imports diretos para conversation-hub, terminal, tools, bridges, config)
+2. **5 violações de boundary** (imports diretos para conversation-hub, terminal, tools, bridges,
+   config)
 3. **BUG-A01**: Snapshot restore quebrado (listSnapshots deprecated retorna [])
 4. **7 operações sem OTEL spans** (gaps de tracing)
 5. **loop-manager.js god module** (600L, 5+ responsabilidades)

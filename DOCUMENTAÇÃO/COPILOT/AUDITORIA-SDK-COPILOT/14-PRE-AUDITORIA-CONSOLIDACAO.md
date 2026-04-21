@@ -1,9 +1,8 @@
 # 14 — Pré-Auditoria de Consolidação: Plano de Migração Unificado
 
-**Data**: 2026-03-21
-**Propósito**: Planejar a série de documentos que consolidam e ampliam o roadmap de migração
-da situação atual para a situação ideal de `src/copilot/`.
-**Input**: Todos os 15 documentos existentes (00-13 + este).
+**Data**: 2026-03-21 **Propósito**: Planejar a série de documentos que consolidam e ampliam o
+roadmap de migração da situação atual para a situação ideal de `src/copilot/`. **Input**: Todos os
+15 documentos existentes (00-13 + este).
 
 ---
 
@@ -34,7 +33,8 @@ da situação atual para a situação ideal de `src/copilot/`.
 O `07-ROADMAP-MASTER.md` cresceu organicamente ao longo de múltiplas sessões e apresenta:
 
 1. **Fragmentação**: 12 faixas (A-L) com sobreposições entre G/K/L e entre J/L
-2. **Sobreposições não resolvidas**: G1↔K1↔L2 (agent decomposition), G3↔L4 (event routing), G4↔L1 (cleanup), J2↔L1 (dead code)
+2. **Sobreposições não resolvidas**: G1↔K1↔L2 (agent decomposition), G3↔L4 (event routing), G4↔L1
+   (cleanup), J2↔L1 (dead code)
 3. **Sequenciamento ambíguo**: Sprints 4-7 têm dependências cruzadas não totalmente explícitas
 4. **Faixas concluídas poluem a leitura**: A, I, B, C, E estão ✅ mas ocupam ~40% do doc
 5. **Falta contexto técnico**: Cada subfase tem 1 linha — insuficiente para um agente sem contexto
@@ -57,7 +57,7 @@ Para que um agente LLM possa executar o plano sem contexto prévio, cada documen
 
 ## 2. Plano de Documentos a Gerar
 
-### Estrutura proposta: Série MIGRAÇÃO-* (M-00 a M-07)
+### Estrutura proposta: Série MIGRAÇÃO-\* (M-00 a M-07)
 
 Todos os novos documentos ficam em: `DOCUMENTAÇÃO/COPILOT/PLANO-MIGRACAO/`
 
@@ -111,17 +111,21 @@ Cada documento de fase (M-02 a M-06) seguirá esta estrutura:
 # M-0x — Fase N: [Nome]
 
 ## 1. Contexto e Motivação
+
 - Problema(s) resolvido(s) com evidência (referência a doc 12/13)
 - Métricas antes → depois esperadas
 
 ## 2. Pré-Requisitos
+
 - Fases anteriores que devem estar concluídas
 - Estado esperado do codebase antes de iniciar
 
 ## 3. Inventário de Arquivos Afetados
+
 - Tabela: arquivo | ação (criar/mover/editar/deletar) | linhas | módulo origem → destino
 
 ## 4. Passos de Execução
+
 - Cada passo numerado (P01, P02, ...)
 - Para cada passo:
   - O que fazer (descrição técnica)
@@ -131,13 +135,16 @@ Cada documento de fase (M-02 a M-06) seguirá esta estrutura:
   - Rollback (git checkout, etc.)
 
 ## 5. Testes Necessários
+
 - Novos testes a criar
 - Testes existentes que devem continuar passando
 
 ## 6. Critérios de Conclusão
+
 - Checklist verificável
 
 ## 7. Riscos e Mitigações
+
 - Risk matrix por step
 ```
 
@@ -161,7 +168,8 @@ Cada documento de fase (M-02 a M-06) seguirá esta estrutura:
 - **Total**: 408 arquivos JS, ~62.000 linhas, 21 módulos em `src/copilot/`
 - **Top 4**: agent (8.620L), sdk (8.096L), terminal (7.111L), tools (6.928L)
 - **Event buses**: 3 (EventBus core, SDK session events, HookBus)
-- **Error handling layers**: 5 (core/errors, core/handlers, hooks/error-handler, obs/tracker, obs/alerting)
+- **Error handling layers**: 5 (core/errors, core/handlers, hooks/error-handler, obs/tracker,
+  obs/alerting)
 - **DI tokens**: 11 (subutilizados — maioria dos módulos usa singletons diretos)
 - **Message send chain**: 7 níveis de indireção
 - **Duplicações funcionais**: 7 pares identificados (doc 12 §3.1)
@@ -246,6 +254,7 @@ M-07 (Fases Futuras) ──────  FASE 6+: features novas pós-migração
 ## 5. Decisão
 
 **Próximos passos**:
+
 1. Criar diretório `DOCUMENTAÇÃO/COPILOT/PLANO-MIGRACAO/`
 2. Gerar M-00 (visão geral)
 3. Gerar M-01 (inventário completo)

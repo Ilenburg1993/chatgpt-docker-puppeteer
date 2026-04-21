@@ -1,8 +1,7 @@
 # R-11B — Terminal como Frontend Principal da LLM-B
 
-**Programa**: P4
-**Status**: canônico para a frente terminal-first
-**Relacionamento**: complemento operacional de `R-11` e `R-11A`
+**Programa**: P4 **Status**: canônico para a frente terminal-first **Relacionamento**: complemento
+operacional de `R-11` e `R-11A`
 
 ---
 
@@ -125,8 +124,8 @@ terminal/
 
 ## 4.2 Regra operacional
 
-Quando um comando, handler ou flow do terminal precisar falar com muitos domínios ao mesmo tempo,
-o destino preferencial **não** é mais o container espalhado; o destino preferencial passa a ser:
+Quando um comando, handler ou flow do terminal precisar falar com muitos domínios ao mesmo tempo, o
+destino preferencial **não** é mais o container espalhado; o destino preferencial passa a ser:
 
 - `terminal/frontend/*` para composição específica da UX local;
 - `presentation/*` para superfícies compartilhadas entre bordas;
@@ -141,9 +140,12 @@ O terminal só pode ser considerado convergente com o end-state clean quando:
 1. o `server/` continuar em **0 imports estruturais diretos** de `terminal/`;
 2. projections compartilhadas seguirem concentradas em `presentation/`;
 3. `commands/` e `dialog/` pararem de abrir integrações transversais em cada arquivo;
-4. existir uma camada `terminal/frontend/*` claramente reconhecível como consumer layer principal da LLM-B;
-5. a UX do terminal continuar plenamente compatível com `agent/`, `channel/`, `conversation-hub/` e `sdk/`;
-6. o terminal continuar operando tanto para o usuário humano quanto para a LLM-A sem duplicar runtime truth.
+4. existir uma camada `terminal/frontend/*` claramente reconhecível como consumer layer principal da
+   LLM-B;
+5. a UX do terminal continuar plenamente compatível com `agent/`, `channel/`, `conversation-hub/` e
+   `sdk/`;
+6. o terminal continuar operando tanto para o usuário humano quanto para a LLM-A sem duplicar
+   runtime truth.
 
 ---
 
@@ -161,24 +163,34 @@ O terminal só pode ser considerado convergente com o end-state clean quando:
 O primeiro corte dessa fase já foi materializado:
 
 - foi criada a camada `src/copilot/terminal/frontend/llm-b-frontend.js`;
-- essa camada já centraliza status, diagnose, métricas, usage, operações centrais de sessão, memória, retomada e busca do terminal;
-- `commands/session.js`, `commands/diagnose.js`, `commands/metrics.js`, `commands/usage.js`, `commands/memory.js`, `commands/resume.js` e `commands/search.js` passaram a consumir essa camada;
-- `commands/config.js`, `commands/context.js` e `commands/errors.js` também passaram a consumir essa camada;
-- foi criado `src/copilot/terminal/frontend/llm-b-runtime.js` como gateway runtime da UX principal da LLM-B;
-- `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`, `dialog/engine-persistence.js`, `terminal-agent-wiring.js` e `index.js` passaram a consumir esse gateway;
-- o binding canônico `runtimeSessionId ↔ sdkSessionId ↔ hubSessionId` agora aparece de forma mais explícita na UX local do terminal;
+- essa camada já centraliza status, diagnose, métricas, usage, operações centrais de sessão,
+  memória, retomada e busca do terminal;
+- `commands/session.js`, `commands/diagnose.js`, `commands/metrics.js`, `commands/usage.js`,
+  `commands/memory.js`, `commands/resume.js` e `commands/search.js` passaram a consumir essa camada;
+- `commands/config.js`, `commands/context.js` e `commands/errors.js` também passaram a consumir essa
+  camada;
+- foi criado `src/copilot/terminal/frontend/llm-b-runtime.js` como gateway runtime da UX principal
+  da LLM-B;
+- `repl.js`, `repl-listeners.js`, `dialog/output.js`, `dialog/engine.js`,
+  `dialog/engine-persistence.js`, `terminal-agent-wiring.js` e `index.js` passaram a consumir esse
+  gateway;
+- o binding canônico `runtimeSessionId ↔ sdkSessionId ↔ hubSessionId` agora aparece de forma mais
+  explícita na UX local do terminal;
 - a DI direta do recorte `terminal/commands/` caiu de **22** para **0** ocorrências;
-- o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências, com apenas **1** remanescente no runtime efetivo do módulo.
+- o recorte total de `container.resolve()` em `src/copilot/terminal/` caiu para **2** ocorrências,
+  com apenas **1** remanescente no runtime efetivo do módulo.
 
 Próxima fila recomendada de T1/T2:
 
-1. seguir refinando `dialog/`, `repl.js` e `repl-listeners.js` agora em torno do gateway runtime já extraído;
+1. seguir refinando `dialog/`, `repl.js` e `repl-listeners.js` agora em torno do gateway runtime já
+   extraído;
 2. expandir os contract tests do frontend principal da LLM-B e do boundary runtime local;
 3. manter README e artefatos do P4 alinhados ao boundary terminal-first.
 
 ### Estado atual resumido adicional de T1/T2
 
-- `terminal/frontend/*` agora tem **3 arquivos / 1.045 linhas** e funciona como camada interna canônica do frontend principal + gateway runtime;
+- `terminal/frontend/*` agora tem **3 arquivos / 1.045 linhas** e funciona como camada interna
+  canônica do frontend principal + gateway runtime;
 - validação focada mais recente do slice terminal-first:
   - **44/44** testes verdes em `vitest` no slice de comandos/frontend;
   - **14/14** testes verdes em `node:test` nos contratos de `dialog`/`repl`/`wiring`/`index`;
@@ -207,7 +219,8 @@ rearquitertura clean busca não é reduzir essa centralidade, e sim discipliná-
 
 - SSOTs continuam nos domínios certos;
 - projections compartilhadas continuam em `presentation/`;
-- o terminal passa a ser um frontend principal mais explícito, mais fino por dentro e mais forte por fora.
+- o terminal passa a ser um frontend principal mais explícito, mais fino por dentro e mais forte por
+  fora.
 
 ## 8. Atualização do baseline terminal-first
 

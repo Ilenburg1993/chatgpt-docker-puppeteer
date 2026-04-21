@@ -78,9 +78,11 @@ A partir desta série:
 
 ## 6. Nota de governança
 
-Se um novo documento for criado fora desta série para orientar execução arquitetural ampla, ele deve:
+Se um novo documento for criado fora desta série para orientar execução arquitetural ampla, ele
+deve:
 
 - apontar explicitamente para esta série;
 - ou ser incorporado a ela.
 
-O objetivo é evitar que o sistema volte a ter quatro “roadmaps principais” ao mesmo tempo. Um já é divertido o bastante.
+O objetivo é evitar que o sistema volte a ter quatro “roadmaps principais” ao mesmo tempo. Um já é
+divertido o bastante.

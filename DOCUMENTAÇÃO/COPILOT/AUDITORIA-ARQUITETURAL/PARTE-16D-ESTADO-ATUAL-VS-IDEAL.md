@@ -1,8 +1,7 @@
 # PARTE-16D — Estado Atual vs Estado Ideal (Pós-F120)
 
-**Data**: 2026-04-08
-**Baseline**: commit `bfe96b57`
-**Referência**: PARTE-14D (estado ideal original), PARTE-16A/B/C (nova auditoria)
+**Data**: 2026-04-08 **Baseline**: commit `bfe96b57` **Referência**: PARTE-14D (estado ideal
+original), PARTE-16A/B/C (nova auditoria)
 
 ---
 
@@ -80,33 +79,33 @@
 
 ### 3.1 Cenário: Sessão Longa (>4h)
 
-| Risco                           | Probabilidade | Impacto | Mitigação Atual | Gap         |
-| ------------------------------- | ------------- | ------- | --------------- | ----------- |
-| Memory leak (metrics unbounded) | 🟡 Média       | 🟡 Médio | Nenhuma         | PRF-03      |
-| Memory leak (event-collector)   | 🟡 Média       | 🟡 Médio | Nenhuma         | PRF-07      |
-| Timer accumulation              | 🟢 Baixa       | 🟢 Baixo | Parcial         | CNF-T01..06 |
-| SQLite WAL growth               | 🟢 Baixa       | 🟢 Baixo | Checkpoint      | ✅ OK        |
-| Log file growth                 | 🟢 Baixa       | 🟢 Baixo | Rotation        | ✅ OK        |
+| Risco                           | Probabilidade | Impacto  | Mitigação Atual | Gap         |
+| ------------------------------- | ------------- | -------- | --------------- | ----------- |
+| Memory leak (metrics unbounded) | 🟡 Média      | 🟡 Médio | Nenhuma         | PRF-03      |
+| Memory leak (event-collector)   | 🟡 Média      | 🟡 Médio | Nenhuma         | PRF-07      |
+| Timer accumulation              | 🟢 Baixa      | 🟢 Baixo | Parcial         | CNF-T01..06 |
+| SQLite WAL growth               | 🟢 Baixa      | 🟢 Baixo | Checkpoint      | ✅ OK       |
+| Log file growth                 | 🟢 Baixa      | 🟢 Baixo | Rotation        | ✅ OK       |
 
 ### 3.2 Cenário: Crash e Recovery
 
-| Risco                         | Probabilidade | Impacto | Mitigação Atual  | Gap         |
-| ----------------------------- | ------------- | ------- | ---------------- | ----------- |
-| State corruption (sync write) | 🟡 Média       | 🔴 Alto  | Nenhuma          | CNF-F01..03 |
-| Orphan timers pós-crash       | 🟡 Média       | 🟢 Baixo | Nenhuma          | CNF-T01..06 |
-| Incomplete shutdown           | 🟡 Média       | 🟡 Médio | Parcial (entry)  | PAD-09..12  |
-| DB corruption                 | 🟢 Baixa       | 🔴 Alto  | WAL mode + exit  | ✅ OK        |
-| Session state loss            | 🟡 Média       | 🟡 Médio | Snapshot restore | RC-01..02   |
+| Risco                         | Probabilidade | Impacto  | Mitigação Atual  | Gap         |
+| ----------------------------- | ------------- | -------- | ---------------- | ----------- |
+| State corruption (sync write) | 🟡 Média      | 🔴 Alto  | Nenhuma          | CNF-F01..03 |
+| Orphan timers pós-crash       | 🟡 Média      | 🟢 Baixo | Nenhuma          | CNF-T01..06 |
+| Incomplete shutdown           | 🟡 Média      | 🟡 Médio | Parcial (entry)  | PAD-09..12  |
+| DB corruption                 | 🟢 Baixa      | 🔴 Alto  | WAL mode + exit  | ✅ OK       |
+| Session state loss            | 🟡 Média      | 🟡 Médio | Snapshot restore | RC-01..02   |
 
 ### 3.3 Cenário: Ataque via Tool Input
 
-| Risco                           | Probabilidade | Impacto | Mitigação Atual   | Gap    |
-| ------------------------------- | ------------- | ------- | ----------------- | ------ |
-| Path traversal (file tools)     | 🟢 Baixa       | 🟡 Médio | isWithinWorkspace | SEC-04 |
-| Shell injection (session-tools) | 🟢 Baixa       | 🔴 Alto  | Timeout only      | SEC-01 |
-| SSRF (web-tools)                | 🟢 Baixa       | 🟡 Médio | URL validation    | SEC-05 |
-| SQL injection (todo store)      | 🟢 Baixa       | 🟡 Médio | Prepared stmts    | ✅ OK   |
-| XSS (terminal output)           | 🟢 Baixa       | 🟢 Baixo | Non-browser env   | ✅ N/A  |
+| Risco                           | Probabilidade | Impacto  | Mitigação Atual   | Gap    |
+| ------------------------------- | ------------- | -------- | ----------------- | ------ |
+| Path traversal (file tools)     | 🟢 Baixa      | 🟡 Médio | isWithinWorkspace | SEC-04 |
+| Shell injection (session-tools) | 🟢 Baixa      | 🔴 Alto  | Timeout only      | SEC-01 |
+| SSRF (web-tools)                | 🟢 Baixa      | 🟡 Médio | URL validation    | SEC-05 |
+| SQL injection (todo store)      | 🟢 Baixa      | 🟡 Médio | Prepared stmts    | ✅ OK  |
+| XSS (terminal output)           | 🟢 Baixa      | 🟢 Baixo | Non-browser env   | ✅ N/A |
 
 ---
 
@@ -116,20 +115,20 @@ Estimativa do impacto de cada tipo de refatoração planejada:
 
 | Faixa Planejada                 | Arquivos Toc. | Testes Novos | Risco de Break | Dependências  |
 | ------------------------------- | ------------: | -----------: | -------------- | ------------- |
-| F1: Foundation hardening        |          8-12 |          5-8 | 🟢 Baixo        | core/ only    |
-| F2: Security hardening          |           4-6 |          4-6 | 🟢 Baixo        | tools, server |
-| F3: Catch block audit           |         20-30 |          0-2 | 🟢 Baixo        | Scattered     |
-| F4: Timer cleanup               |          8-10 |          3-5 | 🟢 Baixo        | Scattered     |
-| F5: conversation-hub tests      |           0-2 |         6-10 | 🟢 Baixo        | Nenhum        |
-| F6: bridges tests               |           0-2 |          4-6 | 🟢 Baixo        | Nenhum        |
-| F7: terminal decomposição       |         10-15 |          5-8 | 🟡 Médio        | terminal/*    |
-| F8: tools decomposição + testes |          8-12 |         6-10 | 🟡 Médio        | tools/*       |
-| F9: observability tests         |           0-2 |          4-6 | 🟢 Baixo        | Nenhum        |
-| F10: God module decomp tier-2   |         10-15 |          5-8 | 🟡 Médio        | Multiple      |
-| F11: God module decomp tier-3   |          8-12 |          3-5 | 🟡 Médio        | Multiple      |
-| F12: Performance hardening      |          6-10 |          2-4 | 🟡 Médio        | FS paths      |
-| F13: API consistency            |           4-8 |          2-4 | 🟢 Baixo        | api, server   |
-| F14: Coverage + CI + relatório  |           2-4 |          0-2 | 🟢 Baixo        | CI config     |
+| F1: Foundation hardening        |          8-12 |          5-8 | 🟢 Baixo       | core/ only    |
+| F2: Security hardening          |           4-6 |          4-6 | 🟢 Baixo       | tools, server |
+| F3: Catch block audit           |         20-30 |          0-2 | 🟢 Baixo       | Scattered     |
+| F4: Timer cleanup               |          8-10 |          3-5 | 🟢 Baixo       | Scattered     |
+| F5: conversation-hub tests      |           0-2 |         6-10 | 🟢 Baixo       | Nenhum        |
+| F6: bridges tests               |           0-2 |          4-6 | 🟢 Baixo       | Nenhum        |
+| F7: terminal decomposição       |         10-15 |          5-8 | 🟡 Médio       | terminal/\*   |
+| F8: tools decomposição + testes |          8-12 |         6-10 | 🟡 Médio       | tools/\*      |
+| F9: observability tests         |           0-2 |          4-6 | 🟢 Baixo       | Nenhum        |
+| F10: God module decomp tier-2   |         10-15 |          5-8 | 🟡 Médio       | Multiple      |
+| F11: God module decomp tier-3   |          8-12 |          3-5 | 🟡 Médio       | Multiple      |
+| F12: Performance hardening      |          6-10 |          2-4 | 🟡 Médio       | FS paths      |
+| F13: API consistency            |           4-8 |          2-4 | 🟢 Baixo       | api, server   |
+| F14: Coverage + CI + relatório  |           2-4 |          0-2 | 🟢 Baixo       | CI config     |
 | **TOTAL**                       |    **88-140** |    **49-82** |                |               |
 
 ---

@@ -1,8 +1,6 @@
 # Auditoria DI Completa — `src/copilot/`
 
-**Status**: EXECUTADO (Fases A + B + C parcial)
-**Criado**: 2026-06-12
-**Atualizado**: 2026-06-12
+**Status**: EXECUTADO (Fases A + B + C parcial) **Criado**: 2026-06-12 **Atualizado**: 2026-06-12
 **Escopo**: Todo o subsistema `src/copilot/` — container, tokens, singletons, setters, boot flow
 
 ---
@@ -22,8 +20,8 @@
 
 ### 1.2 Problemas Identificados
 
-| #   | Problema                                                             | Severidade | Status                     |
-| --- | -------------------------------------------------------------------- | ---------- | -------------------------- |
+| #   | Problema                                                             | Severidade | Status                      |
+| --- | -------------------------------------------------------------------- | ---------- | --------------------------- |
 | P1  | **21 tokens "fantasma"** — definidos sem register/resolve            | Médio      | ✅ CORRIGIDO                |
 | P2  | **Module-level singletons** — 9+ instanciadas no import              | Alto       | ✅ REGISTRADOS no container |
 | P3  | **3 setters sem DI** — injection direta em boot-wiring.js            | Alto       | ✅ MIGRADOS para DI         |
@@ -80,12 +78,11 @@
 
 ### 2.4 Dead Tokens Removidos (19)
 
-`DIALOG_ENGINE`, `AUDIT_PIPELINE`, `INJECT_SERVER`, `SOCKET_NAMESPACE`,
-`RATE_LIMITER`, `CACHE_MANAGER`, `MUTEX_POOL`, `TIMER_REGISTRY`, `WORKER_POOL`, `MISSION_CONTROL`,
-`ALERTS_MANAGER`, `QUOTA_MONITOR`, `HEALTH_MANAGER`, `OTEL_TRACER`,
-`CIRCUIT_BREAKER_REGISTRY`, `PLUGIN_REGISTRY`,
-`ROOT_LOGGER`, `APP_CONFIG`,
-`SESSION_SERVICE`, `CONVERSATION_SERVICE`, `AGENT_SERVICE`, `DIALOG_SERVICE`
+`DIALOG_ENGINE`, `AUDIT_PIPELINE`, `INJECT_SERVER`, `SOCKET_NAMESPACE`, `RATE_LIMITER`,
+`CACHE_MANAGER`, `MUTEX_POOL`, `TIMER_REGISTRY`, `WORKER_POOL`, `MISSION_CONTROL`, `ALERTS_MANAGER`,
+`QUOTA_MONITOR`, `HEALTH_MANAGER`, `OTEL_TRACER`, `CIRCUIT_BREAKER_REGISTRY`, `PLUGIN_REGISTRY`,
+`ROOT_LOGGER`, `APP_CONFIG`, `SESSION_SERVICE`, `CONVERSATION_SERVICE`, `AGENT_SERVICE`,
+`DIALOG_SERVICE`
 
 ### 2.5 Boot Flow Atualizado
 
@@ -129,7 +126,9 @@
 
 ### 3.3 Fase C — Singletons → Container (parcial) ✅
 
-- 4 singletons registrados no container: `defaultMetrics` → `METRICS_STORE`, `defaultErrorTracker` → `ERROR_TRACKER`, `defaultEventCollector` → `EVENT_COLLECTOR`, `alwaysAliveAgent` → `ALWAYS_ALIVE_AGENT`
+- 4 singletons registrados no container: `defaultMetrics` → `METRICS_STORE`, `defaultErrorTracker` →
+  `ERROR_TRACKER`, `defaultEventCollector` → `EVENT_COLLECTOR`, `alwaysAliveAgent` →
+  `ALWAYS_ALIVE_AGENT`
 - Module-level exports mantidos como aliases (backward compat)
 - Consumers existentes continuam funcionando sem alteração
 
@@ -138,20 +137,25 @@
 ## 4. Trabalho Futuro
 
 ### 4.1 Full Singleton Migration (Fase C completa)
+
 - Substituir `import { conversationHub }` por `container.resolve(HUB)` nos 9 consumers
-- Substituir `import { conversationStore }` por `container.resolve(CONVERSATION_STORE)` nos 10 consumers
-- Substituir `import { alwaysAliveAgent }` por `container.resolve(ALWAYS_ALIVE_AGENT)` nos 21 consumers
+- Substituir `import { conversationStore }` por `container.resolve(CONVERSATION_STORE)` nos 10
+  consumers
+- Substituir `import { alwaysAliveAgent }` por `container.resolve(ALWAYS_ALIVE_AGENT)` nos 21
+  consumers
 - Refatorar module-level exports para lazy resolution via container
 
 ### 4.2 Setter Deprecation
+
 - Marcar todos os `set*()` com `@deprecated`
 - Migrar gradualmente consumers para `container.resolve()` direto
 
 ### 4.3 Container Enhancements
+
 - `container.registerOptional()` — não falha se já registrado
 - `container.snapshot()` — serializa estado para debug/observability
 - Manter `wireLegacySetters` temporariamente para backward compat
 
 ---
 
-*Documento gerado automaticamente durante Auditoria DI — Faixa 3.5+ / sessão de 2026-06-12.*
+_Documento gerado automaticamente durante Auditoria DI — Faixa 3.5+ / sessão de 2026-06-12._

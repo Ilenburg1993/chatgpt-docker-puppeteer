@@ -1,12 +1,11 @@
 # PARTE 11C — Roadmap de Refatoração: Fases 1–4 (Higiene & Eliminação)
 
-**Data**: 2026-07-21
-**Pré-requisitos**: [11A](PARTE-11A-ANALISE-ARQUITETURAL-COMPLETA.md) (análise),
-[11B](PARTE-11B-SITUACAO-IDEAL.md) (situação ideal).
-**Escopo**: Limpeza de código morto, deprecated, diretórios vazios, re-exports obsoletos.
+**Data**: 2026-07-21 **Pré-requisitos**: [11A](PARTE-11A-ANALISE-ARQUITETURAL-COMPLETA.md)
+(análise), [11B](PARTE-11B-SITUACAO-IDEAL.md) (situação ideal). **Escopo**: Limpeza de código morto,
+deprecated, diretórios vazios, re-exports obsoletos.
 
-> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
-> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**. Ver
+> [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
 
 ---
 

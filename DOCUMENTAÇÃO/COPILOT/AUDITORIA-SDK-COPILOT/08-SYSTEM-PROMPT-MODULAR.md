@@ -1,7 +1,6 @@
 # 08 — System Prompt Modular: Controle Total via Replace-First
 
-**Data**: 2026-03-21
-**Status**: ✅ IMPLEMENTADO (Fases I1+I2+I3 completas — 2026-04-14)
+**Data**: 2026-03-21 **Status**: ✅ IMPLEMENTADO (Fases I1+I2+I3 completas — 2026-04-14)
 **Referências**: 02-GAPS-FUNCIONAIS-SDK.md, 05-ARQUITETURA-IDEAL.md, 07-ROADMAP-MASTER.md
 
 ---
@@ -88,6 +87,7 @@ Cada arquivo em `sections/` exporta:
 
 /**
  * Seção: identity — Agent identity preamble and mode statement
+ *
  * @module copilot/config/system-prompt/sections/identity
  */
 
@@ -105,9 +105,9 @@ arquitetura orientada a eventos e foco em confiabilidade operacional.
 Tecnologias principais: Node.js 24+ ESM, Puppeteer, NERV event bus, Express/Socket.io, PM2, TypeScript via JSDoc.`;
 
 /**
- * Conteúdo final da seção: SDK_DEFAULT + CUSTOM (ou CUSTOM replace completo).
- * Em mode 'replace', SDK_DEFAULT é ignorado (nosso CUSTOM substitui completamente).
- * Em mode 'customize', usamos action:'replace' com CUSTOM (substitui apenas esta seção).
+ * Conteúdo final da seção: SDK_DEFAULT + CUSTOM (ou CUSTOM replace completo). Em mode 'replace', SDK_DEFAULT é ignorado
+ * (nosso CUSTOM substitui completamente). Em mode 'customize', usamos action:'replace' com CUSTOM (substitui apenas
+ * esta seção).
  *
  * @type {string}
  */
@@ -115,6 +115,7 @@ export const CONTENT = CUSTOM;
 
 /**
  * Override action para mode 'customize'.
+ *
  * @type {import('@github/copilot-sdk').SectionOverrideAction}
  */
 export const ACTION = 'replace';
@@ -130,43 +131,49 @@ import * as tone from './sections/tone.js';
 // ... todas as 10 seções
 
 const SECTIONS = {
-    identity, tone, tool_efficiency, environment_context,
-    code_change_rules, guidelines, safety, tool_instructions,
-    custom_instructions, last_instructions,
+  identity,
+  tone,
+  tool_efficiency,
+  environment_context,
+  code_change_rules,
+  guidelines,
+  safety,
+  tool_instructions,
+  custom_instructions,
+  last_instructions,
 };
 
 /**
  * Monta o SystemMessageConfig completo.
+ *
  * @param {{ extraContext?: string }} [opts]
  * @returns {SystemMessageConfig}
  */
 export function buildSystemMessage(opts = {}) {
-    const mode = getMode(); // 'replace' | 'customize'
+  const mode = getMode(); // 'replace' | 'customize'
 
-    if (mode === 'replace') {
-        return buildReplaceMode(opts);
-    }
-    return buildCustomizeMode(opts);
+  if (mode === 'replace') {
+    return buildReplaceMode(opts);
+  }
+  return buildCustomizeMode(opts);
 }
 
 function buildReplaceMode({ extraContext } = {}) {
-    const parts = Object.entries(SECTIONS).map(
-        ([key, section]) => `# ${key}\n\n${section.CONTENT}`
-    );
-    if (extraContext) parts.push(`# operational_context\n\n${extraContext}`);
-    return { mode: 'replace', content: parts.join('\n\n---\n\n') };
+  const parts = Object.entries(SECTIONS).map(([key, section]) => `# ${key}\n\n${section.CONTENT}`);
+  if (extraContext) parts.push(`# operational_context\n\n${extraContext}`);
+  return { mode: 'replace', content: parts.join('\n\n---\n\n') };
 }
 
 function buildCustomizeMode({ extraContext } = {}) {
-    const sections = {};
-    for (const [key, section] of Object.entries(SECTIONS)) {
-        sections[key] = { action: section.ACTION, content: section.CONTENT };
-    }
-    return {
-        mode: 'customize',
-        sections,
-        ...(extraContext ? { content: extraContext } : {}),
-    };
+  const sections = {};
+  for (const [key, section] of Object.entries(SECTIONS)) {
+    sections[key] = { action: section.ACTION, content: section.CONTENT };
+  }
+  return {
+    mode: 'customize',
+    sections,
+    ...(extraContext ? { content: extraContext } : {}),
+  };
 }
 ```
 
@@ -177,8 +184,12 @@ function buildCustomizeMode({ extraContext } = {}) {
 /** @type {'replace' | 'customize'} */
 let _mode = 'replace'; // DEFAULT: replace para controle total
 
-export function getMode() { return _mode; }
-export function setMode(mode) { _mode = mode; }
+export function getMode() {
+  return _mode;
+}
+export function setMode(mode) {
+  _mode = mode;
+}
 ```
 
 **Troca de modo em runtime**: Basta chamar `setMode('customize')` — sem refatoração.
@@ -193,34 +204,34 @@ usamos `SectionTransformFn`:
 import { SYSTEM_PROMPT_SECTIONS } from '@github/copilot-sdk';
 
 /**
- * Cria um SystemMessageConfig que captura o conteúdo padrão de todas as seções
- * via SectionTransformFn. Use em uma sessão descartável para extrair os defaults.
+ * Cria um SystemMessageConfig que captura o conteúdo padrão de todas as seções via SectionTransformFn. Use em uma
+ * sessão descartável para extrair os defaults.
  *
  * @returns {import('@github/copilot-sdk').SystemMessageCustomizeConfig}
  */
 export function createCaptureConfig() {
-    const captured = {};
-    const sections = {};
+  const captured = {};
+  const sections = {};
 
-    for (const key of Object.keys(SYSTEM_PROMPT_SECTIONS)) {
-        sections[key] = {
-            action: (currentContent) => {
-                captured[key] = currentContent;
-                return currentContent; // não altera
-            },
-        };
-    }
-
-    return {
-        mode: 'customize',
-        sections,
-        _captured: captured, // acessar após a sessão para salvar
+  for (const key of Object.keys(SYSTEM_PROMPT_SECTIONS)) {
+    sections[key] = {
+      action: (currentContent) => {
+        captured[key] = currentContent;
+        return currentContent; // não altera
+      },
     };
+  }
+
+  return {
+    mode: 'customize',
+    sections,
+    _captured: captured, // acessar após a sessão para salvar
+  };
 }
 ```
 
-> **Nota**: O conteúdo real de cada seção é gerado pelo Copilot CLI no server-side e pode variar
-> por modelo, versão e contexto. A captura é uma fotografia do momento.
+> **Nota**: O conteúdo real de cada seção é gerado pelo Copilot CLI no server-side e pode variar por
+> modelo, versão e contexto. A captura é uma fotografia do momento.
 
 ---
 
@@ -237,9 +248,9 @@ export function createCaptureConfig() {
 | `CODE_CHANGE_RULES`   | `code_change_rules`   | `sections/code-change-rules.js`              |
 | `AGENT_GUIDELINES`    | `guidelines`          | `sections/guidelines.js`                     |
 | `LAST_INSTRUCTIONS`   | `last_instructions`   | `sections/last-instructions.js`              |
-| *(não existe)*        | `safety`              | `sections/safety.js` ← **NOVO**              |
-| *(não existe)*        | `tool_instructions`   | `sections/tool-instructions.js` ← **NOVO**   |
-| *(não existe)*        | `custom_instructions` | `sections/custom-instructions.js` ← **NOVO** |
+| _(não existe)_        | `safety`              | `sections/safety.js` ← **NOVO**              |
+| _(não existe)_        | `tool_instructions`   | `sections/tool-instructions.js` ← **NOVO**   |
+| _(não existe)_        | `custom_instructions` | `sections/custom-instructions.js` ← **NOVO** |
 
 ### 5.2 Plano de Migração
 
@@ -295,8 +306,9 @@ export { buildAppendSystemMessage, buildReplaceSystemMessage } from './system-pr
 
 ## 8. Posição no Roadmap
 
-Esta feature deve ser executada **antes da Faixa B (Event Handlers)** e **após a Faixa A (Bug Fixes)**,
-pois resolve:
+Esta feature deve ser executada **antes da Faixa B (Event Handlers)** e **após a Faixa A (Bug
+Fixes)**, pois resolve:
+
 - BUG-02 (lifecycle.js system message mode confusion)
 - GAP-E02 (system message mode duplication)
 - Completa a cobertura das 10 seções SDK

@@ -1,12 +1,14 @@
 # PARTE-23F — Roadmap Completo: Faixas, Fases e Subfases
 
-**Data**: 2026-04-12 | **Status**: Proposta | **Versão**: 1.0
-**Scope**: Plano de execução completo para upgrades pós-PARTE-22
-**Precedente**: PARTE-23A (diagnóstico), 23B (events), 23C (services), 23D (bugs/features), 23E (grafos)
+**Data**: 2026-04-12 | **Status**: Proposta | **Versão**: 1.0 **Scope**: Plano de execução completo
+para upgrades pós-PARTE-22 **Precedente**: PARTE-23A (diagnóstico), 23B (events), 23C (services),
+23D (bugs/features), 23E (grafos)
 
-> **Exclusões explícitas**: God files splitting (apenas via natural refactoring), migração direta para TS
+> **Exclusões explícitas**: God files splitting (apenas via natural refactoring), migração direta
+> para TS
 >
-> LEIA O ARQUIVO A SEGUIR, QUE SUBSTITUI ESTE: DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL/PARTE-23I-ROADMAP-EXPANDIDO-V2.md
+> LEIA O ARQUIVO A SEGUIR, QUE SUBSTITUI ESTE:
+> DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL/PARTE-23I-ROADMAP-EXPANDIDO-V2.md
 
 ---
 
@@ -40,6 +42,7 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Objetivo**: Limpar base para que outras faixas possam executar com segurança
 
 ### Fase 1A: Triagem de Testes (~P0)
+
 > Fix das 575 falhas — sem testes, tudo é arriscado
 
 | Sub  | Tarefa                                                            | Esforço | Dependências |
@@ -53,6 +56,7 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: `npm run test:unit` → ≥200 passing, ≤100 skipped
 
 ### Fase 1B: Cleanup de Módulos Órfãos
+
 > Eliminar dead code: plugins/, types/events.js, logs/
 
 | Sub  | Tarefa                                                          | Esforço | Dependências |
@@ -65,6 +69,7 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 0 módulos órfãos, 0 diretórios vazios
 
 ### Fase 1C: Health-Check Honesto
+
 > Calibrar heuristics para refletir estado real
 
 | Sub  | Tarefa                                                                     | Esforço | Dependências |
@@ -82,10 +87,11 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 
 ## 3. FAIXA-2: Events Unification
 
-**Objetivo**: Consolidar 4 sistemas de eventos em 1 SSOT + bridges para EventBus
-**Depende de**: Fase 1B.4 (types/events.js consolidado)
+**Objetivo**: Consolidar 4 sistemas de eventos em 1 SSOT + bridges para EventBus **Depende de**:
+Fase 1B.4 (types/events.js consolidado)
 
 ### Fase 2A: Expandir events/ como SSOT
+
 > Consolidar todas as constantes de evento num único módulo
 
 | Sub  | Tarefa                                                               | Esforço | Dependências |
@@ -103,6 +109,7 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: events/ tem ~45 constantes organizadas em 7 arquivos + barrel
 
 ### Fase 2B: Migrar Importadores
+
 > Todos os arquivos que usam event strings devem importar de `#copilot/events`
 
 | Sub  | Tarefa                                                                  | Esforço | Dependências |
@@ -119,28 +126,30 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 **Critério de saída**: 0 event string definitions fora de `events/`; ≥25 arquivos importam events/
 
 ### Fase 2C: Bridges EventBus
+
 > Emissores locais (BaseEmitter) publicam cross-module via EventBus bridge
 
 | Sub  | Tarefa                                                                           | Esforço | Dependências |
 | ---- | -------------------------------------------------------------------------------- | ------- | ------------ |
 | 2C.1 | Criar `core/event-bus-bridge.js` — helper genérico                               | Baixo   | —            |
-| 2C.2 | Bridge always-alive.js → EventBus (agent:*)                                      | Baixo   | 2C.1         |
-| 2C.3 | Bridge loop-manager.js → EventBus (dialog:*)                                     | Baixo   | 2C.1         |
-| 2C.4 | Bridge orchestrator.js → EventBus (session:*)                                    | Baixo   | 2C.1         |
-| 2C.5 | Bridge hooks/bus.js → EventBus (hook:*)                                          | Baixo   | 2C.1         |
-| 2C.6 | Bridge state.js → EventBus (terminal:*)                                          | Baixo   | 2C.1         |
+| 2C.2 | Bridge always-alive.js → EventBus (agent:\*)                                     | Baixo   | 2C.1         |
+| 2C.3 | Bridge loop-manager.js → EventBus (dialog:\*)                                    | Baixo   | 2C.1         |
+| 2C.4 | Bridge orchestrator.js → EventBus (session:\*)                                   | Baixo   | 2C.1         |
+| 2C.5 | Bridge hooks/bus.js → EventBus (hook:\*)                                         | Baixo   | 2C.1         |
+| 2C.6 | Bridge state.js → EventBus (terminal:\*)                                         | Baixo   | 2C.1         |
 | 2C.7 | Migrar subscribers: observability/ → usar EventBus.on() em vez de `.on()` direto | Médio   | 2C.2-2C.6    |
 | 2C.8 | ESLint rule: warn on direct `.on()` de BaseEmitter em cross-module               | Baixo   | 2C.7         |
 | 2C.9 | TypeCheck + lint + tests                                                         | —       | 2C.8         |
 
-**Critério de saída**: ≥6 bridges ativas; observability/ consome via EventBus; 0 cross-module `.on()` direto
+**Critério de saída**: ≥6 bridges ativas; observability/ consome via EventBus; 0 cross-module
+`.on()` direto
 
 ---
 
 ## 4. FAIXA-3: Services Expansion
 
-**Objetivo**: De 4 para 10 services com facades completas
-**Depende de**: Fase 2C parcial (para event emission nos services)
+**Objetivo**: De 4 para 10 services com facades completas **Depende de**: Fase 2C parcial (para
+event emission nos services)
 
 ### Fase 3A: Core Services (Agent + Dialog + Health)
 
@@ -185,8 +194,8 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 
 ## 5. FAIXA-4: Core Infrastructure
 
-**Objetivo**: Sistemas missing do core/ que estabilizam a runtime
-**Pode iniciar em paralelo com Faixa-2**
+**Objetivo**: Sistemas missing do core/ que estabilizam a runtime **Pode iniciar em paralelo com
+Faixa-2**
 
 ### Fase 4A: Request Context + Rate Limiter
 
@@ -222,8 +231,8 @@ FAIXA-5 ░░░░░░░░░░░░░░░░░░░░░░░░
 
 ## 6. FAIXA-5: Quality Assurance
 
-**Objetivo**: Métricas reais, CI gates, cobertura
-**Depende de**: Fase 1A (testes), Fase 1C (health honesto)
+**Objetivo**: Métricas reais, CI gates, cobertura **Depende de**: Fase 1A (testes), Fase 1C (health
+honesto)
 
 ### Fase 5A: DI Adoption Real
 
@@ -267,6 +276,7 @@ F5-Quality   1A,1C→     2C→        3C→           4B→       —
 **Legenda**: ← depende de; → precede; ∅ independente
 
 **Ordem de execução recomendada**:
+
 1. **1A** (testes) — paralelizável com **4A** (context + rate limiter)
 2. **1B + 1C** (cleanup + health honesto) — paralelizável com **4B** (retry + shutdown)
 3. **2A** (expand events/) — paralelizável com **3A** (core services)
@@ -293,23 +303,23 @@ F5-Quality   1A,1C→     2C→        3C→           4B→       —
 
 ## 9. Critérios de Sucesso Globais
 
-| Métrica                      | Atual  | Pós FAIXA-1 | Pós F1-F4       | Target Final |
-| ---------------------------- | ------ | ----------- | --------------- | ------------ |
-| Testes passando              | 0/423  | ≥200/423    | ≥250/423        | ≥300/423     |
-| Health-check (honesto)       | ~35-40 | ≥55         | ≥75             | ≥85/100      |
-| Event sources                | 4      | 3           | 1               | 1            |
-| BaseEmitter→EventBus bridges | 0      | 0           | ≥6              | 8            |
-| Services count               | 4      | 4           | 8               | 10           |
-| Services LoC                 | 529    | 529         | ~1.100          | ~1.400       |
-| Singletons                   | 25     | 25          | ≤18             | ≤10          |
-| Fan-out max                  | 8      | 8           | ≤7              | ≤6           |
-| Ciclos de dependência        | 1 real | 1           | 0               | 0            |
-| Módulos órfãos               | 3      | 0           | 0               | 0            |
-| Deep imports reais           | 4      | 4           | 0               | 0            |
-| Rate limiters centralizados  | 0      | 0           | 1               | 1            |
-| Request context propagation  | 0%     | 0%          | 50%             | 100%         |
-| Health endpoint              | ❌      | ❌           | ✅ basic         | ✅ deep       |
-| Layer validator CI           | ❌      | ❌           | ✅ informacional | ✅ blocking   |
+| Métrica                      | Atual  | Pós FAIXA-1 | Pós F1-F4        | Target Final |
+| ---------------------------- | ------ | ----------- | ---------------- | ------------ |
+| Testes passando              | 0/423  | ≥200/423    | ≥250/423         | ≥300/423     |
+| Health-check (honesto)       | ~35-40 | ≥55         | ≥75              | ≥85/100      |
+| Event sources                | 4      | 3           | 1                | 1            |
+| BaseEmitter→EventBus bridges | 0      | 0           | ≥6               | 8            |
+| Services count               | 4      | 4           | 8                | 10           |
+| Services LoC                 | 529    | 529         | ~1.100           | ~1.400       |
+| Singletons                   | 25     | 25          | ≤18              | ≤10          |
+| Fan-out max                  | 8      | 8           | ≤7               | ≤6           |
+| Ciclos de dependência        | 1 real | 1           | 0                | 0            |
+| Módulos órfãos               | 3      | 0           | 0                | 0            |
+| Deep imports reais           | 4      | 4           | 0                | 0            |
+| Rate limiters centralizados  | 0      | 0           | 1                | 1            |
+| Request context propagation  | 0%     | 0%          | 50%              | 100%         |
+| Health endpoint              | ❌     | ❌          | ✅ basic         | ✅ deep      |
+| Layer validator CI           | ❌     | ❌          | ✅ informacional | ✅ blocking  |
 
 ---
 

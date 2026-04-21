@@ -1,7 +1,6 @@
 # 06 — TSServer, SDK e Internalização: Investigação
 
-**Data**: 2026-03-21 | **Revisado**: 2026-03-21
-**Status**: Versão Definitiva (pós revisão crítica)
+**Data**: 2026-03-21 | **Revisado**: 2026-03-21 **Status**: Versão Definitiva (pós revisão crítica)
 **Referências**: 04-ARQUITETURA-ATUAL.md, 05-ARQUITETURA-IDEAL.md
 
 ---
@@ -124,18 +123,18 @@ informações de tipo em tempo real.
 ```js
 // Exemplo: tool que consulta tsserver
 createTool({
-    name: 'get_type_info',
-    description: 'Get TypeScript type information for a symbol',
-    parameters: z.object({
-        file: z.string(),
-        line: z.number(),
-        character: z.number(),
-    }),
-    execute: async ({ file, line, character }) => {
-        const daemon = getTsserverDaemon();
-        const info = await daemon.quickInfo(file, line, character);
-        return { content: JSON.stringify(info) };
-    },
+  name: 'get_type_info',
+  description: 'Get TypeScript type information for a symbol',
+  parameters: z.object({
+    file: z.string(),
+    line: z.number(),
+    character: z.number(),
+  }),
+  execute: async ({ file, line, character }) => {
+    const daemon = getTsserverDaemon();
+    const info = await daemon.quickInfo(file, line, character);
+    return { content: JSON.stringify(info) };
+  },
 });
 ```
 
@@ -161,8 +160,8 @@ createTool({
 
 Além de `isChildProcess`, há outras opções relevantes para internalização:
 
-| Opção               | Status                                | Proposta                                                 |
-| ------------------- | ------------------------------------- | -------------------------------------------------------- |
+| Opção               | Status                                 | Proposta                                                 |
+| ------------------- | -------------------------------------- | -------------------------------------------------------- |
 | `cliPath`           | ❌ Não usado                           | Permitir override do CLI path para desenvolvimento local |
 | `cliArgs`           | ❌ Não usado                           | Possibilitar args extras (debug flags, log verbosity)    |
 | `cwd`               | ❌ Não usado                           | Default é `process.cwd()`, OK para nosso caso            |
@@ -228,6 +227,7 @@ Além de `isChildProcess`, há outras opções relevantes para internalização:
 ## 7. Conclusão
 
 A integração TSServer ↔ SDK deve seguir o **Modelo B (SDK-Aware)** com:
+
 - Tools que consultam o tsserver-daemon (bidirecional, desacoplado)
 - Context injection via SystemMessage sections
 - Ciclos de vida independentes

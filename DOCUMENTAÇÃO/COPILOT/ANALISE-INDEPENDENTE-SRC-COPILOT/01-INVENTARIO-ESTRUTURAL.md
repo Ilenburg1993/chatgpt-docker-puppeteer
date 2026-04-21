@@ -26,7 +26,8 @@ Existe também `src/copilot/logs/`, que contém artefatos operacionais como:
 - `otel-traces.jsonl`
 - `tool-audit.jsonl`
 
-Ele faz parte da realidade operacional do sistema, mas **não** deve ser tratado como camada arquitetural de código.
+Ele faz parte da realidade operacional do sistema, mas **não** deve ser tratado como camada
+arquitetural de código.
 
 ## Tabela-base por módulo
 
@@ -57,7 +58,8 @@ Ele faz parte da realidade operacional do sistema, mas **não** deve ser tratado
 
 ### `agent/`
 
-**Subpastas**: `.`, `dialog`, `facades`, `infra`, `lifecycle`, `messaging`, `session`, `session/event-handlers`, `state`
+**Subpastas**: `.`, `dialog`, `facades`, `infra`, `lifecycle`, `messaging`, `session`,
+`session/event-handlers`, `state`
 
 **Arquivos de raiz**:
 
@@ -698,7 +700,11 @@ Ele faz parte da realidade operacional do sistema, mas **não** deve ser tratado
 
 O inventário revela quatro fatos importantes:
 
-1. `src/copilot` já tem massa crítica suficiente para ser tratado como **subplataforma interna**, não como “módulo auxiliar”.
-2. Há módulos que já nasceram como **camadas** (`presentation`, `infra`, `event-handlers`), convivendo com módulos históricos mais “função-centristas”.
-3. A árvore atual expõe bastante código de **compatibilidade/transição**, principalmente em `agent/`, `sdk/` e `terminal/`.
-4. O sistema já possui peças suficientes para um endstate limpo — o problema é alinhá-las por ownership, não criar novos blocos arbitrários.
+1. `src/copilot` já tem massa crítica suficiente para ser tratado como **subplataforma interna**,
+   não como “módulo auxiliar”.
+2. Há módulos que já nasceram como **camadas** (`presentation`, `infra`, `event-handlers`),
+   convivendo com módulos históricos mais “função-centristas”.
+3. A árvore atual expõe bastante código de **compatibilidade/transição**, principalmente em
+   `agent/`, `sdk/` e `terminal/`.
+4. O sistema já possui peças suficientes para um endstate limpo — o problema é alinhá-las por
+   ownership, não criar novos blocos arbitrários.

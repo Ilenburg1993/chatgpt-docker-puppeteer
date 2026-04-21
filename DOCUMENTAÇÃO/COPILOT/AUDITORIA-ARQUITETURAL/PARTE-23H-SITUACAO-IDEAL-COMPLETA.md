@@ -1,8 +1,8 @@
 # PARTE-23H — Situação Ideal Completa
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Visão-alvo para TODOS os subsistemas de `src/copilot/` — o que "done" significa
-**Precedente**: PARTE-23G (situação atual), PARTE-23C (sistemas faltantes)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Visão-alvo para TODOS os
+subsistemas de `src/copilot/` — o que "done" significa **Precedente**: PARTE-23G (situação atual),
+PARTE-23C (sistemas faltantes)
 
 ---
 
@@ -30,6 +30,7 @@
 | di-container.js    | wireLegacySetters helper       | Removido após migração DI completa                             |
 
 ### Ações Concretas
+
 1. Mover `core/events.js` → `events/legacy-agent.js` (re-export temporário em core/)
 2. Deprecar `core/constants.js` (adicionar JSDoc `@deprecated`)
 3. Converter `shared-state.js` em DI token resolvível
@@ -48,6 +49,7 @@
 | Documentação            | Nenhuma                                                       | Catálogo com source, payload shape, consumers            |
 
 ### Ações Concretas
+
 1. Consolidar TODAS as constantes de evento em events/ (incluindo HUB_EVENTS, HOOK_EVENTS, etc.)
 2. Cada módulo que define eventos locais deve exportar para events/
 3. Criar events/catalog.md com listagem completa
@@ -68,6 +70,7 @@
 | Singletons `let=null` | 25                              | <10 (migrados para DI singleton)         |
 
 ### Ações Concretas
+
 1. Criar `core/composition-root.js` que centraliza TODOS os `container.register()` calls
 2. Migrar registrations de bootstrap.js, entry.js, terminal/index.js para composition-root
 3. Converter 10+ singletons `let=null` em DI singleton tokens
@@ -88,6 +91,7 @@
 | Observability via EventBus | Não (escuta direto no emitter) | Sim (observers migrados para EventBus) |
 
 ### Ações Concretas (por prioridade)
+
 1. **Fase E1**: Bridge os 6 emitters restantes:
    - `loop-manager.js` → bridgeEmitter(loopManager, bus, dialogEventMap)
    - `hooks/bus.js` → bridgeEmitter(hookBus, bus, hookEventMap)
@@ -96,7 +100,8 @@
    - `fanout.js` → bridgeEmitter(fanout, bus, apiEventMap)
    - `state.js` → bridgeEmitter(terminalState, bus, terminalEventMap)
 2. **Fase E2**: Subscribers cross-module — observability observers migrados para EventBus.on()
-3. **Fase E3**: Remover BaseEmitter de módulos que só precisam de EventBus (hooks/bus.js → pure listener)
+3. **Fase E3**: Remover BaseEmitter de módulos que só precisam de EventBus (hooks/bus.js → pure
+   listener)
 
 ---
 
@@ -112,7 +117,9 @@
 | Feature flag       | Não há                       | `sdk/feature-flags.js` → `plugins: true`     |
 
 ### Ações Concretas
-1. Wiring: `entry.js` ou `composition-root.js` chama `discoverPlugins()` + `registry.installAll(container)`
+
+1. Wiring: `entry.js` ou `composition-root.js` chama `discoverPlugins()` +
+   `registry.installAll(container)`
 2. Feature flag: `isExperimental('plugins')` guarda o load
 3. Converter 3 subsistemas existentes em plugins canônicos:
    - `plugins/builtin/audit-plugin.js` → instala pipeline-audit-log
@@ -139,6 +146,7 @@
 | plugin-service       | 0           | —                      | list, install, uninstall, getStatus                  |
 
 ### Ações Concretas
+
 1. Expandir 4 services existentes com métodos essenciais
 2. Criar health-service (facade sobre sdk/health + bridges + DB + EventBus)
 3. Criar bridge-service (facade sobre nerv-bridge + mcp-tool-bridge)
@@ -160,6 +168,7 @@
 | Health          | Sem health endpoint                          | health-service.checkBridge('nerv') / .checkBridge('mcp') |
 
 ### Ações Concretas
+
 1. `mcp-tool-bridge.js`: Substituir retry ad-hoc por `withRetry()` de core/retry.js
 2. `mcp-tool-bridge.js`: Substituir circuit breaker ad-hoc por `CircuitBreaker` de core/
 3. `nerv-bridge.js`: 5 singletons → DI tokens (NERV_BRIDGE, NERV_AGENT, etc.)
@@ -180,6 +189,7 @@
 | CI pipeline     | Inexistente  | GitHub Actions com lint + typecheck + test         |
 
 ### Fases de Fix
+
 1. **T1** (1 script): Injetar `import { test, describe, it } from 'node:test'` em 299 files
 2. **T2** (por módulo): Corrigir imports quebrados (módulos renomeados na PARTE-22)
 3. **T3** (por módulo): Atualizar mocks obsoletos
@@ -200,6 +210,7 @@
 | Swallowed errors   | catch vazio em bridges                   | Sempre `logSwallowed()`         |
 
 ### Ações Concretas
+
 1. Remover process.on('uncaughtException') de entry.js — manter só em error-tracker
 2. Reduzir process.exit a 1 call (após runShutdown)
 3. Grep catch vazio → substituir por logSwallowed
@@ -213,16 +224,17 @@
 
 | Handler                  | Atual | Ideal |
 | ------------------------ | ----- | ----- |
-| agent-session-stop (P10) | ✅     | ✅     |
-| sdk-client-close (P20)   | ✅     | ✅     |
-| nerv-disconnect (P20)    | ❌     | ✅     |
-| mcp-disconnect (P20)     | ❌     | ✅     |
-| db-close (P30)           | ❌     | ✅     |
-| eventbus-dispose (P30)   | ❌     | ✅     |
-| terminal-server (P40)    | ❌     | ✅     |
-| timer-cleanup (P50)      | ✅     | ✅     |
+| agent-session-stop (P10) | ✅    | ✅    |
+| sdk-client-close (P20)   | ✅    | ✅    |
+| nerv-disconnect (P20)    | ❌    | ✅    |
+| mcp-disconnect (P20)     | ❌    | ✅    |
+| db-close (P30)           | ❌    | ✅    |
+| eventbus-dispose (P30)   | ❌    | ✅    |
+| terminal-server (P40)    | ❌    | ✅    |
+| timer-cleanup (P50)      | ✅    | ✅    |
 
 ### Ações Concretas
+
 1. nerv-bridge: `registerShutdownHandler('nerv-disconnect', disconnectNerv, 20)`
 2. mcp-bridge: `registerShutdownHandler('mcp-disconnect', disconnectMcp, 20)`
 3. db/sqlite.js: `registerShutdownHandler('db-close', closeDb, 30)`
@@ -244,6 +256,7 @@
 | Request context     | Não há                        | AsyncLocalStorage com request-id     |
 
 ### Ações Concretas
+
 1. Observers: migrar de `emitter.on()` para `eventBus.on()`
 2. Quebrar ciclo: config/ usa DI token LOGGER em vez de import direto
 3. Adicionar `/health` route em api/express/
@@ -264,21 +277,24 @@
 | Validation          | Nenhuma                               | Container.validate() — verifica tokens não resolvidos |
 
 ### Ações Concretas
+
 1. Criar `core/composition-root.js`:
+
 ```js
 export function composeContainer(container) {
-    // Phase 1: Core infrastructure
-    container.register(EVENT_BUS, () => createEventBus());
-    container.register(SHUTDOWN, () => createShutdownManager());
-    // Phase 2: Services
-    container.register(SESSION_SERVICE, () => createSessionService());
-    // Phase 3: Bridges
-    container.register(NERV_BRIDGE, () => createNervBridge());
-    // Phase 4: Plugins
-    const registry = discoverPlugins(PLUGINS_DIR, pluginRegistry);
-    registry.installAll(container);
+  // Phase 1: Core infrastructure
+  container.register(EVENT_BUS, () => createEventBus());
+  container.register(SHUTDOWN, () => createShutdownManager());
+  // Phase 2: Services
+  container.register(SESSION_SERVICE, () => createSessionService());
+  // Phase 3: Bridges
+  container.register(NERV_BRIDGE, () => createNervBridge());
+  // Phase 4: Plugins
+  const registry = discoverPlugins(PLUGINS_DIR, pluginRegistry);
+  registry.installAll(container);
 }
 ```
+
 2. entry.js e terminal/ chamam `composeContainer(container)` uma vez
 3. Remover registrations ad-hoc dos 3 arquivos atuais
 
@@ -300,6 +316,7 @@ export function composeContainer(container) {
 ## 14. Mapa Visual — Atual vs Ideal
 
 ### Atual
+
 ```
 main.js ──→ entry.js ──→ always-alive ──→ dialog/loop-manager
                 │            │ (bridgeEmitter ✅)
@@ -320,6 +337,7 @@ main.js ──→ entry.js ──→ always-alive ──→ dialog/loop-manager
 ```
 
 ### Ideal
+
 ```
 main.js ──→ composition-root.js ──→ DI container (ALL tokens)
                 │                        │

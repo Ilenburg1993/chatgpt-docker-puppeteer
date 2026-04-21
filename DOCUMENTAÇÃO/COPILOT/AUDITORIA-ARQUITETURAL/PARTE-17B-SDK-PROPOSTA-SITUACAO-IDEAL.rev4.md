@@ -1,19 +1,19 @@
 # PARTE-17B — Proposta Arquitetural: Situação Ideal do SDK Wrapper
 
-**Data**: 2026-03-20 (rev.4 — cobertura completa da API Surface do SDK)
-**Escopo**: Redesign completo de `src/copilot/sdk/` + impactos em 14 módulos
-**Base**: PARTE-17A rev.4 — inventário de 90+ tipos, 17 subsistemas RPC, 70+ events
-**Autor**: Auditoria automatizada PARTE-17
+**Data**: 2026-03-20 (rev.4 — cobertura completa da API Surface do SDK) **Escopo**: Redesign
+completo de `src/copilot/sdk/` + impactos em 14 módulos **Base**: PARTE-17A rev.4 — inventário de
+90+ tipos, 17 subsistemas RPC, 70+ events **Autor**: Auditoria automatizada PARTE-17
 
 ---
 
 ## Sumário Executivo
 
-A rev.4 expande drasticamente a proposta da rev.3 para cobrir **100% da API Surface do SDK**.
-A rev.3 propunha 5 novos módulos e ~35 arquivos afetados. A rev.4 propõe **18+ novos módulos**,
+A rev.4 expande drasticamente a proposta da rev.3 para cobrir **100% da API Surface do SDK**. A
+rev.3 propunha 5 novos módulos e ~35 arquivos afetados. A rev.4 propõe **18+ novos módulos**,
 expansão do sdk/ de ~3.252 para ~6.000 linhas, e ~60 arquivos afetados.
 
 **Princípios arquiteturais (expandidos)**:
+
 1. **Zero bypass** — toda interação com `@github/copilot-sdk` passa por `#copilot/sdk`
 2. **Type completeness** — 100% dos tipos SDK re-exportados com JSDocg
 3. **RPC facade** — todos os 17 subsistemas com wrappers ergonômicos
@@ -91,7 +91,8 @@ expansão do sdk/ de ~3.252 para ~6.000 linhas, e ~60 arquivos afetados.
 | `tools-registry.js`    | DEPREC  | Migrar para `tools.js` — manter como re-export temporário          |         ~30 |
 | **TOTAL**              |         |                                                                    |  **~4.840** |
 
-*Nota: Inclui os ~3.252 existentes refatorados + ~1.600 new code. Total sdk/ estimado: ~5.500-6.000 linhas.*
+_Nota: Inclui os ~3.252 existentes refatorados + ~1.600 new code. Total sdk/ estimado: ~5.500-6.000
+linhas._
 
 ---
 
@@ -107,18 +108,19 @@ import { defineTool } from '@github/copilot-sdk';
 
 /**
  * Cria uma tool SDK com metadata padrão do projeto.
+ *
  * @param {import('./types.js').ToolDefinitionOptions} options
  * @returns {import('@github/copilot-sdk').Tool}
  */
 export function createTool(options) {
-    const { name, description, schema, handler, ...rest } = options;
-    return defineTool({
-        name,
-        description,
-        schema,
-        handler,
-        ...rest
-    });
+  const { name, description, schema, handler, ...rest } = options;
+  return defineTool({
+    name,
+    description,
+    schema,
+    handler,
+    ...rest,
+  });
 }
 
 /** Re-export para backward compatibility */
@@ -140,19 +142,25 @@ export { approveAll };
 
 /**
  * Cria permission handler com logging.
+ *
  * @param {object} options
- * @param {boolean} [options.autoApprove=true]
+ * @param {boolean} [options.autoApprove=true] Default is `true`
  * @param {Function} [options.onRequest]
  * @returns {import('@github/copilot-sdk').PermissionHandler}
  */
-export function createPermissionHandler(options = {}) { /* ... */ }
+export function createPermissionHandler(options = {}) {
+  /* ... */
+}
 
 /**
  * Cria permission handler com whitelist de tool names.
+ *
  * @param {string[]} allowedTools
  * @returns {import('@github/copilot-sdk').PermissionHandler}
  */
-export function createAllowlistPermissionHandler(allowedTools) { /* ... */ }
+export function createAllowlistPermissionHandler(allowedTools) {
+  /* ... */
+}
 ```
 
 **Consumers impactados**: 5 arquivos.
@@ -167,68 +175,74 @@ error handling, e logging.
 
 /**
  * Cria facade tipada para session RPC.
+ *
  * @param {import('@github/copilot-sdk').CopilotSession} session
  * @returns {SessionRpcFacade}
  */
 export function createSessionRpc(session) {
-    return {
-        model: {
-            getCurrent: () => session.rpc.model.getCurrent(),
-            switchTo: (modelId, reasoningEffort) =>
-                session.rpc.model.switchTo({ modelId, reasoningEffort }),
-        },
-        mode: {
-            get: () => session.rpc.mode.get(),
-            set: (mode) => session.rpc.mode.set({ mode }),
-        },
-        plan: {
-            read: () => session.rpc.plan.read(),
-            update: (content) => session.rpc.plan.update({ content }),
-            delete: () => session.rpc.plan.delete(),
-        },
-        workspace: {
-            listFiles: () => session.rpc.workspace.listFiles(),
-            readFile: (path) => session.rpc.workspace.readFile({ path }),
-            createFile: (path, content) =>
-                session.rpc.workspace.createFile({ path, content }),
-        },
-        compaction: {
-            compact: () => session.rpc.compaction.compact(),
-        },
-        shell: {
-            exec: (command, options) =>
-                session.rpc.shell.exec({ command, ...options }),
-            kill: (processId, signal) =>
-                session.rpc.shell.kill({ processId, signal }),
-        },
-        ui: {
-            elicitation: (message, schema) =>
-                session.rpc.ui.elicitation({ message, requestedSchema: schema }),
-        },
-        log: (message, options) =>
-            session.rpc.log({ message, ...options }),
-        // Experimental (gated por feature flag)
-        fleet: { start: (prompt) => session.rpc.fleet.start({ prompt }) },
-        agent: { /* list, getCurrent, select, deselect, reload */ },
-        skills: { /* list, enable, disable, reload */ },
-        mcp: { /* list, enable, disable, reload */ },
-        plugins: { list: () => session.rpc.plugins.list() },
-        extensions: { /* list, enable, disable, reload */ },
-    };
+  return {
+    model: {
+      getCurrent: () => session.rpc.model.getCurrent(),
+      switchTo: (modelId, reasoningEffort) =>
+        session.rpc.model.switchTo({ modelId, reasoningEffort }),
+    },
+    mode: {
+      get: () => session.rpc.mode.get(),
+      set: (mode) => session.rpc.mode.set({ mode }),
+    },
+    plan: {
+      read: () => session.rpc.plan.read(),
+      update: (content) => session.rpc.plan.update({ content }),
+      delete: () => session.rpc.plan.delete(),
+    },
+    workspace: {
+      listFiles: () => session.rpc.workspace.listFiles(),
+      readFile: (path) => session.rpc.workspace.readFile({ path }),
+      createFile: (path, content) => session.rpc.workspace.createFile({ path, content }),
+    },
+    compaction: {
+      compact: () => session.rpc.compaction.compact(),
+    },
+    shell: {
+      exec: (command, options) => session.rpc.shell.exec({ command, ...options }),
+      kill: (processId, signal) => session.rpc.shell.kill({ processId, signal }),
+    },
+    ui: {
+      elicitation: (message, schema) =>
+        session.rpc.ui.elicitation({ message, requestedSchema: schema }),
+    },
+    log: (message, options) => session.rpc.log({ message, ...options }),
+    // Experimental (gated por feature flag)
+    fleet: { start: (prompt) => session.rpc.fleet.start({ prompt }) },
+    agent: {
+      /* list, getCurrent, select, deselect, reload */
+    },
+    skills: {
+      /* list, enable, disable, reload */
+    },
+    mcp: {
+      /* list, enable, disable, reload */
+    },
+    plugins: { list: () => session.rpc.plugins.list() },
+    extensions: {
+      /* list, enable, disable, reload */
+    },
+  };
 }
 
 /**
  * Cria facade tipada para server RPC.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @returns {ServerRpcFacade}
  */
 export function createServerRpc(client) {
-    return {
-        ping: (message) => client.rpc.ping({ message }),
-        models: { list: () => client.rpc.models.list() },
-        tools: { list: (model) => client.rpc.tools.list({ model }) },
-        account: { getQuota: () => client.rpc.account.getQuota() },
-    };
+  return {
+    ping: (message) => client.rpc.ping({ message }),
+    models: { list: () => client.rpc.models.list() },
+    tools: { list: (model) => client.rpc.tools.list({ model }) },
+    account: { getQuota: () => client.rpc.account.getQuota() },
+  };
 }
 ```
 
@@ -243,22 +257,24 @@ export function createServerRpc(client) {
 
 /**
  * Constantes de event types (evita magic strings).
+ *
  * @type {Record<string, string>}
  */
 export const SESSION_EVENTS = {
-    SESSION_START: 'session.start',
-    SESSION_IDLE: 'session.idle',
-    SESSION_ERROR: 'session.error',
-    ASSISTANT_TURN_START: 'assistant.turn_start',
-    ASSISTANT_MESSAGE: 'assistant.message',
-    ASSISTANT_TURN_END: 'assistant.turn_end',
-    TOOL_EXECUTION_START: 'tool.execution_start',
-    TOOL_EXECUTION_COMPLETE: 'tool.execution_complete',
-    // ... todos os 70+ types
+  SESSION_START: 'session.start',
+  SESSION_IDLE: 'session.idle',
+  SESSION_ERROR: 'session.error',
+  ASSISTANT_TURN_START: 'assistant.turn_start',
+  ASSISTANT_MESSAGE: 'assistant.message',
+  ASSISTANT_TURN_END: 'assistant.turn_end',
+  TOOL_EXECUTION_START: 'tool.execution_start',
+  TOOL_EXECUTION_COMPLETE: 'tool.execution_complete',
+  // ... todos os 70+ types
 };
 
 /**
  * Registra handler tipado para um evento específico.
+ *
  * @template {keyof typeof SESSION_EVENTS} K
  * @param {import('@github/copilot-sdk').CopilotSession} session
  * @param {K} eventType
@@ -266,29 +282,31 @@ export const SESSION_EVENTS = {
  * @returns {void}
  */
 export function onSessionEvent(session, eventType, handler) {
-    session.on(eventType, handler);
+  session.on(eventType, handler);
 }
 
 /**
  * Registra handlers para múltiplos eventos.
+ *
  * @param {import('@github/copilot-sdk').CopilotSession} session
  * @param {Record<string, Function>} handlers
  * @returns {void}
  */
 export function onSessionEvents(session, handlers) {
-    for (const [type, handler] of Object.entries(handlers)) {
-        session.on(type, handler);
-    }
+  for (const [type, handler] of Object.entries(handlers)) {
+    session.on(type, handler);
+  }
 }
 
 /**
  * Extraí payload tipado de um event.
+ *
  * @template T
  * @param {SessionEvent} event
  * @returns {T}
  */
 export function getEventPayload(event) {
-    return event.data;
+  return event.data;
 }
 ```
 
@@ -326,26 +344,30 @@ export function getEventPayload(event) {
  */
 
 /**
- * Constrói SessionConfig completa a partir de input parcial + defaults.
- * Substitui buildSessionConfig() atual e inline config da API.
+ * Constrói SessionConfig completa a partir de input parcial + defaults. Substitui buildSessionConfig() atual e inline
+ * config da API.
+ *
  * @param {Partial<SessionConfigInput>} input
  * @param {object} [defaults] - Defaults centralizados do projeto
  * @returns {import('@github/copilot-sdk').SessionConfig}
  */
 export function buildSessionConfig(input, defaults = getProjectDefaults()) {
-    return {
-        ...defaults,
-        ...input,
-        // Ensure required fields
-        onPermissionRequest: input.onPermissionRequest ?? defaults.onPermissionRequest,
-    };
+  return {
+    ...defaults,
+    ...input,
+    // Ensure required fields
+    onPermissionRequest: input.onPermissionRequest ?? defaults.onPermissionRequest,
+  };
 }
 
 /**
  * Defaults canônicos do projeto.
+ *
  * @returns {Partial<SessionConfigInput>}
  */
-export function getProjectDefaults() { /* ... */ }
+export function getProjectDefaults() {
+  /* ... */
+}
 ```
 
 ### 2.6 `sdk/system-message.js` — System Message Builder (NOVO rev.4)
@@ -361,40 +383,44 @@ export { SYSTEM_PROMPT_SECTIONS };
 
 /**
  * Seções do system prompt.
+ *
  * @type {readonly string[]}
  */
 export const SECTION_NAMES = Object.keys(SYSTEM_PROMPT_SECTIONS);
 
 /**
  * Cria system message em modo append (padrão).
+ *
  * @param {string} content - Conteúdo a adicionar ao final
  * @returns {import('./types.js').SystemMessageAppendConfig}
  */
 export function appendSystemMessage(content) {
-    return { type: 'append', content };
+  return { type: 'append', content };
 }
 
 /**
  * Cria system message em modo replace (cuidado: remove guardrails).
+ *
  * @param {string} content - Conteúdo substituto completo
  * @returns {import('./types.js').SystemMessageReplaceConfig}
  */
 export function replaceSystemMessage(content) {
-    return { type: 'replace', content };
+  return { type: 'replace', content };
 }
 
 /**
- * Cria system message em modo customize (mais seguro e poderoso).
- * Permite override por seção individual.
+ * Cria system message em modo customize (mais seguro e poderoso). Permite override por seção individual.
+ *
  * @param {import('./types.js').SectionOverride[]} overrides
  * @returns {import('./types.js').SystemMessageCustomizeConfig}
  */
 export function customizeSystemMessage(overrides) {
-    return { type: 'customize', overrides };
+  return { type: 'customize', overrides };
 }
 
 /**
  * Helper para criar um section override.
+ *
  * @param {string} section - Nome da seção (identity, tone, guidelines, etc.)
  * @param {import('./types.js').SectionOverrideAction} action
  * @param {string} [content]
@@ -402,7 +428,7 @@ export function customizeSystemMessage(overrides) {
  * @returns {import('./types.js').SectionOverride}
  */
 export function sectionOverride(section, action, content, transform) {
-    return { section, action, content, transform };
+  return { section, action, content, transform };
 }
 ```
 
@@ -415,52 +441,59 @@ export function sectionOverride(section, action, content, transform) {
 
 /**
  * Verifica conectividade com CLI server.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
- * @returns {Promise<{ok: boolean, latencyMs: number}>}
+ * @returns {Promise<{ ok: boolean; latencyMs: number }>}
  */
 export async function ping(client) {
-    const start = Date.now();
-    try {
-        await client.ping();
-        return { ok: true, latencyMs: Date.now() - start };
-    } catch {
-        return { ok: false, latencyMs: Date.now() - start };
-    }
+  const start = Date.now();
+  try {
+    await client.ping();
+    return { ok: true, latencyMs: Date.now() - start };
+  } catch {
+    return { ok: false, latencyMs: Date.now() - start };
+  }
 }
 
 /**
  * Verifica status do CLI server (versão, protocolo).
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @returns {Promise<import('./types.js').GetStatusResponse>}
  */
 export async function getServerStatus(client) {
-    return client.getStatus();
+  return client.getStatus();
 }
 
 /**
  * Verifica autenticação GitHub Copilot.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @returns {Promise<import('./types.js').GetAuthStatusResponse>}
  */
 export async function getAuthStatus(client) {
-    return client.getAuthStatus();
+  return client.getAuthStatus();
 }
 
 /**
  * Verifica quota da conta Copilot.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @returns {Promise<import('./types.js').AccountGetQuotaResult>}
  */
 export async function getQuota(client) {
-    return client.rpc.account.getQuota();
+  return client.rpc.account.getQuota();
 }
 
 /**
  * Health check completo: ping + auth + quota.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @returns {Promise<HealthCheckResult>}
  */
-export async function fullHealthCheck(client) { /* ... */ }
+export async function fullHealthCheck(client) {
+  /* ... */
+}
 ```
 
 ### 2.8 `sdk/provider.js` — BYOK Provider Config (NOVO rev.4)
@@ -472,17 +505,19 @@ export async function fullHealthCheck(client) { /* ... */ }
 
 /**
  * Cria ProviderConfig para OpenAI.
+ *
  * @param {object} options
  * @param {string} options.apiKey
  * @param {string} [options.baseUrl]
  * @returns {import('./types.js').ProviderConfig}
  */
 export function openaiProvider({ apiKey, baseUrl }) {
-    return { type: 'openai', apiKey, baseUrl };
+  return { type: 'openai', apiKey, baseUrl };
 }
 
 /**
  * Cria ProviderConfig para Azure OpenAI.
+ *
  * @param {object} options
  * @param {string} options.apiKey
  * @param {string} options.baseUrl
@@ -491,18 +526,19 @@ export function openaiProvider({ apiKey, baseUrl }) {
  * @returns {import('./types.js').ProviderConfig}
  */
 export function azureProvider(options) {
-    return { type: 'azure', ...options };
+  return { type: 'azure', ...options };
 }
 
 /**
  * Cria ProviderConfig para Anthropic.
+ *
  * @param {object} options
  * @param {string} options.apiKey
  * @param {string} [options.baseUrl]
  * @returns {import('./types.js').ProviderConfig}
  */
 export function anthropicProvider({ apiKey, baseUrl }) {
-    return { type: 'anthropic', apiKey, baseUrl };
+  return { type: 'anthropic', apiKey, baseUrl };
 }
 ```
 
@@ -516,15 +552,16 @@ export { getTraceContext };
 
 /**
  * Cria TelemetryConfig para o projeto.
+ *
  * @param {Partial<import('./types.js').TelemetryConfig>} [overrides]
  * @returns {import('./types.js').TelemetryConfig}
  */
 export function createTelemetryConfig(overrides = {}) {
-    return {
-        sourceName: 'chatgpt-docker-puppeteer',
-        exporterType: 'otlp',
-        ...overrides,
-    };
+  return {
+    sourceName: 'chatgpt-docker-puppeteer',
+    exporterType: 'otlp',
+    ...overrides,
+  };
 }
 ```
 
@@ -535,24 +572,26 @@ export function createTelemetryConfig(overrides = {}) {
 
 /**
  * Lifecycle event types.
+ *
  * @type {Record<string, import('./types.js').SessionLifecycleEventType>}
  */
 export const LIFECYCLE_EVENTS = {
-    CREATED: 'session.created',
-    DELETED: 'session.deleted',
-    UPDATED: 'session.updated',
-    FOREGROUND: 'session.foreground',
-    BACKGROUND: 'session.background',
+  CREATED: 'session.created',
+  DELETED: 'session.deleted',
+  UPDATED: 'session.updated',
+  FOREGROUND: 'session.foreground',
+  BACKGROUND: 'session.background',
 };
 
 /**
  * Registra handler tipado para lifecycle events no client.
+ *
  * @param {import('@github/copilot-sdk').CopilotClient} client
  * @param {import('./types.js').SessionLifecycleEventType} eventType
  * @param {import('./types.js').SessionLifecycleHandler} handler
  */
 export function onLifecycleEvent(client, eventType, handler) {
-    client.on(eventType, handler);
+  client.on(eventType, handler);
 }
 ```
 
@@ -565,86 +604,143 @@ export function onLifecycleEvent(client, eventType, handler) {
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
+ *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
+ *
  * @typedef {import('@github/copilot-sdk').ConnectionState} ConnectionState
+ *
  * @typedef {import('@github/copilot-sdk').ReasoningEffort} ReasoningEffort
  *
  * @typedef {import('@github/copilot-sdk').Tool} Tool
+ *
  * @typedef {import('@github/copilot-sdk').ToolHandler} ToolHandler
+ *
  * @typedef {import('@github/copilot-sdk').ToolInvocation} ToolInvocation
+ *
  * @typedef {import('@github/copilot-sdk').ToolResult} ToolResult
+ *
  * @typedef {import('@github/copilot-sdk').ToolResultType} ToolResultType
+ *
  * @typedef {import('@github/copilot-sdk').ToolResultObject} ToolResultObject
+ *
  * @typedef {import('@github/copilot-sdk').ToolBinaryResult} ToolBinaryResult
  *
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ *
  * @typedef {import('@github/copilot-sdk').PermissionRequest} PermissionRequest
+ *
  * @typedef {import('@github/copilot-sdk').PermissionRequestResult} PermissionRequestResult
  *
  * @typedef {import('@github/copilot-sdk').UserInputHandler} UserInputHandler
+ *
  * @typedef {import('@github/copilot-sdk').UserInputRequest} UserInputRequest
+ *
  * @typedef {import('@github/copilot-sdk').UserInputResponse} UserInputResponse
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
+ *
  * @typedef {import('@github/copilot-sdk').SystemMessageAppendConfig} SystemMessageAppendConfig
+ *
  * @typedef {import('@github/copilot-sdk').SystemMessageReplaceConfig} SystemMessageReplaceConfig
+ *
  * @typedef {import('@github/copilot-sdk').SystemMessageCustomizeConfig} SystemMessageCustomizeConfig
+ *
  * @typedef {import('@github/copilot-sdk').SectionOverride} SectionOverride
+ *
  * @typedef {import('@github/copilot-sdk').SectionOverrideAction} SectionOverrideAction
+ *
  * @typedef {import('@github/copilot-sdk').SectionTransformFn} SectionTransformFn
  *
  * @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks
+ *
  * @typedef {import('@github/copilot-sdk').PreToolUseHandler} PreToolUseHandler
+ *
  * @typedef {import('@github/copilot-sdk').PreToolUseHookInput} PreToolUseHookInput
+ *
  * @typedef {import('@github/copilot-sdk').PreToolUseHookOutput} PreToolUseHookOutput
+ *
  * @typedef {import('@github/copilot-sdk').PostToolUseHandler} PostToolUseHandler
+ *
  * @typedef {import('@github/copilot-sdk').PostToolUseHookInput} PostToolUseHookInput
+ *
  * @typedef {import('@github/copilot-sdk').PostToolUseHookOutput} PostToolUseHookOutput
+ *
  * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHandler} UserPromptSubmittedHandler
+ *
  * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHookInput} UserPromptSubmittedHookInput
+ *
  * @typedef {import('@github/copilot-sdk').UserPromptSubmittedHookOutput} UserPromptSubmittedHookOutput
+ *
  * @typedef {import('@github/copilot-sdk').SessionStartHandler} SessionStartHandler
+ *
  * @typedef {import('@github/copilot-sdk').SessionStartHookInput} SessionStartHookInput
+ *
  * @typedef {import('@github/copilot-sdk').SessionStartHookOutput} SessionStartHookOutput
+ *
  * @typedef {import('@github/copilot-sdk').SessionEndHandler} SessionEndHandler
+ *
  * @typedef {import('@github/copilot-sdk').SessionEndHookInput} SessionEndHookInput
+ *
  * @typedef {import('@github/copilot-sdk').SessionEndHookOutput} SessionEndHookOutput
+ *
  * @typedef {import('@github/copilot-sdk').ErrorOccurredHandler} ErrorOccurredHandler
+ *
  * @typedef {import('@github/copilot-sdk').ErrorOccurredHookInput} ErrorOccurredHookInput
+ *
  * @typedef {import('@github/copilot-sdk').ErrorOccurredHookOutput} ErrorOccurredHookOutput
  *
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
+ *
  * @typedef {import('@github/copilot-sdk').ModelCapabilities} ModelCapabilities
+ *
  * @typedef {import('@github/copilot-sdk').ModelPolicy} ModelPolicy
+ *
  * @typedef {import('@github/copilot-sdk').ModelBilling} ModelBilling
  *
  * @typedef {import('@github/copilot-sdk').MCPServerConfig} MCPServerConfig
+ *
  * @typedef {import('@github/copilot-sdk').MCPLocalServerConfig} MCPLocalServerConfig
+ *
  * @typedef {import('@github/copilot-sdk').MCPRemoteServerConfig} MCPRemoteServerConfig
  *
  * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
+ *
  * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').ProviderConfig} ProviderConfig
  *
  * @typedef {import('@github/copilot-sdk').SessionContext} SessionContext
+ *
  * @typedef {import('@github/copilot-sdk').SessionMetadata} SessionMetadata
+ *
  * @typedef {import('@github/copilot-sdk').SessionListFilter} SessionListFilter
+ *
  * @typedef {import('@github/copilot-sdk').ForegroundSessionInfo} ForegroundSessionInfo
  *
  * @typedef {import('@github/copilot-sdk').TelemetryConfig} TelemetryConfig
+ *
  * @typedef {import('@github/copilot-sdk').TraceContext} TraceContext
+ *
  * @typedef {import('@github/copilot-sdk').TraceContextProvider} TraceContextProvider
  *
  * @typedef {import('@github/copilot-sdk').GetStatusResponse} GetStatusResponse
+ *
  * @typedef {import('@github/copilot-sdk').GetAuthStatusResponse} GetAuthStatusResponse
  *
  * @typedef {import('@github/copilot-sdk').SessionEvent} SessionEvent
+ *
  * @typedef {import('@github/copilot-sdk').SessionEventType} SessionEventType
+ *
  * @typedef {import('@github/copilot-sdk').SessionEventHandler} SessionEventHandler
+ *
  * @typedef {import('@github/copilot-sdk').AssistantMessageEvent} AssistantMessageEvent
+ *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleEventType} SessionLifecycleEventType
+ *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleEvent} SessionLifecycleEvent
  */
 
@@ -658,56 +754,56 @@ export {};
 
 /** Session modes */
 export const SESSION_MODES = /** @type {const} */ ({
-    INTERACTIVE: 'interactive',
-    PLAN: 'plan',
-    AUTOPILOT: 'autopilot',
+  INTERACTIVE: 'interactive',
+  PLAN: 'plan',
+  AUTOPILOT: 'autopilot',
 });
 
 /** Reasoning effort levels */
 export const REASONING_EFFORTS = /** @type {const} */ ({
-    LOW: 'low',
-    MEDIUM: 'medium',
-    HIGH: 'high',
-    XHIGH: 'xhigh',
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  XHIGH: 'xhigh',
 });
 
 /** Connection states */
 export const CONNECTION_STATES = /** @type {const} */ ({
-    DISCONNECTED: 'disconnected',
-    CONNECTING: 'connecting',
-    CONNECTED: 'connected',
-    ERROR: 'error',
+  DISCONNECTED: 'disconnected',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  ERROR: 'error',
 });
 
 /** Section override actions */
 export const SECTION_ACTIONS = /** @type {const} */ ({
-    PREPEND: 'prepend',
-    APPEND: 'append',
-    REPLACE: 'replace',
-    REMOVE: 'remove',
-    WRAP: 'wrap',
+  PREPEND: 'prepend',
+  APPEND: 'append',
+  REPLACE: 'replace',
+  REMOVE: 'remove',
+  WRAP: 'wrap',
 });
 
 /** Permission request result kinds */
 export const PERMISSION_RESULTS = /** @type {const} */ ({
-    ALLOW: 'allow',
-    DENY: 'deny',
-    ALLOW_ALWAYS: 'allowAlways',
-    DENY_ALWAYS: 'denyAlways',
-    DISMISS: 'dismiss',
+  ALLOW: 'allow',
+  DENY: 'deny',
+  ALLOW_ALWAYS: 'allowAlways',
+  DENY_ALWAYS: 'denyAlways',
+  DISMISS: 'dismiss',
 });
 
 /** Provider types */
 export const PROVIDER_TYPES = /** @type {const} */ ({
-    OPENAI: 'openai',
-    AZURE: 'azure',
-    ANTHROPIC: 'anthropic',
+  OPENAI: 'openai',
+  AZURE: 'azure',
+  ANTHROPIC: 'anthropic',
 });
 
 /** Default infinite session thresholds */
 export const INFINITE_SESSION_DEFAULTS = /** @type {const} */ ({
-    BACKGROUND_COMPACTION_THRESHOLD: 0.80,
-    BUFFER_EXHAUSTION_THRESHOLD: 0.95,
+  BACKGROUND_COMPACTION_THRESHOLD: 0.8,
+  BUFFER_EXHAUSTION_THRESHOLD: 0.95,
 });
 ```
 
@@ -752,6 +848,7 @@ export const INFINITE_SESSION_DEFAULTS = /** @type {const} */ ({
 ### 3.3 `sdk/models.js` — Expansão
 
 **Adicionar:**
+
 - Helpers para `ModelCapabilities` (hasVision, hasReasoningEffort, getMaxTokens)
 - `getModelById()` — busca em cache
 - `getSupportedReasoningEfforts(modelId)` — filtra por capacidade
@@ -759,6 +856,7 @@ export const INFINITE_SESSION_DEFAULTS = /** @type {const} */ ({
 ### 3.4 `sdk/agents.js` — Expansão com RPC
 
 **Adicionar:**
+
 - `listAgents(session)` → `session.rpc.agent.list()`
 - `selectAgent(session, name)` → `session.rpc.agent.select()`
 - `deselectAgent(session)` → `session.rpc.agent.deselect()`
@@ -784,9 +882,12 @@ export { buildSessionConfig, getProjectDefaults } from './config.js';
 
 // System Message
 export {
-    SYSTEM_PROMPT_SECTIONS, SECTION_NAMES,
-    appendSystemMessage, replaceSystemMessage, customizeSystemMessage,
-    sectionOverride,
+  SYSTEM_PROMPT_SECTIONS,
+  SECTION_NAMES,
+  appendSystemMessage,
+  replaceSystemMessage,
+  customizeSystemMessage,
+  sectionOverride,
 } from './system-message.js';
 
 // RPC
@@ -914,6 +1015,7 @@ Hub:    conversation-hub/             → sdk/config.js → sdk/session.js → S
 ```
 
 `config/session-config.js` é **deprecado** e se torna um re-export:
+
 ```javascript
 // config/session-config.js (deprecated)
 /** @deprecated Use import from '#copilot/sdk' */
@@ -931,23 +1033,23 @@ export { buildSessionConfig } from '#copilot/sdk';
 
 ### 6.2 Estado Alvo
 
-`sdk/client.js` mantém o Map como **Single Source of Truth**. `sdk/session.js` delega para
-client.js para CRUD de sessões. Toda criação/resumo/acesso a sessão passa pelo Map.
+`sdk/client.js` mantém o Map como **Single Source of Truth**. `sdk/session.js` delega para client.js
+para CRUD de sessões. Toda criação/resumo/acesso a sessão passa pelo Map.
 
 ```javascript
 // sdk/session.js (refactored)
 import { getClient } from './client.js';
 
 export async function createSession(config) {
-    const client = getClient();
-    const session = await client.createSession(config);
-    // Map é atualizado internamente pelo client.js
-    return session;
+  const client = getClient();
+  const session = await client.createSession(config);
+  // Map é atualizado internamente pelo client.js
+  return session;
 }
 
 export function getSession(sessionId) {
-    const client = getClient();
-    return client.sessions.get(sessionId);
+  const client = getClient();
+  return client.sessions.get(sessionId);
 }
 ```
 
@@ -972,8 +1074,8 @@ hooks/types.js ← deprecar imports locais, alinhar com sdk/types.js
 core/sdk-types.js ← deprecar, re-export de sdk/types.js
 ```
 
-Hooks que adicionam campos extras (ex: project-specific metadata) mantêm tipos estendidos
-via `@typedef` que `extends` os tipos SDK:
+Hooks que adicionam campos extras (ex: project-specific metadata) mantêm tipos estendidos via
+`@typedef` que `extends` os tipos SDK:
 
 ```javascript
 /**
@@ -1092,6 +1194,6 @@ via `@typedef` que `extends` os tipos SDK:
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.4. Proposta alinhada com a API Surface completa
-do SDK (9 arquivos de declaração, 4.498 linhas). Revisões anteriores preservadas em .rev2.md
-e .rev3.md.*
+_Documento gerado pela auditoria PARTE-17, rev.4. Proposta alinhada com a API Surface completa do
+SDK (9 arquivos de declaração, 4.498 linhas). Revisões anteriores preservadas em .rev2.md e
+.rev3.md._

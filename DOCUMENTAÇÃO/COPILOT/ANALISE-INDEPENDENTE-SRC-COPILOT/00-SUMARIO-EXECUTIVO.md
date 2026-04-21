@@ -25,7 +25,9 @@ O sistema já não é um monólito simples. Ele é uma plataforma composta por c
 4. **memória/sessão/conversa** (`conversation-hub/`, `channel/`, `core/shared-state`)
 5. **instrumentação e governança** (`observability/`, `hooks/`, `events/`, `audit/`)
 
-O maior problema arquitetural atual não é “falta de módulos”; é o contrário: o sistema já tem muitos módulos, mas ainda conserva **sobreposição de responsabilidades**, **bridges transitórios demais** e **pontos de verdade múltiplos** em algumas trilhas.
+O maior problema arquitetural atual não é “falta de módulos”; é o contrário: o sistema já tem muitos
+módulos, mas ainda conserva **sobreposição de responsabilidades**, **bridges transitórios demais** e
+**pontos de verdade múltiplos** em algumas trilhas.
 
 ## Achados mais relevantes
 
@@ -37,8 +39,10 @@ Medição objetiva:
 
 Leitura:
 
-- `observability/` continua funcionando parcialmente como utilidade transversal, parcialmente como domínio, parcialmente como reação semântica.
-- Isso aumenta o risco de duplicação entre `collectors`, `observers`, `bus-actions`, `health` e `error tracking`.
+- `observability/` continua funcionando parcialmente como utilidade transversal, parcialmente como
+  domínio, parcialmente como reação semântica.
+- Isso aumenta o risco de duplicação entre `collectors`, `observers`, `bus-actions`, `health` e
+  `error tracking`.
 
 ### 2. `agent/` ainda é o maior centro de coordenação funcional
 
@@ -61,7 +65,8 @@ Achados objetivos:
 - `server -> terminal` já foi reduzido para **0 imports estruturais diretos**;
 - `terminal/commands/` zerou DI direta no recorte mais trabalhado;
 - `terminal/frontend/*` já virou seam canônica importante;
-- mas `terminal/` ainda tem **50 arquivos** e **7.063 linhas**, o que indica que o boundary interno ainda está em transformação.
+- mas `terminal/` ainda tem **50 arquivos** e **7.063 linhas**, o que indica que o boundary interno
+  ainda está em transformação.
 
 ### 4. o sistema ainda convive com muitas estruturas transitórias
 
@@ -74,7 +79,8 @@ Medições:
 
 Leitura:
 
-- há progresso de SSOT, mas a arquitetura ainda convive com compat shims, caches locais, registries e wiring tardio demais.
+- há progresso de SSOT, mas a arquitetura ainda convive com compat shims, caches locais, registries
+  e wiring tardio demais.
 
 ### 5. o boundary com o SDK ainda é difuso demais fora da camada `sdk/`
 
@@ -84,7 +90,8 @@ Medição:
 
 Leitura:
 
-- mesmo que parte desses imports esteja dentro da própria camada `sdk/`, o volume total ainda indica que o wrapper fino não fechou completamente as costuras de vendor.
+- mesmo que parte desses imports esteja dentro da própria camada `sdk/`, o volume total ainda indica
+  que o wrapper fino não fechou completamente as costuras de vendor.
 
 ## Situação ideal proposta
 
@@ -109,7 +116,8 @@ A arquitetura ideal não é “ter mais pastas”; é ter **ownership inequívoc
 
 ## Critério simples para julgar qualquer refactor futuro
 
-Uma transformação só melhora `src/copilot` se ela reduzir ao mesmo tempo pelo menos três dos quatro itens abaixo:
+Uma transformação só melhora `src/copilot` se ela reduzir ao mesmo tempo pelo menos três dos quatro
+itens abaixo:
 
 1. **ownership ambíguo**;
 2. **duplicação de projeção ou coordenação**;

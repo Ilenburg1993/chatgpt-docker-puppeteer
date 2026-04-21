@@ -1,8 +1,7 @@
 # R-04A — End-state e Critérios de Sucesso da Arquitetura-Alvo
 
-**Data**: 2026-04-16
-**Status**: canônico para convergência arquitetural
-**Relacionamento**: complemento operacional de `R-04-ARQUITETURA-ALVO-E-PRINCIPIOS.md`
+**Data**: 2026-04-16 **Status**: canônico para convergência arquitetural **Relacionamento**:
+complemento operacional de `R-04-ARQUITETURA-ALVO-E-PRINCIPIOS.md`
 
 ---
 
@@ -10,7 +9,8 @@
 
 `R-04` já define a arquitetura-alvo em termos de princípios, camadas e ownership macro.
 
-O problema é que, sem um documento complementar, parte importante do “alvo” continua distribuída entre:
+O problema é que, sem um documento complementar, parte importante do “alvo” continua distribuída
+entre:
 
 - `R-04` (princípios e desenho);
 - `R-07B` (ownership e contratos);
@@ -153,7 +153,8 @@ Se duas SSOTs disputarem o mesmo aspecto do sistema, a rearquitetura ainda **nã
 1. `server/` **não importa** `terminal/` diretamente.
 2. `presentation/` **não importa** `server/` nem `terminal/`.
 3. `sdk/` **não é dono** do ownership profundo de sessão, replay nem sessão conversacional.
-4. `terminal/` continua livre para falar com `agent/`, `channel/`, `conversation-hub/` e `sdk/` quando isso for UX real da LLM-B.
+4. `terminal/` continua livre para falar com `agent/`, `channel/`, `conversation-hub/` e `sdk/`
+   quando isso for UX real da LLM-B.
 5. `observability/` não volta a ser atalho para lógica de negócio.
 
 ## 5.2 Invariantes de ownership
@@ -198,7 +199,8 @@ O `agent/` só será considerado convergido quando:
 
 - `always-alive.js` funcionar como fachada real;
 - lifecycle, session, dialog e messaging forem lidos como subdomínios claros;
-- `background-tasks`, `health-check` e `error-policy` estiverem estáveis como infraestrutura do runtime;
+- `background-tasks`, `health-check` e `error-policy` estiverem estáveis como infraestrutura do
+  runtime;
 - shims prioritários deixarem de ser pontos de consumo normal do sistema;
 - novas bordas não precisarem “adivinhar” estado do runtime via snapshots informais.
 
@@ -248,9 +250,12 @@ O eixo de borda só será considerado convergido quando:
 - toda SSOT compartilhada entre `server/` e `terminal/` morar em `presentation/`;
 - `server/` operar como presentation remota;
 - `terminal/` operar como UX local da LLM-B;
-- reducers de DI e wiring explícito forem materializados em `commands/`, `handlers/` e `dialog/` do terminal;
-- o terminal continuar plenamente compatível com `agent/`, `channel/`, `conversation-hub/` e `sdk/` como interface operacional da LLM-B.
-- existir uma camada interna explícita (`terminal/frontend/*`) para compor a UX principal da LLM-B, evitando reabrir integrações transversais em cada comando do REPL.
+- reducers de DI e wiring explícito forem materializados em `commands/`, `handlers/` e `dialog/` do
+  terminal;
+- o terminal continuar plenamente compatível com `agent/`, `channel/`, `conversation-hub/` e `sdk/`
+  como interface operacional da LLM-B.
+- existir uma camada interna explícita (`terminal/frontend/*`) para compor a UX principal da LLM-B,
+  evitando reabrir integrações transversais em cada comando do REPL.
 
 ### Indicadores desejados
 
@@ -298,7 +303,8 @@ Estas não precisam atingir um número mágico imediatamente, mas precisam evolu
 - imports diretos de `sdk/` fora do módulo devem cair continuamente contra a baseline;
 - imports diretos de `observability/` fora do subsistema devem cair continuamente contra a baseline;
 - compatibilidade residual deve diminuir checkpoint a checkpoint;
-- hotspots de `agent/` devem redistribuir responsabilidade e reduzir concentração em poucos arquivos.
+- hotspots de `agent/` devem redistribuir responsabilidade e reduzir concentração em poucos
+  arquivos.
 
 ## 8.3 Critérios de checkpoint
 
@@ -310,16 +316,19 @@ Todo checkpoint estrutural relevante precisa responder, explicitamente:
 4. quais suites e gates foram rodados?
 5. qual risco operacional caiu, subiu ou ficou igual?
 
-Se a resposta não estiver clara, provavelmente a mudança ainda é local demais para ser chamada de avanço arquitetural.
+Se a resposta não estiver clara, provavelmente a mudança ainda é local demais para ser chamada de
+avanço arquitetural.
 
 ---
 
 ## 9. Definição de pronto da arquitetura-alvo
 
-A rearquitetura clean só poderá ser considerada **estruturalmente concluída** quando as respostas abaixo forem majoritariamente “sim”:
+A rearquitetura clean só poderá ser considerada **estruturalmente concluída** quando as respostas
+abaixo forem majoritariamente “sim”:
 
 1. Existe uma SSOT clara para cada domínio central do sistema?
-2. `agent/`, `sdk/`, `conversation-hub/`, `channel/`, `presentation/`, `server/` e `terminal/` têm ownership legível?
+2. `agent/`, `sdk/`, `conversation-hub/`, `channel/`, `presentation/`, `server/` e `terminal/` têm
+   ownership legível?
 3. As bordas compartilham projections via `presentation/`, e não via dependência acidental entre si?
 4. O terminal continua sendo a interface operacional completa da LLM-B sem virar backend informal?
 5. O SDK deixou de ser dono de state e ownership sistêmico?
@@ -329,33 +338,40 @@ A rearquitetura clean só poderá ser considerada **estruturalmente concluída**
 9. Quality, security, tests, typing e docs operam como gates reais?
 10. O backlog de capabilities avançadas ficou desacoplado do backlog estrutural?
 
-Se três ou mais dessas respostas ainda forem “não”, o sistema ainda não convergiu o suficiente para ser tratado como base saudável.
+Se três ou mais dessas respostas ainda forem “não”, o sistema ainda não convergiu o suficiente para
+ser tratado como base saudável.
 
 ---
 
 ## 10. Como usar este documento durante a execução
 
-Este documento não substitui `R-16`; ele serve como a régua para interpretar se os checkpoints do roadmap realmente aproximam o sistema do alvo.
+Este documento não substitui `R-16`; ele serve como a régua para interpretar se os checkpoints do
+roadmap realmente aproximam o sistema do alvo.
 
 Uso recomendado:
 
 - `R-04` responde **qual é a arquitetura-alvo**;
 - `R-04A` responde **como reconhecer que ela foi atingida**;
-- `R-07B/C/D` respondem **quem é dono do quê, quais fronteiras valem e quais gates precisamos respeitar**;
+- `R-07B/C/D` respondem **quem é dono do quê, quais fronteiras valem e quais gates precisamos
+  respeitar**;
 - `R-16` responde **em que ordem vamos atacar isso**.
 
-Toda mudança estrutural importante deveria conseguir apontar para ao menos um critério deste documento e dizer: “foi isso que melhorou”.
+Toda mudança estrutural importante deveria conseguir apontar para ao menos um critério deste
+documento e dizer: “foi isso que melhorou”.
 
 ---
 
 ## 11. Conclusão
 
-O valor deste documento não está em inventar uma arquitetura nova em cima da arquitetura-alvo já existente.
+O valor deste documento não está em inventar uma arquitetura nova em cima da arquitetura-alvo já
+existente.
 
 O valor está em transformar o target em uma régua mais objetiva.
 
-Sem isso, o sistema corre o risco de continuar evoluindo por muitos checkpoints corretos localmente, mas sem uma noção forte o suficiente de chegada.
+Sem isso, o sistema corre o risco de continuar evoluindo por muitos checkpoints corretos localmente,
+mas sem uma noção forte o suficiente de chegada.
 
 Com isso, a rearquitetura clean ganha uma definição mais rigorosa de sucesso:
 
-> **menos ambiguidade de ownership, menos SSOTs concorrentes, menos fronteiras porosas e mais capacidade de evoluir sem reabrir a fundação a cada novo avanço.**
+> **menos ambiguidade de ownership, menos SSOTs concorrentes, menos fronteiras porosas e mais
+> capacidade de evoluir sem reabrir a fundação a cada novo avanço.**

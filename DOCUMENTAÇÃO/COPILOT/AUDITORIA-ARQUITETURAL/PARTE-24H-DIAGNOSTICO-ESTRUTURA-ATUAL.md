@@ -1,9 +1,8 @@
 # PARTE-24H — DIAGNÓSTICO: ESTRUTURA ATUAL DO src/copilot
 
-> **Documento**: PARTE-24H-DIAGNOSTICO-ESTRUTURA-ATUAL.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Análise profunda do estado atual de `src/copilot` — problemas estruturais, mistura de responsabilidades, gaps arquiteturais
+> **Documento**: PARTE-24H-DIAGNOSTICO-ESTRUTURA-ATUAL.md **Versão**: 1.0 **Data**: 2026-04-12
+> **Escopo**: Análise profunda do estado atual de `src/copilot` — problemas estruturais, mistura de
+> responsabilidades, gaps arquiteturais
 
 ---
 
@@ -57,6 +56,7 @@ src/copilot/
 O servidor HTTP atual vive em **`src/copilot/terminal/server.js`** — 407 LOC.
 
 ### O que ele implementa:
+
 - Servidor HTTP/HTTPS nativo (sem Express, sem socket.io)
 - 3 rate limiters independentes (inject, write, SSE)
 - Autenticação por token em header `X-LLM-B-Token`
@@ -67,55 +67,56 @@ O servidor HTTP atual vive em **`src/copilot/terminal/server.js`** — 407 LOC.
 - CORS configurado para dashboard local
 
 ### Handlers distribuídos em 4 arquivos:
-| Arquivo | LOC | Domínio |
-|---------|-----|---------|
-| `handlers/agent.js` | ~150 | inject, pipeline, dialog pause/resume, handoff |
-| `handlers/dialog.js` | ~120 | hub sessions, turns, memory |
-| `handlers/system-config.js` | ~200 | config, skills, tools |
-| `handlers/system-metrics.js` | ~396 | metrics, errors, audit, git, gh |
+
+| Arquivo                      | LOC  | Domínio                                        |
+| ---------------------------- | ---- | ---------------------------------------------- |
+| `handlers/agent.js`          | ~150 | inject, pipeline, dialog pause/resume, handoff |
+| `handlers/dialog.js`         | ~120 | hub sessions, turns, memory                    |
+| `handlers/system-config.js`  | ~200 | config, skills, tools                          |
+| `handlers/system-metrics.js` | ~396 | metrics, errors, audit, git, gh                |
 
 ### Rotas atuais do inject server (:3009):
 
-| Método | Path | Domínio |
-|--------|------|---------|
-| GET | /health | auth-exempt |
-| GET | /hub-health | auth-exempt |
-| GET | /metrics | auth-exempt, Prometheus |
-| GET | /context | agent context |
-| GET | /quota | quota info |
-| GET | /pr-budget | PR budget |
-| GET | /config | config completa |
-| GET | /config/skills | skills list |
-| GET | /config/tools | tools config |
-| GET | /config/tools/custom | custom tools |
-| GET | /errors | error stats |
-| GET | /tool-stats | tool stats |
-| GET | /history | injection history |
-| GET | /audit | audit log |
-| GET | /sessions | hub sessions |
-| GET | /sessions/:id/turns | turns de sessão |
-| GET | /memory | recall memories |
-| GET | /gh/issues | GitHub issues |
-| GET | /gh/prs | GitHub PRs |
-| GET | /gh/ci | GitHub CI |
-| GET | /git/status | git status |
-| GET | /git/log | git log |
-| GET | /events | SSE stream |
-| GET | /handoff | handoffs pendentes |
-| POST | /system/reset | emergency reset |
-| POST | /inject | mensagem inject |
-| POST | /dialog/pause | pausar dialog |
-| POST | /dialog/resume | retomar dialog |
-| POST | /memory | store memory |
-| POST | /pipeline | run pipeline |
-| POST | /handoff/:id/accept | aceitar handoff |
-| POST | /handoff/:id/reject | rejeitar handoff |
-| PUT | /config/infinite-session | config sessão infinita |
-| PUT | /config/skills | update skills |
-| PUT | /config/tools | update tools |
-| POST | /config/tools/custom | registrar custom tool |
-| DELETE | /config/tools/custom/:name | remover custom tool |
-| DELETE | /memory/:id | remover memória |
+| Método | Path                       | Domínio                 |
+| ------ | -------------------------- | ----------------------- |
+| GET    | /health                    | auth-exempt             |
+| GET    | /hub-health                | auth-exempt             |
+| GET    | /metrics                   | auth-exempt, Prometheus |
+| GET    | /context                   | agent context           |
+| GET    | /quota                     | quota info              |
+| GET    | /pr-budget                 | PR budget               |
+| GET    | /config                    | config completa         |
+| GET    | /config/skills             | skills list             |
+| GET    | /config/tools              | tools config            |
+| GET    | /config/tools/custom       | custom tools            |
+| GET    | /errors                    | error stats             |
+| GET    | /tool-stats                | tool stats              |
+| GET    | /history                   | injection history       |
+| GET    | /audit                     | audit log               |
+| GET    | /sessions                  | hub sessions            |
+| GET    | /sessions/:id/turns        | turns de sessão         |
+| GET    | /memory                    | recall memories         |
+| GET    | /gh/issues                 | GitHub issues           |
+| GET    | /gh/prs                    | GitHub PRs              |
+| GET    | /gh/ci                     | GitHub CI               |
+| GET    | /git/status                | git status              |
+| GET    | /git/log                   | git log                 |
+| GET    | /events                    | SSE stream              |
+| GET    | /handoff                   | handoffs pendentes      |
+| POST   | /system/reset              | emergency reset         |
+| POST   | /inject                    | mensagem inject         |
+| POST   | /dialog/pause              | pausar dialog           |
+| POST   | /dialog/resume             | retomar dialog          |
+| POST   | /memory                    | store memory            |
+| POST   | /pipeline                  | run pipeline            |
+| POST   | /handoff/:id/accept        | aceitar handoff         |
+| POST   | /handoff/:id/reject        | rejeitar handoff        |
+| PUT    | /config/infinite-session   | config sessão infinita  |
+| PUT    | /config/skills             | update skills           |
+| PUT    | /config/tools              | update tools            |
+| POST   | /config/tools/custom       | registrar custom tool   |
+| DELETE | /config/tools/custom/:name | remover custom tool     |
+| DELETE | /memory/:id                | remover memória         |
 
 ---
 
@@ -131,6 +132,7 @@ responsabilidades:
 - O servidor HTTP é uma **infraestrutura de rede** independente do terminal
 
 **Consequência**:
+
 - Impossível reusar o servidor sem o terminal
 - Impossível adicionar socket.io sem reestruturar o terminal
 - `terminal/index.js` faz `createInjectServer()` e ao mesmo tempo gerencia REPL — dois concerns
@@ -138,6 +140,7 @@ responsabilidades:
 - Qualidade de expansabilidade: baixa
 
 **Evidência**:
+
 ```
 terminal/
 ├── server.js      ← 407 LOC de infra servidor HTTP
@@ -152,8 +155,8 @@ terminal/
 ├── index.js       ← orquestra tudo junto
 ```
 
-O `terminal/index.js` inicializa: aliases, inject server, hub session, agent wiring, reflection
-loop e REPL — **5 concerns diferentes em 228 LOC**. Esse acoplamento torna o módulo frágil.
+O `terminal/index.js` inicializa: aliases, inject server, hub session, agent wiring, reflection loop
+e REPL — **5 concerns diferentes em 228 LOC**. Esse acoplamento torna o módulo frágil.
 
 ---
 
@@ -163,6 +166,7 @@ loop e REPL — **5 concerns diferentes em 228 LOC**. Esse acoplamento torna o m
 JWT auth, broadcast de eventos hub, mas **nunca é inicializado** no modo standalone.
 
 `initStandalone()` explicitamente omite o socket:
+
 ```js
 // OMITE socket.io — sem broadcast tempo real
 conversationStore.init();
@@ -170,6 +174,7 @@ this.#orchestrator = new HubOrchestrator(conversationStore);
 ```
 
 **Consequência**:
+
 - Dashboard não recebe eventos em tempo real do hub
 - Não é possível ter múltiplos clientes recebendo o mesmo stream de eventos
 - SSE existe mas é point-to-point, não broadcast para múltiplos listeners
@@ -187,13 +192,14 @@ estruturalmente.
 ### P4 — `src/copilot/api/` ÓRFÃO
 
 **Problema**: `src/copilot/api/` (3.327 LOC / 21 files) contém:
+
 - `bridge/` — router Express para `/api/copilot`
 - `express/` — SDK API Express router
 - `sse/` — utilitários SSE (replay buffer, fanout, utils)
 - `openapi.json`
 
-Os routers Express (`bridge/`, `express/`) foram usados pelo `src/server/api/router.js` — que
-os removeu na Onda 2.7. Agora estão órfãos (não são importados por ninguém no path ativo).
+Os routers Express (`bridge/`, `express/`) foram usados pelo `src/server/api/router.js` — que os
+removeu na Onda 2.7. Agora estão órfãos (não são importados por ninguém no path ativo).
 
 Os utilitários SSE (`sse/`) são usados pelo `terminal/server.js`. Mas estão na pasta errada —
 deveriam estar no servidor copilot, não em `api/`.
@@ -203,6 +209,7 @@ deveriam estar no servidor copilot, não em `api/`.
 ### P5 — BOOTSTRAP SEPARADO DO TERMINAL
 
 **Problema**: Existem dois bootstraps:
+
 - `src/copilot/bootstrap.js` — entry point geral (chama terminal)
 - `src/copilot/terminal/bootstrap.js` — entry point do terminal (chama bootstrap geral)
 
@@ -213,9 +220,9 @@ volta para `terminal/index.js`. A lógica de boot é artificial.
 
 ### P6 — `src/copilot/logs/` VAZIA, `src/copilot/infra/` QUASE VAZIA
 
-**Problema**: `logs/` tem 0 arquivos, `infra/` tem apenas 1 arquivo (50 LOC). São pastas de
-intento não realizado. A lógica de logging está em `observability/`, e infra distribuída em
-`core/`, `db/`, etc.
+**Problema**: `logs/` tem 0 arquivos, `infra/` tem apenas 1 arquivo (50 LOC). São pastas de intento
+não realizado. A lógica de logging está em `observability/`, e infra distribuída em `core/`, `db/`,
+etc.
 
 ---
 
@@ -230,13 +237,14 @@ do copilot", mas na prática foi sempre um shim para o server de produção.
 ### P8 — CONVERSATION-HUB/SOCKET-NS.JS É SERVIDOR (NÃO É HUB)
 
 **Problema**: `socket-ns.js` (458 LOC) implementa um namespace Socket.io **completo** com:
+
 - JWT auth
 - Middleware de conexão
 - Broadcast de mensagens
 - Event routing
 
-Mas vive dentro de `conversation-hub/` — misturando lógica de transporte (socket.io) com lógica
-de domínio (hub de conversas). O hub deveria ser agnóstico à camada de transporte.
+Mas vive dentro de `conversation-hub/` — misturando lógica de transporte (socket.io) com lógica de
+domínio (hub de conversas). O hub deveria ser agnóstico à camada de transporte.
 
 ---
 
@@ -259,25 +267,26 @@ terminal/bootstrap.js
 ```
 
 ### Módulos sem consumidores ativos:
-| Módulo | Status |
-|--------|--------|
-| `src/copilot/api/bridge/` | Órfão — era bridge do production server |
-| `src/copilot/api/express/` | Órfão — eram rotas SDK no :3008 |
-| `src/copilot/server/wiring.js` | Órfão — @deprecated Onda 2.7 |
-| `conversation-hub/socket-ns.js` | Sem init no standalone |
+
+| Módulo                          | Status                                  |
+| ------------------------------- | --------------------------------------- |
+| `src/copilot/api/bridge/`       | Órfão — era bridge do production server |
+| `src/copilot/api/express/`      | Órfão — eram rotas SDK no :3008         |
+| `src/copilot/server/wiring.js`  | Órfão — @deprecated Onda 2.7            |
+| `conversation-hub/socket-ns.js` | Sem init no standalone                  |
 
 ---
 
 ## 5. SCORE ARQUITETURAL ATUAL
 
-| Dimensão | Score | Comentário |
-|----------|-------|------------|
-| Separação de responsabilidades | 4/10 | Server misturado com terminal |
-| Extensibilidade | 4/10 | Difícil adicionar socket.io, WebRTC, etc. sem quebrar terminal |
-| Testabilidade | 5/10 | Server HTTP testável isolation, mas acoplado com REPL |
-| Cobertura standalone | 6/10 | Hub funciona mas sem socket; SSE funciona mas sem broadcast |
-| Clareza estrutural | 5/10 | api/ órfã, server/ quase vazia, logs/ vazia |
-| Preparação para crescimento | 4/10 | Terminal com 49 arquivos, server embutido nela |
+| Dimensão                       | Score | Comentário                                                     |
+| ------------------------------ | ----- | -------------------------------------------------------------- |
+| Separação de responsabilidades | 4/10  | Server misturado com terminal                                  |
+| Extensibilidade                | 4/10  | Difícil adicionar socket.io, WebRTC, etc. sem quebrar terminal |
+| Testabilidade                  | 5/10  | Server HTTP testável isolation, mas acoplado com REPL          |
+| Cobertura standalone           | 6/10  | Hub funciona mas sem socket; SSE funciona mas sem broadcast    |
+| Clareza estrutural             | 5/10  | api/ órfã, server/ quase vazia, logs/ vazia                    |
+| Preparação para crescimento    | 4/10  | Terminal com 49 arquivos, server embutido nela                 |
 
 **Score médio**: **4.7/10**
 
@@ -285,21 +294,21 @@ terminal/bootstrap.js
 
 ## 6. RESUMO DOS ACHADOS
 
-| # | Problema | Severidade | Impacto no crescimento futuro |
-|---|---------|------------|-------------------------------|
-| P1 | Server HTTP misturado com terminal | 🔴 CRÍTICO | Bloqueia socket.io, WebRTC, múltiplos clientes |
-| P2 | Socket.io não inicializado no standalone | 🟠 ALTO | Dashboard sem tempo real |
-| P3 | `server/` praticamente vazia | 🟡 MÉDIO | Confusão arquitetural |
-| P4 | `api/` órfã | 🟡 MÉDIO | Dead code, confusão sobre propósito |
-| P5 | Bootstrap chain circular | 🟡 MÉDIO | Complexidade desnecessária |
-| P6 | `logs/`, `infra/` vazias | 🟢 BAIXO | Ruído estrutural |
-| P7 | `api/` = adapter production server, não API standalone | 🟠 ALTO | Nome enganoso, propósito incorreto |
-| P8 | socket-ns no conversation-hub (transporte misturado com domínio) | 🟡 MÉDIO | Dificulta isolamento do hub |
+| #   | Problema                                                         | Severidade | Impacto no crescimento futuro                  |
+| --- | ---------------------------------------------------------------- | ---------- | ---------------------------------------------- |
+| P1  | Server HTTP misturado com terminal                               | 🔴 CRÍTICO | Bloqueia socket.io, WebRTC, múltiplos clientes |
+| P2  | Socket.io não inicializado no standalone                         | 🟠 ALTO    | Dashboard sem tempo real                       |
+| P3  | `server/` praticamente vazia                                     | 🟡 MÉDIO   | Confusão arquitetural                          |
+| P4  | `api/` órfã                                                      | 🟡 MÉDIO   | Dead code, confusão sobre propósito            |
+| P5  | Bootstrap chain circular                                         | 🟡 MÉDIO   | Complexidade desnecessária                     |
+| P6  | `logs/`, `infra/` vazias                                         | 🟢 BAIXO   | Ruído estrutural                               |
+| P7  | `api/` = adapter production server, não API standalone           | 🟠 ALTO    | Nome enganoso, propósito incorreto             |
+| P8  | socket-ns no conversation-hub (transporte misturado com domínio) | 🟡 MÉDIO   | Dificulta isolamento do hub                    |
 
 ---
 
 ## 7. CHANGELOG
 
-| Versão | Data       | Mudanças |
-| ------ | ---------- | -------- |
+| Versão | Data       | Mudanças                          |
+| ------ | ---------- | --------------------------------- |
 | 1.0    | 2026-04-12 | Diagnóstico completo pós Onda 2.7 |

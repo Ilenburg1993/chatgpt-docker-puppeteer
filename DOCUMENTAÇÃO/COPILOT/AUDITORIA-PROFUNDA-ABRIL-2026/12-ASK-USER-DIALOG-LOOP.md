@@ -1,14 +1,16 @@
 # 12-ASK-USER-DIALOG-LOOP — Auditoria Profunda do Fluxo `ask_user`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Escopo**: `agent/dialog/user-input-handler.js`, `dialog/loop-manager.js`, `messaging/agent-messaging.js`, `lifecycle/state-io.js`, `terminal/terminal-agent-wiring.js`, `terminal/frontend/llm-b-runtime.js`, rotas HTTP e projeções de health ligadas ao dialog loop.
-**Documentado em**: 2026-04-18
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Escopo**:
+`agent/dialog/user-input-handler.js`, `dialog/loop-manager.js`, `messaging/agent-messaging.js`,
+`lifecycle/state-io.js`, `terminal/terminal-agent-wiring.js`, `terminal/frontend/llm-b-runtime.js`,
+rotas HTTP e projeções de health ligadas ao dialog loop. **Documentado em**: 2026-04-18
 
 ---
 
 ## 1. Por que `ask_user` é crítico
 
-No desenho atual, `ask_user` não é apenas uma ferramenta do SDK. Ele é o **canal de controle** do dialog loop e, portanto, o ponto central de acoplamento entre:
+No desenho atual, `ask_user` não é apenas uma ferramenta do SDK. Ele é o **canal de controle** do
+dialog loop e, portanto, o ponto central de acoplamento entre:
 
 - o estado vivo do SDK;
 - o loop permanente da LLM-B;
@@ -24,7 +26,8 @@ Em termos práticos:
 - `STOPPED` representa **encerramento indevido do loop**;
 - perguntas normais representam **interação real do usuário/operador**.
 
-Se o sistema não distingue semanticamente esses quatro casos, todo o restante fica certo “por aproximação”, não por contrato.
+Se o sistema não distingue semanticamente esses quatro casos, todo o restante fica certo “por
+aproximação”, não por contrato.
 
 ---
 
@@ -47,7 +50,8 @@ Isso não permitia responder perguntas essenciais como:
 
 ### ASK-02 — Recovery zero-PR otimista demais
 
-O watchdog do terminal tratava **qualquer** `pendingQuestion` reaparecida como sinal de recuperação zero-PR.
+O watchdog do terminal tratava **qualquer** `pendingQuestion` reaparecida como sinal de recuperação
+zero-PR.
 
 Isso era impreciso: uma pergunta qualquer não equivale a “loop retomado com `READY` preservado”.
 
@@ -58,7 +62,8 @@ O runtime não distinguia adequadamente:
 - uma **pergunta viva do SDK**, ainda respondível via `answerPendingQuestion()`;
 - uma **sombra restaurada de processo anterior**, cujo resolver do SDK já não existe mais.
 
-Isso criava um gap conceitual importante: o operador via “há pergunta pendente”, mas o sistema não deixava claro se ainda era possível responder aquilo de forma real.
+Isso criava um gap conceitual importante: o operador via “há pergunta pendente”, mas o sistema não
+deixava claro se ainda era possível responder aquilo de forma real.
 
 ### ASK-04 — Observabilidade pública incompleta
 
@@ -97,7 +102,8 @@ Agora o runtime diferencia claramente:
 Também houve correção explícita de conformidade com o SDK em `session-setup.js`:
 
 - `UserInputRequest.allowFreeform` é opcional no SDK e tem default efetivo `true`;
-- o wiring do agent agora respeita isso (`undefined` → `true`), em vez de degradar silenciosamente para `false`.
+- o wiring do agent agora respeita isso (`undefined` → `true`), em vez de degradar silenciosamente
+  para `false`.
 
 ### 3.3 Sombra persistida reidratada no boot
 
@@ -106,7 +112,8 @@ Também houve correção explícita de conformidade com o SDK em `session-setup.
 - `pendingQuestion`
 - `pendingQuestionMeta`
 
-como uma **sombra persistida**, via `ctx.setPendingQuestionShadow(...)`, em vez de fingir que existe uma pergunta viva respondível.
+como uma **sombra persistida**, via `ctx.setPendingQuestionShadow(...)`, em vez de fingir que existe
+uma pergunta viva respondível.
 
 Além disso, a shadow restaurada agora carrega TTL explícito e semântica temporal:
 
@@ -115,7 +122,8 @@ Além disso, a shadow restaurada agora carrega TTL explícito e semântica tempo
 
 via helper canônico em `agent/dialog/pending-question-shadow.js`.
 
-Nesta continuação, o TTL também deixou de ser único para todos os casos e passou a ser **semântico por kind**:
+Nesta continuação, o TTL também deixou de ser único para todos os casos e passou a ser **semântico
+por kind**:
 
 - `ready` → TTL menor
 - `question` → TTL padrão/mais longo
@@ -161,7 +169,8 @@ Além disso, `readTerminalStatusProjection()` e o comando `/status` agora expõe
 
 ### 3.5 Watchdog zero-PR ficou semântico
 
-`terminal/terminal-agent-wiring.js` deixou de usar “qualquer pergunta pendente” como critério de recuperação.
+`terminal/terminal-agent-wiring.js` deixou de usar “qualquer pergunta pendente” como critério de
+recuperação.
 
 Agora o watchdog só considera recuperação zero-PR quando o estado volta especificamente para:
 
@@ -177,10 +186,11 @@ O runtime agora expõe limpeza canônica da shadow persistida por duas vias:
 2. `POST /answer/clear-shadow`
 3. comando REPL `/clear-shadow`
 
-Com isso, a ação sugerida pelo health (`clear_pending_question_shadow`) deixou de ser apenas descritiva e passou a ter
-uma superfície operacional direta.
+Com isso, a ação sugerida pelo health (`clear_pending_question_shadow`) deixou de ser apenas
+descritiva e passou a ter uma superfície operacional direta.
 
-Importante: essa limpeza atua apenas sobre a **shadow persistida restaurada**, não sobre perguntas vivas do SDK.
+Importante: essa limpeza atua apenas sobre a **shadow persistida restaurada**, não sobre perguntas
+vivas do SDK.
 
 ---
 
@@ -203,7 +213,8 @@ Uma pergunta restaurada do disco agora é tratada como **sombra** e não como pe
 
 ### ✅ O health consegue explicar o problema
 
-Se o processo sobe com uma sombra persistida de `ask_user`, o health entra em caminho degradado e recomenda ação explícita.
+Se o processo sobe com uma sombra persistida de `ask_user`, o health entra em caminho degradado e
+recomenda ação explícita.
 
 ### ✅ O terminal passou a ter base para UX mais segura
 
@@ -227,17 +238,19 @@ Hoje a shadow já tem:
 - detecção de expiração em health/runtime;
 - limpeza do estado persistido quando o boot encontra uma shadow já vencida.
 - estado semântico explícito no runtime/health/terminal:
-   - `fresh`
-   - `active`
-   - `expiring_soon`
-   - `expired`
+  - `fresh`
+  - `active`
+  - `expiring_soon`
+  - `expired`
 - `pendingQuestionShadowRemainingMs` para troubleshooting direto do tempo restante.
-- persistência também em snapshots manuais do terminal/agent, permitindo post-mortem com a mesma semântica.
+- persistência também em snapshots manuais do terminal/agent, permitindo post-mortem com a mesma
+  semântica.
 
 O que ainda não está ideal:
 
 - já existe reaper periódico no runtime para shadows que expiram **depois** do boot atual;
-- a UX ainda não diferencia com mais riqueza “shadow expirada limpável” de “shadow restaurada ainda relevante”.
+- a UX ainda não diferencia com mais riqueza “shadow expirada limpável” de “shadow restaurada ainda
+  relevante”.
 
 ### ASK-06 — UX dedicada existe, mas ainda falta fechar o ciclo completo
 
@@ -251,19 +264,22 @@ Hoje já existem:
 
 Também nesta rodada:
 
-- `/diagnose` passou a exibir explicitamente o estado de `ask_user` (vivo/shadow/expirando/expirada), idade e tempo
-   restante;
-- snapshots manuais (`/session save` + `/session restore`) passaram a carregar/exibir também a shadow persistida.
+- `/diagnose` passou a exibir explicitamente o estado de `ask_user`
+  (vivo/shadow/expirando/expirada), idade e tempo restante;
+- snapshots manuais (`/session save` + `/session restore`) passaram a carregar/exibir também a
+  shadow persistida.
 
 O que ainda falta:
 
-- UX mais explícita quando uma shadow restaurada ainda não expirou, mas já não é respondível por ausência de estado vivo;
+- UX mais explícita quando uma shadow restaurada ainda não expirou, mas já não é respondível por
+  ausência de estado vivo;
 - mensagens operacionais mais orientadas a recovery automático de dialog loop;
 - distinção visual mais rica entre shadow recém-restaurada, expirada e já reapada automaticamente.
 
 ### ASK-07 — Ainda falta SSOT explícita final do orçamento zero-PR
 
-O protocolo e o watchdog respeitam a política zero-PR, mas ainda falta um contrato formal único dizendo:
+O protocolo e o watchdog respeitam a política zero-PR, mas ainda falta um contrato formal único
+dizendo:
 
 - quais tipos de `ask_user` podem ser persistidos;
 - quais podem ser usados para recovery zero-PR;
@@ -364,11 +380,13 @@ deve permanecer como **governança interna do runtime**, nunca confundida com co
 
 ## 7. Critérios claros de consolidação do `ask_user`
 
-Consideraremos o subfluxo `ask_user` consolidado quando todos estes critérios forem verdadeiros ao mesmo tempo:
+Consideraremos o subfluxo `ask_user` consolidado quando todos estes critérios forem verdadeiros ao
+mesmo tempo:
 
 ### AQ-1 — Semântica persistida
 
-`pendingQuestionMeta` existe e é gravado apenas para tipos semanticamente válidos para recovery/continuidade.
+`pendingQuestionMeta` existe e é gravado apenas para tipos semanticamente válidos para
+recovery/continuidade.
 
 ### AQ-2 — Estado vivo ≠ estado restaurado
 
@@ -394,8 +412,8 @@ Snapshots persistidos e frontend do terminal carregam a mesma semântica, sem mo
 
 ### AQ-5b — Shadow limpável por caminho canônico
 
-Quando a ação recomendada for `clear_pending_question_shadow`, deve existir pelo menos um caminho canônico suportado
-para executar essa limpeza sem tocar estado interno manualmente.
+Quando a ação recomendada for `clear_pending_question_shadow`, deve existir pelo menos um caminho
+canônico suportado para executar essa limpeza sem tocar estado interno manualmente.
 
 ### AQ-6 — Testes mínimos de regressão
 
@@ -425,12 +443,15 @@ Nesta rodada, o sistema passou a:
 
 Resumo franco:
 
-> O `ask_user` deixou de ser apenas um texto pendente no runtime e começou a virar um **subprotocolo governado** do dialog loop.
+> O `ask_user` deixou de ser apenas um texto pendente no runtime e começou a virar um **subprotocolo
+> governado** do dialog loop.
 
-Ainda falta endurecer TTL, UX operacional e reconciliação no boot, mas a fundação certa agora existe.
+Ainda falta endurecer TTL, UX operacional e reconciliação no boot, mas a fundação certa agora
+existe.
 
 Hoje, o diagnóstico mais preciso é:
 
-> `ask_user` já é um subprotocolo governado, com conformidade clara em relação ao SDK, shadow/restauração
-> semanticamente modeladas, limpeza canônica via agent/HTTP/REPL e reap contínuo em runtime. O que falta agora não é
-> fundação — é acabamento fino de UX e heurísticas operacionais mais ricas.
+> `ask_user` já é um subprotocolo governado, com conformidade clara em relação ao SDK,
+> shadow/restauração semanticamente modeladas, limpeza canônica via agent/HTTP/REPL e reap contínuo
+> em runtime. O que falta agora não é fundação — é acabamento fino de UX e heurísticas operacionais
+> mais ricas.

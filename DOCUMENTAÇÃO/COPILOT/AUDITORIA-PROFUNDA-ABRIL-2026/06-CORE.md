@@ -1,8 +1,7 @@
 # 06-CORE — Auditoria do Módulo `core/`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Módulo**: `src/copilot/core/`
-**Documentado em**: 2026-04-18
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Módulo**: `src/copilot/core/` **Documentado
+em**: 2026-04-18
 
 ---
 
@@ -27,8 +26,9 @@ core/
 
 ### 2.1 BUG CRÍTICO — `#deliver()` com Async Handlers (CAT-007 / BUG-CORE-01)
 
-> **Status de execução (2026-04-17): corrigido no código.**
-> `src/copilot/core/event-bus.js` agora usa `Promise.resolve(handler(event)).catch(...)` em `once()` e em `#deliver()`, eliminando a janela de `UnhandledPromiseRejection` para handlers assíncronos.
+> **Status de execução (2026-04-17): corrigido no código.** `src/copilot/core/event-bus.js` agora
+> usa `Promise.resolve(handler(event)).catch(...)` em `once()` e em `#deliver()`, eliminando a
+> janela de `UnhandledPromiseRejection` para handlers assíncronos.
 
 **Código atual:**
 
@@ -49,12 +49,14 @@ core/
 }
 ```
 
-**Problema**: `void handler(event)` descarta a Promise retornada por handlers assíncronos.
-O `try/catch` **só captura erros síncronos** — rejeições de `async` handlers se tornam **unhandled Promise rejections**.
+**Problema**: `void handler(event)` descarta a Promise retornada por handlers assíncronos. O
+`try/catch` **só captura erros síncronos** — rejeições de `async` handlers se tornam **unhandled
+Promise rejections**.
 
 Em Node.js 24+, `unhandledRejection` por padrão **termina o processo** (modo `throw`).
 
-**Impacto**: Qualquer handler assíncrono registrado no EventBus que rejeitar vai crashar o processo de produção.
+**Impacto**: Qualquer handler assíncrono registrado no EventBus que rejeitar vai crashar o processo
+de produção.
 
 **Achado**:
 
@@ -67,19 +69,22 @@ Em Node.js 24+, `unhandledRejection` por padrão **termina o processo** (modo `t
 ```js
 // Opção 1: catch por handler
 try {
-    const result = handler(event);
-    if (result instanceof Promise) {
-        result.catch((err) => {
-            log('WARN', `[EventBus] handler assíncrono lançou erro para '${type}': ${toError(err).message}`);
-        });
-    }
+  const result = handler(event);
+  if (result instanceof Promise) {
+    result.catch((err) => {
+      log(
+        'WARN',
+        `[EventBus] handler assíncrono lançou erro para '${type}': ${toError(err).message}`,
+      );
+    });
+  }
 } catch (err) {
-    log('WARN', `[EventBus] handler síncrono lançou erro para '${type}': ${toError(err).message}`);
+  log('WARN', `[EventBus] handler síncrono lançou erro para '${type}': ${toError(err).message}`);
 }
 
 // Opção 2: Promise.resolve wrapper
 Promise.resolve(handler(event)).catch((err) => {
-    log('WARN', `[EventBus] handler error for '${type}': ${err}`);
+  log('WARN', `[EventBus] handler error for '${type}': ${err}`);
 });
 ```
 
@@ -87,12 +92,12 @@ Promise.resolve(handler(event)).catch((err) => {
 
 ```js
 const deliver = () => {
-    if (idx < mw.length) {
-        const fn = mw[idx++];
-        if (fn) fn(event, deliver);
-    } else {
-        this.#deliver(event);
-    }
+  if (idx < mw.length) {
+    const fn = mw[idx++];
+    if (fn) fn(event, deliver);
+  } else {
+    this.#deliver(event);
+  }
 };
 deliver();
 ```
@@ -101,8 +106,9 @@ deliver();
 | --------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **GAP-CORE-01** | P2  | Se um middleware é assíncrono e chama `deliver()` dentro de um `await`, o fluxo se rompe — `deliver()` retorna antes do middleware completar, e o próximo middleware pode executar antes do anterior terminar. O middleware chain assume handlers síncronos. |
 
-> **Status de execução (2026-04-17): mitigado no código.**
-> `emit()` agora delega para `#runMiddlewareChain(event)` com suporte a middlewares síncronos e assíncronos, preservando o contrato fire-and-forget.
+> **Status de execução (2026-04-17): mitigado no código.** `emit()` agora delega para
+> `#runMiddlewareChain(event)` com suporte a middlewares síncronos e assíncronos, preservando o
+> contrato fire-and-forget.
 
 ### 2.3 `dispose()` sem Verificação de Emits Pendentes
 
@@ -126,6 +132,7 @@ dispose() {
 Analisado indiretamente via `di-wiring.js` e `bootstrap.js`.
 
 **Positivo**:
+
 - `container.validateRequired(tokens)` — validação declarativa de tokens obrigatórios
 - Token-based registration via `container.register(TOKEN, value)`
 
@@ -149,7 +156,7 @@ Analisado indiretamente via `di-wiring.js` e `bootstrap.js`.
 
 ```js
 export function logSwallowed(err, context = 'unknown') {
-    log('WARN', `[${context}] Erro engolido: ${toError(err).message}`);
+  log('WARN', `[${context}] Erro engolido: ${toError(err).message}`);
 }
 ```
 
@@ -176,8 +183,9 @@ export function logSwallowed(err, context = 'unknown') {
 
 ### Severidade Geral do Módulo: **P0 (CRÍTICO)**
 
-BUG-CORE-01 foi o bug mais severo encontrado nesta auditoria. Ele já está corrigido no código atual, mas continua importante como referência arquitetural para novos handlers.
+BUG-CORE-01 foi o bug mais severo encontrado nesta auditoria. Ele já está corrigido no código atual,
+mas continua importante como referência arquitetural para novos handlers.
 
 ---
 
-*Próximo: [07-SERVER.md](./07-SERVER.md)*
+_Próximo: [07-SERVER.md](./07-SERVER.md)_

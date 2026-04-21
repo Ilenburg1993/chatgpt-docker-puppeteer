@@ -1,8 +1,7 @@
 # PARTE-16B — Análise de Dívida Técnica e Vulnerabilidades
 
-**Data**: 2026-04-08
-**Baseline**: commit `bfe96b57`
-**Referência**: PARTE-16A (inventário), PARTE-14B (análise original), PARTE-15B (relatório)
+**Data**: 2026-04-08 **Baseline**: commit `bfe96b57` **Referência**: PARTE-16A (inventário),
+PARTE-14B (análise original), PARTE-15B (relatório)
 
 ---
 
@@ -72,13 +71,13 @@
 
 | ID      | Severidade | Módulo               | Descrição                                           | Ação                   |
 | ------- | ---------- | -------------------- | --------------------------------------------------- | ---------------------- |
-| CNF-E01 | 🔴 Alta     | `otel.js`            | 4 catch {} vazios em init de providers              | Log com warn           |
-| CNF-E02 | 🔴 Alta     | `event-collector.js` | 3 catch {} vazios em parsing de eventos             | Log + metric increment |
-| CNF-E03 | 🟡 Média    | `metrics.js`         | catch {} em metric export — silencia falhas de OTEL | Log + fallback counter |
-| CNF-E04 | 🟡 Média    | `mcp-tool-bridge.js` | catch sem rethrow em métodos críticos               | Log + optional rethrow |
-| CNF-E05 | 🟡 Média    | `socket-ns.js`       | catch silencioso em emit de broadcast               | Log + error count      |
-| CNF-E06 | 🟢 Baixa    | `tool-stats.js`      | catch com log mas sem metric                        | Adicionar metric       |
-| CNF-E07 | 🟢 Baixa    | Multiple files       | `.catch(() => {})` patterns (9 occurrences)         | `.catch(logSwallowed)` |
+| CNF-E01 | 🔴 Alta    | `otel.js`            | 4 catch {} vazios em init de providers              | Log com warn           |
+| CNF-E02 | 🔴 Alta    | `event-collector.js` | 3 catch {} vazios em parsing de eventos             | Log + metric increment |
+| CNF-E03 | 🟡 Média   | `metrics.js`         | catch {} em metric export — silencia falhas de OTEL | Log + fallback counter |
+| CNF-E04 | 🟡 Média   | `mcp-tool-bridge.js` | catch sem rethrow em métodos críticos               | Log + optional rethrow |
+| CNF-E05 | 🟡 Média   | `socket-ns.js`       | catch silencioso em emit de broadcast               | Log + error count      |
+| CNF-E06 | 🟢 Baixa   | `tool-stats.js`      | catch com log mas sem metric                        | Adicionar metric       |
+| CNF-E07 | 🟢 Baixa   | Multiple files       | `.catch(() => {})` patterns (9 occurrences)         | `.catch(logSwallowed)` |
 
 ### 3.2 FS Síncrono (CNF-FS)
 
@@ -113,8 +112,8 @@
 
 16 `process.on` / `process.once` listeners espalhados:
 
-| ID      | Arquivo                | Signal             | Ação                                    |
-| ------- | ---------------------- | ------------------ | --------------------------------------- |
+| ID      | Arquivo                | Signal             | Ação                                     |
+| ------- | ---------------------- | ------------------ | ---------------------------------------- |
 | CNF-P01 | `entry.js`             | SIGTERM, SIGINT    | ✅ Já usa `core/shutdown.js`             |
 | CNF-P02 | `sqlite.js`            | exit               | ✅ Já usa `registerShutdownHandler`      |
 | CNF-P03 | `always-alive.js`      | unhandledRejection | ⚠️ Deveria delegar para shutdown         |
@@ -130,11 +129,11 @@
 
 | ID     | Severidade | Arquivo               | Padrão           | Risco                                        |
 | ------ | ---------- | --------------------- | ---------------- | -------------------------------------------- |
-| SEC-01 | 🟡 Média    | `session-tools.js`    | `execSync(cmd)`  | Shell injection se CWD contém metacaracteres |
-| SEC-02 | 🟢 Baixa    | `tools/git/index.js`  | `execFile(git)`  | Seguro — execFile não usa shell              |
-| SEC-03 | 🟢 Baixa    | `tools/code-tools.js` | `execFile(node)` | Seguro — args controlados                    |
-| SEC-04 | 🟢 Baixa    | `shell/executor.js`   | `execFile`       | Sandbox com deny-list robusto                |
-| SEC-05 | 🟢 Baixa    | `hook-tools.js`       | `execFile`       | Args controlados pelo sistema                |
+| SEC-01 | 🟡 Média   | `session-tools.js`    | `execSync(cmd)`  | Shell injection se CWD contém metacaracteres |
+| SEC-02 | 🟢 Baixa   | `tools/git/index.js`  | `execFile(git)`  | Seguro — execFile não usa shell              |
+| SEC-03 | 🟢 Baixa   | `tools/code-tools.js` | `execFile(node)` | Seguro — args controlados                    |
+| SEC-04 | 🟢 Baixa   | `shell/executor.js`   | `execFile`       | Sandbox com deny-list robusto                |
+| SEC-05 | 🟢 Baixa   | `hook-tools.js`       | `execFile`       | Args controlados pelo sistema                |
 
 **Plano**: Migrar SEC-01 de `execSync` para `execFile`, sem shell.
 
@@ -142,17 +141,17 @@
 
 | ID     | Severidade | Arquivo              | Input               | Risco                             |
 | ------ | ---------- | -------------------- | ------------------- | --------------------------------- |
-| SEC-06 | 🟡 Média    | `socket-ns.js`       | `socket.handshake`  | Auth bypass se token não validado |
-| SEC-07 | 🟡 Média    | `terminal/server.js` | HTTP request origin | CSRF/WebSocket origin spoofing    |
-| SEC-08 | 🟢 Baixa    | `file/read-tools.js` | File path args      | Symlink escape (mitigado)         |
-| SEC-09 | 🟢 Baixa    | `web-tools.js`       | URL args            | SSRF lento (sem timeout ceiling)  |
+| SEC-06 | 🟡 Média   | `socket-ns.js`       | `socket.handshake`  | Auth bypass se token não validado |
+| SEC-07 | 🟡 Média   | `terminal/server.js` | HTTP request origin | CSRF/WebSocket origin spoofing    |
+| SEC-08 | 🟢 Baixa   | `file/read-tools.js` | File path args      | Symlink escape (mitigado)         |
+| SEC-09 | 🟢 Baixa   | `web-tools.js`       | URL args            | SSRF lento (sem timeout ceiling)  |
 
 ### 4.3 Vetor: Information Disclosure
 
 | ID     | Severidade | Arquivo                | Problema                          | Ação                       |
 | ------ | ---------- | ---------------------- | --------------------------------- | -------------------------- |
-| SEC-10 | 🟢 Baixa    | `server.js` (terminal) | Stack traces em error responses   | Filtrar em production      |
-| SEC-11 | 🟢 Baixa    | `error-handler.js`     | Error messages com paths internos | Sanitizar em API responses |
+| SEC-10 | 🟢 Baixa   | `server.js` (terminal) | Stack traces em error responses   | Filtrar em production      |
+| SEC-11 | 🟢 Baixa   | `error-handler.js`     | Error messages com paths internos | Sanitizar em API responses |
 
 ---
 
@@ -197,14 +196,14 @@
 
 | ID     | Severidade | Módulo                | Problema                                           | Impacto                |
 | ------ | ---------- | --------------------- | -------------------------------------------------- | ---------------------- |
-| PRF-01 | 🔴 Alta     | `snapshot.js`         | 8x readFileSync em hot path                        | Bloqueia event loop    |
-| PRF-02 | 🔴 Alta     | `file-context.js`     | readdirSync recursivo em workspace scan            | Bloqueia 100ms+        |
-| PRF-03 | 🟡 Média    | `metrics.js`          | Contadores crescem indefinidamente                 | Memory leak lento      |
-| PRF-04 | 🟡 Média    | `store.js` (conv-hub) | Queries sem índice em tabelas de conversação       | Lento com muitos dados |
-| PRF-05 | 🟡 Média    | `write-tools.js`      | 7x writeFileSync em operações de tool              | Bloqueia event loop    |
-| PRF-06 | 🟢 Baixa    | `state-io.js`         | 7x sync — mas alguns são shutdown-only (aceitável) | Parcial                |
-| PRF-07 | 🟢 Baixa    | `event-collector.js`  | Array unbounded para eventos coletados             | Memory em sessão longa |
-| PRF-08 | 🟢 Baixa    | `logger.js`           | Buffer de log sem flush periódico                  | Memory marginal        |
+| PRF-01 | 🔴 Alta    | `snapshot.js`         | 8x readFileSync em hot path                        | Bloqueia event loop    |
+| PRF-02 | 🔴 Alta    | `file-context.js`     | readdirSync recursivo em workspace scan            | Bloqueia 100ms+        |
+| PRF-03 | 🟡 Média   | `metrics.js`          | Contadores crescem indefinidamente                 | Memory leak lento      |
+| PRF-04 | 🟡 Média   | `store.js` (conv-hub) | Queries sem índice em tabelas de conversação       | Lento com muitos dados |
+| PRF-05 | 🟡 Média   | `write-tools.js`      | 7x writeFileSync em operações de tool              | Bloqueia event loop    |
+| PRF-06 | 🟢 Baixa   | `state-io.js`         | 7x sync — mas alguns são shutdown-only (aceitável) | Parcial                |
+| PRF-07 | 🟢 Baixa   | `event-collector.js`  | Array unbounded para eventos coletados             | Memory em sessão longa |
+| PRF-08 | 🟢 Baixa   | `logger.js`           | Buffer de log sem flush periódico                  | Memory marginal        |
 
 ---
 

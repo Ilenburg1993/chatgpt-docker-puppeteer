@@ -1,8 +1,7 @@
 # R-10 — Programa 3: Eventos, hooks e observabilidade
 
-**Programa**: P3
-**Prioridade**: alta
-**Foco**: governar o ecossistema transversal que hoje conecta metade do sistema por emissão, observação e políticas
+**Programa**: P3 **Prioridade**: alta **Foco**: governar o ecossistema transversal que hoje conecta
+metade do sistema por emissão, observação e políticas
 
 ---
 
@@ -16,7 +15,8 @@ P3 existe para resolver um problema sistêmico:
 - muito `observability/` importado diretamente;
 - e hooks/policies ainda próximos demais do runtime.
 
-Em bom português: o sistema conversa bastante consigo mesmo. O objetivo agora é fazer isso de modo menos caótico e mais governável.
+Em bom português: o sistema conversa bastante consigo mesmo. O objetivo agora é fazer isso de modo
+menos caótico e mais governável.
 
 ---
 
@@ -137,4 +137,5 @@ Saúde, erro e projeções operacionais viram pipeline coerente, não mosaico de
 
 ## 7. Resultado esperado
 
-Ao concluir P3, o sistema deve continuar orientado a eventos — mas de forma muito mais legível, contratual e sustentável.
+Ao concluir P3, o sistema deve continuar orientado a eventos — mas de forma muito mais legível,
+contratual e sustentável.

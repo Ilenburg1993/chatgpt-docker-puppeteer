@@ -1,7 +1,6 @@
 # 07 — ROADMAP MASTER: SDK Copilot 100% Coverage
 
-**Data**: 2026-03-21 | **Revisado**: 2026-03-21
-**Status**: Versão Definitiva (pós revisão crítica)
+**Data**: 2026-03-21 | **Revisado**: 2026-03-21 **Status**: Versão Definitiva (pós revisão crítica)
 **Referências**: Todos os documentos 00–06 desta auditoria
 
 ---
@@ -12,8 +11,7 @@ Este roadmap organiza TODO o trabalho necessário para levar o `src/copilot/` de
 cobertura do `@github/copilot-sdk`, corrigir bugs catalogados, e migrar para a arquitetura ideal
 descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
-**Estimativa total**: ~208h
-**Organização**: 9 Faixas × múltiplas Fases × Subfases
+**Estimativa total**: ~208h **Organização**: 9 Faixas × múltiplas Fases × Subfases
 
 ---
 
@@ -21,26 +19,25 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 | Símbolo | Significado                                |
 | ------- | ------------------------------------------ |
-| 🔴       | P0 — Crítico (bugs, type safety)           |
-| 🟠       | P1 — Alto (features core, observabilidade) |
-| 🟡       | P2 — Moderado (features experimentais)     |
-| 🟢       | P3 — Baixo (otimização, polish)            |
-| ⬜       | Não iniciado                               |
-| 🔵       | Em progresso                               |
-| ✅       | Concluído                                  |
+| 🔴      | P0 — Crítico (bugs, type safety)           |
+| 🟠      | P1 — Alto (features core, observabilidade) |
+| 🟡      | P2 — Moderado (features experimentais)     |
+| 🟢      | P3 — Baixo (otimização, polish)            |
+| ⬜      | Não iniciado                               |
+| 🔵      | Em progresso                               |
+| ✅      | Concluído                                  |
 
 ---
 
 ## FAIXA A — Bug Fixes & Misalignments
 
-**Referência**: [03-BUGS-MISALIGNMENTS.md](./03-BUGS-MISALIGNMENTS.md)
-**Estimativa**: ~18h
+**Referência**: [03-BUGS-MISALIGNMENTS.md](./03-BUGS-MISALIGNMENTS.md) **Estimativa**: ~18h
 **Risco**: Baixo (correções pontuais)
 
 ### Fase A1 — Bugs Diretos (~3.5h) 🔴
 
-| #    | Subfase                             | Descrição                                                       | Estimativa | Ref    |
-| ---- | ----------------------------------- | --------------------------------------------------------------- | ---------- | ------ |
+| #    | Subfase                              | Descrição                                                       | Estimativa | Ref    |
+| ---- | ------------------------------------ | --------------------------------------------------------------- | ---------- | ------ |
 | A1.1 | ✅ ~~Remover `injectHookContext`~~   | FALSO POSITIVO — campo é flag interno consumido por initializer | 0h         | BUG-01 |
 | A1.2 | ✅ ~~Corrigir system message mode~~  | RECLASSIFICADO — `customize`+`content` válido no SDK; defer→I   | 0h         | BUG-02 |
 | A1.3 | ✅ Eliminar `Record<string,unknown>` | Refatorado para `Partial<SessionConfig>` com tipos SDK reais    | 2h         | BUG-03 |
@@ -50,8 +47,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase A2 — Misalignments (~6h) 🟠
 
-| #    | Subfase                          | Descrição                                                                                               | Estimativa | Ref       |
-| ---- | -------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| #    | Subfase                           | Descrição                                                                                               | Estimativa | Ref       |
+| ---- | --------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------- | --------- |
 | A2.1 | ✅ ~~Threshold compaction~~       | Absorvido por A1.5 — já alinhado a 0.8                                                                  | 0h         | BUG-10-10 |
 | A2.2 | ✅ Cobrir SessionConfig faltantes | `clientName` e `workingDirectory` adicionados; demais campos são features avançadas sem infra (Faixa C) | 1h         | BUG-07    |
 | A2.3 | ✅ WARN `approveAll` fallback     | Log WARN quando `onPermissionRequest` não fornecido; fallback preservado para compat                    | 0.5h       | BUG-08    |
@@ -59,8 +56,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase A3 — Dead Code Cleanup (~6h) 🟠
 
-| #    | Subfase                      | Descrição                                                                                                                                                                  | Estimativa | Ref    |
-| ---- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ |
+| #    | Subfase                       | Descrição                                                                                                                                                                  | Estimativa | Ref    |
+| ---- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ |
 | A3.1 | ✅ Migrar boot-wiring         | `boot-wiring.js` refatorado: `client.on()` → `onLifecycleEvents()` via `client-events.js`                                                                                  | 1h         | BUG-04 |
 | A3.2 | ✅ Wire experimental RPC      | Reescrita completa de `experimental.js` (SDK-aligned, 20 funções), criação de `experimental-rpc-tools.js` (20 tools), wiring via `setExperimentalSession()`, 45 testes F22 | 4h         | BUG-05 |
 | A3.3 | ✅ Audit trail para dead code | Reclassificações documentadas no doc 03. BUG-04→DEBT, BUG-05 DEAD CODE (Faixa D), BUG-11→FALSO POS.                                                                        | 0.5h       | —      |
@@ -74,18 +71,17 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA I — System Prompt Modular (Replace-First)
 
-**Referência**: [08-SYSTEM-PROMPT-MODULAR.md](./08-SYSTEM-PROMPT-MODULAR.md)
-**Estimativa**: ~14h
-**Risco**: Baixo (modular, backward compat via facade)
-**Resolve**: BUG-02, GAP-E02, cobertura 10/10 seções SDK
+**Referência**: [08-SYSTEM-PROMPT-MODULAR.md](./08-SYSTEM-PROMPT-MODULAR.md) **Estimativa**: ~14h
+**Risco**: Baixo (modular, backward compat via facade) **Resolve**: BUG-02, GAP-E02, cobertura 10/10
+seções SDK
 
 > Controle total do system prompt com modo `replace` como padrão, estrutura modular com 1 arquivo
 > por seção, e troca fácil para `customize` via flag.
 
 ### Fase I1 — Estrutura e Migração (~6h) ✅
 
-| #    | Subfase                                      | Descrição                                               | Status |
-| ---- | -------------------------------------------- | ------------------------------------------------------- | ------ |
+| #    | Subfase                                       | Descrição                                               | Status |
+| ---- | --------------------------------------------- | ------------------------------------------------------- | ------ |
 | I1.1 | ✅ Criar pasta `config/system-prompt/`        | Estrutura: index.js, mode.js, sections/, sdk-defaults/  | DONE   |
 | I1.2 | ✅ Migrar 7 constantes existentes             | AGENT_IDENTITY→identity.js, AGENT_TONE→tone.js, etc.    | DONE   |
 | I1.3 | ✅ Criar 3 seções novas                       | safety.js, tool-instructions.js, custom-instructions.js | DONE   |
@@ -94,8 +90,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase I2 — Integração e Captura (~5h) ✅
 
-| #    | Subfase                              | Descrição                                               | Status |
-| ---- | ------------------------------------ | ------------------------------------------------------- | ------ |
+| #    | Subfase                               | Descrição                                               | Status |
+| ---- | ------------------------------------- | ------------------------------------------------------- | ------ |
 | I2.1 | ✅ Atualizar lifecycle.js             | Passthrough automático (sem mudança necessária)         | DONE   |
 | I2.2 | ✅ Atualizar initializer.js           | Wire do novo buildSystemMessage() via importação direta | DONE   |
 | I2.3 | ✅ Implementar captura SDK defaults   | SectionTransformFn para extrair conteúdo padrão         | DONE   |
@@ -104,8 +100,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase I3 — Testes (~3h) ✅
 
-| #    | Subfase                        | Descrição                                        | Status |
-| ---- | ------------------------------ | ------------------------------------------------ | ------ |
+| #    | Subfase                         | Descrição                                        | Status |
+| ---- | ------------------------------- | ------------------------------------------------ | ------ |
 | I3.1 | ✅ Testes unitários por seção   | 10 seções verificadas: CONTENT + ACTION          | DONE   |
 | I3.2 | ✅ Teste de assembler dual-mode | replace vs customize produzem output válido      | DONE   |
 | I3.3 | ✅ Teste de backward compat     | Funções antigas continuam funcionando via facade | DONE   |
@@ -114,14 +110,13 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA B — Event Handlers 100% Coverage
 
-**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa D
-**Estimativa**: ~32h
-**Risco**: Baixo-Moderado (aditivo)
+**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa D **Estimativa**:
+~32h **Risco**: Baixo-Moderado (aditivo)
 
 ### Fase B1 — Session Events (~10h) ✅
 
-| #    | Subfase                             | Descrição                                 | Estimativa |
-| ---- | ----------------------------------- | ----------------------------------------- | ---------- |
+| #    | Subfase                              | Descrição                                 | Estimativa |
+| ---- | ------------------------------------ | ----------------------------------------- | ---------- |
 | B1.1 | ✅ `session.idle` handler            | Detectar sessão ociosa, emitir para hub   | 2h         |
 | B1.2 | ✅ `session.error` handler           | Error categorization + emit para EventBus | 2h         |
 | B1.3 | ✅ `session.warning` handler         | Warning emit + log WARN                   | 1h         |
@@ -132,8 +127,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase B2 — MCP & OAuth Events (~8h) ✅
 
-| #    | Subfase                               | Descrição                            | Estimativa |
-| ---- | ------------------------------------- | ------------------------------------ | ---------- |
+| #    | Subfase                                | Descrição                            | Estimativa |
+| ---- | -------------------------------------- | ------------------------------------ | ---------- |
 | B2.1 | ✅ `mcp.server_status_changed` handler | Bridge MCP status → EventBus         | 2h         |
 | B2.2 | ✅ `mcp.oauth_required` handler        | OAuth required event emit + log WARN | 1h         |
 | B2.3 | ✅ `mcp.oauth_completed` handler       | OAuth completed event emit           | 1h         |
@@ -141,16 +136,16 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase B3 — Tool Events Avançados (~6h) ✅
 
-| #    | Subfase                         | Descrição                       | Estimativa |
-| ---- | ------------------------------- | ------------------------------- | ---------- |
+| #    | Subfase                          | Descrição                       | Estimativa |
+| ---- | -------------------------------- | ------------------------------- | ---------- |
 | B3.1 | ✅ `tool.progress` handler       | Progress tracking per-tool      | 2h         |
 | B3.2 | ✅ `tool.user_requested` handler | User-requested tool tracking    | 1h         |
 | B3.3 | ✅ Testes                        | 3 testes — tool progress + user | 1h         |
 
 ### Fase B4 — Skill, Command, Permission, Subagent Events (~8h) ✅
 
-| #    | Subfase                              | Descrição                                       | Estimativa |
-| ---- | ------------------------------------ | ----------------------------------------------- | ---------- |
+| #    | Subfase                               | Descrição                                       | Estimativa |
+| ---- | ------------------------------------- | ----------------------------------------------- | ---------- |
 | B4.1 | ✅ `skill.invoked` handler            | Skill invocation tracking                       | 1h         |
 | B4.2 | ✅ `command.*` handlers (3 events)    | execute, queued, completed tracking             | 2h         |
 | B4.3 | ✅ `permission.*` handlers (2 events) | requested + completed audit trail               | 2h         |
@@ -161,14 +156,13 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA C — SessionConfig 100% Coverage
 
-**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa B
-**Estimativa**: ~20h
-**Risco**: Moderado (mudar config builder)
+**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa B **Estimativa**:
+~20h **Risco**: Moderado (mudar config builder)
 
 ### Fase C1 — SessionConfigBuilder (~8h) ✅
 
-| #    | Subfase                        | Descrição                                                        | Estimativa |
-| ---- | ------------------------------ | ---------------------------------------------------------------- | ---------- |
+| #    | Subfase                         | Descrição                                                        | Estimativa |
+| ---- | ------------------------------- | ---------------------------------------------------------------- | ---------- |
 | C1.1 | ✅ Criar `SessionConfigBuilder` | Builder fluent tipado em `config/session-config.js` (21+ campos) | 4h         |
 | C1.2 | ✅ Preservar `lifecycle.js`     | `lifecycle.js` mantém buildSessionConfig interno (compat)        | 0h         |
 | C1.3 | ✅ Migrar `session-setup.js`    | `buildSessionOptions()` usa SessionConfigBuilder                 | 1h         |
@@ -176,11 +170,11 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase C2 — Opções Faltantes (~8h) ✅
 
-> Todas as opções já estão suportadas no builder com métodos dedicados. O uso em runtime já existia no
-> codebase (initializer.js, session-setup.js) — o builder as formaliza.
+> Todas as opções já estão suportadas no builder com métodos dedicados. O uso em runtime já existia
+> no codebase (initializer.js, session-setup.js) — o builder as formaliza.
 
-| #    | Subfase                                 | Descrição                                           | Estimativa |
-| ---- | --------------------------------------- | --------------------------------------------------- | ---------- |
+| #    | Subfase                                  | Descrição                                           | Estimativa |
+| ---- | ---------------------------------------- | --------------------------------------------------- | ---------- |
 | C2.1 | ✅ `availableTools` / `excludedTools`    | Métodos `.availableTools()` / `.excludedTools()`    | 0.5h       |
 | C2.2 | ✅ `skillDirectories` / `disabledSkills` | Métodos `.skillDirectories()` / `.disabledSkills()` | 0.5h       |
 | C2.3 | ✅ `agent` config                        | Método `.agent()` + `.customAgents()`               | 0.5h       |
@@ -189,10 +183,10 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase C3 — CopilotClientOptions (~4h) ✅
 
-| #    | Subfase                    | Descrição                                                   | Estimativa |
-| ---- | -------------------------- | ----------------------------------------------------------- | ---------- |
+| #    | Subfase                     | Descrição                                                   | Estimativa |
+| ---- | --------------------------- | ----------------------------------------------------------- | ---------- |
 | C3.1 | ✅ `logLevel` mapping       | `LOG_LEVEL_MAP` em `ClientOptionsBuilder.logLevelFromEnv()` | 0.5h       |
-| C3.2 | ✅ `env` passthrough        | `envPassthrough()` filtra COPILOT_/GITHUB_/OTEL_/NODE_      | 1h         |
+| C3.2 | ✅ `env` passthrough        | `envPassthrough()` filtra COPILOT*/GITHUB*/OTEL*/NODE*      | 1h         |
 | C3.3 | ✅ `onListModels` para BYOK | Método `.onListModels()` no builder                         | 0.5h       |
 | C3.4 | ✅ `githubToken` support    | `.githubToken()` + `.githubTokenFromEnv()`                  | 0.5h       |
 | C3.5 | ✅ Testes                   | 16 testes cobrindo ClientOptionsBuilder                     | 1h         |
@@ -201,14 +195,13 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA D — Experimental RPC Exposure
 
-**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa C
-**Estimativa**: ~30h
-**Risco**: Moderado (feature-flagged)
+**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa C **Estimativa**:
+~30h **Risco**: Moderado (feature-flagged)
 
 ### Fase D1 — Skills Management Tools (~6h) 🟡
 
-| #    | Subfase                          | Descrição                        | Estimativa |
-| ---- | -------------------------------- | -------------------------------- | ---------- |
+| #    | Subfase                           | Descrição                        | Estimativa |
+| ---- | --------------------------------- | -------------------------------- | ---------- |
 | D1.1 | ⬜ Tool `sdk_skills_list`         | Lista skills disponíveis via RPC | 1h         |
 | D1.2 | ⬜ Tool `sdk_skills_enable`       | Habilitar skill por nome         | 1h         |
 | D1.3 | ⬜ Tool `sdk_skills_disable`      | Desabilitar skill por nome       | 1h         |
@@ -218,8 +211,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase D2 — MCP Management Tools (~6h) 🟡
 
-| #    | Subfase                             | Descrição            | Estimativa |
-| ---- | ----------------------------------- | -------------------- | ---------- |
+| #    | Subfase                              | Descrição            | Estimativa |
+| ---- | ------------------------------------ | -------------------- | ---------- |
 | D2.1 | ⬜ Tool `sdk_mcp_list`               | Lista MCP servers    | 1h         |
 | D2.2 | ⬜ Tool `sdk_mcp_enable` / `disable` | Toggle MCP server    | 2h         |
 | D2.3 | ⬜ Tool `sdk_mcp_status`             | Status de MCP server | 1h         |
@@ -228,8 +221,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase D3 — Agent Management Tools (~6h) 🟡
 
-| #    | Subfase                                 | Descrição        | Estimativa |
-| ---- | --------------------------------------- | ---------------- | ---------- |
+| #    | Subfase                                  | Descrição        | Estimativa |
+| ---- | ---------------------------------------- | ---------------- | ---------- |
 | D3.1 | ⬜ Tool `sdk_agents_list`                | Lista agents     | 1h         |
 | D3.2 | ⬜ Tool `sdk_agents_select` / `deselect` | Seleção de agent | 2h         |
 | D3.3 | ⬜ Tool `sdk_agents_status`              | Status do agent  | 1h         |
@@ -238,8 +231,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase D4 — Extensions & Plugins (~6h) 🟢
 
-| #    | Subfase                                    | Descrição        | Estimativa |
-| ---- | ------------------------------------------ | ---------------- | ---------- |
+| #    | Subfase                                     | Descrição        | Estimativa |
+| ---- | ------------------------------------------- | ---------------- | ---------- |
 | D4.1 | ⬜ Tool `sdk_extensions_list`               | Lista extensions | 1h         |
 | D4.2 | ⬜ Tool `sdk_extensions_enable` / `disable` | Toggle extension | 2h         |
 | D4.3 | ⬜ Tool `sdk_plugins_list`                  | Lista plugins    | 1h         |
@@ -248,8 +241,8 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase D5 — Fleet Management (~6h) 🟢
 
-| #    | Subfase                       | Descrição               | Estimativa |
-| ---- | ----------------------------- | ----------------------- | ---------- |
+| #    | Subfase                        | Descrição               | Estimativa |
+| ---- | ------------------------------ | ----------------------- | ---------- |
 | D5.1 | ⬜ Tool `sdk_fleet_start`      | Start fleet via RPC     | 2h         |
 | D5.2 | ⬜ Fleet lifecycle integration | Conectar com agent-loop | 2h         |
 | D5.3 | ⬜ REST endpoint + testes      |                         | 2h         |
@@ -258,52 +251,50 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA E — Hooks Optimization
 
-**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa E
-**Estimativa**: ~16h
-**Risco**: Moderado (refactor)
+**Referência**: [02-GAPS-FUNCIONAIS-SDK.md](./02-GAPS-FUNCIONAIS-SDK.md) Faixa E **Estimativa**:
+~16h **Risco**: Moderado (refactor)
 
 ### Fase E1 — Thin Adapter Migration (~8h) 🟠
 
-| #    | Subfase                                | Descrição                                                               | Estimativa |
-| ---- | -------------------------------------- | ----------------------------------------------------------------------- | ---------- |
+| #    | Subfase                                 | Descrição                                                               | Estimativa |
+| ---- | --------------------------------------- | ----------------------------------------------------------------------- | ---------- |
 | E1.1 | ✅ Separar filtering estático           | `tool-filter.js`: extractStaticFilters() → availableTools/excludedTools | 3h         |
 | E1.2 | ✅ Simplificar `buildPreToolUseHandler` | buildDynamicOnlyPreToolUseHandler + isDynamicOnly() fast-path           | 3h         |
 | E1.3 | ✅ Testes de paridade                   | 52 testes cobrindo E1+E2+E3 — paridade verificada                       | 2h         |
 
 ### Fase E2 — Hook Composition Improvement (~4h) 🟡
 
-| #    | Subfase                         | Descrição                                                            | Estimativa |
-| ---- | ------------------------------- | -------------------------------------------------------------------- | ---------- |
+| #    | Subfase                          | Descrição                                                            | Estimativa |
+| ---- | -------------------------------- | -------------------------------------------------------------------- | ---------- |
 | E2.1 | ✅ Melhorar `composer.js`        | middleware(), loggingMiddleware(), forTools() — composição Koa-style | 2h         |
 | E2.2 | ✅ Adicionar hook `onSessionEnd` | createCleanupHandler() com fail-safe sequencial                      | 2h         |
 
 ### Fase E3 — Audit & Compliance (~4h) 🟡
 
-| #    | Subfase                   | Descrição                                                  | Estimativa |
-| ---- | ------------------------- | ---------------------------------------------------------- | ---------- |
-| E3.1 | ✅ Audit trail completo    | AuditTrail ring buffer + with*Audit wrappers + query/stats | 2h         |
-| E3.2 | ✅ Dashboard de compliance | GET /compliance e /compliance/stats endpoints              | 2h         |
+| #    | Subfase                    | Descrição                                                   | Estimativa |
+| ---- | -------------------------- | ----------------------------------------------------------- | ---------- |
+| E3.1 | ✅ Audit trail completo    | AuditTrail ring buffer + with\*Audit wrappers + query/stats | 2h         |
+| E3.2 | ✅ Dashboard de compliance | GET /compliance e /compliance/stats endpoints               | 2h         |
 
 ---
 
 ## FAIXA F — Observabilidade SDK
 
 **Referência**: [06-TSSERVER-SDK-INTERNALIZACAO.md](./06-TSSERVER-SDK-INTERNALIZACAO.md)
-**Estimativa**: ~16h
-**Risco**: Baixo (aditivo)
+**Estimativa**: ~16h **Risco**: Baixo (aditivo)
 
 ### Fase F1 — Telemetry Integration (~8h) 🟠
 
-| #    | Subfase                           | Descrição                           | Estimativa |
-| ---- | --------------------------------- | ----------------------------------- | ---------- |
+| #    | Subfase                            | Descrição                           | Estimativa |
+| ---- | ---------------------------------- | ----------------------------------- | ---------- |
 | F1.1 | ⬜ Configurar `telemetry` OTel     | Passar OTel endpoint ao CLI process | 3h         |
 | F1.2 | ⬜ Implementar `onGetTraceContext` | Propagação de W3C trace context     | 3h         |
 | F1.3 | ⬜ Correlação de traces            | Dashboard unificado SDK + sistema   | 2h         |
 
 ### Fase F2 — Client-Level Monitoring (~8h) 🟠
 
-| #    | Subfase                                | Descrição                        | Estimativa |
-| ---- | -------------------------------------- | -------------------------------- | ---------- |
+| #    | Subfase                                 | Descrição                        | Estimativa |
+| ---- | --------------------------------------- | -------------------------------- | ---------- |
 | F2.1 | ⬜ Wire `getStatus()` periódico         | Health check do CLI server       | 2h         |
 | F2.2 | ⬜ Wire `getAuthStatus()`               | Monitorar estado de autenticação | 2h         |
 | F2.3 | ⬜ Wire `getQuotaInfo()`                | Monitorar quotas e rate limits   | 2h         |
@@ -313,14 +304,13 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ## FAIXA G — Architectural Refactoring
 
-**Referência**: [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md)
-**Estimativa**: ~46h
-**Risco**: Alto (substitutivo)
+**Referência**: [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md) **Estimativa**: ~46h **Risco**:
+Alto (substitutivo)
 
 ### Fase G1 — God Module Decomposition (~16h) 🟠
 
-| #    | Subfase                        | Descrição                                  | Estimativa |
-| ---- | ------------------------------ | ------------------------------------------ | ---------- |
+| #    | Subfase                         | Descrição                                  | Estimativa |
+| ---- | ------------------------------- | ------------------------------------------ | ---------- |
 | G1.1 | ⬜ Extrair `agent-loop.js`      | Loop principal isolado (~150L)             | 4h         |
 | G1.2 | ⬜ Extrair `session-manager.js` | Multi-session SDK-based (~200L)            | 4h         |
 | G1.3 | ⬜ Extrair `turn-executor.js`   | Turn execution isolado (~150L)             | 4h         |
@@ -329,20 +319,20 @@ descrita em [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md).
 
 ### Fase G2 — Hub ↔ SDK Lifecycle Integration (~8h) 🟡
 
-**Nota**: O conversation-hub NÃO é um registry duplicado. É uma camada de persistência SQLite para
-o ambiente LLM-A ↔ LLM-B ↔ Usuário. A integração necessária é wiring de lifecycle events, não
+**Nota**: O conversation-hub NÃO é um registry duplicado. É uma camada de persistência SQLite para o
+ambiente LLM-A ↔ LLM-B ↔ Usuário. A integração necessária é wiring de lifecycle events, não
 substituição.
 
-| #    | Subfase                           | Descrição                                  | Estimativa |
-| ---- | --------------------------------- | ------------------------------------------ | ---------- |
+| #    | Subfase                            | Descrição                                  | Estimativa |
+| ---- | ---------------------------------- | ------------------------------------------ | ---------- |
 | G2.1 | ⬜ Criar `hub-lifecycle-bridge.js` | Wire lifecycle events do client para o hub | 3h         |
 | G2.2 | ⬜ Implementar handlers no hub     | `onSdkSessionCreated/Deleted/Updated`      | 3h         |
 | G2.3 | ⬜ Testes de integração            | Verificar sync bidirecional                | 2h         |
 
 ### Fase G3 — Event Router Centralizado (~12h) 🟡
 
-| #    | Subfase                        | Descrição                                          | Estimativa |
-| ---- | ------------------------------ | -------------------------------------------------- | ---------- |
+| #    | Subfase                         | Descrição                                          | Estimativa |
+| ---- | ------------------------------- | -------------------------------------------------- | ---------- |
 | G3.1 | ⬜ Criar `events/router.js`     | Dispatcher central por categoria                   | 4h         |
 | G3.2 | ⬜ Migrar handlers existentes   | Mover de `event-handlers/` para `events/handlers/` | 4h         |
 | G3.3 | ⬜ Adicionar handlers faltantes | Da Faixa B que ainda não foram criados             | 2h         |
@@ -350,8 +340,8 @@ substituição.
 
 ### Fase G4 — Import Cleanup (~10h) 🟢
 
-| #    | Subfase                      | Descrição                           | Estimativa |
-| ---- | ---------------------------- | ----------------------------------- | ---------- |
+| #    | Subfase                       | Descrição                           | Estimativa |
+| ---- | ----------------------------- | ----------------------------------- | ---------- |
 | G4.1 | ⬜ Eliminar circular imports  | Detectar e quebrar ciclos           | 4h         |
 | G4.2 | ⬜ Uniformizar barrel exports | Cada submódulo com `index.js` limpo | 3h         |
 | G4.3 | ⬜ Alias mapping              | Verificar `#copilot/*` aliases      | 1h         |
@@ -362,13 +352,12 @@ substituição.
 ## FAIXA H — TSServer Integration
 
 **Referência**: [06-TSSERVER-SDK-INTERNALIZACAO.md](./06-TSSERVER-SDK-INTERNALIZACAO.md)
-**Estimativa**: ~16h
-**Risco**: Moderado (novo canal de comunicação)
+**Estimativa**: ~16h **Risco**: Moderado (novo canal de comunicação)
 
 ### Fase H1 — Tools de TSServer para Copilot (~8h) 🟡
 
-| #    | Subfase                  | Descrição                     | Estimativa |
-| ---- | ------------------------ | ----------------------------- | ---------- |
+| #    | Subfase                   | Descrição                     | Estimativa |
+| ---- | ------------------------- | ----------------------------- | ---------- |
 | H1.1 | ⬜ Tool `get_type_info`   | Type info via tsserver-daemon | 2h         |
 | H1.2 | ⬜ Tool `get_diagnostics` | Diagnostics de arquivo        | 2h         |
 | H1.3 | ⬜ Tool `get_completions` | Completion candidates         | 2h         |
@@ -376,8 +365,8 @@ substituição.
 
 ### Fase H2 — Context Injection via SystemMessage (~8h) 🟡
 
-| #    | Subfase                        | Descrição                              | Estimativa |
-| ---- | ------------------------------ | -------------------------------------- | ---------- |
+| #    | Subfase                         | Descrição                              | Estimativa |
+| ---- | ------------------------------- | -------------------------------------- | ---------- |
 | H2.1 | ⬜ Builder de seção TSServer    | SystemMessage section com type context | 3h         |
 | H2.2 | ⬜ Auto-inject on session start | Hook para injetar automaticamente      | 3h         |
 | H2.3 | ⬜ Testes                       |                                        | 2h         |
@@ -387,13 +376,12 @@ substituição.
 ## FAIXA J — SDK Gateway Enforcement & Cleanup
 
 **Referência**: [08-AUDITORIA-DUPLICATAS-IMPORTS.md](./08-AUDITORIA-DUPLICATAS-IMPORTS.md)
-**Estimativa**: ~12h
-**Risco**: Baixo (refactor mecânico, sem mudança de comportamento)
+**Estimativa**: ~12h **Risco**: Baixo (refactor mecânico, sem mudança de comportamento)
 
 ### Fase J1 — Import Violations Fix (~4h) 🔴
 
-| #    | Subfase                                      | Descrição                                                                    | Estimativa |
-| ---- | -------------------------------------------- | ---------------------------------------------------------------------------- | ---------- |
+| #    | Subfase                                       | Descrição                                                                    | Estimativa |
+| ---- | --------------------------------------------- | ---------------------------------------------------------------------------- | ---------- |
 | J1.1 | ⬜ Fix runtime import `config/session-config` | `@github/copilot-sdk` → `#copilot/sdk` (1 arquivo)                           | 0.5h       |
 | J1.2 | ⬜ Fix JSDoc type refs fora de `sdk/`         | `import('@github/copilot-sdk')` → `import('#copilot/sdk/types.js')` (21 arq) | 2h         |
 | J1.3 | ⬜ ESLint `no-restricted-imports` rule        | Bloquear `@github/copilot-sdk` fora de `src/copilot/sdk/`                    | 1h         |
@@ -401,8 +389,8 @@ substituição.
 
 ### Fase J2 — Dead Code Removal (~4h) 🟠
 
-| #    | Subfase                                               | Descrição                                                      | Estimativa |
-| ---- | ----------------------------------------------------- | -------------------------------------------------------------- | ---------- |
+| #    | Subfase                                                | Descrição                                                      | Estimativa |
+| ---- | ------------------------------------------------------ | -------------------------------------------------------------- | ---------- |
 | J2.1 | ⬜ Deprecar/remover `createPermissionHandler` (sdk/)   | Dead code: toda lógica real é em `hooks/permission-handler.js` | 1h         |
 | J2.2 | ⬜ Deprecar/remover `createAllowlistPermissionHandler` | Sem callers — barrel export morto                              | 0.5h       |
 | J2.3 | ⬜ Deprecar `sdk/config.js::buildSessionConfig`        | Subsumido por `SessionConfigBuilder` (Faixa C)                 | 1h         |
@@ -411,8 +399,8 @@ substituição.
 
 ### Fase J3 — Documentation & Prevention (~4h) 🟡
 
-| #    | Subfase                               | Descrição                                                                     | Estimativa |
-| ---- | ------------------------------------- | ----------------------------------------------------------------------------- | ---------- |
+| #    | Subfase                                | Descrição                                                                     | Estimativa |
+| ---- | -------------------------------------- | ----------------------------------------------------------------------------- | ---------- |
 | J3.1 | ⬜ Atualizar ADR de camadas            | Documentar regras L1-L7 + canonical paths oficiais                            | 2h         |
 | J3.2 | ⬜ Documentar 3 perfis pre-tool-use    | resolveToolDecision, production onPreToolUse, dynamic-only                    | 1h         |
 | J3.3 | ⬜ CI check para novos imports diretos | Script ou hook de pre-commit que rejeita `@github/copilot-sdk` fora de `sdk/` | 1h         |
@@ -423,20 +411,19 @@ substituição.
 
 **Referência**: [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md),
 [10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md),
-[11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md)
-**Estimativa**: ~43h
-**Risco**: Moderado (refactor interno do agent; API pública AlwaysAliveAgent não muda)
+[11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md) **Estimativa**: ~43h **Risco**: Moderado
+(refactor interno do agent; API pública AlwaysAliveAgent não muda)
 
 > **Relação com Faixa G**: G1 (God Module Decomposition, 16h) focaliza `src/copilot/` em geral.
-> Faixa K é mais granular e focada exclusivamente em `src/copilot/agent/` (~55 arquivos, 8620L).
-> K1 (AgentContext partitioning) e K5 (boot wiring pipeline) substituem G1.1-G1.4 no escopo agent.
+> Faixa K é mais granular e focada exclusivamente em `src/copilot/agent/` (~55 arquivos, 8620L). K1
+> (AgentContext partitioning) e K5 (boot wiring pipeline) substituem G1.1-G1.4 no escopo agent.
 > Recomenda-se executar Faixa K antes de G1 — os artefatos de K reduzem o escopo de G1
 > significativamente.
 
 ### Fase K1 — AgentContext Partitioning (~8h) 🔴
 
-| #    | Subfase                                          | Descrição                                           | Estimativa |
-| ---- | ------------------------------------------------ | --------------------------------------------------- | ---------- |
+| #    | Subfase                                           | Descrição                                           | Estimativa |
+| ---- | ------------------------------------------------- | --------------------------------------------------- | ---------- |
 | K1.1 | ⬜ Definir interfaces SessionState, etc.          | Interfaces tipadas para cada domínio do contexto    | 2h         |
 | K1.2 | ⬜ Refatorar AgentContext para compor sub-estados | Substituir campos planos por objetos particionados  | 3h         |
 | K1.3 | ⬜ Migrar consumidores para sub-estados           | Acessar `ctx.session` em vez de `ctx.client` direto | 2h         |
@@ -444,8 +431,8 @@ substituição.
 
 ### Fase K2 — Test Coverage Sprint (~12h) 🔴
 
-| #    | Subfase                                          | Descrição                               | Estimativa |
-| ---- | ------------------------------------------------ | --------------------------------------- | ---------- |
+| #    | Subfase                                           | Descrição                               | Estimativa |
+| ---- | ------------------------------------------------- | --------------------------------------- | ---------- |
 | K2.1 | ⬜ Testes AgentContext FSM                        | Transições válidas/inválidas, setStatus | 2h         |
 | K2.2 | ⬜ Testes MessageQueue                            | FIFO, abort, drain, size, shift         | 2h         |
 | K2.3 | ⬜ Testes performBootWiring                       | 12 etapas isoladas com mocks            | 3h         |
@@ -455,47 +442,47 @@ substituição.
 
 ### Fase K3 — Error Handling Centralizado (~4h) 🟠
 
-| #    | Subfase                                   | Descrição                                     | Estimativa |
-| ---- | ----------------------------------------- | --------------------------------------------- | ---------- |
+| #    | Subfase                                    | Descrição                                     | Estimativa |
+| ---- | ------------------------------------------ | --------------------------------------------- | ---------- |
 | K3.1 | ⬜ Criar error-policy.js com classificador | retry/fatal/ignore por tipo de erro           | 2h         |
 | K3.2 | ⬜ Migrar task-executor e queue-processor  | Substituir 5 padrões adhoc pelo classificador | 1h         |
 | K3.3 | ⬜ Testes de classificação + policy        | Cobertura das 3 categorias                    | 1h         |
 
 ### Fase K4 — Background Task Tracker (~3h) 🟠
 
-| #    | Subfase                                       | Descrição                                    | Estimativa |
-| ---- | --------------------------------------------- | -------------------------------------------- | ---------- |
+| #    | Subfase                                        | Descrição                                    | Estimativa |
+| ---- | ---------------------------------------------- | -------------------------------------------- | ---------- |
 | K4.1 | ⬜ Criar background-tasks.js                   | track(), drain(timeoutMs), pendingCount      | 1h         |
 | K4.2 | ⬜ Migrar void writeStateAsync → bgTasks.track | Substituir 15+ fire-and-forget               | 1h         |
 | K4.3 | ⬜ Integrar drain no shutdown + testes         | Garantir que shutdown espera tasks pendentes | 1h         |
 
 ### Fase K5 — Boot Wiring Pipeline (~6h) 🟠
 
-| #    | Subfase                                   | Descrição                              | Estimativa |
-| ---- | ----------------------------------------- | -------------------------------------- | ---------- |
+| #    | Subfase                                    | Descrição                              | Estimativa |
+| ---- | ------------------------------------------ | -------------------------------------- | ---------- |
 | K5.1 | ⬜ Extrair 12 etapas como funções nomeadas | Cada step com interface uniforme       | 3h         |
 | K5.2 | ⬜ Criar pipeline runner                   | Loop orquestrador com logging por step | 1h         |
 | K5.3 | ⬜ Testes de cada step isolado             | Mocks + verificação de unsubs          | 2h         |
 
 ### Fase K6 — Event Bridge Declarativo (~4h) 🟡
 
-| #    | Subfase                                   | Descrição                                             | Estimativa |
-| ---- | ----------------------------------------- | ----------------------------------------------------- | ---------- |
+| #    | Subfase                                    | Descrição                                             | Estimativa |
+| ---- | ------------------------------------------ | ----------------------------------------------------- | ---------- |
 | K6.1 | ⬜ Criar event-bridge-map.js               | Array de [localEvent, busEvent] como fonte de verdade | 1h         |
 | K6.2 | ⬜ Migrar always-alive.js para usar o mapa | Substituir ~80 bridges hardcoded                      | 2h         |
 | K6.3 | ⬜ Testes de completude do bridge          | Verificar que todos os eventos estão mapeados         | 1h         |
 
 ### Fase K7 — Health Check Formal (~3h) 🟡
 
-| #    | Subfase                          | Descrição                                    | Estimativa |
-| ---- | -------------------------------- | -------------------------------------------- | ---------- |
+| #    | Subfase                           | Descrição                                    | Estimativa |
+| ---- | --------------------------------- | -------------------------------------------- | ---------- |
 | K7.1 | ⬜ Criar health-check.js          | 5 checks: client, session, dialog, queue, IO | 1.5h       |
 | K7.2 | ⬜ Expor via GET /health + testes | Endpoint HTTP + testes unitários             | 1.5h       |
 
 ### Fase K8 — Lazy Singleton (~3h) 🟡
 
-| #    | Subfase                                  | Descrição                                 | Estimativa |
-| ---- | ---------------------------------------- | ----------------------------------------- | ---------- |
+| #    | Subfase                                   | Descrição                                 | Estimativa |
+| ---- | ----------------------------------------- | ----------------------------------------- | ---------- |
 | K8.1 | ⬜ Refatorar para lazy init + resetAgent  | getAgent() lazy, resetAgent() para testes | 1h         |
 | K8.2 | ⬜ Migrar imports diretos para getAgent() | Deprecation warning em export direto      | 1h         |
 | K8.3 | ⬜ Testes + deprecation warning           | Verificar lazy init e reset               | 1h         |
@@ -504,19 +491,19 @@ substituição.
 
 ## FAIXA L — Consolidação Arquitetural
 
-**Referência**: [12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md](./12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md),
-[13-ARQUITETURA-IDEAL-GERAL.md](./13-ARQUITETURA-IDEAL-GERAL.md)
-**Estimativa**: ~54h
-**Risco**: Moderado-Alto (refatoração estrutural cross-cutting)
+**Referência**:
+[12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md](./12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md),
+[13-ARQUITETURA-IDEAL-GERAL.md](./13-ARQUITETURA-IDEAL-GERAL.md) **Estimativa**: ~54h **Risco**:
+Moderado-Alto (refatoração estrutural cross-cutting)
 
 > **Relação com Faixas G, J, K**: L subsume G1+G3+G4 (arch refactoring), J2 (dead code). L2
-> complementa K (agent refactoring). Executar K1+K2 antes de L2 é recomendado para que
-> AgentContext já esteja particionado quando o agent for slimmed.
+> complementa K (agent refactoring). Executar K1+K2 antes de L2 é recomendado para que AgentContext
+> já esteja particionado quando o agent for slimmed.
 
 ### Fase L1 — Quick Wins (~8h) 🔴
 
-| #    | Subfase                                              | Descrição                                           | Estimativa |
-| ---- | ---------------------------------------------------- | --------------------------------------------------- | ---------- |
+| #    | Subfase                                               | Descrição                                           | Estimativa |
+| ---- | ----------------------------------------------------- | --------------------------------------------------- | ---------- |
 | L1.1 | ⬜ Remover `api/` — merge endpoints em server/routes/ | Eliminar 10 arquivos, 1937L de duplicação funcional | 3h         |
 | L1.2 | ⬜ Remover `services/` — inline em consumers          | Eliminar 6 arquivos, 547L de indireção sem valor    | 2h         |
 | L1.3 | ⬜ Mover `agent/config.js` → `config/agent.js`        | Config do agente fica em L2 onde pertence           | 1h         |
@@ -525,8 +512,8 @@ substituição.
 
 ### Fase L2 — Agent Slimming (~16h) 🟠
 
-| #    | Subfase                                                     | Descrição                                         | Estimativa |
-| ---- | ----------------------------------------------------------- | ------------------------------------------------- | ---------- |
+| #    | Subfase                                                      | Descrição                                         | Estimativa |
+| ---- | ------------------------------------------------------------ | ------------------------------------------------- | ---------- |
 | L2.1 | ⬜ Mover `agent/session/event-handlers/` → `event-handlers/` | 12 handlers de eventos SDK genéricos vão para L3  | 4h         |
 | L2.2 | ⬜ Mover itens de `agent/infra/` para módulos corretos       | webhook→infra, perms→hooks, tools→tools, snap→obs | 4h         |
 | L2.3 | ⬜ Merge `agent-messaging.js` + `queue-processor.js`         | 2 thin wrappers → 1 queue-sender                  | 2h         |
@@ -535,17 +522,17 @@ substituição.
 
 ### Fase L3 — SDK Stateless (~10h) 🟠
 
-| #    | Subfase                                                   | Descrição                                         | Estimativa |
-| ---- | --------------------------------------------------------- | ------------------------------------------------- | ---------- |
-| L3.1 | ⬜ Extrair session registry de `sdk/session/client.js`     | _client + _sessions → agent/ ou conversation-hub/ | 4h         |
-| L3.2 | ⬜ Mover `sdk/agent/agents.js` → `config/custom-agents.js` | Factory de CustomAgentConfig pertence à config    | 2h         |
-| L3.3 | ⬜ Eliminar `sdk/config.js` (subsumido por builders)       | Dependentes migram para #copilot/config           | 2h         |
-| L3.4 | ⬜ Testes de regressão                                     | SDK stateless + consumers migrados                | 2h         |
+| #    | Subfase                                                    | Descrição                                           | Estimativa |
+| ---- | ---------------------------------------------------------- | --------------------------------------------------- | ---------- |
+| L3.1 | ⬜ Extrair session registry de `sdk/session/client.js`     | \_client + \_sessions → agent/ ou conversation-hub/ | 4h         |
+| L3.2 | ⬜ Mover `sdk/agent/agents.js` → `config/custom-agents.js` | Factory de CustomAgentConfig pertence à config      | 2h         |
+| L3.3 | ⬜ Eliminar `sdk/config.js` (subsumido por builders)       | Dependentes migram para #copilot/config             | 2h         |
+| L3.4 | ⬜ Testes de regressão                                     | SDK stateless + consumers migrados                  | 2h         |
 
 ### Fase L4 — Event Bus Unification (~12h) 🟠
 
-| #    | Subfase                                              | Descrição                             | Estimativa |
-| ---- | ---------------------------------------------------- | ------------------------------------- | ---------- |
+| #    | Subfase                                               | Descrição                             | Estimativa |
+| ---- | ----------------------------------------------------- | ------------------------------------- | ---------- |
 | L4.1 | ⬜ HookBus → EventBus com namespace `hook:*`          | Eliminar bus separado para hooks      | 4h         |
 | L4.2 | ⬜ SDK event bridge automático via registry           | Eliminar bridge manual de ~80 eventos | 4h         |
 | L4.3 | ⬜ Consolidar obs. collectors/bus-actions → observers | Eliminar 3 subsistemas paralelos      | 2h         |
@@ -553,8 +540,8 @@ substituição.
 
 ### Fase L5 — Error Pipeline + Observability Trim (~8h) 🟡
 
-| #    | Subfase                                                    | Descrição                                        | Estimativa |
-| ---- | ---------------------------------------------------------- | ------------------------------------------------ | ---------- |
+| #    | Subfase                                                     | Descrição                                        | Estimativa |
+| ---- | ----------------------------------------------------------- | ------------------------------------------------ | ---------- |
 | L5.1 | ⬜ Unificar error-tracker + error-alerting → error-pipeline | 3 módulos → 1 pipeline: track → evaluate → alert | 3h         |
 | L5.2 | ⬜ Remover event-catalog.js dead-letter                     | Defensive code não usado em produção             | 1h         |
 | L5.3 | ⬜ Consolidar collectors + bus-actions → observers          | Unificar subscriptions duplicadas                | 2h         |
@@ -568,80 +555,80 @@ substituição.
 
 | Faixa | Fase                       | Prioridade | Horas |
 | ----- | -------------------------- | ---------- | ----- |
-| A     | A1 — Bug Fixes             | 🔴 P0       | 6h    |
-| A     | A2 — Misalignments         | 🟠 P1       | 6h    |
-| A     | A3 — Dead Code Wire        | 🟠 P1       | 6h    |
-| I     | I1 — System Prompt Modular | 🔴 P0       | 6h    |
-| I     | I2 — Integração e Captura  | 🟠 P1       | 5h    |
-| I     | I3 — Testes System Prompt  | 🟠 P1       | 3h    |
-| C     | C1 — SessionConfigBuilder  | 🔴 P0       | 8h    |
-| C     | C3 — ClientOptions básicas | 🟡 P2       | 4h    |
-| F     | F1 — Telemetry (parcial)   | 🟠 P1       | 8h    |
+| A     | A1 — Bug Fixes             | 🔴 P0      | 6h    |
+| A     | A2 — Misalignments         | 🟠 P1      | 6h    |
+| A     | A3 — Dead Code Wire        | 🟠 P1      | 6h    |
+| I     | I1 — System Prompt Modular | 🔴 P0      | 6h    |
+| I     | I2 — Integração e Captura  | 🟠 P1      | 5h    |
+| I     | I3 — Testes System Prompt  | 🟠 P1      | 3h    |
+| C     | C1 — SessionConfigBuilder  | 🔴 P0      | 8h    |
+| C     | C3 — ClientOptions básicas | 🟡 P2      | 4h    |
+| F     | F1 — Telemetry (parcial)   | 🟠 P1      | 8h    |
 
 ### Sprint 2 — Events & Config (Semana 3-4, ~36h)
 
 | Faixa | Fase                       | Prioridade | Horas |
 | ----- | -------------------------- | ---------- | ----- |
-| B     | B1 — Session Events        | 🟠 P1       | 10h   |
-| B     | B2 — MCP Events            | 🟠 P1       | 8h    |
-| C     | C2 — SessionConfig options | 🟠 P1       | 8h    |
-| F     | F2 — Client Monitoring     | 🟠 P1       | 8h    |
-| E     | E1 — Thin Adapter (início) | 🟠 P1       | 2h    |
+| B     | B1 — Session Events        | 🟠 P1      | 10h   |
+| B     | B2 — MCP Events            | 🟠 P1      | 8h    |
+| C     | C2 — SessionConfig options | 🟠 P1      | 8h    |
+| F     | F2 — Client Monitoring     | 🟠 P1      | 8h    |
+| E     | E1 — Thin Adapter (início) | 🟠 P1      | 2h    |
 
 ### Sprint 3 — Experimental RPC (Semana 5-6, ~36h)
 
 | Faixa | Fase                          | Prioridade | Horas |
 | ----- | ----------------------------- | ---------- | ----- |
-| D     | D1 — Skills Tools             | 🟡 P2       | 6h    |
-| D     | D2 — MCP Tools                | 🟡 P2       | 6h    |
-| D     | D3 — Agent Tools              | 🟡 P2       | 6h    |
-| B     | B3 — Tool Events              | 🟡 P2       | 6h    |
-| B     | B4 — Skill/Command Events     | 🟡 P2       | 8h    |
-| E     | E1 — Thin Adapter (conclusão) | 🟠 P1       | 6h    |
+| D     | D1 — Skills Tools             | 🟡 P2      | 6h    |
+| D     | D2 — MCP Tools                | 🟡 P2      | 6h    |
+| D     | D3 — Agent Tools              | 🟡 P2      | 6h    |
+| B     | B3 — Tool Events              | 🟡 P2      | 6h    |
+| B     | B4 — Skill/Command Events     | 🟡 P2      | 8h    |
+| E     | E1 — Thin Adapter (conclusão) | 🟠 P1      | 6h    |
 
 ### Sprint 4 — Architecture (Semana 7-8, ~40h)
 
 | Faixa | Fase                           | Prioridade | Horas |
 | ----- | ------------------------------ | ---------- | ----- |
-| G     | G1 — God Module Decomposition  | 🟠 P1       | 16h   |
-| G     | G2 — Hub Lifecycle Integration | 🟡 P2       | 8h    |
-| G     | G3 — Event Router (parcial)    | 🟡 P2       | 12h   |
+| G     | G1 — God Module Decomposition  | 🟠 P1      | 16h   |
+| G     | G2 — Hub Lifecycle Integration | 🟡 P2      | 8h    |
+| G     | G3 — Event Router (parcial)    | 🟡 P2      | 12h   |
 
 ### Sprint 5 — Polish & Integration (Semana 9-10, ~48h)
 
 | Faixa | Fase                          | Prioridade | Horas |
 | ----- | ----------------------------- | ---------- | ----- |
-| D     | D4 — Extensions/Plugins       | 🟢 P3       | 6h    |
-| D     | D5 — Fleet                    | 🟢 P3       | 6h    |
-| E     | E2 — Hook Composition         | 🟡 P2       | 4h    |
-| E     | E3 — Audit Compliance         | 🟡 P2       | 4h    |
-| G     | G3 — Event Router (conclusão) | 🟡 P2       | 2h    |
-| G     | G4 — Import Cleanup           | 🟢 P3       | 10h   |
-| H     | H1 — TSServer Tools           | 🟡 P2       | 8h    |
-| H     | H2 — Context Injection        | 🟡 P2       | 8h    |
+| D     | D4 — Extensions/Plugins       | 🟢 P3      | 6h    |
+| D     | D5 — Fleet                    | 🟢 P3      | 6h    |
+| E     | E2 — Hook Composition         | 🟡 P2      | 4h    |
+| E     | E3 — Audit Compliance         | 🟡 P2      | 4h    |
+| G     | G3 — Event Router (conclusão) | 🟡 P2      | 2h    |
+| G     | G4 — Import Cleanup           | 🟢 P3      | 10h   |
+| H     | H1 — TSServer Tools           | 🟡 P2      | 8h    |
+| H     | H2 — Context Injection        | 🟡 P2      | 8h    |
 
 ### Sprint 6 — Agent Refactoring (Semana 11-13, ~43h)
 
 | Faixa | Fase                             | Prioridade | Horas |
 | ----- | -------------------------------- | ---------- | ----- |
-| K     | K1 — AgentContext Partitioning   | 🔴 P0       | 8h    |
-| K     | K2 — Test Coverage Sprint        | 🔴 P0       | 12h   |
-| K     | K3 — Error Handling Centralizado | 🟠 P1       | 4h    |
-| K     | K4 — Background Task Tracker     | 🟠 P1       | 3h    |
-| K     | K5 — Boot Wiring Pipeline        | 🟠 P1       | 6h    |
-| K     | K6 — Event Bridge Declarativo    | 🟡 P2       | 4h    |
-| K     | K7 — Health Check Formal         | 🟡 P2       | 3h    |
-| K     | K8 — Lazy Singleton              | 🟡 P2       | 3h    |
+| K     | K1 — AgentContext Partitioning   | 🔴 P0      | 8h    |
+| K     | K2 — Test Coverage Sprint        | 🔴 P0      | 12h   |
+| K     | K3 — Error Handling Centralizado | 🟠 P1      | 4h    |
+| K     | K4 — Background Task Tracker     | 🟠 P1      | 3h    |
+| K     | K5 — Boot Wiring Pipeline        | 🟠 P1      | 6h    |
+| K     | K6 — Event Bridge Declarativo    | 🟡 P2      | 4h    |
+| K     | K7 — Health Check Formal         | 🟡 P2      | 3h    |
+| K     | K8 — Lazy Singleton              | 🟡 P2      | 3h    |
 
 ### Sprint 7 — Architectural Consolidation (Semana 14-17, ~54h)
 
 | Faixa | Fase                           | Prioridade | Horas |
 | ----- | ------------------------------ | ---------- | ----- |
-| L     | L1 — Quick Wins                | 🔴 P0       | 8h    |
-| L     | L2 — Agent Slimming            | 🟠 P1       | 16h   |
-| L     | L3 — SDK Stateless             | 🟠 P1       | 10h   |
-| L     | L4 — Event Bus Unification     | 🟠 P1       | 12h   |
-| L     | L5 — Error Pipeline + Obs Trim | 🟡 P2       | 8h    |
+| L     | L1 — Quick Wins                | 🔴 P0      | 8h    |
+| L     | L2 — Agent Slimming            | 🟠 P1      | 16h   |
+| L     | L3 — SDK Stateless             | 🟠 P1      | 10h   |
+| L     | L4 — Event Bus Unification     | 🟠 P1      | 12h   |
+| L     | L5 — Error Pipeline + Obs Trim | 🟡 P2      | 8h    |
 
 ---
 
@@ -674,12 +661,11 @@ D1-D5 (experimental) ─────────┼──► G1 (decompose alway
                        L1-L5 (consolidação arquitetural) ←── subsume G1+G3+G4, J2
 ```
 
-**Regra de ouro**: Faixa A (bugs) é pré-requisito para tudo. Faixa I (system prompt modular)
-depende de A1-A2 e é pré-requisito para C1 (builder). Faixa C1 (builder) é pré-requisito para C2,
-E1. Faixa G1 (decomposição) é pré-requisito para G2, G3.
-**Faixa K**: pode iniciar independentemente após Faixa A. K1+K2 (fundação) devem preceder K3-K8.
-**Faixa L**: L1 pode iniciar após K1+K2. L2 requer K1 (AgentContext particionado). L3+L4
-requerem L2. L5 requer L4.
+**Regra de ouro**: Faixa A (bugs) é pré-requisito para tudo. Faixa I (system prompt modular) depende
+de A1-A2 e é pré-requisito para C1 (builder). Faixa C1 (builder) é pré-requisito para C2, E1. Faixa
+G1 (decomposição) é pré-requisito para G2, G3. **Faixa K**: pode iniciar independentemente após
+Faixa A. K1+K2 (fundação) devem preceder K3-K8. **Faixa L**: L1 pode iniciar após K1+K2. L2 requer
+K1 (AgentContext particionado). L3+L4 requerem L2. L5 requer L4.
 
 ---
 

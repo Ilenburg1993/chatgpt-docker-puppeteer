@@ -1,7 +1,7 @@
 # PARTE-23L-C — Events System: Situação Ideal v2.0
 
-**Data**: 2026-04-12 | **Status**: Design | **Versão**: 2.0 (pós-L1–L8)
-**Precedente**: PARTE-23L-A v2.0 (re-auditoria) + PARTE-23L-B v2.0 (grafos)
+**Data**: 2026-04-12 | **Status**: Design | **Versão**: 2.0 (pós-L1–L8) **Precedente**: PARTE-23L-A
+v2.0 (re-auditoria) + PARTE-23L-B v2.0 (grafos)
 
 ---
 
@@ -52,6 +52,7 @@ EventBus (SSOT Central)
 ### 2.2 Eliminação do SdkSessionBridge
 
 O SdkSessionBridge (L5) cria um **segundo caminho** SDK→EventBus que:
+
 - Duplica eventos que já chegam via event-handlers→agent→bridge
 - Usa namespace `sdk:*` diferente do `agent:*`
 - Nunca teve `attach()` chamado em produção
@@ -61,24 +62,26 @@ Os 18 eventos do SdkSessionBridge são um subconjunto dos 25 já consumidos por 
 
 ### 2.3 Eliminação do nerv-bridge.js legado
 
-Após o bridgeEmitter cobrir todos ~52 eventos do agent, o NervEventBusAdapter (via EventBus)
-terá cobertura completa. O nerv-bridge.js direto pode ser removido:
+Após o bridgeEmitter cobrir todos ~52 eventos do agent, o NervEventBusAdapter (via EventBus) terá
+cobertura completa. O nerv-bridge.js direto pode ser removido:
 
 **Antes** (duplicação):
+
 ```
 Agent ──→ nerv-bridge (62 direto)  ──→ NERV (envelope 1)
 Agent ──→ bridge ──→ EventBus ──→ NervAdapter ──→ NERV (envelope 2)
 ```
 
 **Depois** (single path):
+
 ```
 Agent ──→ bridge ──→ EventBus ──→ NervAdapter ──→ NERV (envelope único)
 ```
 
 ### 2.4 Migração de Observers para EventBus
 
-Atualmente, `session-agent-handlers.js` e `dialog-task-handlers.js` escutam o Agent
-EventEmitter diretamente (50 events). Na situação ideal:
+Atualmente, `session-agent-handlers.js` e `dialog-task-handlers.js` escutam o Agent EventEmitter
+diretamente (50 events). Na situação ideal:
 
 ```
 ATUAL:
@@ -154,36 +157,37 @@ export const AGENT_STEERING_SENT = 'agent:steering:sent';
 ### 3.3 BridgeEmitter Expandido (always-alive.js)
 
 O bridgeEmitter deve incluir TODOS os 52 events:
+
 ```javascript
 bridgeEmitter(alwaysAliveAgent, bus, {
-    // ... (38 existentes) ...
-    // + 26 novos:
-    'assistant.turn_start': AGENT_ASSISTANT_TURN_START,
-    'assistant.turn_end': AGENT_ASSISTANT_TURN_END,
-    'assistant.intent': AGENT_ASSISTANT_INTENT,
-    'assistant.reasoning_complete': AGENT_ASSISTANT_REASONING_COMPLETE,
-    'session.error': AGENT_SESSION_ERROR,
-    'session.shutdown': AGENT_SESSION_SHUTDOWN,
-    'session.handoff': AGENT_SESSION_HANDOFF,
-    'session.task_complete': AGENT_SESSION_TASK_COMPLETE,
-    'session.context_changed': AGENT_SESSION_CONTEXT_CHANGED,
-    'session.truncation': AGENT_SESSION_TRUNCATION,
-    'session.cleanup': AGENT_SESSION_CLEANUP,
-    'subagent.started': AGENT_SUBAGENT_STARTED,
-    'subagent.completed': AGENT_SUBAGENT_COMPLETED,
-    'subagent.failed': AGENT_SUBAGENT_FAILED,
-    'dialog.delta': AGENT_DIALOG_DELTA,
-    'dialog.boot_recovery': AGENT_DIALOG_BOOT_RECOVERY,
-    'abort': AGENT_ABORT,
-    'elicitation.pending': AGENT_ELICITATION_PENDING,
-    'agent.background.completed': AGENT_BACKGROUND_COMPLETED,
-    'agent.background.idle': AGENT_BACKGROUND_IDLE,
-    'agent.shell.completed': AGENT_SHELL_COMPLETED,
-    'agent.shell.detached_completed': AGENT_SHELL_DETACHED_COMPLETED,
-    'sdk.lifecycle': AGENT_SDK_LIFECYCLE,
-    'mcp.reconnected': AGENT_MCP_RECONNECTED,
-    'quota.warning': AGENT_QUOTA_WARNING,
-    'steering.sent': AGENT_STEERING_SENT,
+  // ... (38 existentes) ...
+  // + 26 novos:
+  'assistant.turn_start': AGENT_ASSISTANT_TURN_START,
+  'assistant.turn_end': AGENT_ASSISTANT_TURN_END,
+  'assistant.intent': AGENT_ASSISTANT_INTENT,
+  'assistant.reasoning_complete': AGENT_ASSISTANT_REASONING_COMPLETE,
+  'session.error': AGENT_SESSION_ERROR,
+  'session.shutdown': AGENT_SESSION_SHUTDOWN,
+  'session.handoff': AGENT_SESSION_HANDOFF,
+  'session.task_complete': AGENT_SESSION_TASK_COMPLETE,
+  'session.context_changed': AGENT_SESSION_CONTEXT_CHANGED,
+  'session.truncation': AGENT_SESSION_TRUNCATION,
+  'session.cleanup': AGENT_SESSION_CLEANUP,
+  'subagent.started': AGENT_SUBAGENT_STARTED,
+  'subagent.completed': AGENT_SUBAGENT_COMPLETED,
+  'subagent.failed': AGENT_SUBAGENT_FAILED,
+  'dialog.delta': AGENT_DIALOG_DELTA,
+  'dialog.boot_recovery': AGENT_DIALOG_BOOT_RECOVERY,
+  abort: AGENT_ABORT,
+  'elicitation.pending': AGENT_ELICITATION_PENDING,
+  'agent.background.completed': AGENT_BACKGROUND_COMPLETED,
+  'agent.background.idle': AGENT_BACKGROUND_IDLE,
+  'agent.shell.completed': AGENT_SHELL_COMPLETED,
+  'agent.shell.detached_completed': AGENT_SHELL_DETACHED_COMPLETED,
+  'sdk.lifecycle': AGENT_SDK_LIFECYCLE,
+  'mcp.reconnected': AGENT_MCP_RECONNECTED,
+  'quota.warning': AGENT_QUOTA_WARNING,
+  'steering.sent': AGENT_STEERING_SENT,
 });
 ```
 
@@ -233,32 +237,33 @@ Criar `observability/observers/eventbus-metrics-handlers.js` que subscreve via `
 
 ```javascript
 export function attachEventBusMetricsHandlers(bus, metrics, errorTracker) {
-    // Substitui session-agent-handlers + dialog-task-handlers
-    // usando EventBus em vez de agent.on()
-    bus.on('agent:dialog:turn_start', () => metrics.recordDialogTurnStart());
-    bus.on('agent:dialog:turn_end', (evt) => metrics.recordDialogTurnDuration(evt.durationMs));
-    bus.on('agent:task:completed', () => metrics.recordTaskSuccess());
-    bus.on('agent:task:error', () => metrics.recordTaskError());
-    bus.on('agent:session:fatal', (evt) => {
-        metrics.recordFatal();
-        errorTracker.track(evt);
-    });
-    // ... (todos os 50 events migrados)
+  // Substitui session-agent-handlers + dialog-task-handlers
+  // usando EventBus em vez de agent.on()
+  bus.on('agent:dialog:turn_start', () => metrics.recordDialogTurnStart());
+  bus.on('agent:dialog:turn_end', (evt) => metrics.recordDialogTurnDuration(evt.durationMs));
+  bus.on('agent:task:completed', () => metrics.recordTaskSuccess());
+  bus.on('agent:task:error', () => metrics.recordTaskError());
+  bus.on('agent:session:fatal', (evt) => {
+    metrics.recordFatal();
+    errorTracker.track(evt);
+  });
+  // ... (todos os 50 events migrados)
 }
 ```
 
 ### 5.2 Fase 2: Deprecar observers diretos
 
 Marcar `session-agent-handlers.js` e `dialog-task-handlers.js` como deprecated:
+
 - Manter por 1-2 releases como fallback
 - Logging de warning se ambos estiverem ativos
 - Remover quando todos os consumers migrarem
 
 ### 5.3 Fase 3: Remover observers diretos
 
-Remover `attachSessionAgentHandlers` e `attachDialogTaskHandlers` completamente.
-Remover `agent-event-observer.js` (factory que cria o observer).
-O `boot-wiring.js` não precisa mais de `agentObserver.attach(agentEmitter)`.
+Remover `attachSessionAgentHandlers` e `attachDialogTaskHandlers` completamente. Remover
+`agent-event-observer.js` (factory que cria o observer). O `boot-wiring.js` não precisa mais de
+`agentObserver.attach(agentEmitter)`.
 
 ---
 
@@ -272,7 +277,7 @@ bus.on('agent:session:error', () => healthManager.degrade('session_error'));
 bus.on('agent:session:fatal', () => healthManager.critical('session_fatal'));
 bus.on('agent:ready', () => healthManager.recover());
 bus.on('agent:session:compaction_complete', (evt) => {
-    if (!evt.success) healthManager.degrade('compaction_failed');
+  if (!evt.success) healthManager.degrade('compaction_failed');
 });
 ```
 
@@ -281,12 +286,12 @@ bus.on('agent:session:compaction_complete', (evt) => {
 ```javascript
 // Reações automáticas a condições adversas
 bus.on('agent:dialog:stalled', (evt) => {
-    if (evt.stalledMs > FORCE_RESTART_THRESHOLD) {
-        bus.emit({ type: 'system:auto_heal', action: 'force_deactivate' });
-    }
+  if (evt.stalledMs > FORCE_RESTART_THRESHOLD) {
+    bus.emit({ type: 'system:auto_heal', action: 'force_deactivate' });
+  }
 });
 bus.on('agent:quota:warning', () => {
-    bus.emit({ type: 'system:auto_heal', action: 'reduce_parallelism' });
+  bus.emit({ type: 'system:auto_heal', action: 'reduce_parallelism' });
 });
 ```
 
@@ -295,12 +300,12 @@ bus.on('agent:quota:warning', () => {
 ```javascript
 // Log estruturado para auditoria
 bus.on('agent:*', (evt) => {
-    auditLogger.append({
-        type: evt.type,
-        timestamp: evt.timestamp,
-        correlationId: evt._correlationId,
-        source: evt._source,
-    });
+  auditLogger.append({
+    type: evt.type,
+    timestamp: evt.timestamp,
+    correlationId: evt._correlationId,
+    source: evt._source,
+  });
 });
 ```
 
@@ -308,25 +313,25 @@ bus.on('agent:*', (evt) => {
 
 ## 7. Métricas de Sucesso
 
-| Métrica                                  | Atual | Ideal | Critério |
-|------------------------------------------|-------|-------|----------|
-| Events no EventBus (agent-emitted)       | 38/52 | 52/52 | 100%     |
-| Events duplicados (sdk: + agent:)        | 6     | 0     | 0        |
-| NERV outbound paths                      | 2     | 1     | 1        |
-| NERV envelope duplicação                 | 38    | 0     | 0        |
-| Observer paths (direto + EventBus)       | 2     | 1     | 1        |
-| Namespace formatos                       | 4     | 1     | 1        |
-| EventBus-observers com ação real         | 0/15  | 15/15 | 100%     |
-| SSOT coverage (events/ vs inline)        | 85%   | 100%  | 100%     |
+| Métrica                            | Atual | Ideal | Critério |
+| ---------------------------------- | ----- | ----- | -------- |
+| Events no EventBus (agent-emitted) | 38/52 | 52/52 | 100%     |
+| Events duplicados (sdk: + agent:)  | 6     | 0     | 0        |
+| NERV outbound paths                | 2     | 1     | 1        |
+| NERV envelope duplicação           | 38    | 0     | 0        |
+| Observer paths (direto + EventBus) | 2     | 1     | 1        |
+| Namespace formatos                 | 4     | 1     | 1        |
+| EventBus-observers com ação real   | 0/15  | 15/15 | 100%     |
+| SSOT coverage (events/ vs inline)  | 85%   | 100%  | 100%     |
 
 ---
 
 ## 8. Riscos e Mitigações
 
-| Risco                                        | Mitigação                                    |
-|----------------------------------------------|----------------------------------------------|
-| Remoção do nerv-bridge quebra NERV           | Teste de cobertura: verificar todos 62 events do legado estão no adapter |
-| Remoção do SdkSessionBridge perde sdk:*      | Verificar que nenhum consumer depende de `sdk:*` events |
-| Observer migration pode perder handlers      | Diff line-by-line entre old e new observers  |
-| Rate-limiter suprime events legítimos        | Monitorar via diagnostics() e ajustar thresholds |
-| bridgeEmitter com 52+ entries fica lento     | Benchmark: bridgeEmitter é O(1) lookup per emit |
+| Risco                                    | Mitigação                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| Remoção do nerv-bridge quebra NERV       | Teste de cobertura: verificar todos 62 events do legado estão no adapter |
+| Remoção do SdkSessionBridge perde sdk:\* | Verificar que nenhum consumer depende de `sdk:*` events                  |
+| Observer migration pode perder handlers  | Diff line-by-line entre old e new observers                              |
+| Rate-limiter suprime events legítimos    | Monitorar via diagnostics() e ajustar thresholds                         |
+| bridgeEmitter com 52+ entries fica lento | Benchmark: bridgeEmitter é O(1) lookup per emit                          |

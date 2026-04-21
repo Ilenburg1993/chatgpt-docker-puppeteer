@@ -1,12 +1,11 @@
 # 13 — Arquitetura Ideal Geral: Proposta de Consolidação
 
-**Data**: 2026-03-21
-**Escopo**: Todo `src/copilot/` — proposta de arquitetura clean
-**Referência**: [12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md](./12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md),
+**Data**: 2026-03-21 **Escopo**: Todo `src/copilot/` — proposta de arquitetura clean **Referência**:
+[12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md](./12-ARQUITETURA-GERAL-AUDITORIA-PROFUNDA.md),
 [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md)
 
-> Este documento **supersede** o 05-ARQUITETURA-IDEAL.md que focava em SDK coverage.
-> Aqui o foco é consolidação arquitetural integral.
+> Este documento **supersede** o 05-ARQUITETURA-IDEAL.md que focava em SDK coverage. Aqui o foco é
+> consolidação arquitetural integral.
 
 ---
 
@@ -81,84 +80,76 @@
 
 ### C1: Eliminar `api/` — Merge em `server/` 🔴
 
-**Problema**: `api/express/` (10 files, 1937L) duplica `server/routes/`.
-**Ação**: Migrar callers de `api/` para `server/routes/`, remover `api/`.
-**Impacto**: -1937L, -10 arquivos.
-**Risco**: Baixo (verificar se algum consumer externo usa `api/`).
+**Problema**: `api/express/` (10 files, 1937L) duplica `server/routes/`. **Ação**: Migrar callers de
+`api/` para `server/routes/`, remover `api/`. **Impacto**: -1937L, -10 arquivos. **Risco**: Baixo
+(verificar se algum consumer externo usa `api/`).
 
 ### C2: Eliminar `services/` — Inline nos consumers 🟡
 
-**Problema**: `services/` (547L) é barrel + 4 facades finas sem lógica.
-**Ação**: Routes que usam `SessionService` importam diretamente de `#copilot/sdk` + `#copilot/hooks`.
-Os re-exports de `index.js` viram barrel direto.
-**Impacto**: -547L, -6 arquivos.
-**Risco**: Baixo (4 consumers afetados).
+**Problema**: `services/` (547L) é barrel + 4 facades finas sem lógica. **Ação**: Routes que usam
+`SessionService` importam diretamente de `#copilot/sdk` + `#copilot/hooks`. Os re-exports de
+`index.js` viram barrel direto. **Impacto**: -547L, -6 arquivos. **Risco**: Baixo (4 consumers
+afetados).
 
 ### C3: Mover event-handlers de `agent/` para `event-handlers/` (L3) 🟠
 
-**Problema**: `agent/session/event-handlers/` (12 files, ~700L) são handlers de eventos SDK genéricos que reagem a session events. Estão em L5 (agent) mas são lógica L3.
-**Ação**: Criar `src/copilot/event-handlers/` (L3). Agent apenas registra via `wireSessionEvents()`.
-**Impacto**: agent/ fica menor, handlers testáveis isoladamente.
-**Risco**: Moderado (refator imports).
+**Problema**: `agent/session/event-handlers/` (12 files, ~700L) são handlers de eventos SDK
+genéricos que reagem a session events. Estão em L5 (agent) mas são lógica L3. **Ação**: Criar
+`src/copilot/event-handlers/` (L3). Agent apenas registra via `wireSessionEvents()`. **Impacto**:
+agent/ fica menor, handlers testáveis isoladamente. **Risco**: Moderado (refator imports).
 
 ### C4: Mover infra do agent para `infra/` 🟠
 
-**Problema**: `agent/infra/` mistura lógica do agente com infra genérica.
-**Ação**:
+**Problema**: `agent/infra/` mistura lógica do agente com infra genérica. **Ação**:
+
 - `webhook-manager.js` → `infra/webhooks.js`
 - `status-snapshot.js` → `observability/snapshots.js`
 - `permission-controller.js` → `hooks/permission-controller.js`
 - `tools-bootstrap.js` → `tools/bootstrap.js`
-- Manter em agent/: `task-executor.js`, `message-queue.js`, `handoff-manager.js` (são agent-specific)
-**Impacto**: -4 arquivos do agent/, melhor colocação semântica.
-**Risco**: Moderado.
+- Manter em agent/: `task-executor.js`, `message-queue.js`, `handoff-manager.js` (são
+  agent-specific) **Impacto**: -4 arquivos do agent/, melhor colocação semântica. **Risco**:
+  Moderado.
 
 ### C5: Remover estado do `sdk/` — Stateless Wrapper 🟠
 
 **Problema**: `sdk/session/client.js` (386L) mantém `_client`, `_sessions` Map, `_startPromise`.
-Isso é estado de orquestração vivendo em L1.
-**Ação**: Mover session registry para `conversation-hub/` ou para um novo `agent/session-registry.js`.
-`sdk/session/client.js` vira wrapper puro: `createClient(opts)` → `CopilotClient`.
-**Impacto**: sdk/ fica stateless e mais simples de testar.
-**Risco**: Alto (muitos consumers dependem de `getClient()` singleton).
+Isso é estado de orquestração vivendo em L1. **Ação**: Mover session registry para
+`conversation-hub/` ou para um novo `agent/session-registry.js`. `sdk/session/client.js` vira
+wrapper puro: `createClient(opts)` → `CopilotClient`. **Impacto**: sdk/ fica stateless e mais
+simples de testar. **Risco**: Alto (muitos consumers dependem de `getClient()` singleton).
 
 ### C6: Consolidar `sdk/agent/` em `config/` 🟡
 
-**Problema**: `sdk/agent/agents.js` é factory de CustomAgentConfig.
-`config/custom-agents.js` já existe e faz algo similar.
-**Ação**: Mover lógica de `sdk/agent/agents.js` para `config/custom-agents.js`.
-Contracts (`contract.js`, `bridge-contract.js`, `channel-contract.js`) vão para `types/contracts/`.
-**Impacto**: sdk/ fica mais fino.
-**Risco**: Baixo.
+**Problema**: `sdk/agent/agents.js` é factory de CustomAgentConfig. `config/custom-agents.js` já
+existe e faz algo similar. **Ação**: Mover lógica de `sdk/agent/agents.js` para
+`config/custom-agents.js`. Contracts (`contract.js`, `bridge-contract.js`, `channel-contract.js`)
+vão para `types/contracts/`. **Impacto**: sdk/ fica mais fino. **Risco**: Baixo.
 
 ### C7: Mover `agent/config.js` para `config/agent.js` 🟡
 
-**Problema**: Config do agente está em agent/ (L5), mas config é L2.
-**Ação**: `agent/config.js` → `config/agent.js`. Agent importa de `#copilot/config`.
-**Impacto**: agent/ fica mais focado em orquestração.
-**Risco**: Baixo.
+**Problema**: Config do agente está em agent/ (L5), mas config é L2. **Ação**: `agent/config.js` →
+`config/agent.js`. Agent importa de `#copilot/config`. **Impacto**: agent/ fica mais focado em
+orquestração. **Risco**: Baixo.
 
 ### C8: Unificar Event Buses 🟠
 
-**Problema**: 3 buses (EventBus, SDK events, HookBus) com bridges manuais.
-**Ação — Fase 1**: Substituir HookBus por EventBus com namespace `hook:*`.
-`hooks/bus.js` vira thin adapter sobre EventBus.
-**Ação — Fase 2**: SDK events passam pelo EventBus via bridge automático (já existe parcialmente).
-**Resultado**: 1 bus global. Consumers filtram por prefix (`agent:*`, `hook:*`, `sdk:*`).
-**Impacto**: Eliminação de bridges manuais, simplificação de observability.
-**Risco**: Alto (mudança fundamental na wiring).
+**Problema**: 3 buses (EventBus, SDK events, HookBus) com bridges manuais. **Ação — Fase 1**:
+Substituir HookBus por EventBus com namespace `hook:*`. `hooks/bus.js` vira thin adapter sobre
+EventBus. **Ação — Fase 2**: SDK events passam pelo EventBus via bridge automático (já existe
+parcialmente). **Resultado**: 1 bus global. Consumers filtram por prefix (`agent:*`, `hook:*`,
+`sdk:*`). **Impacto**: Eliminação de bridges manuais, simplificação de observability. **Risco**:
+Alto (mudança fundamental na wiring).
 
 ### C9: Consolidar error handling pipeline 🟡
 
-**Problema**: 5 camadas de error handling (seção 6 do doc 12).
-**Ação**: Definir pipeline explícito:
+**Problema**: 5 camadas de error handling (seção 6 do doc 12). **Ação**: Definir pipeline explícito:
+
 1. `core/errors.js` — hierarquia de erros (inalterado)
 2. `core/error-handlers.js` — classificação + toError (inalterado)
 3. `hooks/error-handler.js` — SDK onErrorOccurred (inalterado)
 4. **NOVO** `observability/error-pipeline.js` — unifica error-tracker, error-alerting, error-alerter
-   em um único pipeline com 3 estágios: track → evaluate → alert
-**Impacto**: 3 módulos → 1 pipeline. Configuração declarativa.
-**Risco**: Baixo (consolidação interna de observability).
+   em um único pipeline com 3 estágios: track → evaluate → alert **Impacto**: 3 módulos → 1
+   pipeline. Configuração declarativa. **Risco**: Baixo (consolidação interna de observability).
 
 ### C10: Simplificar chain de envio de mensagem 🟠
 
@@ -173,20 +164,19 @@ DEPOIS (4 níveis):
 ```
 
 **Ação**:
+
 - `agent-messaging.js` merge com `queue-processor.js` — ambos são thin
 - `task-executor.js` merge com `turn-executor.js` — executar + OTEL é 1 responsabilidade
 - `lifecycle.js` (sdk) chamado diretamente, não via wrapper intermediário
 
 ### C11: Trim `observability/` 🟡
 
-**Problema**: 32 arquivos, 5.757L. Collectors e bus-actions duplicam handlers do agent.
-**Ação**:
+**Problema**: 32 arquivos, 5.757L. Collectors e bus-actions duplicam handlers do agent. **Ação**:
+
 - Unificar `collectors/` e `bus-actions/` em `observers/` (já existe parcialmente)
 - Remover `event-catalog.js` dead-letter queue (defensive programming excessivo)
-- Consolidar `error-tracker.js` + `error-alerting.js` + `bus-actions/error-alerter.js`
-  em `error-pipeline.js` (proposta C9)
-**Impacto**: -8 arquivos, -1500L estimados.
-**Risco**: Baixo.
+- Consolidar `error-tracker.js` + `error-alerting.js` + `bus-actions/error-alerter.js` em
+  `error-pipeline.js` (proposta C9) **Impacto**: -8 arquivos, -1500L estimados. **Risco**: Baixo.
 
 ---
 
@@ -253,11 +243,13 @@ DEPOIS (4 níveis):
 | Duplicações funcionais  | 7     | 0      | -100%   |
 
 ### Módulos removidos:
+
 - `api/` → consolidado em `server/`
 - `services/` → inline em consumers
 - `plugins/` → merge com `config/` (plugin config) ou removido se não usado
 
 ### Módulos movidos:
+
 - `agent/session/event-handlers/` → `event-handlers/` (L3)
 - `agent/infra/webhook-manager.js` → `infra/webhooks.js`
 - `agent/infra/permission-controller.js` → `hooks/permission-controller.js`
@@ -323,11 +315,11 @@ DEPOIS (4 níveis):
 
 | Fase      | Nome                      | Prioridade | Horas   |
 | --------- | ------------------------- | ---------- | ------- |
-| L1        | Quick Wins                | 🔴 P0       | 8h      |
-| L2        | Agent Slimming            | 🟠 P1       | 16h     |
-| L3        | SDK Stateless             | 🟠 P1       | 10h     |
-| L4        | Event Bus Unification     | 🟠 P1       | 12h     |
-| L5        | Error Pipeline + Obs Trim | 🟡 P2       | 8h      |
+| L1        | Quick Wins                | 🔴 P0      | 8h      |
+| L2        | Agent Slimming            | 🟠 P1      | 16h     |
+| L3        | SDK Stateless             | 🟠 P1      | 10h     |
+| L4        | Event Bus Unification     | 🟠 P1      | 12h     |
+| L5        | Error Pipeline + Obs Trim | 🟡 P2      | 8h      |
 | **Total** |                           |            | **54h** |
 
 ### Relação com Faixas Anteriores
@@ -357,8 +349,8 @@ Para cada fase, verificar:
 - [ ] `npm run test:unit` ✅
 - [ ] `npm run test:integration` ✅
 - [ ] Nenhum import de @github/copilot-sdk fora de sdk/
-- [ ] Nenhum path relativo cross-module (usar aliases #copilot/*)
+- [ ] Nenhum path relativo cross-module (usar aliases #copilot/\*)
 - [ ] agent/ < 5000L
-- [ ] sdk/ stateless (sem _client, _sessions)
+- [ ] sdk/ stateless (sem \_client, \_sessions)
 - [ ] EventBus é o único bus
 - [ ] Send message chain ≤ 4 níveis

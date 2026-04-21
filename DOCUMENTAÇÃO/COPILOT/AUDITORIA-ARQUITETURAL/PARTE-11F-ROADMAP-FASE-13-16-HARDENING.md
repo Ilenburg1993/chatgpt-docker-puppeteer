@@ -1,11 +1,10 @@
 # PARTE 11F — Roadmap de Refatoração: Fases 13–16 (Hardening & Extensibilidade)
 
-**Data**: 2026-07-21
-**Pré-requisitos**: Fases 1–12 concluídas.
-**Escopo**: Barrel consistency, import aliases, error handling, testes, extensibilidade.
+**Data**: 2026-07-21 **Pré-requisitos**: Fases 1–12 concluídas. **Escopo**: Barrel consistency,
+import aliases, error handling, testes, extensibilidade.
 
-> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
-> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade F17–F22.
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**. Ver
+> [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade F17–F22.
 
 ---
 
@@ -39,7 +38,8 @@
 ### F13.4 — Substituir imports `../../` selecionados
 
 1. Em módulos onde `../../` cruza fronteira de subsistema:
-   - Ex: `terminal/handlers-system.js` → `../../bridges/git-bridge.js` → `#copilot/bridges/git-bridge`
+   - Ex: `terminal/handlers-system.js` → `../../bridges/git-bridge.js` →
+     `#copilot/bridges/git-bridge`
 2. Manter `../../` para imports DENTRO do mesmo subsistema (ex: `dialog/loop-manager.js` →
    `../config.js`)
 

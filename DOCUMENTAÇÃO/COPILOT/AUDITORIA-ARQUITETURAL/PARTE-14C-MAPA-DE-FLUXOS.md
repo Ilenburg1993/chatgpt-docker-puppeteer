@@ -1,8 +1,7 @@
 # PARTE 14C — Mapa de Fluxos de `src/copilot/agent/`
 
-**Data**: 2026-03-15
-**Baseline**: commit `54c135c4` (pós-F44)
-**Referência**: PARTE-14A (Inventário), PARTE-14B (Análise Arquitetural)
+**Data**: 2026-03-15 **Baseline**: commit `54c135c4` (pós-F44) **Referência**: PARTE-14A
+(Inventário), PARTE-14B (Análise Arquitetural)
 
 ---
 
@@ -432,4 +431,6 @@ always-alive.js (facade)
                  └── #copilot/* (dependências externas ao agent/)
 ```
 
-Exceção controlada: `messaging/agent-messaging.js` importa `#copilot/tools/hook-tools.js` (cross-cutting), e `session/history-sync.js` importa `../../conversation-hub/store.js` (cross-domain).
+Exceção controlada: `messaging/agent-messaging.js` importa `#copilot/tools/hook-tools.js`
+(cross-cutting), e `session/history-sync.js` importa `../../conversation-hub/store.js`
+(cross-domain).

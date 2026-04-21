@@ -1,8 +1,8 @@
 # PARTE-22B — Situação Ideal: Arquitetura Target v3 — Transformação Profunda
 
-**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0
-**Scope**: Arquitetura ideal de `src/copilot` — critérios máximos, sem relativização
-**Referência**: PARTE-22A (baseline honesto), PARTE-21B (ideal v2 — parcialmente atingido)
+**Data**: 2026-04-12 | **Status**: Canônico | **Versão**: 1.0 **Scope**: Arquitetura ideal de
+`src/copilot` — critérios máximos, sem relativização **Referência**: PARTE-22A (baseline honesto),
+PARTE-21B (ideal v2 — parcialmente atingido)
 
 ---
 
@@ -69,8 +69,7 @@ L0  events/          — [NOVO] Event schema central (único SSOT de eventos)
 
 ### 3.1 `agent/` — Orquestrador Slim
 
-**Atual:** 54 arquivos, 7.779 LoC — `always-alive.js` = 623 LoC god file
-**Ideal:**
+**Atual:** 54 arquivos, 7.779 LoC — `always-alive.js` = 623 LoC god file **Ideal:**
 
 ```
 agent/
@@ -107,14 +106,14 @@ agent/
 ```
 
 **Mudanças obrigatórias:**
+
 - `always-alive.js`: remover ALL state, delegate 100% via AlwaysAliveAgent(ctx, di)
 - `loop-manager.js`: remover turn execution, delegar para turn-executor.js
 - `state-io.js`: sem module-scope let, usar DI-injected cache
 
 ### 3.2 `conversation-hub/` — Hub Imutável e Slim
 
-**Atual:** store.js = 561 LoC, socket-ns.js = 482 LoC, orchestrator.js = 438 LoC
-**Ideal:**
+**Atual:** store.js = 561 LoC, socket-ns.js = 482 LoC, orchestrator.js = 438 LoC **Ideal:**
 
 ```
 conversation-hub/
@@ -133,8 +132,7 @@ conversation-hub/
 
 ### 3.3 `sdk/` — Wrapper Perfeito
 
-**Atual:** 42 arquivos, 569 LoC types.js, sdk/client.js = 416 LoC (state)
-**Ideal:**
+**Atual:** 42 arquivos, 569 LoC types.js, sdk/client.js = 416 LoC (state) **Ideal:**
 
 ```
 sdk/
@@ -153,8 +151,7 @@ sdk/
 
 ### 3.4 `terminal/` — REPL Slim
 
-**Atual:** 47 arquivos, repl.js = 437 LoC, server.js = 452 LoC
-**Ideal:**
+**Atual:** 47 arquivos, repl.js = 437 LoC, server.js = 452 LoC **Ideal:**
 
 ```
 terminal/
@@ -178,8 +175,7 @@ terminal/
 
 ### 3.5 `observability/` — Structured + Slim
 
-**Atual:** metrics.js = 426 LoC, event-collector.js = 405 LoC
-**Ideal:**
+**Atual:** metrics.js = 426 LoC, event-collector.js = 405 LoC **Ideal:**
 
 ```
 observability/
@@ -197,8 +193,7 @@ observability/
 
 ### 3.6 `services/` — Domínio Completo (Situação Atual vs Ideal)
 
-**Atual:** 5 arquivos, 509 LoC — apenas 4 services superficiais
-**Ideal:**
+**Atual:** 5 arquivos, 509 LoC — apenas 4 services superficiais **Ideal:**
 
 ```
 services/
@@ -215,6 +210,7 @@ services/
 ```
 
 **services/ deve ser O ponto único de entrada para todos os casos de uso:**
+
 - api/ importa APENAS de services/
 - terminal/ importa agent, conversation de services/
 - Nenhum módulo L5/L6 importa de L4 (agent/, channel/, conv-hub/) diretamente
@@ -233,12 +229,12 @@ events/
   all-events.js               — Aggregate + discriminated union
 ```
 
-**Regra:** Toda string de evento DEVE estar neste módulo. Não existem strings literais de eventos em código de produção.
+**Regra:** Toda string de evento DEVE estar neste módulo. Não existem strings literais de eventos em
+código de produção.
 
 ### 3.8 `core/` — Utilitários Puros (Incremento)
 
-**Atual:** 20 arquivos, 2.659 LoC — já bem organizado
-**Adicionar obrigatoriamente:**
+**Atual:** 20 arquivos, 2.659 LoC — já bem organizado **Adicionar obrigatoriamente:**
 
 ```
 core/
@@ -259,8 +255,8 @@ core/
 
 ### 4.1 EventBus como Único Canal de Comunicação Inter-Módulo
 
-**Regra:** Toda comunicação entre módulos diferentes deve fluir via EventBus.
-Exceções: chamadas de função síncronas que retornam dados (query-style).
+**Regra:** Toda comunicação entre módulos diferentes deve fluir via EventBus. Exceções: chamadas de
+função síncronas que retornam dados (query-style).
 
 ```js
 // ❌ Proibido: EventEmitter direto cross-module
@@ -274,6 +270,7 @@ getEventBus().on('agent:ready', handler);
 ```
 
 **Namespaces de evento canônicos (via events/ module):**
+
 ```
 agent:*         — agent lifecycle
 agent:dialog:*  — dialog loop events
@@ -287,13 +284,15 @@ rpc:*           — RPC callbacks
 
 ### 4.2 DI Container como Única Forma de Inicializar Dependências
 
-**Regra:** Nenhum módulo instancia diretamente suas dependências.
-Todo `let X = null; function init(val){ X = val }` deve virar DI token.
+**Regra:** Nenhum módulo instancia diretamente suas dependências. Todo
+`let X = null; function init(val){ X = val }` deve virar DI token.
 
 ```js
 // ❌ Proibido:
 let _agent = null;
-export function setAgent(agent) { _agent = agent; }
+export function setAgent(agent) {
+  _agent = agent;
+}
 
 // ✅ Correto:
 import { BRIDGE_AGENT } from '#copilot/core';
@@ -302,6 +301,7 @@ const agent = container.resolve(BRIDGE_AGENT);
 ```
 
 **40+ tokens DI necessários (adicionais aos 13 existentes):**
+
 ```
 CONVERSATION_STORE     — ConversationStore
 METRICS_STORE          — MetricsStore
@@ -355,27 +355,28 @@ audit/
   index.js
 ```
 
-**Invariante:** Nenhum evento de audit pode ser modificado depois de registrado.
-Implementação: WAL (write-ahead log) em SQLite ou arquivo append-only.
+**Invariante:** Nenhum evento de audit pode ser modificado depois de registrado. Implementação: WAL
+(write-ahead log) em SQLite ou arquivo append-only.
 
 ### 4.5 Circuit Breakers em Todas as Dependências Externas
 
 | Serviço/Dependência | Status Atual | Status Target                 |
 | ------------------- | ------------ | ----------------------------- |
-| MCP server calls    | ✅ CB existe  | Manter + expor via health/    |
-| SDK API calls       | ❌ Nenhum     | Circuit breaker com fallback  |
-| NERV bridge         | ❌ Nenhum     | CB com reconnect policy       |
-| HTTP webhooks       | ❌ Nenhum     | CB + timeout + retry          |
-| SQLite writes       | ❌ Nenhum     | CB para disk errors           |
-| SSE clients         | ❌ Nenhum     | CB por cliente + backpressure |
-| GitHub CLI calls    | ❌ Nenhum     | CB com rate limiting          |
+| MCP server calls    | ✅ CB existe | Manter + expor via health/    |
+| SDK API calls       | ❌ Nenhum    | Circuit breaker com fallback  |
+| NERV bridge         | ❌ Nenhum    | CB com reconnect policy       |
+| HTTP webhooks       | ❌ Nenhum    | CB + timeout + retry          |
+| SQLite writes       | ❌ Nenhum    | CB para disk errors           |
+| SSE clients         | ❌ Nenhum    | CB por cliente + backpressure |
+| GitHub CLI calls    | ❌ Nenhum    | CB com rate limiting          |
 
 ### 4.6 Zero God Files
 
-**Critério:** Nenhum arquivo de lógica com >250 LoC.
-**Exceções permitidas:** `types.js` (typedefs), `constants.js`, arquivos `index.js` de barrels com re-exports extensos.
+**Critério:** Nenhum arquivo de lógica com >250 LoC. **Exceções permitidas:** `types.js` (typedefs),
+`constants.js`, arquivos `index.js` de barrels com re-exports extensos.
 
 **Método de avaliação por arquivo:**
+
 1. LoC ≤250? Se não, split obrigatório
 2. Mais de 2 concerns detectáveis? Split obrigatório
 3. Funções/classes ≥6? Extrair arquivo(s)

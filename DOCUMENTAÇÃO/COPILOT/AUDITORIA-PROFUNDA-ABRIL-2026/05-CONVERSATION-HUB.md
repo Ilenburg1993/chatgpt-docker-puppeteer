@@ -1,7 +1,6 @@
 # 05-CONVERSATION-HUB — Auditoria do Módulo `conversation-hub/`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Módulo**: `src/copilot/conversation-hub/`
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Módulo**: `src/copilot/conversation-hub/`
 **Documentado em**: 2026-04-18
 
 ---
@@ -41,16 +40,18 @@ sendToLlmB(hubSessionId, message, opts = {}) {
 }
 ```
 
-**Positivo**: Padrão de mutex via Promise chain — garante serialização de turns por sessão sem locks reais.
+**Positivo**: Padrão de mutex via Promise chain — garante serialização de turns por sessão sem locks
+reais.
 
-**Positivo**: Double-check em `#closedSessions` — protege contra race entre `closeSession()` e turn enfileirado.
+**Positivo**: Double-check em `#closedSessions` — protege contra race entre `closeSession()` e turn
+enfileirado.
 
 ### 2.2 `#closedSessions` Set com LRU Simples
 
 ```js
 if (this.#closedSessions.size >= 1000) {
-    const first = this.#closedSessions.values().next().value;
-    if (first !== undefined) this.#closedSessions.delete(first);
+  const first = this.#closedSessions.values().next().value;
+  if (first !== undefined) this.#closedSessions.delete(first);
 }
 this.#closedSessions.add(hubSessionId);
 ```
@@ -66,19 +67,23 @@ this.#closedSessions.add(hubSessionId);
 ### 2.3 Limpeza do `#inflightBySession`
 
 ```js
-tail.then(() => {
+tail
+  .then(() => {
     if (this.#inflightBySession.get(hubSessionId) === tail) {
-        this.#inflightBySession.delete(hubSessionId);
+      this.#inflightBySession.delete(hubSessionId);
     }
-}).catch((e) => logSwallowed(e, 'hub.orchestrator.inflightCleanup'));
+  })
+  .catch((e) => logSwallowed(e, 'hub.orchestrator.inflightCleanup'));
 ```
 
-**Positivo**: Verifica identidade da Promise antes de limpar — evita deletar entry de outra operação subsequente.
+**Positivo**: Verifica identidade da Promise antes de limpar — evita deletar entry de outra operação
+subsequente.
 
 ### 2.4 `destroy()` vs Pendências em Voo
 
-> **Status de execução (2026-04-17): mitigado no código.**
-> O `HubOrchestrator` agora entra em estado `#destroyed`, bloqueia chamadas tardias e adia o teardown final até `Promise.allSettled(...)` das operações inflight.
+> **Status de execução (2026-04-17): mitigado no código.** O `HubOrchestrator` agora entra em estado
+> `#destroyed`, bloqueia chamadas tardias e adia o teardown final até `Promise.allSettled(...)` das
+> operações inflight.
 
 ```js
 destroy() {
@@ -100,24 +105,27 @@ destroy() {
 
 > **Status de execução (2026-04-17): novo hardening introduzido no código.**
 
-O módulo `conversation-hub/access.js` agora concentra a autorização por sessão usada pelo transporte Socket.IO.
+O módulo `conversation-hub/access.js` agora concentra a autorização por sessão usada pelo transporte
+Socket.IO.
 
 ### O que ele faz
 
-- normaliza claims JWT em um principal (`sub`, `roles`, `scopes`, grants explícitos por `hubSessionId`);
+- normaliza claims JWT em um principal (`sub`, `roles`, `scopes`, grants explícitos por
+  `hubSessionId`);
 - faz parse resiliente de `metadata` da `hub_session`;
 - deriva ACL de sessão (`ownerIds`, `viewerIds`, `editorIds`, `sharedRead`, `sharedWrite`);
 - aplica política fail-closed para sessões system-managed sem grant explícito.
 
 ### Impacto arquitetural
 
-Antes, a validação no socket distinguia apenas **token válido** de **token inválido**.
-Agora há separação explícita entre:
+Antes, a validação no socket distinguia apenas **token válido** de **token inválido**. Agora há
+separação explícita entre:
 
 1. **autenticação de transporte** (JWT válido);
 2. **autorização de domínio** (pode ler/escrever nesta `hub_session` específica).
 
-Isso reduz o acoplamento entre transport layer e regras de ownership e cria uma SSOT reutilizável para futuras rotas HTTP com identidade de usuário real.
+Isso reduz o acoplamento entre transport layer e regras de ownership e cria uma SSOT reutilizável
+para futuras rotas HTTP com identidade de usuário real.
 
 ---
 
@@ -152,4 +160,4 @@ O mutex por sessão é bem implementado. Os gaps são em edge cases de shutdown 
 
 ---
 
-*Próximo: [06-CORE.md](./06-CORE.md)*
+_Próximo: [06-CORE.md](./06-CORE.md)_

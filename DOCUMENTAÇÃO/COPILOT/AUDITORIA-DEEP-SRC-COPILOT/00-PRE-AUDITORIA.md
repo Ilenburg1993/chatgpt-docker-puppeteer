@@ -1,8 +1,7 @@
 # PRÉ-AUDITORIA PROFUNDA — `src/copilot/`
 
-> **Data**: 2026-06-11 | **HEAD**: `55a4b071`
-> **Escopo**: 389 arquivos JS, 65 diretórios, ~59.400 LOC
-> **Pós**: Ondas 4.0–6.0 concluídas (migração arquitetural completa)
+> **Data**: 2026-06-11 | **HEAD**: `55a4b071` **Escopo**: 389 arquivos JS, 65 diretórios, ~59.400
+> LOC **Pós**: Ondas 4.0–6.0 concluídas (migração arquitetural completa)
 
 ---
 
@@ -76,10 +75,10 @@ Auditoria exaustiva e profunda de `src/copilot/` em busca de:
 
 | Métrica                              | Valor          | Alvo                    |
 | ------------------------------------ | -------------- | ----------------------- |
-| `@ts-check` em todos os .js          | 389/389 (100%) | ✅                       |
-| `tsc -p tsconfig.node.json` errors   | 0              | ✅                       |
-| `tsc -p tsconfig.strict.json` errors | 0              | ✅                       |
-| ESLint errors em src/copilot         | 0              | ✅                       |
+| `@ts-check` em todos os .js          | 389/389 (100%) | ✅                      |
+| `tsc -p tsconfig.node.json` errors   | 0              | ✅                      |
+| `tsc -p tsconfig.strict.json` errors | 0              | ✅                      |
+| ESLint errors em src/copilot         | 0              | ✅                      |
 | Arquivos @deprecated                 | 24             | Reduzir para <10        |
 | TODO/FIXME/HACK markers              | ~20            | Resolver ou documentar  |
 | `@type {any}` usage                  | 359            | Reduzir para <100       |
@@ -104,8 +103,8 @@ Auditoria exaustiva e profunda de `src/copilot/` em busca de:
 | A-04 | `api/express/` tem 9 arquivos ativos (~1.861 LOC) que NÃO são @deprecated stubs — migração incompleta                      | M    | api              |
 | A-05 | `logs/` diretório vazio — sem código, sem index.js                                                                         | B    | logs             |
 | A-06 | `server/middleware/rate-limiter-state.js` importa de `terminal/rate-limiter-state.js` — coupling residual                  | M    | server, terminal |
-| A-07 | 325 arquivos referenciam `EventBus` — pode indicar acoplamento excessivo                                                   | I    | *                |
-| A-08 | 4 diferentes mecanismos de event emission: bridgeEmitter (10 files), EventBus (325), createEventBus (4), createEmitter (8) | M    | *                |
+| A-07 | 325 arquivos referenciam `EventBus` — pode indicar acoplamento excessivo                                                   | I    | \*               |
+| A-08 | 4 diferentes mecanismos de event emission: bridgeEmitter (10 files), EventBus (325), createEventBus (4), createEmitter (8) | M    | \*               |
 
 ### 3.2 BUGS E RACE CONDITIONS POTENCIAIS
 
@@ -136,8 +135,8 @@ Auditoria exaustiva e profunda de `src/copilot/` em busca de:
 
 | #    | Achado                                                                              | Sev. | Módulo           |
 | ---- | ----------------------------------------------------------------------------------- | ---- | ---------------- |
-| T-01 | 359 usos de `@type {any}` — muitos são em catch blocks, mas outros são lazy typing  | M    | *                |
-| T-02 | 169 exports públicos sem JSDoc imediato (line anterior ao export não é `*/`)        | M    | *                |
+| T-01 | 359 usos de `@type {any}` — muitos são em catch blocks, mas outros são lazy typing  | M    | \*               |
+| T-02 | 169 exports públicos sem JSDoc imediato (line anterior ao export não é `*/`)        | M    | \*               |
 | T-03 | `config/env.js` tem ~27 exports consecutivos sem JSDoc individual                   | A    | config           |
 | T-04 | `sdk/types.js` (646 LOC) — God Type File, poderia ser dividido por domínio          | M    | sdk              |
 | T-05 | `agent/always-alive.js` (746 LOC) — God Class, responsabilidades múltiplas          | A    | agent            |
@@ -241,7 +240,8 @@ Todos os outros 20 módulos possuem `index.js`. ✅
        └────────────────┘
 ```
 
-**Conclusão**: O coupling `server/ → terminal/handlers/` é o gap arquitetural mais significativo pós-Onda 6.0.
+**Conclusão**: O coupling `server/ → terminal/handlers/` é o gap arquitetural mais significativo
+pós-Onda 6.0.
 
 ---
 
@@ -264,11 +264,13 @@ Todos os outros 20 módulos possuem `index.js`. ✅
 
 ## 7. PRÓXIMOS PASSOS
 
-1. **Fase 1**: Leitura profunda de cada módulo (agent → sdk → terminal → tools → observability → hooks → server → core → conversation-hub → bridges → events → channel → config → audit → services → db → infra → plugins → types)
+1. **Fase 1**: Leitura profunda de cada módulo (agent → sdk → terminal → tools → observability →
+   hooks → server → core → conversation-hub → bridges → events → channel → config → audit → services
+   → db → infra → plugins → types)
 2. **Fase 2**: Geração dos documentos 01–07 com achados detalhados
 3. **Fase 3**: Síntese no roadmap 08 com faixas temporais e prioridades
 4. **Fase 4**: Validação cruzada (cada achado referencia arquivo + linha)
 
 ---
 
-*Documento gerado automaticamente pela auditoria profunda de `src/copilot/`.*
+_Documento gerado automaticamente pela auditoria profunda de `src/copilot/`._

@@ -1,8 +1,7 @@
 # PARTE 14E — Roadmap F49–F120: Consolidação Integral de `src/copilot/`
 
-**Data original**: 2026-03-15 | **Revisão expandida**: 2026-04-07
-**Baseline**: commit `a1a4a2cf` (pós-F48/PARTE-14)
-**Referência**: PARTE-14A/B/C/D + auditoria cross-módulo 2026-04-07
+**Data original**: 2026-03-15 | **Revisão expandida**: 2026-04-07 **Baseline**: commit `a1a4a2cf`
+(pós-F48/PARTE-14) **Referência**: PARTE-14A/B/C/D + auditoria cross-módulo 2026-04-07
 **Pré-requisito**: Quality gates passando (`npm run lint && npx tsc --noEmit`)
 
 ---
@@ -158,6 +157,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 1: Fundação e Correções Imediatas
 
 ### F49 — Barrels e Organização Estrutural
+
 **Gap**: GAP-S4 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                   | Entregável |
@@ -172,6 +172,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F50 — Fix de Bugs e Inconsistências Pontuais
+
 **Gap**: GAP-R5, M-02 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                                                     | Entregável                |
@@ -185,6 +186,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F51 — Config Migration (Hardcoded → config.js)
+
 **Gap**: GAP-C4, GAP-C5, L-03 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                | Entregável                     |
@@ -199,6 +201,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F52 — AgentContext Invariantes
+
 **Gap**: GAP-R1 | **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                          | Entregável              |
@@ -215,6 +218,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 2: Testes Unitários — Onda 1
 
 ### F53 — Testes: protocol.js + rotation.js + watchdog.js
+
 **Gap**: GAP-Q8 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                                                               | Entregável |
@@ -228,6 +232,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F54 — Testes: message-queue.js
+
 **Gap**: GAP-Q5 | **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                  | Entregável |
@@ -243,6 +248,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F55 — Testes: task-executor.js
+
 **Gap**: GAP-Q6 | **Esforço**: Médio | **Risco**: Médio (mocking pesado do SDK)
 
 | Subfase | Descrição                                                   | Entregável |
@@ -260,6 +266,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F56 — Testes: initializer.js
+
 **Gap**: GAP-Q3 | **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                              | Entregável |
@@ -268,7 +275,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 | F56.2   | Resume de sessão existente (state com sessionId válido)                                | ~2 testes  |
 | F56.3   | Sessão expirada (age > maxAge) → nova sessão                                           | ~2 testes  |
 | F56.4   | shouldRotateSession() trigger → nova sessão                                            | ~2 testes  |
-| F56.5   | _validateSessionForResume() — sessionId inválido, null, expirado                       | ~4 testes  |
+| F56.5   | \_validateSessionForResume() — sessionId inválido, null, expirado                      | ~4 testes  |
 | F56.6   | buildHookSystemContext() — briefing existente, truncamento, session.json inválido      | ~4 testes  |
 | F56.7   | buildHookSystemContextSafe() — truncamento por HOOK_CONTEXT_MAX_BYTES                  | ~2 testes  |
 | F56.8   | setBackgroundCompactionThreshold() — valores válidos e inválidos                       | ~3 testes  |
@@ -278,6 +285,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F57 — Testes: webhook-manager.js
+
 **Gap**: GAP-Q7 | **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                 | Entregável |
@@ -296,6 +304,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 3: Decomposição Arquitetural
 
 ### F58 — Extrair hook-context.js de initializer.js
+
 **Gap**: GAP-S3 | **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                                       | Entregável           |
@@ -314,6 +323,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F59 — Extrair backpressure.js de loop-manager.js
+
 **Gap**: GAP-S1.1 | **Esforço**: Médio | **Risco**: Médio
 
 | Subfase | Descrição                                                                        | Entregável           |
@@ -328,6 +338,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F60 — Extrair model-fallback.js de loop-manager.js
+
 **Gap**: GAP-S1.2 | **Esforço**: Baixo | **Risco**: Baixo
 
 | Subfase | Descrição                                          | Entregável          |
@@ -342,6 +353,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F61 — Extrair wireDialogLoopEvents → dialog/event-wiring.js
+
 **Gap**: GAP-S1.3, D-05 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                   | Entregável           |
@@ -356,6 +368,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F62 — Decompor event-wirer.js em event-handlers/
+
 **Gap**: GAP-S2 | **Esforço**: Alto | **Risco**: Baixo
 
 | Subfase | Descrição                                                                  | Entregável   |
@@ -380,6 +393,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F63 — Extrair session-setup.js de agent-lifecycle.js
+
 **Gap**: GAP-S5 | **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                          | Entregável           |
@@ -396,6 +410,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 4: Testes Unitários — Onda 2
 
 ### F64 — Testes: loop-manager.js (pós-decomposição)
+
 **Gap**: GAP-Q1 | **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                | Entregável |
@@ -413,6 +428,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F65 — Testes: turn-executor.js (race conditions)
+
 **Gap**: GAP-Q2 | **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                | Entregável |
@@ -430,6 +446,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F66 — Testes: cleanup.js + keepalive.js + snapshot.js
+
 **Gap**: GAP-Q9 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                                                  | Entregável |
@@ -443,6 +460,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F67 — Teste de Integração: Agent Boot → Send → Stop
+
 **Gap**: GAP-Q10 | **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                             | Entregável       |
@@ -461,6 +479,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 5: Observabilidade e Performance — agent/
 
 ### F68 — OTEL Spans em Dialog, Reconnect e Session Init
+
 **Gap**: GAP-O1, GAP-O2, GAP-O3 | **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                       | Entregável |
@@ -474,6 +493,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F69 — Async FS em snapshot.js + Deprecação writeState Sync
+
 **Gap**: GAP-C1, GAP-C2 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                       | Entregável            |
@@ -489,6 +509,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F70 — Métricas em Rotation + Cleanup Paralelo
+
 **Gap**: GAP-O4, GAP-C3, S-05 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                               | Entregável |
@@ -502,6 +523,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 6: Hardening agent/
 
 ### F71 — URL Validator Reutilizável
+
 **Gap**: GAP-R3 | **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                       | Entregável          |
@@ -514,6 +536,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F72 — Auditoria Final agent/ + Documentação PARTE-15A
+
 **Gap**: — | **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                          | Entregável   |
@@ -528,12 +551,13 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 7: Recuperação de Testes Legados ★
 
-> **Contexto**: 269 de 275 test files falham. Root cause primária: paths de import quebrados
-> após refatorações (ex: `src/copilot/agent/reconnect-policy.js` → movido para
+> **Contexto**: 269 de 275 test files falham. Root cause primária: paths de import quebrados após
+> refatorações (ex: `src/copilot/agent/reconnect-policy.js` → movido para
 > `lifecycle/reconnect-policy.js`). Testes usam `node:test` mas o runner é Vitest, causando
 > coexistência frágil. Apenas os 6 spec files com 46 testes criados nas fases F35–F48 passam.
 
 ### F73 — Triage e Categorização dos 269 Test Files Quebrados
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                                           | Entregável             |
@@ -548,6 +572,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F74 — Fix Path Imports em Testes copilot/ (68 arquivos)
+
 **Esforço**: Alto | **Risco**: Baixo
 
 | Subfase | Descrição                                                                              | Entregável         |
@@ -564,6 +589,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F75 — Fix Path Imports em Testes server/ (10 arquivos)
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                           | Entregável      |
@@ -575,6 +601,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F76 — Fix Path Imports em regression/ (63 arquivos)
+
 **Esforço**: Alto | **Risco**: Médio (podem ter dependências de runtime)
 
 | Subfase | Descrição                                                                  | Entregável      |
@@ -587,6 +614,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F77 — Fix integration/ + e2e/ + manual/ (39 arquivos)
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                            | Entregável      |
@@ -600,6 +628,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F78 — Quarentena + Relatório Final de Testes
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                            | Entregável    |
@@ -616,10 +645,11 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 8: Tipagem Strict & JSDoc ★
 
-> **Contexto**: 221/225 arquivos têm `@ts-check`. O typecheck passa com tsconfig.node.json
-> (modo normal). Falta migração incremental para strict e cobertura JSDoc nos módulos externos.
+> **Contexto**: 221/225 arquivos têm `@ts-check`. O typecheck passa com tsconfig.node.json (modo
+> normal). Falta migração incremental para strict e cobertura JSDoc nos módulos externos.
 
 ### F79 — @ts-check nos 4 Barrels Faltantes
+
 **Esforço**: Trivial | **Risco**: Nenhum
 
 | Subfase | Descrição                                            | Entregável |
@@ -634,6 +664,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F80 — JSDoc Missing em Funções Exportadas de agent/
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                           | Entregável |
@@ -647,6 +678,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F81 — JSDoc Missing em Funções Exportadas de sdk/
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                              | Entregável |
@@ -659,6 +691,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F82 — JSDoc Missing em Funções Exportadas de tools/
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                          | Entregável |
@@ -670,6 +703,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F83 — Migração Incremental para tsconfig.strict.json
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                                  | Entregável      |
@@ -686,6 +720,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F84 — Typedef Centralizado para SDK Types
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                     | Entregável      |
@@ -698,11 +733,13 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 9: Error Handling Unificado ★
 
-> **Contexto**: A hierarquia de erros (CopilotError → SessionError/BridgeError/ConfigError/ToolError)
-> é boa, mas há ~5 instâncias de `throw new Error()` raw (sem tipo), e ~15 `JSON.parse()` sem
-> try-catch. Os error codes são adhoc strings, não constantes exportadas.
+> **Contexto**: A hierarquia de erros (CopilotError →
+> SessionError/BridgeError/ConfigError/ToolError) é boa, mas há ~5 instâncias de `throw new Error()`
+> raw (sem tipo), e ~15 `JSON.parse()` sem try-catch. Os error codes são adhoc strings, não
+> constantes exportadas.
 
 ### F85 — Eliminar throw new Error() Raw → Typed Errors
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                             | Entregável |
@@ -714,6 +751,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F86 — Novas Classes de Erro
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                               | Entregável             |
@@ -726,6 +764,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F87 — Error Codes Catalog
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                 | Entregável      |
@@ -737,6 +776,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F88 — JSON.parse Wrapping com Typed Error
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                    | Entregável     |
@@ -751,6 +791,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F89 — Padronizar Catch Blocks
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                         | Entregável       |
@@ -765,7 +806,9 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ## FAIXA 10: Async FS Global ★
 
 > **Contexto**: 18+ chamadas `*Sync()` em produção bloqueiam o event loop. Distribuição:
-> - `snapshot.js`: 11 calls (existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSync)
+>
+> - `snapshot.js`: 11 calls (existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync,
+>   rmSync)
 > - `state-io.js`: 6 calls
 > - `sdk/custom-tools.js`: 4 calls (readFileSync, writeFileSync, renameSync, existsSync)
 > - `sdk/tools-state.js`: 3 calls
@@ -775,6 +818,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 > - `terminal/workspace-context.js`: 1 call (execSync)
 
 ### F90 — Async FS em snapshot.js
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                       | Entregável |
@@ -791,6 +835,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F91 — Async FS em state-io.js
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                    | Entregável |
@@ -803,6 +848,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F92 — Async FS em sdk/custom-tools.js + tools-state.js
+
 **Esforço**: Baixo | **Risco**: Baixo
 
 | Subfase | Descrição                                                     | Entregável |
@@ -815,15 +861,16 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F93 — Async FS em terminal/ + db/ + config/
+
 **Esforço**: Médio | **Risco**: Médio
 
-| Subfase | Descrição                                                               | Entregável |
-| ------- | ----------------------------------------------------------------------- | ---------- |
-| F93.1   | Migrar `alias-store.js` readFileSync/writeFileSync → async              | Edição     |
-| F93.2   | Migrar `db/sqlite.js` mkdirSync na inicialização → async                | Edição     |
-| F93.3   | Migrar `config/pinned-files.js` existsSync/readdirSync/statSync → async | Edição     |
-| F93.4   | Migrar `terminal/workspace-context.js` execSync → exec (com timeout)    | Edição     |
-| F93.5   | Auditar se restam *Sync calls em src/copilot/ (meta: zero em prod code) | Validação  |
+| Subfase | Descrição                                                                | Entregável |
+| ------- | ------------------------------------------------------------------------ | ---------- |
+| F93.1   | Migrar `alias-store.js` readFileSync/writeFileSync → async               | Edição     |
+| F93.2   | Migrar `db/sqlite.js` mkdirSync na inicialização → async                 | Edição     |
+| F93.3   | Migrar `config/pinned-files.js` existsSync/readdirSync/statSync → async  | Edição     |
+| F93.4   | Migrar `terminal/workspace-context.js` execSync → exec (com timeout)     | Edição     |
+| F93.5   | Auditar se restam \*Sync calls em src/copilot/ (meta: zero em prod code) | Validação  |
 
 **Validação**: `grep -r 'Sync(' src/copilot/ | grep -v test | grep -v node_modules` → vazio
 
@@ -831,11 +878,12 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 11: Segurança & Validação de Input ★
 
-> **Contexto**: webhook-manager.js tem boa proteção SSRF com DNS rebinding check. Porém, há
-> 15+ chamadas JSON.parse sem schema validation, e endpoints API/express não validam body
-> de forma consistente. channel/inject.js aceita HTTP posts sem rate limiting.
+> **Contexto**: webhook-manager.js tem boa proteção SSRF com DNS rebinding check. Porém, há 15+
+> chamadas JSON.parse sem schema validation, e endpoints API/express não validam body de forma
+> consistente. channel/inject.js aceita HTTP posts sem rate limiting.
 
 ### F94 — JSON.parse com Schema Validation em Paths Críticos
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                              | Entregável |
@@ -843,7 +891,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 | F94.1   | Criar schemas Zod para: snapshot data, state-io data, alias config, tools-state config | Schemas    |
 | F94.2   | Aplicar `z.safeParse()` em snapshot.js (loadSnapshot, listSnapshots)                   | Edição     |
 | F94.3   | Aplicar `z.safeParse()` em state-io.js (readState)                                     | Edição     |
-| F94.4   | Aplicar `z.safeParse()` em sdk/custom-tools.js (_loadFromDisk)                         | Edição     |
+| F94.4   | Aplicar `z.safeParse()` em sdk/custom-tools.js (\_loadFromDisk)                        | Edição     |
 | F94.5   | Aplicar `z.safeParse()` em channel/inject.js (parse body)                              | Edição     |
 
 **Validação**: `npm run test:unit && npm run lint`
@@ -851,6 +899,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F95 — Input Validation nos Endpoints API/express
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                        | Entregável |
@@ -864,6 +913,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F96 — Rate Limiting Defensivo em channel/inject.js
+
 **Esforço**: Baixo | **Risco**: Baixo
 
 | Subfase | Descrição                                                         | Entregável |
@@ -875,6 +925,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F97 — Audit Log para Operações Administrativas
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                             | Entregável |
@@ -887,6 +938,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F98 — Revisão SSRF/DNS-Rebinding em Bridges
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                       | Entregável |
@@ -907,6 +959,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 > identificar responsabilidades distintas, extrair para módulos coesos, manter facade.
 
 ### F99 — Decompor tools/shell/index.js (714L)
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                              | Entregável      |
@@ -923,6 +976,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F100 — Decompor conversation-hub/orchestrator.js (658L)
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                                | Entregável      |
@@ -936,6 +990,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F101 — Decompor conversation-hub/store.js (609L)
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                          | Entregável      |
@@ -948,6 +1003,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F102 — Decompor terminal/dialog/engine.js (589L)
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                    | Entregável      |
@@ -960,6 +1016,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F103 — Decompor terminal/repl.js (575L)
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                       | Entregável      |
@@ -972,6 +1029,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F104 — Decompor sdk/models/registry.js (557L)
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                              | Entregável      |
@@ -984,6 +1042,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F105 — Decompor channel/client.js (556L) + channel/inject.js (546L)
+
 **Esforço**: Alto | **Risco**: Médio
 
 | Subfase | Descrição                                                           | Entregável      |
@@ -997,6 +1056,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F106 — Decompor observability/metrics.js (552L)
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                          | Entregável      |
@@ -1009,6 +1069,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F107 — Decompor bridges/mcp-tool-bridge.js (531L)
+
 **Esforço**: Médio | **Risco**: Médio
 
 | Subfase | Descrição                                                              | Entregável      |
@@ -1022,11 +1083,12 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 13: Observabilidade Cross-Módulo ★
 
-> **Contexto**: OTEL está parcialmente implementado (otel.js 230L). error-tracker.js usa
-> process.on global. Logger é funcional mas sem níveis estruturados. Falta health-check com
-> componentes degradados e dashboard de dead-letter events.
+> **Contexto**: OTEL está parcialmente implementado (otel.js 230L). error-tracker.js usa process.on
+> global. Logger é funcional mas sem níveis estruturados. Falta health-check com componentes
+> degradados e dashboard de dead-letter events.
 
 ### F108 — OTEL Spans em sdk/client.js e Bridges
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                               | Entregável |
@@ -1040,6 +1102,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F109 — Error Tracker Unificado (Singleton → DI)
+
 **Esforço**: Médio | **Risco**: Médio
 
 | Subfase | Descrição                                                                          | Entregável |
@@ -1052,6 +1115,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F110 — Structured Logging Padronizado
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                            | Entregável |
@@ -1064,6 +1128,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F111 — Health Check Endpoint com Componentes Degradados
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                    | Entregável |
@@ -1076,6 +1141,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F112 — Métricas de Latência por Bridge
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                | Entregável |
@@ -1087,6 +1153,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F113 — Dashboard de Eventos (Catálogo + Dead-Letter)
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                              | Entregável     |
@@ -1100,11 +1167,12 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 
 ## FAIXA 14: Hardening Final & CI ★
 
-> **Contexto**: Sem CI gates formais. Nenhum coverage threshold. Padrão de retry/backoff
-> está duplicado em 6+ lugares. AbortController não é usado (todos usam timeout manual).
-> Graceful shutdown está registrado em entry.js e terminal/index.js separadamente.
+> **Contexto**: Sem CI gates formais. Nenhum coverage threshold. Padrão de retry/backoff está
+> duplicado em 6+ lugares. AbortController não é usado (todos usam timeout manual). Graceful
+> shutdown está registrado em entry.js e terminal/index.js separadamente.
 
 ### F114 — CI Gate: lint + typecheck + test:unit Obrigatório
+
 **Esforço**: Médio | **Risco**: Nenhum
 
 | Subfase | Descrição                                                         | Entregável |
@@ -1117,6 +1185,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F115 — Coverage Mínima com Threshold Bloqueante
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                        | Entregável      |
@@ -1129,6 +1198,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F116 — Dependency Audit
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                   | Entregável      |
@@ -1141,6 +1211,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F117 — Retry/Backoff Utility (Eliminar Padrão Duplicado)
+
 **Esforço**: Baixo | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                      | Entregável     |
@@ -1155,6 +1226,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F118 — AbortController Patterns Padronizados
+
 **Esforço**: Médio | **Risco**: Baixo
 
 | Subfase | Descrição                                                                     | Entregável     |
@@ -1168,6 +1240,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F119 — Graceful Shutdown Unificado
+
 **Esforço**: Médio | **Risco**: Médio
 
 | Subfase | Descrição                                                                          | Entregável     |
@@ -1182,6 +1255,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ---
 
 ### F120 — Auditoria Final Integral + PARTE-15B
+
 **Esforço**: Alto | **Risco**: Nenhum
 
 | Subfase | Descrição                                                                          | Entregável   |
@@ -1302,6 +1376,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 ```
 
 **Paralelização recomendada:**
+
 - **Onda A (imediata)**: FAIXA 1 + FAIXA 7 + FAIXA 9
 - **Onda B (após Onda A)**: FAIXA 2 + FAIXA 8.F79-F82
 - **Onda C**: FAIXA 3 + FAIXA 8.F83-F84 + FAIXA 12
@@ -1316,6 +1391,7 @@ A versão original (v1) focava exclusivamente em `agent/`. Esta revisão (v2) ab
 Para considerar o roadmap F49–F120 completo:
 
 ### Faixas 1–6 (agent/ consolidation):
+
 1. ✅ Nenhum arquivo em `agent/` excede 400L
 2. ✅ Cobertura de testes ≥ 60% dos arquivos de agent/ (30+/50)
 3. ✅ Total de testes unitários agent/ ≥ 200
@@ -1324,42 +1400,51 @@ Para considerar o roadmap F49–F120 completo:
 6. ✅ Todos os valores configuráveis em config.js
 
 ### Faixa 7 (testes legados):
+
 7. ✅ ≥ 180 test files passando (de 6 atual para 180+)
 8. ✅ Testes irrecuperáveis em quarantine/ com documentação
 
 ### Faixa 8 (tipagem):
+
 9. ✅ 225/225 arquivos com `@ts-check`
 10. ✅ agent/ + core/ + config/ passando em strict typecheck
 11. ✅ 100% de funções exportadas com JSDoc (@param/@returns/@throws)
 
 ### Faixa 9 (error handling):
+
 12. ✅ Zero `throw new Error()` raw em production code
 13. ✅ Error codes em constantes exportadas (core/error-codes.js)
 14. ✅ Todos os catch blocks com log ou re-throw
 
 ### Faixa 10 (async FS):
+
 15. ✅ Zero `*Sync()` calls em production code
 
 ### Faixa 11 (segurança):
+
 16. ✅ JSON.parse com schema validation em paths críticos
 17. ✅ Input validation em todos os endpoints API/express
 18. ✅ URL validation reutilizável aplicada em todos os fetch de URLs externas
 
 ### Faixa 12 (God Modules):
+
 19. ✅ Nenhum arquivo em `copilot/` excede 400L (meta: <350L)
 20. ✅ 14 God Modules decompostos com ~22 novos módulos coesos
 
 ### Faixa 13 (observabilidade):
+
 21. ✅ OTEL spans em sdk/client e bridges
 22. ✅ Health endpoint com status por componente
 23. ✅ Dead-letter event tracking operacional
 
 ### Faixa 14 (CI + hardening):
+
 24. ✅ CI workflow bloqueante (lint + typecheck + test + coverage)
 25. ✅ Coverage mínima 30% lines (progressivo para 50%)
 26. ✅ Retry utility reutilizável em uso por 4+ módulos
 27. ✅ Graceful shutdown unificado
-28. ✅ `npm run lint && npm run format:check && npm run typecheck:node && npm run test:unit` passando
+28. ✅ `npm run lint && npm run format:check && npm run typecheck:node && npm run test:unit`
+    passando
 29. ✅ PARTE-15A (agent/) e PARTE-15B (integral) criadas
 
 ---
@@ -1376,7 +1461,7 @@ Para considerar o roadmap F49–F120 completo:
 | Test files fixados   | 0                   | ≥180                | ★ novo     |
 | God Modules atacados | 3 (agent/)          | 17 (14 ext + 3 int) | +14        |
 | Coverage target      | 60% arquivos agent/ | 50% lines copilot/  | ★ ampliado |
-| *Sync() eliminação   | parcial (snapshot)  | total (zero)        | ★ completo |
+| \*Sync() eliminação  | parcial (snapshot)  | total (zero)        | ★ completo |
 | Security faixas      | 1 (SSRF parcial)    | 5 fases dedicadas   | ★ ampliado |
 | CI/CD                | nenhum              | workflow bloqueante | ★ novo     |
 | Documentação final   | PARTE-15            | PARTE-15A + 15B     | ★ ampliado |

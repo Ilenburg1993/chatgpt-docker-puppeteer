@@ -1,8 +1,7 @@
 # 07-SERVER — Auditoria do Módulo `server/`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Módulo**: `src/copilot/server/`
-**Documentado em**: 2026-04-18
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Módulo**: `src/copilot/server/` **Documentado
+em**: 2026-04-18
 
 ---
 
@@ -52,7 +51,7 @@ server/
 ### Código Problemático
 
 ```js
-const DEFAULT_CORS_ORIGIN = 'http://localhost:*';  // ← INVÁLIDO
+const DEFAULT_CORS_ORIGIN = 'http://localhost:*'; // ← INVÁLIDO
 app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? DEFAULT_CORS_ORIGIN }));
 ```
 
@@ -65,8 +64,9 @@ res.setHeader('Access-Control-Allow-Origin', originHeader);
 | ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **BUG-CORS-01** / CAT-005 | **P1** | `http://localhost:*` **não é um valor válido** para `Access-Control-Allow-Origin`. A spec HTTP não permite globs/wildcards em origens — apenas `*` (qualquer origem) ou uma origin exata. Resultado: browsers rejeitam o header CORS, fazendo todas as requisições do dashboard frontend falharem com CORS error. |
 
-> **Status de execução (2026-04-17): corrigido no código.**
-> O middleware agora faz reflection de uma única origin válida por request, aceita `localhost` em qualquer porta por regex e deixa de emitir valores inválidos ou múltiplos no header.
+> **Status de execução (2026-04-17): corrigido no código.** O middleware agora faz reflection de uma
+> única origin válida por request, aceita `localhost` em qualquer porta por regex e deixa de emitir
+> valores inválidos ou múltiplos no header.
 
 **Quando array é passado:**
 
@@ -83,23 +83,23 @@ res.setHeader('Access-Control-Allow-Origin', originHeader);
 
 ```js
 export function createCorsMiddleware(opts) {
-    const allowedOrigins = Array.isArray(opts?.origin)
-        ? opts.origin
-        : opts?.origin
-          ? [opts.origin]
-          : ['*'];
+  const allowedOrigins = Array.isArray(opts?.origin)
+    ? opts.origin
+    : opts?.origin
+      ? [opts.origin]
+      : ['*'];
 
-    return function corsMiddleware(req, res, next) {
-        const reqOrigin = req.headers.origin;
+  return function corsMiddleware(req, res, next) {
+    const reqOrigin = req.headers.origin;
 
-        if (allowedOrigins.includes('*')) {
-            res.setHeader('Access-Control-Allow-Origin', '*');
-        } else if (reqOrigin && allowedOrigins.includes(reqOrigin)) {
-            res.setHeader('Access-Control-Allow-Origin', reqOrigin);
-            res.setHeader('Vary', 'Origin');
-        }
-        // ... resto igual
-    };
+    if (allowedOrigins.includes('*')) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (reqOrigin && allowedOrigins.includes(reqOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+      res.setHeader('Vary', 'Origin');
+    }
+    // ... resto igual
+  };
 }
 ```
 
@@ -111,7 +111,7 @@ export function createCorsMiddleware(opts) {
 import { timingSafeEqual } from 'node:crypto';
 // ...
 if (!timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
-    // 401
+  // 401
 }
 ```
 
@@ -141,10 +141,14 @@ Esperado: `X-Frame-Options`, `X-Content-Type-Options`, `Content-Security-Policy`
 
 O namespace `/copilot` agora separa autenticação de transporte de autorização por sessão:
 
-- claims JWT são normalizadas em um principal (`sub`, `roles`, `scopes`, grants explícitos por sessão);
-- `join:session`, `user:inject`, `sessions:list` e `turns:history` consultam ACL derivada de `hub_session.metadata`;
-- sessões system-managed (ex.: `source=terminal-server`) passam a exigir admin/scope ou grant explícito;
-- eventos passivos (`session:created`, `turn:*`, `user:injected`, `hub:error`) só são emitidos para sockets autorizados.
+- claims JWT são normalizadas em um principal (`sub`, `roles`, `scopes`, grants explícitos por
+  sessão);
+- `join:session`, `user:inject`, `sessions:list` e `turns:history` consultam ACL derivada de
+  `hub_session.metadata`;
+- sessões system-managed (ex.: `source=terminal-server`) passam a exigir admin/scope ou grant
+  explícito;
+- eventos passivos (`session:created`, `turn:*`, `user:injected`, `hub:error`) só são emitidos para
+  sockets autorizados.
 
 | ID          | Sev | Descrição                                                                                                                                      |
 | ----------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -163,8 +167,9 @@ O namespace `/copilot` agora separa autenticação de transporte de autorizaçã
 
 ### Severidade Geral do Módulo: **P1 (Alto)**
 
-Os dois bugs P1 de CORS já foram corrigidos no código atual. Eles permanecem documentados aqui como referência da causa-raiz.
+Os dois bugs P1 de CORS já foram corrigidos no código atual. Eles permanecem documentados aqui como
+referência da causa-raiz.
 
 ---
 
-*Próximo: [08-INFRA-OBSERVABILITY.md](./08-INFRA-OBSERVABILITY.md)*
+_Próximo: [08-INFRA-OBSERVABILITY.md](./08-INFRA-OBSERVABILITY.md)_

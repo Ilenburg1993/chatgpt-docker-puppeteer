@@ -3,8 +3,8 @@
 **Data**: 2026-04-15 **Status**: proposta canônica desta série
 
 > **Complemento operacional obrigatório**:
-> [`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md)
-> traduz este documento em end-state explícito, invariantes e critérios objetivos de convergência.
+> [`R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md`](./R-04A-ENDSTATE-E-CRITERIOS-DE-SUCESSO.md) traduz
+> este documento em end-state explícito, invariantes e critérios objetivos de convergência.
 
 ---
 
@@ -280,8 +280,8 @@ Reduzir ao longo do programa:
 
 ## 10. Critérios macro de sucesso
 
-> Os critérios macro abaixo continuam válidos como síntese.
-> A versão operacional detalhada, usada como régua de checkpoint, está em `R-04A`.
+> Os critérios macro abaixo continuam válidos como síntese. A versão operacional detalhada, usada
+> como régua de checkpoint, está em `R-04A`.
 
 Ao final da rearquitetura clean, espera-se:
 

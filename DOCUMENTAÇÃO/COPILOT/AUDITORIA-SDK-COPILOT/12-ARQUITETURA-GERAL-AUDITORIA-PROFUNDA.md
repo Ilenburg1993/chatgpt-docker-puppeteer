@@ -1,7 +1,6 @@
 # 12 — Auditoria Arquitetural Profunda: `src/copilot/`
 
-**Data**: 2026-03-21
-**Escopo**: Todo `src/copilot/` — 408 arquivos JS, ~62.000 linhas, 21 módulos
+**Data**: 2026-03-21 **Escopo**: Todo `src/copilot/` — 408 arquivos JS, ~62.000 linhas, 21 módulos
 **Referência**: [04-ARQUITETURA-ATUAL.md](./04-ARQUITETURA-ATUAL.md),
 [05-ARQUITETURA-IDEAL.md](./05-ARQUITETURA-IDEAL.md),
 [10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md)
@@ -37,8 +36,8 @@
 ### Concentração de código
 
 Os 4 maiores módulos (`agent`, `sdk`, `terminal`, `tools`) representam **~50%** do código total.
-`agent/` sozinho é o maior módulo (14% do codebase), o que é desproporcional para uma camada
-que deveria ser orquestração.
+`agent/` sozinho é o maior módulo (14% do codebase), o que é desproporcional para uma camada que
+deveria ser orquestração.
 
 ---
 
@@ -102,7 +101,8 @@ O codebase tem **7 pares de conceitos duplicados ou sobrepostos**:
 
 ### 3.2 🔴 `agent/` é Desproporcionalmente Grande
 
-O módulo `agent/` (8.620L, 61 arquivos) contém responsabilidades que deveriam estar em outras camadas:
+O módulo `agent/` (8.620L, 61 arquivos) contém responsabilidades que deveriam estar em outras
+camadas:
 
 | Responsabilidade no agent/                 | Deveria estar em              | Razão                                              |
 | ------------------------------------------ | ----------------------------- | -------------------------------------------------- |
@@ -131,8 +131,9 @@ terminal/dialog/engine.js
             → @github/copilot-sdk (session.send)
 ```
 
-**7 níveis de indireção** entre o input do usuário e a chamada SDK. Cada nível adiciona pouco
-valor individual. O valor real está concentrado em:
+**7 níveis de indireção** entre o input do usuário e a chamada SDK. Cada nível adiciona pouco valor
+individual. O valor real está concentrado em:
+
 - Enfileiramento (queue-processor)
 - Streaming + OTEL (task-executor/turn-executor)
 - A chamada SDK (sendAndWait)
@@ -147,8 +148,8 @@ O `sdk/` (L1) deveria ser abstração pura sobre `@github/copilot-sdk`. Mas:
   mutable. Isso é orquestração (L4/L5), não wrapping (L1).
 - `sdk/agent/agents.js` tem lógica de custom agents — pertence a config/ ou agent/.
 - `sdk/rpc/` (4 files, ~800L) tem wrappers RPC que são usados por tools/ via
-  `experimental-rpc-tools.js`. A camada 1 (sdk) está servindo diretamente a camada 3 (tools),
-  devia haver um intermediário.
+  `experimental-rpc-tools.js`. A camada 1 (sdk) está servindo diretamente a camada 3 (tools), devia
+  haver um intermediário.
 
 **Consequência**: `sdk/` tem 8.096L — quase tão grande quanto `agent/` (8.620L). Para um wrapper
 module, isso é excessivo.
@@ -169,6 +170,7 @@ module, isso é excessivo.
 - EventBusObservers → 6+ bus actions
 
 **3 subsistemas paralelos** para o mesmo problema (coletar e reagir a eventos):
+
 1. `agent/session/event-handlers/` — reagem operacionalmente
 2. `observability/collectors/` — coletam métricas
 3. `observability/bus-actions/` — reagem via EventBus
@@ -187,8 +189,8 @@ validator é defensive programming excessivo para eventos internos.
 
 ### 3.7 🟡 `services/` — Camada sem Propósito Claro
 
-547L e 6 arquivos. `services/index.js` re-exporta de `#copilot/agent`, `#copilot/conversation-hub`
-e `#copilot/channel`. É basicamente um barrel extra com 4 wrappers finos:
+547L e 6 arquivos. `services/index.js` re-exporta de `#copilot/agent`, `#copilot/conversation-hub` e
+`#copilot/channel`. É basicamente um barrel extra com 4 wrappers finos:
 
 - `SessionService` — facade sobre sdk/session + hooks → usado por 2 routes
 - `ConversationService` — facade sobre conversation-hub → usado por 1 route
@@ -256,6 +258,7 @@ sdk/ importa de:
 | `services/`         | (vazio — tokens especulativos removidos)                          | —                    |
 
 **Observações**:
+
 - `bridges/di-tokens.js` declara 4 tokens que são **todos** do tipo `AlwaysAliveAgent`. Isso sugere
   que bridges não deveria ter referência direta ao agent — quebra o princípio de inversão.
 - 11 tokens ao todo. Para 408 arquivos, a DI é subutilizada. A maioria dos módulos usa import
@@ -287,32 +290,35 @@ Camada 5: observability/error-alerting.js + bus-actions/error-alerter.js
 **Fluxo ideal**: Erro ocorre → Camada 1 tipifica → Camada 2 classifica → Camada 3 decide retry/skip
 → Camada 4 registra → Camada 5 alerta.
 
-**Realidade**: Cada módulo escolhe ad-hoc quais camadas usar. `agent/` usa C1+C2 e ignora C3-C5
-em muitos locais. Hooks usa C3. Terminal usa `try/catch` raw.
+**Realidade**: Cada módulo escolhe ad-hoc quais camadas usar. `agent/` usa C1+C2 e ignora C3-C5 em
+muitos locais. Hooks usa C3. Terminal usa `try/catch` raw.
 
 ---
 
 ## 7. Event System — 3 Subsistemas Paralelos
 
 ### 7.1 EventBus (core/event-bus.js)
+
 - Bus global com `on/off/emit` por string
 - Bridge via `bridgeEmitter()` de agent→bus
 - ~80 eventos bridgeados do agent
 - Subscribers: observability bus-actions, terminal state
 
 ### 7.2 SDK Session Events (via session.on)
+
 - 55+ event types do @github/copilot-sdk
 - Registered em `agent/session/event-handlers/` (12 handlers)
 - E TAMBÉM em `observability/collectors/` (6 collectors)
 - **Duplicação de registration**: mesmo evento escutado por 2 handlers independentes
 
 ### 7.3 HookBus (hooks/bus.js)
+
 - Bus separado para hooks (`emitHook(eventName, ...)`)
 - Bridge para EventBus em `agent/lifecycle/entry.js`
 - Usado por audit pipeline
 
-**Problema**: 3 buses (EventBus, SDK events, HookBus), 3 sets de handlers, com bridges manuais
-entre eles. Um evento pode fluir: SDK→handler→emit EventBus→bus-action→emit HookBus→audit.
+**Problema**: 3 buses (EventBus, SDK events, HookBus), 3 sets de handlers, com bridges manuais entre
+eles. Um evento pode fluir: SDK→handler→emit EventBus→bus-action→emit HookBus→audit.
 
 ---
 
@@ -349,8 +355,8 @@ entre eles. Um evento pode fluir: SDK→handler→emit EventBus→bus-action→e
 ## 10. Resumo Executivo
 
 O `src/copilot/` é um sistema funcional e bem documentado, mas sofre de **crescimento orgânico
-não-governado**. A cada feature nova (hooks, tools, agent dialog, observability), um novo módulo
-foi criado sem refatorar o existente, resultando em:
+não-governado**. A cada feature nova (hooks, tools, agent dialog, observability), um novo módulo foi
+criado sem refatorar o existente, resultando em:
 
 1. **Duplicação de conceitos** (7 pares identificados)
 2. **God module** `agent/` que absorve tudo por conveniência
@@ -360,5 +366,5 @@ foi criado sem refatorar o existente, resultando em:
 6. **`api/` obsoleto** que duplica `server/`
 7. **`services/` e `plugins/`** quase vazios, sem propósito claro
 
-A base é sólida (DI, EventBus, barrel discipline, JSDoc), mas precisa de consolidação
-arquitetural antes de adicionar mais features.
+A base é sólida (DI, EventBus, barrel discipline, JSDoc), mas precisa de consolidação arquitetural
+antes de adicionar mais features.

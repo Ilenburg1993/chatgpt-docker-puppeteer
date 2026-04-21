@@ -1,10 +1,9 @@
 # PARTE-17A — Análise Arquitetural Profunda: Situação Atual do SDK (rev.5)
 
-**Data**: 2026-10-10 (rev.5 — auditoria pós-conclusão das Faixas 35-42)
-**Escopo**: TODO `src/copilot/` (281 arquivos JS, ~51.142 linhas) + suíte de testes (178 specs)
-**SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado)
-**Autor**: Auditoria automatizada PARTE-17, rev.5
-**Base**: Rev.4 + resultados Faixas 35-42 do roadmap SDK Hardening
+**Data**: 2026-10-10 (rev.5 — auditoria pós-conclusão das Faixas 35-42) **Escopo**: TODO
+`src/copilot/` (281 arquivos JS, ~51.142 linhas) + suíte de testes (178 specs) **SDK oficial**:
+`@github/copilot-sdk@0.2.0` (instalado) **Autor**: Auditoria automatizada PARTE-17, rev.5 **Base**:
+Rev.4 + resultados Faixas 35-42 do roadmap SDK Hardening
 
 ---
 
@@ -59,7 +58,7 @@ A rev.5 atualiza os números da rev.4 após a conclusão integral das Faixas 35-
 | `core/`                 |       14 |   ~1.715 |      10 |      ~150 |
 | `audit/`                |        4 |     ~721 |       1 |       ~10 |
 | `db/`                   |        3 |     ~411 |       0 |         0 |
-| *(nível raiz copilot/)* |        — |        — |      74 |    ~1.086 |
+| _(nível raiz copilot/)_ |        — |        — |      74 |    ~1.086 |
 | **TOTAL**               |  **281** | **~51k** | **178** | **3.266** |
 
 ### 1.2 Grafo de Dependências (sem alterações desde rev.4)
@@ -92,30 +91,30 @@ O grafo permanece idêntico — nenhuma refatoração estrutural foi realizada n
 
 | Área                            | Linhas | Criticidade | Motivo                                    |
 | ------------------------------- | -----: | :---------: | ----------------------------------------- |
-| `agent/` (raiz)                 |  1.257 |      🔴      | AlwaysAliveAgent — core do sistema        |
-| `agent/dialog/`                 |  1.793 |      🔴      | loop-manager 600L — god module            |
-| `agent/infra/`                  |  1.292 |      🟡      | Boot wiring, reconnect, session pool      |
-| `agent/lifecycle/`              |  1.140 |      🟡      | Graceful shutdown, health monitor         |
-| `agent/session/`                |  1.614 |      🔴      | Session state machine, event handlers     |
-| `agent/session/event-handlers/` |    505 |      🟡      | RPC event routing                         |
-| `agent/messaging/`              |    168 |      🟢      | Message formatting                        |
-| `agent/state/`                  |     80 |      🟢      | State enums                               |
-| `api/bridge/`                   |    796 |      🟡      | HTTP→Agent proxy bridge                   |
-| `api/sse/`                      |    473 |      🟡      | SSE streaming, replay buffer              |
-| `audit/` (completo)             |    721 |      🟡      | JSONL pipeline, ring-buffer writers       |
-| `bridges/gh/`                   |    775 |      🟢      | GitHub MCP bridge                         |
-| `config/`                       |  1.424 |      🟡      | env SSOT, session-config, system-prompt   |
-| `core/` (sublayers)             |  1.715 |      🟡      | Alguns já testados em specs raiz          |
-| `db/`                           |    411 |      🟢      | SQLite persistence                        |
-| `hooks/presets/`                |    878 |      🟢      | Hook preset definitions                   |
-| `observability/collectors/`     |  1.191 |      🟡      | Session, tool, error collectors           |
-| `observability/observers/`      |    837 |      🟡      | Dialog-task handlers, streaming observers |
-| `sdk/models/`                   |  1.088 |      🟡      | Model registry, fallback, capabilities    |
-| `terminal/commands/`            |  2.479 |      🟡      | 23 arquivos de comandos CLI               |
-| `terminal/dialog/`              |    889 |      🟡      | Dialog engine 459L                        |
-| `terminal/handlers/`            |  1.281 |      🟡      | System metrics, formatters                |
-| `tools/git/`                    |    272 |      🟢      | Git tools                                 |
-| `tools/todo/`                   |  1.539 |      🟡      | TODO CRUD 459L + store 423L               |
+| `agent/` (raiz)                 |  1.257 |     🔴      | AlwaysAliveAgent — core do sistema        |
+| `agent/dialog/`                 |  1.793 |     🔴      | loop-manager 600L — god module            |
+| `agent/infra/`                  |  1.292 |     🟡      | Boot wiring, reconnect, session pool      |
+| `agent/lifecycle/`              |  1.140 |     🟡      | Graceful shutdown, health monitor         |
+| `agent/session/`                |  1.614 |     🔴      | Session state machine, event handlers     |
+| `agent/session/event-handlers/` |    505 |     🟡      | RPC event routing                         |
+| `agent/messaging/`              |    168 |     🟢      | Message formatting                        |
+| `agent/state/`                  |     80 |     🟢      | State enums                               |
+| `api/bridge/`                   |    796 |     🟡      | HTTP→Agent proxy bridge                   |
+| `api/sse/`                      |    473 |     🟡      | SSE streaming, replay buffer              |
+| `audit/` (completo)             |    721 |     🟡      | JSONL pipeline, ring-buffer writers       |
+| `bridges/gh/`                   |    775 |     🟢      | GitHub MCP bridge                         |
+| `config/`                       |  1.424 |     🟡      | env SSOT, session-config, system-prompt   |
+| `core/` (sublayers)             |  1.715 |     🟡      | Alguns já testados em specs raiz          |
+| `db/`                           |    411 |     🟢      | SQLite persistence                        |
+| `hooks/presets/`                |    878 |     🟢      | Hook preset definitions                   |
+| `observability/collectors/`     |  1.191 |     🟡      | Session, tool, error collectors           |
+| `observability/observers/`      |    837 |     🟡      | Dialog-task handlers, streaming observers |
+| `sdk/models/`                   |  1.088 |     🟡      | Model registry, fallback, capabilities    |
+| `terminal/commands/`            |  2.479 |     🟡      | 23 arquivos de comandos CLI               |
+| `terminal/dialog/`              |    889 |     🟡      | Dialog engine 459L                        |
+| `terminal/handlers/`            |  1.281 |     🟡      | System metrics, formatters                |
+| `tools/git/`                    |    272 |     🟢      | Git tools                                 |
+| `tools/todo/`                   |  1.539 |     🟡      | TODO CRUD 459L + store 423L               |
 
 **Total sem cobertura direta**: ~22.827 linhas (~45% do código fonte)
 
@@ -125,8 +124,8 @@ O grafo permanece idêntico — nenhuma refatoração estrutural foi realizada n
 
 ### 3.1 Problemas RESOLVIDOS pelas Faixas 35-42
 
-| ID  | Status    | Resolução                                                                                      |
-| --- | --------- | ---------------------------------------------------------------------------------------------- |
+| ID  | Status     | Resolução                                                                                      |
+| --- | ---------- | ---------------------------------------------------------------------------------------------- |
 | P11 | ⚠️ Parcial | 17 subsistemas RPC agora expostos via `sdk/rpc.js` — testes em F41 confirmam contrato completo |
 | —   | ✅ Novo    | Typecheck baseline eliminado (33 → 0 erros)                                                    |
 | —   | ✅ Novo    | write-tools.js 100% testado — path traversal validado                                          |
@@ -136,23 +135,23 @@ O grafo permanece idêntico — nenhuma refatoração estrutural foi realizada n
 
 | ID  | Severidade | Status   | Achado                                              |
 | --- | :--------: | -------- | --------------------------------------------------- |
-| P1  | 🔴 CRÍTICO  | Pendente | Dois caminhos de config: buildSessionConfig vs init |
-| P2  | 🔴 CRÍTICO  | Pendente | Dois registros de sessão: Map vs stateless          |
-| P3  |   🔴 ALTO   | Pendente | Config barrel importa de sdk/ — violação boundaries |
-| P4  |   🔴 ALTO   | Pendente | Tipos hooks paralelos a SDK types                   |
-| P12 |   🔴 ALTO   | Pendente | 70+ event types sem tipagem forte nos payloads      |
-| P5  |  🟡 MÉDIO   | Pendente | `defineTool` bypass em 11 arquivos                  |
-| P6  |  🟡 MÉDIO   | Pendente | `approveAll` bypass em 5 arquivos                   |
-| P7  |  🟡 MÉDIO   | Pendente | `CopilotClient` fora do wrapper em 2 arquivos       |
-| P8  |  🟡 MÉDIO   | Pendente | API routes usam SDK features não-wrapped            |
-| P13 |  🟡 MÉDIO   | Pendente | SystemMessage `customize` mode não usado            |
-| P14 |  🟡 MÉDIO   | Pendente | Nenhum health check do CLI server                   |
-| P15 |  🟡 MÉDIO   | Pendente | Sem verificação autenticação no boot                |
-| P16 |  🟡 MÉDIO   | Pendente | Account quota não monitorada                        |
-| P9  |  🟢 BAIXO   | Pendente | `SYSTEM_PROMPT_SECTIONS` importado diretamente      |
-| P10 |  🟢 BAIXO   | Pendente | `core/sdk-types.js` duplica hooks/types.js          |
-| P17 |  🟢 BAIXO   | Pendente | `session.abort()` não exposto                       |
-| P18 |  🟢 BAIXO   | Pendente | `joinSession()` extension API ignorada              |
+| P1  | 🔴 CRÍTICO | Pendente | Dois caminhos de config: buildSessionConfig vs init |
+| P2  | 🔴 CRÍTICO | Pendente | Dois registros de sessão: Map vs stateless          |
+| P3  |  🔴 ALTO   | Pendente | Config barrel importa de sdk/ — violação boundaries |
+| P4  |  🔴 ALTO   | Pendente | Tipos hooks paralelos a SDK types                   |
+| P12 |  🔴 ALTO   | Pendente | 70+ event types sem tipagem forte nos payloads      |
+| P5  |  🟡 MÉDIO  | Pendente | `defineTool` bypass em 11 arquivos                  |
+| P6  |  🟡 MÉDIO  | Pendente | `approveAll` bypass em 5 arquivos                   |
+| P7  |  🟡 MÉDIO  | Pendente | `CopilotClient` fora do wrapper em 2 arquivos       |
+| P8  |  🟡 MÉDIO  | Pendente | API routes usam SDK features não-wrapped            |
+| P13 |  🟡 MÉDIO  | Pendente | SystemMessage `customize` mode não usado            |
+| P14 |  🟡 MÉDIO  | Pendente | Nenhum health check do CLI server                   |
+| P15 |  🟡 MÉDIO  | Pendente | Sem verificação autenticação no boot                |
+| P16 |  🟡 MÉDIO  | Pendente | Account quota não monitorada                        |
+| P9  |  🟢 BAIXO  | Pendente | `SYSTEM_PROMPT_SECTIONS` importado diretamente      |
+| P10 |  🟢 BAIXO  | Pendente | `core/sdk-types.js` duplica hooks/types.js          |
+| P17 |  🟢 BAIXO  | Pendente | `session.abort()` não exposto                       |
+| P18 |  🟢 BAIXO  | Pendente | `joinSession()` extension API ignorada              |
 
 ---
 
@@ -184,8 +183,10 @@ O grafo permanece idêntico — nenhuma refatoração estrutural foi realizada n
 | 22  | `hooks/factory.js`                                |    416 |         Parcial         |
 
 **Resumo**: 22 god modules, dos quais:
+
 - **1 coberto** (rpc.js — 99 testes)
-- **7 parcialmente cobertos** (orchestrator, store, pipeline, terminal/index, inject, mcp-bridge, metrics, client, factory)
+- **7 parcialmente cobertos** (orchestrator, store, pipeline, terminal/index, inject, mcp-bridge,
+  metrics, client, factory)
 - **14 sem testes diretos**
 
 ---
@@ -202,7 +203,8 @@ de 3.053 para 3.266 (+7%) e o typecheck chegou a zero.
 
 1. **~45% do código fonte** (22.827L) permanece sem testes diretos
 2. **14 god modules** continuam sem cobertura
-3. **Problemas arquiteturais P1–P18** da rev.4 permanecem abertos (são de refatoração, não de testes)
+3. **Problemas arquiteturais P1–P18** da rev.4 permanecem abertos (são de refatoração, não de
+   testes)
 4. Áreas críticas sem teste: `agent/` (AlwaysAliveAgent, dialog loop, session lifecycle)
 5. `config/`, `db/`, `hooks/presets/` completamente sem cobertura
 
@@ -210,17 +212,17 @@ de 3.053 para 3.266 (+7%) e o typecheck chegou a zero.
 
 | Prioridade | Área                        | Linhas | Justificativa                           |
 | :--------: | --------------------------- | -----: | --------------------------------------- |
-|    🔴 1     | `agent/` + `agent/dialog/`  |  3.050 | Core do sistema, crítico em produção    |
-|    🔴 2     | `agent/session/`            |  2.119 | State machine + event handlers          |
-|    🟡 3     | `tools/todo/`               |  1.539 | God modules (crud-tools + store)        |
-|    🟡 4     | `config/`                   |  1.424 | env SSOT, session-config críticos       |
-|    🟡 5     | `observability/collectors/` |  1.191 | Collectors e observers                  |
-|    🟡 6     | `terminal/commands/`        |  2.479 | CLI commands (volume alto, risco baixo) |
-|    🟢 7     | `api/bridge/` + `api/sse/`  |  1.269 | Bridge HTTP→Agent                       |
-|    🟢 8     | `bridges/gh/`               |    775 | GitHub MCP (externo, risco baixo)       |
+|    🔴 1    | `agent/` + `agent/dialog/`  |  3.050 | Core do sistema, crítico em produção    |
+|    🔴 2    | `agent/session/`            |  2.119 | State machine + event handlers          |
+|    🟡 3    | `tools/todo/`               |  1.539 | God modules (crud-tools + store)        |
+|    🟡 4    | `config/`                   |  1.424 | env SSOT, session-config críticos       |
+|    🟡 5    | `observability/collectors/` |  1.191 | Collectors e observers                  |
+|    🟡 6    | `terminal/commands/`        |  2.479 | CLI commands (volume alto, risco baixo) |
+|    🟢 7    | `api/bridge/` + `api/sse/`  |  1.269 | Bridge HTTP→Agent                       |
+|    🟢 8    | `bridges/gh/`               |    775 | GitHub MCP (externo, risco baixo)       |
 
 ---
 
-*Documento gerado pela auditoria PARTE-17, rev.5. Base: 281 arquivos JS em `src/copilot/`,
-178 specs, 3.266 testes passando, 0 erros de typecheck.
-Revisões anteriores: .rev2.md, .rev3.md, .rev4.md.*
+_Documento gerado pela auditoria PARTE-17, rev.5. Base: 281 arquivos JS em `src/copilot/`, 178
+specs, 3.266 testes passando, 0 erros de typecheck. Revisões anteriores: .rev2.md, .rev3.md,
+.rev4.md._

@@ -1,16 +1,14 @@
 # PARTE-24G — ARQUITETURA IDEAL: COPILOT COMO FERRAMENTA DE DESENVOLVIMENTO
 
-> **Documento**: PARTE-24G-ARQUITETURA-COPILOT-DEV.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
+> **Documento**: PARTE-24G-ARQUITETURA-COPILOT-DEV.md **Versão**: 1.0 **Data**: 2026-04-12
 > **Escopo**: Definição da arquitetura ideal para `src/copilot` como módulo de desenvolvimento
 
 ---
 
 ## 0. PREMISSA FUNDAMENTAL
 
-> **`src/copilot` NÃO é uma feature de produção.**
-> É uma **ferramenta de desenvolvimento** equivalente a um DevTools avançado.
+> **`src/copilot` NÃO é uma feature de produção.** É uma **ferramenta de desenvolvimento**
+> equivalente a um DevTools avançado.
 
 O `src/copilot` implementa a LLM-B — um agente de IA local que roda no ambiente de desenvolvimento.
 É o par da LLM-A (Copilot do VS Code). A LLM-B:
@@ -38,10 +36,11 @@ integrada ao workflow de desenvolvimento, não funcionalidade do produto.
 
 ### O Problema
 
-Os modos `agent` e `server` foram construídos sob a premissa de que o copilot operaria em
-produção — como addon do server HTTP ou como processo PM2 separado. **Essa premissa é incorreta.**
+Os modos `agent` e `server` foram construídos sob a premissa de que o copilot operaria em produção —
+como addon do server HTTP ou como processo PM2 separado. **Essa premissa é incorreta.**
 
 O copilot é uma ferramenta de dev. Ele:
+
 - Não precisa de NERV (sistema de eventos do server de produção)
 - Não precisa de socket.io (websockets do server de produção)
 - Não precisa de Express routes em `/api/copilot`
@@ -49,8 +48,8 @@ O copilot é uma ferramenta de dev. Ele:
 
 ### O Modo Canônico
 
-**`terminal` é o único modo que faz sentido como primário.** Os outros são adaptações para
-cenários que não são o cenário primário de uso.
+**`terminal` é o único modo que faz sentido como primário.** Os outros são adaptações para cenários
+que não são o cenário primário de uso.
 
 ---
 
@@ -82,8 +81,8 @@ O terminal já roda um HTTP server na porta 3009 (`terminal/server.js`) com:
 
 ### O que o `src/server/main.js` adiciona (via mode=server)
 
-| O que                                     | Relevância para DEV                                    |
-| ----------------------------------------- | ------------------------------------------------------ |
+| O que                                     | Relevância para DEV                                     |
+| ----------------------------------------- | ------------------------------------------------------- |
 | NERV EventBus adapter                     | ❌ NERV é o event bus do server de produção             |
 | Inbound NERV commands (SEND_MESSAGE etc.) | ❌ Duplica funcionalidade do inject server              |
 | ConversationHub com socket.io             | ⚠️ Socket namespace /copilot — para dashboard real-time |
@@ -94,11 +93,14 @@ O terminal já roda um HTTP server na porta 3009 (`terminal/server.js`) com:
 ### Análise: O que vale preservar do modo server?
 
 **Preservar**:
-1. **ConversationHub com persistência** — sessões e turns gravados em DB, consultáveis pelo dashboard
+
+1. **ConversationHub com persistência** — sessões e turns gravados em DB, consultáveis pelo
+   dashboard
 2. **Express routes `/api/hub/*`** — para o dashboard-ui consultar conversas
 3. **AlwaysAliveAgent autostart** — mas isso já existe no terminal
 
 **Eliminar/absorver**:
+
 1. NERV adapter — sem utilidade para dev
 2. Inbound NERV commands — duplicam /inject
 3. Express routes `/api/copilot/*` — duplicam :3009
@@ -118,8 +120,8 @@ VS Code (LLM-A) ──HTTP──→ Terminal LLM-B (:3009)
                           └── SSE events
 ```
 
-**Vantagens**: Simples, auto-contido, nenhuma dependência externa.
-**Limitações**: Sem dashboard UI, sem persistência elegante, sem websockets.
+**Vantagens**: Simples, auto-contido, nenhuma dependência externa. **Limitações**: Sem dashboard UI,
+sem persistência elegante, sem websockets.
 
 ### Cenário B: Terminal + Dashboard (potencial)
 
@@ -134,8 +136,8 @@ Dashboard UI ──HTTP──→ Terminal LLM-B (:3009)
               └── PUT /config/*, /memory
 ```
 
-**Insight**: O terminal :3009 JÁ TEM todos os endpoints que o dashboard precisaria.
-Não há necessidade de montar o copilot no server de produção (:3008) para ter dashboard.
+**Insight**: O terminal :3009 JÁ TEM todos os endpoints que o dashboard precisaria. Não há
+necessidade de montar o copilot no server de produção (:3008) para ter dashboard.
 
 ### Cenário C: Terminal com WebSocket (se necessário no futuro)
 
@@ -147,8 +149,8 @@ Terminal LLM-B (:3009)
       └── Bi-directional real-time
 ```
 
-WebSocket pode ser adicionado ao inject server se SSE for insuficiente. Não precisa de socket.io
-do server de produção.
+WebSocket pode ser adicionado ao inject server se SSE for insuficiente. Não precisa de socket.io do
+server de produção.
 
 ---
 
@@ -193,9 +195,9 @@ do server de produção.
 
 ### Backwards compatibility
 
-O `src/server/main.js` fica mais limpo — remove o bloco `COPILOT_SDK_ENABLED` inteiro.
-Se o usuário quiser acessar o copilot via o server principal, pode usar um proxy reverso
-simples de :3008/api/copilot → :3009.
+O `src/server/main.js` fica mais limpo — remove o bloco `COPILOT_SDK_ENABLED` inteiro. Se o usuário
+quiser acessar o copilot via o server principal, pode usar um proxy reverso simples de
+:3008/api/copilot → :3009.
 
 ---
 
@@ -220,23 +222,24 @@ export async function bootCopilot() {
 }
 ```
 
-**Backwards compat**: `agent.js` e `terminal/bootstrap.js` continuam como thin entries
-que chamam `bootCopilot()` (sem args).
+**Backwards compat**: `agent.js` e `terminal/bootstrap.js` continuam como thin entries que chamam
+`bootCopilot()` (sem args).
 
 #### L53.15 — Deprecar modo `server` em server/main.js
 
-**O que**: Remover o bloco `COPILOT_SDK_ENABLED` inteiro de `server/main.js`. O copilot roda
-como processo separado via terminal:llm-b, não embarcado no server.
+**O que**: Remover o bloco `COPILOT_SDK_ENABLED` inteiro de `server/main.js`. O copilot roda como
+processo separado via terminal:llm-b, não embarcado no server.
 
-**O que server perde**: ~15 LOC do bootCopilot call + wiring.
-**O que server ganha**: Zero acoplamento com copilot.
+**O que server perde**: ~15 LOC do bootCopilot call + wiring. **O que server ganha**: Zero
+acoplamento com copilot.
 
 #### L53.16 — Consolidar `agent.js` no terminal
 
-**O que**: As features únicas do `startAgentLoop()` (plugin discovery, HookBus bridge, retry,
-IPC, shutdown handlers) são absorvidas no terminal se forem úteis. Se não, são descartadas.
+**O que**: As features únicas do `startAgentLoop()` (plugin discovery, HookBus bridge, retry, IPC,
+shutdown handlers) são absorvidas no terminal se forem úteis. Se não, são descartadas.
 
 Análise do que startAgentLoop() faz:
+
 - Plugin discovery → ✅ útil, mover para terminal
 - HookBus→EventBus bridge → ✅ útil, mover para terminal
 - startWithRetry → ⚠️ terminal já inicia agent, mas sem retry
@@ -252,8 +255,8 @@ Análise do que startAgentLoop() faz:
 
 #### L53.18 — Deprecar server/wiring.js + NERV bridge
 
-**O que**: Marcar `server/wiring.js` como deprecated. O módulo continua existindo mas não é
-chamado por nenhum boot path.
+**O que**: Marcar `server/wiring.js` como deprecated. O módulo continua existindo mas não é chamado
+por nenhum boot path.
 
 #### L53.19 — Atualizar smoke test
 
@@ -267,14 +270,14 @@ chamado por nenhum boot path.
 
 ## 6. DECISÃO DE DESIGN: POR QUE NÃO REMOVER server/wiring.js AGORA
 
-O `server/wiring.js` e o modo `server` representam a integração copilot ↔ server de produção.
-Mesmo sendo desnecessários para o caso de uso primário (dev), eles podem ser úteis para:
+O `server/wiring.js` e o modo `server` representam a integração copilot ↔ server de produção. Mesmo
+sendo desnecessários para o caso de uso primário (dev), eles podem ser úteis para:
 
 1. **Dashboard-UI** que roda no :3008 e quer acessar conversas via socket.io
 2. **Futuro**: se o copilot evoluir para algo que roda em produção
 
-**Proposta**: Deprecar (não remover). Remover o `if COPILOT_SDK_ENABLED` do server/main.js
-mas manter server/wiring.js como módulo disponível para uso futuro.
+**Proposta**: Deprecar (não remover). Remover o `if COPILOT_SDK_ENABLED` do server/main.js mas
+manter server/wiring.js como módulo disponível para uso futuro.
 
 ---
 
@@ -296,27 +299,28 @@ mas manter server/wiring.js como módulo disponível para uso futuro.
 
 ## 8. CHANGELOG
 
-| Versão | Data       | Mudanças                                                            |
-| ------ | ---------- | ------------------------------------------------------------------- |
+| Versão | Data       | Mudanças                                                              |
+| ------ | ---------- | --------------------------------------------------------------------- |
 | 2.0    | 2026-04-12 | Onda 2.7 implementada: L53.14–L53.20 completos, lint ✅, typecheck ✅ |
-| 1.0    | 2026-04-12 | Análise completa, proposta de single boot, roadmap Onda 2.7         |
+| 1.0    | 2026-04-12 | Análise completa, proposta de single boot, roadmap Onda 2.7           |
 
 ---
 
 ## 9. STATUS DA ONDA 2.7 (pós-implementação)
 
-| Step | Arquivo                              | Status | Descrição                                           |
-| ---- | ------------------------------------ | ------ | --------------------------------------------------- |
-| L53.14 | `src/copilot/bootstrap.js`         | ✅     | Modo único — `bootCopilot()` sem parâmetros         |
-| L53.14 | `src/copilot/terminal/bootstrap.js`| ✅     | Chama `bootCopilot()` sem args                      |
-| L53.14 | `src/copilot/agent.js`             | ✅     | Marcado `@deprecated`, alias para bootCopilot()     |
-| L53.15 | `src/server/main.js`               | ✅     | Bloco bootCopilot server removido (L53.15 comment)  |
-| L53.16 | `src/server/api/router.js`         | ✅     | Imports e rotas /api/copilot, /api/sdk, /api/hub removidos |
-| L53.17 | `src/copilot/server/wiring.js`     | ✅     | Marcado `@deprecated` (orphaned desde Onda 2.7)     |
-| L53.18 | `terminal/index.js`                | ✅     | `conversationHub.initStandalone()` já funcionava    |
-| L53.19 | `scripts/check-copilot-autonomy.mjs`| ✅    | 8/8 checks passam, Check 5 (modo único) adicionado  |
+| Step   | Arquivo                              | Status | Descrição                                                  |
+| ------ | ------------------------------------ | ------ | ---------------------------------------------------------- |
+| L53.14 | `src/copilot/bootstrap.js`           | ✅     | Modo único — `bootCopilot()` sem parâmetros                |
+| L53.14 | `src/copilot/terminal/bootstrap.js`  | ✅     | Chama `bootCopilot()` sem args                             |
+| L53.14 | `src/copilot/agent.js`               | ✅     | Marcado `@deprecated`, alias para bootCopilot()            |
+| L53.15 | `src/server/main.js`                 | ✅     | Bloco bootCopilot server removido (L53.15 comment)         |
+| L53.16 | `src/server/api/router.js`           | ✅     | Imports e rotas /api/copilot, /api/sdk, /api/hub removidos |
+| L53.17 | `src/copilot/server/wiring.js`       | ✅     | Marcado `@deprecated` (orphaned desde Onda 2.7)            |
+| L53.18 | `terminal/index.js`                  | ✅     | `conversationHub.initStandalone()` já funcionava           |
+| L53.19 | `scripts/check-copilot-autonomy.mjs` | ✅     | 8/8 checks passam, Check 5 (modo único) adicionado         |
 
 ### Validações finais:
+
 - `npm run lint` → ✅ 0 erros
 - `npm run typecheck:node` → ✅ 0 erros
 - `node scripts/check-copilot-autonomy.mjs` → ✅ 8/8 OK

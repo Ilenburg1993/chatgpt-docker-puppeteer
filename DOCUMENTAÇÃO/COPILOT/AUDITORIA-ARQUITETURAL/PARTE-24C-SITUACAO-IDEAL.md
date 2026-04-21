@@ -1,10 +1,8 @@
 # SITUAÇÃO ARQUITETURAL IDEAL — `src/copilot`
 
-> **Documento**: PARTE-24C-SITUACAO-IDEAL.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Arquitetura-alvo ideal para `src/copilot/` — sistema 100% autônomo
-> **Pré-requisito**: PARTE-24A (PRÉ-AUDITORIA) + PARTE-24B (SITUAÇÃO ATUAL)
+> **Documento**: PARTE-24C-SITUACAO-IDEAL.md **Versão**: 1.0 **Data**: 2026-04-12 **Escopo**:
+> Arquitetura-alvo ideal para `src/copilot/` — sistema 100% autônomo **Pré-requisito**: PARTE-24A
+> (PRÉ-AUDITORIA) + PARTE-24B (SITUAÇÃO ATUAL)
 
 ---
 
@@ -12,11 +10,15 @@
 
 A arquitetura ideal se baseia em 6 princípios não-negociáveis:
 
-1. **Autonomia Total**: `src/copilot/` deve funcionar como pacote independente — zero imports de `#core/*`, `#infra/*`, `#driver/*`, `#server/*`
-2. **Aciclic Layer Model**: Zero ciclos entre qualquer par de módulos. Dependências fluem **unidirecionalmente**, de camadas superiores para inferiores
-3. **Contract-First**: Toda comunicação cross-module via interfaces/contracts tipados, nunca via implementações concretas
+1. **Autonomia Total**: `src/copilot/` deve funcionar como pacote independente — zero imports de
+   `#core/*`, `#infra/*`, `#driver/*`, `#server/*`
+2. **Aciclic Layer Model**: Zero ciclos entre qualquer par de módulos. Dependências fluem
+   **unidirecionalmente**, de camadas superiores para inferiores
+3. **Contract-First**: Toda comunicação cross-module via interfaces/contracts tipados, nunca via
+   implementações concretas
 4. **Plug & Play**: Qualquer módulo pode ser substituído isoladamente sem impacto nos demais
-5. **Observable by Default**: Minden módulo emite eventos no EventBus — observabilidade é emergente, não injetada
+5. **Observable by Default**: Minden módulo emite eventos no EventBus — observabilidade é emergente,
+   não injetada
 6. **Fail Safe**: Graceful degradation em todos os níveis — nenhuma falha isolada propaga cascata
 
 ---
@@ -78,7 +80,8 @@ REGRA: Lx só pode importar de Ly onde y < x. NUNCA o contrário.
 
 **Problema**: `core/di-container.js` chama `wireLegacySetters()` que importa `config/env.js`.
 
-**Solução**: `core/` define **interface** `IConfigProvider`. `config/` implementa e registra via DI. `core/` consome via token DI, sem import direto.
+**Solução**: `core/` define **interface** `IConfigProvider`. `config/` implementa e registra via DI.
+`core/` consome via token DI, sem import direto.
 
 ```
 ANTES:  core/di-container.js --import--> config/env.js
@@ -91,19 +94,23 @@ IDEAL:  core/ define IConfigProvider (interface)
 
 **Problema**: `config/env.js` importa `observability/logger.js` e vice-versa.
 
-**Solução**: Config emite `config:loaded` no EventBus. Observability subscreve. Logger é injetado via DI, não importado.
+**Solução**: Config emite `config:loaded` no EventBus. Observability subscreve. Logger é injetado
+via DI, não importado.
 
 ### 3.3. Ciclo `events ↔ observability` → **Extrair dead-letter para `events/`**
 
 **Problema**: `events/index.js` importa `observability/event-catalog.js` para dead letter tracking.
 
-**Solução**: Dead-letter tracking pertence a `events/` (é funcionalidade do bus). Mover `trackUnregistered()` para `events/dead-letter.js`.
+**Solução**: Dead-letter tracking pertence a `events/` (é funcionalidade do bus). Mover
+`trackUnregistered()` para `events/dead-letter.js`.
 
 ### 3.4. Ciclo `hooks ↔ observability` → **DI + Event Bus**
 
-**Problema**: `hooks/factory.js` importa OTel de `observability/`. `observability/` importa `hooks/bus.js`.
+**Problema**: `hooks/factory.js` importa OTel de `observability/`. `observability/` importa
+`hooks/bus.js`.
 
-**Solução**: OTel facade é contrato em `core/` injetado via DI. Hook bus é consumido via EventBus, não import direto.
+**Solução**: OTel facade é contrato em `core/` injetado via DI. Hook bus é consumido via EventBus,
+não import direto.
 
 ---
 
@@ -164,6 +171,7 @@ types/
 ### 5.2. `core/` → Primitivas Puras (L0)
 
 **Mudanças**:
+
 1. **Remover** `core/events.js` (legado — já migrado para `events/`)
 2. **Mover** DI tokens de camadas superiores para cada módulo respectivo
 3. `di-tokens.js` mantém apenas tokens L0 (EVENT_BUS, LOGGER, CONFIG)
@@ -191,11 +199,13 @@ core/
   └── index.js           // Barrel
 ```
 
-**Removidos**: `events.js` (legado), `shared-state.js` (move para DI), `constants.js` (merge em config), `create-emitter.js` (move para events), `abort-utils.js` (merge em retry)
+**Removidos**: `events.js` (legado), `shared-state.js` (move para DI), `constants.js` (merge em
+config), `create-emitter.js` (move para events), `abort-utils.js` (merge em retry)
 
 ### 5.3. `observability/` → L2 (redesenhado)
 
 **Mudanças radicais**:
+
 1. **Promover para L2** (depende de sdk para OTel contexts)
 2. **Eliminar** `bootstrap.js` — injeção via DI Module pattern
 3. **Consolidar** `bus-actions/` + `event-bus-observers.js` — atualmente duplicados
@@ -237,7 +247,9 @@ REMOVIDOS:
 ### 5.4. `agent/` → Lean Orchestrator (L4)
 
 **Mudanças**:
-1. **always-alive.js** quebrado em 3 módulos: `agent-core.js` (300 LOC), `agent-bus.js` (200 LOC), `agent-state.js` (200 LOC)
+
+1. **always-alive.js** quebrado em 3 módulos: `agent-core.js` (300 LOC), `agent-bus.js` (200 LOC),
+   `agent-state.js` (200 LOC)
 2. **Absorver** `observers/` de observability (são handlers do agent)
 3. **Consolidar** lifecycle/ em 2 arquivos: `lifecycle.js` + `reconnect.js`
 4. **Remover** `lifecycle/entry.js` — PM2 usa bootstrap.js
@@ -275,6 +287,7 @@ agent/
 ### 5.5. `terminal/` → Entry Point Autônomo (L5)
 
 **Mudanças radicais**:
+
 1. **CRIAR** `bootstrap.js` — entry point standalone
 2. **Extrair** `server.js` → `http-server.js` (server) + `middleware.js` (middleware)
 3. **Extrair** `repl.js` → `repl-core.js` + `repl-renderer.js`
@@ -314,28 +327,28 @@ terminal/
 ```js
 // src/copilot/bootstrap.js — Entry point canônico
 export async function bootCopilot(options = {}) {
-    // 1. Inicializar DI container
-    const container = initContainer();
+  // 1. Inicializar DI container
+  const container = initContainer();
 
-    // 2. Registrar módulos (Module pattern)
-    await registerCoreModule(container);       // L0
-    await registerEventsModule(container);     // L0
-    await registerConfigModule(container);     // L1
-    await registerDbModule(container);         // L1
-    await registerSdkModule(container);        // L2
-    await registerHooksModule(container);      // L2
-    await registerObsModule(container);        // L2
+  // 2. Registrar módulos (Module pattern)
+  await registerCoreModule(container); // L0
+  await registerEventsModule(container); // L0
+  await registerConfigModule(container); // L1
+  await registerDbModule(container); // L1
+  await registerSdkModule(container); // L2
+  await registerHooksModule(container); // L2
+  await registerObsModule(container); // L2
 
-    // 3. Entry point
-    if (options.mode === 'server') {
-        await registerServerBridge(container, options.express);
-    } else {
-        await registerTerminal(container);
-    }
+  // 3. Entry point
+  if (options.mode === 'server') {
+    await registerServerBridge(container, options.express);
+  } else {
+    await registerTerminal(container);
+  }
 
-    // 4. Graceful shutdown
-    registerShutdown(container);
-    return container;
+  // 4. Graceful shutdown
+  registerShutdown(container);
+  return container;
 }
 ```
 
@@ -344,6 +357,7 @@ export async function bootCopilot(options = {}) {
 ## 6. `conversation-hub/` → Lean Persistence (L4)
 
 **Mudanças**:
+
 1. **Eliminar** import de `#core/jwt_config` — JWT config via DI
 2. **Quebrar** `store.js` (563 LOC) — já parcialmente extraído:
    - `store-core.js` (CRUD base) — ~200 LOC
@@ -362,18 +376,19 @@ Cada módulo L1+ define um `register()` function:
 ```js
 // exemplo: config/module.js
 export function registerConfigModule(container) {
-    container.register(DI_TOKENS.CONFIG_PROVIDER, {
-        lifecycle: 'singleton',
-        factory: () => new EnvConfigProvider()
-    });
-    container.register(DI_TOKENS.SYSTEM_PROMPT, {
-        lifecycle: 'singleton',
-        factory: () => new SystemPromptBuilder()
-    });
+  container.register(DI_TOKENS.CONFIG_PROVIDER, {
+    lifecycle: 'singleton',
+    factory: () => new EnvConfigProvider(),
+  });
+  container.register(DI_TOKENS.SYSTEM_PROMPT, {
+    lifecycle: 'singleton',
+    factory: () => new SystemPromptBuilder(),
+  });
 }
 ```
 
 Benefícios:
+
 - **Zero ciclos**: módulos não importam uns dos outros — apenas registram no container
 - **Testável**: Mock via `container.register(TOKEN, { factory: () => fakeFn })`
 - **Lazy**: Factories executadas no primeiro `resolve()`, não no import
@@ -411,6 +426,7 @@ tests/
 ```
 
 **Meta de cobertura**:
+
 - L0 (core, events, types): >90% linhas
 - L1 (config, db): >85%
 - L2 (sdk, hooks, observability, audit): >80%
@@ -424,6 +440,7 @@ tests/
 ## 9. Segurança Ideal
 
 ### 9.1. Práticas Obrigatórias
+
 - **URL validation** em todo endpoint HTTP e tool que aceita URL
 - **Input sanitization** em todo inject handler
 - **Rate limiting** por IP em todos os endpoints HTTP
@@ -432,7 +449,9 @@ tests/
 - **Audit trail** em toda operação destrutiva
 
 ### 9.2. Mudanças Necessárias
-- Unificar path validation (atualmente disperso em `tools/file/shared.js` e `core/security/url-validator.js`)
+
+- Unificar path validation (atualmente disperso em `tools/file/shared.js` e
+  `core/security/url-validator.js`)
 - Adicionar CSP headers na API
 - Implementar token rotation para sessões SDK longas
 
@@ -451,7 +470,7 @@ tests/
 | Arquivos sem JSDoc (>100 LOC) | 13     | **0**    |
 | Barrels problemáticos         | 4      | **0**    |
 | Score global                  | 5.9/10 | **8.5+** |
-| Boot standalone funcional     | ❌      | **✅**    |
+| Boot standalone funcional     | ❌     | **✅**   |
 
 ---
 
@@ -497,7 +516,8 @@ tests/
 
 ## 12. Resumo
 
-A arquitetura ideal transforma src/copilot de um subsistema acoplado ao workspace em um **pacote autônomo** com:
+A arquitetura ideal transforma src/copilot de um subsistema acoplado ao workspace em um **pacote
+autônomo** com:
 
 - **6 camadas** claras (vs 5 com violações)
 - **0 ciclos** (vs 4 bidirecionais + 32+ transitivos)
@@ -506,7 +526,8 @@ A arquitetura ideal transforma src/copilot de um subsistema acoplado ao workspac
 - **DI Module pattern** para registros lazy e isolados
 - **Score-alvo 8.5+/10** (vs 5.9 atual)
 
-As mudanças são **progressivas** — cada onda do roadmap (PARTE-24D) entrega valor incremental sem quebrar o sistema em produção.
+As mudanças são **progressivas** — cada onda do roadmap (PARTE-24D) entrega valor incremental sem
+quebrar o sistema em produção.
 
 ---
 

@@ -1,11 +1,8 @@
 # M-06 — Fase 5: Observability & Error Pipeline
 
-**Data**: 2026-03-21
-**Versão**: 1.1
-**Pré-requisito**: M-05 (Event Unification) concluído
-**Estimativa**: ~12h
-**Risco**: Baixo-Moderado
-**Consolida**: Faixa L5 + K3 (complementa) + F (parcial)
+**Data**: 2026-03-21 **Versão**: 1.1 **Pré-requisito**: M-05 (Event Unification) concluído
+**Estimativa**: ~12h **Risco**: Baixo-Moderado **Consolida**: Faixa L5 + K3 (complementa) + F
+(parcial)
 
 ## 0. Status auditado — 2026-04-15
 
@@ -32,8 +29,8 @@ O módulo `observability/` (32 arquivos, 5.757L) é super-engenheirado:
    - `error-alerting.js` (242L) — alertas com threshold
    - `bus-actions/error-alerter.js` (~80L) — reage a errors via EventBus
 
-2. **bus-actions/** (6 arquivos, ~566L) são "Event Bus → side effect" handlers que
-   duplicam funcionalidade dos observers
+2. **bus-actions/** (6 arquivos, ~566L) são "Event Bus → side effect" handlers que duplicam
+   funcionalidade dos observers
 
 3. **event-catalog.js** (130L) implementa dead-letter queue que nunca é consumida
 
@@ -41,8 +38,8 @@ O módulo `observability/` (32 arquivos, 5.757L) é super-engenheirado:
 
 ### Princípio-alvo
 
-> **1 error pipeline**: ring buffer → classificação → alerta → OTEL export.
-> Sem camadas intermediárias duplicadas.
+> **1 error pipeline**: ring buffer → classificação → alerta → OTEL export. Sem camadas
+> intermediárias duplicadas.
 
 ### Métricas antes → depois
 
@@ -74,21 +71,26 @@ O módulo `observability/` (32 arquivos, 5.757L) é super-engenheirado:
 | `bus-actions/error-alerter.js`    | ~80    | DELETAR (lógica movida para error-pipeline) |
 
 **Target**: `observability/error-pipeline.js` (~350L):
+
 ```javascript
 export class ErrorPipeline {
-    #ringBuffer; // do error-tracker
-    #thresholds; // do error-alerting
-    #otelExporter; // do tracing.js
+  #ringBuffer; // do error-tracker
+  #thresholds; // do error-alerting
+  #otelExporter; // do tracing.js
 
-    record(error, context) {
-        const classified = classifyError(error); // de K3 error-policy.js
-        this.#ringBuffer.push({ error, classified, context, ts: Date.now() });
-        this.#checkThresholds(classified);
-        this.#exportToOTEL(error, classified);
-    }
+  record(error, context) {
+    const classified = classifyError(error); // de K3 error-policy.js
+    this.#ringBuffer.push({ error, classified, context, ts: Date.now() });
+    this.#checkThresholds(classified);
+    this.#exportToOTEL(error, classified);
+  }
 
-    getRecentErrors(n) { return this.#ringBuffer.slice(-n); }
-    getAlerts() { /* ... */ }
+  getRecentErrors(n) {
+    return this.#ringBuffer.slice(-n);
+  }
+  getAlerts() {
+    /* ... */
+  }
 }
 ```
 
@@ -133,6 +135,7 @@ Documentar todos os pontos de uso para cada módulo.
 ### P02 — Criar `error-pipeline.js` (3h)
 
 **O que fazer**:
+
 1. Criar `src/copilot/observability/error-pipeline.js`
 2. Consolidar:
    - Ring buffer de `error-tracker.js` (manter classe interna `ErrorRingBuffer`)
@@ -151,6 +154,7 @@ Documentar todos os pontos de uso para cada módulo.
 ### P03 — Migrar consumers para ErrorPipeline (2h)
 
 **O que fazer**: Para cada consumer mapeado em P01:
+
 - Substituir `import { ErrorTracker }` → `import { ErrorPipeline }`
 - Substituir `errorTracker.track(error)` → `errorPipeline.record(error, ctx)`
 - Substituir `errorAlerting.check()` → `errorPipeline.getAlerts()`
@@ -179,8 +183,7 @@ Documentar todos os pontos de uso para cada módulo.
 grep -rn "event-catalog\|EventCatalog\|deadLetter" src/ --include="*.js" | grep -v node_modules
 ```
 
-Se 0 consumers reais: deletar.
-Se consumers existem: avaliar necessidade.
+Se 0 consumers reais: deletar. Se consumers existem: avaliar necessidade.
 
 **Validação**: `npm run lint`
 
@@ -190,12 +193,12 @@ Se consumers existem: avaliar necessidade.
 
 ```javascript
 router.get('/health/errors', (req, res) => {
-    const pipeline = container.get(ErrorPipelineToken);
-    res.json({
-        alerts: pipeline.getAlerts(),
-        recentErrors: pipeline.getRecentErrors(10),
-        stats: pipeline.getStats(),
-    });
+  const pipeline = container.get(ErrorPipelineToken);
+  res.json({
+    alerts: pipeline.getAlerts(),
+    recentErrors: pipeline.getRecentErrors(10),
+    stats: pipeline.getStats(),
+  });
 });
 ```
 
@@ -204,6 +207,7 @@ router.get('/health/errors', (req, res) => {
 ### P07 — Testes (2h)
 
 Testes novos:
+
 - `test_error_pipeline.spec.js`:
   - record() armazena no ring buffer
   - threshold triggers alert

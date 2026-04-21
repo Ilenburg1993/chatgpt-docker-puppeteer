@@ -1,9 +1,10 @@
 # PARTE-17A — Análise Completa da Situação Atual do SDK
 
-**Data**: 2026-03-20 (rev.2 — integração completa)
-**Escopo**: `src/copilot/sdk/` (20 arquivos, ~3.252 linhas) + API Express (21 arquivos, ~3.233 linhas) + Agent layer (52 arquivos, ~10.200 linhas) + Observability (21 arquivos, ~4.400 linhas) + Bridges (10 arquivos, ~2.183 linhas) + Channel (7 arquivos, ~1.497 linhas)
-**SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado) | `0.2.1` (NPM latest)
-**Autor**: Auditoria automatizada PARTE-17
+**Data**: 2026-03-20 (rev.2 — integração completa) **Escopo**: `src/copilot/sdk/` (20 arquivos,
+~3.252 linhas) + API Express (21 arquivos, ~3.233 linhas) + Agent layer (52 arquivos, ~10.200
+linhas) + Observability (21 arquivos, ~4.400 linhas) + Bridges (10 arquivos, ~2.183 linhas) +
+Channel (7 arquivos, ~1.497 linhas) **SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado) |
+`0.2.1` (NPM latest) **Autor**: Auditoria automatizada PARTE-17
 
 ---
 
@@ -37,20 +38,20 @@
 
 ### 1.2 API Express Derivada
 
-| Módulo                              | Linhas     | Endpoints                                         |
-| ----------------------------------- | ---------- | ------------------------------------------------- |
-| `api/express/client.js`             | 205        | /ping, /status, /auth, /models, /tools, /client/* |
-| `api/express/sessions.js`           | 100        | Barrel + auth middleware                          |
-| `api/express/session-crud.js`       | 371        | CRUD sessions + foreground                        |
-| `api/express/session-messaging.js`  | 295        | /send, /stream, /model, /abort, /messages         |
-| `api/express/session-middleware.js` | 159        | Session resolution middleware                     |
-| `api/express/agent.js`              | 214        | /agent/* endpoints                                |
-| `api/express/hooks.js`              | 120        | /hooks/* introspection                            |
-| `api/express/observability.js`      | 310        | /metrics, /errors, /logs, /health                 |
-| `api/express/webhooks.js`           | (variável) | /webhooks CRUD                                    |
-| `api/express/middleware.js`         | 89         | withErrorHandler + ERROR_STATUS_MAP               |
-| `api/bridge/*`                      | ~1.056     | Bridge API (control, dialog, stream, tasks)       |
-| `api/sse/*`                         | ~500       | SSE fanout/replay                                 |
+| Módulo                              | Linhas     | Endpoints                                          |
+| ----------------------------------- | ---------- | -------------------------------------------------- |
+| `api/express/client.js`             | 205        | /ping, /status, /auth, /models, /tools, /client/\* |
+| `api/express/sessions.js`           | 100        | Barrel + auth middleware                           |
+| `api/express/session-crud.js`       | 371        | CRUD sessions + foreground                         |
+| `api/express/session-messaging.js`  | 295        | /send, /stream, /model, /abort, /messages          |
+| `api/express/session-middleware.js` | 159        | Session resolution middleware                      |
+| `api/express/agent.js`              | 214        | /agent/\* endpoints                                |
+| `api/express/hooks.js`              | 120        | /hooks/\* introspection                            |
+| `api/express/observability.js`      | 310        | /metrics, /errors, /logs, /health                  |
+| `api/express/webhooks.js`           | (variável) | /webhooks CRUD                                     |
+| `api/express/middleware.js`         | 89         | withErrorHandler + ERROR_STATUS_MAP                |
+| `api/bridge/*`                      | ~1.056     | Bridge API (control, dialog, stream, tasks)        |
+| `api/sse/*`                         | ~500       | SSE fanout/replay                                  |
 
 ### 1.3 Hooks Layer (re-exportado via SDK barrel)
 
@@ -76,8 +77,8 @@
 
 ### 2.1 CopilotClient — Cobertura
 
-| Feature SDK Oficial                      | Nossa Implementação                                                   | Status                           |
-| ---------------------------------------- | --------------------------------------------------------------------- | -------------------------------- |
+| Feature SDK Oficial                      | Nossa Implementação                                                   | Status                            |
+| ---------------------------------------- | --------------------------------------------------------------------- | --------------------------------- |
 | `new CopilotClient(options)`             | `getClient(overrides)` singleton                                      | ✅ Implementado                   |
 | `client.start()`                         | Implícito via autoStart                                               | ✅ Via getClient                  |
 | `client.stop()`                          | `stopClient()`                                                        | ✅ Implementado                   |
@@ -91,29 +92,29 @@
 | `client.listModels()`                    | `listAvailableModels()`                                               | ✅ Implementado                   |
 | `client.listSessions(filter)`            | `listAllClientSessions(filter)`                                       | ✅ Implementado                   |
 | `client.deleteSession(id)`               | `deleteClientSession(id)`                                             | ✅ Implementado                   |
-| `client.getLastSessionId()`              | ❌ Não exposto                                                         | ❌ **GAP**                        |
+| `client.getLastSessionId()`              | ❌ Não exposto                                                        | ❌ **GAP**                        |
 | `client.getForegroundSessionId()`        | Exposto via API route                                                 | ✅ Via API                        |
 | `client.setForegroundSessionId(id)`      | Exposto via API route                                                 | ✅ Via API                        |
-| `client.on(eventType, handler)`          | ❌ Não wrappado                                                        | ❌ **GAP**                        |
-| `client.on(handler)` (all events)        | ❌ Não wrappado                                                        | ❌ **GAP**                        |
-| `CopilotClientOptions.cliArgs`           | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.cwd`               | ❌ Não exposto                                                         | ⚠️ Parcial (via workingDirectory) |
-| `CopilotClientOptions.port`              | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.useStdio`          | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.isChildProcess`    | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.logLevel`          | ❌ Não exposto                                                         | ❌ **GAP**                        |
+| `client.on(eventType, handler)`          | ❌ Não wrappado                                                       | ❌ **GAP**                        |
+| `client.on(handler)` (all events)        | ❌ Não wrappado                                                       | ❌ **GAP**                        |
+| `CopilotClientOptions.cliArgs`           | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.cwd`               | ❌ Não exposto                                                        | ⚠️ Parcial (via workingDirectory) |
+| `CopilotClientOptions.port`              | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.useStdio`          | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.isChildProcess`    | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.logLevel`          | ❌ Não exposto                                                        | ❌ **GAP**                        |
 | `CopilotClientOptions.autoStart`         | Sempre true                                                           | ⚠️ Hardcoded                      |
-| `CopilotClientOptions.env`               | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.githubToken`       | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.useLoggedInUser`   | ❌ Não exposto                                                         | ❌ **GAP**                        |
-| `CopilotClientOptions.onListModels`      | ❌ Não exposto                                                         | ❌ **GAP**                        |
+| `CopilotClientOptions.env`               | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.githubToken`       | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.useLoggedInUser`   | ❌ Não exposto                                                        | ❌ **GAP**                        |
+| `CopilotClientOptions.onListModels`      | ❌ Não exposto                                                        | ❌ **GAP**                        |
 | `CopilotClientOptions.telemetry`         | Parcial (OTEL endpoint)                                               | ⚠️ Parcial                        |
-| `CopilotClientOptions.onGetTraceContext` | ❌ Não exposto                                                         | ❌ **GAP**                        |
+| `CopilotClientOptions.onGetTraceContext` | ❌ Não exposto                                                        | ❌ **GAP**                        |
 
 ### 2.2 CopilotSession — Cobertura
 
-| Feature SDK Oficial                     | Nossa Implementação                      | Status                                |
-| --------------------------------------- | ---------------------------------------- | ------------------------------------- |
+| Feature SDK Oficial                     | Nossa Implementação                      | Status                                 |
+| --------------------------------------- | ---------------------------------------- | -------------------------------------- |
 | `session.send(options)`                 | Via API `/sessions/:id/send`             | ✅ Implementado                        |
 | `session.sendAndWait(options, timeout)` | Via API `/sessions/:id/send` (sync mode) | ✅ Implementado                        |
 | `session.on(eventType, handler)`        | Via SSE stream                           | ⚠️ Parcial (via SSE, não programático) |
@@ -122,17 +123,17 @@
 | `session.disconnect()`                  | Via API `/sessions/:id/disconnect`       | ✅ Implementado                        |
 | `session.getMessages()`                 | Via API `/sessions/:id/messages`         | ✅ Implementado                        |
 | `session.setModel(model, opts)`         | Via API `/sessions/:id/model`            | ✅ Implementado                        |
-| `session.log(message, opts)`            | ❌ Não implementado                       | ❌ **GAP**                             |
-| `session.workspacePath`                 | ❌ Não exposto                            | ❌ **GAP**                             |
-| `session.capabilities`                  | ❌ Não implementado                       | ❌ **GAP** (v0.2.1)                    |
-| `session.ui` (elicitation)              | ❌ Não implementado                       | ❌ **GAP** (v0.2.1)                    |
-| `session.rpc` (typed RPC)               | ❌ Não exposto                            | ❌ **GAP**                             |
-| `Symbol.asyncDispose`                   | ❌ Não utilizado                          | ⚠️ Nice-to-have                        |
+| `session.log(message, opts)`            | ❌ Não implementado                      | ❌ **GAP**                             |
+| `session.workspacePath`                 | ❌ Não exposto                           | ❌ **GAP**                             |
+| `session.capabilities`                  | ❌ Não implementado                      | ❌ **GAP** (v0.2.1)                    |
+| `session.ui` (elicitation)              | ❌ Não implementado                      | ❌ **GAP** (v0.2.1)                    |
+| `session.rpc` (typed RPC)               | ❌ Não exposto                           | ❌ **GAP**                             |
+| `Symbol.asyncDispose`                   | ❌ Não utilizado                         | ⚠️ Nice-to-have                        |
 
 ### 2.3 SessionConfig — Cobertura
 
-| Config Option               | Nossa Implementação              | Status             |
-| --------------------------- | -------------------------------- | ------------------ |
+| Config Option               | Nossa Implementação               | Status              |
+| --------------------------- | --------------------------------- | ------------------- |
 | `sessionId`                 | ❌ Não exposto                    | ❌ **GAP**          |
 | `clientName`                | ❌ Não exposto                    | ❌ **GAP**          |
 | `model`                     | ✅ Via buildSessionConfig         | ✅                  |
@@ -160,8 +161,8 @@
 
 ### 2.4 Modelos — Cobertura
 
-| Feature                        | Nossa Implementação          | Status              |
-| ------------------------------ | ---------------------------- | ------------------- |
+| Feature                        | Nossa Implementação           | Status               |
+| ------------------------------ | ----------------------------- | -------------------- |
 | listModels com cache           | ✅ 5min TTL                   | ✅                   |
 | filterEnabled/Reasoning/Vision | ✅ Implementado               | ✅                   |
 | pickModel com critérios        | ✅ Implementado               | ✅                   |
@@ -176,30 +177,30 @@
 
 ### 2.5 Hooks — Cobertura
 
-| Hook SDK Oficial        | Nossa Implementação                                       | Status |
-| ----------------------- | --------------------------------------------------------- | ------ |
-| `onPreToolUse`          | ✅ tool-interceptor.js + factory                           | ✅      |
-| `onPostToolUse`         | ✅ tool-interceptor.js + factory                           | ✅      |
-| `onUserPromptSubmitted` | ✅ prompt-transformer.js                                   | ✅      |
-| `onSessionStart`        | ✅ session-lifecycle.js                                    | ✅      |
-| `onSessionEnd`          | ✅ session-lifecycle.js                                    | ✅      |
-| `onErrorOccurred`       | ✅ error-handler.js                                        | ✅      |
-| Hook presets (6)        | ✅ production, safe, interactive, audit, deny-all, minimal | ✅      |
-| Hook registry           | ✅ registry.js + bus.js                                    | ✅      |
-| Hook composer           | ✅ composer.js                                             | ✅      |
+| Hook SDK Oficial        | Nossa Implementação                                        | Status |
+| ----------------------- | ---------------------------------------------------------- | ------ |
+| `onPreToolUse`          | ✅ tool-interceptor.js + factory                           | ✅     |
+| `onPostToolUse`         | ✅ tool-interceptor.js + factory                           | ✅     |
+| `onUserPromptSubmitted` | ✅ prompt-transformer.js                                   | ✅     |
+| `onSessionStart`        | ✅ session-lifecycle.js                                    | ✅     |
+| `onSessionEnd`          | ✅ session-lifecycle.js                                    | ✅     |
+| `onErrorOccurred`       | ✅ error-handler.js                                        | ✅     |
+| Hook presets (6)        | ✅ production, safe, interactive, audit, deny-all, minimal | ✅     |
+| Hook registry           | ✅ registry.js + bus.js                                    | ✅     |
+| Hook composer           | ✅ composer.js                                             | ✅     |
 
 ### 2.6 Tools Layer — Cobertura
 
-| Feature                     | Nossa Implementação                | Status |
-| --------------------------- | ---------------------------------- | ------ |
-| `defineTool` usage          | ✅ Via buildTool factory            | ✅      |
-| skipPermission flag         | ✅ Suportado                        | ✅      |
-| overridesBuiltInTool        | ❌ Não utilizado                    | ⚠️ GAP  |
-| Custom tools (declarativas) | ✅ BUILTIN_HANDLER_MAP (6 handlers) | ✅      |
-| Custom tools persistência   | ✅ custom-tools.json                | ✅      |
-| tools-state (allow/deny)    | ✅ Implementado                     | ✅      |
-| ToolRegistry composição     | ✅ merge/filter/exclude             | ✅      |
-| Zod schema support          | ❌ Usa JSON Schema diretamente      | ⚠️ GAP  |
+| Feature                     | Nossa Implementação                 | Status |
+| --------------------------- | ----------------------------------- | ------ |
+| `defineTool` usage          | ✅ Via buildTool factory            | ✅     |
+| skipPermission flag         | ✅ Suportado                        | ✅     |
+| overridesBuiltInTool        | ❌ Não utilizado                    | ⚠️ GAP |
+| Custom tools (declarativas) | ✅ BUILTIN_HANDLER_MAP (6 handlers) | ✅     |
+| Custom tools persistência   | ✅ custom-tools.json                | ✅     |
+| tools-state (allow/deny)    | ✅ Implementado                     | ✅     |
+| ToolRegistry composição     | ✅ merge/filter/exclude             | ✅     |
+| Zod schema support          | ❌ Usa JSON Schema diretamente      | ⚠️ GAP |
 
 ---
 
@@ -260,8 +261,8 @@
 
 Baseado na última execução: **3.101 testes passed, 335 arquivos.**
 
-| Domínio                   | Arquivos de teste       | Status            |
-| ------------------------- | ----------------------- | ----------------- |
+| Domínio                   | Arquivos de teste        | Status            |
+| ------------------------- | ------------------------ | ----------------- |
 | `sdk/client.js`           | ✅ Testado (Faixa 11)    | Cobertura boa     |
 | `sdk/session.js`          | ✅ Testado (Faixa 11)    | Cobertura boa     |
 | `sdk/agents.js`           | ✅ Testado (Faixa 11)    | Cobertura boa     |
@@ -273,9 +274,9 @@ Baseado na última execução: **3.101 testes passed, 335 arquivos.**
 | `sdk/url-validator.js`    | ✅ Testado               | Cobertura boa     |
 | `sdk/http-request.js`     | ⚠️ Testado indiretamente | Cobertura fraca   |
 | `sdk/utils.js`            | ✅ Simples               | Cobertura OK      |
-| `sdk/agent-contract.js`   | N/A (apenas types)      | —                 |
-| `sdk/bridge-contract.js`  | N/A (apenas types)      | —                 |
-| `sdk/channel-contract.js` | N/A (apenas types)      | —                 |
+| `sdk/agent-contract.js`   | N/A (apenas types)       | —                 |
+| `sdk/bridge-contract.js`  | N/A (apenas types)       | —                 |
+| `sdk/channel-contract.js` | N/A (apenas types)       | —                 |
 | API Express routes        | ✅ Testado (Faixa 11)    | Cobertura parcial |
 | Hooks layer               | ✅ Testado (Faixa 10)    | Cobertura boa     |
 
@@ -286,9 +287,9 @@ Baseado na última execução: **3.101 testes passed, 335 arquivos.**
 | Métrica                        | Valor    |
 | ------------------------------ | -------- |
 | Features SDK oficiais mapeadas | 62       |
-| ✅ Totalmente implementadas     | 35 (56%) |
-| ⚠️ Parcialmente implementadas   | 9 (15%)  |
-| ❌ Não implementadas (GAPs)     | 18 (29%) |
+| ✅ Totalmente implementadas    | 35 (56%) |
+| ⚠️ Parcialmente implementadas  | 9 (15%)  |
+| ❌ Não implementadas (GAPs)    | 18 (29%) |
 | Bugs confirmados               | 5        |
 | Design gaps estruturais        | 14       |
 | Inconsistências de tipagem     | 5        |
@@ -307,17 +308,22 @@ Baseado na última execução: **3.101 testes passed, 335 arquivos.**
 
 ## 6. Conclusão
 
-A implementação SDK cobre **~71%** (implementado + parcial) das features do `@github/copilot-sdk@0.2.0`, com boa profundidade nos módulos core (client, session, hooks, models). No entanto, existem **18 features não implementadas**, com destaque para:
+A implementação SDK cobre **~71%** (implementado + parcial) das features do
+`@github/copilot-sdk@0.2.0`, com boa profundidade nos módulos core (client, session, hooks, models).
+No entanto, existem **18 features não implementadas**, com destaque para:
 
 1. **BYOK/Provider** — bloqueio total para uso com providers externos
 2. **Lifecycle events** — sem observabilidade programática de eventos de sessão no client
 3. **Elicitation/UI** — feature nova no 0.2.1, sem suporte
-4. **Tools filtering nativo** (`availableTools`/`excludedTools`) — duplica lógica com nosso `tools-state`
+4. **Tools filtering nativo** (`availableTools`/`excludedTools`) — duplica lógica com nosso
+   `tools-state`
 5. **Commands** (slash commands) — feature nova, sem suporte
 
-A parte de modelos está sólida (ModelRegistry, Selector, StatsTracker, AutoDowngrade), mas o catálogo de known-models precisa de atualização.
+A parte de modelos está sólida (ModelRegistry, Selector, StatsTracker, AutoDowngrade), mas o
+catálogo de known-models precisa de atualização.
 
-A dívida técnica principal é o uso de FS sync como side-effects na importação de módulos, e versões deprecated de persistência.
+A dívida técnica principal é o uso de FS sync como side-effects na importação de módulos, e versões
+deprecated de persistência.
 
 ---
 
@@ -325,7 +331,8 @@ A dívida técnica principal é o uso de FS sync como side-effects na importaç�
 
 ### 7.1 Agent como Consumidor Principal
 
-O `src/copilot/agent/` (52 arquivos, ~10.200 linhas) é o **consumidor principal** do SDK layer. A cadeia de integração:
+O `src/copilot/agent/` (52 arquivos, ~10.200 linhas) é o **consumidor principal** do SDK layer. A
+cadeia de integração:
 
 ```
 agent/lifecycle/agent-lifecycle.js
@@ -342,10 +349,12 @@ agent/lifecycle/agent-lifecycle.js
 
 ### 7.2 Features SDK usadas DIRETAMENTE pelo Agent (bypass do SDK wrapper)
 
-**DESCOBERTA IMPORTANTE**: Várias features que foram listadas como "GAP" no SDK wrapper (seção 2.3) são na verdade **já usadas** pelo agent layer, que importa diretamente do `@github/copilot-sdk` ao invés de usar o wrapper `sdk/session.js`:
+**DESCOBERTA IMPORTANTE**: Várias features que foram listadas como "GAP" no SDK wrapper (seção 2.3)
+são na verdade **já usadas** pelo agent layer, que importa diretamente do `@github/copilot-sdk` ao
+invés de usar o wrapper `sdk/session.js`:
 
-| Feature               | Onde é usado                            | Status real              |
-| --------------------- | --------------------------------------- | ------------------------ |
+| Feature               | Onde é usado                            | Status real               |
+| --------------------- | --------------------------------------- | ------------------------- |
 | `availableTools`      | `agent/session/initializer.js` L140     | ✅ Usado (bypass wrapper) |
 | `excludedTools`       | `agent/session/initializer.js` L139     | ✅ Usado (bypass wrapper) |
 | `skillDirectories`    | `agent/session/initializer.js` L137     | ✅ Usado (bypass wrapper) |
@@ -357,11 +366,16 @@ agent/lifecycle/agent-lifecycle.js
 | `onPermissionRequest` | `agent/session/initializer.js` L148     | ✅ Usado (bypass wrapper) |
 | `mcpServers`          | `agent/session/initializer.js` L146     | ✅ Usado (bypass wrapper) |
 
-**Implicação**: O "GAP" real não é que estas features estão faltando, mas que o **SDK wrapper** (`sdk/session.js → buildSessionConfig`) **não as centraliza**. O agent as passa diretamente. Isso cria:
+**Implicação**: O "GAP" real não é que estas features estão faltando, mas que o **SDK wrapper**
+(`sdk/session.js → buildSessionConfig`) **não as centraliza**. O agent as passa diretamente. Isso
+cria:
 
-1. **Duplicação de lógica** — tools filtering é feito tanto por `tools-state.js` quanto pela passagem direta de `availableTools`/`excludedTools`
-2. **Config não centralizada** — qualquer consumidor não-agent (API Express, terminal, channel) não tem acesso fácil a estas features
-3. **Tipagem dispersa** — os tipos para `availableTools`, `excludedTools`, etc. estão em typedefs locais e não no barrel SDK
+1. **Duplicação de lógica** — tools filtering é feito tanto por `tools-state.js` quanto pela
+   passagem direta de `availableTools`/`excludedTools`
+2. **Config não centralizada** — qualquer consumidor não-agent (API Express, terminal, channel) não
+   tem acesso fácil a estas features
+3. **Tipagem dispersa** — os tipos para `availableTools`, `excludedTools`, etc. estão em typedefs
+   locais e não no barrel SDK
 4. **Testabilidade reduzida** — não é possível testar o config-building isoladamente
 
 ### 7.3 Agent Sub-módulos e sua relação com SDK
@@ -377,7 +391,8 @@ agent/lifecycle/agent-lifecycle.js
 
 ### 7.4 Session RPC — Uso extensivo
 
-O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SDK como ferramentas do agente:
+O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SDK como ferramentas do
+agente:
 
 | RPC Method           | Tool Name                    | Funcionalidade                                |
 | -------------------- | ---------------------------- | --------------------------------------------- |
@@ -396,17 +411,26 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 ### 8.1 Telemetria (OTEL)
 
 `src/copilot/observability/otel.js` (230L) fornece:
-- `buildTelemetryConfig()` — constrói `CopilotClientOptions.telemetry` com suporte a OTLP HTTP ou arquivo JSONL
-- `startSpan(name, attrs, fn)` — instrumentação manual com graceful degradation (se `@opentelemetry/sdk-trace-node` não instalado, é no-op)
+
+- `buildTelemetryConfig()` — constrói `CopilotClientOptions.telemetry` com suporte a OTLP HTTP ou
+  arquivo JSONL
+- `startSpan(name, attrs, fn)` — instrumentação manual com graceful degradation (se
+  `@opentelemetry/sdk-trace-node` não instalado, é no-op)
 - `startSpanImmediate(name, attrs)` — span sem wrapper para event handlers
 
-**Integração**: `agent-lifecycle.js` passa `buildTelemetryConfig()` ao `CopilotClient()` constructor.
+**Integração**: `agent-lifecycle.js` passa `buildTelemetryConfig()` ao `CopilotClient()`
+constructor.
 
-**Gap**: O `TelemetryConfig` do nosso `otel.js` usa campos `{otlpEndpoint, filePath, exporterType, sourceName, captureContent}`, mas o SDK oficial aceita o tipo `TelemetryConfig` completo de `@github/copilot-sdk` que pode ter campos adicionais. Não há validação de paridade.
+**Gap**: O `TelemetryConfig` do nosso `otel.js` usa campos
+`{otlpEndpoint, filePath, exporterType, sourceName, captureContent}`, mas o SDK oficial aceita o
+tipo `TelemetryConfig` completo de `@github/copilot-sdk` que pode ter campos adicionais. Não há
+validação de paridade.
 
 ### 8.2 Event Collector
 
-`src/copilot/observability/event-collector.js` (391L) captura **70+ tipos de eventos** do SDK via `session.on()`:
+`src/copilot/observability/event-collector.js` (391L) captura **70+ tipos de eventos** do SDK via
+`session.on()`:
+
 - Tool calls (start/complete) com latência e pending tracking
 - Token usage (input/output/cache) por modelo
 - Session lifecycle (start/resume/error/compaction)
@@ -415,13 +439,17 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 - Sub-agent events
 - MCP OAuth events
 
-**Integração**: O collector `.attach(session, sessionId)` é chamado em `boot-wiring.js` após a sessão ser criada.
+**Integração**: O collector `.attach(session, sessionId)` é chamado em `boot-wiring.js` após a
+sessão ser criada.
 
-**Gap/Bug**: O `DEFAULT_PERSIST_TYPES` Set inclui 55 tipos de eventos. Mas não há validação contra os tipos reais que o SDK 0.2.1 emite — novos tipos adicionados pelo SDK seriam silenciosamente ignorados.
+**Gap/Bug**: O `DEFAULT_PERSIST_TYPES` Set inclui 55 tipos de eventos. Mas não há validação contra
+os tipos reais que o SDK 0.2.1 emite — novos tipos adicionados pelo SDK seriam silenciosamente
+ignorados.
 
 ### 8.3 Metrics Store
 
 `src/copilot/observability/metrics.js` (425L) — `MetricsStore` com:
+
 - Tool call latências (histogramas rolling p50/p95/p99)
 - Token usage por modelo
 - Session starts/ends/errors/rotations/cleanups/handoffs
@@ -430,7 +458,8 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 - Counters e gauges genéricos
 - Periodic snapshot (JSONL) para análise off-line
 
-**Integração**: Consumido por `event-collector` (alimenta métricas) e `agent-event-observer` (alimenta a partir do EventEmitter do agent).
+**Integração**: Consumido por `event-collector` (alimenta métricas) e `agent-event-observer`
+(alimenta a partir do EventEmitter do agent).
 
 ### 8.4 Error Tracking & Alerting
 
@@ -441,6 +470,7 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 ### 8.5 Tool Stats
 
 `tool-stats.js` (163L) — wrapper transparente via `wrapWithStats(tool)`:
+
 - Captura latência, success/error por tool
 - `getToolStats()` e `getStatsByCategory()`
 - Aplicado a TODAS as tools em `bootstrapTools()`
@@ -460,16 +490,21 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 
 ### 9.1 NERV Bridge
 
-`src/copilot/bridges/nerv-bridge.js` (385L) — **52 event mappings** do agent EventEmitter para NERV envelope:
+`src/copilot/bridges/nerv-bridge.js` (385L) — **52 event mappings** do agent EventEmitter para NERV
+envelope:
+
 - Outbound: agent events → NERV `COPILOT_*` action codes
 - Inbound: NERV commands → `sendMessage`, `pause`, `resume`, etc.
 - Cobertura extensiva de eventos (session, dialog, tool, permission, subagent, streaming)
 
-**Integração com SDK**: O nerv-bridge observa o `alwaysAliveAgent` EventEmitter (não a session SDK diretamente). Os eventos do SDK são primeiro capturados pelo `event-collector` e re-emitidos pelo agent.
+**Integração com SDK**: O nerv-bridge observa o `alwaysAliveAgent` EventEmitter (não a session SDK
+diretamente). Os eventos do SDK são primeiro capturados pelo `event-collector` e re-emitidos pelo
+agent.
 
 ### 9.2 MCP Tool Bridge
 
 `src/copilot/bridges/mcp-tool-bridge.js` (432L):
+
 - `buildMcpTools()` — lista tools de servidores MCP configurados
 - `getMcpStatus()` / `listMcpTools()` — introspecção
 - Auto-reconnect com backoff
@@ -478,6 +513,7 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 ### 9.3 Git Bridge
 
 `src/copilot/bridges/git-bridge.js` (428L) + `gh/` (4 arquivos, ~633L):
+
 - Operações Git completas (status, diff, commit, push, branch, stash)
 - Integração GitHub via `gh` CLI (issues, PRs, CI, workflows)
 - Usado pelas `gitTools` registradas via `tools-bootstrap.js`
@@ -496,6 +532,7 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 ### 10.1 Canal LLM-A ↔ LLM-B
 
 `src/copilot/channel/` (7 arquivos, ~1.497L):
+
 - **HTTP injection mode** (`inject.js`): envia mensagens ao terminal server LLM-B via `POST /inject`
 - **SDK client mode** (`client.js`): `LlmBridgeClient` que usa o `AlwaysAliveAgent` em-processo
 - `clientName` field do SDK usado indiretamente (via agent identity)
@@ -504,11 +541,13 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 ### 10.2 Conversation Hub
 
 `src/copilot/conversation-hub/` (10 arquivos, ~2.487L):
+
 - Orchestrator com call strategies (multi-model)
 - Store persistente (SQLite) com memories, queries, sync
 - Socket.io namespace para streaming real-time
 
-**Integração com SDK**: O hub usa o agent como backend, que por sua vez usa o SDK. A integração é indireta.
+**Integração com SDK**: O hub usa o agent como backend, que por sua vez usa o SDK. A integração é
+indireta.
 
 ---
 
@@ -517,9 +556,9 @@ O `session-rpc-tools.js` (em `src/copilot/tools/`) expõe os RPCs internos do SD
 | Métrica                        | Valor Original | Valor Revisado                           |
 | ------------------------------ | -------------- | ---------------------------------------- |
 | Features SDK oficiais mapeadas | 62             | 62                                       |
-| ✅ Totalmente implementadas     | 35 (56%)       | 44 (71%) ← 9 features "bypass"           |
-| ⚠️ Parcialmente implementadas   | 9 (15%)        | 9 (15%)                                  |
-| ❌ Não implementadas (GAPs)     | 18 (29%)       | 9 (14%)                                  |
+| ✅ Totalmente implementadas    | 35 (56%)       | 44 (71%) ← 9 features "bypass"           |
+| ⚠️ Parcialmente implementadas  | 9 (15%)        | 9 (15%)                                  |
+| ❌ Não implementadas (GAPs)    | 18 (29%)       | 9 (14%)                                  |
 | Bugs confirmados               | 5              | 5                                        |
 | Design gaps estruturais        | 14             | 14 (+ 4 observability + 2 bridges)       |
 | Archetype problems             | 0              | 3 (bypass, duplicação, tipagem dispersa) |

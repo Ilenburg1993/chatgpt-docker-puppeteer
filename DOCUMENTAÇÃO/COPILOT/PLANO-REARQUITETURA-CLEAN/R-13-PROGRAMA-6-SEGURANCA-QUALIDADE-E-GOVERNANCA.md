@@ -1,8 +1,7 @@
 # R-13 — Programa 6: Segurança, qualidade e governança
 
-**Programa**: P6
-**Prioridade**: alta e contínua
-**Foco**: tratar segurança, testes, typing, performance, documentação e dívida como gates reais do ciclo de rearquitetura
+**Programa**: P6 **Prioridade**: alta e contínua **Foco**: tratar segurança, testes, typing,
+performance, documentação e dívida como gates reais do ciclo de rearquitetura
 
 ---
 
@@ -40,7 +39,8 @@ Segurança deixa de aparecer só como backlog lateral e passa a operar como gate
 
 - F6.2.a — mapear cobertura por módulo e por contrato de fronteira
 - F6.2.b — definir suites obrigatórias por programa
-- F6.2.c — fechar gaps críticos em `server/`, `events/`, `hooks/`, `channel/`, `core/` e outros eixos assimétricos
+- F6.2.c — fechar gaps críticos em `server/`, `events/`, `hooks/`, `channel/`, `core/` e outros
+  eixos assimétricos
 - F6.2.d — separar testes de contrato, integração e regressão ampla
 
 ### Resultado esperado
@@ -97,7 +97,8 @@ O repositório para de carregar dívida histórica sem dono.
 
 ### Resultado esperado
 
-A documentação volta a servir ao código, em vez de pedir que o código sirva à arqueologia dos documentos.
+A documentação volta a servir ao código, em vez de pedir que o código sirva à arqueologia dos
+documentos.
 
 ---
 
@@ -134,4 +135,5 @@ Ele é transversal e contínuo. Em especial:
 
 ## 6. Resultado esperado
 
-Ao concluir P6, a rearquitetura clean deixa de ser só uma reorganização estrutural e vira um processo de evolução governada, medível e mais segura.
+Ao concluir P6, a rearquitetura clean deixa de ser só uma reorganização estrutural e vira um
+processo de evolução governada, medível e mais segura.

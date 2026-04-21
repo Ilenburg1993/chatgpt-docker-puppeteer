@@ -1,11 +1,8 @@
 # M-02 — Fase 1: Cleanup & Quick Wins
 
-**Data**: 2026-03-21
-**Versão**: 1.1
-**Pré-requisito**: Nenhum (pode iniciar imediatamente)
-**Estimativa**: ~12h
-**Risco**: Baixo
-**Consolida**: Faixa L1 + J2 (parcial) + G4 (parcial) + C4 (parcial)
+**Data**: 2026-03-21 **Versão**: 1.1 **Pré-requisito**: Nenhum (pode iniciar imediatamente)
+**Estimativa**: ~12h **Risco**: Baixo **Consolida**: Faixa L1 + J2 (parcial) + G4 (parcial) + C4
+(parcial)
 
 ## 0. Addendum de execução — 2026-04-15
 
@@ -16,34 +13,34 @@ O que foi confirmado ou concluído até esta data:
 - `src/copilot/api/` já estava removido do baseline vivo;
 - `src/copilot/services/` foi removido do runtime e do filesystem nesta execução;
 - consumers restantes foram redirecionados para módulos de origem em
-   `server/routes/copilot-api/control.js`, `server/routes/sdk/index.js`,
-   `server/routes/sdk/session-crud.js`, `server/routes/sdk/session-messaging.js` e
-   `server/routes/sdk/observability.js`;
+  `server/routes/copilot-api/control.js`, `server/routes/sdk/index.js`,
+  `server/routes/sdk/session-crud.js`, `server/routes/sdk/session-messaging.js` e
+  `server/routes/sdk/observability.js`;
 - `plugin-registry.js` foi alinhado para não mais procurar plugins em `services/`;
-- o último bypass residual da Faixa F19 (`config/session-config.js` importando `approveAll`
-   direto de `@github/copilot-sdk`) foi corrigido para usar `#copilot/sdk`.
+- o último bypass residual da Faixa F19 (`config/session-config.js` importando `approveAll` direto
+  de `@github/copilot-sdk`) foi corrigido para usar `#copilot/sdk`.
 
 Validação focalizada executada neste checkpoint:
 
 - `node --strip-types --test tests/unit/copilot/test_services_l4_facades.spec.js` ✅
-- `npx vitest run tests/unit/copilot/contracts/test_services_contracts.spec.js tests/unit/copilot/sdk/test_sdk_migration_f19.spec.js` ✅
+- `npx vitest run tests/unit/copilot/contracts/test_services_contracts.spec.js tests/unit/copilot/sdk/test_sdk_migration_f19.spec.js`
+  ✅
 - `make lint` / `npm run lint` ✅ (0 erros, 2 warnings preexistentes fora do escopo)
 - Resultado consolidado: **19/19 testes** verdes.
 
 Pendências explícitas desta fase após o checkpoint:
 
 - `npm run test:unit` completo ainda não fecha o phase gate por um failure baseline fora do escopo
-   de `src/copilot`: `tests/unit/agent/test_ssot_consolidation.spec.js` →
-   `DriverNERVAdapter sempre responde em duplicate dispatch (activeDrivers)`;
+  de `src/copilot`: `tests/unit/agent/test_ssot_consolidation.spec.js` →
+  `DriverNERVAdapter sempre responde em duplicate dispatch (activeDrivers)`;
 - se desejado, executar `format:check` e `test:integration` como fechamento formal do phase gate.
 
 ---
 
 ## 1. Contexto e Motivação
 
-Esta fase elimina duplicações óbvias, código morto e módulos mal-posicionados.
-São mudanças de baixo risco que reduzem ruído e simplificam a base antes das
-refatorações mais profundas das fases 2-5.
+Esta fase elimina duplicações óbvias, código morto e módulos mal-posicionados. São mudanças de baixo
+risco que reduzem ruído e simplificam a base antes das refatorações mais profundas das fases 2-5.
 
 ### Métricas antes → depois
 
@@ -149,15 +146,15 @@ grep -n "router\.\(get\|post\|put\|delete\|patch\)" src/copilot/api/express/*.js
 grep -rn "router\.\(get\|post\|put\|delete\|patch\)" src/copilot/server/routes/
 ```
 
-**Validação**: Lista de endpoints a migrar vs. a deletar.
-**Rollback**: Nenhuma mudança ainda.
+**Validação**: Lista de endpoints a migrar vs. a deletar. **Rollback**: Nenhuma mudança ainda.
 
 ### P02 — Migrar endpoints exclusivos de `api/` para `server/routes/` (2h)
 
-**O que fazer**: Para cada endpoint exclusivo identificado em P01, criar o handler correspondente
-em `server/routes/`. Manter a mesma assinatura de request/response.
+**O que fazer**: Para cada endpoint exclusivo identificado em P01, criar o handler correspondente em
+`server/routes/`. Manter a mesma assinatura de request/response.
 
 **Validação**:
+
 ```bash
 npm run lint
 npm run test:unit
@@ -176,8 +173,8 @@ npm run test:unit
    - `import { CHANNEL_VERSION, createConversationService } from '#copilot/services'`
    - → `import { CHANNEL_VERSION } from '#copilot/channel'`
    - → `import { createConversationService } from '#copilot/conversation-hub'`
-   - Note: `createConversationService` vem de `services/conversation-service.js`. Verificar se
-     a função existe em `conversation-hub/` ou se precisa ser movida.
+   - Note: `createConversationService` vem de `services/conversation-service.js`. Verificar se a
+     função existe em `conversation-hub/` ou se precisa ser movida.
 
 2. `terminal/dialog/sse.js`:
    - `import { broadcastGlobal, broadcastToSession } from '#copilot/services'`
@@ -208,6 +205,7 @@ npm run test:unit
    - Rotear cada um para o módulo de origem correto
 
 **Validação**:
+
 ```bash
 npm run lint
 npm run test:unit
@@ -223,10 +221,11 @@ npm run test:unit
 rm -rf src/copilot/api/
 ```
 
-**Atualizar**: Remover `#copilot/api` do `package.json` imports (se existir).
-**Atualizar**: Remover qualquer referência em `src/copilot/bootstrap.js` ou `src/copilot/server/`.
+**Atualizar**: Remover `#copilot/api` do `package.json` imports (se existir). **Atualizar**: Remover
+qualquer referência em `src/copilot/bootstrap.js` ou `src/copilot/server/`.
 
 **Validação**:
+
 ```bash
 grep -rn "copilot/api" src/ --include="*.js" | grep -v node_modules
 # Deve retornar apenas JSDoc @module references (inofensivos)
@@ -247,6 +246,7 @@ rm -rf src/copilot/services/
 **Atualizar**: Remover `#copilot/services` do `package.json` imports (se existir).
 
 **Validação**:
+
 ```bash
 grep -rn "#copilot/services" src/ --include="*.js" | grep -v node_modules
 # Deve retornar 0 resultados (todos os consumers já foram migrados em P03)
@@ -259,6 +259,7 @@ npm run test:unit
 ### P06 — Mover `agent/config.js` → `config/agent.js` (1h)
 
 **O que fazer**:
+
 1. Copiar `src/copilot/agent/config.js` → `src/copilot/config/agent.js`
 2. Atualizar imports internos do arquivo (se houver caminhos relativos)
 3. Atualizar todos os consumers:
@@ -272,6 +273,7 @@ grep -rn "from.*agent/config\|from.*#copilot/agent.*config" src/copilot/ --inclu
 6. Atualizar `agent/index.js` se re-exportava config
 
 **Validação**:
+
 ```bash
 npm run lint
 npm run test:unit
@@ -282,6 +284,7 @@ npm run test:unit
 ### P07 — Mover contratos `sdk/agent/` → `types/contracts/` (1h)
 
 **O que fazer**:
+
 1. Criar diretório `src/copilot/types/contracts/`
 2. Mover:
    - `sdk/agent/contract.js` → `types/contracts/contract.js`
@@ -298,6 +301,7 @@ grep -rn "sdk/agent/contract\|sdk/agent/bridge-contract\|sdk/agent/channel-contr
 6. Remover diretório `sdk/agent/` se ficar vazio ou deixar apenas `agents.js`
 
 **Validação**:
+
 ```bash
 npm run lint
 npm run test:unit
@@ -346,21 +350,28 @@ grep -rn "status-snapshot\|StatusSnapshot" src/copilot/ --include="*.js" | grep 
 1. Copiar, atualizar imports, atualizar consumers, atualizar barrel, remover original
 
 **Validação (após cada sub-passo)**:
+
 ```bash
 npm run lint
 npm run test:unit
 ```
 
-**Rollback**: `git checkout -- src/copilot/agent/infra/ src/copilot/infra/ src/copilot/hooks/ src/copilot/tools/ src/copilot/observability/`
+**Rollback**:
+`git checkout -- src/copilot/agent/infra/ src/copilot/infra/ src/copilot/hooks/ src/copilot/tools/ src/copilot/observability/`
 
 ### P09 — Deprecar `sdk/config.js::buildSessionConfig` (0.5h)
 
 **O que fazer**:
+
 1. Abrir `sdk/config.js`
-2. Adicionar `@deprecated Use SessionConfigBuilder from #copilot/config` no JSDoc de `buildSessionConfig`
-3. Adicionar `console.warn('[DEPRECATED] buildSessionConfig — use SessionConfigBuilder from #copilot/config')` no corpo da função (1x via flag estática)
+2. Adicionar `@deprecated Use SessionConfigBuilder from #copilot/config` no JSDoc de
+   `buildSessionConfig`
+3. Adicionar
+   `console.warn('[DEPRECATED] buildSessionConfig — use SessionConfigBuilder from #copilot/config')`
+   no corpo da função (1x via flag estática)
 
 **Validação**:
+
 ```bash
 npm run lint
 ```
@@ -369,13 +380,15 @@ npm run lint
 
 ### P10 — Atualizar `package.json` imports (0.5h)
 
-**O que fazer**: Verificar e remover paths de `api/` e `services/` nos mappings de import do `package.json`.
+**O que fazer**: Verificar e remover paths de `api/` e `services/` nos mappings de import do
+`package.json`.
 
 ```bash
 grep -n "api\|services" package.json | head -20
 ```
 
 **Validação**:
+
 ```bash
 node -e "import('#copilot/agent')" # Deve resolver
 npm run lint
@@ -386,14 +399,16 @@ npm run lint
 ### P11 — Testes de regressão finais (1h)
 
 **O que fazer**:
+
 ```bash
 npm run lint
 npm run format:check
 npm run test:unit
-npm run test:integration  # se houver testes de server/api
+npm run test:integration # se houver testes de server/api
 ```
 
 Verificar que nenhum teste referencia `api/` ou `services/`:
+
 ```bash
 grep -rn "#copilot/api\|#copilot/services\|copilot/api\|copilot/services" tests/ --include="*.js"
 ```
@@ -439,11 +454,16 @@ git push origin main
 - [x] `src/copilot/api/` não existe
 - [x] `src/copilot/services/` não existe
 - [x] `src/copilot/agent/config.js` não existe; `src/copilot/config/agent.js` existe
-- [x] `src/copilot/sdk/agent/contract.js` não existe; `src/copilot/types/contracts/contract.js` existe
-- [x] `src/copilot/agent/infra/webhook-manager.js` não existe; `src/copilot/infra/webhooks.js` existe
-- [x] `src/copilot/agent/infra/permission-controller.js` não existe; `src/copilot/hooks/permission-controller.js` existe
-- [x] `src/copilot/agent/infra/tools-bootstrap.js` não existe; `src/copilot/tools/bootstrap.js` existe
-- [x] `src/copilot/agent/infra/status-snapshot.js` não existe; `src/copilot/observability/snapshots.js` existe
+- [x] `src/copilot/sdk/agent/contract.js` não existe; `src/copilot/types/contracts/contract.js`
+      existe
+- [x] `src/copilot/agent/infra/webhook-manager.js` não existe; `src/copilot/infra/webhooks.js`
+      existe
+- [x] `src/copilot/agent/infra/permission-controller.js` não existe;
+      `src/copilot/hooks/permission-controller.js` existe
+- [x] `src/copilot/agent/infra/tools-bootstrap.js` não existe; `src/copilot/tools/bootstrap.js`
+      existe
+- [x] `src/copilot/agent/infra/status-snapshot.js` não existe;
+      `src/copilot/observability/snapshots.js` existe
 - [x] `grep -rn "#copilot/api\|#copilot/services" src/` retorna 0 resultados
 - [x] `npm run lint` ✅
 - [ ] `npm run test:unit` ✅

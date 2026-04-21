@@ -1,27 +1,35 @@
 # 01-TERMINAL-LLM-B — Auditoria do Módulo `terminal/`
 
-**Auditoria Profunda de `src/copilot`** · Abril 2026
-**Módulo**: `src/copilot/terminal/`
-**Foco**: Ponto de entrada `npm run terminal:llm-b`, toda a cadeia de boot, REPL, DI, wiring de eventos.
+**Auditoria Profunda de `src/copilot`** · Abril 2026 **Módulo**: `src/copilot/terminal/` **Foco**:
+Ponto de entrada `npm run terminal:llm-b`, toda a cadeia de boot, REPL, DI, wiring de eventos.
 **Documentado em**: 2026-04-18
 
 ---
 
 ## 1. Cadeia de Inicialização Completa
 
-> **Status de execução (2026-04-17): smoke test aprovado.**
-> O task `shell: terminal:llm-b` subiu com sucesso, consumiu o boot prompt, entrou em `READY` e exibiu `LLM-B pronta — pode começar` no terminal.
+> **Status de execução (2026-04-17): smoke test aprovado.** O task `shell: terminal:llm-b` subiu com
+> sucesso, consumiu o boot prompt, entrou em `READY` e exibiu `LLM-B pronta — pode começar` no
+> terminal.
 >
 > **Revalidação adicional do boot real (2026-04-17):**
 >
 > - a ausência opcional de `custom-tools.json` não gera mais `logSwallowed` de erro;
-> - o terminal continua subindo em modo standalone com MCP ausente, mas sem o ruído anterior de fallback ambíguo no registry de custom tools;
-> - o log de `SessionKeepalive` agora explicita o motivo da parada (`dialog_loop_active`), deixando claro que o stop durante o boot é intencional;
-> - os falsos warnings de boot recovery F53 deixaram de aparecer quando a retomada da sessão ainda está em `processing`.
-> - o runtime do terminal/agent passou a usar `gpt-5-mini` com `reasoning=high` como defaults canônicos.
-> - o REPL agora constrói prompt dinâmico com `modelo/esforço` (e marcador `PLAN` quando aplicável), reduzindo ambiguidade operacional.
-> - o prompt dinâmico também passou a refletir o modo real do SDK (`MODE:PLAN`, `MODE:AUTOPILOT`, etc.) quando ele diverge do estado local do terminal.
-> - o terminal agora consome `tool.execution_partial_result`, `session.mode_changed`, `session.plan_changed`, `session.info`, `session.warning`, `session.model_change`, `session.context_changed` e `exit_plan_mode.completed` como sinais operacionais visíveis.
+> - o terminal continua subindo em modo standalone com MCP ausente, mas sem o ruído anterior de
+>   fallback ambíguo no registry de custom tools;
+> - o log de `SessionKeepalive` agora explicita o motivo da parada (`dialog_loop_active`), deixando
+>   claro que o stop durante o boot é intencional;
+> - os falsos warnings de boot recovery F53 deixaram de aparecer quando a retomada da sessão ainda
+>   está em `processing`.
+> - o runtime do terminal/agent passou a usar `gpt-5-mini` com `reasoning=high` como defaults
+>   canônicos.
+> - o REPL agora constrói prompt dinâmico com `modelo/esforço` (e marcador `PLAN` quando aplicável),
+>   reduzindo ambiguidade operacional.
+> - o prompt dinâmico também passou a refletir o modo real do SDK (`MODE:PLAN`, `MODE:AUTOPILOT`,
+>   etc.) quando ele diverge do estado local do terminal.
+> - o terminal agora consome `tool.execution_partial_result`, `session.mode_changed`,
+>   `session.plan_changed`, `session.info`, `session.warning`, `session.model_change`,
+>   `session.context_changed` e `exit_plan_mode.completed` como sinais operacionais visíveis.
 
 ```
 npm run terminal:llm-b
@@ -43,15 +51,14 @@ npm run terminal:llm-b
 
 ## 2. Arquivo: `terminal/bootstrap.js`
 
-**Função**: Entry point para o script npm.
-**LOC**: 15
+**Função**: Entry point para o script npm. **LOC**: 15
 
 ### Código Crítico
 
 ```js
 bootCopilot().catch((err) => {
-    console.error('[bootstrap] Falha crítica ao iniciar:', err);
-    process.exitCode = 1;
+  console.error('[bootstrap] Falha crítica ao iniciar:', err);
+  process.exitCode = 1;
 });
 ```
 
@@ -67,9 +74,9 @@ bootCopilot().catch((err) => {
 
 ```js
 bootCopilot().catch((err) => {
-    console.error('[bootstrap] Falha crítica ao iniciar:', err);
-    process.exitCode = 1;
-    process.exit(1);
+  console.error('[bootstrap] Falha crítica ao iniciar:', err);
+  process.exitCode = 1;
+  process.exit(1);
 });
 ```
 
@@ -77,26 +84,25 @@ bootCopilot().catch((err) => {
 
 ## 3. Arquivo: `bootstrap.js` (canônico)
 
-**Função**: Orquestrador de boot em 3 fases.
-**LOC**: ~120
+**Função**: Orquestrador de boot em 3 fases. **LOC**: ~120
 
 ### Achados
 
 | ID              | Sev | Descrição                                                                                                                                                                                                                                                                                                                                                                                                            |
 | --------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GAP-BOOT-01** | P2  | `container.validateRequired([8 tokens])` é chamado no final da **Phase 2**, mas `wireTerminalDI()` só é executado na **Phase 3**. Tokens como `ALWAYS_ALIVE_AGENT` e `TERMINAL_SERVER_OPTIONS` são registrados *depois* da validação. A validação na Phase 2 valida apenas tokens dos módulos core/infra/sdk, não os tokens do terminal — gap de cobertura, não falha imediata (desde que wireTerminalDI esteja OK). |
+| **GAP-BOOT-01** | P2  | `container.validateRequired([8 tokens])` é chamado no final da **Phase 2**, mas `wireTerminalDI()` só é executado na **Phase 3**. Tokens como `ALWAYS_ALIVE_AGENT` e `TERMINAL_SERVER_OPTIONS` são registrados _depois_ da validação. A validação na Phase 2 valida apenas tokens dos módulos core/infra/sdk, não os tokens do terminal — gap de cobertura, não falha imediata (desde que wireTerminalDI esteja OK). |
 | **GAP-BOOT-04** | P3  | Flag `_booted` não tem mecanismo de reset. Em testes que chamam `bootCopilot()` múltiplas vezes, o segundo call é silenciosamente ignorado — dificulta testes de lifecycle.                                                                                                                                                                                                                                          |
 
-> **Status de execução (2026-04-17): `GAP-BOOT-01` mitigado no código.**
-> O `bootstrap` agora chama `wireTerminalDI()` antes de `startTerminalServer()`, e o wiring ficou idempotente.
-> Com isso, os tokens do stack terminal são registrados/validados antes do boot real do terminal, sem duplicar registros.
+> **Status de execução (2026-04-17): `GAP-BOOT-01` mitigado no código.** O `bootstrap` agora chama
+> `wireTerminalDI()` antes de `startTerminalServer()`, e o wiring ficou idempotente. Com isso, os
+> tokens do stack terminal são registrados/validados antes do boot real do terminal, sem duplicar
+> registros.
 
 ---
 
 ## 4. Arquivo: `terminal/index.js`
 
-**Função**: Orquestrador principal de inicialização do terminal server.
-**LOC**: ~380
+**Função**: Orquestrador principal de inicialização do terminal server. **LOC**: ~380
 
 ### Achados Críticos
 
@@ -109,19 +115,22 @@ bootCopilot().catch((err) => {
 
 ### Positivos
 
-- `registerTimer()` usado corretamente para `_reflectionTimer` e `todoCleanupTimer` — cleanup centralizado
+- `registerTimer()` usado corretamente para `_reflectionTimer` e `todoCleanupTimer` — cleanup
+  centralizado
 - `registerShutdownHandler()` registrado para shutdown gracioso
-- `SIGHUP` ignorado para manter inject server vivo quando painel VS Code é fechado (comportamento intencional documentado)
+- `SIGHUP` ignorado para manter inject server vivo quando painel VS Code é fechado (comportamento
+  intencional documentado)
 - Sequência de shutdown bem definida com `await` em cascata
-- `custom-tools.json` opcional agora usa caminho canônico na raiz do workspace, com fallback de leitura para o caminho legado
-- reexecução do boot não mostrou mais warning F53 espúrio nem `Evento SDK desconhecido: session.custom_agents_updated`
+- `custom-tools.json` opcional agora usa caminho canônico na raiz do workspace, com fallback de
+  leitura para o caminho legado
+- reexecução do boot não mostrou mais warning F53 espúrio nem
+  `Evento SDK desconhecido: session.custom_agents_updated`
 
 ---
 
 ## 5. Arquivo: `terminal/di-wiring.js`
 
-**Função**: Registra tokens de DI do stack terminal.
-**LOC**: ~100
+**Função**: Registra tokens de DI do stack terminal. **LOC**: ~100
 
 ### Tokens Registrados
 
@@ -179,18 +188,17 @@ CONVERSATION_STORE (se não registrado)
 
 ## 7. Arquivo: `terminal/repl.js`
 
-**Função**: Interface REPL interativa com 40+ comandos.
-**LOC**: ~400+
+**Função**: Interface REPL interativa com 40+ comandos. **LOC**: ~400+
 
 ### Estrutura
 
 ```js
 const CMD_ROUTES = new Map([
-    ['/help', _cmdHelp],
-    ['/restart', _cmdRestart],
-    ['/reset', _cmdEmergencyReset],
-    ['/status', _cmdStatus],
-    // ... 35+ mais
+  ['/help', _cmdHelp],
+  ['/restart', _cmdRestart],
+  ['/reset', _cmdEmergencyReset],
+  ['/status', _cmdStatus],
+  // ... 35+ mais
 ]);
 ```
 
@@ -212,7 +220,8 @@ await stopTerminalDialogMode();
 
 ### Positivos
 
-- Timeout de 30s em `_cmdRestart()` com `rejectReady(new Error('Timeout aguardando restart'))` — correto
+- Timeout de 30s em `_cmdRestart()` com `rejectReady(new Error('Timeout aguardando restart'))` —
+  correto
 - `once()` vs `on()` usado corretamente para handlers one-shot em restart
 - CMD_ROUTES Map evita switch-case frágil
 
@@ -220,8 +229,8 @@ await stopTerminalDialogMode();
 
 ## 8. Arquivo: `terminal/frontend/llm-b-runtime.js`
 
-**Função**: Gateway centralizado para acesso a agent/channel/hub de módulos do terminal.
-**LOC**: ~120
+**Função**: Gateway centralizado para acesso a agent/channel/hub de módulos do terminal. **LOC**:
+~120
 
 ### Funções Exportadas
 
@@ -249,11 +258,15 @@ stopTerminalDialogMode()
 
 ### Status adicional do `ask_user` / zero-PR (2026-04-18)
 
-- o watchdog zero-PR do terminal deixou de tratar “qualquer `pendingQuestion`” como recuperação bem-sucedida;
+- o watchdog zero-PR do terminal deixou de tratar “qualquer `pendingQuestion`” como recuperação
+  bem-sucedida;
 - agora a recuperação zero-PR exige especificamente `pendingQuestionKind === 'ready'`;
-- o runtime do terminal também passou a expor `pendingQuestionShadow` e `pendingQuestionShadowKind`, permitindo distinguir loop realmente pronto de sombra restaurada do disco.
-- o terminal passou a usar `assistant.streaming_delta` como sinal operacional de progresso de resposta mesmo quando o texto incremental está oculto pela UX.
-- o handler de `tool.execution_progress` foi alinhado ao payload real do SDK (`progressMessage`, com `progress` opcional), removendo a suposição de que sempre existiria percentual numérico.
+- o runtime do terminal também passou a expor `pendingQuestionShadow` e `pendingQuestionShadowKind`,
+  permitindo distinguir loop realmente pronto de sombra restaurada do disco.
+- o terminal passou a usar `assistant.streaming_delta` como sinal operacional de progresso de
+  resposta mesmo quando o texto incremental está oculto pela UX.
+- o handler de `tool.execution_progress` foi alinhado ao payload real do SDK (`progressMessage`, com
+  `progress` opcional), removendo a suposição de que sempre existiria percentual numérico.
 
 ---
 
@@ -275,18 +288,20 @@ stopTerminalDialogMode()
 
 ### Severidade Geral do Módulo: **P2 (Médio)**
 
-Nenhum bug P0/P1 encontrado no módulo terminal. Os gaps P2 afetam confiabilidade em falhas de boot e shutdown, não o caminho normal de execução.
+Nenhum bug P0/P1 encontrado no módulo terminal. Os gaps P2 afetam confiabilidade em falhas de boot e
+shutdown, não o caminho normal de execução.
 
 ---
 
 ## 10. Diagnóstico de UX do terminal (2026-04-18)
 
-Embora o runtime do terminal já tivesse boa cobertura funcional, a UX ainda estava primitiva em relação à superfície
-real do sistema:
+Embora o runtime do terminal já tivesse boa cobertura funcional, a UX ainda estava primitiva em
+relação à superfície real do sistema:
 
-- havia eventos ricos de `assistant.intent`, `tool.execution_*`, `task.*`, `dialog.*` e `session.usage`;
-- mas o operador ainda precisava inferir “o que a LLM-B está fazendo” a partir de linhas soltas, snapshots e blocos
-  textuais pouco semânticos.
+- havia eventos ricos de `assistant.intent`, `tool.execution_*`, `task.*`, `dialog.*` e
+  `session.usage`;
+- mas o operador ainda precisava inferir “o que a LLM-B está fazendo” a partir de linhas soltas,
+  snapshots e blocos textuais pouco semânticos.
 
 ### Melhorias aplicadas nesta onda
 
@@ -296,19 +311,24 @@ real do sistema:
 - broadcast SSE `terminal.activity` para dashboards/consumidores externos;
 - correção do comportamento parcialmente enganoso do toggle `streaming`;
 - toggles adicionais para `tools` e `intent`.
-- prompt interativo dinâmico (`você[modelo/reasoning][MODE:<SDK>]›` quando a sessão sai de `interactive`).
+- prompt interativo dinâmico (`você[modelo/reasoning][MODE:<SDK>]›` quando a sessão sai de
+  `interactive`).
 - prompt interativo dinâmico também com `MODE:<SDK>` quando o runtime reporta modo não-interativo.
-- `/status` enriquecido com metadata local do modelo (`cost`, `speed`, `contextWindow`) e timeline curta da atividade recente.
-- `/status`, `/diagnose`, `/metrics` e `/usage now` agora refletem diretamente o `mode` e o `plan` vanilla observados do SDK, sem um plan mode local paralelo no terminal.
-- o terminal passou a tratar `tool.execution_partial_result` como streaming incremental de saída de tool, em vez de depender só de `progress`/`complete`.
-- o terminal passou a refletir também `session.task_complete`, `session.truncation`, `session.snapshot_rewind`,
-  `session.shutdown`, `session.handoff` e `session.workspace_file_changed`, deixando a trilha vanilla do SDK mais
-  observável para operador e dashboards.
+- `/status` enriquecido com metadata local do modelo (`cost`, `speed`, `contextWindow`) e timeline
+  curta da atividade recente.
+- `/status`, `/diagnose`, `/metrics` e `/usage now` agora refletem diretamente o `mode` e o `plan`
+  vanilla observados do SDK, sem um plan mode local paralelo no terminal.
+- o terminal passou a tratar `tool.execution_partial_result` como streaming incremental de saída de
+  tool, em vez de depender só de `progress`/`complete`.
+- o terminal passou a refletir também `session.task_complete`, `session.truncation`,
+  `session.snapshot_rewind`, `session.shutdown`, `session.handoff` e
+  `session.workspace_file_changed`, deixando a trilha vanilla do SDK mais observável para operador e
+  dashboards.
 
 ### Estado atual
 
-O terminal ainda tem backlog de evolução visual, mas já saiu do modelo “REPL com muitas features” e começou a entrar no
-modelo “console operacional contínuo”.
+O terminal ainda tem backlog de evolução visual, mas já saiu do modelo “REPL com muitas features” e
+começou a entrar no modelo “console operacional contínuo”.
 
 ---
 
@@ -343,4 +363,4 @@ LLM-A (este agente)
 
 ---
 
-*Próximo: [02-AGENT.md](./02-AGENT.md)*
+_Próximo: [02-AGENT.md](./02-AGENT.md)_

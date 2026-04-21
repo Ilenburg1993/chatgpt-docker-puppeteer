@@ -1,18 +1,20 @@
 # R-00 — Pré-Auditoria da Rearquitetura Clean de `src/copilot/`
 
-**Data**: 2026-04-15
-**Status**: concluída
-**Papel**: documento de entrada metodológica e decisória da nova linha clean
+**Data**: 2026-04-15 **Status**: concluída **Papel**: documento de entrada metodológica e decisória
+da nova linha clean
 
 ---
 
 ## 1. Objetivo
 
-Esta pré-auditoria existe para responder, antes de qualquer nova transformação grande, a quatro perguntas:
+Esta pré-auditoria existe para responder, antes de qualquer nova transformação grande, a quatro
+perguntas:
 
 1. **Qual é o estado real atual** de `src/copilot/` e, especialmente, de `src/copilot/agent/`?
-2. **Quanto da documentação atual ainda é operacionalmente útil** e quanto já virou material histórico fragmentado?
-3. **Qual arquitetura-alvo faz sentido hoje**, à luz do baseline vivo de 2026-04-15, e não apenas do snapshot de março?
+2. **Quanto da documentação atual ainda é operacionalmente útil** e quanto já virou material
+   histórico fragmentado?
+3. **Qual arquitetura-alvo faz sentido hoje**, à luz do baseline vivo de 2026-04-15, e não apenas do
+   snapshot de março?
 4. **Como reorganizar o backlog** em uma linha canônica, profunda e executável?
 
 ---
@@ -54,12 +56,12 @@ Foram consideradas, como base histórica e técnica:
 
 Distribuição principal:
 
-| Diretório                     |  MDs |
-| ----------------------------- | ---: |
-| `AUDITORIA-ARQUITETURAL/`     |  103 |
-| `AUDITORIA-DEEP-SRC-COPILOT/` |   10 |
-| `AUDITORIA-SDK-COPILOT/`      |   16 |
-| `PLANO-MIGRACAO/`             |    9 |
+| Diretório                     | MDs |
+| ----------------------------- | --: |
+| `AUDITORIA-ARQUITETURAL/`     | 103 |
+| `AUDITORIA-DEEP-SRC-COPILOT/` |  10 |
+| `AUDITORIA-SDK-COPILOT/`      |  16 |
+| `PLANO-MIGRACAO/`             |   9 |
 
 ### 3.2 Drift entre documentação e código
 
@@ -67,13 +69,16 @@ O drift é material, não cosmético.
 
 Exemplos confirmados:
 
-- `src/copilot/README.md` ainda descreve uma topologia mais antiga, com números de LOC e estruturas já superadas;
-- o inventário histórico ainda fala em `api/` e `services/` como módulos ativos em tabelas antigas, embora já tenham sido removidos como diretórios centrais da arquitetura viva;
+- `src/copilot/README.md` ainda descreve uma topologia mais antiga, com números de LOC e estruturas
+  já superadas;
+- o inventário histórico ainda fala em `api/` e `services/` como módulos ativos em tabelas antigas,
+  embora já tenham sido removidos como diretórios centrais da arquitetura viva;
 - `PLANO-MIGRACAO/` contém visão útil, mas já mistura:
   - backlog ainda válido;
   - itens já executados parcialmente;
   - suposições de março que hoje precisam de recalibração;
-- `ROADMAP-UPGRADES-SRC-COPILOT.md` é útil, mas foca muito mais em terminal/UX/capacidades do que no fechamento arquitetural da base.
+- `ROADMAP-UPGRADES-SRC-COPILOT.md` é útil, mas foca muito mais em terminal/UX/capacidades do que no
+  fechamento arquitetural da base.
 
 ### 3.3 Estado real do código
 
@@ -106,12 +111,16 @@ Exemplos confirmados:
 
 ## 4. Leitura preliminar da crise arquitetural
 
-A pré-auditoria conclui que o problema de `src/copilot/` hoje não é um bug isolado, e sim uma soma de quatro tensões estruturais:
+A pré-auditoria conclui que o problema de `src/copilot/` hoje não é um bug isolado, e sim uma soma
+de quatro tensões estruturais:
 
-1. **módulos com ownership difuso**, especialmente `agent/`, `sdk/`, `observability/` e as bordas `server/ ↔ terminal/`;
-2. **forte herança de compatibilidade**, com shims, barrels e bridges que já foram úteis, mas agora prolongam acoplamento;
+1. **módulos com ownership difuso**, especialmente `agent/`, `sdk/`, `observability/` e as bordas
+   `server/ ↔ terminal/`;
+2. **forte herança de compatibilidade**, com shims, barrels e bridges que já foram úteis, mas agora
+   prolongam acoplamento;
 3. **documentação muito rica, porém dispersa**, o que dificulta governança de backlog;
-4. **mistura entre backlog estrutural e backlog de capabilities**, o que torna fácil pular para features antes de estabilizar a base.
+4. **mistura entre backlog estrutural e backlog de capabilities**, o que torna fácil pular para
+   features antes de estabilizar a base.
 
 ---
 
@@ -123,7 +132,8 @@ Foi criada uma nova linha documental em:
 
 - `DOCUMENTAÇÃO/COPILOT/PLANO-REARQUITETURA-CLEAN/`
 
-Motivo: o material existente é valioso, mas está espalhado demais para continuar servindo como hub operacional sem overhead cognitivo desnecessário.
+Motivo: o material existente é valioso, mas está espalhado demais para continuar servindo como hub
+operacional sem overhead cognitivo desnecessário.
 
 ### 5.2 O acervo antigo vira fonte, não hub principal
 
@@ -141,7 +151,8 @@ Mas a governança do próximo ciclo passa a ser centralizada nesta nova série.
 O foco central da nova série será:
 
 - `src/copilot/agent/` como epicentro do problema arquitetural atual;
-- sua relação com `sdk/`, `events/`, `hooks/`, `observability/`, `server/`, `terminal/`, `channel/` e `conversation-hub/`;
+- sua relação com `sdk/`, `events/`, `hooks/`, `observability/`, `server/`, `terminal/`, `channel/`
+  e `conversation-hub/`;
 - o backlog transversal necessário para fechar essas fronteiras com segurança.
 
 ### 5.4 Separação obrigatória entre base e futuro
@@ -152,7 +163,8 @@ A nova série separa explicitamente:
 - **programas de qualidade e governança**;
 - **capacidades futuras / expansões**.
 
-Isso evita que features apetitosas matem a disciplina arquitetural. Clássico problema de software adulto com alma de startup em sexta-feira à noite.
+Isso evita que features apetitosas matem a disciplina arquitetural. Clássico problema de software
+adulto com alma de startup em sexta-feira à noite.
 
 ---
 
@@ -166,7 +178,8 @@ A auditoria profunda desta linha deve obedecer a estas diretrizes:
 4. **tratar `agent/` como prioridade**, mas nunca isolado do resto de `src/copilot/`;
 5. **converter backlog antigo em programas coerentes**, com fases e subfases acionáveis;
 6. **registrar explicitamente o que é legado, o que é base atual e o que é target**;
-7. **deixar critérios de aceitação claros**, para que o roadmap futuro não dependa de interpretação poética.
+7. **deixar critérios de aceitação claros**, para que o roadmap futuro não dependa de interpretação
+   poética.
 
 ---
 
@@ -195,6 +208,8 @@ A próxima fase exige uma linha documental nova porque:
 - o sistema evoluiu bastante desde o snapshot original;
 - o backlog restante ficou maior, mais transversal e mais profundo;
 - o `agent/` continua no centro do problema, mas já não é o único eixo crítico;
-- há backlog suficiente acumulado em `server/`, `terminal/`, `channel/`, `observability/`, `sdk/`, `tools/` e `config/` para justificar um plano clean por programas.
+- há backlog suficiente acumulado em `server/`, `terminal/`, `channel/`, `observability/`, `sdk/`,
+  `tools/` e `config/` para justificar um plano clean por programas.
 
-Esta pré-auditoria, portanto, **autoriza e orienta** a criação da série `R-00` a `R-15` como nova referência operacional para a próxima grande etapa de rearquitetura de `src/copilot/`.
+Esta pré-auditoria, portanto, **autoriza e orienta** a criação da série `R-00` a `R-15` como nova
+referência operacional para a próxima grande etapa de rearquitetura de `src/copilot/`.

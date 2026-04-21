@@ -1,11 +1,9 @@
 # PARTE-17B — Proposta: Situação Ideal do SDK Wrapper
 
-**Data**: 2026-03-21 (rev.5 — pós conclusão Fase 1 + proposta Fase 2)
-**Escopo**: `src/copilot/sdk/` como fachada única para `@github/copilot-sdk@0.2.0`
-**SDK oficial**: `@github/copilot-sdk@0.2.0` (instalado)
-**Status Fase 1**: ✅ 22 faixas concluídas, 618/618 testes
-**Status Fase 2**: 🔜 12 faixas planejadas (F23–F34), ~200 testes estimados
-**Autor**: Auditoria automatizada PARTE-17, rev.5
+**Data**: 2026-03-21 (rev.5 — pós conclusão Fase 1 + proposta Fase 2) **Escopo**: `src/copilot/sdk/`
+como fachada única para `@github/copilot-sdk@0.2.0` **SDK oficial**: `@github/copilot-sdk@0.2.0`
+(instalado) **Status Fase 1**: ✅ 22 faixas concluídas, 618/618 testes **Status Fase 2**: 🔜 12
+faixas planejadas (F23–F34), ~200 testes estimados **Autor**: Auditoria automatizada PARTE-17, rev.5
 
 > Revisões anteriores preservadas em `.rev2.md`, `.rev3.md`, `.rev4.md`
 
@@ -13,38 +11,38 @@
 
 ## Sumário Executivo (rev.5)
 
-A rev.4 propunha uma arquitetura ideal de SDK wrapper com 18+ módulos em `sdk/`, 
-zero-bypass, cobertura 100% da API Surface e arquitetura de evento tipado.
+A rev.4 propunha uma arquitetura ideal de SDK wrapper com 18+ módulos em `sdk/`, zero-bypass,
+cobertura 100% da API Surface e arquitetura de evento tipado.
 
-A rev.5 registra o **estado de implementação** de cada proposta e define a **Fase 2**
-para completar os itens parcialmente implementados ou não integrados.
+A rev.5 registra o **estado de implementação** de cada proposta e define a **Fase 2** para completar
+os itens parcialmente implementados ou não integrados.
 
 ### Estado das Propostas (Fase 1 — Faixas 1-22)
 
-| Proposta                          | Status     | Notas                                              |
+| Proposta                          |   Status   | Notas                                              |
 | --------------------------------- | :--------: | -------------------------------------------------- |
-| Zero-bypass architecture          | ✅ DONE    | 0 imports diretos fora de sdk/                     |
-| sdk/types.js — 90+ tipos          | ✅ DONE    | 545 linhas, todos tipados                          |
-| sdk/constants.js                  | ✅ DONE    | 233 linhas, SESSION_MODES, REASONING_EFFORTS       |
-| sdk/tools.js + sdk/permissions.js | ✅ DONE    | defineTool, approveAll wrappers                    |
-| sdk/system-message.js             | ✅ DONE    | 3 modos, sectionOverride                           |
-| sdk/config.js                     | ✅ DONE    | buildSessionConfig() unificado                     |
-| sdk/client.js expanded            | ✅ DONE    | 15+ métodos + sdk/client-facade.js                 |
-| sdk/session.js expanded           | ✅ DONE    | 12+ métodos + abort + sdk/session-lifecycle.js     |
-| sdk/rpc.js — 17 subsistemas       | ✅ DONE    | createSessionRpc() + createServerRpc()             |
-| sdk/events.js — 70+ event types   | ✅ DONE    | SESSION_EVENTS, onSessionEvent, event-helpers.js   |
-| sdk/health.js                     | ✅ DONE    | ping, auth, quota, fullHealthCheck                 |
-| sdk/provider.js — BYOK            | ✅ DONE    | openai / azure / anthropic builders                |
-| sdk/telemetry.js                  | ✅ DONE    | getTraceContext, W3C traceparent                   |
-| sdk/models/ directory             | ✅ DONE    | helpers.js + registry.js + selector.js             |
-| sdk/agents.js                     | ✅ DONE    | listAgents, selectAgent, deselectAgent, etc.       |
-| sdk/feature-flags.js              | ✅ DONE    | isExperimentalEnabled, gated features              |
-| sdk/experimental-rpc.js           | ✅ DONE    | 6 subsistemas experimentais gated                  |
+| Zero-bypass architecture          |  ✅ DONE   | 0 imports diretos fora de sdk/                     |
+| sdk/types.js — 90+ tipos          |  ✅ DONE   | 545 linhas, todos tipados                          |
+| sdk/constants.js                  |  ✅ DONE   | 233 linhas, SESSION_MODES, REASONING_EFFORTS       |
+| sdk/tools.js + sdk/permissions.js |  ✅ DONE   | defineTool, approveAll wrappers                    |
+| sdk/system-message.js             |  ✅ DONE   | 3 modos, sectionOverride                           |
+| sdk/config.js                     |  ✅ DONE   | buildSessionConfig() unificado                     |
+| sdk/client.js expanded            |  ✅ DONE   | 15+ métodos + sdk/client-facade.js                 |
+| sdk/session.js expanded           |  ✅ DONE   | 12+ métodos + abort + sdk/session-lifecycle.js     |
+| sdk/rpc.js — 17 subsistemas       |  ✅ DONE   | createSessionRpc() + createServerRpc()             |
+| sdk/events.js — 70+ event types   |  ✅ DONE   | SESSION_EVENTS, onSessionEvent, event-helpers.js   |
+| sdk/health.js                     |  ✅ DONE   | ping, auth, quota, fullHealthCheck                 |
+| sdk/provider.js — BYOK            |  ✅ DONE   | openai / azure / anthropic builders                |
+| sdk/telemetry.js                  |  ✅ DONE   | getTraceContext, W3C traceparent                   |
+| sdk/models/ directory             |  ✅ DONE   | helpers.js + registry.js + selector.js             |
+| sdk/agents.js                     |  ✅ DONE   | listAgents, selectAgent, deselectAgent, etc.       |
+| sdk/feature-flags.js              |  ✅ DONE   | isExperimentalEnabled, gated features              |
+| sdk/experimental-rpc.js           |  ✅ DONE   | 6 subsistemas experimentais gated                  |
 | sdk/quota-monitor.js              | ⚠️ PARCIAL | Criado mas não integrado ao observability (N3)     |
 | Boot auth validation              | ⚠️ PARCIAL | getAuthStatus() existe; boot não chama (N4, N5)    |
 | Session registry SSOT             | ⚠️ PARCIAL | Map + stateless coexistem (P2 residual)            |
 | Config path único                 | ⚠️ PARCIAL | api/routes/sessions.js parcialmente inline (P1)    |
-| RPC subsistemas integrados        | ⚠️ PARCIAL | Facade pronta; agent não usa mode/plan/shell ainda  |
+| RPC subsistemas integrados        | ⚠️ PARCIAL | Facade pronta; agent não usa mode/plan/shell ainda |
 | CI regression gates               | 🔜 PLANNED | Faixa 33                                           |
 
 ---
@@ -75,17 +73,17 @@ para completar os itens parcialmente implementados ou não integrados.
 
 ### 1.2 Estado Atual vs. Alvo por Categoria
 
-| Categoria                     | Alvo (rev.4)        | Atual (rev.5)          | Gap                          |
-| ----------------------------- | ------------------- | ---------------------- | ---------------------------- |
-| Imports diretos ao SDK        | 0                   | **0** ✅               | Nenhum                       |
-| Módulos em sdk/               | 18+                 | **32** ✅              | Excedeu (bom)                |
-| Linhas em sdk/                | ~5.500-6.000        | **~7.744** ✅          | +29% (mais features)         |
-| Boot auth check               | Sim                 | **Não** ⚠️             | N4, N5 — Faixa 24            |
-| Quota monitor em produção     | Sim                 | **Não** ⚠️             | N3 — Faixa 25                |
-| Session registry único        | Sim                 | **Parcial** ⚠️          | P2 — Faixa 26                |
-| Config path único             | Sim                 | **Parcial** ⚠️          | P1 — Faixa 27                |
-| RPC integrado no agent        | Sim                 | **Parcial** ⚠️          | P11 integr. — Faixas 29-31   |
-| CI regression gates           | Sim                 | **Não** 🔜             | N7 — Faixa 33                |
+| Categoria                 | Alvo (rev.4) | Atual (rev.5)  | Gap                        |
+| ------------------------- | ------------ | -------------- | -------------------------- |
+| Imports diretos ao SDK    | 0            | **0** ✅       | Nenhum                     |
+| Módulos em sdk/           | 18+          | **32** ✅      | Excedeu (bom)              |
+| Linhas em sdk/            | ~5.500-6.000 | **~7.744** ✅  | +29% (mais features)       |
+| Boot auth check           | Sim          | **Não** ⚠️     | N4, N5 — Faixa 24          |
+| Quota monitor em produção | Sim          | **Não** ⚠️     | N3 — Faixa 25              |
+| Session registry único    | Sim          | **Parcial** ⚠️ | P2 — Faixa 26              |
+| Config path único         | Sim          | **Parcial** ⚠️ | P1 — Faixa 27              |
+| RPC integrado no agent    | Sim          | **Parcial** ⚠️ | P11 integr. — Faixas 29-31 |
+| CI regression gates       | Sim          | **Não** 🔜     | N7 — Faixa 33              |
 
 ---
 
@@ -100,15 +98,23 @@ para completar os itens parcialmente implementados ou não integrados.
 // @file src/copilot/sdk/types.js
 
 /**
- * Re-exporta os 90+ tipos do @github/copilot-sdk com JSDoc robusto.
- * Serve como a referência central de tipos para todo o codebase.
+ * Re-exporta os 90+ tipos do @github/copilot-sdk com JSDoc robusto. Serve como a referência central de tipos para todo
+ * o codebase.
  */
 export {
-    CopilotClient,    CopilotSession,   SessionConfig,
-    ChatMessage,      ModelInfo,        AgentInfo,
-    ToolDefinition,   ContentBlock,     TextBlock,
-    TokenCountResult, TurnRequest,      ConversationEntry,
-    // ... 70+ tipos adicionais
+  CopilotClient,
+  CopilotSession,
+  SessionConfig,
+  ChatMessage,
+  ModelInfo,
+  AgentInfo,
+  ToolDefinition,
+  ContentBlock,
+  TextBlock,
+  TokenCountResult,
+  TurnRequest,
+  ConversationEntry,
+  // ... 70+ tipos adicionais
 } from '@github/copilot-sdk';
 ```
 
@@ -117,10 +123,15 @@ export {
 ```javascript
 // Situação ideal — ALCANÇADA
 export const SESSION_MODES = Object.freeze({
-    NORMAL: 'normal', EDIT: 'edit', AGENT: 'agent', AUTO: 'auto'
+  NORMAL: 'normal',
+  EDIT: 'edit',
+  AGENT: 'agent',
+  AUTO: 'auto',
 });
 export const REASONING_EFFORTS = Object.freeze({
-    LOW: 'low', MEDIUM: 'medium', HIGH: 'high'
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
 });
 // ... CONNECTION_STATES, ERROR_CODES, FEATURE_FLAGS, etc.
 ```
@@ -133,11 +144,15 @@ export const REASONING_EFFORTS = Object.freeze({
 // Situação ideal — ALCANÇADA
 // sdk/tools.js
 export { defineTool, ToolResult } from '@github/copilot-sdk';
-export function createTool(name, description, handler) { /* wrapper */ }
+export function createTool(name, description, handler) {
+  /* wrapper */
+}
 
 // sdk/permissions.js
 export { approveAll } from '@github/copilot-sdk';
-export function createPermissionHandler(policy) { /* factory */ }
+export function createPermissionHandler(policy) {
+  /* factory */
+}
 ```
 
 ### 2.3 Camada RPC — `sdk/rpc.js` ✅ IMPLEMENTADO
@@ -145,20 +160,42 @@ export function createPermissionHandler(policy) { /* factory */ }
 ```javascript
 // Situação ideal — ALCANÇADA (17 subsistemas)
 export function createSessionRpc(session) {
-    return {
-        model:       { /* getModel, setModel */            },
-        mode:        { /* getMode, setMode */              },
-        plan:        { /* readPlan, updatePlan, delete */   },
-        workspace:   { /* listFiles, readFile, etc. */     },
-        shell:       { /* exec, kill, listRunning */       },
-        compaction:  { /* compact, getHistory */           },
-        tools:       { /* register, list, execute */       },
-        commands:    { /* execute, list */                 },
-        ui:          { /* elicitation(), progress() */    },
-        permissions: { /* request, check */               },
-        log:         { /* write, read */                  },
-        // ... 17 subsistemas totais
-    };
+  return {
+    model: {
+      /* getModel, setModel */
+    },
+    mode: {
+      /* getMode, setMode */
+    },
+    plan: {
+      /* readPlan, updatePlan, delete */
+    },
+    workspace: {
+      /* listFiles, readFile, etc. */
+    },
+    shell: {
+      /* exec, kill, listRunning */
+    },
+    compaction: {
+      /* compact, getHistory */
+    },
+    tools: {
+      /* register, list, execute */
+    },
+    commands: {
+      /* execute, list */
+    },
+    ui: {
+      /* elicitation(), progress() */
+    },
+    permissions: {
+      /* request, check */
+    },
+    log: {
+      /* write, read */
+    },
+    // ... 17 subsistemas totais
+  };
 }
 ```
 
@@ -167,29 +204,41 @@ export function createSessionRpc(session) {
 ```javascript
 // Situação ideal — ALCANÇADA
 export const SESSION_EVENTS = Object.freeze({
-    // Lifecycle
-    INITIALIZED: 'initialized',   DESTROYED: 'destroyed',
-    RESUMED: 'resumed',           SUSPENDED: 'suspended',
-    // Conversation
-    TURN_STARTED: 'turn:started', TURN_COMPLETED: 'turn:completed',
-    TURN_ABORTED: 'turn:aborted',
-    // Messages
-    MESSAGE_ADDED: 'message:added', MESSAGE_CLEARED: 'message:cleared',
-    // Models
-    MODEL_CHANGED: 'model:changed',
-    // ... 70+ event types
+  // Lifecycle
+  INITIALIZED: 'initialized',
+  DESTROYED: 'destroyed',
+  RESUMED: 'resumed',
+  SUSPENDED: 'suspended',
+  // Conversation
+  TURN_STARTED: 'turn:started',
+  TURN_COMPLETED: 'turn:completed',
+  TURN_ABORTED: 'turn:aborted',
+  // Messages
+  MESSAGE_ADDED: 'message:added',
+  MESSAGE_CLEARED: 'message:cleared',
+  // Models
+  MODEL_CHANGED: 'model:changed',
+  // ... 70+ event types
 });
 
-export function onSessionEvent(session, eventType, handler) { /* typed handler */ }
+export function onSessionEvent(session, eventType, handler) {
+  /* typed handler */
+}
 ```
 
 ### 2.5 Health & Auth — `sdk/health.js` ✅ IMPLEMENTADO (⚠️ não integrado no boot)
 
 ```javascript
 // Criado — MAS não chamado no boot (N4, N5)
-export async function getAuthStatus(client) { /* wrapper */ }
-export async function ping(client) { /* wrapper */ }
-export async function fullHealthCheck(client) { /* composite */ }
+export async function getAuthStatus(client) {
+  /* wrapper */
+}
+export async function ping(client) {
+  /* wrapper */
+}
+export async function fullHealthCheck(client) {
+  /* composite */
+}
 
 // ❌ AINDA NÃO INTEGRADO em:
 // agent/lifecycle/initializer.js (N4, N5) — Faixa 24
@@ -200,8 +249,8 @@ export async function fullHealthCheck(client) { /* composite */ }
 ```javascript
 // Criado em F21 — MAS não iniciado no observability (N3)
 export function createQuotaMonitor({ client, intervalMs, warningThreshold, onUpdate, onWarning }) {
-    // polling a cada intervalMs
-    // chama onWarning quando uso > warningThreshold
+  // polling a cada intervalMs
+  // chama onWarning quando uso > warningThreshold
 }
 
 // ❌ AINDA NÃO INTEGRADO em:
@@ -215,23 +264,23 @@ export function createQuotaMonitor({ client, intervalMs, warningThreshold, onUpd
 
 ### 3.1 Objetivos da Fase 2
 
-A Fase 1 entregou a **fachada completa** — todos os wrappers existem.
-A Fase 2 entrega a **integração profunda** — todos os wrappers são usados.
+A Fase 1 entregou a **fachada completa** — todos os wrappers existem. A Fase 2 entrega a
+**integração profunda** — todos os wrappers são usados.
 
-| Objetivo Fase 2                            | Prioridade | Faixa   |
-| ------------------------------------------ | :--------: | :-----: |
-| Barrel index.js consistente                |   MÉDIO    |   F23   |
-| Boot valida autenticação antes de criar sessão | ALTA  |   F24   |
-| Quota monitor ativo em produção            |    ALTA    |   F25   |
-| Session registry unificado (SSOT)          |   CRÍTICO  |   F26   |
-| Config path único (P1 final)               |   CRÍTICO  |   F27   |
-| Hook types alinhados (P4 final)            |   MÉDIO    |   F28   |
-| Mode + Plan via RPC no agent               |   MÉDIO    |   F29   |
-| UI Elicitation + Shell via RPC             |   MÉDIO    |   F30   |
-| Compaction + Workspace via RPC             |    BAIXO   |   F31   |
-| tools-registry deprecated e limpo          |    BAIXO   |   F32   |
-| CI regression gates (zero-bypass)          |   MÉDIO    |   F33   |
-| Documentação + release                     |    BAIXO   |   F34   |
+| Objetivo Fase 2                                | Prioridade | Faixa |
+| ---------------------------------------------- | :--------: | :---: |
+| Barrel index.js consistente                    |   MÉDIO    |  F23  |
+| Boot valida autenticação antes de criar sessão |    ALTA    |  F24  |
+| Quota monitor ativo em produção                |    ALTA    |  F25  |
+| Session registry unificado (SSOT)              |  CRÍTICO   |  F26  |
+| Config path único (P1 final)                   |  CRÍTICO   |  F27  |
+| Hook types alinhados (P4 final)                |   MÉDIO    |  F28  |
+| Mode + Plan via RPC no agent                   |   MÉDIO    |  F29  |
+| UI Elicitation + Shell via RPC                 |   MÉDIO    |  F30  |
+| Compaction + Workspace via RPC                 |   BAIXO    |  F31  |
+| tools-registry deprecated e limpo              |   BAIXO    |  F32  |
+| CI regression gates (zero-bypass)              |   MÉDIO    |  F33  |
+| Documentação + release                         |   BAIXO    |  F34  |
 
 ### 3.2 Arquitetura Alvo da Fase 2
 
@@ -242,26 +291,27 @@ A Fase 2 entrega a **integração profunda** — todos os wrappers são usados.
 import { getClient, getAuthStatus, ping } from '#copilot/sdk';
 
 export async function initialize(config) {
-    const client = getClient(config);           // ✅ usa wrapper, não new CopilotClient
-    
-    // [F24] Auth check antes de criar sessão
-    const authStatus = await getAuthStatus(client);
-    if (!authStatus.isAuthenticated) {
-        throw new Error(`Auth falhou: ${authStatus.errorMessage}`);
-    }
-    
-    // [F24] Health check
-    const alive = await ping(client);
-    if (!alive) throw new Error('Copilot server não responde');
-    
-    // [F25] Iniciar quota monitor
-    const monitor = createQuotaMonitor({
-        client, intervalMs: 60_000,
-        warningThreshold: 80,
-        onWarning: (usage) => logger.warn('Quota alta:', usage),
-    });
-    
-    return { client, monitor };
+  const client = getClient(config); // ✅ usa wrapper, não new CopilotClient
+
+  // [F24] Auth check antes de criar sessão
+  const authStatus = await getAuthStatus(client);
+  if (!authStatus.isAuthenticated) {
+    throw new Error(`Auth falhou: ${authStatus.errorMessage}`);
+  }
+
+  // [F24] Health check
+  const alive = await ping(client);
+  if (!alive) throw new Error('Copilot server não responde');
+
+  // [F25] Iniciar quota monitor
+  const monitor = createQuotaMonitor({
+    client,
+    intervalMs: 60_000,
+    warningThreshold: 80,
+    onWarning: (usage) => logger.warn('Quota alta:', usage),
+  });
+
+  return { client, monitor };
 }
 ```
 
@@ -302,8 +352,9 @@ await rpc.mode.set('agent');
 
 // UI Elicitation (F30)
 const form = await rpc.ui.elicitation({
-    type: 'form', title: 'Confirme a ação',
-    fields: [{ name: 'confirm', type: 'boolean', label: 'Continuar?' }]
+  type: 'form',
+  title: 'Confirme a ação',
+  fields: [{ name: 'confirm', type: 'boolean', label: 'Continuar?' }],
 });
 
 // Compaction (F31)
@@ -359,19 +410,19 @@ Estimativa final Fase 2: ~8.200 linhas, 32 módulos
 
 ## §5. Métricas Alvo (Fase 2 Completa)
 
-| Métrica                          | Fase 1 (atual)  | Fase 2 (alvo)    |
-| -------------------------------- | :-------------: | :--------------: |
-| Testes                           | 618             | **818+**         |
-| Specs                            | 25              | **35+**          |
-| Zero-bypass                      | ✅ 0            | ✅ 0 (CI gated)  |
-| Boot auth validation             | ❌ Não           | ✅ Sim           |
-| Quota monitor em produção        | ❌ Não           | ✅ Sim           |
-| Session registry SSOT            | ⚠️ Parcial       | ✅ Sim           |
-| Config path único                | ⚠️ Parcial       | ✅ Sim           |
-| RPC integrado no agent           | ⚠️ Facade only   | ✅ Integrado     |
-| CI regression gates              | ❌ Não           | ✅ Sim           |
-| Cobertura fachada                | ~100%           | ~100%            |
-| Cobertura integração             | ~70%            | ~100%            |
+| Métrica                   | Fase 1 (atual) |  Fase 2 (alvo)  |
+| ------------------------- | :------------: | :-------------: |
+| Testes                    |      618       |    **818+**     |
+| Specs                     |       25       |     **35+**     |
+| Zero-bypass               |      ✅ 0      | ✅ 0 (CI gated) |
+| Boot auth validation      |     ❌ Não     |     ✅ Sim      |
+| Quota monitor em produção |     ❌ Não     |     ✅ Sim      |
+| Session registry SSOT     |   ⚠️ Parcial   |     ✅ Sim      |
+| Config path único         |   ⚠️ Parcial   |     ✅ Sim      |
+| RPC integrado no agent    | ⚠️ Facade only |  ✅ Integrado   |
+| CI regression gates       |     ❌ Não     |     ✅ Sim      |
+| Cobertura fachada         |     ~100%      |      ~100%      |
+| Cobertura integração      |      ~70%      |      ~100%      |
 
 ---
 
@@ -379,16 +430,15 @@ Estimativa final Fase 2: ~8.200 linhas, 32 módulos
 
 ### 6.1 Boundary Single Entry Point
 
-> **REGRA**: `src/copilot/sdk/` é a ÚNICA fonte de verdade para o SDK.
-> Nenhum módulo fora de `sdk/` importa diretamente de `@github/copilot-sdk`.
+> **REGRA**: `src/copilot/sdk/` é a ÚNICA fonte de verdade para o SDK. Nenhum módulo fora de `sdk/`
+> importa diretamente de `@github/copilot-sdk`.
 
-Estado atual: ✅ **ALCANÇADO** (F18-F20)
-Manutenção: 🔜 CI gate permanente (F33)
+Estado atual: ✅ **ALCANÇADO** (F18-F20) Manutenção: 🔜 CI gate permanente (F33)
 
 ### 6.2 Ergonomia Acima de Tudo
 
-> **REGRA**: A API pública de `sdk/index.js` deve ser simples de usar.
-> O developer não deve precisar conhecer a estrutura interna do SDK.
+> **REGRA**: A API pública de `sdk/index.js` deve ser simples de usar. O developer não deve precisar
+> conhecer a estrutura interna do SDK.
 
 Estado atual: ✅ **ALCANÇADO** (`#copilot/sdk` = acesso a tudo)
 
@@ -413,13 +463,17 @@ Estado atual: ✅ **ALCANÇADO** (sdk/types.js — 545 linhas de JSDoc)
 ```javascript
 // ❌ ERRADO — abstrair além do necessário:
 class CopilotSDKWrapper {
-    constructor() { this._internal = new CopilotClient(); }
-    doSomethingFancy() { /* complex logic */ }
+  constructor() {
+    this._internal = new CopilotClient();
+  }
+  doSomethingFancy() {
+    /* complex logic */
+  }
 }
 
 // ✅ CORRETO — expor o SDK com ergonomia, não esconder:
 export function getClient(config) {
-    return new CopilotClient(config);  // simples, no overhead
+  return new CopilotClient(config); // simples, no overhead
 }
 ```
 
@@ -428,10 +482,10 @@ export function getClient(config) {
 ```javascript
 // ❌ ERRADO — regra de negócio no sdk/:
 export function createSession(client, config) {
-    if (config.modelId.includes('gpt-4')) {
-        config.maxTokens = 128000;  // regra de negócio!
-    }
-    return client.createSession(config);
+  if (config.modelId.includes('gpt-4')) {
+    config.maxTokens = 128000; // regra de negócio!
+  }
+  return client.createSession(config);
 }
 
 // ✅ CORRETO — a regra de negócio fica no consumer:
@@ -463,6 +517,7 @@ Semana 6: F33 (CI gates) + F34 (docs + release)
 
 ---
 
-*Documento atualizado em 2026-03-21, rev.5. Base: conclusão das 22 faixas (618 testes, 25 specs)
-+ proposta Fase 2 (Faixas 23–34, ~200 testes estimados, ~8.200 linhas sdk/ alvo).
-Revisões anteriores: `.rev2.md`, `.rev3.md`, `.rev4.md`*
+\*Documento atualizado em 2026-03-21, rev.5. Base: conclusão das 22 faixas (618 testes, 25 specs)
+
+- proposta Fase 2 (Faixas 23–34, ~200 testes estimados, ~8.200 linhas sdk/ alvo). Revisões
+  anteriores: `.rev2.md`, `.rev3.md`, `.rev4.md`\*

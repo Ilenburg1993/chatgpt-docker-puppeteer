@@ -1,9 +1,8 @@
 # PARTE-24J — ROADMAP COMPLETO: COPILOT SERVER DEDICADO E ARQUITETURA ROBUSTA
 
-> **Documento**: PARTE-24J-ROADMAP-COPILOT-SERVER.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Roadmap de implementação detalhado para chegar da estrutura atual à arquitetura ideal descrita na PARTE-24I
+> **Documento**: PARTE-24J-ROADMAP-COPILOT-SERVER.md **Versão**: 1.0 **Data**: 2026-04-12
+> **Escopo**: Roadmap de implementação detalhado para chegar da estrutura atual à arquitetura ideal
+> descrita na PARTE-24I
 
 ---
 
@@ -38,8 +37,8 @@ Onda 3.7  — Documentação, validação final, score check
 
 ## 2. ONDA 3.0 — CRIAÇÃO DO SERVER COPILOT BÁSICO
 
-**Objetivo**: Criar `src/copilot/server/` como módulo autônomo com Express + HTTP server.
-Nesta onda, o servidor convive com o atual `terminal/server.js` — não substitui ainda.
+**Objetivo**: Criar `src/copilot/server/` como módulo autônomo com Express + HTTP server. Nesta
+onda, o servidor convive com o atual `terminal/server.js` — não substitui ainda.
 
 **Referência**: Resolve P3 (server/ vazia) parcialmente
 
@@ -54,11 +53,11 @@ import { createAuthMiddleware } from './middleware/auth.js';
 import { createRateLimiters } from './middleware/rate-limiter.js';
 
 export function createCopilotApp() {
-    const app = express();
-    app.use(express.json({ limit: '10mb' }));
-    // CORS para dashboard local
-    app.use(createCorsMiddleware());
-    return { app };
+  const app = express();
+  app.use(express.json({ limit: '10mb' }));
+  // CORS para dashboard local
+  app.use(createCorsMiddleware());
+  return { app };
 }
 ```
 
@@ -71,12 +70,12 @@ export function createCopilotApp() {
 ```js
 // src/copilot/server/middleware/auth.js
 export function createAuthMiddleware(token) {
-    return (req, res, next) => {
-        if (req.path === '/health') return next();
-        const provided = req.headers['x-llm-b-token'];
-        if (!timingSafeEqual(provided, token)) return res.status(401).json({ error: 'Unauthorized' });
-        next();
-    };
+  return (req, res, next) => {
+    if (req.path === '/health') return next();
+    const provided = req.headers['x-llm-b-token'];
+    if (!timingSafeEqual(provided, token)) return res.status(401).json({ error: 'Unauthorized' });
+    next();
+  };
 }
 ```
 
@@ -98,9 +97,9 @@ import http from 'node:http';
 import { createCopilotApp } from './app.js';
 
 export async function createCopilotServer() {
-    const { app } = createCopilotApp();
-    const server = http.createServer(app);
-    return { app, server };
+  const { app } = createCopilotApp();
+  const server = http.createServer(app);
+  return { app, server };
 }
 ```
 
@@ -135,8 +134,8 @@ export default router;
 
 ### L55.3 — Criar `src/copilot/server/routes/config.js`
 
-**O que**: Router Express para `/config`, `/config/skills`, `/config/tools`,
-`/config/tools/custom`, `/config/infinite-session`.
+**O que**: Router Express para `/config`, `/config/skills`, `/config/tools`, `/config/tools/custom`,
+`/config/infinite-session`.
 
 ### L55.4 — Criar `src/copilot/server/routes/memory.js`
 
@@ -161,13 +160,13 @@ export default router;
 ```js
 // src/copilot/server/router.js
 export function mountRoutes(app) {
-    app.use('/', healthRouter);
-    app.use('/', agentRouter);
-    app.use('/', configRouter);
-    app.use('/', memoryRouter);
-    app.use('/', observabilityRouter);
-    app.use('/', gitRouter);
-    app.use('/', githubRouter);
+  app.use('/', healthRouter);
+  app.use('/', agentRouter);
+  app.use('/', configRouter);
+  app.use('/', memoryRouter);
+  app.use('/', observabilityRouter);
+  app.use('/', gitRouter);
+  app.use('/', githubRouter);
 }
 ```
 
@@ -190,6 +189,7 @@ grep "socket.io" package.json
 ```
 
 Se não existir:
+
 ```bash
 npm install socket.io
 ```
@@ -198,34 +198,35 @@ npm install socket.io
 
 ### L56.2 — Criar `src/copilot/server/socket.js`
 
-**O que**: Configura Socket.IO server, monta namespace `/copilot` (mover de `conversation-hub/socket-ns.js`).
+**O que**: Configura Socket.IO server, monta namespace `/copilot` (mover de
+`conversation-hub/socket-ns.js`).
 
 ```js
 // src/copilot/server/socket.js
 import { Server as SocketServer } from 'socket.io';
 
 export function createCopilotSocket(httpServer) {
-    const io = new SocketServer(httpServer, {
-        cors: {
-            origin: ['http://localhost:3000', 'http://localhost:5173'],
-            methods: ['GET', 'POST'],
-        },
-        path: '/socket.io',
-    });
+  const io = new SocketServer(httpServer, {
+    cors: {
+      origin: ['http://localhost:3000', 'http://localhost:5173'],
+      methods: ['GET', 'POST'],
+    },
+    path: '/socket.io',
+  });
 
-    // Namespace /copilot — ConversationHub
-    const hubNs = io.of('/copilot');
-    mountHubNamespace(hubNs);
+  // Namespace /copilot — ConversationHub
+  const hubNs = io.of('/copilot');
+  mountHubNamespace(hubNs);
 
-    // Namespace /events — stream de eventos copilot
-    const eventsNs = io.of('/events');
-    mountEventsNamespace(eventsNs);
+  // Namespace /events — stream de eventos copilot
+  const eventsNs = io.of('/events');
+  mountEventsNamespace(eventsNs);
 
-    // Namespace /agent — controle do AlwaysAliveAgent
-    const agentNs = io.of('/agent');
-    mountAgentNamespace(agentNs);
+  // Namespace /agent — controle do AlwaysAliveAgent
+  const agentNs = io.of('/agent');
+  mountAgentNamespace(agentNs);
 
-    return { io, hubNs, eventsNs, agentNs };
+  return { io, hubNs, eventsNs, agentNs };
 }
 ```
 
@@ -241,7 +242,8 @@ para não quebrar `hub.js`.
 ### L56.4 — Atualizar `conversation-hub/hub.js`
 
 **O que**: Remover `initStandalone()` como método alternativo. O init padrão agora recebe `io` via
-`createCopilotSocket()`. Manter `initStandalone()` como compatibilidade temporária durante transição.
+`createCopilotSocket()`. Manter `initStandalone()` como compatibilidade temporária durante
+transição.
 
 **Acceptance**: `conversationHub.init({ io })` funções com socket.io real.
 
@@ -250,12 +252,12 @@ para não quebrar `hub.js`.
 ```js
 // src/copilot/server/index.js
 export async function createCopilotServer() {
-    const { app } = createCopilotApp();
-    const server = http.createServer(app);
-    const { io } = createCopilotSocket(server);
-    conversationHub.init({ io });  // hub com socket!
-    mountRoutes(app);
-    return { app, server, io };
+  const { app } = createCopilotApp();
+  const server = http.createServer(app);
+  const { io } = createCopilotSocket(server);
+  conversationHub.init({ io }); // hub com socket!
+  mountRoutes(app);
+  return { app, server, io };
 }
 ```
 
@@ -263,17 +265,18 @@ export async function createCopilotServer() {
 
 ## 5. ONDA 3.3 — TERMINAL CLEANUP (UI-ONLY)
 
-**Objetivo**: Remover toda lógica de servidor HTTP do `terminal/`. Depois desta onda, `terminal/`
-é puramente a camada de UI (REPL, comandos, display).
+**Objetivo**: Remover toda lógica de servidor HTTP do `terminal/`. Depois desta onda, `terminal/` é
+puramente a camada de UI (REPL, comandos, display).
 
 **Referência**: Resolve P1 (server misturado com terminal) — fase 2 (conclusão)
 
 ### L57.1 — Atualizar `terminal/index.js`
 
-**O que**: Substituir `createInjectServer()` por `startCopilotServer()` do novo `server/`.
-Remover imports de `server.js`, `route-table.js`, `state.js`, `rate-limiter-state.js`.
+**O que**: Substituir `createInjectServer()` por `startCopilotServer()` do novo `server/`. Remover
+imports de `server.js`, `route-table.js`, `state.js`, `rate-limiter-state.js`.
 
 **Antes:**
+
 ```js
 import { createInjectServer } from './server.js';
 // ...
@@ -282,10 +285,11 @@ injectServer.listen(3009);
 ```
 
 **Depois:**
+
 ```js
 import { startCopilotServer } from '../server/index.js';
 // ...
-await startCopilotServer();  // server separado cuida de tudo
+await startCopilotServer(); // server separado cuida de tudo
 ```
 
 ### L57.2 — Mover `terminal/state.js` para `server/state.js`
@@ -309,8 +313,8 @@ necessidade de duplicar — routers em `server/routes/` podem importar handlers 
 
 ## 6. ONDA 3.4 — CONVERSATION HUB REFACTOR (DOMÍNIO LIMPO)
 
-**Objetivo**: Tornar o `conversation-hub/` um módulo de domínio puro — sem transporte, sem socket.io,
-sem Express. O acoplamento a socket.io fica exclusivamente em `server/socket/`.
+**Objetivo**: Tornar o `conversation-hub/` um módulo de domínio puro — sem transporte, sem
+socket.io, sem Express. O acoplamento a socket.io fica exclusivamente em `server/socket/`.
 
 **Referência**: Resolve P8 (socket-ns misturado com domínio)
 
@@ -333,8 +337,8 @@ sem Express. O acoplamento a socket.io fica exclusivamente em `server/socket/`.
  */
 
 export const nullSocketAdapter = {
-    broadcast: () => {},
-    emit: () => {},
+  broadcast: () => {},
+  emit: () => {},
 };
 ```
 
@@ -344,13 +348,13 @@ export const nullSocketAdapter = {
 
 ```js
 class ConversationHub {
-    /** @type {import('./socket-adapter.js').SocketAdapter} */
-    #socketAdapter = nullSocketAdapter;
+  /** @type {import('./socket-adapter.js').SocketAdapter} */
+  #socketAdapter = nullSocketAdapter;
 
-    init({ io, socketAdapter }) {
-        this.#socketAdapter = socketAdapter ?? createSocketAdapterFromIO(io);
-        // ...
-    }
+  init({ io, socketAdapter }) {
+    this.#socketAdapter = socketAdapter ?? createSocketAdapterFromIO(io);
+    // ...
+  }
 }
 ```
 
@@ -364,17 +368,15 @@ class ConversationHub {
 
 ### L59.1 — Auditar cada arquivo em `src/copilot/api/`
 
-**O que**: Classificar: (a) integrar ao novo server/, (b) manter como lib compartilhada, (c) remover.
+**O que**: Classificar: (a) integrar ao novo server/, (b) manter como lib compartilhada, (c)
+remover.
 
-**Mapeamento esperado**:
-| Arquivo | Destino |
-|---------|---------|
-| `api/bridge/` | ⚠️ Era bridge do production server. Avaliar se tem valor standalone. |
-| `api/express/` | ✅ SDK API router — integrar em `server/routes/sdk.js` |
-| `api/sse/fanout.js` | ✅ Mover para `server/sse/fanout.js` |
-| `api/sse/replay-buffer.js` | ✅ Mover para `server/sse/replay-buffer.js` |
-| `api/sse/utils.js` | ✅ Mover para `server/sse/utils.js` |
-| `api/openapi.json` | ✅ Mover para `server/openapi.json`, adicionar novos endpoints |
+**Mapeamento esperado**: | Arquivo | Destino | |---------|---------| | `api/bridge/` | ⚠️ Era bridge
+do production server. Avaliar se tem valor standalone. | | `api/express/` | ✅ SDK API router —
+integrar em `server/routes/sdk.js` | | `api/sse/fanout.js` | ✅ Mover para `server/sse/fanout.js` |
+| `api/sse/replay-buffer.js` | ✅ Mover para `server/sse/replay-buffer.js` | | `api/sse/utils.js` |
+✅ Mover para `server/sse/utils.js` | | `api/openapi.json` | ✅ Mover para `server/openapi.json`,
+adicionar novos endpoints |
 
 ### L59.2 — Criar `server/routes/sdk.js`
 
@@ -394,7 +396,8 @@ GET  /sdk/health   ← status do SDK
 
 ## 8. ONDA 3.6 — BOOTSTRAP UNIFICADO + VALIDAÇÕES
 
-**Objetivo**: Simplificar o bootstrap para 1 path limpo. Remover chain bootstrap → terminal/bootstrap.
+**Objetivo**: Simplificar o bootstrap para 1 path limpo. Remover chain bootstrap →
+terminal/bootstrap.
 
 **Referência**: Resolve P5 (bootstrap chain circular)
 
@@ -405,9 +408,9 @@ GET  /sdk/health   ← status do SDK
 ```js
 // src/copilot/bootstrap.js
 export async function bootCopilot() {
-    bootstrapObservability();
-    bootstrapLateDeps({ buildTool });
-    await startCopilotServer();  // server/ cuida de tudo (terminal incluído)
+  bootstrapObservability();
+  bootstrapLateDeps({ buildTool });
+  await startCopilotServer(); // server/ cuida de tudo (terminal incluído)
 }
 ```
 
@@ -419,6 +422,7 @@ Manter apenas por backwards compat com PM2 se necessário (como alias vazio).
 ### L60.3 — Atualizar `check-copilot-autonomy.mjs`
 
 **O que**: Check 5 (modo único) continua válido. Adicionar:
+
 - Check 6: `server/index.js` existe e exporta `startCopilotServer()`
 - Check 7: Zero imports de `terminal/server.js` fora de `terminal/` (server movido)
 - Check 8: `conversationHub` tem `init({ io })` funcional (não apenas standalone)
@@ -436,19 +440,19 @@ Manter apenas por backwards compat com PM2 se necessário (como alias vazio).
 
 ### L61.1 — Remover arquivos deprecated
 
-| Arquivo | Status | Ação |
-|---------|--------|------|
-| `src/copilot/server/wiring.js` | @deprecated Onda 2.7 | Remover |
-| `src/copilot/terminal/server.js` | @deprecated Onda 3.3 | Remover |
-| `src/copilot/terminal/route-table.js` | @deprecated Onda 3.3 | Remover |
-| `src/copilot/terminal/rate-limiter-state.js` | @deprecated Onda 3.3 | Remover |
-| `src/copilot/api/bridge/` | Órfão desde Onda 2.7 | Avaliar: remover ou integrar |
-| `src/copilot/conversation-hub/socket-ns.js` | Movido para server/ | Manter como re-export ou remover |
+| Arquivo                                      | Status               | Ação                             |
+| -------------------------------------------- | -------------------- | -------------------------------- |
+| `src/copilot/server/wiring.js`               | @deprecated Onda 2.7 | Remover                          |
+| `src/copilot/terminal/server.js`             | @deprecated Onda 3.3 | Remover                          |
+| `src/copilot/terminal/route-table.js`        | @deprecated Onda 3.3 | Remover                          |
+| `src/copilot/terminal/rate-limiter-state.js` | @deprecated Onda 3.3 | Remover                          |
+| `src/copilot/api/bridge/`                    | Órfão desde Onda 2.7 | Avaliar: remover ou integrar     |
+| `src/copilot/conversation-hub/socket-ns.js`  | Movido para server/  | Manter como re-export ou remover |
 
 ### L61.2 — Consolidar `logs/` e `infra/`
 
-**Opção A**: Remover pastas vazias.
-**Opção B**: Preencher com conteúdo: `infra/` = wrappers de FS, network; `logs/` = log formatters.
+**Opção A**: Remover pastas vazias. **Opção B**: Preencher com conteúdo: `infra/` = wrappers de FS,
+network; `logs/` = log formatters.
 
 ### L61.3 — Atualizar `src/copilot/README.md`
 
@@ -462,28 +466,31 @@ Manter apenas por backwards compat com PM2 se necessário (como alias vazio).
 
 ## 10. TABELA DE PRIORIDADES
 
-| Onda | Prioridade | Dependências | Impacto |
-|------|-----------|--------------|---------|
-| 3.0 | 🔴 ALTA | nenhuma | Base do server |
-| 3.1 | 🔴 ALTA | 3.0 | Express routers |
-| 3.2 | 🔴 ALTA | 3.0 | Socket.IO + dashboard RT |
-| 3.3 | 🟠 MÉDIA | 3.0, 3.1 | Terminal limpo |
-| 3.4 | 🟠 MÉDIA | 3.2, 3.3 | Hub domínio puro |
-| 3.5 | 🟡 NORMAL | 3.0, 3.1 | API/ cleanup |
-| 3.6 | 🟡 NORMAL | 3.0–3.5 | Bootstrap unificado |
-| 3.7 | 🟢 BAIXA | 3.0–3.6 | Cleanup + docs |
+| Onda | Prioridade | Dependências | Impacto                  |
+| ---- | ---------- | ------------ | ------------------------ |
+| 3.0  | 🔴 ALTA    | nenhuma      | Base do server           |
+| 3.1  | 🔴 ALTA    | 3.0          | Express routers          |
+| 3.2  | 🔴 ALTA    | 3.0          | Socket.IO + dashboard RT |
+| 3.3  | 🟠 MÉDIA   | 3.0, 3.1     | Terminal limpo           |
+| 3.4  | 🟠 MÉDIA   | 3.2, 3.3     | Hub domínio puro         |
+| 3.5  | 🟡 NORMAL  | 3.0, 3.1     | API/ cleanup             |
+| 3.6  | 🟡 NORMAL  | 3.0–3.5      | Bootstrap unificado      |
+| 3.7  | 🟢 BAIXA   | 3.0–3.6      | Cleanup + docs           |
 
 ---
 
 ## 11. CRITÉRIOS DE SUCESSO
 
 ### Por onda:
+
 - Lint ✅ + Typecheck ✅ + Smoke test ✅ antes de cada commit
 - Zero regressões no terminal (boot, inject, SSE)
 - ConversationHub funciona em ambos os modos durante transição
 
 ### Final (Onda 3.7 completa):
-- `src/copilot/server/` tem pelo menos: `index.js`, `app.js`, `socket.js`, `router.js`, `middleware/`, `routes/`
+
+- `src/copilot/server/` tem pelo menos: `index.js`, `app.js`, `socket.js`, `router.js`,
+  `middleware/`, `routes/`
 - `terminal/` não importa mais de `terminal/server.js` ou `terminal/route-table.js`
 - `conversationHub.init({ io })` funciona no boot standalone
 - Dashboard pode se conectar via socket.io ao copilot server
@@ -495,16 +502,19 @@ Manter apenas por backwards compat com PM2 se necessário (como alias vazio).
 ## 12. NOTAS DE IMPLEMENTAÇÃO
 
 ### Sobre compatibilidade backward:
+
 - Durante a migração, manter `terminal/server.js` funcionando até Onda 3.3
 - Usar feature flags se necessário: `COPILOT_USE_NEW_SERVER=true`
 - Socket.IO é aditivo — não quebra SSE existente
 
 ### Sobre tamanho dos commits:
+
 - Cada passo (L54.x, L55.x) deve ser um commit atômico
 - Usar mensagens `refactor(onda3.X): L5Y.Z — [descrição curta]`
 - Push após cada onda completa (não a cada commit)
 
 ### Sobre testes:
+
 - `terminal/server.js` tem testes implícitos via `test:integration`
 - Verificar quais testes dependem do inject server antes de Onda 3.3
 - Criar testes para `server/app.js` que sejam independentes do terminal
@@ -513,18 +523,18 @@ Manter apenas por backwards compat com PM2 se necessário (como alias vazio).
 
 ## 13. PERGUNTAS EM ABERTO
 
-| Questão | Relevância | Impacto |
-|---------|-----------|---------|
-| `api/bridge/` tem valor standalone? | Médio | Define se é integrado ao server/ ou removido |
-| Terminal deve ter REPL + server no mesmo processo? | Alto | Impacta L57.1 |
-| Socket.IO no copilot deve usar porta :3009 ou separada? | Médio | Impacta networking do dashboard |
-| `agent.js` @deprecated deve ser removido ou mantido para PM2? | Baixo | Cleanup |
-| `initStandalone()` deve ser mantido em modo de compatibilidade? | Médio | Transição suave |
+| Questão                                                         | Relevância | Impacto                                      |
+| --------------------------------------------------------------- | ---------- | -------------------------------------------- |
+| `api/bridge/` tem valor standalone?                             | Médio      | Define se é integrado ao server/ ou removido |
+| Terminal deve ter REPL + server no mesmo processo?              | Alto       | Impacta L57.1                                |
+| Socket.IO no copilot deve usar porta :3009 ou separada?         | Médio      | Impacta networking do dashboard              |
+| `agent.js` @deprecated deve ser removido ou mantido para PM2?   | Baixo      | Cleanup                                      |
+| `initStandalone()` deve ser mantido em modo de compatibilidade? | Médio      | Transição suave                              |
 
 ---
 
 ## 14. CHANGELOG
 
-| Versão | Data       | Mudanças |
-| ------ | ---------- | -------- |
+| Versão | Data       | Mudanças                      |
+| ------ | ---------- | ----------------------------- |
 | 1.0    | 2026-04-12 | Roadmap completo Onda 3.0–3.7 |

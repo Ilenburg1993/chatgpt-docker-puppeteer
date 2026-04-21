@@ -1,15 +1,15 @@
 # 01 — Inventário Completo: SDK `@github/copilot-sdk` vs `src/copilot`
 
-**Data**: 2026-03-21 | **Revisado**: 2026-03-21
-**Status**: Versão Definitiva (pós revisão crítica)
-**Legenda**: ✅ = implementado | ⚠️ = parcial | ❌ = ausente | 🧪 = experimental (wrapper existe, sem exposição)
+**Data**: 2026-03-21 | **Revisado**: 2026-03-21 **Status**: Versão Definitiva (pós revisão crítica)
+**Legenda**: ✅ = implementado | ⚠️ = parcial | ❌ = ausente | 🧪 = experimental (wrapper existe,
+sem exposição)
 
 ---
 
 ## 1. CopilotClient — Métodos de Instância
 
-| Método SDK                           | Nosso Wrapper                        | Arquivo                        | Status                              |
-| ------------------------------------ | ------------------------------------ | ------------------------------ | ----------------------------------- |
+| Método SDK                           | Nosso Wrapper                        | Arquivo                        | Status                               |
+| ------------------------------------ | ------------------------------------ | ------------------------------ | ------------------------------------ |
 | `new CopilotClient(opts)`            | `buildClientOptions() + getClient()` | `sdk/session/client.js`        | ✅                                   |
 | `client.start()`                     | Implícito via `getClient()` (lazy)   | `sdk/session/client.js`        | ✅                                   |
 | `client.stop()`                      | `stopClient()`                       | `sdk/session/client.js`        | ✅                                   |
@@ -32,19 +32,19 @@
 
 | Opção                      | Status | Notas                              |
 | -------------------------- | ------ | ---------------------------------- |
-| `cliUrl`                   | ✅      | Via `COPILOT_CLI_URL` env          |
-| `isChildProcess`           | ❌      | Não utilizado                      |
-| `telemetry.captureContent` | ❌      | Não exposto                        |
-| `telemetry.filePath`       | ❌      | Não configurado                    |
-| `telemetry.exporterType`   | ✅      | Via OTLP em `buildClientOptions()` |
-| `onGetTraceContext`        | ❌      | Não wired                          |
+| `cliUrl`                   | ✅     | Via `COPILOT_CLI_URL` env          |
+| `isChildProcess`           | ❌     | Não utilizado                      |
+| `telemetry.captureContent` | ❌     | Não exposto                        |
+| `telemetry.filePath`       | ❌     | Não configurado                    |
+| `telemetry.exporterType`   | ✅     | Via OTLP em `buildClientOptions()` |
+| `onGetTraceContext`        | ❌     | Não wired                          |
 
 ---
 
 ## 2. CopilotSession — Métodos de Instância
 
-| Método SDK                               | Nosso Wrapper                      | Arquivo                                     | Status                          |
-| ---------------------------------------- | ---------------------------------- | ------------------------------------------- | ------------------------------- |
+| Método SDK                               | Nosso Wrapper                      | Arquivo                                     | Status                           |
+| ---------------------------------------- | ---------------------------------- | ------------------------------------------- | -------------------------------- |
 | `session.send(options)`                  | Direto via `session.send()`        | `agent/dialog/turn-executor.js`             | ✅                               |
 | `session.sendAndWait(options, timeout?)` | Direto via `session.sendAndWait()` | `agent/dialog/turn-executor.js`             | ✅                               |
 | `session.on(eventType, handler)`         | `subscribeEvent()` + direto        | `sdk/session/events.js` + handlers          | ✅                               |
@@ -61,30 +61,30 @@
 
 ### SessionConfig cobertura
 
-| Opção                     | Passado em `session-setup.js`?   | Status |
-| ------------------------- | -------------------------------- | ------ |
-| `model`                   | ✅ `ctx.model`                    | ✅      |
-| `reasoningEffort`         | ✅ `ctx.reasoningEffort`          | ✅      |
-| `streaming`               | ✅ default `true` em lifecycle.js | ✅      |
-| `onPermissionRequest`     | ✅ `ctx.permissions.handler`      | ✅      |
-| `onUserInputRequest`      | ✅ `handleUserInputRequest()`     | ✅      |
-| `hooks`                   | ✅ `busHooks` (attachBus)         | ✅      |
-| `tools`                   | ✅ `bootstrapTools()`             | ✅      |
-| `mcpServers`              | ✅ `buildMcpConfig()`             | ✅      |
-| `workingDirectory`        | ✅ em `lifecycle.js`              | ✅      |
-| `customAgents`            | ✅ em `lifecycle.js`              | ✅      |
-| `infiniteSessions`        | ✅ em `lifecycle.js`              | ✅      |
-| `systemMessage`           | ✅ em `lifecycle.js`              | ✅      |
-| `sessionId`               | ✅ (para resume)                  | ✅      |
-| `clientName`              | ❌ não passado                    | ❌      |
-| `configDir`               | ❌                                | ❌      |
-| `availableTools`          | ❌                                | ❌      |
-| `excludedTools`           | ❌                                | ❌      |
-| `provider` (BYOK)         | ✅ em `sdk/session/provider.js`   | ✅      |
-| `agent` (initial agent)   | ❌                                | ❌      |
-| `skillDirectories`        | ❌                                | ❌      |
-| `disabledSkills`          | ❌                                | ❌      |
-| `onEvent` (early handler) | ❌                                | ❌      |
+| Opção                     | Passado em `session-setup.js`?    | Status |
+| ------------------------- | --------------------------------- | ------ |
+| `model`                   | ✅ `ctx.model`                    | ✅     |
+| `reasoningEffort`         | ✅ `ctx.reasoningEffort`          | ✅     |
+| `streaming`               | ✅ default `true` em lifecycle.js | ✅     |
+| `onPermissionRequest`     | ✅ `ctx.permissions.handler`      | ✅     |
+| `onUserInputRequest`      | ✅ `handleUserInputRequest()`     | ✅     |
+| `hooks`                   | ✅ `busHooks` (attachBus)         | ✅     |
+| `tools`                   | ✅ `bootstrapTools()`             | ✅     |
+| `mcpServers`              | ✅ `buildMcpConfig()`             | ✅     |
+| `workingDirectory`        | ✅ em `lifecycle.js`              | ✅     |
+| `customAgents`            | ✅ em `lifecycle.js`              | ✅     |
+| `infiniteSessions`        | ✅ em `lifecycle.js`              | ✅     |
+| `systemMessage`           | ✅ em `lifecycle.js`              | ✅     |
+| `sessionId`               | ✅ (para resume)                  | ✅     |
+| `clientName`              | ❌ não passado                    | ❌     |
+| `configDir`               | ❌                                | ❌     |
+| `availableTools`          | ❌                                | ❌     |
+| `excludedTools`           | ❌                                | ❌     |
+| `provider` (BYOK)         | ✅ em `sdk/session/provider.js`   | ✅     |
+| `agent` (initial agent)   | ❌                                | ❌     |
+| `skillDirectories`        | ❌                                | ❌     |
+| `disabledSkills`          | ❌                                | ❌     |
+| `onEvent` (early handler) | ❌                                | ❌     |
 
 ---
 
@@ -92,24 +92,24 @@
 
 | Namespace                                            | Método                             | Wrapper          | Status |
 | ---------------------------------------------------- | ---------------------------------- | ---------------- | ------ |
-| `model.getCurrent()`                                 | `modelGetCurrent()`                | `sdk/rpc/ops.js` | ✅      |
-| `model.switchTo(params)`                             | `modelSwitchTo()`                  | `sdk/rpc/ops.js` | ✅      |
-| `mode.get()`                                         | `modeGet()`                        | `sdk/rpc/ops.js` | ✅      |
-| `mode.set(params)`                                   | `modeSet()`                        | `sdk/rpc/ops.js` | ✅      |
-| `plan.read()`                                        | `planRead()`                       | `sdk/rpc/ops.js` | ✅      |
-| `plan.update(params)`                                | `planUpdate()`                     | `sdk/rpc/ops.js` | ✅      |
-| `plan.delete()`                                      | `planDelete()`                     | `sdk/rpc/ops.js` | ✅      |
-| `workspace.listFiles(params)`                        | `workspaceListFiles()`             | `sdk/rpc/ops.js` | ✅      |
-| `workspace.readFile(params)`                         | `workspaceReadFile()`              | `sdk/rpc/ops.js` | ✅      |
-| `workspace.createFile(params)`                       | `workspaceCreateFile()`            | `sdk/rpc/ops.js` | ✅      |
-| `tools.handlePendingToolCall(params)`                | `handlePendingToolCall()`          | `sdk/rpc/ops.js` | ✅      |
-| `commands.handlePendingCommand(params)`              | `handlePendingCommand()`           | `sdk/rpc/ops.js` | ✅      |
-| `ui.elicitation(params)`                             | `uiElicitation()`                  | `sdk/rpc/ops.js` | ✅      |
-| `permissions.handlePendingPermissionRequest(params)` | `handlePendingPermissionRequest()` | `sdk/rpc/ops.js` | ✅      |
-| `log(params)`                                        | `rpcLog()`                         | `sdk/rpc/ops.js` | ✅      |
-| `shell.exec(params)`                                 | `shellExec()`                      | `sdk/rpc/ops.js` | ✅      |
-| `shell.kill(params)`                                 | `shellKill()`                      | `sdk/rpc/ops.js` | ✅      |
-| `compaction.compact(params)`                         | `compactionCompact()`              | `sdk/rpc/ops.js` | ✅      |
+| `model.getCurrent()`                                 | `modelGetCurrent()`                | `sdk/rpc/ops.js` | ✅     |
+| `model.switchTo(params)`                             | `modelSwitchTo()`                  | `sdk/rpc/ops.js` | ✅     |
+| `mode.get()`                                         | `modeGet()`                        | `sdk/rpc/ops.js` | ✅     |
+| `mode.set(params)`                                   | `modeSet()`                        | `sdk/rpc/ops.js` | ✅     |
+| `plan.read()`                                        | `planRead()`                       | `sdk/rpc/ops.js` | ✅     |
+| `plan.update(params)`                                | `planUpdate()`                     | `sdk/rpc/ops.js` | ✅     |
+| `plan.delete()`                                      | `planDelete()`                     | `sdk/rpc/ops.js` | ✅     |
+| `workspace.listFiles(params)`                        | `workspaceListFiles()`             | `sdk/rpc/ops.js` | ✅     |
+| `workspace.readFile(params)`                         | `workspaceReadFile()`              | `sdk/rpc/ops.js` | ✅     |
+| `workspace.createFile(params)`                       | `workspaceCreateFile()`            | `sdk/rpc/ops.js` | ✅     |
+| `tools.handlePendingToolCall(params)`                | `handlePendingToolCall()`          | `sdk/rpc/ops.js` | ✅     |
+| `commands.handlePendingCommand(params)`              | `handlePendingCommand()`           | `sdk/rpc/ops.js` | ✅     |
+| `ui.elicitation(params)`                             | `uiElicitation()`                  | `sdk/rpc/ops.js` | ✅     |
+| `permissions.handlePendingPermissionRequest(params)` | `handlePendingPermissionRequest()` | `sdk/rpc/ops.js` | ✅     |
+| `log(params)`                                        | `rpcLog()`                         | `sdk/rpc/ops.js` | ✅     |
+| `shell.exec(params)`                                 | `shellExec()`                      | `sdk/rpc/ops.js` | ✅     |
+| `shell.kill(params)`                                 | `shellKill()`                      | `sdk/rpc/ops.js` | ✅     |
+| `compaction.compact(params)`                         | `compactionCompact()`              | `sdk/rpc/ops.js` | ✅     |
 
 ---
 
@@ -117,28 +117,28 @@
 
 | Namespace                    | Método                | Wrapper                   | Exposição (tools/routes) | Status |
 | ---------------------------- | --------------------- | ------------------------- | ------------------------ | ------ |
-| `fleet.start(params)`        | `fleetStart()`        | `sdk/rpc/experimental.js` | ❌ sem tools/routes       | 🧪      |
-| `agent.list()`               | `agentList()`         | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `agent.select(params)`       | `agentSelect()`       | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `agent.deselect()`           | `agentDeselect()`     | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `agent.getStatus(params)`    | `agentGetStatus()`    | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `agent.stop(params)`         | `agentStop()`         | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `agent.getCurrent()`         | —                     | —                         | —                        | ❌      |
-| `agent.reload()`             | —                     | —                         | —                        | ❌      |
-| `skills.list()`              | `skillsList()`        | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `skills.enable(params)`      | `skillsEnable()`      | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `skills.disable(params)`     | `skillsDisable()`     | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `skills.getStatus(params)`   | `skillsGetStatus()`   | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `skills.reload()`            | —                     | —                         | —                        | ❌      |
-| `mcp.list()`                 | `mcpList()`           | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `mcp.enable(params)`         | `mcpEnable()`         | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `mcp.disable(params)`        | `mcpDisable()`        | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `mcp.getStatus(params)`      | `mcpGetStatus()`      | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `mcp.reload()`               | —                     | —                         | —                        | ❌      |
-| `plugins.list()`             | `pluginsList()`       | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `extensions.list()`          | `extensionsList()`    | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `extensions.enable(params)`  | `extensionsEnable()`  | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
-| `extensions.disable(params)` | `extensionsDisable()` | `sdk/rpc/experimental.js` | ❌                        | 🧪      |
+| `fleet.start(params)`        | `fleetStart()`        | `sdk/rpc/experimental.js` | ❌ sem tools/routes      | 🧪     |
+| `agent.list()`               | `agentList()`         | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `agent.select(params)`       | `agentSelect()`       | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `agent.deselect()`           | `agentDeselect()`     | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `agent.getStatus(params)`    | `agentGetStatus()`    | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `agent.stop(params)`         | `agentStop()`         | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `agent.getCurrent()`         | —                     | —                         | —                        | ❌     |
+| `agent.reload()`             | —                     | —                         | —                        | ❌     |
+| `skills.list()`              | `skillsList()`        | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `skills.enable(params)`      | `skillsEnable()`      | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `skills.disable(params)`     | `skillsDisable()`     | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `skills.getStatus(params)`   | `skillsGetStatus()`   | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `skills.reload()`            | —                     | —                         | —                        | ❌     |
+| `mcp.list()`                 | `mcpList()`           | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `mcp.enable(params)`         | `mcpEnable()`         | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `mcp.disable(params)`        | `mcpDisable()`        | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `mcp.getStatus(params)`      | `mcpGetStatus()`      | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `mcp.reload()`               | —                     | —                         | —                        | ❌     |
+| `plugins.list()`             | `pluginsList()`       | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `extensions.list()`          | `extensionsList()`    | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `extensions.enable(params)`  | `extensionsEnable()`  | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
+| `extensions.disable(params)` | `extensionsDisable()` | `sdk/rpc/experimental.js` | ❌                       | 🧪     |
 
 ---
 
@@ -146,32 +146,32 @@
 
 | Namespace            | Método                      | Wrapper                 | Status |
 | -------------------- | --------------------------- | ----------------------- | ------ |
-| `models.list()`      | Via `listAvailableModels()` | `sdk/session/client.js` | ✅      |
-| `account.getQuota()` | —                           | —                       | ❌      |
-| `tools.list(params)` | —                           | —                       | ❌      |
+| `models.list()`      | Via `listAvailableModels()` | `sdk/session/client.js` | ✅     |
+| `account.getQuota()` | —                           | —                       | ❌     |
+| `tools.list(params)` | —                           | —                       | ❌     |
 
 ---
 
 ## 6. SessionHooks — 6 Slots do SDK
 
-| Hook Slot               | Factory default              | Custom override                   | Bus bridge      | Status |
-| ----------------------- | ---------------------------- | --------------------------------- | --------------- | ------ |
-| `onPreToolUse`          | ✅ `buildPreToolUseHandler()` | ✅ via `cfg.onPreToolUse`          | ✅ `attachBus()` | ✅      |
-| `onPostToolUse`         | ✅ audit logging              | ✅ via `cfg.onPostToolUse`         | ✅ `attachBus()` | ✅      |
-| `onUserPromptSubmitted` | ✅ audit logging              | ✅ via `cfg.onUserPromptSubmitted` | ✅ `attachBus()` | ✅      |
-| `onSessionStart`        | ✅ lifecycle hooks            | ✅ via `cfg.onSessionStart`        | ✅ `attachBus()` | ✅      |
-| `onSessionEnd`          | ✅ lifecycle hooks            | ✅ via `cfg.onSessionEnd`          | ✅ `attachBus()` | ✅      |
-| `onErrorOccurred`       | ✅ retry/skip/abort           | ✅ via `cfg.onErrorOccurred`       | ✅ `attachBus()` | ✅      |
+| Hook Slot               | Factory default               | Custom override                    | Bus bridge       | Status |
+| ----------------------- | ----------------------------- | ---------------------------------- | ---------------- | ------ |
+| `onPreToolUse`          | ✅ `buildPreToolUseHandler()` | ✅ via `cfg.onPreToolUse`          | ✅ `attachBus()` | ✅     |
+| `onPostToolUse`         | ✅ audit logging              | ✅ via `cfg.onPostToolUse`         | ✅ `attachBus()` | ✅     |
+| `onUserPromptSubmitted` | ✅ audit logging              | ✅ via `cfg.onUserPromptSubmitted` | ✅ `attachBus()` | ✅     |
+| `onSessionStart`        | ✅ lifecycle hooks            | ✅ via `cfg.onSessionStart`        | ✅ `attachBus()` | ✅     |
+| `onSessionEnd`          | ✅ lifecycle hooks            | ✅ via `cfg.onSessionEnd`          | ✅ `attachBus()` | ✅     |
+| `onErrorOccurred`       | ✅ retry/skip/abort           | ✅ via `cfg.onErrorOccurred`       | ✅ `attachBus()` | ✅     |
 
 ---
 
 ## 7. System Message — Modos
 
-| Modo SDK                            | Wrapper                         | Status                            |
-| ----------------------------------- | ------------------------------- | --------------------------------- |
-| `append` (default)                  | `appendSystemMessage()`         | ✅ `sdk/session/system-message.js` |
-| `replace`                           | `replaceSystemMessage()`        | ✅                                 |
-| `customize` (sections + transforms) | `customizeSystemMessage()`      | ✅ (módulo existe)                 |
+| Modo SDK                            | Wrapper                          | Status                             |
+| ----------------------------------- | -------------------------------- | ---------------------------------- |
+| `append` (default)                  | `appendSystemMessage()`          | ✅ `sdk/session/system-message.js` |
+| `replace`                           | `replaceSystemMessage()`         | ✅                                 |
+| `customize` (sections + transforms) | `customizeSystemMessage()`       | ✅ (módulo existe)                 |
 | `SectionTransformFn` callbacks      | ❓ (suportado no tipo, testado?) | ⚠️                                 |
 | `SYSTEM_PROMPT_SECTIONS` re-export  | ✅                               | ✅                                 |
 
@@ -253,8 +253,8 @@
 
 ## 9. Presets de Hooks
 
-| Preset                | Função                        | Status                           |
-| --------------------- | ----------------------------- | -------------------------------- |
+| Preset                | Função                        | Status                            |
+| --------------------- | ----------------------------- | --------------------------------- |
 | Minimal (debug tools) | `createMinimalHooks()`        | ✅ `hooks/factory.js`             |
 | Audit (full logging)  | `createAuditHooks()`          | ✅ `hooks/factory.js`             |
 | Deny-all (read-only)  | `createDenyAllHooks()`        | ✅ `hooks/factory.js`             |
@@ -269,18 +269,19 @@
 
 ## 10. Sumário Quantitativo
 
-| Categoria               | Total SDK | ✅ Implementado | ⚠️ Parcial | 🧪 Wrapper sem exposição | ❌ Ausente               |
-| ----------------------- | --------- | -------------- | --------- | ----------------------- | ----------------------- |
-| Client methods          | 16        | 12             | 1         | 0                       | 3                       |
-| Session methods         | 12        | 11             | 0         | 0                       | 1                       |
-| SessionConfig options   | 21        | 14             | 0         | 0                       | 7                       |
-| RPC estáveis            | 18        | 18             | 0         | 0                       | 0                       |
-| RPC experimentais       | 23        | 0              | 0         | 19                      | 4                       |
-| Server RPC              | 3         | 1              | 0         | 0                       | 2                       |
-| SessionHooks            | 6         | 6              | 0         | 0                       | 0                       |
-| System message modes    | 4         | 3              | 1         | 0                       | 0                       |
-| Session events          | 55+       | 33             | 0         | 0                       | 22+ (catch-all captura) |
-| Client lifecycle events | 5         | 0              | 5         | 0                       | 0                       |
-| Hook presets            | 7+        | 7+             | 0         | 0                       | 0                       |
+| Categoria               | Total SDK | ✅ Implementado | ⚠️ Parcial | 🧪 Wrapper sem exposição | ❌ Ausente              |
+| ----------------------- | --------- | --------------- | ---------- | ------------------------ | ----------------------- |
+| Client methods          | 16        | 12              | 1          | 0                        | 3                       |
+| Session methods         | 12        | 11              | 0          | 0                        | 1                       |
+| SessionConfig options   | 21        | 14              | 0          | 0                        | 7                       |
+| RPC estáveis            | 18        | 18              | 0          | 0                        | 0                       |
+| RPC experimentais       | 23        | 0               | 0          | 19                       | 4                       |
+| Server RPC              | 3         | 1               | 0          | 0                        | 2                       |
+| SessionHooks            | 6         | 6               | 0          | 0                        | 0                       |
+| System message modes    | 4         | 3               | 1          | 0                        | 0                       |
+| Session events          | 55+       | 33              | 0          | 0                        | 22+ (catch-all captura) |
+| Client lifecycle events | 5         | 0               | 5          | 0                        | 0                       |
+| Hook presets            | 7+        | 7+              | 0          | 0                        | 0                       |
 
-**Cobertura estimada**: ~75% (APIs estáveis: ~90%, APIs experimentais: ~0% exposto, events: ~60% com handler dedicado)
+**Cobertura estimada**: ~75% (APIs estáveis: ~90%, APIs experimentais: ~0% exposto, events: ~60% com
+handler dedicado)

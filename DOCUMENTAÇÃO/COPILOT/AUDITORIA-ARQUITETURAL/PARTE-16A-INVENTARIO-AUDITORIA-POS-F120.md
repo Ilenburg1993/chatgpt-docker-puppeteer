@@ -1,9 +1,8 @@
 # PARTE-16A — Inventário e Auditoria Profunda Pós-F120
 
-**Data**: 2026-04-08
-**Baseline**: commit `bfe96b57` (pós-PARTE-14E completo)
-**Escopo**: Todo o módulo `src/copilot/` (260 arquivos, 45.750 linhas, 42 diretórios)
-**Referência**: PARTE-14A/B/C/D, PARTE-15B
+**Data**: 2026-04-08 **Baseline**: commit `bfe96b57` (pós-PARTE-14E completo) **Escopo**: Todo o
+módulo `src/copilot/` (260 arquivos, 45.750 linhas, 42 diretórios) **Referência**: PARTE-14A/B/C/D,
+PARTE-15B
 
 ---
 
@@ -16,11 +15,11 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 ### Métricas Gerais
 
-| Métrica                         | Valor   | Avaliação                             |
-| ------------------------------- | ------- | ------------------------------------- |
-| Arquivos `.js`                  | 260     | Boa granularidade                     |
-| Linhas totais                   | 45.750  | Módulo grande mas organizado          |
-| Diretórios (subsistemas)        | 42      | Boa separação                         |
+| Métrica                         | Valor   | Avaliação                              |
+| ------------------------------- | ------- | -------------------------------------- |
+| Arquivos `.js`                  | 260     | Boa granularidade                      |
+| Linhas totais                   | 45.750  | Módulo grande mas organizado           |
+| Diretórios (subsistemas)        | 42      | Boa separação                          |
 | Arquivos >400L                  | **22**  | ⚠️ Ainda excessivo — alvo <10          |
 | Arquivos sem nenhum teste       | ~200    | ⚠️ Cobertura de teste deficiente       |
 | FS sync calls (não-shutdown)    | **84**  | ⚠️ Bloqueiam event loop                |
@@ -48,7 +47,9 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `file-context.js`            |    381 | Workspace scanning com FS sync pesado               |
 
 **Achados críticos:**
-- `file-context.js` usa `readdirSync`, `readFileSync`, `statSync` extensivamente para scan de workspace
+
+- `file-context.js` usa `readdirSync`, `readFileSync`, `statSync` extensivamente para scan de
+  workspace
 - `terminal/server.js` não valida headers de origin em WebSocket connections
 - Nenhum teste unitário para `engine.js`, `server.js`, `repl.js`
 - Timers (`setInterval`) em `index.js` para cleanup sem `clearInterval` no shutdown
@@ -66,6 +67,7 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `web-tools.js`           |    397 | Web scraping + URL handling               |
 
 **Achados críticos:**
+
 - `session-tools.js` usa `execSync` 3x sem sanitização de input (`git rev-parse`)
 - `file/read-tools.js` valida paths com `isWithinWorkspace()` mas não protege contra symlink escape
 - `web-tools.js` faz fetch de URLs externas sem timeout configurável
@@ -85,6 +87,7 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `hub.js`          |    282 | Coordenação de sessions + orchestration      |
 
 **Achados críticos:**
+
 - Nenhum teste unitário para nenhum dos 10 arquivos
 - `orchestrator.js` tem retry manual duplicado (não usa `core/retry.js`)
 - `socket-ns.js` não valida `socket.handshake.auth` rigorosamente
@@ -101,8 +104,9 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `nerv-bridge.js`     |    385 | HTTP bridge sem retry centralizado   |
 
 **Achados críticos:**
-- `git-bridge.js` passa args diretamente para `execFile` — seguro por natureza do execFile, mas
-  sem validação semântica do argumento git ref
+
+- `git-bridge.js` passa args diretamente para `execFile` — seguro por natureza do execFile, mas sem
+  validação semântica do argumento git ref
 - `mcp-tool-bridge.js` tem retry manual que deveria migrar para `core/retry.js`
 - `nerv-bridge.js` não usa `withTimeout` para requisições HTTP
 - `gh/ci.js` tem retry manual com padrão duplicado
@@ -119,6 +123,7 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `event-collector.js`                |    386 | Collector core com many catch {} vazios |
 
 **Achados críticos:**
+
 - `otel.js` tem 4 catch blocks vazios — erros silenciados sem log
 - `event-collector.js` tem 3 catch blocks vazios
 - `metrics.js` acumula contadores sem limit/reset — potencial memory leak em sessões longas
@@ -133,6 +138,7 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `factory.js` |    402 | Mistura criação, validação, merge e resolução de hooks |
 
 **Achados críticos:**
+
 - `factory.js` implementa lógica de merge complexa que deveria ser testada
 - Presets em `presets/` estão bem organizados
 - 4 testes existentes cobrem hooks bem
@@ -150,8 +156,10 @@ estavam fora do foco agent-centric do roadmap anterior.
 **Risco: 🟡 MÉDIO** — `client.js` (556L) é o maior god module restante pelo tamanho relativo.
 
 **Achados críticos:**
+
 - `client.js` (556L) é god module: HTTP client + SSE + dialog + history + structured messages
-- Já foi parcialmente decomposto (client-dialog, client-structured, client-history) mas o core é grande
+- Já foi parcialmente decomposto (client-dialog, client-structured, client-history) mas o core é
+  grande
 
 ### 2.9 `agent/` — 7.736L, 53 arquivos, 11 testes
 
@@ -163,6 +171,7 @@ estavam fora do foco agent-centric do roadmap anterior.
 | `dialog/loop-manager.js` |    597 | Ainda o maior após 3 extrações |
 
 **Achados críticos:**
+
 - `session/snapshot.js` ainda usa 8 FS sync calls
 - `lifecycle/state-io.js` mistura sync/async (7 FS sync calls)
 - Boa cobertura de testes relativamente ao tamanho
@@ -175,14 +184,14 @@ estavam fora do foco agent-centric do roadmap anterior.
 
 | ID     | Severidade | Módulo               | Descrição                                                         |
 | ------ | ---------- | -------------------- | ----------------------------------------------------------------- |
-| SEC-01 | 🟡 Média    | `session-tools.js`   | `execSync('git ...')` sem sanitização do CWD                      |
-| SEC-02 | 🟡 Média    | `socket-ns.js`       | Validação fraca de `socket.handshake.auth`                        |
-| SEC-03 | 🟡 Média    | `terminal/server.js` | WebSocket sem validação de origin rigorosa                        |
-| SEC-04 | 🟢 Baixa    | `file/read-tools.js` | Path traversal via symlink não verificado                         |
-| SEC-05 | 🟢 Baixa    | `web-tools.js`       | fetch de URLs externas sem timeout ceiling (potencial SSRF lento) |
-| SEC-06 | ✅ OK       | `shell/sandbox.js`   | Sanitização regex robusta mas frágil para edge cases              |
-| SEC-07 | ✅ OK       | `todo/store.js`      | Prepared statements — seguro contra SQLi                          |
-| SEC-08 | ✅ OK       | `webhook-manager.js` | SSRF prevention + DNS rebinding check implementados               |
+| SEC-01 | 🟡 Média   | `session-tools.js`   | `execSync('git ...')` sem sanitização do CWD                      |
+| SEC-02 | 🟡 Média   | `socket-ns.js`       | Validação fraca de `socket.handshake.auth`                        |
+| SEC-03 | 🟡 Média   | `terminal/server.js` | WebSocket sem validação de origin rigorosa                        |
+| SEC-04 | 🟢 Baixa   | `file/read-tools.js` | Path traversal via symlink não verificado                         |
+| SEC-05 | 🟢 Baixa   | `web-tools.js`       | fetch de URLs externas sem timeout ceiling (potencial SSRF lento) |
+| SEC-06 | ✅ OK      | `shell/sandbox.js`   | Sanitização regex robusta mas frágil para edge cases              |
+| SEC-07 | ✅ OK      | `todo/store.js`      | Prepared statements — seguro contra SQLi                          |
+| SEC-08 | ✅ OK      | `webhook-manager.js` | SSRF prevention + DNS rebinding check implementados               |
 
 ### 3.2 Recomendações de Segurança
 
@@ -232,8 +241,8 @@ Top ofensores por módulo:
 
 ### 5.1 Mapa de Cobertura
 
-| Subsistema          | Linhas | Testes | Cobertura | Avaliação                   |
-| ------------------- | -----: | -----: | --------: | --------------------------- |
+| Subsistema          | Linhas | Testes | Cobertura | Avaliação                    |
+| ------------------- | -----: | -----: | --------: | ---------------------------- |
 | `agent/`            |  7.736 |     11 |      ~25% | 🟢 Aceitável (pós-PARTE-14E) |
 | `terminal/`         |  7.618 |      3 |       ~5% | 🔴 Crítico                   |
 | `tools/`            |  6.120 |      6 |      ~10% | 🔴 Crítico                   |

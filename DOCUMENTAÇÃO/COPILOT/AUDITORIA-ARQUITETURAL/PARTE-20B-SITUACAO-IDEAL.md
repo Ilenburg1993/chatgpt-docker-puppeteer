@@ -1,13 +1,14 @@
 # PARTE-20B — Situação Ideal: Arquitetura Target de `src/copilot`
 
-**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0
-**Referência cruzada**: PARTE-20A (problemas), PARTE-20D (grafos), PARTE-20E (critérios)
+**Data**: 2026-04-10 | **Status**: Canônico | **Versão**: 1.0 **Referência cruzada**: PARTE-20A
+(problemas), PARTE-20D (grafos), PARTE-20E (critérios)
 
 ---
 
 ## 1. Visão da Arquitetura Ideal
 
-A arquitetura target de `src/copilot` deve satisfazer todos os 13 critérios definidos em `PARTE-20E-CRITERIOS.md`. O resultado final será um sistema com:
+A arquitetura target de `src/copilot` deve satisfazer todos os 13 critérios definidos em
+`PARTE-20E-CRITERIOS.md`. O resultado final será um sistema com:
 
 - **Hierarquia de camadas estrita** — dependências unidirecionais, verificadas por CI
 - **Módulos coesos e bem delimitados** — cada pasta tem uma única responsabilidade
@@ -349,22 +350,22 @@ src/copilot/
 
 ## 3. Comparação por Módulo: Atual → Ideal
 
-| Módulo | Antes | Depois | Tipo de mudança |
-|---|---|---|---|
-| `core/` | 14 arquivos, importa observability | 15 arquivos (+security/), sem imports internos | Extração + fix |
-| `sdk/` | 32 arquivos, rpc.js 484 LoC | 33 arquivos, rpc dividido | Divisão |
-| `audit/` | 4 arquivos OK | 4 arquivos, pipeline dividido | Divisão |
-| `config/` | 7 arquivos, 3 locais de config | 7 arq + subfolders, session-config consolidado | Reestruturação |
-| `observability/` | 17 arquivos, métricas duplicadas | 17 arq + bootstrap.js, metrics fundidos | Adição + fusão |
-| `hooks/` | 19 arq, tipos conflitantes | 19 arq, renomeações | Renomeação |
-| `tools/` | 28 arq, todo/store.js 423 LoC | 28+ arq, arquivos grandes divididos | Divisão |
-| `bridges/` | 11 arq, 4 naturezas misturadas | Reorganizado em git/, mcp/, nerv/ | Reorganização |
-| `agent/` | 40 arq, always-alive 603 LoC | 42 arq, god objects divididos, sem imports terminal | Divisão + fix |
-| `conversation-hub/` | 12 arq, store.js 562 LoC | 12 arq + store/ subdir, arquivos grandes divididos | Divisão |
-| `channel/` | 7 arq, client.js 557 LoC + DI problemática | 8+ arq, DI explícita | Divisão + DI |
-| `api/` | 20 arq, singleton import direto | 20 arq, factory DI | Fix DI |
-| `terminal/` | 38 arq, handlers duplos, state global vaza | 36 arq (-flat handlers), state encapsulado | Limpeza + fix |
-| `logs/` | Em src/copilot — errado | Movido para var/logs/copilot/ | Movimentação |
+| Módulo              | Antes                                      | Depois                                              | Tipo de mudança |
+| ------------------- | ------------------------------------------ | --------------------------------------------------- | --------------- |
+| `core/`             | 14 arquivos, importa observability         | 15 arquivos (+security/), sem imports internos      | Extração + fix  |
+| `sdk/`              | 32 arquivos, rpc.js 484 LoC                | 33 arquivos, rpc dividido                           | Divisão         |
+| `audit/`            | 4 arquivos OK                              | 4 arquivos, pipeline dividido                       | Divisão         |
+| `config/`           | 7 arquivos, 3 locais de config             | 7 arq + subfolders, session-config consolidado      | Reestruturação  |
+| `observability/`    | 17 arquivos, métricas duplicadas           | 17 arq + bootstrap.js, metrics fundidos             | Adição + fusão  |
+| `hooks/`            | 19 arq, tipos conflitantes                 | 19 arq, renomeações                                 | Renomeação      |
+| `tools/`            | 28 arq, todo/store.js 423 LoC              | 28+ arq, arquivos grandes divididos                 | Divisão         |
+| `bridges/`          | 11 arq, 4 naturezas misturadas             | Reorganizado em git/, mcp/, nerv/                   | Reorganização   |
+| `agent/`            | 40 arq, always-alive 603 LoC               | 42 arq, god objects divididos, sem imports terminal | Divisão + fix   |
+| `conversation-hub/` | 12 arq, store.js 562 LoC                   | 12 arq + store/ subdir, arquivos grandes divididos  | Divisão         |
+| `channel/`          | 7 arq, client.js 557 LoC + DI problemática | 8+ arq, DI explícita                                | Divisão + DI    |
+| `api/`              | 20 arq, singleton import direto            | 20 arq, factory DI                                  | Fix DI          |
+| `terminal/`         | 38 arq, handlers duplos, state global vaza | 36 arq (-flat handlers), state encapsulado          | Limpeza + fix   |
+| `logs/`             | Em src/copilot — errado                    | Movido para var/logs/copilot/                       | Movimentação    |
 
 ---
 
@@ -373,12 +374,14 @@ src/copilot/
 ### 4.1 `core/error-handlers.js` — Remover Inversão de Dependência
 
 **Atual:**
+
 ```js
 import { errorTracker } from '../observability/error-tracker.js';
 import logger from '../observability/logger.js';
 ```
 
 **Ideal:**
+
 ```js
 // core não importa observability
 // observability registra handler via callback:
@@ -390,17 +393,20 @@ registerCoreErrorHandler(logger, errorTracker);
 ### 4.2 `agent/lifecycle/agent-lifecycle.js` — Remover Import de Terminal
 
 **Atual:**
+
 ```js
 import { getHubSessionId } from '../../terminal/state.js';
 void syncSdkHistory(session, ..., { getHubSessionId, conversationStore });
 ```
 
 **Ideal — opção A (core/shared-state.js):**
+
 ```js
 import { getHubSessionId } from '#copilot/core/shared-state';
 ```
 
 **Ideal — opção B (injeção por parâmetro):**
+
 ```js
 // agent-lifecycle.js não importa — recebe getHubSessionId como parâmetro de setup
 async function setupSession(session, host, { getHubSessionId, conversationStore }) { ... }
@@ -409,11 +415,13 @@ async function setupSession(session, host, { getHubSessionId, conversationStore 
 ### 4.3 `bridges/nerv-bridge.js` — Remover Import de Agent
 
 **Atual:**
+
 ```js
 import { alwaysAliveAgent } from '../agent/index.js';
 ```
 
 **Ideal:**
+
 ```js
 // nerv-bridge é um publisher passivo
 // createNervBridge(agent) → bridge — DI explícita
@@ -421,13 +429,14 @@ import { alwaysAliveAgent } from '../agent/index.js';
 
 ### 4.4 `terminal/` — Eliminar Handlers Duplicados
 
-Remover: `terminal/handlers-agent.js`, `terminal/handlers-dialog.js`, `terminal/handlers-shared.js`, `terminal/handlers-system.js`
-Manter: `terminal/handlers/` (versão subdiretório — organização correta)
+Remover: `terminal/handlers-agent.js`, `terminal/handlers-dialog.js`, `terminal/handlers-shared.js`,
+`terminal/handlers-system.js` Manter: `terminal/handlers/` (versão subdiretório — organização
+correta)
 
 ### 4.5 `always-alive.js` — Decomposição
 
-**Atual:** 1 arquivo 603 LoC com bootstrap + conexão + lifecycle + public API
-**Ideal:**
+**Atual:** 1 arquivo 603 LoC com bootstrap + conexão + lifecycle + public API **Ideal:**
+
 ```
 agent/lifecycle/agent-bootstrap.js   — inicialização única (criar agent, configurar)
 agent/lifecycle/connection-manager.js — reconexão, keepalive, retry
@@ -436,8 +445,8 @@ agent/always-alive.js                — public API minimalista (< 100 LoC)
 
 ### 4.6 `loop-manager.js` — Decomposição
 
-**Atual:** 1 arquivo 600 LoC com loop principal + retry + model fallback + event dispatch
-**Ideal:**
+**Atual:** 1 arquivo 600 LoC com loop principal + retry + model fallback + event dispatch **Ideal:**
+
 ```
 agent/dialog/loop-manager.js        — loop principal puro (< 200 LoC)
 agent/dialog/turn-pipeline.js       — NEW — pipeline de execução de turn
@@ -448,24 +457,25 @@ agent/dialog/loop-coordinator.js    — NEW — coordena sub-managers, backpress
 
 ## 5. Métricas Target
 
-| Métrica | Atual | Target Ideal |
-|---|---|---|
-| Arquivos JS | 284 | ~290 (mais arquivos, menores) |
-| LoC totais | ~33.700 | ~30.000 |
-| Arquivos > 400 LoC | 13 | **0** |
-| Violações de camada | 3 | **0** |
-| Ciclos arquiteturais (módulo) | 3 | **0** |
-| Cross-module edges | 26 | **≤ 16** |
-| God objects | 4 | **0** |
-| Duplicações de responsabilidade | 6 | **0** |
-| Módulos sem README.md de escopo | 14 | **0** |
-| Singleton imports diretos em camadas altas | 8+ | **0** |
+| Métrica                                    | Atual   | Target Ideal                  |
+| ------------------------------------------ | ------- | ----------------------------- |
+| Arquivos JS                                | 284     | ~290 (mais arquivos, menores) |
+| LoC totais                                 | ~33.700 | ~30.000                       |
+| Arquivos > 400 LoC                         | 13      | **0**                         |
+| Violações de camada                        | 3       | **0**                         |
+| Ciclos arquiteturais (módulo)              | 3       | **0**                         |
+| Cross-module edges                         | 26      | **≤ 16**                      |
+| God objects                                | 4       | **0**                         |
+| Duplicações de responsabilidade            | 6       | **0**                         |
+| Módulos sem README.md de escopo            | 14      | **0**                         |
+| Singleton imports diretos em camadas altas | 8+      | **0**                         |
 
 ---
 
 ## 6. Princípio de Evolução
 
 A migração para este estado ideal deve ser **incremental e não-destrutiva**:
+
 1. Cada fase tem zero regressões funcionais
 2. Cada fase tem seus próprios testes antes do merge
 3. Refatoração estrutural (mover arquivos) é separada de mudanças de comportamento

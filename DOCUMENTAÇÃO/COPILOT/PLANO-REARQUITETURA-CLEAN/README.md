@@ -82,10 +82,10 @@ A diferença é que eles deixam de ser usados como “mapa mestre” disperso.
 A partir desta série:
 
 1. **roadmap operacional** = `R-06` + `R-16` + programas `R-07` a `R-13`;
-3. **arquitetura-alvo + critérios de convergência** = `R-04` + `R-04A` + `R-07B`–`R-07D`;
-4. **diagnóstico base** = `R-01` a `R-05`;
-5. **mapeamento histórico** = `R-14`;
-6. **futuro opcional / pós-base saudável** = `R-15`.
+2. **arquitetura-alvo + critérios de convergência** = `R-04` + `R-04A` + `R-07B`–`R-07D`;
+3. **diagnóstico base** = `R-01` a `R-05`;
+4. **mapeamento histórico** = `R-14`;
+5. **futuro opcional / pós-base saudável** = `R-15`.
 
 ---
 

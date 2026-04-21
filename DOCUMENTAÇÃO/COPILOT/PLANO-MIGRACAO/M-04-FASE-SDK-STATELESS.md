@@ -1,11 +1,8 @@
 # M-04 — Fase 3: SDK Stateless
 
-**Data**: 2026-03-21
-**Versão**: 1.1
-**Pré-requisito**: M-02 (Cleanup) concluído; M-03 (Agent Refactor) K1 concluído
-**Estimativa**: ~14h
-**Risco**: Moderado-Alto (toca no wrapper do copilot-sdk)
-**Consolida**: Faixa L3 + Faixa J1
+**Data**: 2026-03-21 **Versão**: 1.1 **Pré-requisito**: M-02 (Cleanup) concluído; M-03 (Agent
+Refactor) K1 concluído **Estimativa**: ~14h **Risco**: Moderado-Alto (toca no wrapper do
+copilot-sdk) **Consolida**: Faixa L3 + Faixa J1
 
 ## 0. Status auditado — 2026-04-15
 
@@ -37,8 +34,8 @@ O módulo `sdk/` (41 arquivos, 8.096L) deveria ser uma **camada fina e stateless
 
 ### Princípio-alvo
 
-> **L1 SDK é stateless**: apenas converte chamadas internas em chamadas ao `@github/copilot-sdk`.
-> O registry de sessões vive em L4 (Orchestration). Config vive em L2.
+> **L1 SDK é stateless**: apenas converte chamadas internas em chamadas ao `@github/copilot-sdk`. O
+> registry de sessões vive em L4 (Orchestration). Config vive em L2.
 
 ### Métricas antes → depois
 
@@ -67,9 +64,9 @@ O módulo `sdk/` (41 arquivos, 8.096L) deveria ser uma **camada fina e stateless
 | `conversation-hub/store.js` | 563    | ATUALIZAR: receber ownership do session registry |
 | `sdk/session/lifecycle.js`  | 335    | ATUALIZAR: parar de acessar registry interno     |
 
-**Conceito**: Hoje `client.js` mantém `_sessions = new Map()` com sessões ativas.
-Essa responsabilidade passa para `conversation-hub/` (L4) ou um novo
-`sdk/session/session-registry.js` em L4.
+**Conceito**: Hoje `client.js` mantém `_sessions = new Map()` com sessões ativas. Essa
+responsabilidade passa para `conversation-hub/` (L4) ou um novo `sdk/session/session-registry.js` em
+L4.
 
 ### Grupo B: Eliminar `sdk/config.js` (1 arquivo, -150L)
 
@@ -106,6 +103,7 @@ pode ser duplicado ou complementar. Avaliar e consolidar.
 ### P01 — Mapear estado mutável em `sdk/session/client.js` (1h)
 
 **O que fazer**: Ler `client.js` (386L) e identificar:
+
 1. Onde `_sessions` é definido e populado
 2. Quem acessa `_sessions` (getSession, listSessions, etc.)
 3. Onde `_client` singleton é criado e mantido
@@ -124,19 +122,33 @@ grep -rn "getSession\|listSessions\|getClient" src/copilot/ --include="*.js" | g
 ```javascript
 // conversation-hub/session-registry.js
 export class SessionRegistry {
-    #sessions = new Map();
-    get(id) { return this.#sessions.get(id); }
-    set(id, session) { this.#sessions.set(id, session); }
-    delete(id) { return this.#sessions.delete(id); }
-    list() { return [...this.#sessions.values()]; }
-    clear() { this.#sessions.clear(); }
-    get size() { return this.#sessions.size; }
+  #sessions = new Map();
+  get(id) {
+    return this.#sessions.get(id);
+  }
+  set(id, session) {
+    this.#sessions.set(id, session);
+  }
+  delete(id) {
+    return this.#sessions.delete(id);
+  }
+  list() {
+    return [...this.#sessions.values()];
+  }
+  clear() {
+    this.#sessions.clear();
+  }
+  get size() {
+    return this.#sessions.size;
+  }
 }
 ```
 
-**Opção B**: Registry como sub-módulo de `sdk/session/` mas acessado via DI token (stateless pattern).
+**Opção B**: Registry como sub-módulo de `sdk/session/` mas acessado via DI token (stateless
+pattern).
 
 **O que fazer**:
+
 1. Criar `conversation-hub/session-registry.js`
 2. Adicionar DI token `SessionRegistryToken` em `conversation-hub/di-tokens.js`
 3. Refatorar `sdk/session/client.js`:
@@ -147,6 +159,7 @@ export class SessionRegistry {
 4. Atualizar bootstrap para registrar SessionRegistry no DI
 
 **Validação**:
+
 ```bash
 npm run lint
 npm run test:unit
@@ -159,7 +172,9 @@ npm run test:unit
 **Pré-requisito**: M-02 P09 (deprecation) já executado.
 
 **O que fazer**:
+
 1. Encontrar todos os consumers:
+
 ```bash
 grep -rn "buildSessionConfig\|from.*sdk/config" src/ --include="*.js" | grep -v node_modules
 ```
@@ -173,6 +188,7 @@ grep -rn "buildSessionConfig\|from.*sdk/config" src/ --include="*.js" | grep -v 
 4. Remover re-export de `sdk/index.js`
 
 **Validação**:
+
 ```bash
 grep -rn "buildSessionConfig\|sdk/config" src/ --include="*.js" | grep -v node_modules
 # Deve retornar 0 resultados
@@ -182,6 +198,7 @@ npm run lint && npm run test:unit
 ### P04 — Consolidar `sdk/agent/agents.js` com `config/custom-agents.js` (2h)
 
 **O que fazer**:
+
 1. Comparar os dois arquivos:
    - `sdk/agent/agents.js` (268L) — factory de CustomAgentConfig
    - `config/custom-agents.js` (326L) — config de custom agents
@@ -191,6 +208,7 @@ npm run lint && npm run test:unit
    `config/custom-agents.js`
 
 4. Atualizar consumers:
+
 ```bash
 grep -rn "from.*sdk/agent/agents\|from.*sdk/agent.*agents\|CustomAgentConfig" src/ --include="*.js"
 ```
@@ -202,6 +220,7 @@ grep -rn "from.*sdk/agent/agents\|from.*sdk/agent.*agents\|CustomAgentConfig" sr
 ### P05 — Limpar `sdk/index.js` barrel (1h)
 
 **O que fazer**:
+
 1. Ler `sdk/index.js` (356L)
 2. Remover re-exports de:
    - `config.js` (eliminado em P03)
@@ -213,6 +232,7 @@ grep -rn "from.*sdk/agent/agents\|from.*sdk/agent.*agents\|CustomAgentConfig" sr
 ### P06 — Verificar aderência JSDoc ao SDK real (2h)
 
 **O que fazer**:
+
 1. Ler `sdk/types.js` (700L)
 2. Comparar com API real do `@github/copilot-sdk` (>=0.2.0):
    - `CopilotClient`, `CopilotSession`, `SessionConfig`, etc.
@@ -240,6 +260,7 @@ npm run test:integration
 ```
 
 Testes específicos:
+
 - Session creation via SDK → registry armazena
 - Session listing → registry lista
 - Config build → SessionConfigBuilder funciona

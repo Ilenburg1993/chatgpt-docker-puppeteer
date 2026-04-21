@@ -1,11 +1,7 @@
 # M-05 — Fase 4: Event System Unification
 
-**Data**: 2026-03-21
-**Versão**: 1.1
-**Pré-requisito**: M-03 (K6 — event bridge declarativo) concluído
-**Estimativa**: ~16h
-**Risco**: Moderado
-**Consolida**: Faixa L4 + G3 + K6 (complementa)
+**Data**: 2026-03-21 **Versão**: 1.1 **Pré-requisito**: M-03 (K6 — event bridge declarativo)
+concluído **Estimativa**: ~16h **Risco**: Moderado **Consolida**: Faixa L4 + G3 + K6 (complementa)
 
 ## 0. Status auditado — 2026-04-15
 
@@ -16,8 +12,8 @@ Estado real confirmado:
 - `agent/session/event-handlers/` ainda existe dentro de `agent/`;
 - `hooks/bus.js` ainda permanece como subsistema próprio;
 - `observability/collectors/` e `observability/bus-actions/` ainda coexistem;
-- `always-alive.js` já faz bridge amplo para o EventBus, então há groundwork parcial, mas
-    a unificação total de naming, lifecycle e schema ainda não aconteceu.
+- `always-alive.js` já faz bridge amplo para o EventBus, então há groundwork parcial, mas a
+  unificação total de naming, lifecycle e schema ainda não aconteceu.
 
 ---
 
@@ -32,15 +28,17 @@ O sistema de eventos atual é tripartido:
 | **SDK Events** | `@github/copilot-sdk` session | Eventos nativos do SDK        | ~30       |
 
 **Problemas**:
+
 1. **P5 (🟠)**: 3 buses = 3 mental models, 3 subscription patterns, 3 event naming conventions
 2. bridge entre HookBus→EventBus é manual (80+ linhas em `hooks/bus.js`)
-3. `agent/session/event-handlers/` (agora `event-handlers/` após M-03) e
-   `observability/collectors/` ouvem os mesmos eventos SDK com contextos diferentes
+3. `agent/session/event-handlers/` (agora `event-handlers/` após M-03) e `observability/collectors/`
+   ouvem os mesmos eventos SDK com contextos diferentes
 4. Não há event schema enforcement — qualquer string é aceita como event name
 
 ### Princípio-alvo
 
 > **1 EventBus canônico** com namespace automático:
+>
 > - SDK events: `sdk:session.turnStarted` (prefixo `sdk:`)
 > - Hook events: `hook:permission.approved` (prefixo `hook:`)
 > - Domain events: `agent:started`, `hub:message.sent` (sem prefixo adicional)
@@ -130,18 +128,28 @@ on('hook:permission.*', handler) // ouve permission events
 **O que fazer**: Refatorar `hooks/bus.js` (230L):
 
 Antes:
+
 ```javascript
-class HookBus extends EventEmitter { /* bus independente */ }
+class HookBus extends EventEmitter {
+  /* bus independente */
+}
 // + manual bridge linhas 150-230
 ```
 
 Depois:
+
 ```javascript
 class HookBus {
-    #eventBus;
-    constructor(eventBus) { this.#eventBus = eventBus; }
-    emit(event, data) { this.#eventBus.emit('hook', event, data); }
-    on(event, handler) { this.#eventBus.on(`hook:${event}`, handler); }
+  #eventBus;
+  constructor(eventBus) {
+    this.#eventBus = eventBus;
+  }
+  emit(event, data) {
+    this.#eventBus.emit('hook', event, data);
+  }
+  on(event, handler) {
+    this.#eventBus.on(`hook:${event}`, handler);
+  }
 }
 ```
 
@@ -155,15 +163,18 @@ class HookBus {
 
 ```javascript
 // Antes (em lifecycle wrappers)
-session.on('turnStarted', (data) => { /* local handler */ });
+session.on('turnStarted', (data) => {
+  /* local handler */
+});
 
 // Depois
 session.on('turnStarted', (data) => {
-    eventBus.emit('sdk', 'session.turnStarted', data);
+  eventBus.emit('sdk', 'session.turnStarted', data);
 });
 ```
 
 2. Atualizar `event-bridge-map.js` (M-03) para usar `sdk:` namespace:
+
 ```javascript
 // Antes: ['session.turnStarted', 'agent:turn:started']
 // Depois: ['sdk:session.turnStarted', 'agent:turn:started']
@@ -178,6 +189,7 @@ session.on('turnStarted', (data) => {
 **O que fazer**:
 
 1. Mapear o que cada collector e handler escuta:
+
 ```bash
 grep -n "\.on\b\|subscribe\|addEventListener" src/copilot/observability/collectors/*.js
 grep -n "\.on\b\|subscribe\|addEventListener" src/copilot/event-handlers/*.js
@@ -203,16 +215,17 @@ grep -n "\.on\b\|subscribe\|addEventListener" src/copilot/event-handlers/*.js
 import { EVENT_SCHEMAS } from './schemas/index.js';
 
 export function validateEvent(namespace, event, data) {
-    const schema = EVENT_SCHEMAS[`${namespace}:${event}`];
-    if (!schema) {
-        log.warn(`Unknown event: ${namespace}:${event}`);
-        return true; // permissive durante migração
-    }
-    return schema.validate(data);
+  const schema = EVENT_SCHEMAS[`${namespace}:${event}`];
+  if (!schema) {
+    log.warn(`Unknown event: ${namespace}:${event}`);
+    return true; // permissive durante migração
+  }
+  return schema.validate(data);
 }
 ```
 
 Integrar no EventBus.emit() em modo `warn` (não bloqueia):
+
 ```javascript
 emit(namespace, event, data) {
     if (this.#validateEvents) validateEvent(namespace, event, data);
@@ -225,11 +238,14 @@ emit(namespace, event, data) {
 ### P06 — Deprecar `events/legacy-events.js` (1h)
 
 **O que fazer**:
+
 1. Ler `events/legacy-events.js` (151L)
 2. Para cada constante, verificar consumers:
+
 ```bash
 grep -rn "LEGACY_EVENT_NAME" src/ --include="*.js" | grep -v "events/"
 ```
+
 3. Se 0 consumers: marcar com `@deprecated` + log WARN
 4. Se consumers existem: mapear para novo namespace e manter como alias temporário
 
@@ -242,6 +258,7 @@ npm run test:unit
 ```
 
 Testes novos:
+
 - `test_event_bus_namespaces.spec.js`: emit/on com namespaces, wildcard
 - `test_hook_bus_adapter.spec.js`: HookBus agora é adapter
 - `test_sdk_event_bridge.spec.js`: SDK events chegam ao EventBus com `sdk:` prefix

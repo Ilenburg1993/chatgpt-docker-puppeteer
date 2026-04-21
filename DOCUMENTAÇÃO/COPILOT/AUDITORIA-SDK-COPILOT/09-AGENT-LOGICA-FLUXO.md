@@ -1,15 +1,14 @@
 # 09 — Agent Module: Lógica, Fluxo e Arquitetura Detalhada
 
-**Data**: 2026-03-21
-**Escopo**: `src/copilot/agent/` — 50+ arquivos, ~8620 linhas
-**Referência**: Análise de código-fonte vivo (commit `4234854f`)
+**Data**: 2026-03-21 **Escopo**: `src/copilot/agent/` — 50+ arquivos, ~8620 linhas **Referência**:
+Análise de código-fonte vivo (commit `4234854f`)
 
 ---
 
 ## 1. Visão Geral do Módulo
 
-O módulo `agent/` implementa o **AlwaysAliveAgent** — um agente singleton persistente que gerencia
-o ciclo de vida completo de uma sessão Copilot SDK neste processo Node.js. É a camada L5 da
+O módulo `agent/` implementa o **AlwaysAliveAgent** — um agente singleton persistente que gerencia o
+ciclo de vida completo de uma sessão Copilot SDK neste processo Node.js. É a camada L5 da
 arquitetura de camadas do sistema.
 
 ### Responsabilidades centrais
@@ -348,6 +347,7 @@ O `AgentContext` implementa um FSM com transições validadas:
 ```
 
 Transições válidas:
+
 - `stopped` → `starting`
 - `starting` → `idle` | `stopped`
 - `idle` → `processing` | `stopped`
@@ -362,8 +362,8 @@ Nota: qualquer estado → `stopped` é sempre permitido (shutdown).
 
 ### 9.1 Agente → EventBus (Bridge)
 
-O `always-alive.js` faz bridge de ~80 eventos do agente (e subsistemas) para o EventBus
-centralizado via `bridgeEmitter()`. Os eventos são divididos em categorias:
+O `always-alive.js` faz bridge de ~80 eventos do agente (e subsistemas) para o EventBus centralizado
+via `bridgeEmitter()`. Os eventos são divididos em categorias:
 
 - **Agent lifecycle**: ready, before-stop, stopped, error, status
 - **Dialog loop**: changed, ready, turn_start, turn_end, stalled, paused, resumed, stopped, reply
@@ -407,13 +407,14 @@ O `AgentContext` é o **objeto central de estado compartilhado** entre todos os 
 Substituiu 32+ campos `#private` que existiam em `always-alive.js`.
 
 **Conteúdo**:
+
 - Referências SDK: `client`, `session`, `sessionEventUnsubscribers`
 - Estado: `status` (FSM), `isResumed`, `sendCount`, `pendingQuestion`, cache de snapshot
 - Config: `model`, `reasoningEffort`
 - Contadores: `lastPrInfo`, `contextState`, `lastCheckpointPath`
 - Timers: `metricsTimer`, `mcpReconnectCancel`, `quotaMonitor`
-- Managers: `dialogLoop`, `messageQueue`, `webhooks`, `permissions`, `toolsRegistry`,
-  `keepalive`, `handoff`, `messagesCache`
+- Managers: `dialogLoop`, `messageQueue`, `webhooks`, `permissions`, `toolsRegistry`, `keepalive`,
+  `handoff`, `messagesCache`
 
 **Prós**: reduz acoplamento vs campos privados; permite que módulos extraídos acessem estado sem
 callbacks pesados.
@@ -472,6 +473,7 @@ Estado persistido em JSON (leitura sync com cache + escrita async debounced):
 ### 13.2 Snapshots
 
 Snapshots de estado salvos em disco para diagnóstico (diretório configurável):
+
 - Criados no shutdown, em erros fatais, ou periodicamente
 - Rotação automática por max snapshots
 - Incluem: sessionId, model, status, sendCount, dialogLoop state, prMetrics

@@ -6,9 +6,10 @@
 > parciais em arquivos anteriores. Baseado na inspeção exaustiva do código-fonte combinada com o
 > histórico de fases de desenvolvimento (AE → AI).
 
-> **Nota de governança (abril/2026):** a arquitetura evoluiu desde esta fotografia. Para o fluxo canônico
-> atualizado `sdk -> event-handlers -> agent -> presentation -> terminal/server` e para a proposta de
-> centralização com `AgentRuntimeRegistry` / `presentation/agent-runtime.js`, leia também:
+> **Nota de governança (abril/2026):** a arquitetura evoluiu desde esta fotografia. Para o fluxo
+> canônico atualizado `sdk -> event-handlers -> agent -> presentation -> terminal/server` e para a
+> proposta de centralização com `AgentRuntimeRegistry` / `presentation/agent-runtime.js`, leia
+> também:
 >
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md`
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md`
@@ -855,11 +856,11 @@ remoção.
 
 ## 11. Issues e Pontos de Atenção
 
-| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                            |
-| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                 |
-| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                 |
-| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                 |
+| #    | Issue                                                     | Impacto                     | Arquivo                                      | Status                                                                                             |
+| ---- | --------------------------------------------------------- | --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 9.1  | 13 shims legados na raiz                                  | DX                          | `src/copilot/*.js` (raiz)                    | Pendente (Fase 3)                                                                                  |
+| 9.2  | `sdk-client.js` oculta mapeamento                         | DX                          | `sdk-client.js`                              | Pendente (Fase 3)                                                                                  |
+| 9.3  | `terminal-server.js` vs `terminal/server.js`              | Confusão                    | ambos                                        | Pendente (Fase 3)                                                                                  |
 | 9.4  | `orchestrator.js` importava shim deprecated               | Médio                       | `conversation-hub/orchestrator.js`           | ✅ **Corrigido** — agora importa `../channel/client.js`                                            |
 | 9.5  | `routes/agent.js` acessa campos privados via cast `any`   | Médio                       | `routes/agent.js`                            | ✅ **Corrigido** — casts `@type {any}` removidos; usa `.sessionId`, `.toolsRegistry`, `.telemetry` |
 | 9.6  | `task-tools.js` usava `execSync + curl`                   | Médio (bloqueia event loop) | `tools/task-tools.js`                        | ✅ **Corrigido** — substituído por `http.request` nativo                                           |
@@ -876,8 +877,8 @@ remoção.
 
 ### Ativos (canônicos)
 
-| Arquivo                            | Camada | Status              |
-| ---------------------------------- | ------ | ------------------- |
+| Arquivo                            | Camada | Status               |
+| ---------------------------------- | ------ | -------------------- |
 | `agent/entry.js`                   | 12     | ✅ Ativo             |
 | `agent/always-alive.js`            | 3      | ✅ Crítico           |
 | `agent/session-manager.js`         | 3      | ✅ Ativo             |

@@ -2,13 +2,15 @@
 
 ## 1. Por que este módulo foi eleito prioritário
 
-Entre todos os módulos de `src/copilot`, `observability/` é o melhor candidato para a próxima transformação estrutural profunda porque concentra três sinais fortes ao mesmo tempo:
+Entre todos os módulos de `src/copilot`, `observability/` é o melhor candidato para a próxima
+transformação estrutural profunda porque concentra três sinais fortes ao mesmo tempo:
 
 1. **centralidade transversal extrema** — `cross -> observability = 91`;
 2. **massa estrutural relevante** — `33 arquivos / 5.893 linhas`;
 3. **papel ainda impreciso** entre coleta, reação, health, erro e leitura operacional.
 
-Em termos práticos: se esse módulo continuar difuso, ele continuará contaminando a arquitetura do restante do sistema.
+Em termos práticos: se esse módulo continuar difuso, ele continuará contaminando a arquitetura do
+restante do sistema.
 
 ## 2. Anatomia atual do módulo
 
@@ -42,7 +44,8 @@ Hoje o módulo contém, ao mesmo tempo:
 - tracking de erro;
 - métricas e snapshots.
 
-Isso é poderoso, mas também perigoso: se tudo isso convive sem um owner interno claro, `observability/` vira um “macro-balde” arquitetural.
+Isso é poderoso, mas também perigoso: se tudo isso convive sem um owner interno claro,
+`observability/` vira um “macro-balde” arquitetural.
 
 ## 3. Problemas específicos encontrados
 
@@ -58,15 +61,18 @@ Há sinais de sobreposição entre:
 - `bus-actions/error-alerter.js`
 - `bus-actions/correlation-tracer.js`
 
-O ponto mais crítico é que `event-bus-observers.js` e `log-observer.js` fazem versões diferentes do mesmo tipo de papel: “observar e registrar eventos do EventBus”.
+O ponto mais crítico é que `event-bus-observers.js` e `log-observer.js` fazem versões diferentes do
+mesmo tipo de papel: “observar e registrar eventos do EventBus”.
 
 ### 3.2 Health de observability não está claramente fechado como domínio próprio
 
-Existe health do agente, registry agregado e health derivado de eventos — mas `observability/` ainda não está plenamente representado no registry como módulo com runtime próprio.
+Existe health do agente, registry agregado e health derivado de eventos — mas `observability/` ainda
+não está plenamente representado no registry como módulo com runtime próprio.
 
 ### 3.3 Mistura de camadas internas
 
-`collectors`, `observers` e `bus-actions` apontam para uma decomposição correta, mas ainda incompleta:
+`collectors`, `observers` e `bus-actions` apontam para uma decomposição correta, mas ainda
+incompleta:
 
 - collector = ingestão
 - observer = observação de fonte específica
@@ -79,21 +85,27 @@ Hoje essa distinção ainda não está imposta pela arquitetura pública do mód
 ### 4.1 Papéis desejados
 
 #### `logger.js`
+
 - logging puro
 
 #### `metrics.js`
+
 - store e summary de métricas
 
 #### `error-tracker.js` / `error-alerting.js`
+
 - tracking e alerting de erro
 
 #### `event-collector.js` + `collectors/*`
+
 - ingestão de eventos do SDK
 
 #### `agent-event-observer.js` + `observers/*`
+
 - observação de eventos do runtime/agente
 
 #### `event-bus-runtime.js` (novo owner canônico)
+
 - composição única do runtime observacional do EventBus
 - agregando:
   - log observer
@@ -104,6 +116,7 @@ Hoje essa distinção ainda não está imposta pela arquitetura pública do mód
   - error alerter
 
 #### `bootstrap.js`
+
 - único ponto de wiring do módulo
 
 ### 4.2 Regra de fronteira interna
@@ -121,11 +134,13 @@ Deve existir **um lugar único** responsável por anexar `observability/` ao Eve
 
 ### Critério O2 — compatibilidade controlada
 
-APIs legadas como `event-bus-observers.js` podem sobreviver temporariamente, mas apenas como shim/adapter fino para o runtime canônico.
+APIs legadas como `event-bus-observers.js` podem sobreviver temporariamente, mas apenas como
+shim/adapter fino para o runtime canônico.
 
 ### Critério O3 — health observability explícito
 
-`server/routes/health-registry.js` deve enxergar `observability/` como módulo próprio, com health derivado da sua runtime pipeline.
+`server/routes/health-registry.js` deve enxergar `observability/` como módulo próprio, com health
+derivado da sua runtime pipeline.
 
 ### Critério O4 — separação interna
 
@@ -143,18 +158,25 @@ Deve existir teste cobrindo:
 ## 6. Transformações objetivas propostas
 
 ### T-OBS-01
-Criar `src/copilot/observability/event-bus-runtime.js` como owner único da composição observacional do EventBus.
+
+Criar `src/copilot/observability/event-bus-runtime.js` como owner único da composição observacional
+do EventBus.
 
 ### T-OBS-02
-Migrar `bootstrapObservability()` para anexar esse runtime canônico, em vez de acoplar apenas `log-observer`.
+
+Migrar `bootstrapObservability()` para anexar esse runtime canônico, em vez de acoplar apenas
+`log-observer`.
 
 ### T-OBS-03
+
 Reduzir `event-bus-observers.js` a compat shim, removendo sua autonomia arquitetural.
 
 ### T-OBS-04
+
 Expor health/diagnostics do runtime de observability para o registry de módulos.
 
 ### T-OBS-05
+
 Criar testes de contrato específicos para a nova arquitetura interna.
 
 ## 7. Primeiro corte escolhido para execução agora
@@ -184,10 +206,12 @@ O primeiro corte já foi materializado em código.
 
 ### Entregas realizadas
 
-- surgiu `src/copilot/observability/event-bus-runtime.js` como owner canônico da runtime pipeline observacional do EventBus;
+- surgiu `src/copilot/observability/event-bus-runtime.js` como owner canônico da runtime pipeline
+  observacional do EventBus;
 - `bootstrapObservability()` passou a anexar essa runtime diretamente;
 - `event-bus-observers.js` foi reduzido a compat shim fino;
-- `server/routes/health-registry.js` passou a registrar `observability` como módulo próprio no health registry;
+- `server/routes/health-registry.js` passou a registrar `observability` como módulo próprio no
+  health registry;
 - foram adicionados testes de comportamento e contrato para segurar essa arquitetura.
 
 ### Critérios O1–O5 após o corte
@@ -209,6 +233,7 @@ Depois deste corte, a próxima etapa mais útil em `observability/` é reduzir a
 - leituras operacionais expostas via `presentation/system-metrics.js`
 
 O objetivo passa a ser menos “criar owner” e mais “limpar a superfície restante”.
+
 ## 9. Segundo corte — T-OBS-06
 
 ### Motivação
@@ -222,7 +247,8 @@ const dummyAgent = /** @type {EventEmitter} */ (/** @type {unknown} */ ({}));
 const ctx = { ..., agent: dummyAgent, on: busOn };
 ```
 
-Em modo bus (`attachToBus()`), `agent` não existe — não há EventEmitter. O cast tornava a tipagem mentirosa.
+Em modo bus (`attachToBus()`), `agent` não existe — não há EventEmitter. O cast tornava a tipagem
+mentirosa.
 
 ### Alterações realizadas
 
@@ -248,8 +274,8 @@ Verifica: ausência de `dummyAgent`, presença de `agent: null`, typedef com `Ev
 
 ### Estado de O1–O5 após o segundo corte
 
-| Critério                            | Estado                           |
-| ----------------------------------- | -------------------------------- |
+| Critério                            | Estado                            |
+| ----------------------------------- | --------------------------------- |
 | O1 — owner do EventBus              | ✅ atingido no primeiro corte     |
 | O2 — compatibilidade controlada     | ✅ atingido no primeiro corte     |
 | O3 — health observability explícito | ✅ atingido no primeiro corte     |

@@ -1,13 +1,13 @@
 # 04 — Arquitetura Atual: `src/copilot`
 
-**Data**: 2026-03-21 | **Revisado**: 2026-03-21
-**Status**: Versão Definitiva (pós revisão crítica)
+**Data**: 2026-03-21 | **Revisado**: 2026-03-21 **Status**: Versão Definitiva (pós revisão crítica)
 
 ---
 
 ## 1. Visão Geral
 
 O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github/copilot-sdk` para:
+
 1. Orquestrar sessões de IA com controle granular
 2. Expor funcionalidades via REST API + SSE
 3. Manter um loop de agente always-alive com dialog loop, recovery e multi-sessão
@@ -71,8 +71,9 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 | `sdk/tools/registry.js`         | 1        | `createRegistry()`                                            |
 | `sdk/index.js`                  | 1        | Barrel (12 bandas temáticas)                                  |
 
-**Pontos fortes**: Boa abstração. Tipagem JSDoc completa. Separação clara entre estável e experimental.
-**Pontos fracos**: RPC experimental sem exposição. `lifecycle.js` usa `Record<string,unknown>` que anula tipagem.
+**Pontos fortes**: Boa abstração. Tipagem JSDoc completa. Separação clara entre estável e
+experimental. **Pontos fracos**: RPC experimental sem exposição. `lifecycle.js` usa
+`Record<string,unknown>` que anula tipagem.
 
 ### 2.2 `hooks/` — Camada 3
 
@@ -90,8 +91,9 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 | `presets/` (7 arquivos) | Audit, deny-all, interactive, minimal, production, safe, profiles |
 | `registry.js`           | Registry de hooks                                                 |
 
-**Pontos fortes**: Arquitetura composável. Presets prontos para diferentes perfis de segurança. Bridge com EventBus.
-**Pontos fracos**: Pode haver overlap com `availableTools`/`excludedTools` do SDK (ver GAP-E01).
+**Pontos fortes**: Arquitetura composável. Presets prontos para diferentes perfis de segurança.
+Bridge com EventBus. **Pontos fracos**: Pode haver overlap com `availableTools`/`excludedTools` do
+SDK (ver GAP-E01).
 
 ### 2.3 `agent/` — Camada 4
 
@@ -106,8 +108,9 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 | `session/event-handlers/`      | 8+ handlers para eventos da sessão                    |
 | `session/boot-wiring.js`       | Wiring de boot da sessão                              |
 
-**Pontos fortes**: Separação em lifecycle/dialog/session. Event handlers modulares.
-**Pontos fracos**: `always-alive.js` é um God Module (~700 linhas). Muitos event handlers dependem de estado global em `AgentContext`.
+**Pontos fortes**: Separação em lifecycle/dialog/session. Event handlers modulares. **Pontos
+fracos**: `always-alive.js` é um God Module (~700 linhas). Muitos event handlers dependem de estado
+global em `AgentContext`.
 
 ### 2.4 `tools/` — Camada 2
 
@@ -126,8 +129,8 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 | `introspection-tools.js` | Tools de introspection do sistema                        |
 | `task-tools.js`          | Tools de tasks/TODOs                                     |
 
-**Pontos fortes**: Categorização clara. `tool-factory.js` para criação padronizada.
-**Pontos fracos**: Nenhuma tool expõe os 19 wrappers experimentais de `experimental.js`.
+**Pontos fortes**: Categorização clara. `tool-factory.js` para criação padronizada. **Pontos
+fracos**: Nenhuma tool expõe os 19 wrappers experimentais de `experimental.js`.
 
 ### 2.5 `bridges/` — Camada 2
 
@@ -144,7 +147,8 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 | Session registry | Rastreamento de sessões ativas |
 | Hub tools        | Tools específicas do hub       |
 
-**Pontos fracos**: Registry próprio duplica parcialmente `client.listSessions()` do SDK. Não usa lifecycle events do client para sincronização.
+**Pontos fracos**: Registry próprio duplica parcialmente `client.listSessions()` do SDK. Não usa
+lifecycle events do client para sincronização.
 
 ### 2.7 `server/` — Camada 5
 
@@ -198,26 +202,39 @@ O `src/copilot/` é um sistema de ~180 arquivos JS (ESM) que envelopa o `@github
 ## 4. Padrões Arquiteturais Identificados
 
 ### 4.1 Singleton Client Pattern
-`sdk/session/client.js` mantém um singleton de `CopilotClient` com lazy init. Sessões são registradas em `Map` interno. Vantagem: evita múltiplos processos CLI. Risco: single point of failure.
+
+`sdk/session/client.js` mantém um singleton de `CopilotClient` com lazy init. Sessões são
+registradas em `Map` interno. Vantagem: evita múltiplos processos CLI. Risco: single point of
+failure.
 
 ### 4.2 Hook Composition Pattern
-`hooks/factory.js` + `hooks/bus.js` criam pipeline de hooks composável. Presets oferecem perfis prontos. Bridge com EventBus permite observabilidade global.
+
+`hooks/factory.js` + `hooks/bus.js` criam pipeline de hooks composável. Presets oferecem perfis
+prontos. Bridge com EventBus permite observabilidade global.
 
 ### 4.3 Event Handler Registration Pattern
-`agent/session/event-handlers/` usa padrão de módulos que retornam unsubscribe functions. O catch-all captura eventos não tratados.
+
+`agent/session/event-handlers/` usa padrão de módulos que retornam unsubscribe functions. O
+catch-all captura eventos não tratados.
 
 ### 4.4 Tool Registry Pattern
-Tools são definidas via `createTool()`, registradas em `createRegistry()`, e bootstrappadas via `bootstrapTools()`. Tools MCP são bridged no mesmo registry.
+
+Tools são definidas via `createTool()`, registradas em `createRegistry()`, e bootstrappadas via
+`bootstrapTools()`. Tools MCP são bridged no mesmo registry.
 
 ### 4.5 DI Container Pattern (parcial)
-`core/di.js` + `core/di-container.js` fornecem IoC básico com tokens e registrations. Usado para resolução de serviços (metrics, logger, etc.) mas não para todas as dependências.
+
+`core/di.js` + `core/di-container.js` fornecem IoC básico com tokens e registrations. Usado para
+resolução de serviços (metrics, logger, etc.) mas não para todas as dependências.
 
 ---
 
 ## 5. Acoplamentos Críticos
 
 ### 5.1 `always-alive.js` ↔ Everything
+
 O módulo `always-alive.js` é o God Module do sistema. Importa diretamente de quase todas as camadas:
+
 - `sdk/session/client.js` — para `getClient()`
 - `sdk/rpc/` — para RPC operations
 - `hooks/` — para hook setup
@@ -228,16 +245,23 @@ O módulo `always-alive.js` é o God Module do sistema. Importa diretamente de q
 Este alto fan-out torna mudanças arriscadas.
 
 ### 5.2 `AgentContext` como state bag
-`agent-context.js` agrega todo o estado mutável do agente: sessão, modelo, status, caches, webhooks, dialog loop, pending questions. É compartilhado por referência entre todos os subsistemas.
+
+`agent-context.js` agrega todo o estado mutável do agente: sessão, modelo, status, caches, webhooks,
+dialog loop, pending questions. É compartilhado por referência entre todos os subsistemas.
 
 ### 5.3 `EventBus` global
-O EventBus de `src/nerv/` é o canal de comunicação entre hooks, event handlers, e o server layer. Cross-cutting mas difícil de testar isoladamente. A bridge `HookBus → EventBus` via `attachBus()` funciona corretamente e é bem implementada (cada hook é wrappeado com emissão para ambos os bus: local EventEmitter + EventBus global).
+
+O EventBus de `src/nerv/` é o canal de comunicação entre hooks, event handlers, e o server layer.
+Cross-cutting mas difícil de testar isoladamente. A bridge `HookBus → EventBus` via `attachBus()`
+funciona corretamente e é bem implementada (cada hook é wrappeado com emissão para ambos os bus:
+local EventEmitter + EventBus global).
 
 ---
 
 ## 6. Forças & Fraquezas
 
 ### Forças
+
 1. **Tipagem JSDoc completa** — quase todos os exports têm `@param`/`@returns` documentados
 2. **Separação SDK/hooks/agent/server** — camadas lógicas bem definidas
 3. **Event handlers modulares** — fácil adicionar handler para novo evento
@@ -246,10 +270,14 @@ O EventBus de `src/nerv/` é o canal de comunicação entre hooks, event handler
 6. **Experimental RPC isolado** — wrappers prontos para quando APIs estabilizarem
 
 ### Fraquezas
+
 1. **God Module** (`always-alive.js`) — alto fan-out, difícil de testar
 2. **Dead code** — lifecycle events e experimental RPC não wired (~420 linhas mortas)
-3. **Hub sem sync de lifecycle** — `conversation-hub/` não recebe lifecycle events do client (`session.created/deleted/updated`), o que significa que sessões criadas/destruídas externamente não são refletidas no hub em tempo real
+3. **Hub sem sync de lifecycle** — `conversation-hub/` não recebe lifecycle events do client
+   (`session.created/deleted/updated`), o que significa que sessões criadas/destruídas externamente
+   não são refletidas no hub em tempo real
 4. **Type evasion** — `Record<string,unknown>` em `lifecycle.js` derrota tipagem
 5. **22+ events sem handler** — catch-all captura mas sem lógica específica
-6. **Tool filtering duplicado** — hooks L3 reimplementam what SDK `availableTools`/`excludedTools` faz nativamente
+6. **Tool filtering duplicado** — hooks L3 reimplementam what SDK `availableTools`/`excludedTools`
+   faz nativamente
 7. **System message mode confusion** — `customize` usado onde `append` seria correto

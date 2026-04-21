@@ -1,20 +1,21 @@
 # SITUAÇÃO ARQUITETURAL ATUAL — `src/copilot`
 
-> **Documento**: PARTE-24B-SITUACAO-ATUAL.md
-> **Versão**: 1.0
-> **Data**: 2026-04-12
-> **Escopo**: Análise profunda e exaustiva da situação arquitetural atual de `src/copilot/`
-> **Pré-requisito**: PARTE-24A (PRÉ-AUDITORIA)
+> **Documento**: PARTE-24B-SITUACAO-ATUAL.md **Versão**: 1.0 **Data**: 2026-04-12 **Escopo**:
+> Análise profunda e exaustiva da situação arquitetural atual de `src/copilot/` **Pré-requisito**:
+> PARTE-24A (PRÉ-AUDITORIA)
 
 ---
 
 ## 1. Visão Geral do Sistema
 
-`src/copilot/` é um subsistema de **57.841 LOC** distribuídas em **345 arquivos** e **18 módulos**. É um sistema de orquestração de agentes LLM com automação de browser, construído sobre o `@github/copilot-sdk`.
+`src/copilot/` é um subsistema de **57.841 LOC** distribuídas em **345 arquivos** e **18 módulos**.
+É um sistema de orquestração de agentes LLM com automação de browser, construído sobre o
+`@github/copilot-sdk`.
 
 ### 1.1. Propósito
 
 O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma permanente, com:
+
 - Sessão SDK persistente com o GitHub Copilot
 - Terminal REPL interativo (LLM-B)
 - API HTTP/SSE para controle e observabilidade
@@ -24,8 +25,10 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 1.2. Modos de Operação
 
-1. **Via Server** (`src/server/main.js`): O server Express do workspace inicia o copilot como subsistema, importando dinamicamente os módulos.
-2. **Via Terminal** (`npm run terminal:llm-b`): Boot standalone direto — **atualmente quebrado** (bootstrap.js faltando).
+1. **Via Server** (`src/server/main.js`): O server Express do workspace inicia o copilot como
+   subsistema, importando dinamicamente os módulos.
+2. **Via Terminal** (`npm run terminal:llm-b`): Boot standalone direto — **atualmente quebrado**
+   (bootstrap.js faltando).
 
 ---
 
@@ -33,7 +36,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.1. `core/` — Foundation (L0) | 23 arquivos, 3.301 LOC
 
-**Responsabilidade**: Primitivas fundamentais — DI container, EventBus, error handling, circuit breaker, cache, retry patterns, JSON utils, shutdown manager, mutex, timer registry.
+**Responsabilidade**: Primitivas fundamentais — DI container, EventBus, error handling, circuit
+breaker, cache, retry patterns, JSON utils, shutdown manager, mutex, timer registry.
 
 **Arquivos**:
 
@@ -64,9 +68,13 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `timer-registry.js`         | 114 | Registro de timers com cleanup automático via shutdown                             |
 
 **Problemas identificados**:
-- ⚠️ `core/events.js` (204 LOC) é **legado** — duplica constantes que já estão em `events/`. Deve ser removido
-- ⚠️ `di-tokens.js` (344 LOC) é desproporcionalmente grande — define tokens de TODOS os módulos, acoplando core a conceitos de camadas superiores
-- 🔴 `core → config` (bidirectional cycle) — `core/index.js` importa de `config/` via `di-container.js` e `schemas.js`
+
+- ⚠️ `core/events.js` (204 LOC) é **legado** — duplica constantes que já estão em `events/`. Deve
+  ser removido
+- ⚠️ `di-tokens.js` (344 LOC) é desproporcionalmente grande — define tokens de TODOS os módulos,
+  acoplando core a conceitos de camadas superiores
+- 🔴 `core → config` (bidirectional cycle) — `core/index.js` importa de `config/` via
+  `di-container.js` e `schemas.js`
 
 **Score**: 7/10
 
@@ -99,8 +107,11 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `schemas/registry.js`                | 126 | Schema registry com validação                                |
 
 **Problemas identificados**:
-- ⚠️ `nerv-events.js` (273 LOC) é desproporcionalmente grande — inclui lógica de mapeamento que deveria estar em `bridges/`
-- 🔴 `events → observability` (ciclo) — `events/index.js` importa de `observability/` para dead letter tracking
+
+- ⚠️ `nerv-events.js` (273 LOC) é desproporcionalmente grande — inclui lógica de mapeamento que
+  deveria estar em `bridges/`
+- 🔴 `events → observability` (ciclo) — `events/index.js` importa de `observability/` para dead
+  letter tracking
 
 **Score**: 8/10
 
@@ -116,6 +127,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`  | 52  | Re-exports de `core/di-container`, `core/di`, `core/event-bus` + events |
 
 **Problemas identificados**:
+
 - ⚠️ `types/index.js` re-exporta implementações concretas de `core/` — deveria exportar apenas tipos
 - ⚠️ Módulo sub-utilizado — apenas `events` e `channel` importam dele
 
@@ -125,7 +137,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.4. `config/` — Configuration (L1) | 7 arquivos, 1.279 LOC
 
-**Responsabilidade**: Variáveis de ambiente, system prompts, MCP servers, pinned files, custom agents.
+**Responsabilidade**: Variáveis de ambiente, system prompts, MCP servers, pinned files, custom
+agents.
 
 | Arquivo             | LOC | Função                                                  |
 | ------------------- | --- | ------------------------------------------------------- |
@@ -138,9 +151,12 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`          | 45  | Barrel                                                  |
 
 **Problemas identificados**:
+
 - 🔴 Ciclo bidirecional `config ↔ core` e `config ↔ observability`
-- ⚠️ `config → sdk` (violação L1→L2) — `env.js` importa de `sdk/constants.js` para defaults de modelo
-- ⚠️ `custom-agents.js` (327 LOC) contém lógica de domínio (tool selection, prompt building) que pertence a L3
+- ⚠️ `config → sdk` (violação L1→L2) — `env.js` importa de `sdk/constants.js` para defaults de
+  modelo
+- ⚠️ `custom-agents.js` (327 LOC) contém lógica de domínio (tool selection, prompt building) que
+  pertence a L3
 
 **Score**: 6/10
 
@@ -157,6 +173,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`      | 11  | Barrel                                          |
 
 **Problemas identificados**:
+
 - 🔴 `db/sqlite.js` importa `#core/config` (dependência EXTERNA ao src/copilot) — quebra autonomia
 - ⚠️ Sem connection pooling — singleton global
 
@@ -166,7 +183,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.6. `audit/` — Audit Pipeline (L1) | 8 arquivos, 884 LOC
 
-**Responsabilidade**: Ring buffer em memória, JSONL persistence, audit logging de tools e permissões.
+**Responsabilidade**: Ring buffer em memória, JSONL persistence, audit logging de tools e
+permissões.
 
 | Arquivo                  | LOC | Função                                  |
 | ------------------------ | --- | --------------------------------------- |
@@ -180,6 +198,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`               | 35  | Barrel                                  |
 
 **Problemas identificados**:
+
 - ⚠️ `audit → sdk` (violação L1→L2) — `pipeline-audit-log.js` importa tipos de `sdk/`
 - ⚠️ `pipeline-audit-log.js` (332 LOC) contém tanto lógica de buffer quanto I/O — SRP violado
 
@@ -189,7 +208,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.7. `observability/` — Monitoring & Logging (L1) | 31 arquivos, 5.645 LOC
 
-**Responsabilidade**: Logger, métricas, error tracking, alerting, event collection, bus-actions, OpenTelemetry.
+**Responsabilidade**: Logger, métricas, error tracking, alerting, event collection, bus-actions,
+OpenTelemetry.
 
 **Sub-módulos**:
 
@@ -201,6 +221,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)         | 14       | 3.285 | Logger, métricas, error tracker, alerting, OTel          |
 
 **Problemas identificados**:
+
 - 🔴 7 dependências de saída — muito alto para L1
 - 🔴 `observability → hooks` e `observability → sdk` (violações L1→L2)
 - ⚠️ `metrics.js` (397 LOC) e `event-collector.js` (368 LOC) sem descrição — possíveis God Modules
@@ -213,7 +234,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.8. `sdk/` — SDK Wrapper (L2) | 42 arquivos, 7.875 LOC
 
-**Responsabilidade**: Abstração do `@github/copilot-sdk` — client, sessions, tools, RPC, models, feature flags, health checks.
+**Responsabilidade**: Abstração do `@github/copilot-sdk` — client, sessions, tools, RPC, models,
+feature flags, health checks.
 
 **Sub-módulos**:
 
@@ -223,11 +245,13 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)     | 37       | 6.783 | Client, session, tools, RPC, configs, contracts |
 
 **Destaques positivos**:
+
 - ✅ Instabilidade 0.13 (muito estável) — muitos dependem, poucos deps de saída
 - ✅ 39 testes dedicados — melhor ratio do sistema
 - ✅ Bem organizado com barrels e tipagem
 
 **Problemas identificados**:
+
 - ⚠️ `types.js` (647 LOC) — enorme arquivo de re-exportação de tipos
 - ⚠️ `index.js` (353 LOC) — barrel gigante com ~120 exports
 - ⚠️ `experimental-rpc.js` (352 LOC) — "experimental" ainda em produção?
@@ -249,8 +273,10 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)     | 7        | 1.357 | Git, MCP, NERV adapter, barrels     |
 
 **Problemas identificados**:
+
 - ⚠️ `nerv-event-bus-adapter.js` ainda referencia "nerv-bridge.js" em comentários
-- ⚠️ `mcp-tool-bridge.js` (428 LOC) — maior arquivo, acumula registro, auto-reconnect, status, conversão
+- ⚠️ `mcp-tool-bridge.js` (428 LOC) — maior arquivo, acumula registro, auto-reconnect, status,
+  conversão
 
 **Score**: 7/10
 
@@ -258,7 +284,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.10. `channel/` — LLM-A ↔ LLM-B Communication (L2) | 7 arquivos, 1.416 LOC
 
-**Responsabilidade**: Cliente de comunicação bidirecional entre LLM-A (GitHub Copilot) e LLM-B (terminal local).
+**Responsabilidade**: Cliente de comunicação bidirecional entre LLM-A (GitHub Copilot) e LLM-B
+(terminal local).
 
 | Arquivo                | LOC | Função                                 |
 | ---------------------- | --- | -------------------------------------- |
@@ -271,7 +298,9 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`             | 81  | Barrel                                 |
 
 **Problemas identificados**:
-- 🔴 `channel/index.js` tem imports estranhos: `import * as _reexport from '#copilot/channel/client'` — barrel suspeito
+
+- 🔴 `channel/index.js` tem imports estranhos:
+  `import * as _reexport from '#copilot/channel/client'` — barrel suspeito
 - ⚠️ `client.js` (508 LOC) é God Module — acumula dialog, bridge, config, state
 - ⚠️ `inject.js` (402 LOC) sem descrição — handler monolítico
 
@@ -281,7 +310,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.11. `hooks/` — SDK Hook System (L2) | 21 arquivos, 3.788 LOC
 
-**Responsabilidade**: Sistema de hooks para os 6 slots do SDK: permission, tool intercept, prompt transform, error handling, user input, session lifecycle.
+**Responsabilidade**: Sistema de hooks para os 6 slots do SDK: permission, tool intercept, prompt
+transform, error handling, user input, session lifecycle.
 
 **Sub-módulos**:
 
@@ -291,6 +321,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)     | 12       | 2.622 | Factory, bus, registry, types, handlers                       |
 
 **Problemas identificados**:
+
 - 🔴 `hooks → tools` (violação L2→L3) — hooks depende de tools para inspeção
 - 🔴 `hooks ↔ observability` (ciclo bidirecional)
 - ⚠️ `factory.js` (418 LOC) — maior arquivo, responsabilidade excessiva
@@ -306,6 +337,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 **Responsabilidade**: Registry de plugins com descoberta e ativação automática.
 
 **Problemas identificados**:
+
 - ⚠️ 0 testes
 - ⚠️ Módulo minimalista — quase não usado em produção
 - ⚠️ Apenas `plugins → observability` como dependência
@@ -316,7 +348,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.13. `agent/` — Agent Core (L3) | 57 arquivos, 8.274 LOC
 
-**Responsabilidade**: AlwaysAliveAgent — singleton que orquestra sessão SDK, dialog loop, message queue, lifecycle, state, facades, webhooks.
+**Responsabilidade**: AlwaysAliveAgent — singleton que orquestra sessão SDK, dialog loop, message
+queue, lifecycle, state, facades, webhooks.
 
 **Sub-módulos**:
 
@@ -333,7 +366,9 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)                    | 8        | 1.636 | always-alive.js (745 LOC!), config, context, queue-processor, types, index                         |
 
 **Problemas identificados**:
-- 🔴 `always-alive.js` (745 LOC) — **God Module**. Mesmo após extração em ~50 sub-módulos, ainda concentra demais
+
+- 🔴 `always-alive.js` (745 LOC) — **God Module**. Mesmo após extração em ~50 sub-módulos, ainda
+  concentra demais
 - ⚠️ 10 dependências de saída — depende de quase todo o sistema
 - ⚠️ Baixa cobertura de testes (2 testes dedicados na pasta `agent/`, ~20 em nível raiz)
 - ⚠️ `lifecycle/entry.js` (250 LOC) — entry point PM2 com lógica de boot duplicada
@@ -344,7 +379,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.14. `conversation-hub/` — Persistent Conversations (L3) | 12 arquivos, 2.589 LOC
 
-**Responsabilidade**: ConversationHub — persistência SQLite de diálogos, socket.io namespace, orquestração de mensagens.
+**Responsabilidade**: ConversationHub — persistência SQLite de diálogos, socket.io namespace,
+orquestração de mensagens.
 
 | Arquivo              | LOC    | Função                                |
 | -------------------- | ------ | ------------------------------------- |
@@ -359,6 +395,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`           | 15     | Barrel                                |
 
 **Problemas identificados**:
+
 - 🔴 `socket-ns.js` importa `#core/jwt_config` — dependência EXTERNA ao src/copilot
 - ⚠️ `store.js` (563 LOC) ainda é God Module apesar de extrações
 - ⚠️ `orchestrator.js` (410 LOC) sem descrição
@@ -369,7 +406,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.15. `tools/` — Agent Custom Tools (L3) | 28 arquivos, 6.352 LOC
 
-**Responsabilidade**: 60+ custom tools para o agente: file ops, git, shell, hub, hooks, introspection, session RPC, TODO, code quality.
+**Responsabilidade**: 60+ custom tools para o agente: file ops, git, shell, hub, hooks,
+introspection, session RPC, TODO, code quality.
 
 **Sub-módulos**:
 
@@ -382,6 +420,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)     | 11       | 3.820 | Hub, hook, introspection, permission, session, code, web, task, factory, barrel |
 
 **Problemas identificados**:
+
 - ⚠️ `index.js` (113 LOC) mas barrel está vazio para export
 - ⚠️ `introspection-tools.js` (409 LOC) — God Module de diagnóstico
 - ⚠️ `hub-tools.js` (346 LOC) e `hook-tools.js` (344 LOC) — grandes
@@ -403,7 +442,9 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | `index.js`                | 37  | Barrel com re-exports de conversation-hub e channel |
 
 **Problemas identificados**:
-- ⚠️ `index.js` re-exporta diretamente de `#copilot/conversation-hub` e `#copilot/channel` — rompe encapsulamento
+
+- ⚠️ `index.js` re-exporta diretamente de `#copilot/conversation-hub` e `#copilot/channel` — rompe
+  encapsulamento
 - ⚠️ 9 dependências de saída vs 2 de entrada — instabilidade 0.82 (muito instável)
 - 🔴 0 testes dedicados
 
@@ -425,6 +466,7 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)     | 1        | 21    | Barrel                                     |
 
 **Problemas identificados**:
+
 - ⚠️ Dois routers paralelos (`bridge/` e `express/`) com sobreposição funcional
 - ⚠️ `express/session-crud.js` (350 LOC) sem descrição
 - ⚠️ `express/session-messaging.js` (296 LOC) — messaging via HTTP REST
@@ -435,7 +477,8 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 
 ### 2.18. `terminal/` — Terminal REPL (L4) | 47 arquivos, 7.753 LOC
 
-**Responsabilidade**: Terminal interativo permanente LLM-B com REPL, comandos, handlers HTTP, dialog engine, SSE.
+**Responsabilidade**: Terminal interativo permanente LLM-B com REPL, comandos, handlers HTTP, dialog
+engine, SSE.
 
 **Sub-módulos**:
 
@@ -447,9 +490,11 @@ O sistema permite que um agente LLM ("LLM-B", Always-Alive) opere de forma perma
 | (raiz)      | 14       | 3.310 | index, repl, server, state, route-table, agent-wiring, file-context, alias |
 
 **Problemas identificados**:
+
 - 🔴 **bootstrap.js FALTANDO** — npm script `terminal:llm-b` não funciona
 - 🔴 13 dependências de saída — depende de praticamente todo o sistema
-- ⚠️ `repl.js` (422 LOC), `server.js` (396 LOC), `state.js` (354 LOC), `file-context.js` (346 LOC) — sem descrição, possíveis God Modules
+- ⚠️ `repl.js` (422 LOC), `server.js` (396 LOC), `state.js` (354 LOC), `file-context.js` (346 LOC) —
+  sem descrição, possíveis God Modules
 - ⚠️ `commands/gh.js` (384 LOC) — maior comando, acumula 7 subcomandos
 - ⚠️ `commands/session.js` (300 LOC) — 10+ subcomandos
 
@@ -506,6 +551,7 @@ CICLO 4: hooks ↔ observability
 ### 3.4. Arquivos Sem Descrição (JSDoc)
 
 12 arquivos de >100 LOC sem JSDoc header:
+
 - `agent/always-alive.js`, `agent/dialog/loop-manager.js`, `agent/dialog/turn-executor.js`
 - `channel/client.js`, `channel/inject.js`
 - `conversation-hub/orchestrator.js`, `conversation-hub/socket-ns.js`
@@ -515,6 +561,7 @@ CICLO 4: hooks ↔ observability
 ### 3.5. Shims de Compatibilidade
 
 5 shims de ≤14 LOC que apenas re-exportam:
+
 - `agent/infra/url-validator.js` → `core/security/url-validator.js`
 - `sdk/url-validator.js` → `core/security/url-validator.js`
 - `sdk/session-lifecycle.js` → `sdk/sdk-session-wrapper.js`
@@ -611,23 +658,28 @@ Agent EventEmitter (.emit)
 ## 6. Resumo de Achados
 
 ### Críticos (bloqueantes) 🔴
+
 1. **bootstrap.js faltando** — terminal não inicia standalone
-2. **4 ciclos bidirecionais** — core↔config, config↔observability, events↔observability, hooks↔observability
+2. **4 ciclos bidirecionais** — core↔config, config↔observability, events↔observability,
+   hooks↔observability
 3. **2 dependências externas** — `#core/jwt_config`, `#core/config` — quebram autonomia
 
 ### Altos (impacto estrutural) 🟠
+
 4. **7 violações de camada** — L0→L1, L1→L2, L2→L3
 5. **12 God Modules** (>400 LOC com responsabilidade mista)
 6. **0 testes** em services/ e plugins/
 7. **core/events.js legado** — 204 LOC de duplicação
 
 ### Médios (melhorias de qualidade) 🟡
+
 8. **13 arquivos sem JSDoc** header (>100 LOC)
 9. **5 shims de compatibilidade** sem prazo de remoção
 10. **4 barrels problemáticos** (tools, channel, services, sdk)
 11. **metrics.js e event-collector.js** sem descrição — desconhecidos
 
 ### Baixos (cleanup) 🟢
+
 12. **nerv-events.js** com lógica de mapeamento que pertence a bridges
 13. **.github/hooks/state/** dentro de src/copilot — runtime data em source tree
 14. **Comentários referenciando nerv-bridge.js** (removido em L36)

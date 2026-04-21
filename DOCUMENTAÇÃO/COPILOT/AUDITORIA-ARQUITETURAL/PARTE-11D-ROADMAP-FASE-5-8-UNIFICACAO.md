@@ -1,11 +1,10 @@
 # PARTE 11D — Roadmap de Refatoração: Fases 5–8 (Unificação & Centralização)
 
-**Data**: 2026-07-21
-**Pré-requisitos**: Fases 1–4 concluídas (higiene).
-**Escopo**: Centralização de config, unificação de auditoria, merge de rotas HTTP.
+**Data**: 2026-07-21 **Pré-requisitos**: Fases 1–4 concluídas (higiene). **Escopo**: Centralização
+de config, unificação de auditoria, merge de rotas HTTP.
 
-> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**.
-> Ver [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
+> **STATUS (2026-07-22)**: ✅ **TODAS AS FASES CONCLUÍDAS E PUSHADAS**. Ver
+> [PARTE-12](PARTE-12-STATUS-POS-F16.md) para métricas finais e roadmap de continuidade.
 
 ---
 
@@ -85,9 +84,8 @@
 
 ### Validação F5
 
-- `grep -rn 'process\.env\b' src/copilot --include='*.js' | grep -v config/env.js | grep -v
-  agent/config.js` — deve retornar 0 (ou apenas as 4 exceções justificadas: NODE_ENV em
-  condicionais dinâmicos)
+- `grep -rn 'process\.env\b' src/copilot --include='*.js' | grep -v config/env.js | grep -v agent/config.js`
+  — deve retornar 0 (ou apenas as 4 exceções justificadas: NODE_ENV em condicionais dinâmicos)
 - lint + typecheck + format:check
 
 ---
@@ -198,7 +196,7 @@
 
 - lint + typecheck
 - Confirmar que `api/express/index.js` monta todos os sub-routers
-- Confirmar que importadores de routes/* redirecionados
+- Confirmar que importadores de routes/\* redirecionados
 
 ---
 

@@ -1,20 +1,18 @@
 # PARTE-17B — Relatório Comparativo rev.2 (Pós Faixas 28-34)
 
-**Data**: 2026-10-04
-**Escopo**: Hardening SDK zero-bypass + suite de testes `src/copilot/sdk/`
-**Sessão**: Faixas 28–34 (F151–F180 + correções lint/typecheck)
-**Baseline**: PARTE-17B rev.1 (pós PARTE-16E / Faixas 1-27)
-**Branch**: `main`
+**Data**: 2026-10-04 **Escopo**: Hardening SDK zero-bypass + suite de testes `src/copilot/sdk/`
+**Sessão**: Faixas 28–34 (F151–F180 + correções lint/typecheck) **Baseline**: PARTE-17B rev.1 (pós
+PARTE-16E / Faixas 1-27) **Branch**: `main`
 
 ---
 
 ## 1. Resumo Executivo
 
-A sessão Faixas 28–34 completou o **zero-bypass hardening** total do `src/copilot/`:
-nenhum arquivo consumer importa diretamente de `@github/copilot-sdk` para uso em runtime.
-Foram adicionados 165 novos testes na suite `tests/unit/copilot/sdk/`, elevando o total de
-**3.101** para **3.053** (ajuste: remoção de testes duplicados + adição dos 165 novos =
-net 3.053 total `src/copilot/`; 1.040 apenas no diretório `sdk/`).
+A sessão Faixas 28–34 completou o **zero-bypass hardening** total do `src/copilot/`: nenhum arquivo
+consumer importa diretamente de `@github/copilot-sdk` para uso em runtime. Foram adicionados 165
+novos testes na suite `tests/unit/copilot/sdk/`, elevando o total de **3.101** para **3.053**
+(ajuste: remoção de testes duplicados + adição dos 165 novos = net 3.053 total `src/copilot/`; 1.040
+apenas no diretório `sdk/`).
 
 **Entregas desta sessão**:
 
@@ -50,9 +48,9 @@ net 3.053 total `src/copilot/`; 1.040 apenas no diretório `sdk/`).
 | Typecheck errors                         |  33 (baseline)   |       **33**       | 0 regressão                 |
 | God modules >400L                        |        22        |       **22**       | 0                           |
 
-> **Bypasses fora de sdk/**: A rev.1 tinha 2 bypasses intencionais restantes
-> (`boot-wiring.js` → `quota-monitor` e `config/index.js` → `tools-state`).
-> Ambos eliminados nesta sessão via Faixas 30+33.
+> **Bypasses fora de sdk/**: A rev.1 tinha 2 bypasses intencionais restantes (`boot-wiring.js` →
+> `quota-monitor` e `config/index.js` → `tools-state`). Ambos eliminados nesta sessão via Faixas
+> 30+33.
 
 ---
 
@@ -68,8 +66,8 @@ grep -rn "from '@github/copilot-sdk'" src/copilot/ \
   → 0 resultados
 ```
 
-Zero bypasses em consumer code. **Todos os imports diretos do SDK estão dentro
-de `src/copilot/sdk/`**, que é a única camada autorizada.
+Zero bypasses em consumer code. **Todos os imports diretos do SDK estão dentro de
+`src/copilot/sdk/`**, que é a única camada autorizada.
 
 ### 3.2 Bypasses Intencionais Dentro do sdk/ (correto)
 
@@ -88,41 +86,41 @@ de `src/copilot/sdk/`**, que é a única camada autorizada.
 
 ### 4.1 sdk/ — Inventário Completo (33 arquivos)
 
-| Módulo                 |   L   |            Testes Cobrindo             |  Status   |
-| ---------------------- | :---: | :------------------------------------: | :-------: |
-| `index.js`             | ~280  |       `test_sdk_barrel*.spec.js`       |     ✅     |
-| `client.js`            | ~320  |       `test_sdk_client.spec.js`        |     ✅     |
-| `client-facade.js`     |  130  |    `test_sdk_client_facade.spec.js`    |     ✅     |
-| `client-events.js`     | ~100  |    `test_sdk_client_events.spec.js`    |     ✅     |
-| `session.js`           | ~280  |     `test_sdk_integration.spec.js`     |     ✅     |
-| `session-lifecycle.js` |  ~80  |  `test_sdk_session_lifecycle.spec.js`  |     ✅     |
-| `tools.js`             | ~150  |    `test_sdk_tools.spec.js`, `f28`     |     ✅     |
-| `tools-registry.js`    | ~180  | `test_sdk_tools_registry_f28.spec.js`  |     ✅     |
-| `permissions.js`       | ~120  |     `test_sdk_permissions.spec.js`     |     ✅     |
-| `config.js`            | ~200  |    `test_sdk_config.spec.js`, `f27`    |     ✅     |
-| `system-message.js`    | ~180  |   `test_sdk_system_message.spec.js`    |     ✅     |
-| `rpc.js`               |  484  | `test_sdk_rpc.spec.js`, `rpc_advanced` |     ✅     |
-| `server-rpc.js`        |  181  |  `test_sdk_server_rpc_health.spec.js`  |     ✅     |
-| `experimental-rpc.js`  |  368  |  `test_sdk_experimental_f22.spec.js`   |     ✅     |
-| `events.js`            | ~200  |       `test_sdk_events.spec.js`        |     ✅     |
-| `event-helpers.js`     |  140  |       `test_sdk_events.spec.js`        |     ✅     |
-| `models/`              | ~200  |       `test_sdk_models.spec.js`        |     ✅     |
-| `agents.js`            | ~180  |       `test_sdk_agents.spec.js`        |     ✅     |
-| `health.js`            | ~200  |  `test_sdk_server_rpc_health.spec.js`  |     ✅     |
-| `quota-monitor.js`     |  152  |  `test_sdk_quota_monitor_f25.spec.js`  |     ✅     |
-| `constants.js`         | ~180  |      `test_sdk_constants.spec.js`      |     ✅     |
-| `types.js`             |  545  |        `test_sdk_types.spec.js`        |     ✅     |
-| `telemetry.js`         | ~100  |      `test_sdk_telemetry.spec.js`      |     ✅     |
-| `provider.js`          | ~150  |      `test_sdk_provider.spec.js`       |     ✅     |
-| `custom-tools.js`      |  327  |   `test_sdk_migration_tools.spec.js`   | ⚠️ parcial |
-| `url-validator.js`     |  100  |     `test_sdk_integration.spec.js`     | ⚠️ parcial |
-| `http-request.js`      |  61   |     `test_sdk_integration.spec.js`     | ⚠️ parcial |
-| `feature-flags.js`     |  94   |  `test_sdk_experimental_f22.spec.js`   | ⚠️ parcial |
-| `utils.js`             | ~100  |                 vários                 |     ✅     |
-| `agent-contract.js`    |  76   |          ❌ sem spec dedicado           |     ❌     |
-| `bridge-contract.js`   |  55   |          ❌ sem spec dedicado           |     ❌     |
-| `channel-contract.js`  |  55   |          ❌ sem spec dedicado           |     ❌     |
-| `tools-state.js`       |  ~50  |   `test_sdk_zero_bypass_f33.spec.js`   | ⚠️ parcial |
+| Módulo                 |  L   |            Testes Cobrindo             |   Status   |
+| ---------------------- | :--: | :------------------------------------: | :--------: |
+| `index.js`             | ~280 |       `test_sdk_barrel*.spec.js`       |     ✅     |
+| `client.js`            | ~320 |       `test_sdk_client.spec.js`        |     ✅     |
+| `client-facade.js`     | 130  |    `test_sdk_client_facade.spec.js`    |     ✅     |
+| `client-events.js`     | ~100 |    `test_sdk_client_events.spec.js`    |     ✅     |
+| `session.js`           | ~280 |     `test_sdk_integration.spec.js`     |     ✅     |
+| `session-lifecycle.js` | ~80  |  `test_sdk_session_lifecycle.spec.js`  |     ✅     |
+| `tools.js`             | ~150 |    `test_sdk_tools.spec.js`, `f28`     |     ✅     |
+| `tools-registry.js`    | ~180 | `test_sdk_tools_registry_f28.spec.js`  |     ✅     |
+| `permissions.js`       | ~120 |     `test_sdk_permissions.spec.js`     |     ✅     |
+| `config.js`            | ~200 |    `test_sdk_config.spec.js`, `f27`    |     ✅     |
+| `system-message.js`    | ~180 |   `test_sdk_system_message.spec.js`    |     ✅     |
+| `rpc.js`               | 484  | `test_sdk_rpc.spec.js`, `rpc_advanced` |     ✅     |
+| `server-rpc.js`        | 181  |  `test_sdk_server_rpc_health.spec.js`  |     ✅     |
+| `experimental-rpc.js`  | 368  |  `test_sdk_experimental_f22.spec.js`   |     ✅     |
+| `events.js`            | ~200 |       `test_sdk_events.spec.js`        |     ✅     |
+| `event-helpers.js`     | 140  |       `test_sdk_events.spec.js`        |     ✅     |
+| `models/`              | ~200 |       `test_sdk_models.spec.js`        |     ✅     |
+| `agents.js`            | ~180 |       `test_sdk_agents.spec.js`        |     ✅     |
+| `health.js`            | ~200 |  `test_sdk_server_rpc_health.spec.js`  |     ✅     |
+| `quota-monitor.js`     | 152  |  `test_sdk_quota_monitor_f25.spec.js`  |     ✅     |
+| `constants.js`         | ~180 |      `test_sdk_constants.spec.js`      |     ✅     |
+| `types.js`             | 545  |        `test_sdk_types.spec.js`        |     ✅     |
+| `telemetry.js`         | ~100 |      `test_sdk_telemetry.spec.js`      |     ✅     |
+| `provider.js`          | ~150 |      `test_sdk_provider.spec.js`       |     ✅     |
+| `custom-tools.js`      | 327  |   `test_sdk_migration_tools.spec.js`   | ⚠️ parcial |
+| `url-validator.js`     | 100  |     `test_sdk_integration.spec.js`     | ⚠️ parcial |
+| `http-request.js`      |  61  |     `test_sdk_integration.spec.js`     | ⚠️ parcial |
+| `feature-flags.js`     |  94  |  `test_sdk_experimental_f22.spec.js`   | ⚠️ parcial |
+| `utils.js`             | ~100 |                 vários                 |     ✅     |
+| `agent-contract.js`    |  76  |          ❌ sem spec dedicado          |     ❌     |
+| `bridge-contract.js`   |  55  |          ❌ sem spec dedicado          |     ❌     |
+| `channel-contract.js`  |  55  |          ❌ sem spec dedicado          |     ❌     |
+| `tools-state.js`       | ~50  |   `test_sdk_zero_bypass_f33.spec.js`   | ⚠️ parcial |
 
 ---
 
@@ -150,24 +148,24 @@ de `src/copilot/sdk/`**, que é a única camada autorizada.
 
 | Arquivo                            | Linhas | Criticidade | Sugestão                         |
 | ---------------------------------- | :----: | :---------: | -------------------------------- |
-| `tools/file/write-tools.js`        |  339   |   🔴 ALTA    | F35: write tools test suite      |
-| `api/express/session-crud.js`      |  371   |   🔴 ALTA    | F36: session CRUD API test suite |
-| `api/express/session-messaging.js` |  292   |   🟡 MÉDIA   | F36: mesma faixa                 |
-| `api/express/observability.js`     |  310   |   🟡 MÉDIA   | F37: observability API tests     |
-| `sdk/agent-contract.js`            |   76   |   🟢 BAIXA   | F38: contract types tests        |
-| `sdk/bridge-contract.js`           |   55   |   🟢 BAIXA   | F38: mesma faixa                 |
-| `sdk/channel-contract.js`          |   55   |   🟢 BAIXA   | F38: mesma faixa                 |
+| `tools/file/write-tools.js`        |  339   |   🔴 ALTA   | F35: write tools test suite      |
+| `api/express/session-crud.js`      |  371   |   🔴 ALTA   | F36: session CRUD API test suite |
+| `api/express/session-messaging.js` |  292   |  🟡 MÉDIA   | F36: mesma faixa                 |
+| `api/express/observability.js`     |  310   |  🟡 MÉDIA   | F37: observability API tests     |
+| `sdk/agent-contract.js`            |   76   |  🟢 BAIXA   | F38: contract types tests        |
+| `sdk/bridge-contract.js`           |   55   |  🟢 BAIXA   | F38: mesma faixa                 |
+| `sdk/channel-contract.js`          |   55   |  🟢 BAIXA   | F38: mesma faixa                 |
 
 ### 6.2 Custom-Tools (Cobertura Parcial)
 
 `sdk/custom-tools.js` (327L) tem apenas importação indireta via `test_sdk_migration_tools.spec.js`.
-Não há testes diretos de criação de ferramentas customizadas, validação de parâmetros, e
-integração com `tools-registry`.
+Não há testes diretos de criação de ferramentas customizadas, validação de parâmetros, e integração
+com `tools-registry`.
 
 ### 6.3 API Express — Cobertura Muito Baixa (~10%)
 
-Há apenas 1 spec em `tests/unit/copilot/api/` (`test_middleware.spec.js`). Os 9 outros
-arquivos da api express não têm cobertura unitária isolada.
+Há apenas 1 spec em `tests/unit/copilot/api/` (`test_middleware.spec.js`). Os 9 outros arquivos da
+api express não têm cobertura unitária isolada.
 
 ### 6.4 Channel (0% cobertura)
 
@@ -178,8 +176,8 @@ arquivos da api express não têm cobertura unitária isolada.
 ## 7. Fixes Aplicados nesta Sessão (fora das faixas)
 
 | Arquivo                                                              | Tipo de Fix | Descrição                                                                       |
-| -------------------------------------------------------------------- | :---------: | ------------------------------------------------------------------------------- |
-| `src/copilot/sdk/tools.js`                                           |   Typedef   | `parameters` mudou de `ZodTypeAny                                               | Record<...>` para `any` para aceitar `ZodSchema` |
+| -------------------------------------------------------------------- | :---------: | ------------------------------------------------------------------------------- | -------------------------------------------- |
+| `src/copilot/sdk/tools.js`                                           |   Typedef   | `parameters` mudou de `ZodTypeAny                                               | Record<...>`para`any`para aceitar`ZodSchema` |
 | `src/copilot/sdk/tools.js`                                           |   Typedef   | `handler` aceita agora `ToolHandler<T> \| ((...args: any[]) => any)`            |
 | `src/copilot/observability/metrics.js`                               |   Typedef   | Adicionado `recordQuotaPoll?: () => void` ao `MetricsStore`                     |
 | `src/copilot/tools/shell/index.js`                                   | Annotation  | Casts JSDoc nos parâmetros dos 3 handlers                                       |
