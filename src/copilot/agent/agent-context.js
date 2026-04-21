@@ -832,6 +832,33 @@ export class AgentContext {
     }
 
     /**
+     * Retorna uma cópia semântica da pergunta pendente atual, quando existir.
+     *
+     * @returns {{
+     *     question: string;
+     *     allowFreeform: boolean;
+     *     askedAt: number;
+     *     kind: import('./types.js').PendingQuestionKind;
+     *     protocolControlled: boolean;
+     *     choices?: string[];
+     * } | null}
+     */
+    getPendingQuestionSnapshot() {
+        const question = this.dialogState.pendingQuestion;
+        if (question === null) {
+            return null;
+        }
+        return {
+            question: question.question,
+            allowFreeform: question.allowFreeform,
+            askedAt: question.askedAt,
+            kind: question.kind,
+            protocolControlled: question.protocolControlled,
+            ...(question.choices !== undefined ? { choices: [...question.choices] } : {}),
+        };
+    }
+
+    /**
      * Indica se existe sombra persistida de `ask_user` restaurada do state-io.
      *
      * @returns {boolean}
@@ -943,6 +970,15 @@ export class AgentContext {
      */
     getBackgroundPendingCount() {
         return this.backgroundTasks.pendingCount;
+    }
+
+    /**
+     * Retorna uma cópia defensiva dos unsubscribers registrados para a sessão ativa.
+     *
+     * @returns {(() => void)[]}
+     */
+    getSessionEventUnsubscribersSnapshot() {
+        return [...this.sessionState.sessionEventUnsubscribers];
     }
 
     /**

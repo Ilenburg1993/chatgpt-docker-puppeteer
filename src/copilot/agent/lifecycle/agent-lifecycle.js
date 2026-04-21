@@ -92,9 +92,6 @@ export async function initSession(ctx, client, host) {
  * @returns {Promise<void>}
  */
 export async function agentStart(ctx, host) {
-    const configState = ctx.configState ?? ctx;
-    const runtimeState = ctx.runtimeState ?? ctx;
-
     if (ctx.status !== 'stopped') {
         log('WARN', `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.status}'.`);
         return;
@@ -129,10 +126,8 @@ export async function agentStart(ctx, host) {
         const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
         ctx.setClient(client);
 
-        const { session, isResumed } = await startSpan(
-            'copilot.session.init',
-            { model: configState.model ?? ctx.model },
-            () => initSession(ctx, client, host),
+        const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.model }, () =>
+            initSession(ctx, client, host),
         );
 
         const ownershipSync = await syncActiveSessionOwnershipWithPolicy(
@@ -148,8 +143,8 @@ export async function agentStart(ctx, host) {
             log('WARN', `[AlwaysAlive] Ownership sync degradado no boot: ${ownershipSync.error.message}`);
         }
 
-        if (runtimeState.agentObserver) {
-            runtimeState.agentObserver.detach();
+        if (ctx.agentObserver) {
+            ctx.agentObserver.detach();
             ctx.clearAgentObserver();
         }
         const eventBus = container.resolve(EVENT_BUS) ?? undefined;
@@ -202,7 +197,7 @@ export async function agentStart(ctx, host) {
                 startDialogLoop: () => host.startDialogLoop(),
                 getDialogPrMetrics: () => host.dialogPrMetrics,
                 backgroundTasks: ctx.backgroundTasks,
-                mcpBridge: configState.mcpBridge ?? ctx.mcpBridge ?? null,
+                mcpBridge: ctx.mcpBridge,
             },
             { eventBus },
         );
@@ -297,13 +292,6 @@ export async function agentStart(ctx, host) {
  * @returns {Promise<void>}
  */
 export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
-    const sessionState = ctx.sessionState ?? ctx;
-    const dialogState = ctx.dialogState ?? ctx;
-    const configState = ctx.configState ?? ctx;
-    const metricsState = ctx.metricsState ?? ctx;
-    const runtimeState = ctx.runtimeState ?? ctx;
-    const ioState = ctx.ioState ?? ctx;
-
     if (ctx.status === 'stopped') return;
 
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
@@ -335,7 +323,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             ]);
         }
 
-        if (dialogState.dialogLoopAttached) {
+        if (ctx.dialogLoopAttached) {
             ctx.dialogLoop.removeAllListeners();
             ctx.setDialogLoopAttached(false);
         }
@@ -345,12 +333,15 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         try {
-            const pendingQuestion = dialogState.pendingQuestion ?? ctx.pendingQuestion;
+            const pendingQuestion =
+                typeof ctx.getPendingQuestionSnapshot === 'function'
+                    ? ctx.getPendingQuestionSnapshot()
+                    : ctx.pendingQuestion;
             const snap = createSnapshot({
                 sessionId: host.sessionId ?? null,
-                model: configState.model ?? ctx.model,
-                status: runtimeState.status ?? ctx.status,
-                sendCount: metricsState.sendCount ?? ctx.sendCount,
+                model: ctx.model,
+                status: ctx.status,
+                sendCount: ctx.sendCount,
                 dialogLoopActive: false,
                 dialogPaused: ctx.dialogLoop.paused,
                 pendingQuestion: pendingQuestion?.question ?? null,
@@ -373,19 +364,19 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         const persistedShutdown = await persistStateWithPolicy(
-            { sendCount: metricsState.sendCount ?? ctx.sendCount, gracefulShutdown: true },
+            { sendCount: ctx.sendCount, gracefulShutdown: true },
             { label: 'state.gracefulShutdown.persist' },
         );
         if (!persistedShutdown.ok) {
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${persistedShutdown.error.message}`);
         }
 
-        if (runtimeState.metricsTimer) {
-            clearInterval(runtimeState.metricsTimer);
+        if (ctx.metricsTimer) {
+            clearInterval(ctx.metricsTimer);
             ctx.clearMetricsTimer();
         }
-        if (runtimeState.mcpReconnectCancel) {
-            runtimeState.mcpReconnectCancel();
+        if (ctx.mcpReconnectCancel) {
+            ctx.mcpReconnectCancel();
             ctx.clearMcpReconnectCancel();
         }
         if (ctx.quotaMonitor) {
@@ -410,17 +401,21 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
         }
 
-        if (runtimeState.agentObserver) {
-            runtimeState.agentObserver.detach();
+        if (ctx.agentObserver) {
+            ctx.agentObserver.detach();
             ctx.clearAgentObserver();
         }
 
-        for (const unsub of sessionState.sessionEventUnsubscribers ?? []) unsub();
+        const sessionEventUnsubscribers =
+            typeof ctx.getSessionEventUnsubscribersSnapshot === 'function'
+                ? ctx.getSessionEventUnsubscribersSnapshot()
+                : [...(ctx.sessionEventUnsubscribers ?? [])];
+        for (const unsub of sessionEventUnsubscribers) unsub();
         ctx.clearSessionEventUnsubscribers();
 
-        if (sessionState.session) {
+        if (ctx.session) {
             try {
-                await sessionState.session.disconnect();
+                await ctx.session.disconnect();
             } catch (e) {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
@@ -430,9 +425,9 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             setExperimentalSession(null);
         }
 
-        if (ioState.client) {
+        if (ctx.client) {
             try {
-                const stopErrors = await ioState.client.stop();
+                const stopErrors = await ctx.client.stop();
                 if (stopErrors.length > 0) {
                     log(
                         'WARN',
@@ -470,22 +465,22 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
  * @returns {Promise<boolean>}
  */
 export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
-    const sessionState = ctx.sessionState ?? ctx;
-    const runtimeState = ctx.runtimeState ?? ctx;
-    const ioState = ctx.ioState ?? ctx;
-
     ctx.setReconnectState(true);
     try {
         return await tryReconnect(
             originalError,
-            /** @type {import('#copilot/sdk/types').CopilotClient} */ (ioState.client ?? ctx.client),
-            runtimeState.status ?? ctx.status,
+            /** @type {import('#copilot/sdk/types').CopilotClient} */ (ctx.client),
+            ctx.status,
             {
                 emit: (event, payload) => host.emit(event, payload),
                 initSession: (client) => initSession(ctx, client, host),
                 dialogLoop: ctx.dialogLoop,
                 clearSessionEventUnsubs: () => {
-                    for (const unsub of sessionState.sessionEventUnsubscribers ?? []) unsub();
+                    const sessionEventUnsubscribers =
+                        typeof ctx.getSessionEventUnsubscribersSnapshot === 'function'
+                            ? ctx.getSessionEventUnsubscribersSnapshot()
+                            : [...(ctx.sessionEventUnsubscribers ?? [])];
+                    for (const unsub of sessionEventUnsubscribers) unsub();
                     ctx.clearSessionEventUnsubscribers();
                 },
                 createClient: () => {

@@ -37,6 +37,7 @@ O objetivo agora é:
 - centralizar policy de erro;
 - manter o SDK como base canônica das features análogas;
 - reduzir mutação crua do contexto;
+- reduzir também leituras cruas de `ctx.*State` nos módulos quentes de lifecycle/health/setup;
 - deixar `AlwaysAliveAgent` como fachada previsível.
 
 ## Runtime default vs runtimes registrados
@@ -51,6 +52,21 @@ Em outras palavras:
 
 - `AlwaysAliveAgent` continua sendo a fachada principal;
 - a `AgentRuntimeRegistry` prepara o caminho para multi-agent futuro sem quebrar o singleton atual.
+
+## Hardening recente do `AgentContext`
+
+O `AgentContext` já não serve apenas para mutation API.
+
+O hot path do `agent` passou a consumir também snapshots/helpers semânticos como:
+
+- `getPendingQuestionSnapshot()`
+- `getPendingQuestionShadowSnapshot()`
+- `getSessionEventUnsubscribersSnapshot()`
+- `getBootReportSnapshot()`
+
+Com isso, `lifecycle/session-setup.js`, `lifecycle/agent-lifecycle.js` e `health-check.js` reduziram
+a dependência do shape cru de `configState/sessionState/dialogState/runtimeState/...`, aproximando o
+módulo do critério CA-3 da consolidação arquitetural.
 
 ## Relação com `presentation/`
 

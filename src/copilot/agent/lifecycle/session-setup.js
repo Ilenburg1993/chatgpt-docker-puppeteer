@@ -38,9 +38,9 @@ import { handleUserInputRequest } from '../dialog/user-input-handler.js';
  * @returns {Promise<{ tools: import('#copilot/sdk/types').Tool[] }>}
  */
 export async function buildSessionTools(ctx) {
-    const configState = ctx.configState ?? ctx;
     ctx.messagesCache.invalidate();
-    const mcpTools = configState.mcpBridge ? await configState.mcpBridge.buildTools() : await buildMcpTools();
+    const mcpBridge = ctx.mcpBridge ?? ctx.configState?.mcpBridge ?? null;
+    const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildMcpTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
@@ -58,7 +58,6 @@ export async function buildSessionTools(ctx) {
  * @returns {{ busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']> }}
  */
 export function buildSessionHooks(ctx, host) {
-    const configState = ctx.configState ?? ctx;
     /** @type {{ recordSessionStart: () => void; recordSessionEnd: () => void }} */
     let metricsStore = {
         recordSessionStart: () => {},
@@ -72,7 +71,7 @@ export function buildSessionHooks(ctx, host) {
 
     const lifecycleHooks = createSessionHooks({
         emitWebhook: (event, payload) => ctx.webhooks.emit(event, payload),
-        getModel: () => configState.model,
+        getModel: () => ctx.model,
         scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
@@ -100,12 +99,12 @@ export function buildSessionHooks(ctx, host) {
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
-    const configState = ctx.configState ?? ctx;
+    const mcpBridge = ctx.mcpBridge ?? ctx.configState?.mcpBridge ?? null;
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
-        configState.mcpBridge ? configState.mcpBridge.buildConfig() : buildMcpConfig()
+        mcpBridge ? mcpBridge.buildConfig() : buildMcpConfig()
     );
     const builder = new SessionConfigBuilder()
-        .model(configState.model)
+        .model(ctx.model)
         .clientName('chatgpt-docker-puppeteer')
         .workingDirectory(process.cwd())
         .onPermissionRequest(ctx.permissions.handler)
@@ -116,12 +115,12 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         builder.mcpServers(mcpConfig);
     }
 
-    if (configState.reasoningEffort) {
-        const modelMeta = modelRegistry.get(configState.model);
+    if (ctx.reasoningEffort) {
+        const modelMeta = modelRegistry.get(ctx.model);
         if (modelMeta?.supportsReasoning === false) {
             log(
                 'INFO',
-                `[session-setup] reasoningEffort omitido para '${configState.model}' — modelo sem suporte explícito a reasoning.`,
+                `[session-setup] reasoningEffort omitido para '${ctx.model}' — modelo sem suporte explícito a reasoning.`,
             );
             if (typeof ctx.setReasoningEffort === 'function') {
                 ctx.setReasoningEffort(undefined);
@@ -129,7 +128,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
                 ctx.reasoningEffort = undefined;
             }
         } else {
-            builder.reasoningEffort(configState.reasoningEffort);
+            builder.reasoningEffort(ctx.reasoningEffort);
         }
     }
 

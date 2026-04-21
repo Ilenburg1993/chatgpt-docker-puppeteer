@@ -213,6 +213,38 @@ describe('AgentContext', () => {
         assert.equal(ctx.hasPendingQuestionShadow(), false);
     });
 
+    it('expõe snapshots semânticos de pendingQuestion e session unsubscribers', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        const unsubA = () => {};
+        const unsubB = () => {};
+        ctx.setSessionEventUnsubscribers([unsubA, unsubB]);
+
+        const unsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
+        assert.deepEqual(unsubscribers, [unsubA, unsubB]);
+        assert.notEqual(unsubscribers, ctx.sessionEventUnsubscribers);
+
+        ctx.setPendingQuestion({
+            question: 'Confirmar ação?',
+            allowFreeform: false,
+            resolve: () => {},
+            askedAt: 123,
+            kind: 'question',
+            protocolControlled: true,
+            choices: ['A', 'B'],
+        });
+
+        assert.deepEqual(ctx.getPendingQuestionSnapshot(), {
+            question: 'Confirmar ação?',
+            allowFreeform: false,
+            askedAt: 123,
+            kind: 'question',
+            protocolControlled: true,
+            choices: ['A', 'B'],
+        });
+    });
+
     it('detecta shadow expirada semanticamente', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

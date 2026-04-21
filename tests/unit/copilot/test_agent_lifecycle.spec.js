@@ -97,4 +97,16 @@ describe('agent-lifecycle › source contracts', () => {
     it('agentTryReconnect delega para tryReconnect policy', () => {
         assert.ok(src.includes('tryReconnect('), 'agentTryReconnect deve usar reconnect-policy');
     });
+
+    it('hot path evita aliases crus de subestado no lifecycle', () => {
+        assert.ok(
+            !src.includes('const sessionState = ctx.sessionState ?? ctx;') &&
+                !src.includes('const dialogState = ctx.dialogState ?? ctx;') &&
+                !src.includes('const runtimeState = ctx.runtimeState ?? ctx;') &&
+                !src.includes('const metricsState = ctx.metricsState ?? ctx;') &&
+                !src.includes('const ioState = ctx.ioState ?? ctx;') &&
+                !src.includes('const configState = ctx.configState ?? ctx;'),
+            'agent-lifecycle não deve reintroduzir aliases crus de subestado no hot path',
+        );
+    });
 });

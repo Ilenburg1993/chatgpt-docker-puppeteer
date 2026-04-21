@@ -237,6 +237,8 @@ Entregue parcialmente:
 - `setLastCheckpointPath(...)`
 - `setBootReport(...)`
 - `resolvePendingQuestion(...)`
+- `getPendingQuestionSnapshot()`
+- `getSessionEventUnsubscribersSnapshot()`
 - `getBackgroundPendingLabels(...)`
 - `hasClient()`
 - `hasActiveSession()`
@@ -244,6 +246,16 @@ Entregue parcialmente:
 - `getBackgroundPendingCount()`
 - `getLastPrInfoSnapshot()`
 - `getBootReportSnapshot()`
+
+Estado adicional desta continuação:
+
+- `session-setup.js` passou a ler `model`/`reasoningEffort`/`mcpBridge` pelo caminho semântico
+  (`ctx.model`, `ctx.reasoningEffort`, `ctx.mcpBridge`) no wiring quente da sessão;
+- `agent-lifecycle.js` deixou de manter aliases largos de
+  `configState/sessionState/dialogState/runtimeState/metricsState/ioState` nos fluxos principais de
+  `start/stop/reconnect`, consumindo getters/snapshots do `AgentContext` em vez do shape cru;
+- `health-check.js` passou a preferir snapshots semânticos (`getPendingQuestionSnapshot()` /
+  `getPendingQuestionShadowSnapshot()`) antes de cair para fallback estrutural.
 
 ### Próximo passo ideal
 
@@ -961,6 +973,9 @@ Critério verificável:
 - os módulos quentes de leitura (`health`, `state`, `facades`, getters públicos do agent) usam
   getters/helpers do `AgentContext` em vez de depender diretamente de
   `sessionState/dialogState/configState/...`.
+- `lifecycle/session-setup.js` e `agent-lifecycle.js` evitam aliases largos de subestado
+  (`const sessionState = ...`, `const configState = ...`) nos fluxos centrais, mantendo fallback
+  estrutural apenas em fronteiras realmente compatíveis/testáveis.
 
 ### CA-4 — Error policy vira padrão operacional
 

@@ -502,6 +502,8 @@ semântica**. Nesta rodada, foram adicionados helpers como:
 - `hasClient()`
 - `hasActiveSession()`
 - `hasPendingQuestion()`
+- `getPendingQuestionSnapshot()`
+- `getSessionEventUnsubscribersSnapshot()`
 - `getBackgroundPendingCount()`
 - `getLastPrInfoSnapshot()`
 - `getBootReportSnapshot()`
@@ -516,6 +518,20 @@ E eles já foram adotados em módulos quentes como:
 - `facades/agent-session-ops.js`
 - `state/agent-state.js`
 - getters públicos de `always-alive.js`
+
+Nesta continuação, o endurecimento avançou um passo importante no hot path:
+
+- `lifecycle/session-setup.js` deixou de depender do alias largo
+  `configState = ctx.configState ?? ctx` para ler `model`/`reasoningEffort` do runtime quente,
+  priorizando `ctx.model`, `ctx.reasoningEffort` e `ctx.mcpBridge`;
+- `lifecycle/agent-lifecycle.js` drenou aliases crus de
+  `sessionState/dialogState/runtimeState/metricsState/ioState` nos fluxos centrais de
+  `start/stop/reconnect`, passando a consumir getters e snapshots semânticos do `AgentContext`
+  (`ctx.model`, `ctx.status`, `ctx.sendCount`, `ctx.session`, `ctx.client`,
+  `ctx.getPendingQuestionSnapshot()`, `ctx.getSessionEventUnsubscribersSnapshot()`);
+- `health-check.js` passou a preferir `getPendingQuestionSnapshot()` e
+  `getPendingQuestionShadowSnapshot()` antes de recorrer ao shape cru, mantendo fallback apenas para
+  contextos estruturais de teste/compat.
 
 Na prática, isso reduz o acoplamento estrutural ao shape interno de `sessionState/dialogState/...` e
 empurra o agent na direção certa do `CA-3`.

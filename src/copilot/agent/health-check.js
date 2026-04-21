@@ -65,8 +65,14 @@ export function getAgentHealthSnapshot(ctx, host) {
     const dialogState = ctx.dialogState ?? {};
     const runtimeState = ctx.runtimeState ?? {};
 
-    const pendingQuestion = dialogState.pendingQuestion ?? null;
-    const pendingQuestionShadow = dialogState.pendingQuestionShadow ?? null;
+    const pendingQuestion =
+        typeof ctx.getPendingQuestionSnapshot === 'function'
+            ? ctx.getPendingQuestionSnapshot()
+            : (dialogState.pendingQuestion ?? null);
+    const pendingQuestionShadow =
+        typeof ctx.getPendingQuestionShadowSnapshot === 'function'
+            ? ctx.getPendingQuestionShadowSnapshot()
+            : (dialogState.pendingQuestionShadow ?? null);
 
     const hasPendingQuestion =
         typeof ctx.hasPendingQuestion === 'function' ? ctx.hasPendingQuestion() : pendingQuestion !== null;
