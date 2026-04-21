@@ -1,718 +1,544 @@
 # 10 — Agent Module: Situação Atual Validada
 
-**Data de atualização**: 2026-04-17 **Escopo**: `src/copilot/agent/` **Status**: atualizado após
-leitura do código vivo + nova rodada de implementação **Referências**:
+**Data de atualização**: 2026-04-21  
+**Escopo primário**: `src/copilot/agent/`  
+**Escopo contextual**: relação de `agent/` com `sdk/`, `event-handlers/`, `presentation/`, `server/`, `terminal/`, `conversation-hub/` e `observability/` em `src/copilot/`  
+**Status**: auditoria reescrita e consolidada a partir do código vivo  
+**Referências**:
 
 - [09-AGENT-LOGICA-FLUXO.md](./09-AGENT-LOGICA-FLUXO.md)
 - [11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md)
+- [../AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md](../AUDITORIA-PROFUNDA-ABRIL-2026/14-FLUXO-AGENT-TERMINAL-SDK.md)
+- [../AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md](../AUDITORIA-PROFUNDA-ABRIL-2026/15-ARQUITETURA-PADRONIZADA-E-CENTRALIZADA.md)
 
-> **Nota importante**: este documento substitui a análise de 2026-03-21. O texto anterior continua
-> útil como trilha histórica, mas já não refletia o estado real do runtime em abril/2026.
+> **Leitura correta deste documento**: ele descreve a situação atual real do `agent/` no estado do código em 2026-04-21. Não é um plano aspiracional, nem um retrato histórico de março. Quando houver divergência entre documentação antiga e o código vivo, este documento deve ser tratado como fonte canônica mais recente.
 
 ---
 
 ## 1. Resumo executivo
 
-O módulo `src/copilot/agent/` está **significativamente melhor** do que o retrato de março indicava.
+O módulo `src/copilot/agent/` **já não é um monólito em fase de desmontagem**.
 
-Entre março e abril de 2026, várias peças que eram apenas “situação ideal proposta” passaram a
-existir de fato:
+A decomposição estrutural principal aconteceu. Hoje o `agent/` já conta com:
 
-- `AgentContext` foi **particionado em subestados nomeados** (`sessionState`, `dialogState`,
-  `configState`, `metricsState`, `runtimeState`, `ioState`), embora ainda não esteja plenamente
-  encapsulado;
-- existe **tracker de tarefas em background** (`background-tasks.js`) com `drain()` no shutdown;
-- existe **política central de erro** (`error-policy.js`) e, nesta rodada, ela passou a expor também
-  `withAgentErrorPolicy(...)`;
-- o boot do agente saiu do formato “god function opaca” para um **pipeline nomeado de steps**
-  (`createBootWiringSteps()`, `runBootPipeline()`, `boot-steps.js`);
-- o pipeline de boot agora também começa a produzir **relatório observável por step**
-  (`bootReport`), consumível pelo health do agente;
-- o runner de boot agora distingue **falha fatal** de **degradação controlada** por step
-  (`required`, `degraded`, `skipped`), em vez de tratar todo erro como abort obrigatório do boot;
-- o bridge de eventos deixou de ser hardcoded no topo da classe e passou a ter **mapa declarativo**
-  (`event-bridge-map.js` + `event-bridge-wiring.js`);
-- o agente já expõe **health snapshot formal**, reaproveitado por rotas HTTP e health registry;
-- o singleton já possui **lazy accessor** (`getAgent()`) e **proxy de compatibilidade**
-  (`alwaysAliveAgent`).
+- fachada pública em `always-alive.js`;
+- `AgentContext` particionado em subestados nomeados;
+- pipeline de boot por steps;
+- event bridge declarativo;
+- política de erro central com wrapper operacional;
+- health canônico e reutilizável;
+- tracker de tarefas em background;
+- lazy singleton funcional com `getAgent()`;
+- superfície SDK explícita e auditável;
+- registry explícita de runtime;
+- integração arquitetural madura com `presentation/` para bordas compartilhadas.
 
-Em outras palavras: a base arquitetural deixou de ser “monólito inchado com planos no papel” e virou
-um subsistema modular com vários alicerces já entregues.
+Em outras palavras:
 
-Ainda assim, o módulo **não chegou ao estado ideal**. O principal débito restante não é mais “falta
-de módulos”, e sim **governança de estado e contratos**:
+> **o problema principal do `agent` já não é mais falta de modularização; o problema principal agora é hardening final de fronteiras, governança semântica de estado e fechamento das poucas dívidas internas remanescentes.**
 
-- o `AgentContext` continua sendo o centro mutável de tudo;
-- ainda existem módulos com acesso direto a `ctx.*State` e alguns casts `unknown` residuais;
-- a política de erro agora existe, mas sua adoção ainda é parcial;
-- o lazy singleton existe, porém a migração para `getAgent()` ainda não terminou em 100% dos
-  consumidores;
-- o runtime ainda é essencialmente **single-session**;
-- o watchdog do diálogo continua **estático**, sem adaptação por histórico real.
+O estado atual pode ser resumido assim:
 
-Além disso, embora o `agent` agora tenha uma façade canônica de acesso total ao SDK, a adoção
-integral de `withAgentErrorPolicy(...)`, a propagação completa da mutation API e o fechamento final
-do ownership semântico do `AgentContext` ainda seguem como trabalho de consolidação.
+### O que já está forte
 
-Também nesta última frente do subfluxo `ask_user`, o agent passou a:
+- decomposição por domínio (`lifecycle/`, `dialog/`, `session/`, `messaging/`, `state/`, `facades/`, `infra/`);
+- `AlwaysAliveAgent` bem mais próximo de uma fachada fina;
+- integração com o SDK mais explícita e menos artesanal;
+- `presentation/` já assumiu o papel correto de camada de borda compartilhada;
+- `runtimeId` já atravessa parte relevante do HTTP e da UX local do terminal;
+- a trilha `ask_user` já é semântica e governada;
+- hot path com casts residuais praticamente drenados;
+- health e boot com observabilidade muito superiores ao retrato antigo.
 
-- distinguir pergunta viva do SDK de `pendingQuestionShadow` restaurada do disco;
-- carregar TTL/expiração explícita na shadow (`restoredAt`, `expiresAt`), agora com TTL semântico
-  por `kind`;
-- expor `pendingQuestionShadowExpired`, `pendingQuestionShadowAgeMs` e
-  `pendingQuestionShadowExpiresAt` no health;
-- disponibilizar limpeza canônica da shadow por API pública do agent, por rota HTTP dedicada e por
-  comando explícito no REPL do terminal.
-- fazer reap contínuo da shadow expirada no timer periódico do runtime, sem depender apenas do boot
-  para limpeza.
-- alimentar uma nova camada canônica de atividade do terminal, que agora traduz eventos do agent/SDK
-  em fases operacionais visíveis (`turn`, `thinking`, `tool`, `task`, `question`, `compaction`,
-  `error`).
-- consumir `assistant.streaming_delta` como sinal operacional adicional de progresso de resposta,
-  sem depender apenas do texto incremental renderizado.
-- alinhar `tool.execution_progress` ao payload real do SDK (`progressMessage`, com `progress`
-  opcional), melhorando a UX do terminal e removendo a suposição de que o progresso sempre viria em
-  `%` numérico.
-- expor `pendingQuestionShadowState` + `pendingQuestionShadowRemainingMs`, permitindo distinguir
-  shadow recém-restaurada, ativa, expirando ou expirada sem reabrir o state cru.
-- propagar a shadow persistida também para snapshots manuais do terminal/agent.
+### O que ainda não está fechado
 
-Também houve correção fina de conformidade com o SDK neste ponto:
+- `AgentContext` ainda não governa 100% do hot path por mutation/read API semântica;
+- alguns consumers ainda mantêm fallback estrutural para `ctx.*State` em pontos residuais;
+- `withAgentErrorPolicy(...)` ainda não virou padrão absoluto em todo o núcleo;
+- `alwaysAliveAgent` ainda sobrevive em boundaries de compatibilidade legítimos;
+- multi-session real ainda não existe;
+- parte da UX local ainda precisa decisão explícita sobre o que deve continuar `default-only`.
 
-- `onUserInputRequest` agora trata `allowFreeform` omitido como `true`, em linha com o contrato real
-  do `@github/copilot-sdk`.
-- o runtime do terminal/agent passou a alinhar seu default canônico para `gpt-5-mini` com
-  `reasoning=high`, reduzindo drift entre defaults do agent, frontend do terminal e seleção de
-  modelo em runtime.
+### Diagnóstico franco
 
-Resumo franco: **o agent deixou de estar “arquiteturalmente atrasado”, mas ainda está
-“arquiteturalmente semi-endurecido”.**
+Hoje o `agent` está em um estado que pode ser descrito assim:
+
+> **arquitetura boa, modular e operacionalmente madura, porém ainda semi-endurecida no núcleo.**
 
 ---
 
-## 2. O que do plano antigo já saiu do papel
+## 2. O que já foi entregue de verdade
 
-O documento antigo ([11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md), versão de março)
-propunha as fases `K1`–`K8`. Em abril/2026, o status real é o seguinte:
+Abaixo está a leitura correta do que saiu do papel e hoje já faz parte do desenho vivo.
 
-| Fase antiga | Tema                              | Status em 2026-04-17 | Evidência principal                                                                                                    |
-| ----------- | --------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `K1`        | Particionamento do `AgentContext` | **Parcial forte**    | `agent-context.js` agora tem subestados nomeados + accessors compat                                                    |
-| `K2`        | Sprint de cobertura de testes     | **Parcial forte**    | já existem testes para context, health, error-policy, lifecycle, messaging, loop manager, queue                        |
-| `K3`        | Error handling centralizado       | **Parcial forte**    | `error-policy.js` existe; nesta rodada ganhou `withAgentErrorPolicy(...)` e adoção em `messaging` + `reconnect-policy` |
-| `K4`        | Background task tracker           | **Implementado**     | `background-tasks.js` + `ctx.backgroundTasks.drain(...)` no shutdown                                                   |
-| `K5`        | Boot wiring pipeline              | **Implementado**     | `createBootWiringSteps()`, `runBootPipeline()`, `boot-steps.js`                                                        |
-| `K6`        | Event bridge declarativo          | **Implementado**     | `event-bridge-map.js` + `event-bridge-wiring.js`                                                                       |
-| `K7`        | Health check formal               | **Implementado**     | `health-check.js`, `server/routes/agent-health.js`, `/health`, `/health/agent`, `/health/modules`                      |
-| `K8`        | Lazy singleton                    | **Parcial avançado** | `getAgent()` + proxy compat `alwaysAliveAgent`; migração em andamento                                                  |
+| Tema | Situação atual | Observação |
+| --- | --- | --- |
+| Decomposição do runtime | **entregue** | a lógica principal já está distribuída entre submódulos de domínio |
+| `AgentContext` particionado | **entregue parcialmente** | subestados nomeados existem; encapsulação total ainda não |
+| Boot pipeline por steps | **entregue** | `boot-steps.js` + `runBootPipeline()` |
+| Event bridge declarativo | **entregue** | `event-bridge-map.js` + `event-bridge-wiring.js` |
+| Background task tracker | **entregue** | `background-tasks.js` com `drain()` no shutdown |
+| Health formal | **entregue** | `health-check.js` + rotas e projections correlatas |
+| Lazy singleton | **entregue parcialmente** | `getAgent()` é canônico; proxy compatível ainda existe |
+| Error policy | **entregue parcialmente** | classificador + wrapper + adoção forte, mas ainda não total |
+| Superfície SDK pública do agent | **entregue** | `agent-sdk-access.js` + `getSdkHandles()` / `getSdkResourceSnapshot()` |
+| Registry explícita de runtime | **entregue** | `runtime-registry.js` |
+| Shared edge layer em `presentation/` | **entregue parcialmente** | já cobre várias bordas críticas; ainda há espaço de extensão |
+| Runtime targeting compartilhado | **entregue parcialmente** | `runtime-request.js` + `runtime-targeting.js` + `agent-runtime.js` |
+| Semântica governada de `ask_user` | **entregue parcialmente** | forte no runtime/health/terminal, mas ainda com espaço de refinamento |
 
-### Leitura correta do delta
+A conclusão correta não é “ainda falta fazer tudo”. A conclusão correta é:
 
-O plano antigo não “falhou”; ele foi **parcialmente absorvido** pelo código vivo.
-
-O problema agora é outro: a documentação antiga continuava descrevendo o módulo como se quase nada
-tivesse sido entregue. Isso já não era verdade.
+> **o esforço bruto de refatoração estrutural já aconteceu; o esforço restante é de consolidação e endurecimento.**
 
 ---
 
-## 3. Arquitetura atual do módulo `agent`
+## 3. Fotografia atual de `src/copilot/`
 
-Hoje o `agent` já opera com uma topologia bem mais madura:
+O `agent/` não pode mais ser avaliado isoladamente como em março. Hoje ele precisa ser entendido dentro da topologia real do `src/copilot/`.
+
+```text
+src/copilot/
+├── sdk/              # contratos vanilla, sessões, RPC, agents, mode/plan, telemetry SDK
+├── event-handlers/   # tradução de SessionEvent cru em sinais internos estáveis
+├── agent/            # runtime contínuo, lifecycle, dialog, queue, health, reconnect, ownership
+├── presentation/     # seleção de runtime + projections/shared handlers de borda
+├── terminal/         # REPL, comandos, prompt, render e UX operacional local
+├── server/           # rotas HTTP, SSE e composição web
+├── channel/          # cliente de conversa contínua com LLM-B
+├── conversation-hub/ # sessões e turns do hub
+├── observability/    # logs, métricas, tracing, timelines e observers
+└── hooks/            # composição de hooks do SDK e políticas de permissão/erro/auditoria
+```
+
+### Leitura correta dessa topologia
+
+- `sdk/` define **capacidade vanilla**;
+- `event-handlers/` traduz **evento cru do SDK**;
+- `agent/` governa o **runtime contínuo**;
+- `presentation/` governa o **acesso compartilhado de borda**;
+- `terminal/` e `server/` são **consumidores** das capacidades do runtime;
+- `observability/` coleta e projeta sinais, mas não governa semântica do runtime.
+
+Essa divisão já é visível no código. O principal risco atual não é ausência de camada; é **regressão de fronteira**.
+
+---
+
+## 4. Fronteiras atuais por camada
+
+## 4.1 `sdk/`
+
+### Responsabilidade atual correta
+
+- encapsular contratos e helpers vanilla do `@github/copilot-sdk`;
+- centralizar client/session lifecycle;
+- centralizar RPCs vanilla (`mode`, `plan`, `agents`, `sessions`, etc.);
+- manter telemetry e helpers de sessão ligados ao SDK.
+
+### O que já está saudável
+
+- `mode/plan` e RPCs vanilla vivem em `sdk/`;
+- a superfície de sessão do SDK está mais auditável;
+- `agent/` já consegue expor handles do SDK sem duplicar contratos.
+
+### O que ainda pede vigilância
+
+- evitar reexportações confusas ou overlap desnecessário entre barrels;
+- evitar que `terminal/` ou `presentation/` reinventem semantics vanilla fora desta camada.
+
+## 4.2 `event-handlers/`
+
+### Responsabilidade atual correta
+
+- traduzir `SessionEvent` cru em sinais internos estáveis;
+- concentrar a leitura do payload real do SDK;
+- impedir que a interpretação do evento vanilla se espalhe pelo runtime.
+
+### O que já está saudável
+
+- a pasta existe e está organizada por famílias semânticas (`streaming`, `tool-lifecycle`, `mode-and-tools`, etc.);
+- a fronteira conceitual com `agent/` está muito melhor do que antes.
+
+### O que ainda pede vigilância
+
+- impedir que payload HTTP ou state do runtime sejam montados aqui;
+- impedir drift entre payload vanilla do SDK e o shape interno traduzido.
+
+## 4.3 `agent/`
+
+### Responsabilidade atual correta
+
+- source-of-truth do runtime contínuo da LLM-B;
+- lifecycle, reconnect, dialog loop, queue, ownership e health;
+- manutenção de invariantes do runtime;
+- facades públicas de alto valor do SDK para consumidores do runtime.
+
+### O que já está saudável
+
+- `always-alive.js` está mais fino;
+- boot, reconnect, shutdown e sessão já não estão mais esmagados numa única classe;
+- health, `ask_user`, SDK access e state snapshots já têm pontos canônicos.
+
+### O que ainda pede hardening
+
+- governança de estado via `AgentContext`;
+- remoção dos últimos fallback reads de `ctx.*State` no hot path;
+- adoção total da error policy;
+- fechamento da migração canônica para `getAgent()`.
+
+## 4.4 `presentation/`
+
+### Responsabilidade atual correta
+
+- seleção compartilhada de runtime;
+- projections/payloads consumidos por mais de uma borda;
+- composição de deps de router/handlers;
+- explicitação de fallback/targeting do runtime.
+
+### O que já está saudável
+
+Hoje já existem e são reais:
+
+- `agent-runtime.js`
+- `runtime-targeting.js`
+- `runtime-request.js`
+- `runtime-overview.js`
+- `runtime-status.js`
+- `runtime-health.js`
+- `runtime-controls.js`
+- `runtime-dialog.js`
+- `runtime-webhooks.js`
+- `runtime-sdk-session.js`
+- `runtime-file-context.js`
+- `runtime-ui-state-store.js`
+
+Isso significa que a camada já deixou de ser “ideia” e virou parte real da arquitetura.
+
+### O que ainda pede vigilância
+
+- não virar fonte de verdade do runtime;
+- não reinterpretar `SessionEvent` cru;
+- não reabrir dependência de implementação do terminal;
+- continuar drenando duplicação de payloads e handlers das bordas.
+
+## 4.5 `terminal/`
+
+### Responsabilidade atual correta
+
+- REPL;
+- prompt e render;
+- waiting UX;
+- narrativa local do operador;
+- comandos e interação local.
+
+### Situação atual
+
+O `terminal/` está bem mais saudável porque deixou de ser “camada comum informal”. Mas ainda precisa disciplina:
+
+- deve consumir `presentation/` quando a capacidade já for compartilhada;
+- não deve reinterpretar o SDK em paralelo;
+- precisa explicitar, caso a caso, o que continua `default-only` por decisão de UX.
+
+## 4.6 `server/`
+
+### Situação atual
+
+As rotas críticas já deixaram de montar muitos snapshots e composições na mão. Há progresso real em:
+
+- `copilot-api/*`
+- `sdk/*`
+- `health.js`
+- `webhooks.js`
+
+O ganho principal foi arquitetural:
+
+> **as rotas já dependem muito menos da topologia concreta do runtime default e muito mais das facades/projections compartilhadas.**
+
+---
+
+## 5. Arquitetura atual do `agent/`
+
+Hoje a estrutura do módulo é esta:
 
 ```text
 src/copilot/agent/
-├── always-alive.js            # fachada pública + lazy singleton + proxy compat
-├── agent-context.js           # contexto compartilhado com subestados nomeados
-├── background-tasks.js        # tracking de fire-and-forget com drain
-├── error-policy.js            # classificação e wrapper de política de erro
-├── event-bridge-map.js        # mapa declarativo de eventos
-├── event-bridge-wiring.js     # wiring lazy EventEmitter -> EventBus
+├── always-alive.js            # fachada pública + singleton lazy + proxy compat
+├── agent-context.js           # estado interno + mutation/read API semântica
+├── background-tasks.js        # tracking de fire-and-forget
+├── error-policy.js            # classificação e wrapper de erro
+├── runtime-registry.js        # registro explícito de runtimes
 ├── health-check.js            # snapshot canônico de health
-├── lifecycle/                 # start / stop / reconnect / state-io / session-setup / entry
-├── session/                   # init / ownership / cleanup / keepalive / boot-wiring / snapshots
-├── dialog/                    # loop manager / turn executor / watchdog / protocol / backpressure
-├── messaging/                 # send / steer / answer / process queue
-├── infra/                     # queue / handoff / task execution compat
-├── facades/                   # session/model/webhook facades
-└── state/                     # snapshot e funções auxiliares de estado
+├── lifecycle/                 # start, stop, reconnect, state-io, session-setup
+├── session/                   # wiring, snapshots, keepalive, ownership, boot
+├── dialog/                    # dialog loop, turn executor, protocol, watchdog
+├── messaging/                 # send, answer, steer, queue processing
+├── infra/                     # queue, handoff, webhooks, task helpers
+├── facades/                   # surface pública do runtime e do SDK
+└── state/                     # snapshots e helpers de estado
 ```
 
-### O que mudou de verdade em relação ao retrato antigo
+### Leitura correta da arquitetura atual
 
-1. **A classe `AlwaysAliveAgent` já não concentra a maior parte da lógica.** Ela virou
-   majoritariamente uma fachada pública que delega para `lifecycle/`, `dialog/`, `messaging/`,
-   `state/` e facades.
-
-2. **O boot do agente já é step-based.** O antigo “performBootWiring monolítico” foi substituído por
-   um pipeline com steps nomeados, extraídos em `boot-steps.js`.
-
-3. **O runtime já ganhou mecanismos de shutdown mais sólidos.** Há `backgroundTasks.drain()`,
-   `drainStateWrites()`, cleanup de watchers e controle melhor de reentrância.
-
-4. **A observabilidade do agent é substancialmente melhor.** Existem snapshots formais, health
-   checks, tracking de tarefas em background, spans OTEL e bridge de eventos declarativo.
-
-## 3.1 Fronteiras reais hoje: `sdk` vs `event-handlers` vs `agent` vs `presentation`
-
-O retrato atual do código já permite descrever responsabilidades com critérios bem mais objetivos.
-
-| Camada            | Deve ser dona de…                                                                  | Não deve ser dona de…                                                                               |
-| ----------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `sdk/`            | contratos vanilla, RPCs, sessions, agents, mode/plan, hooks, client lifecycle      | UX local, projections HTTP/REPL, estado contínuo do runtime                                         |
-| `event-handlers/` | tradução de `SessionEvent` cru para sinais internos estáveis                       | estado do runtime, payload HTTP, render/prompt do terminal                                          |
-| `agent/`          | runtime contínuo, lifecycle, dialog loop, reconnect, health source-of-truth, state | parsing de request HTTP, projeções compartilhadas de borda, UX final do terminal                    |
-| `presentation/`   | seleção de runtime, projections compartilhadas, payloads HTTP/SSE, deps de router  | source-of-truth do runtime, tradução de `SessionEvent` cru, estado interno mutável do agent         |
-| `terminal/`       | REPL, prompt, render, comandos, narrativa operacional local                        | contratos vanilla do SDK, ownership de runtime, parsing compartilhado de runtime para outras bordas |
-| `observability/`  | logs, métricas, tracing, timelines e coletores                                     | governança semântica do SDK, seleção de runtime, payloads canônicos de borda                        |
-
-### Leitura correta do estado atual
-
-Hoje a fronteira mais importante já está mais saudável do que antes:
-
-- `agent/` continua sendo o dono do runtime;
-- `presentation/` virou o hub compartilhado das bordas;
-- `terminal/` deixou de ser a segunda fonte de verdade do runtime em vários pontos quentes;
-- `server/routes/*` já depende bem menos de composição manual do runtime default.
-
-Isso significa que o problema dominante deixou de ser “mistura total” e passou a ser “endurecimento
-final das fronteiras e extensão coerente da seleção explícita de runtime”.
+- `AlwaysAliveAgent` continua sendo a API pública canônica;
+- `AgentContext` já virou a peça central de composição de estado;
+- o runtime agora é controlado por módulos especializados, e não por um “mega arquivo” único;
+- a topologia atual já permite hardening incremental sem refactor destrutivo.
 
 ---
 
-## 4. Pontos fortes atuais
+## 6. Estado atual por eixo de consolidação
 
-### 4.1 A decomposição funcional já aconteceu
+## 6.1 Estado e `AgentContext`
 
-O problema dominante em março era concentração de lógica. Em abril, a decomposição já está
-materializada.
+### O que já foi entregue
 
-Isso muda a natureza do trabalho: agora não é mais “quebrar monólito”, e sim **endurecer fronteiras
-entre módulos**.
+- subestados nomeados (`sessionState`, `dialogState`, `configState`, `metricsState`, `runtimeState`, `ioState`);
+- mutation API significativa;
+- getters e snapshots semânticos relevantes;
+- redução clara de aliases largos no lifecycle quente.
 
-### 4.2 O pipeline de boot deixou de ser uma caixa-preta
+### Evidência operacional atual
 
-O boot está organizado por etapas nomeadas, o que melhora muito:
+No estado atual do código:
 
-- leitura arquitetural;
-- testabilidade por step;
-- logging por etapa;
-- rollback mental de problemas de boot.
+- o grep de acessos crus relevantes a `ctx.(sessionState|dialogState|runtimeState|metricsState|configState|ioState)` no subtree `src/copilot/agent/**/*.js` está reduzido a **poucas ocorrências residuais**;
+- essas ocorrências já não representam “domínio espalhado”, e sim poucos pontos de fallback/compatibilidade ainda abertos;
+- `session-setup.js` e `agent-lifecycle.js` já consomem majoritariamente `ctx.model`, `ctx.reasoningEffort`, `ctx.status`, `ctx.session`, `ctx.client`, snapshots e helpers.
 
-### 4.3 O subsistema já possui noção formal de health
+### Leitura correta
 
-O agent não depende mais só de heurística ad hoc. Hoje há um `getHealthSnapshot()` canônico, com
-status consolidado e detalhamento por checks (`runtime`, `client`, `session`, `dialog`, `queue`,
-`background`, `quota`, `io`).
+A dívida dominante continua sendo esta, mas agora ela mudou de natureza:
 
-### 4.4 O lazy singleton já existe de forma funcional
+> antes era “o contexto é um saco mutável sem forma”; agora é “o contexto já tem forma, mas precisa dominar completamente o hot path”.
 
-O `getAgent()` já encapsula a criação real. O export `alwaysAliveAgent` virou uma camada de
-compatibilidade, não mais o mecanismo canônico de construção.
+## 6.2 Contratos de host e capability boundaries
 
-Nesta rodada, a migração avançou mais um pouco:
+### O que já foi entregue
 
-- `agent/lifecycle/entry.js` passou a usar `getAgent()`;
-- `presentation/agent-control.js` passou a usar `getAgent()`;
-- a documentação de uso do canal (`channel/index.js`) também foi alinhada.
+- drenagem dos piores casts estruturais;
+- centralização de guards e compat shims em `runtime-contracts.js`;
+- alinhamento dos tipos do SDK e hooks ao shape real;
+- limpeza de listeners de `AbortSignal` no `turn-executor`.
 
-### 4.5 Os testes atuais são muito melhores do que o documento antigo indicava
+### Situação atual correta
 
-O documento de março subestimava a cobertura real. Hoje existem, entre outros:
+O hot path do `agent` já não vive mais de `unknown -> cast -> esperança`.
 
-- `tests/unit/copilot/test_agent_context.spec.js`
-- `tests/unit/copilot/test_agent_error_policy.spec.js`
-- `tests/unit/copilot/test_agent_health_check.spec.js`
-- `tests/unit/copilot/test_agent_health_routes.spec.js`
-- `tests/unit/copilot/test_agent_lifecycle.spec.js`
-- `tests/unit/copilot/test_agent_messaging.spec.js`
-- `tests/unit/copilot/test_agent_dialog_controller.spec.js`
-- `tests/unit/copilot/test_loop_manager.spec.js`
-- `tests/unit/copilot/test_message_queue.spec.js`
-- `tests/unit/copilot/test_always_alive_dialog_loop.spec.js`
-- `tests/unit/copilot/test_agent_background_tasks_integration.spec.js`
-- `tests/unit/copilot/test_agent_state.spec.js`
+Ainda assim, a fronteira ainda não é perfeita porque:
 
-Ainda há gaps, mas o cenário não é mais “quase sem testes”.
+- alguns pontos continuam baseados em JSDoc estrutural;
+- a validação runtime é leve, não formal;
+- boundaries compatíveis ainda existem em pontos controlados.
 
----
+## 6.3 Error policy
 
-## 5. Problemas arquiteturais e gaps que continuam vivos
+### O que já foi entregue
 
-Antes dos itens específicos do `agent`, vale registrar a fotografia transversal atual:
+- `withAgentErrorPolicy(...)` existe;
+- adoção forte em `messaging`, `reconnect`, `dialog`, `ownership` e persistência auxiliar;
+- `persistStateWithPolicy(...)` já virou caminho canônico de persistência quente.
 
-- os **bypasses distribuídos reais** entre `server/`, `terminal/`, `presentation/` e `agent/` foram
-  drenados em larga escala;
-- o que resta hoje é majoritariamente **fronteira canônica deliberada**, não bypass ruim;
-- o sistema já saiu de “multi-agent-ready” e entrou em um estado **multi-agent-path-enabled** em
-  HTTP e em partes relevantes da UX local do terminal.
+### Evidência operacional atual
 
-O que ainda falta não é “recomeçar a arquitetura”, e sim completar o hardening final.
+- o grep de `writeStateAsync(` no subtree `src/copilot/agent/**/*.js` está essencialmente concentrado em `lifecycle/state-io.js`;
+- o runtime quente já opera majoritariamente sobre `persistStateWithPolicy(...)`, não sobre chamadas dispersas.
 
-## 5.1 🔴 `AgentContext` ainda é o centro mutável do sistema
+### Leitura correta
 
-O `AgentContext` melhorou bastante: agora há subestados nomeados e, nesta rodada, ele ganhou
-**helpers semânticos** como:
+A error policy já é parte do desenho vivo, não tese. O que falta é **dominar 100% dos fluxos críticos**.
 
-- `invalidateStatusSnapshot()`
-- `incrementSendCount()`
-- `setPendingQuestion(...)`
-- `clearPendingQuestion()`
-- `setClient(...)` / `clearClient()`
-- `setSession(...)` / `clearSession()`
-- `setIsResumed(...)`
-- `setSendCount(...)`
-- `setDialogLoopAttached(...)`
-- `setContextState(...)`
-- `setLastCheckpointPath(...)`
-- `setBootReport(...)`
-- `resolvePendingQuestion(...)`
-- `getBackgroundPendingLabels(...)`
+## 6.4 Lazy singleton e governança da instância
 
-Mesmo assim, o coração do problema permanece:
+### O que já foi entregue
 
-- vários módulos ainda leem e escrevem `ctx.sessionState`, `ctx.dialogState`, `ctx.runtimeState`,
-  `ctx.metricsState` diretamente;
-- não há ownership formal por domínio (“quem pode mutar o quê?”);
-- os subestados são objetos públicos mutáveis, não controladores com invariantes.
+- `getAgent()` é o caminho canônico;
+- `alwaysAliveAgent` está rebaixado a camada de compatibilidade;
+- DI do terminal já isola explicitamente o que fica no proxy e o que usa a instância real.
 
-**Conclusão**: a partição existe, mas a encapsulação ainda é parcial.
+### Leitura correta
 
----
+A dívida remanescente aqui não é “remover o proxy imediatamente”. É:
 
-## 5.2 🟠 Contratos de host ainda são parcialmente informais
+- manter o proxy apenas em boundaries justificadas;
+- impedir novos consumidores operacionais de nascerem nele;
+- documentar as exceções legítimas.
 
-O cenário melhorou nesta rodada:
+## 6.5 Boot pipeline e observabilidade
 
-- `loop-manager.js` deixou de depender de casts `unknown -> EventEmitter` para ouvir
-  `question.pending`;
-- `messaging/agent-messaging.js` deixou de converter o host à força em `EventEmitter` só para trocar
-  status;
-- `types.js` foi ampliado para refletir melhor hosts que também são emissores de eventos.
-- `session-setup.js` removeu parte importante da dívida artificial de compatibilidade: `mcpServers`
-  voltou ao caminho tipado do builder, e o handler de `onUserInputRequest` agora normaliza a
-  assinatura opcional do SDK antes de entrar no runtime do agente.
+### O que já foi entregue
 
-Mas ainda restam sinais de fragilidade:
+- pipeline por steps;
+- criticidade explícita por step;
+- `bootReport` no runtime;
+- health refletindo `failed`/`degraded`;
+- ação recomendada e flags de risco.
 
-- `session-setup.js` ainda possui casts e composições menos rígidas;
-- `state-io.js`, `snapshot.js` e alguns pontos auxiliares ainda usam casts `unknown` por
-  conveniência estrutural;
-- os contratos continuam baseados em JSDoc estrutural, sem validação runtime dedicada.
+### Leitura correta
 
-Nesta rodada, porém, houve um endurecimento adicional importante:
+O boot já não é mais caixa-preta. A dívida remanescente é **enriquecimento adicional**, não ausência de estrutura.
 
-- `runtime-contracts.js` passou a concentrar guards e compat shims (`assertEmitterHost(...)`,
-  `trySetLiveSessionModel(...)`, normalizadores de eventos), retirando exceções de contrato dos
-  módulos quentes;
-- `sdk/types.js` e `hooks/types.js` foram realinhados com a shape real do SDK 0.2.0, eliminando o
-  drift que ainda forçava boundary artificial em `session-setup.js`;
-- `session-setup.js` passou a registrar `hooks` via `SessionConfigBuilder.hooks(...)`, sem cast de
-  compatibilidade;
-- `boot-steps.js` perdeu o cast residual para `ctx.mcpBridge`;
-- `turn-executor.js` ganhou cleanup explícito dos listeners de `AbortSignal`, reduzindo leak passivo
-  em retries e em turnos abortados.
+## 6.6 Health snapshot
 
-**Status atual do grep estrutural**: o subtree `src/copilot/agent/` não retorna mais casts `unknown`
-residuais no hot path.
+### O que já foi entregue
 
-**Conclusão**: saímos do modo “bypass por toda parte” para “bypass residual concentrado”, o que já é
-um avanço real.
+- runtime, client, session, dialog, queue, io, background, boot, quota;
+- `riskFlags`;
+- `recommendedAction`;
+- `sdkResources`;
+- ask_user shadow semântica.
 
----
+### Leitura correta
 
-## 5.3 🟠 Error handling centralizado existe, mas a adoção ainda está em rollout
+O health atual já é operacionalmente útil. O próximo passo não é “ter health”; é **torná-lo ainda mais acionável**.
 
-O quadro atual é melhor que o de março e melhorou também nesta última onda:
+## 6.7 Superfície SDK do agent
 
-- `classifyAgentError(...)` já existia;
-- nesta rodada foi adicionada `withAgentErrorPolicy(...)`;
-- `messaging/agent-messaging.js` passou a usar o wrapper central;
-- `lifecycle/reconnect-policy.js` passou a usar o mesmo wrapper;
-- `dialog/agent-dialog-controller.js` passou a usar a policy em `start/stop/resume` do loop;
-- `session/ownership.js` ganhou wrappers `sync*WithPolicy` / `clear*WithPolicy` para não transformar
-  falhas laterais de vínculo SDK↔hub em abortos arbitrários do runtime;
-- `lifecycle/state-io.js` ganhou `persistStateWithPolicy(...)`, e esse helper passou a ser usado em
-  `agent-lifecycle.js`, `dialog/user-input-handler.js`, `dialog/loop-manager.js` e
-  `dialog/turn-executor.js`.
-- o subsistema `src/copilot/hooks/` deixou de manter políticas de erro divergentes por
-  preset/factory: `factory.js`, `session-hooks.js` e os presets
-  `minimal/safe/interactive/deny-all/audit` agora convergem para handlers canônicos, com estado de
-  retry/circuit isolado por `sessionId + errorContext`.
-- o preset de produção também deixou de usar `console.info` como destino padrão de auditoria e
-  passou a registrar entradas estruturadas em `defaultAuditLog`.
-- numa rodada dedicada ao `ask_user`, o runtime passou a distinguir pergunta viva do SDK de sombra
-  persistida restaurada do disco (`pendingQuestionShadow`), com classificação semântica
-  (`ready/reply/stopped/question`) refletida em health, terminal e snapshots.
+### O que já foi entregue
 
-Também foi corrigido um bug operacional importante em `dialog/user-input-handler.js`: perguntas
-interativas reais agora persistem `pendingQuestion + lastAskUserAt` em **uma única operação**,
-enquanto mensagens de protocolo interno do dialog loop (`READY` / `REPLY` / `STOPPED`) deixam de
-gerar persistência redundante em disco.
+- `getSdkHandles()`;
+- `getSdkResourceSnapshot()`;
+- status/auth/ping/last session/foreground session;
+- agents, sessions, mode, plan;
+- handles crus controlados.
 
-O que ainda falta:
+### Leitura correta
 
-- adotar o wrapper em mais fluxos assíncronos do agent (especialmente boot/hooks internos que ainda
-  operam por policy local ou via fire-and-forget simples);
-- reduzir padrões locais duplicados de `try/catch + classify + emit + retry`;
-- enriquecer a política com metadados estruturados por contexto (`label`, `phase`, `sessionId`,
-  `taskId`).
+A fronteira `agent ↔ sdk` está muito melhor. O que falta agora é estabilidade de longo prazo e cobertura total consistente em todas as bordas e testes.
 
-Nesta continuação, o subsistema de hooks também deixou de compartilhar retry/circuit state por
-contexto puro:
+## 6.8 `ask_user`
 
-- `hooks/error-handler.js` agora escopa `retryCounts` e `circuits` por `sessionId + errorContext`;
-- isso elimina o leak cross-session em que uma sessão podia herdar o estado de retry/circuit-breaker
-  de outra.
+### O que já foi entregue
 
-**Conclusão**: a policy deixou de ser apenas “um classificador com dois call sites” e passou a
-cobrir partes centrais de `messaging`, `reconnect`, `dialog`, `ownership` e persistência auxiliar —
-mas ainda não domina o módulo inteiro.
+- semântica de `ready/reply/stopped/question`;
+- persistência seletiva;
+- shadow com TTL e expiração;
+- projeção consistente em runtime/terminal/health/snapshots;
+- reaper contínuo;
+- alinhamento com defaults reais do SDK;
+- atividade em tempo real do terminal baseada em sinais reais do SDK.
+
+### Leitura correta
+
+A trilha `ask_user` já deixou de ser gambiarra textual. Hoje ela é um subsistema governado, embora ainda possa ser refinado.
+
+## 6.9 Relação `agent ↔ presentation`
+
+### O que já foi entregue
+
+- `runtime-registry.js`;
+- `presentation/agent-runtime.js`;
+- targeting compartilhado;
+- runtime-aware HTTP e parte do REPL;
+- transparência explícita de fallback.
+
+### Leitura correta
+
+O que mudou de forma decisiva foi isto:
+
+> **o runtime já não é só um singleton implícito exposto a todo mundo; ele já está sendo acessado por uma fronteira compartilhada e deliberada.**
+
+Esse avanço é um dos mais importantes do ciclo atual de consolidação.
 
 ---
 
-## 5.4 🟠 O lazy singleton está funcional, porém ainda não foi “fechado” como fronteira única
+## 7. Indicadores verificáveis do estado atual
 
-Hoje a situação correta é:
+Os indicadores abaixo são os que melhor resumem o estado do módulo hoje.
 
-- `getAgent()` é o mecanismo canônico;
-- `alwaysAliveAgent` é um proxy de compatibilidade;
-- parte dos consumidores já foi migrada.
+### Indicadores positivos já observáveis
 
-Ainda assim, o runtime preserva uma nuance importante:
+- casts `unknown` do hot path do `agent/` praticamente drenados;
+- `writeStateAsync()` concentrado em `state-io.js`;
+- `presentation/` sem imports runtime de `terminal/*`;
+- targeting de `runtimeId` já compartilhado entre HTTP, REPL e accessors;
+- `agent/` com runtime registry explícita;
+- `health-check.js` enriquecido e reutilizável;
+- `alwaysAliveAgent` já rebaixado a boundary compatível, e não mais ponto canônico.
 
-- o wiring de DI do terminal ainda usa o proxy por um motivo legítimo: evitar materialização
-  prematura do singleton em caminhos onde `wireLegacySetters()` resolve tokens durante o boot.
+### Indicadores de dívida ainda viva
 
-Ou seja: a dívida atual **não é apagar o proxy a qualquer custo**, mas sim:
-
-1. migrar consumidores operacionais onde isso é seguro;
-2. manter o proxy como boundary explícita de compatibilidade;
-3. documentar melhor as exceções legítimas.
-
-Nesta rodada, o DI do terminal avançou exatamente nessa direção:
-
-- o token canônico `ALWAYS_ALIVE_AGENT` passou a resolver `getAgent()`;
-- os tokens legados usados por `wireLegacySetters()` permaneceram no proxy compatível
-  `alwaysAliveAgent`, deixando a exceção de boot lazy explicitamente isolada em
-  `terminal/di-wiring.js`.
+- poucas leituras cruas de `ctx.*State` ainda sobrevivem como fallback/compatibilidade;
+- `boot/hooks/cleanup` ainda não são dominados integralmente pela error policy;
+- multi-session continua ausente;
+- ainda existem paths de UX que precisam decisão formal sobre `default-only` vs `runtime-aware`.
 
 ---
 
-## 5.5 🟡 O boot pipeline melhorou, mas o contexto de wiring ainda é largo demais
+## 8. O que ainda falta de forma relevante
 
-O `performBootWiring()` já não é o mesmo gargalo opaco de março. Porém ainda existe uma dívida de
-desenho:
+## 8.1 Encapsulamento final do `AgentContext`
 
-- o `BootWiringContext` continua carregando muitos callbacks e referências;
-- a orquestração dos steps ainda é imperativa, não descrita por contratos de capability/ownership;
-- já existe medição nativa de duração/falha por step em `bootReport`, mas ela ainda não foi
-  propagada com toda a riqueza possível para observabilidade, rotas e troubleshooting operacional.
+Ainda faltam, de forma objetiva:
 
-**Conclusão**: o pipeline existe, mas ainda pode evoluir para um runtime de boot mais observável e
-mais tipado.
+- dominar 100% dos writes quentes por mutation API semântica;
+- reduzir o restante dos raw reads estruturais;
+- explicitar ownership por subestado;
+- impedir que novos módulos voltem a depender do shape cru.
 
----
+## 8.2 Error policy total
 
-## 5.6 🟡 Multi-session continua ausente
+Ainda faltam, de forma objetiva:
 
-O agent continua desenhado para uma sessão principal por vez. Há rotação, retomada, ownership e
-recuperação, mas não há um runtime multi-session isolado com scheduling real entre sessões ativas.
+- adoção em mais trechos de boot interno;
+- adoção em cleanup/rotation residuais;
+- padronização mais forte de contexto operacional (`label`, `phase`, `taskId`, `sessionId`).
 
-Isso não é bug imediato, mas é uma limitação estrutural que continua válida.
+## 8.3 Hardening de fronteira
 
-## 5.8 🟡 Seleção explícita de runtime já existe, mas ainda não cobre tudo com a mesma profundidade
+Ainda faltam, de forma objetiva:
 
-Houve um avanço arquitetural importante que precisa ficar explícito neste documento:
+- reduzir compat shims residuais onde não forem mais necessários;
+- impedir novas dependências cruzadas ruins;
+- formalizar melhor boundaries de capability no núcleo.
 
-- `presentation/runtime-request.js` já centraliza `runtimeId` por `query/header/body/params`;
-- `presentation/runtime-targeting.js` já centraliza `normalizeRuntimeId()` / `pickRuntimeId()` /
-  leitura de payloads;
-- `presentation/agent-runtime.js` já expõe `resolveAgentRuntimeSelection()` com:
-  - `requestedRuntimeId`
-  - `runtimeId` efetivamente resolvido
-  - `runtimeFound`
-  - `usedDefaultRuntimeFallback`
-- `runtime-overview.js`, `system-config.js`, `/status`, `/session`, `/health/agent`, `/webhooks` e
-  partes relevantes do REPL já propagam essa transparência.
+## 8.4 Multi-session real
 
-O que ainda falta:
+Ainda falta, de forma objetiva:
 
-- espalhar a mesma clareza para mais superfícies secundárias onde isso ainda for útil;
-- decidir explicitamente quais caminhos devem continuar `default-only` por motivo de UX local e
-  quais devem virar runtime-aware de forma completa;
-- evitar que novas rotas/handlers reintroduzam parsing manual de `runtimeId` fora das helpers
-  canônicas.
+- múltiplos runtimes/sessões ativas com isolamento real;
+- governança de scheduling e seleção ativa;
+- semantics mais explícitas de lifecycle entre runtimes.
+
+## 8.5 Watchdog e handoff
+
+Ainda faltam, de forma objetiva:
+
+- watchdog adaptativo por histórico real;
+- protocolo de handoff mais formalizado;
+- mais cobertura de regressão em cenários de stall e transferência.
 
 ---
 
-## 5.7 🟡 Watchdog adaptativo e handoff formal continuam incompletos
+## 9. Backlog priorizado a partir do estado atual
 
-- o watchdog do diálogo ainda usa thresholds configurados, não aprendidos a partir do histórico
-  real;
-- o handoff existe, mas segue menos formalizado/testado do que o restante do núcleo `agent`.
-
----
-
-## 6. Mudanças concretas aplicadas nesta rodada
-
-Além da reanálise documental, esta rodada entregou mudanças reais no código do `agent`:
-
-### 6.1 Fortalecimento de contratos e remoção de casts quentes
-
-- `dialog/loop-manager.js`
-  - removeu parte relevante do bypass `unknown -> EventEmitter`;
-  - o host agora é tratado como fonte opcional de eventos de forma explícita.
-- `messaging/agent-messaging.js`
-  - deixou de precisar forçar o host a `EventEmitter` só para atualizar status.
-
-### 6.2 `AgentContext` ganhou mutações semânticas mínimas
-
-Foram adicionados helpers para começar a reduzir mutação crua no hot path:
-
-- `invalidateStatusSnapshot()`
-- `incrementSendCount()`
-- `setPendingQuestion(...)`
-- `clearPendingQuestion()`
-
-Ainda não resolve tudo, mas reduz entropia justamente nos campos mais tocados pelo runtime.
-
-### 6.2b Mutation API ampliada na segunda onda
-
-O endurecimento avançou além do primeiro lote. Hoje o `AgentContext` também já expõe:
-
-- `setClient(...)` / `clearClient()`
-- `setSession(...)` / `clearSession()`
-- `setIsResumed(...)`
-- `setSendCount(...)`
-- `setDialogLoopAttached(...)`
-- `setContextState(...)`
-- `setLastCheckpointPath(...)`
-- `setBootReport(...)`
-- `resolvePendingQuestion(...)`
-- `getBackgroundPendingLabels(...)`
-
-Isso ainda não fecha a dívida de ownership, mas desloca mais mutações do runtime para uma API
-semântica central.
-
-### 6.2c Leitura semântica começou a substituir leitura crua
-
-Além da mutation API, o `AgentContext` passou a atuar também como fronteira de **leitura
-semântica**. Nesta rodada, foram adicionados helpers como:
-
-- `hasClient()`
-- `hasActiveSession()`
-- `hasPendingQuestion()`
-- `getPendingQuestionSnapshot()`
-- `getSessionEventUnsubscribersSnapshot()`
-- `getBackgroundPendingCount()`
-- `getLastPrInfoSnapshot()`
-- `getBootReportSnapshot()`
-
-E eles já foram adotados em módulos quentes como:
-
-- `health-check.js`
-- `messaging/agent-messaging.js`
-- `dialog/agent-dialog-controller.js`
-- `facades/agent-sdk-access.js`
-- `facades/agent-model-config.js`
-- `facades/agent-session-ops.js`
-- `state/agent-state.js`
-- getters públicos de `always-alive.js`
-
-Nesta continuação, o endurecimento avançou um passo importante no hot path:
-
-- `lifecycle/session-setup.js` deixou de depender do alias largo
-  `configState = ctx.configState ?? ctx` para ler `model`/`reasoningEffort` do runtime quente,
-  priorizando `ctx.model`, `ctx.reasoningEffort` e `ctx.mcpBridge`;
-- `lifecycle/agent-lifecycle.js` drenou aliases crus de
-  `sessionState/dialogState/runtimeState/metricsState/ioState` nos fluxos centrais de
-  `start/stop/reconnect`, passando a consumir getters e snapshots semânticos do `AgentContext`
-  (`ctx.model`, `ctx.status`, `ctx.sendCount`, `ctx.session`, `ctx.client`,
-  `ctx.getPendingQuestionSnapshot()`, `ctx.getSessionEventUnsubscribersSnapshot()`);
-- `health-check.js` passou a preferir `getPendingQuestionSnapshot()` e
-  `getPendingQuestionShadowSnapshot()` antes de recorrer ao shape cru, mantendo fallback apenas para
-  contextos estruturais de teste/compat.
-
-Na prática, isso reduz o acoplamento estrutural ao shape interno de `sessionState/dialogState/...` e
-empurra o agent na direção certa do `CA-3`.
-
-### 6.3 Error policy evoluiu de classificador para wrapper operacional
-
-`error-policy.js` agora expõe `withAgentErrorPolicy(...)`, e o wrapper já foi adotado em:
-
-- `messaging/agent-messaging.js`
-- `lifecycle/reconnect-policy.js`
-- `dialog/agent-dialog-controller.js`
-- `session/ownership.js` (wrappers protegidos para vínculo SDK↔hub)
-- `lifecycle/state-io.js` via `persistStateWithPolicy(...)`
-
-Esse helper de persistência canônica agora já é usado no runtime quente em:
-
-- `lifecycle/agent-lifecycle.js`
-- `messaging/agent-messaging.js`
-- `dialog/user-input-handler.js`
-- `dialog/loop-manager.js`
-- `dialog/turn-executor.js`
-- `session/boot-steps.js`
-- `session/initializer.js`
-
-Com isso, o grep de `writeStateAsync(...)` no subtree `src/copilot/agent/` ficou essencialmente
-restrito ao próprio `lifecycle/state-io.js` (onde a primitiva de persistência deve continuar
-morando), em vez de aparecer espalhado pelos módulos quentes do runtime.
-
-### 6.4 Lazy singleton avançou em consumidores reais
-
-Foram migrados para `getAgent()`:
-
-- `agent/lifecycle/entry.js`
-- `presentation/agent-control.js`
-
-Também foi atualizada a documentação de uso em `channel/index.js`.
-
-Além disso, o DI do terminal passou a resolver o token canônico `ALWAYS_ALIVE_AGENT` via
-`getAgent()`, preservando o proxy compatível apenas nos tokens legados acionados por
-`wireLegacySetters()`.
-
-Também nesta rodada:
-
-- o `agent` passou a expor `getSdkHandles()` e `getSdkResourceSnapshot()`;
-- a API pública do `AlwaysAliveAgent` agora inclui acesso canônico a status/auth/last
-  session/foreground session/ sessions/custom agents do SDK atual;
-- `server/routes/agent-health.js` passou a projetar `sdkResources` no health do módulo.
-
-### 6.5 Boot e health ficaram mais observáveis
-
-Nesta segunda onda, o pipeline de boot do agent passou a registrar:
-
-- nome da step;
-- fase (`session`, `observability`, `dialog`, `quota`, etc.);
-- duração;
-- outcome (`ok` / `failed`);
-- timestamp.
-
-Esse `bootReport` agora entra no runtime state e alimenta o health snapshot do agente, junto com:
-
-- `backgroundPendingLabels` para identificar backlog real de fire-and-forget;
-- sinal de `boot.steps_failed` quando uma rodada de boot falhou em alguma etapa.
-- sinal de `boot.steps_degraded` quando o boot conclui, mas com alguma etapa opcional degradada;
-- `riskFlags` para resumir os riscos canônicos do snapshot operacional.
-- `recommendedAction` para sugerir a próxima ação de troubleshooting.
-
-Além disso, o próprio runner do pipeline agora executa cada etapa sob a `withAgentErrorPolicy(...)`:
-
-- step `required=true` continua derrubando o boot quando falha;
-- step opcional com erro retryable passa a ser marcado como `degraded`;
-- step opcional abortado explicitamente passa a ser marcado como `skipped`.
-
-Isso reduz falsos negativos operacionais: o boot não precisa mais fingir que está totalmente
-saudável quando parte da observabilidade/startup lateral falha, mas também não derruba a LLM-B
-inteira por falhas não-críticas.
-
-### 6.6 O agent agora tem superfície SDK explícita e auditável
-
-Foi criada `agent/facades/agent-sdk-access.js`, e o `AlwaysAliveAgent` agora expõe:
-
-- handles crus controlados (`client`, `session`, `serverRpc`, `sessionRpc`, `workspacePath`);
-- snapshot de cobertura (`getSdkResourceSnapshot()`), com flags como `allCoreResourcesAvailable` e
-  `allRuntimeResourcesAvailable`;
-- operações canônicas sobre o runtime SDK atual:
-  - `pingSdk()`
-  - `getSdkStatus()`
-  - `getSdkAuthStatus()`
-  - `getLastSdkSessionId()`
-  - `getForegroundSdkSessionId()` / `setForegroundSdkSessionId()`
-  - `listSdkSessions()`
-  - `listSdkAgents()` / `getCurrentSdkAgent()` / `selectSdkAgent()` / `deselectSdkAgent()` /
-    `reloadSdkAgents()`
-
-Isso fecha uma lacuna importante: antes o agent tinha acesso implícito ao SDK pelo contexto interno,
-mas não possuía uma superfície pública/canônica suficientemente explícita nem um mecanismo runtime
-para verificar a cobertura real do SDK acoplado.
-
-### 6.7 O papel de `presentation/` foi materializado como camada de borda compartilhada
-
-Esta rodada consolidou uma mudança estrutural importante fora do miolo interno do `agent`, mas
-diretamente relacionada à saúde arquitetural do módulo:
-
-- `presentation/runtime-controls.js`
-- `presentation/runtime-health.js`
-- `presentation/runtime-overview.js`
-- `presentation/runtime-status.js`
-- `presentation/runtime-route-deps.js`
-- `presentation/runtime-request.js`
-- `presentation/runtime-targeting.js`
-
-Esses módulos já permitem afirmar que:
-
-1. `agent/` é o dono do runtime;
-2. `presentation/` é o dono do acesso compartilhado de borda ao runtime;
-3. `terminal/` e `server/` devem ser consumidores dessas projections/facades, e não reabrir o
-   runtime por conta própria.
-
-Isso muda a avaliação da situação atual do `agent`: parte do trabalho de consolidação arquitetural
-já não está mais apenas “dentro de `src/copilot/agent/`”, e sim na relação correta entre `agent/` e
-`presentation/`.
+| ID | Severidade | Tema | Estado atual | Próxima ação correta |
+| --- | --- | --- | --- | --- |
+| `A1` | 🔴 | Governança final de estado | parcial | completar mutation/read API do `AgentContext` e drenar raw reads restantes |
+| `A2` | 🔴 | Contratos de host/capability | parcial | consolidar boundaries e remover compatibilidade residual indevida |
+| `A3` | 🔴 | Cobertura estrutural | parcial | ampliar malha em boot/reconnect/lazy singleton/ownership |
+| `A4` | 🟠 | Error policy total | parcial | adotar wrapper e contexto estruturado em todo o núcleo crítico |
+| `A5` | 🟠 | Boot observável | parcial | enriquecer telemetria por step e impacto no health |
+| `A6` | 🟠 | Governança do singleton | parcial | revisar call sites restantes e documentar boundaries compatíveis |
+| `A7` | 🟠 | Superfície SDK estável | parcial | manter cobertura e impedir drift entre runtime e SDK |
+| `A8` | 🟡 | Health mais acionável | parcial | enriquecer backlog labels, timings e rotation ownership |
+| `A9` | 🟡 | Watchdog adaptativo | aberto | mover de threshold estático para threshold informado por histórico |
+| `A10` | 🟡 | Multi-session / handoff formal | aberto | desenhar governança real de múltiplos runtimes |
 
 ---
 
-## 7. Cobertura de testes atual — leitura corrigida
+## 10. Conclusão
 
-### 7.1 O que já existe
+O retrato correto do `agent` hoje é este:
 
-Cobertura atual já visível no repositório:
+- **não** é um subsistema atrasado em decomposição estrutural;
+- **já** é uma arquitetura modular razoavelmente madura;
+- **já** possui base forte de boot, health, hooks, SDK, `ask_user`, singleton e observabilidade;
+- **a principal dívida agora é de consolidação arquitetural**, não de “quebra de monólito”.
 
-| Área                       | Evidência                                                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Contexto/estado            | `test_agent_context.spec.js`, `test_agent_state.spec.js`                                                                 |
-| Error policy               | `test_agent_error_policy.spec.js`                                                                                        |
-| Health                     | `test_agent_health_check.spec.js`, `test_agent_health_routes.spec.js`                                                    |
-| Lifecycle                  | `test_agent_lifecycle.spec.js`                                                                                           |
-| Messaging                  | `test_agent_messaging.spec.js`                                                                                           |
-| Dialog                     | `test_agent_dialog_controller.spec.js`, `test_loop_manager.spec.js`, `test_always_alive_dialog_loop.spec.js`             |
-| Queue/backpressure         | `test_message_queue.spec.js`                                                                                             |
-| Integração/observabilidade | `test_agent_background_tasks_integration.spec.js`, `test_agent_integration.spec.js`, `test_agent_event_observer.spec.js` |
+Em termos simples:
 
-### 7.2 O que ainda falta
+> **situação atual real** = runtime modular, funcional e muito mais governado do que antes, com fronteiras externas bem melhores, porém ainda com dívida interna relevante em `AgentContext`, error policy total, multi-session e fechamento final de boundaries.
 
-Gaps ainda relevantes:
+É exatamente esse estado que justifica a estratégia correta para as próximas ondas:
 
-- boot steps isolados (`boot-steps.js`) com cobertura específica por step;
-- regressão de lazy singleton/import-time behavior;
-- cobertura mais profunda de `reconnect-policy.js`;
-- cobertura para os novos helpers semânticos do `AgentContext` em cenários integrados, não só
-  unitários simples;
-- validação de ownership/ACL e cenários de session rotation em maior profundidade.
-
----
-
-## 8. Dívida técnica priorizada (versão abril/2026)
-
-| ID    | Severidade | Item                                                         | Estado  | Impacto                                  |
-| ----- | ---------- | ------------------------------------------------------------ | ------- | ---------------------------------------- |
-| `A1`  | 🔴         | Encapsular de verdade os subestados do `AgentContext`        | Aberto  | invariantes, testabilidade, ownership    |
-| `A2`  | 🔴         | Eliminar casts residuais e endurecer contratos de host       | Parcial | robustez semântica, typing               |
-| `A3`  | 🔴         | Expandir cobertura crítica de boot/reconnect/lazy singleton  | Parcial | regressão estrutural                     |
-| `A4`  | 🟠         | Adotar `withAgentErrorPolicy(...)` em todo o núcleo do agent | Parcial | consistência operacional                 |
-| `A5`  | 🟠         | Enxugar `BootWiringContext` e medir timings/falhas por step  | Aberto  | operabilidade de boot                    |
-| `A6`  | 🟠         | Fechar migração canônica para `getAgent()`                   | Parcial | previsibilidade de lifecycle             |
-| `A7`  | 🟠         | Consolidar superfície SDK do agent como contrato estável     | Parcial | capacidade operacional / extensibilidade |
-| `A8`  | 🟡         | Health mais rico (step timings, backlog labels, ownership)   | Parcial | diagnóstico runtime                      |
-| `A9`  | 🟡         | Watchdog adaptativo                                          | Aberto  | falsos positivos / tuning                |
-| `A10` | 🟡         | Multi-session/handoff formal                                 | Aberto  | evolução arquitetural                    |
-
----
-
-## 9. Conclusão
-
-O retrato correto do `agent` em abril/2026 é:
-
-- **não** é mais um módulo “quase todo por fazer”;
-- **já** tem várias entregas estruturais relevantes que em março eram apenas idealização;
-- **a principal dívida agora é de endurecimento de fronteiras**, não de decomposição bruta.
-
-Em resumo:
-
-> **Situação atual real** = base arquitetural boa, observabilidade forte, pipeline de boot modular,
-> lazy singleton funcional, health formal e background task tracking entregues; porém ainda com
-> `AgentContext` excessivamente mutável, contratos parcialmente informais, adoção incompleta da
-> policy de erro e roadmap aberto para testes/ownership/multi-session.
+> **menos refactor destrutivo; mais hardening rigoroso.**

@@ -147,7 +147,7 @@ function makeDialogHost() {
         sendMessage: vi.fn(async () => ''),
         sendMessageDialogBoot: vi.fn(async () => ''),
         answerPendingQuestion: vi.fn(() => true),
-        getPendingQuestion: vi.fn(() => null),
+        hasPendingQuestion: vi.fn(() => false),
         setModel: vi.fn(),
         emit: vi.fn(() => true),
         on: vi.fn(() => {}),

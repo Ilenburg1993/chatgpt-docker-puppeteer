@@ -124,13 +124,15 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         return { session, isResumed };
                     },
                     {
-                        onError: (reconnectError, disposition) => {
+                        label: 'reconnect.attempt',
+                        phase: 'reconnect',
+                        onError: (reconnectError, disposition, context) => {
                             log('WARN', `[AlwaysAlive] Tentativa ${attempt} falhou: ${reconnectError.message}`);
                             if (disposition !== 'retry') {
                                 const reason = disposition === 'fatal' ? 'fatal' : 'ignorado';
                                 log(
                                     'ERROR',
-                                    `[AlwaysAlive] Erro ${reason} detectado durante reconexão — abortando retry loop.`,
+                                    `[AlwaysAlive] ${context.label ?? 'reconnect.attempt'} ${reason} — abortando retry loop.`,
                                 );
                             }
                         },

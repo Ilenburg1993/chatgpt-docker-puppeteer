@@ -50,8 +50,8 @@ export function getStatusSnapshot(ctx, host) {
         resumeCount: state?.resumeCount ?? 0,
         sendCount: ctx.sendCount,
         startedAt: state?.startedAt ?? null,
-        contextWindow: ctx.contextState,
-        lastCheckpointPath: ctx.lastCheckpointPath,
+        contextWindow: ctx.getContextStateSnapshot(),
+        lastCheckpointPath: ctx.getLastCheckpointPathSnapshot(),
         permissionMode: ctx.permissions.getMode(),
     });
     ctx.cacheStatusSnapshot(snapshot);

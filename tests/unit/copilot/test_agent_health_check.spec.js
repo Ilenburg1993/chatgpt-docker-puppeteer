@@ -110,8 +110,20 @@ function createContext(overrides = {}) {
         quotaMonitor: overrides.quotaMonitorRunning ? /** @type {any} */ ({ stop() {} }) : null,
         hasClient: () => overrides.hasClient !== false,
         hasActiveSession: () => overrides.hasSession !== false,
+        getPendingQuestionSnapshot: () =>
+            pendingQuestion
+                ? {
+                      question: pendingQuestion.question,
+                      allowFreeform: pendingQuestion.allowFreeform,
+                      askedAt: pendingQuestion.askedAt,
+                      kind: pendingQuestion.kind,
+                      protocolControlled: pendingQuestion.protocolControlled,
+                      ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
+                  }
+                : null,
         hasPendingQuestion: () => pendingQuestion !== null,
         getPendingQuestionKind: () => pendingQuestion?.kind ?? null,
+        getPendingQuestionShadowSnapshot: () => (pendingQuestionShadow ? { ...pendingQuestionShadow } : null),
         hasPendingQuestionShadow: () => pendingQuestionShadow !== null,
         getPendingQuestionShadowKind: () => pendingQuestionShadow?.meta.kind ?? null,
         getPendingQuestionShadowState: () =>
@@ -120,7 +132,13 @@ function createContext(overrides = {}) {
         getPendingQuestionShadowAgeMs: () => (pendingQuestionShadow !== null ? 1_000 : null),
         getPendingQuestionShadowExpiresAt: () => (pendingQuestionShadow !== null ? Date.now() + 60_000 : null),
         getPendingQuestionShadowRemainingMs: () => (pendingQuestionShadow !== null ? 60_000 : null),
+        getDialogLoopAttachedSnapshot: () => overrides.dialogAttached ?? true,
+        isDialogLoopActive: () => overrides.dialogActive ?? false,
+        isDialogLoopPaused: () => false,
+        isKeepaliveRunning: () => overrides.keepaliveRunning ?? true,
         getBackgroundPendingCount: () => overrides.backgroundPendingCount ?? 0,
+        getBootReportSnapshot: () => /** @type {any} */ (overrides.bootReport ?? null),
+        getQuotaMonitorSnapshot: () => (overrides.quotaMonitorRunning ? /** @type {any} */ ({ stop() {} }) : null),
     });
 }
 

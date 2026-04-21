@@ -38,9 +38,9 @@ function resolveRuntimeIdParam(params) {
  */
 export function handleMetrics(params = {}) {
     const { snap: snapshot, contextWindow: cw } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
-    const statusValue = snapshot.status !== 'stopped' ? 1 : 0;
-    const queueSize = snapshot.queueSize ?? 0;
-    const sendCount = snapshot.sendCount ?? 0;
+    const statusValue = snapshot['status'] !== 'stopped' ? 1 : 0;
+    const queueSize = Number(snapshot['queueSize'] ?? 0);
+    const sendCount = Number(snapshot['sendCount'] ?? 0);
     const sseClients = getSseClients().size;
 
     const lines = [
@@ -345,7 +345,7 @@ export function handleGetQuota(params = {}) {
         body: {
             ok: true,
             runtimeId,
-            sendCount: snapshot?.sendCount ?? 0,
+            sendCount: Number(snapshot?.['sendCount'] ?? 0),
             dialogLoopActive: agent.dialogLoopActive,
             sessionId: agent.sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,
@@ -372,7 +372,7 @@ export function handleGetPrBudget(params = {}) {
             ok: true,
             runtimeId,
             prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
-            sendCount: snapshot?.sendCount ?? 0,
+            sendCount: Number(snapshot?.['sendCount'] ?? 0),
             dialogLoopActive: agent.dialogLoopActive,
             sessionId: agent.sessionId ?? null,
             lastPrConsumedAt: prInfo?.ts ?? null,

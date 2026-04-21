@@ -51,7 +51,7 @@ function resolveHandlerParams(req, paramsExtractor) {
     return {
         ...base,
         ...custom,
-        runtimeId: normalizeRuntimeId(custom?.['runtimeId']) ?? base.runtimeId,
+        runtimeId: normalizeRuntimeId(custom['runtimeId']) ?? base['runtimeId'],
     };
 }
 

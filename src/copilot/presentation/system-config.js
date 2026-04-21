@@ -61,6 +61,19 @@ export function handleHealth(params = {}) {
         snap: snapshot,
         health,
     } = readAgentRuntimeOverview(requestedRuntimeId);
+    const healthRecord = health && typeof health === 'object' ? /** @type {Record<string, unknown>} */ (health) : null;
+    const healthChecks =
+        healthRecord && typeof healthRecord['checks'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (healthRecord['checks'])
+            : null;
+    const ioChecks =
+        healthChecks && typeof healthChecks['io'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (healthChecks['io'])
+            : null;
+    const quotaChecks =
+        healthChecks && typeof healthChecks['quota'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (healthChecks['quota'])
+            : null;
     const metricsSummary = (() => {
         try {
             return container.resolve(METRICS_STORE).getSummary();
@@ -82,11 +95,11 @@ export function handleHealth(params = {}) {
         }
     }
     return {
-        status: health?.ok === false ? 503 : 200,
+        status: healthRecord?.['ok'] === false ? 503 : 200,
         body: {
-            ok: health?.ok ?? true,
-            healthStatus: health?.status ?? 'healthy',
-            issues: health?.issues ?? [],
+            ok: healthRecord?.['ok'] ?? true,
+            healthStatus: healthRecord?.['status'] ?? 'healthy',
+            issues: healthRecord?.['issues'] ?? [],
             dialogLoopActive: agent.dialogLoopActive,
             agentStatus: agent.status,
             runtimeId,
@@ -99,10 +112,10 @@ export function handleHealth(params = {}) {
             sseClients: getSseClients().size,
             model: agent.model,
             reasoningEffort: agent.reasoningEffort ?? 'high',
-            contextWindow: snapshot.contextWindow,
-            backgroundPendingCount: health?.backgroundPendingCount ?? 0,
-            keepaliveRunning: health?.checks.io.keepaliveRunning ?? false,
-            quotaMonitorRunning: health?.checks.quota.running ?? false,
+            contextWindow: snapshot['contextWindow'],
+            backgroundPendingCount: healthRecord?.['backgroundPendingCount'] ?? 0,
+            keepaliveRunning: ioChecks?.['keepaliveRunning'] ?? false,
+            quotaMonitorRunning: quotaChecks?.['running'] ?? false,
             cacheStats: { fileContext: readRuntimeFileCacheStats() },
             hub: hubInfo,
             metrics: {
@@ -174,8 +187,8 @@ export function handleGetConfig(params = {}) {
             busy: readRuntimeBusyState(),
             hubSessionId: readRuntimeHubSessionId(),
             port: LLM_B_TERMINAL_PORT,
-            contextWindow: snapshot.contextWindow,
-            lastCheckpointPath: snapshot.lastCheckpointPath,
+            contextWindow: snapshot['contextWindow'],
+            lastCheckpointPath: snapshot['lastCheckpointPath'],
             infiniteSession: getInfiniteSessionConfig(),
         },
     };

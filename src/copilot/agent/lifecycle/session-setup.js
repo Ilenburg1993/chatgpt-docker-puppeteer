@@ -39,7 +39,7 @@ import { handleUserInputRequest } from '../dialog/user-input-handler.js';
  */
 export async function buildSessionTools(ctx) {
     ctx.messagesCache.invalidate();
-    const mcpBridge = ctx.mcpBridge ?? ctx.configState?.mcpBridge ?? null;
+    const mcpBridge = ctx.getMcpBridgeSnapshot();
     const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildMcpTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
@@ -99,7 +99,7 @@ export function buildSessionHooks(ctx, host) {
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
-    const mcpBridge = ctx.mcpBridge ?? ctx.configState?.mcpBridge ?? null;
+    const mcpBridge = ctx.getMcpBridgeSnapshot();
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
         mcpBridge ? mcpBridge.buildConfig() : buildMcpConfig()
     );
@@ -140,7 +140,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
                 allowFreeform: input.allowFreeform !== false,
             },
             {
-                isDialogLoopActive: () => ctx.dialogLoop.active,
+                isDialogLoopActive: () => ctx.isDialogLoopActive(),
                 handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
                 setStatus: (s) => ctx.setStatus(s, host),
                 setPendingQuestion: (pq) => ctx.setPendingQuestion(pq),

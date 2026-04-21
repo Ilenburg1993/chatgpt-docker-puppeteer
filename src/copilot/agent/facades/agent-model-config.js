@@ -32,7 +32,7 @@ export function getModel(ctx) {
  */
 export function setModel(ctx, modelId) {
     ctx.setModel(modelId);
-    trySetLiveSessionModel(ctx.session, modelId, 'AlwaysAlive');
+    trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
 }
 
 /**
@@ -42,9 +42,10 @@ export function setModel(ctx, modelId) {
  * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
  */
 export async function listAvailableModels(ctx) {
-    if (!ctx.client) return [];
+    const client = ctx.getClientSnapshot();
+    if (!client) return [];
     try {
-        return await ctx.client.listModels();
+        return await client.listModels();
     } catch (e) {
         log('WARN', `[AlwaysAlive] listModels() falhou: ${toError(e).message}`);
         return [];

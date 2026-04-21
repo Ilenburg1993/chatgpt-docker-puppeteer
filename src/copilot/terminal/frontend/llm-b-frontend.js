@@ -192,7 +192,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         base.agent.pendingQuestionShadowState ??
         (pendingQuestionShadow !== null ? (base.agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
     const recommendedAction = /** @type {import('#copilot/agent/types').AgentRecommendedAction | null} */ (
-        typeof base.health?.recommendedAction === 'string' ? base.health.recommendedAction : null
+        typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
     );
     return {
         snap: base.snap,
@@ -619,8 +619,8 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
         hubSessionId,
         sdkSessionId: binding.sdkSessionId,
         turns: turns.length,
-        userTurns: turns.filter((turn) => turn.role === 'user').length,
-        llmBTurns: turns.filter((turn) => turn.role === 'llm_b').length,
+        userTurns: turns.filter((turn) => turn['role'] === 'user').length,
+        llmBTurns: turns.filter((turn) => turn['role'] === 'llm_b').length,
         memories: memories.length,
     };
 }
@@ -1007,20 +1007,20 @@ export function readTerminalResumeProjection({ token, limitTurns = 50 }) {
     const sessions = readTerminalHubSessions({ limit: 100, offset: 0 });
     const target =
         sessions.find((session) => {
-            const sessionId = typeof session.id === 'string' ? session.id : '';
+            const sessionId = typeof session['id'] === 'string' ? session['id'] : '';
             return sessionId === token || sessionId.startsWith(token);
         }) ?? null;
     if (!target) {
         return { found: false, reason: 'session-not-found', target: null, turns: [], summaryPrompt: null };
     }
-    const targetId = typeof target.id === 'string' ? target.id : '';
+    const targetId = typeof target['id'] === 'string' ? target['id'] : '';
     const turns = readTerminalHubTurns(targetId, { limit: limitTurns, offset: 0 });
     if (turns.length === 0) {
         return { found: false, reason: 'session-empty', target, turns, summaryPrompt: null };
     }
     const lines = turns.map((turn) => {
-        const roleLabel = turn.role === 'llm_b' ? 'LLM-B' : turn.role === 'llm_a' ? 'LLM-A' : 'Usuário';
-        return `[${roleLabel}] ${turn.content}`;
+        const roleLabel = turn['role'] === 'llm_b' ? 'LLM-B' : turn['role'] === 'llm_a' ? 'LLM-A' : 'Usuário';
+        return `[${roleLabel}] ${turn['content']}`;
     });
     const summaryPrompt =
         '[CONTEXTO DE SESSÃO ANTERIOR] Estou retomando a seguinte conversa. ' +

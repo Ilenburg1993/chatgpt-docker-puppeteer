@@ -48,10 +48,12 @@ function toDialogPolicyLevel(disposition) {
  */
 async function runDialogOperationWithPolicy(label, operation) {
     const result = await withAgentErrorPolicy(operation, {
-        onError: (error, disposition) => {
+        label,
+        phase: 'dialog',
+        onError: (error, disposition, context) => {
             log(
                 toDialogPolicyLevel(disposition),
-                `[DialogController] ${label} falhou (${disposition}): ${error.message}`,
+                `[DialogController] ${context.label ?? label} falhou (${disposition}): ${error.message}`,
             );
         },
     });
@@ -68,14 +70,7 @@ async function runDialogOperationWithPolicy(label, operation) {
  * @returns {void}
  */
 function startKeepaliveIfPossible(ctx, host) {
-    if (ctx.status === 'stopped' || !ctx.session) {
-        return;
-    }
-    ctx.keepalive.start({
-        getSession: () => ctx.session,
-        getClient: () => ctx.client,
-        isIdle: () => ctx.status === 'idle',
-        isDialogLoopActive: () => ctx.dialogLoop.active,
+    ctx.startKeepalive({
         onKeepalive: (/** @type {number} */ ts) => {
             container.resolve(METRICS_STORE).recordKeepalivePing();
             host.emit(EMITTER_SESSION_KEEPALIVE, { ts });
@@ -99,8 +94,9 @@ export async function dialogStart(ctx, host, bootPrompt) {
         );
     }
     // F44.1 (GAP-SD-08): health check pre-boot
-    if (ctx.contextState) {
-        const utilization = ctx.contextState.utilization ?? 0;
+    const contextState = ctx.getContextStateSnapshot();
+    if (contextState) {
+        const utilization = contextState.utilization ?? 0;
         if (utilization >= CONTEXT_UTIL_BLOCK_THRESHOLD) {
             throw new SessionError(
                 `[AlwaysAlive] startDialogLoop() bloqueado: utilização de contexto em ${Math.round(utilization * 100)}% (≥95%). Solicite compaction antes de iniciar.`,
@@ -116,7 +112,7 @@ export async function dialogStart(ctx, host, bootPrompt) {
     }
     ensureDialogLoopAttached(ctx, host);
     // F42.2: pausar keepalive enquanto dialog loop está ativo
-    ctx.keepalive.stop('dialog_loop_active');
+    ctx.stopKeepalive('dialog_loop_active');
     try {
         await runDialogOperationWithPolicy('dialog.start', () => ctx.dialogLoop.start(bootPrompt));
     } catch (error) {
@@ -179,15 +175,15 @@ export function ensureDialogLoopAttached(ctx, host) {
         getModel: () => ctx.model,
         setModel: (modelId) => {
             ctx.setModel(modelId);
-            trySetLiveSessionModel(ctx.session, modelId, 'AlwaysAlive');
+            trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
         },
-        getPendingQuestion: () => ctx.pendingQuestion,
+        hasPendingQuestion: () => ctx.hasPendingQuestion(),
         trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
     };
     // Sempre atualiza host — necessário após reconexão.
     ctx.dialogLoop.attach(agentHost);
     // Wiring de eventos: somente na primeira vez.
-    if (ctx.dialogLoopAttached) return;
+    if (ctx.getDialogLoopAttachedSnapshot()) return;
     ctx.setDialogLoopAttached(true);
     wireDialogLoopEvents(ctx.dialogLoop, (event, payload) => host.emit(event, payload));
 

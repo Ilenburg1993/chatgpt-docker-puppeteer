@@ -441,6 +441,55 @@ describe('F43 — SessionMessagesCache', () => {
         const result = await cache.get(/** @type {any} */ (session));
         expect(result).toEqual([]);
     });
+
+    it('syncSdkHistory emite sucesso quando sincroniza histórico do SDK', async () => {
+        const { syncSdkHistory } = await import('#copilot/agent/session/history-sync');
+        const session = createMockSession();
+        const emit = vi.fn();
+        const syncFromSdkHistory = vi.fn(() => ({ synced: 2, skipped: 1 }));
+
+        const result = await syncSdkHistory(/** @type {any} */ (session), emit, {
+            getHubSessionId: () => 'hub-1',
+            conversationStore: { syncFromSdkHistory },
+        });
+
+        expect(result.ok).toBe(true);
+        expect(syncFromSdkHistory).toHaveBeenCalledWith('hub-1', 'sess-1', expect.any(Array));
+        expect(emit).toHaveBeenCalledWith('session.history_synced', {
+            hubSessionId: 'hub-1',
+            sessionId: 'sess-1',
+            synced: 2,
+            skipped: 1,
+        });
+    });
+
+    it('syncSdkHistory emite falha estruturada quando getMessages explode', async () => {
+        const { syncSdkHistory } = await import('#copilot/agent/session/history-sync');
+        const session = createMockSession();
+        session.getMessages.mockRejectedValueOnce(new Error('history down'));
+        const emit = vi.fn();
+
+        const result = await syncSdkHistory(
+            /** @type {any} */ (session),
+            emit,
+            {
+                getHubSessionId: () => 'hub-1',
+                conversationStore: { syncFromSdkHistory: vi.fn() },
+            },
+            { label: 'session.history.sync', phase: 'resume' },
+        );
+
+        expect(result.ok).toBe(false);
+        expect(emit).toHaveBeenCalledWith(
+            'session.history_synced',
+            expect.objectContaining({
+                ok: false,
+                error: 'history down',
+                disposition: 'retry',
+                sessionId: 'sess-1',
+            }),
+        );
+    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

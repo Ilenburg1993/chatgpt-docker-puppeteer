@@ -79,6 +79,8 @@ function resolveAgentControlInput(params) {
 export function handleGetContext(params = {}) {
     const runtimeId = resolveRuntimeIdParam(params);
     const { snap: snapshot, contextWindow: cw } = readAgentRuntimeOverview(runtimeId);
+    const lastCheckpointPath =
+        typeof snapshot['lastCheckpointPath'] === 'string' ? snapshot['lastCheckpointPath'] : null;
     if (!cw) {
         return {
             status: 200,
@@ -89,7 +91,7 @@ export function handleGetContext(params = {}) {
                 tokenLimit: 0,
                 utilization: 0,
                 utilizationPercent: 0,
-                lastCheckpointPath: snapshot.lastCheckpointPath,
+                lastCheckpointPath,
                 warning: 'none',
             },
         };
@@ -109,7 +111,7 @@ export function handleGetContext(params = {}) {
             tokenLimit: cw.tokenLimit,
             utilization,
             utilizationPercent: Math.round(utilization * 100),
-            lastCheckpointPath: snapshot.lastCheckpointPath,
+            lastCheckpointPath,
             warning,
         },
     };
@@ -124,41 +126,46 @@ export function handleGetContext(params = {}) {
 export async function handlePipeline(params = {}) {
     const body = resolveAgentControlInput(params);
     const runtimeId = resolveRuntimeIdParam(params);
-    if (!Array.isArray(body?.steps) || body.steps.length === 0) {
+    const steps = Array.isArray(body['steps']) ? body['steps'] : null;
+    if (!steps || steps.length === 0) {
         return { status: 400, body: { ok: false, error: '"steps" deve ser um array não vazio' } };
     }
 
     const MAX_PIPELINE_STEPS = 20;
-    if (body.steps.length > MAX_PIPELINE_STEPS) {
+    if (steps.length > MAX_PIPELINE_STEPS) {
         return {
             status: 400,
             body: {
                 ok: false,
-                error: `Máximo ${MAX_PIPELINE_STEPS} steps por pipeline (recebido: ${body.steps.length})`,
+                error: `Máximo ${MAX_PIPELINE_STEPS} steps por pipeline (recebido: ${steps.length})`,
             },
         };
     }
 
-    const rawGlobalFrom = body.from ?? 'llm-a';
+    const rawGlobalFrom = body['from'] ?? 'llm-a';
     const globalFrom = typeof rawGlobalFrom === 'string' && ALLOWED_FROM.has(rawGlobalFrom) ? rawGlobalFrom : 'llm-a';
     /** @type {{ step: number; prompt: string; reply: string | null; durationMs: number }[]} */
     const results = [];
 
-    for (let i = 0; i < body.steps.length; i++) {
-        const step = body.steps[i];
-        if (!step?.prompt) continue;
-        const rawStepFrom = step.from ?? globalFrom;
+    for (let i = 0; i < steps.length; i++) {
+        const rawStep = steps[i];
+        if (!rawStep || typeof rawStep !== 'object') continue;
+        const step = /** @type {Record<string, unknown>} */ (rawStep);
+        const prompt = typeof step['prompt'] === 'string' ? step['prompt'] : '';
+        if (!prompt) continue;
+        const rawStepFrom = typeof step['from'] === 'string' ? step['from'] : globalFrom;
         const from = ALLOWED_FROM.has(rawStepFrom) ? rawStepFrom : globalFrom;
+        const waitMs = typeof step['waitMs'] === 'number' ? step['waitMs'] : 0;
 
-        if (step.waitMs && step.waitMs > 0) {
+        if (waitMs > 0) {
             const MAX_WAIT_MS = 30_000;
-            await new Promise((r) => setTimeout(r, Math.min(step.waitMs ?? 0, MAX_WAIT_MS)));
+            await new Promise((r) => setTimeout(r, Math.min(waitMs, MAX_WAIT_MS)));
         }
 
         const t0 = Date.now();
         try {
-            const reply = await sendRuntimeDialogTurn(step.prompt, from, undefined, getAgent(runtimeId));
-            results.push({ step: i + 1, prompt: step.prompt, reply: reply ?? null, durationMs: Date.now() - t0 });
+            const reply = await sendRuntimeDialogTurn(prompt, from, undefined, getAgent(runtimeId));
+            results.push({ step: i + 1, prompt, reply: reply ?? null, durationMs: Date.now() - t0 });
 
             if (reply === null) {
                 return {
@@ -231,17 +238,17 @@ export async function handleInject(params = {}) {
     const body = resolveAgentControlInput(params);
     const runtimeId = resolveRuntimeIdParam(params);
     const rawMessage =
-        typeof body?.message === 'string' ? body.message : typeof body?.content === 'string' ? body.content : '';
+        typeof body['message'] === 'string' ? body['message'] : typeof body['content'] === 'string' ? body['content'] : '';
     const message = rawMessage.trim();
     if (!message) {
         return { status: 400, body: { ok: false, error: '"message" é obrigatório' } };
     }
 
-    const rawFrom = body?.from ?? 'llm-a';
+    const rawFrom = body['from'] ?? 'llm-a';
     const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
 
     let enrichedMessage = message;
-    const contextFiles = Array.isArray(body?.context_files) ? body.context_files : [];
+    const contextFiles = Array.isArray(body['context_files']) ? body['context_files'] : [];
     if (contextFiles.length > 0) {
         try {
             const ctxs = await Promise.all(contextFiles.map(readRuntimeFileContext));
@@ -254,7 +261,7 @@ export async function handleInject(params = {}) {
         }
     }
 
-    const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
+    const rawAttachments = Array.isArray(body['attachments']) ? body['attachments'] : [];
     if (rawAttachments.length > 0) {
         let embedParts;
         try {

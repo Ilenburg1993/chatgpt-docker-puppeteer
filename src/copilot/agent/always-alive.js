@@ -198,7 +198,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogLoopActive() {
-        return this.ctx.dialogLoop.active;
+        return this.ctx.isDialogLoopActive();
     }
 
     /**
@@ -234,7 +234,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionKind() {
-        return this.ctx.pendingQuestion?.kind ?? null;
+        return this.ctx.getPendingQuestionKind();
     }
 
     /**
@@ -334,7 +334,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string | null}
      */
     get sessionId() {
-        return this.ctx.session?.sessionId ?? readState()?.sessionId ?? null;
+        return this.ctx.getSessionSnapshot()?.sessionId ?? readState()?.sessionId ?? null;
     }
 
     /**
@@ -773,7 +773,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogPaused() {
-        return this.ctx.dialogLoop.paused;
+        return this.ctx.isDialogLoopPaused();
     }
 
     /**
@@ -782,7 +782,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
      */
     get dialogPrMetrics() {
-        return this.ctx.dialogLoop.prMetrics ?? null;
+        return this.ctx.getDialogPrMetricsSnapshot();
     }
 
     /**

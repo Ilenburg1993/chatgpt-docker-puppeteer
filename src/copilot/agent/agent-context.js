@@ -814,12 +814,88 @@ export class AgentContext {
     }
 
     /**
+     * Retorna o client SDK ativo sem expor diretamente o shape cru de `ioState` aos consumidores quentes.
+     *
+     * @returns {CopilotClient | null}
+     */
+    getClientSnapshot() {
+        return this.ioState.client;
+    }
+
+    /**
      * Indica se existe uma sessão SDK ativa acoplada ao agent.
      *
      * @returns {boolean}
      */
     hasActiveSession() {
         return this.sessionState.session !== null;
+    }
+
+    /**
+     * Retorna a sessão SDK ativa sem expor diretamente o shape cru de `sessionState` aos consumidores quentes.
+     *
+     * @returns {CopilotSession | null}
+     */
+    getSessionSnapshot() {
+        return this.sessionState.session;
+    }
+
+    /**
+     * Retorna a bridge MCP ativa sem expor diretamente o shape cru de `configState` aos consumidores quentes.
+     *
+     * @returns {{
+     *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
+     *     buildConfig: () => Record<string, unknown>;
+     *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
+     * } | null}
+     */
+    getMcpBridgeSnapshot() {
+        return this.configState.mcpBridge;
+    }
+
+    /**
+     * Retorna o estado de wiring do dialog loop sem expor diretamente o shape cru de `dialogState`.
+     *
+     * @returns {boolean}
+     */
+    getDialogLoopAttachedSnapshot() {
+        return this.dialogState.dialogLoopAttached;
+    }
+
+    /**
+     * Retorna o quota monitor ativo sem expor diretamente o shape cru de `runtimeState`.
+     *
+     * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor | null}
+     */
+    getQuotaMonitorSnapshot() {
+        return this.runtimeState.quotaMonitor;
+    }
+
+    /**
+     * Indica se o dialog loop está ativo no runtime atual.
+     *
+     * @returns {boolean}
+     */
+    isDialogLoopActive() {
+        return Boolean(this.dialogLoop.active);
+    }
+
+    /**
+     * Indica se o dialog loop está pausado no runtime atual.
+     *
+     * @returns {boolean}
+     */
+    isDialogLoopPaused() {
+        return Boolean(this.dialogLoop.paused);
+    }
+
+    /**
+     * Indica se o keepalive da sessão está ativo.
+     *
+     * @returns {boolean}
+     */
+    isKeepaliveRunning() {
+        return Boolean(this.keepalive.running);
     }
 
     /**
@@ -1004,6 +1080,101 @@ export class AgentContext {
             ...report,
             steps: report.steps.map((step) => ({ ...step })),
         };
+    }
+
+    /**
+     * Retorna uma cópia rasa do último uso de contexto conhecido.
+     *
+     * @returns {{ tokens: number; tokenLimit: number; utilization: number } | null}
+     */
+    getContextStateSnapshot() {
+        return this.sessionState.contextState ? { ...this.sessionState.contextState } : null;
+    }
+
+    /**
+     * Retorna o último checkpoint path persistido pelo SDK.
+     *
+     * @returns {string | null}
+     */
+    getLastCheckpointPathSnapshot() {
+        return this.sessionState.lastCheckpointPath;
+    }
+
+    /**
+     * Retorna as métricas atuais de PR do dialog loop sem expor diretamente o manager vivo.
+     *
+     * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
+     */
+    getDialogPrMetricsSnapshot() {
+        return this.dialogLoop?.prMetrics ?? null;
+    }
+
+    /**
+     * Retorna o timer periódico de métricas do runtime.
+     *
+     * @returns {ReturnType<typeof setInterval> | null}
+     */
+    getMetricsTimerSnapshot() {
+        return this.runtimeState.metricsTimer;
+    }
+
+    /**
+     * Retorna o cancel handler atual do auto-reconnect MCP.
+     *
+     * @returns {(() => void) | null}
+     */
+    getMcpReconnectCancelSnapshot() {
+        return this.runtimeState.mcpReconnectCancel;
+    }
+
+    /**
+     * Retorna o observer atual do agente, quando houver.
+     *
+     * @returns {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null}
+     */
+    getAgentObserverSnapshot() {
+        return this.runtimeState.agentObserver;
+    }
+
+    /**
+     * Registra atividade no keepalive ativo.
+     *
+     * @returns {void}
+     */
+    pingKeepalive() {
+        this.keepalive.ping();
+    }
+
+    /**
+     * Inicia o keepalive do runtime usando os accessors semânticos atuais do contexto.
+     *
+     * @param {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void }} [options]
+     * @returns {boolean} `true` quando o keepalive pôde ser iniciado.
+     */
+    startKeepalive(options = {}) {
+        if (this.status === 'stopped' || !this.hasActiveSession()) {
+            return false;
+        }
+
+        this.keepalive.start({
+            getSession: () => this.getSessionSnapshot(),
+            getClient: () => this.getClientSnapshot(),
+            isIdle: options.isIdle ?? (() => this.status === 'idle'),
+            isDialogLoopActive: () => this.isDialogLoopActive(),
+            ...(options.onKeepalive !== undefined ? { onKeepalive: options.onKeepalive } : {}),
+        });
+
+        return true;
+    }
+
+    /**
+     * Para o keepalive do runtime com razão explícita.
+     *
+     * @param {string} [reason='manual'] Default is `'manual'`
+     * @returns {void}
+     */
+    stopKeepalive(reason = 'manual') {
+        this.keepalive.stop(reason);
     }
 
     // ─── Status FSM ─────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { log, startSpan } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -123,4 +124,45 @@ export async function cleanupStaleSessions(client, options = {}) {
             return result;
         },
     ); // startSpan copilot.session.cleanup
+}
+
+/**
+ * Executa a limpeza de sessões sob a error policy canônica do `agent`, enriquecendo logs com contexto operacional.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {{
+ *     maxAgeMs?: number;
+ *     currentSessionId?: string | null;
+ * }} [options]
+ * @param {{
+ *     label?: string;
+ *     phase?: string;
+ *     taskId?: string;
+ *     sessionId?: string;
+ * }} [policy]
+ * @returns {Promise<import('../error-policy.js').AgentPolicyResult<SessionCleanupResult>>}
+ */
+export async function cleanupStaleSessionsWithPolicy(client, options = {}, policy = {}) {
+    const label = policy.label ?? 'session.cleanup.stale';
+    /** @type {{
+     *     label: string;
+     *     phase: string;
+     *     taskId?: string;
+     *     sessionId?: string;
+     *     onError: (error: Error, disposition: import('../error-policy.js').AgentErrorDisposition, context: import('../error-policy.js').AgentErrorContext) => void;
+     * }} */
+    const policyOptions = {
+        label,
+        phase: policy.phase ?? 'boot',
+        ...(policy.taskId !== undefined ? { taskId: policy.taskId } : {}),
+        onError: (error, disposition, context) => {
+            const level = disposition === 'fatal' ? 'ERROR' : 'WARN';
+            log(level, `[SessionCleanup] ${context.label ?? label}: ${error.message}`);
+        },
+    };
+    const resolvedSessionId = policy.sessionId ?? options.currentSessionId ?? null;
+    if (typeof resolvedSessionId === 'string' && resolvedSessionId.length > 0) {
+        policyOptions.sessionId = resolvedSessionId;
+    }
+    return withAgentErrorPolicy(() => cleanupStaleSessions(client, options), policyOptions);
 }

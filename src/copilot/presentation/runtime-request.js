@@ -33,8 +33,8 @@ export function resolveRequestedRuntimeId(req) {
         req.query?.['runtimeId'],
         req.query?.['runtime'],
         req.headers['x-agent-runtime-id'],
-        req.body?.runtimeId,
-        req.params?.runtimeId,
+        req.body?.['runtimeId'],
+        req.params?.['runtimeId'],
     );
 }
 

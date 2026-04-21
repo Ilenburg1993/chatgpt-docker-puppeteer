@@ -143,8 +143,9 @@ export async function agentStart(ctx, host) {
             log('WARN', `[AlwaysAlive] Ownership sync degradado no boot: ${ownershipSync.error.message}`);
         }
 
-        if (ctx.agentObserver) {
-            ctx.agentObserver.detach();
+        const previousAgentObserver = ctx.getAgentObserverSnapshot();
+        if (previousAgentObserver) {
+            previousAgentObserver.detach();
             ctx.clearAgentObserver();
         }
         const eventBus = container.resolve(EVENT_BUS) ?? undefined;
@@ -182,7 +183,7 @@ export async function agentStart(ctx, host) {
                     );
                 },
                 isProcessing: () => ctx.status === 'processing',
-                dialogLoopActive: () => ctx.dialogLoop?.active ?? false,
+                dialogLoopActive: () => ctx.isDialogLoopActive(),
                 getSessionId: () => host.sessionId,
                 getStatus: () => ctx.status,
                 hasPendingQuestion: () => ctx.hasPendingQuestion(),
@@ -195,9 +196,11 @@ export async function agentStart(ctx, host) {
                 ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
                 resumeDialogLoop: () => host.resumeDialogLoop(),
                 startDialogLoop: () => host.startDialogLoop(),
+                startKeepalive: (options) => ctx.startKeepalive(options),
                 getDialogPrMetrics: () => host.dialogPrMetrics,
                 backgroundTasks: ctx.backgroundTasks,
-                mcpBridge: ctx.mcpBridge,
+                mcpBridge: ctx.getMcpBridgeSnapshot(),
+                getMcpBridgeSnapshot: () => ctx.getMcpBridgeSnapshot(),
             },
             { eventBus },
         );
@@ -323,27 +326,24 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             ]);
         }
 
-        if (ctx.dialogLoopAttached) {
+        if (ctx.getDialogLoopAttachedSnapshot()) {
             ctx.dialogLoop.removeAllListeners();
             ctx.setDialogLoopAttached(false);
         }
-        if (ctx.dialogLoop.active) {
+        if (ctx.isDialogLoopActive()) {
             ctx.dialogLoop.forceDeactivate();
             host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: false, ts: Date.now() });
         }
 
         try {
-            const pendingQuestion =
-                typeof ctx.getPendingQuestionSnapshot === 'function'
-                    ? ctx.getPendingQuestionSnapshot()
-                    : ctx.pendingQuestion;
+            const pendingQuestion = ctx.getPendingQuestionSnapshot();
             const snap = createSnapshot({
                 sessionId: host.sessionId ?? null,
                 model: ctx.model,
                 status: ctx.status,
                 sendCount: ctx.sendCount,
                 dialogLoopActive: false,
-                dialogPaused: ctx.dialogLoop.paused,
+                dialogPaused: ctx.isDialogLoopPaused(),
                 pendingQuestion: pendingQuestion?.question ?? null,
                 pendingQuestionMeta:
                     pendingQuestion !== null
@@ -371,19 +371,22 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${persistedShutdown.error.message}`);
         }
 
-        if (ctx.metricsTimer) {
-            clearInterval(ctx.metricsTimer);
+        const metricsTimer = ctx.getMetricsTimerSnapshot();
+        if (metricsTimer) {
+            clearInterval(metricsTimer);
             ctx.clearMetricsTimer();
         }
-        if (ctx.mcpReconnectCancel) {
-            ctx.mcpReconnectCancel();
+        const mcpReconnectCancel = ctx.getMcpReconnectCancelSnapshot();
+        if (mcpReconnectCancel) {
+            mcpReconnectCancel();
             ctx.clearMcpReconnectCancel();
         }
-        if (ctx.quotaMonitor) {
-            ctx.quotaMonitor.stop();
+        const quotaMonitor = ctx.getQuotaMonitorSnapshot();
+        if (quotaMonitor) {
+            quotaMonitor.stop();
             ctx.clearQuotaMonitor();
         }
-        ctx.keepalive.stop('agent_shutdown');
+        ctx.stopKeepalive('agent_shutdown');
         defaultMetrics.stopPeriodicSnapshot();
 
         const drainedBackgroundTasks = await ctx.backgroundTasks.drain(5000);
@@ -401,21 +404,20 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
         }
 
-        if (ctx.agentObserver) {
-            ctx.agentObserver.detach();
+        const agentObserver = ctx.getAgentObserverSnapshot();
+        if (agentObserver) {
+            agentObserver.detach();
             ctx.clearAgentObserver();
         }
 
-        const sessionEventUnsubscribers =
-            typeof ctx.getSessionEventUnsubscribersSnapshot === 'function'
-                ? ctx.getSessionEventUnsubscribersSnapshot()
-                : [...(ctx.sessionEventUnsubscribers ?? [])];
+        const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
         for (const unsub of sessionEventUnsubscribers) unsub();
         ctx.clearSessionEventUnsubscribers();
 
-        if (ctx.session) {
+        const session = ctx.getSessionSnapshot();
+        if (session) {
             try {
-                await ctx.session.disconnect();
+                await session.disconnect();
             } catch (e) {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
@@ -425,9 +427,10 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             setExperimentalSession(null);
         }
 
-        if (ctx.client) {
+        const client = ctx.getClientSnapshot();
+        if (client) {
             try {
-                const stopErrors = await ctx.client.stop();
+                const stopErrors = await client.stop();
                 if (stopErrors.length > 0) {
                     log(
                         'WARN',
@@ -469,17 +472,14 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
     try {
         return await tryReconnect(
             originalError,
-            /** @type {import('#copilot/sdk/types').CopilotClient} */ (ctx.client),
+            /** @type {import('#copilot/sdk/types').CopilotClient} */ (ctx.getClientSnapshot()),
             ctx.status,
             {
                 emit: (event, payload) => host.emit(event, payload),
                 initSession: (client) => initSession(ctx, client, host),
                 dialogLoop: ctx.dialogLoop,
                 clearSessionEventUnsubs: () => {
-                    const sessionEventUnsubscribers =
-                        typeof ctx.getSessionEventUnsubscribersSnapshot === 'function'
-                            ? ctx.getSessionEventUnsubscribersSnapshot()
-                            : [...(ctx.sessionEventUnsubscribers ?? [])];
+                    const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
                     for (const unsub of sessionEventUnsubscribers) unsub();
                     ctx.clearSessionEventUnsubscribers();
                 },

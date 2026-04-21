@@ -113,7 +113,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal
             reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
             return;
         }
-        if (ctx.dialogLoop.active) {
+        if (ctx.isDialogLoopActive()) {
             reject(
                 new SessionError(
                     '[AlwaysAlive] sendMessage() bloqueado: dialog loop ativo. Use sendDialogTurn().',
@@ -222,8 +222,14 @@ export async function executeTask(session, task, callbacks) {
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
-        const execution = await withAgentErrorPolicy(() =>
-            session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS),
+        const execution = await withAgentErrorPolicy(
+            () => session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS),
+            {
+                label: 'messaging.sendAndWait',
+                phase: 'messaging',
+                taskId: task.id,
+                sessionId: session.sessionId,
+            },
         );
 
         if (!execution.ok) {
@@ -300,10 +306,10 @@ export async function executeTask(session, task, callbacks) {
  */
 export function processQueue(ctx, host, callbacks) {
     // G1-ARCH-03: bloqueia processamento durante reconexão ativa
-    if (ctx.isReconnecting || ctx.status !== 'idle' || ctx.messageQueue.size === 0 || !ctx.session) {
+    const session = ctx.getSessionSnapshot();
+    if (ctx.isReconnecting || ctx.status !== 'idle' || ctx.messageQueue.size === 0 || !session) {
         return;
     }
-    const session = ctx.session;
 
     const task = ctx.messageQueue.shift();
     if (!task) {
@@ -316,7 +322,7 @@ export function processQueue(ctx, host, callbacks) {
     log('INFO', `[AlwaysAlive] Processando tarefa ${task.id}`);
     ctx.incrementSendCount();
     // F42.2: registrar atividade para reset do timer de idle do keepalive
-    ctx.keepalive.ping();
+    ctx.pingKeepalive();
 
     void executeTask(session, task, {
         onDelta: (chunk, taskId) => host.emit(EMITTER_TASK_DELTA, { taskId, chunk }),
@@ -339,10 +345,10 @@ export function processQueue(ctx, host, callbacks) {
  */
 export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     signal?.throwIfAborted();
-    if (!ctx.session) {
+    const session = ctx.getSessionSnapshot();
+    if (!session) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
-    const session = ctx.session;
     return startSpan('copilot.agent.steer', { model: ctx.model ?? '', actor: 'agent' }, async () => {
         const messageId = await session.send({ prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
@@ -363,7 +369,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     const span = startSpanImmediate('copilot.agent.answer', {
         had_pending: String(ctx.hasPendingQuestion()),
     });
-    if (!ctx.pendingQuestion) {
+    if (!ctx.hasPendingQuestion()) {
         // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
         host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false });
         log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');

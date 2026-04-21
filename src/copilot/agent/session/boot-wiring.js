@@ -76,9 +76,17 @@ import {
  * @property {() => void} ensureDialogLoopAttached — Garante DLM attached
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
+ * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive —
+ *   Inicia o keepalive usando o contexto semântico atual do runtime
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {import('../background-tasks.js').BackgroundTasks} backgroundTasks — Tracker central de tarefas em
  *   background do agente
+ * @property {() => {
+ *     startAutoReconnect: (
+ *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
+ *         intervalMs: number,
+ *     ) => () => void;
+ * } | null} [getMcpBridgeSnapshot]
  * @property {({
  *           startAutoReconnect: (
  *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
@@ -288,7 +296,7 @@ export function createBootWiringSteps(client, session, isResumed, agentEmitter, 
             name: 'startKeepalive',
             phase: 'keepalive',
             required: false,
-            run: () => stepStartKeepalive(client, session, ctx),
+            run: () => stepStartKeepalive(ctx),
         },
         {
             name: 'startQuotaMonitor',
@@ -322,7 +330,10 @@ async function runBootStepWithPolicy(step, state) {
     const startedAt = Date.now();
     log('DEBUG', `[BootWiring] step ${step.name}...`);
 
-    const result = await withAgentErrorPolicy(() => step.run());
+    const result = await withAgentErrorPolicy(() => step.run(), {
+        label: `boot.${step.name}`,
+        phase: step.phase,
+    });
     if (result.ok) {
         state.stepReports.push({
             name: step.name,

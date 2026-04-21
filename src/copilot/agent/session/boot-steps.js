@@ -32,7 +32,7 @@ import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '.
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
 import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
-import { cleanupStaleSessions } from './cleanup.js';
+import { cleanupStaleSessionsWithPolicy } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
 
 /**
@@ -70,8 +70,15 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => void} ensureDialogLoopAttached
  * @property {() => Promise<void>} resumeDialogLoop
  * @property {() => Promise<void>} startDialogLoop
+ * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {import('../background-tasks.js').BackgroundTasks} backgroundTasks
+ * @property {() => {
+ *     startAutoReconnect: (
+ *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
+ *         intervalMs: number,
+ *     ) => () => void;
+ * } | null} [getMcpBridgeSnapshot]
  * @property {({
  *           startAutoReconnect: (
  *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
@@ -173,14 +180,22 @@ export function stepAttachAgentObserver(agentEmitter, state, options) {
  */
 export function stepCleanupStaleSessions(client, session, ctx) {
     void ctx.backgroundTasks.track(
-        cleanupStaleSessions(client, { currentSessionId: session.sessionId })
-            .then((result) => {
-                if (result.deleted > 0) {
-                    for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
-                    ctx.emit(EMITTER_SESSION_CLEANUP, result);
-                }
-            })
-            .catch((e) => logSwallowed(e, 'agent.bootWiring.cleanup')),
+        cleanupStaleSessionsWithPolicy(
+            client,
+            { currentSessionId: session.sessionId },
+            { label: 'session.cleanup.stale', phase: 'boot', sessionId: session.sessionId },
+        ).then((policyResult) => {
+            if (!policyResult.ok) {
+                return;
+            }
+            const result = policyResult.value;
+            if (result.deleted > 0) {
+                for (let i = 0; i < result.deleted; i++) defaultMetrics.recordSessionCleanup();
+            }
+            if (result.deleted > 0 || result.errors.length > 0) {
+                ctx.emit(EMITTER_SESSION_CLEANUP, result);
+            }
+        }),
         {
             label: 'session.cleanup.stale',
             description: 'Cleanup stale SDK sessions after boot',
@@ -216,7 +231,7 @@ export function scheduleDialogBootRecovery(ctx) {
  */
 export async function runDialogBootRecovery(ctx) {
     const status = ctx.getStatus();
-    if (ctx.dialogLoop.active) {
+    if (ctx.dialogLoopActive()) {
         log('DEBUG', '[AlwaysAlive] F53: Boot recovery dispensado — dialog loop já está ativo.');
         return;
     }
@@ -240,7 +255,7 @@ export async function runDialogBootRecovery(ctx) {
         }
         await ctx.resumeDialogLoop();
         log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
-        ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoop.active, ts: Date.now() });
+        ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoopActive(), ts: Date.now() });
     } catch (e) {
         log('WARN', `[AlwaysAlive] F53: Boot recovery falhou (${toError(e).message}) — fallback para startDialogLoop.`);
         try {
@@ -332,24 +347,20 @@ export function reapExpiredPendingQuestionShadow(ctx) {
  * @returns {void}
  */
 export function stepStartMcpReconnect(ctx, state) {
-    const _mcpBridgeFn = ctx.mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
+    const mcpBridge = ctx.getMcpBridgeSnapshot?.() ?? ctx.mcpBridge ?? null;
+    const _mcpBridgeFn = mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
     state.mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
         ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
     }, MCP_RECONNECT_MS);
 }
 
 /**
- * @param {CopilotClient} client
- * @param {CopilotSession} session
  * @param {BootWiringContext} ctx
  * @returns {void}
  */
-export function stepStartKeepalive(client, session, ctx) {
-    ctx.keepalive.start({
-        getSession: () => session,
-        getClient: () => client,
+export function stepStartKeepalive(ctx) {
+    ctx.startKeepalive({
         isIdle: () => ctx.getStatus() === 'idle',
-        isDialogLoopActive: ctx.dialogLoopActive,
         onKeepalive: (/** @type {number} */ ts) => {
             defaultMetrics.recordKeepalivePing();
             ctx.emit(EMITTER_SESSION_KEEPALIVE, { ts });

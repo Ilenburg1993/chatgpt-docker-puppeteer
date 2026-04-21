@@ -57,6 +57,9 @@ export function syncActiveSessionOwnership(sdkSessionId, deps) {
 export async function syncActiveSessionOwnershipWithPolicy(sdkSessionId, deps, opts = {}) {
     const label = opts.label ?? 'session.ownership.sync';
     return withAgentErrorPolicy(() => syncActiveSessionOwnership(sdkSessionId, deps), {
+        label,
+        phase: 'session',
+        ...(sdkSessionId !== null ? { sessionId: sdkSessionId } : {}),
         onError: (error, disposition) => logOwnershipPolicyError(label, error, disposition),
     });
 }
@@ -88,6 +91,8 @@ export function clearActiveSdkSessionOwnership(deps) {
 export async function clearActiveSdkSessionOwnershipWithPolicy(deps, opts = {}) {
     const label = opts.label ?? 'session.ownership.clear';
     return withAgentErrorPolicy(() => clearActiveSdkSessionOwnership(deps), {
+        label,
+        phase: 'session',
         onError: (error, disposition) => logOwnershipPolicyError(label, error, disposition),
     });
 }

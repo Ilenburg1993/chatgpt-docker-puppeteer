@@ -103,7 +103,7 @@ function createMockHost() {
         sendMessage: vi.fn(async () => 'ok'),
         sendMessageDialogBoot: vi.fn(async () => 'ok'),
         answerPendingQuestion: vi.fn(),
-        getPendingQuestion: vi.fn(() => null),
+        hasPendingQuestion: vi.fn(() => false),
         setModel: vi.fn(),
         emit: vi.fn(),
         on: vi.fn(() => () => {}),

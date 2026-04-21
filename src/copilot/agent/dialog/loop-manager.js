@@ -64,7 +64,7 @@ import { DialogWatchdog } from './watchdog.js';
  * @property {() => string | null} getSessionId - Retorna o sessionId ativo
  * @property {() => string} getModel - Retorna o modelo ativo
  * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
- * @property {() => import('../types.js').PendingQuestion | null} getPendingQuestion - Retorna a pergunta pendente
+ * @property {() => boolean} hasPendingQuestion - Indica se há pergunta pendente ativa
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
  *   - Tracker de tarefas fire-and-forget do host
  */
@@ -379,7 +379,7 @@ export class DialogLoopManager extends EventEmitter {
         if (this.#stopping) return;
         this.#stopping = true;
 
-        if (this.#host?.getPendingQuestion()) {
+        if (this.#host?.hasPendingQuestion()) {
             this.#host.answerPendingQuestion('STOP_DIALOG');
         }
 
@@ -463,7 +463,7 @@ export class DialogLoopManager extends EventEmitter {
             this.#paused = false;
 
             // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
-            if (this.#host?.getPendingQuestion()) {
+            if (this.#host?.hasPendingQuestion()) {
                 log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
                 // F31: reiniciar watchdog após resume
                 this.#watchdog?.start();

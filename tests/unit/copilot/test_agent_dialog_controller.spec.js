@@ -12,6 +12,7 @@ import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
     dialogResume,
     dialogStart,
+    dialogStop,
     ensureDialogLoopAttached,
 } from '../../../src/copilot/agent/dialog/agent-dialog-controller.js';
 
@@ -48,6 +49,23 @@ describe('agent-dialog-controller › dialogStart', () => {
             () => dialogStart(ctx, /** @type {any} */ (host)),
             (/** @type {any} */ err) => err.code === 'CONTEXT_EXHAUSTED',
         );
+    });
+
+    it('usa a API semântica do keepalive ao iniciar o dialog loop', async () => {
+        const { ctx, host } = setup();
+        ctx.status = 'idle';
+        ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-1' }));
+
+        /** @type {string[]} */
+        const stopReasons = [];
+        ctx.stopKeepalive = (reason = 'manual') => {
+            stopReasons.push(reason);
+        };
+        ctx.dialogLoop.start = async () => {};
+
+        await dialogStart(ctx, /** @type {any} */ (host));
+
+        assert.deepEqual(stopReasons, ['dialog_loop_active']);
     });
 });
 
@@ -97,5 +115,40 @@ describe('agent-dialog-controller › ensureDialogLoopAttached', () => {
         const listenerCount2 = emitter.listenerCount('session.token_budget_warning');
 
         assert.equal(listenerCount1, listenerCount2, 'wiring não deve duplicar listeners');
+    });
+});
+
+describe('agent-dialog-controller › dialogStop', () => {
+    it('reinicia o keepalive via API semântica do contexto', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        const host = Object.assign(emitter, {
+            sessionId: 'test-session',
+            sendMessage: async () => '',
+            sendMessageDialogBoot: async () => '',
+            answerPendingQuestion: () => false,
+        });
+
+        ctx.status = 'idle';
+        ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-1' }));
+
+        /** @type {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void } | null} */
+        let keepaliveOptions = null;
+        ctx.startKeepalive = (options = {}) => {
+            keepaliveOptions = options;
+            return true;
+        };
+        ctx.dialogLoop.stop = async () => {};
+
+        await dialogStop(ctx, /** @type {any} */ (host), { authorized: true });
+
+        assert.ok(keepaliveOptions, 'dialogStop deve solicitar restart do keepalive');
+        if (!keepaliveOptions) {
+            throw new Error('dialogStop não forneceu opções de keepalive');
+        }
+        const restartOptions = /** @type {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void }} */ (
+            keepaliveOptions
+        );
+        assert.equal(typeof restartOptions.onKeepalive, 'function');
     });
 });

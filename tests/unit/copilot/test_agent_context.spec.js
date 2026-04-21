@@ -312,9 +312,13 @@ describe('AgentContext', () => {
         });
         assert.equal(ctx.hasClient(), true);
         assert.equal(ctx.hasActiveSession(), true);
+        assert.equal(/** @type {any} */ (ctx.getClientSnapshot())?.id, 'client-1');
+        assert.equal(ctx.getSessionSnapshot()?.sessionId, 'sess-1');
         assert.equal(ctx.hasPendingQuestion(), false);
         assert.equal(ctx.getBackgroundPendingCount(), 0);
         assert.deepEqual(ctx.getLastPrInfoSnapshot(), null);
+        assert.deepEqual(ctx.getContextStateSnapshot(), { tokens: 10, tokenLimit: 100, utilization: 0.1 });
+        assert.equal(ctx.getLastCheckpointPathSnapshot(), '/tmp/ckpt.json');
         assert.deepEqual(ctx.getBootReportSnapshot(), {
             startedAt: 1,
             completedAt: 2,
@@ -330,6 +334,52 @@ describe('AgentContext', () => {
         ctx.clearClient();
         assert.equal(ctx.session, null);
         assert.equal(ctx.client, null);
+    });
+
+    it('startKeepalive usa accessors semânticos e falha sem sessão ativa', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        /**
+         * @type {{
+         *     getSession: () => { sessionId?: string } | null;
+         *     getClient?: () => { id?: string } | null;
+         *     isIdle: () => boolean;
+         *     isDialogLoopActive: () => boolean;
+         *     onKeepalive?: (ts: number) => void;
+         * } | null}
+         */
+        let captured = null;
+        ctx.keepalive.start = /** @param {any} callbacks */ (callbacks) => {
+            captured = callbacks;
+        };
+
+        assert.equal(ctx.startKeepalive(), false);
+
+        ctx.setStatus('idle', emitter);
+        ctx.setClient(/** @type {any} */ ({ id: 'client-keepalive' }));
+        ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-keepalive' }));
+
+        const onKeepalive = () => {};
+        assert.equal(ctx.startKeepalive({ onKeepalive }), true);
+        assert.ok(captured, 'callbacks do keepalive devem ser capturados');
+        if (!captured) {
+            throw new Error('callbacks do keepalive não foram capturados');
+        }
+        const keepaliveCallbacks = /**
+         * @type {{
+         *     getSession: () => { sessionId?: string } | null;
+         *     getClient?: () => { id?: string } | null;
+         *     isIdle: () => boolean;
+         *     isDialogLoopActive: () => boolean;
+         *     onKeepalive?: (ts: number) => void;
+         * }}
+         */ (captured);
+        assert.equal(keepaliveCallbacks.getClient?.()?.id, 'client-keepalive');
+        assert.equal(keepaliveCallbacks.getSession()?.sessionId, 'sess-keepalive');
+        assert.equal(keepaliveCallbacks.isIdle(), true);
+        assert.equal(keepaliveCallbacks.isDialogLoopActive(), false);
+        assert.equal(keepaliveCallbacks.onKeepalive, onKeepalive);
     });
 
     it('resolvePendingQuestion e getBackgroundPendingLabels centralizam operações semânticas', async () => {

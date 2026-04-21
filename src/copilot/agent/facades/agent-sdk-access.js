@@ -50,7 +50,7 @@ function hasRpcNamespace(value, key) {
  * @returns {import('#copilot/sdk/types').CopilotClient | null}
  */
 function getClientRef(ctx) {
-    return ctx.client ?? ctx.ioState?.client ?? null;
+    return ctx.getClientSnapshot();
 }
 
 /**
@@ -58,7 +58,7 @@ function getClientRef(ctx) {
  * @returns {import('#copilot/sdk/types').CopilotSession | null}
  */
 function getSessionRef(ctx) {
-    return ctx.session ?? ctx.sessionState?.session ?? null;
+    return ctx.getSessionSnapshot();
 }
 
 /**

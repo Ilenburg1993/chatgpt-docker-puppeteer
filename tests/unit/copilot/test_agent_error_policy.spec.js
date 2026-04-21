@@ -71,4 +71,39 @@ describe('agent/error-policy', () => {
         }
         assert.deepEqual(observed, [{ error: 'aborted', disposition: 'ignore' }]);
     });
+
+    it('withAgentErrorPolicy propaga contexto estruturado para o resultado e para onError', async () => {
+        /** @type {import('../../../src/copilot/agent/error-policy.js').AgentErrorContext[]} */
+        const observed = [];
+
+        const result = await withAgentErrorPolicy(
+            async () => {
+                throw new Error('boom');
+            },
+            {
+                label: 'session.history.sync',
+                phase: 'resume',
+                sessionId: 'sess-1',
+                onError: (_error, _disposition, context) => {
+                    observed.push(context);
+                },
+            },
+        );
+
+        assert.equal(result.ok, false);
+        if (!result.ok) {
+            assert.deepEqual(result.context, {
+                label: 'session.history.sync',
+                phase: 'resume',
+                sessionId: 'sess-1',
+            });
+        }
+        assert.deepEqual(observed, [
+            {
+                label: 'session.history.sync',
+                phase: 'resume',
+                sessionId: 'sess-1',
+            },
+        ]);
+    });
 });

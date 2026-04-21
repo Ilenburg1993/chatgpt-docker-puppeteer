@@ -90,7 +90,7 @@ function makeEmitter() {
  */
 function makeTurnHost(overrides = {}) {
     return {
-        getPendingQuestion: vi.fn(() => null),
+        hasPendingQuestion: vi.fn(() => false),
         answerPendingQuestion: vi.fn(() => false),
         ...overrides,
     };
@@ -270,9 +270,9 @@ describe('turn-executor', () => {
 
     /* ── F65.3: dispatchTurnToHost ── */
     describe('dispatchTurnToHost', () => {
-        it('responde pergunta pendente diretamente se getPendingQuestion() truthy', () => {
+        it('responde pergunta pendente diretamente se hasPendingQuestion() truthy', () => {
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(true),
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
                 answerPendingQuestion: vi.fn(),
             };
 
@@ -294,7 +294,7 @@ describe('turn-executor', () => {
 
         it('aguarda question.pending quando não há pergunta pendente', async () => {
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(false),
+                hasPendingQuestion: vi.fn().mockReturnValue(false),
                 answerPendingQuestion: vi.fn(),
             };
 
@@ -331,14 +331,14 @@ describe('turn-executor', () => {
         it('rejeita AbortError se signal já abortado', async () => {
             const ac = new AbortController();
             ac.abort();
-            const host = { getPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
+            const host = { hasPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
             await expect(waitForRestartAndReply(emitter, host, 'msg', 5000, undefined, ac.signal)).rejects.toThrow(
                 /abortado/,
             );
         });
 
         it('timeout rejeita com DIALOG_RESTART_TIMEOUT', async () => {
-            const host = { getPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
+            const host = { hasPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
             const p = waitForRestartAndReply(emitter, host, 'msg', 2000, 'crash');
             const caught = p.catch((e) => e);
             await vi.advanceTimersByTimeAsync(2100);
@@ -348,7 +348,7 @@ describe('turn-executor', () => {
 
         it('happy path: ready → question.pending → reply resolve', async () => {
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(false),
+                hasPendingQuestion: vi.fn().mockReturnValue(false),
                 answerPendingQuestion: vi.fn(),
                 getSessionId: vi.fn(),
                 getModel: vi.fn(),
@@ -374,7 +374,7 @@ describe('turn-executor', () => {
 
         it('abort durante espera por ready cancela', async () => {
             const ac = new AbortController();
-            const host = { getPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
+            const host = { hasPendingQuestion: vi.fn(), answerPendingQuestion: vi.fn() };
 
             const p = waitForRestartAndReply(emitter, host, 'msg', 10000, undefined, ac.signal);
 
@@ -392,7 +392,7 @@ describe('turn-executor', () => {
             const ac = new AbortController();
             const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(false),
+                hasPendingQuestion: vi.fn().mockReturnValue(false),
                 answerPendingQuestion: vi.fn(),
             };
 
@@ -426,7 +426,7 @@ describe('turn-executor', () => {
             const ac = new AbortController();
             ac.abort();
             const host = {
-                getPendingQuestion: vi.fn(),
+                hasPendingQuestion: vi.fn(),
                 answerPendingQuestion: vi.fn(),
                 getSessionId: vi.fn(),
                 getModel: vi.fn(),
@@ -444,7 +444,7 @@ describe('turn-executor', () => {
 
         it('happy path: pergunta pendente → reply resolve', async () => {
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(true),
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
                 answerPendingQuestion: vi.fn(),
                 getSessionId: vi.fn().mockReturnValue('sess-1'),
                 getModel: vi.fn().mockReturnValue('gpt-4o'),
@@ -465,7 +465,7 @@ describe('turn-executor', () => {
             const ac = new AbortController();
             const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
             const host = {
-                getPendingQuestion: vi.fn().mockReturnValue(true),
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
                 answerPendingQuestion: vi.fn(),
                 getSessionId: vi.fn().mockReturnValue('sess-1'),
                 getModel: vi.fn().mockReturnValue('gpt-4o'),

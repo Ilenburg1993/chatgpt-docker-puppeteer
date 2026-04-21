@@ -147,7 +147,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 function makeHost() {
     return {
         getSessionId: vi.fn().mockReturnValue('sess-integ'),
-        getPendingQuestion: vi.fn().mockReturnValue(null),
+        hasPendingQuestion: vi.fn().mockReturnValue(false),
         answerPendingQuestion: vi.fn(),
         send: vi.fn().mockResolvedValue(undefined),
         sendMessage: vi.fn().mockResolvedValue(undefined),

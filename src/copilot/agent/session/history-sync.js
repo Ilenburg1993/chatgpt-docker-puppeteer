@@ -11,7 +11,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { toError } from '../../core/error-handlers.js';
+import { withAgentErrorPolicy } from '../error-policy.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
@@ -28,6 +28,50 @@ import { toError } from '../../core/error-handlers.js';
  */
 
 /**
+ * @typedef {{
+ *     hubSessionId: string | null;
+ *     synced: number;
+ *     skipped: number;
+ *     unavailableReason: 'hub_session_missing' | 'sdk_getMessages_unavailable' | null;
+ * }} SessionHistorySyncResult
+ */
+
+/**
+ * @param {CopilotSession} session
+ * @param {{ getHubSessionId: () => string | null; conversationStore: ConversationStoreLike }} deps
+ * @returns {Promise<SessionHistorySyncResult>}
+ */
+async function runSdkHistorySync(session, deps) {
+    const hubSessionId = deps.getHubSessionId();
+    if (!hubSessionId) {
+        return { hubSessionId: null, synced: 0, skipped: 0, unavailableReason: 'hub_session_missing' };
+    }
+
+    const sdkSession = /** @type {{ getMessages?: () => Promise<unknown[]> }} */ (session);
+    if (typeof sdkSession.getMessages !== 'function') {
+        return {
+            hubSessionId,
+            synced: 0,
+            skipped: 0,
+            unavailableReason: 'sdk_getMessages_unavailable',
+        };
+    }
+
+    const messages = await sdkSession.getMessages();
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return { hubSessionId, synced: 0, skipped: 0, unavailableReason: null };
+    }
+
+    const { synced, skipped } = deps.conversationStore.syncFromSdkHistory(
+        hubSessionId,
+        session.sessionId,
+        /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
+    );
+
+    return { hubSessionId, synced, skipped, unavailableReason: null };
+}
+
+/**
  * Sincroniza o histórico SDK → ConversationStore (SQLite) após reconexão.
  *
  * Chamado de forma assíncrona (fire-and-forget) no `start()` quando `isResumed=true` para não bloquear o startup.
@@ -36,38 +80,57 @@ import { toError } from '../../core/error-handlers.js';
  * @param {CopilotSession} session
  * @param {(event: string, payload?: unknown) => boolean} emit
  * @param {{ getHubSessionId: () => string | null; conversationStore: ConversationStoreLike }} deps
- * @returns {Promise<void>}
+ * @param {{
+ *     label?: string;
+ *     phase?: string;
+ *     taskId?: string;
+ * }} [policy]
+ * @returns {Promise<import('../error-policy.js').AgentPolicyResult<SessionHistorySyncResult>>}
  */
-export async function syncSdkHistory(session, emit, deps) {
-    try {
-        const hubSessionId = deps.getHubSessionId();
-        if (!hubSessionId) return;
-        const sdkSession = /** @type {{ getMessages?: () => Promise<unknown[]> }} */ (session);
-        if (typeof sdkSession.getMessages !== 'function') {
-            log(
-                'WARN',
-                '[AlwaysAlive] sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
-            );
-            return;
-        }
-        const messages = await sdkSession.getMessages();
-        if (!Array.isArray(messages) || messages.length === 0) return;
-        const { synced, skipped } = deps.conversationStore.syncFromSdkHistory(
-            hubSessionId,
-            session.sessionId,
-            /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
-        );
-        if (synced > 0) {
-            log(
-                'INFO',
-                `[AlwaysAlive] ${synced} turnos SDK sincronizados com o ConversationStore (${skipped} ignorados).`,
-            );
-            emit('session.history_synced', { hubSessionId, sessionId: session.sessionId, synced, skipped });
-        }
-    } catch (err) {
-        log('WARN', `[AlwaysAlive] syncSdkHistory falhou (não crítico): ${toError(err).message}`);
-        emit('session.history_synced', { ok: false, error: toError(err).message });
+export async function syncSdkHistory(session, emit, deps, policy = {}) {
+    const label = policy.label ?? 'session.history.sync';
+    const result = await withAgentErrorPolicy(() => runSdkHistorySync(session, deps), {
+        label,
+        phase: policy.phase ?? 'resume',
+        ...(policy.taskId !== undefined ? { taskId: policy.taskId } : {}),
+        sessionId: session.sessionId,
+        onError: (error, disposition, context) => {
+            log('WARN', `[AlwaysAlive] ${context.label ?? label} falhou (${disposition}): ${error.message}`);
+            emit('session.history_synced', {
+                ok: false,
+                error: error.message,
+                disposition,
+                sessionId: session.sessionId,
+            });
+        },
+    });
+
+    if (!result.ok) {
+        return result;
     }
+
+    if (result.value.unavailableReason === 'sdk_getMessages_unavailable') {
+        log(
+            'WARN',
+            '[AlwaysAlive] sdkSession.getMessages() não disponível nesta versão do SDK — histórico não sincronizado.',
+        );
+        return result;
+    }
+
+    if (result.value.synced > 0 && result.value.hubSessionId) {
+        log(
+            'INFO',
+            `[AlwaysAlive] ${result.value.synced} turnos SDK sincronizados com o ConversationStore (${result.value.skipped} ignorados).`,
+        );
+        emit('session.history_synced', {
+            hubSessionId: result.value.hubSessionId,
+            sessionId: session.sessionId,
+            synced: result.value.synced,
+            skipped: result.value.skipped,
+        });
+    }
+
+    return result;
 }
 
 /**

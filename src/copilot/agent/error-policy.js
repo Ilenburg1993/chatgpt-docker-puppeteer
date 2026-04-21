@@ -15,12 +15,26 @@ import { isFatalError, toError } from '#copilot/core';
 /** @template T @typedef {T | Promise<T>} Awaitable */
 
 /**
+ * @typedef {{
+ *     label?: string;
+ *     phase?: string;
+ *     taskId?: string;
+ *     sessionId?: string;
+ * }} AgentErrorContext
+ */
+
+/**
  * @template T
  * @typedef {{ ok: true; value: T }} AgentPolicySuccess
  */
 
 /**
- * @typedef {{ ok: false; error: Error; disposition: AgentErrorDisposition }} AgentPolicyFailure
+ * @typedef {{
+ *     ok: false;
+ *     error: Error;
+ *     disposition: AgentErrorDisposition;
+ *     context: AgentErrorContext;
+ * }} AgentPolicyFailure
  */
 
 /**
@@ -76,18 +90,29 @@ export function shouldRetryAgentError(error) {
  * @param {() => Awaitable<T>} fn
  * @param {{
  *     classify?: (error: unknown) => AgentErrorDisposition;
- *     onError?: (error: Error, disposition: AgentErrorDisposition) => void | Promise<void>;
+ *     onError?: (error: Error, disposition: AgentErrorDisposition, context: AgentErrorContext) => void | Promise<void>;
+ *     label?: string;
+ *     phase?: string;
+ *     taskId?: string;
+ *     sessionId?: string;
  * }} [opts]
  * @returns {Promise<AgentPolicyResult<T>>}
  */
 export async function withAgentErrorPolicy(fn, opts = {}) {
     const classify = opts.classify ?? classifyAgentError;
+    /** @type {AgentErrorContext} */
+    const context = {
+        ...(opts.label !== undefined ? { label: opts.label } : {}),
+        ...(opts.phase !== undefined ? { phase: opts.phase } : {}),
+        ...(opts.taskId !== undefined ? { taskId: opts.taskId } : {}),
+        ...(opts.sessionId !== undefined ? { sessionId: opts.sessionId } : {}),
+    };
     try {
         return { ok: true, value: await Promise.resolve(fn()) };
     } catch (error) {
         const normalized = toError(error);
         const disposition = classify(normalized);
-        await opts.onError?.(normalized, disposition);
-        return { ok: false, error: normalized, disposition };
+        await opts.onError?.(normalized, disposition, context);
+        return { ok: false, error: normalized, disposition, context };
     }
 }

@@ -35,7 +35,7 @@ import { persistStateWithPolicy } from '../lifecycle/state-io.js';
  * Subconjunto do host necessário pelos executores de turno.
  *
  * @typedef {{
- *     getPendingQuestion: () => unknown;
+ *     hasPendingQuestion: () => boolean;
  *     answerPendingQuestion: (message: string) => boolean;
  *     getSessionId?: () => string | null;
  *     getModel?: () => string;
@@ -253,7 +253,7 @@ export function dispatchTurnToHost(emitter, opts) {
         waitForRestartAndReplyFn,
     } = opts;
 
-    if (host.getPendingQuestion()) {
+    if (host.hasPendingQuestion()) {
         host.answerPendingQuestion(message);
     } else {
         const onPending = () => {
@@ -313,7 +313,7 @@ export function dispatchTurnToHost(emitter, opts) {
         };
         pendingListenerRef.current = onPending;
         emitter.once(EMITTER_QUESTION_PENDING, onPending);
-        if (host.getPendingQuestion()) {
+        if (host.hasPendingQuestion()) {
             emitter.off(EMITTER_QUESTION_PENDING, onPending);
             pendingListenerRef.current = null;
             onPending();
@@ -406,7 +406,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
                 emitter.once(EMITTER_LOOP_REPLY, onRetryReply);
                 emitter.once(EMITTER_LOOP_STOPPED, onRetryStopped);
             };
-            if (host.getPendingQuestion()) {
+            if (host.hasPendingQuestion()) {
                 onRetryPending();
             } else {
                 emitter.once(EMITTER_QUESTION_PENDING, onRetryPending);
