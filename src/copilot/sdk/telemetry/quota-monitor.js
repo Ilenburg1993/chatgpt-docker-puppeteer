@@ -129,7 +129,7 @@ export function createQuotaMonitor(opts) {
             if (
                 typeof _timer === 'object' &&
                 _timer !== null &&
-                typeof /** @type {{ unref?: () => void }} */ (_timer).unref === 'function'
+                typeof (/** @type {{ unref?: () => void }} */ (_timer).unref) === 'function'
             ) {
                 /** @type {{ unref: () => void }} */ (_timer).unref();
             }

@@ -51,8 +51,8 @@ o terminal deve **observar e ampliar** esse comportamento, não recriá-lo local
 
 ## Acesso ao runtime
 
-O terminal ainda tem módulos que operam diretamente sobre a façade pública do agent, mas a direção arquitetural
-canônica agora é:
+O terminal ainda tem módulos que operam diretamente sobre a façade pública do agent, mas a direção
+arquitetural canônica agora é:
 
 ```text
 agent/
@@ -61,19 +61,37 @@ agent/
 			-> terminal/dialog/ e comandos
 ```
 
-Ou seja: sempre que o acesso ao runtime puder ser compartilhado com outras bordas, ele deve preferir passar por
-`presentation/agent-runtime.js`.
+Ou seja: sempre que o acesso ao runtime puder ser compartilhado com outras bordas, ele deve preferir
+passar por `presentation/agent-runtime.js`.
+
+## Critério prático: o que permanece no terminal
+
+Continua no `terminal/` quando for:
+
+- prompt/render/waiting UX;
+- parsing de comandos do REPL;
+- narrativa operacional local;
+- detalhes exclusivamente humanos da interação.
+
+Deve sair do `terminal/` quando virar:
+
+- projection compartilhada com `server/`;
+- parsing compartilhado de `runtimeId`;
+- capability pública de runtime ou façade de borda reutilizável.
 
 ## Estado atual relevante
 
 - `/plan` usa somente `mode.get/set` e `plan.read/update/delete` do SDK;
 - o prompt dinâmico mostra `MODE:<SDK>` quando a sessão está fora de `interactive`;
-- `state.js` não guarda mais um “plan mode local” paralelo — apenas a última projeção observada do SDK;
+- `state.js` não guarda mais um “plan mode local” paralelo — apenas a última projeção observada do
+  SDK;
 - `sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
 - `agent-runtime-events.js` reflete sinais já normalizados pelo runtime/agent ao operador;
 - `task-stream-events.js` concentra a narrativa do streaming de tarefas internas do runtime;
-- `agent-sse-fallback.js` explicita o fallback de broadcast SSE para eventos do agent ainda não tratados;
-- `repl-listeners.js` agora orquestra essas duas fronteiras em vez de acumular toda a semântica sozinho.
+- `agent-sse-fallback.js` explicita o fallback de broadcast SSE para eventos do agent ainda não
+  tratados;
+- `repl-listeners.js` agora orquestra essas duas fronteiras em vez de acumular toda a semântica
+  sozinho.
 
 ## Regras de importação
 

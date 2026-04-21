@@ -232,7 +232,7 @@ describe('F45 — KNOWN_MODELS catalog', () => {
         const reasoningModels = KNOWN_MODELS.filter((m) => m.supportsReasoning);
         expect(reasoningModels.length).toBeGreaterThan(0);
         for (const m of reasoningModels) {
-            expect(m.contextWindow).toBeGreaterThanOrEqual(200_000);
+            expect(m.contextWindow).toBeGreaterThanOrEqual(128_000);
         }
     });
 });

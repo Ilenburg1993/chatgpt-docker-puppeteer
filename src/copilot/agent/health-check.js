@@ -61,32 +61,70 @@ function selectRecommendedAction(state) {
 export function getAgentHealthSnapshot(ctx, host) {
     const snap = host.getStatusSnapshot();
 
+    const dialogLoop = ctx.dialogLoop ?? {};
+    const dialogState = ctx.dialogState ?? {};
+    const runtimeState = ctx.runtimeState ?? {};
+
+    const pendingQuestion = dialogState.pendingQuestion ?? null;
+    const pendingQuestionShadow = dialogState.pendingQuestionShadow ?? null;
+
+    const hasPendingQuestion =
+        typeof ctx.hasPendingQuestion === 'function' ? ctx.hasPendingQuestion() : pendingQuestion !== null;
+    const pendingQuestionKind =
+        typeof ctx.getPendingQuestionKind === 'function'
+            ? ctx.getPendingQuestionKind()
+            : (pendingQuestion?.kind ?? null);
+    const hasPendingQuestionShadow =
+        typeof ctx.hasPendingQuestionShadow === 'function'
+            ? ctx.hasPendingQuestionShadow()
+            : pendingQuestionShadow !== null;
+    const pendingQuestionShadowKind =
+        typeof ctx.getPendingQuestionShadowKind === 'function'
+            ? ctx.getPendingQuestionShadowKind()
+            : (pendingQuestionShadow?.meta?.kind ?? null);
+    const pendingQuestionShadowState =
+        typeof ctx.getPendingQuestionShadowState === 'function' ? ctx.getPendingQuestionShadowState() : null;
+    const pendingQuestionShadowExpired =
+        typeof ctx.isPendingQuestionShadowExpired === 'function' ? ctx.isPendingQuestionShadowExpired() : false;
+    const pendingQuestionShadowAgeMs =
+        typeof ctx.getPendingQuestionShadowAgeMs === 'function' ? ctx.getPendingQuestionShadowAgeMs() : null;
+    const pendingQuestionShadowExpiresAt =
+        typeof ctx.getPendingQuestionShadowExpiresAt === 'function' ? ctx.getPendingQuestionShadowExpiresAt() : null;
+    const pendingQuestionShadowRemainingMs =
+        typeof ctx.getPendingQuestionShadowRemainingMs === 'function'
+            ? ctx.getPendingQuestionShadowRemainingMs()
+            : null;
+    const backgroundPendingLabels =
+        typeof ctx.getBackgroundPendingLabels === 'function'
+            ? ctx.getBackgroundPendingLabels(5)
+            : typeof ctx.backgroundTasks?.getPendingLabels === 'function'
+              ? ctx.backgroundTasks.getPendingLabels(5)
+              : [];
+    const bootReport =
+        typeof ctx.getBootReportSnapshot === 'function'
+            ? ctx.getBootReportSnapshot()
+            : (runtimeState.lastBootReport ?? null);
+
     const runtimeOperational =
         snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
 
     const clientAvailable = ctx.hasClient();
     const sessionActive = ctx.hasActiveSession() && Boolean(snap.sessionId);
-    const dialogActive = ctx.dialogLoop.active;
-    const dialogAttached = ctx.dialogLoopAttached;
+    const dialogActive = Boolean(dialogLoop.active);
+    const dialogAttached =
+        typeof ctx.dialogLoopAttached === 'boolean'
+            ? ctx.dialogLoopAttached
+            : typeof dialogState.dialogLoopAttached === 'boolean'
+              ? dialogState.dialogLoopAttached
+              : false;
     const dialogOk = !dialogActive || dialogAttached;
     const queueOk = !snap.starvationAlert;
-    const hasPendingQuestion = ctx.hasPendingQuestion();
-    const pendingQuestionKind = ctx.getPendingQuestionKind();
-    const hasPendingQuestionShadow = ctx.hasPendingQuestionShadow();
-    const pendingQuestionShadowKind = ctx.getPendingQuestionShadowKind();
-    const pendingQuestionShadowState = ctx.getPendingQuestionShadowState();
-    const pendingQuestionShadowExpired = ctx.isPendingQuestionShadowExpired();
-    const pendingQuestionShadowAgeMs = ctx.getPendingQuestionShadowAgeMs();
-    const pendingQuestionShadowExpiresAt = ctx.getPendingQuestionShadowExpiresAt();
-    const pendingQuestionShadowRemainingMs = ctx.getPendingQuestionShadowRemainingMs();
     const waitingForInput = snap.status === 'waiting_for_input';
     const ioOk = !hasPendingQuestion || waitingForInput || dialogActive;
     const keepaliveRunning = ctx.keepalive.running;
     const keepaliveOk = !sessionActive || keepaliveRunning;
     const backgroundPendingCount = ctx.getBackgroundPendingCount();
-    const backgroundPendingLabels = ctx.getBackgroundPendingLabels(5);
     const backgroundOk = backgroundPendingCount < BACKGROUND_PENDING_WARN_THRESHOLD;
-    const bootReport = ctx.getBootReportSnapshot();
     const failedBootSteps = bootReport?.failedCount ?? 0;
     const degradedBootSteps = bootReport?.degradedCount ?? 0;
     const bootOk = bootReport === null || bootReport.ok;
@@ -163,6 +201,7 @@ export function getAgentHealthSnapshot(ctx, host) {
         !dialogOk ||
         !queueOk ||
         !ioOk ||
+        hasPendingQuestionShadow ||
         !keepaliveOk ||
         !backgroundOk ||
         !bootOk ||

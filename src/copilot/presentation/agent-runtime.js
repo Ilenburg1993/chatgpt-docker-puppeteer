@@ -15,6 +15,7 @@ import {
     listAgentRuntimes,
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
 } from '#copilot/agent';
+import { normalizeRuntimeId } from './runtime-targeting.js';
 
 /**
  * @typedef {import('../agent/always-alive.js').AlwaysAliveAgent} AgentRuntime
@@ -39,16 +40,66 @@ export function getDefaultAgentRuntimeId() {
 }
 
 /**
+ * Resolve o `runtimeId` explícito ou cai para o default atual.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {string}
+ */
+export function resolveAgentRuntimeId(runtimeId) {
+    return normalizeRuntimeId(runtimeId) ?? readDefaultAgentRuntimeId();
+}
+
+/**
  * Retorna um runtime específico quando registrado, ou o runtime default quando nenhum id é informado.
  *
  * @param {string | null | undefined} [runtimeId]
  * @returns {AgentRuntime | null}
  */
 export function getAgentRuntime(runtimeId) {
-    if (!runtimeId || runtimeId === readDefaultAgentRuntimeId()) {
+    const resolvedRuntimeId = normalizeRuntimeId(runtimeId);
+    if (!resolvedRuntimeId || resolvedRuntimeId === readDefaultAgentRuntimeId()) {
         return getDefaultAgentRuntime();
     }
-    return getRegisteredAgentRuntime(runtimeId);
+    return getRegisteredAgentRuntime(resolvedRuntimeId);
+}
+
+/**
+ * Retorna um runtime específico quando registrado ou o runtime default quando o id não existir/for omitido.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {AgentRuntime}
+ */
+export function getAgentRuntimeOrDefault(runtimeId) {
+    return getAgentRuntime(runtimeId) ?? getDefaultAgentRuntime();
+}
+
+/**
+ * Resolve a seleção efetiva do runtime, tornando explícito quando um `runtimeId` pedido caiu em fallback.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     requestedRuntimeId: string | null;
+ *     runtimeId: string;
+ *     runtime: AgentRuntime;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ *     defaultRuntimeId: string;
+ * }}
+ */
+export function resolveAgentRuntimeSelection(runtimeId) {
+    const defaultRuntimeId = readDefaultAgentRuntimeId();
+    const requestedRuntimeId = normalizeRuntimeId(runtimeId);
+    const explicitRuntime = requestedRuntimeId ? getRegisteredAgentRuntime(requestedRuntimeId) : null;
+    const runtimeFound = requestedRuntimeId ? explicitRuntime !== null : true;
+    const usedDefaultRuntimeFallback = requestedRuntimeId !== null && explicitRuntime === null;
+    return {
+        requestedRuntimeId,
+        runtimeId: runtimeFound ? (requestedRuntimeId ?? defaultRuntimeId) : defaultRuntimeId,
+        runtime: explicitRuntime ?? getDefaultAgentRuntime(),
+        runtimeFound,
+        usedDefaultRuntimeFallback,
+        defaultRuntimeId,
+    };
 }
 
 /**
@@ -59,8 +110,9 @@ export function getAgentRuntime(runtimeId) {
  */
 export function requireAgentRuntime(runtimeId) {
     const runtime = getAgentRuntime(runtimeId);
+    const resolvedRuntimeId = resolveAgentRuntimeId(runtimeId);
     if (!runtime) {
-        throw new Error(`AGENT_RUNTIME_NOT_FOUND:${runtimeId ?? readDefaultAgentRuntimeId()}`);
+        throw new Error(`AGENT_RUNTIME_NOT_FOUND:${resolvedRuntimeId}`);
     }
     return runtime;
 }

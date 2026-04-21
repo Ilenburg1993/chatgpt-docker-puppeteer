@@ -7,7 +7,7 @@
  * runSessionLifecycle
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),

@@ -1,7 +1,7 @@
 # SDK Defaults — System Prompt Sections
 
-**Status**: referência canônica das seções definidas pelo `@github/copilot-sdk`.
-**Última atualização**: 2026-04-14.
+**Status**: referência canônica das seções definidas pelo `@github/copilot-sdk`. **Última
+atualização**: 2026-04-14.
 
 ## Seções do SDK (`SYSTEM_PROMPT_SECTIONS`)
 
@@ -61,6 +61,7 @@ No modo `replace`, substituímos inteiramente o system prompt do SDK com nossas 
 - **Adaptações para o projeto** — pt-BR, hooks protocol, ESM, segurança customizada
 
 O capture.js existe para:
+
 1. **Auditoria periódica** — comparar nossos conteúdos com o que o SDK geraria
 2. **Detecção de drift** — se o SDK adicionar/alterar seções em updates
 3. **Referência** — documentar o baseline que estamos substituindo

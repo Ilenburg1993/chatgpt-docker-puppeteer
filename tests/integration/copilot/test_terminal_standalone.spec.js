@@ -22,8 +22,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { getMcpStatus } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '#copilot/config/pinned-files';
+import { getMcpStatus } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 import { getToolStats, recordToolCall } from '../../../src/copilot/observability/tool-stats.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

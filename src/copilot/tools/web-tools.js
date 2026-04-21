@@ -11,7 +11,7 @@
  */
 
 import { WEB_SEARCH_DISABLED } from '#copilot/config';
-import { toError, logSwallowed, validateUrl } from '#copilot/core';
+import { logSwallowed, toError, validateUrl } from '#copilot/core';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
@@ -172,7 +172,8 @@ const webFetchTool = buildTool({
                 content: text,
             };
         } catch (e) {
-            const msg = toError(e).name === 'AbortError' ? `Timeout após ${timeout}ms` : (toError(e).message ?? String(e));
+            const msg =
+                toError(e).name === 'AbortError' ? `Timeout após ${timeout}ms` : (toError(e).message ?? String(e));
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
             return { success: false, error: msg };
         }

@@ -438,13 +438,14 @@ describe('F44 — WebhookManager', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F44 — wireModeAndToolEvents', () => {
-    it('retorna array com 1 unsubscribe function', async () => {
+    it('retorna array com 2 unsubscribe functions', async () => {
         const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireModeAndToolEvents(/** @type {any} */ (session), { emit });
-        expect(unsubs).toHaveLength(1);
+        expect(unsubs).toHaveLength(2);
         expect(typeof unsubs[0]).toBe('function');
+        expect(typeof unsubs[1]).toBe('function');
     });
 
     it('emite session.mode_changed com previousMode/newMode', async () => {

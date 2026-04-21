@@ -7,7 +7,7 @@
  * createFile), sessionLog, createSessionRpcFacade
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
@@ -15,7 +15,10 @@ const { mockLog } = vi.hoisted(() => ({
 
 // ─── Mock: logger ──────────────────────────────────────────────────────────
 vi.mock('#copilot/observability/logger', () => ({
-    log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 // ─── Mock: SDK (necessário pelo barrel) ────────────────────────────────────
 vi.mock('@github/copilot-sdk', () => ({

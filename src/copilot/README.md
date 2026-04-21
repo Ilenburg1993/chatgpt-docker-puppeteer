@@ -4,8 +4,8 @@ Hub arquitetural do runtime Copilot local.
 
 Este diretório tem uma regra simples:
 
-> sempre que existir um conceito análogo no `@github/copilot-sdk`, o código local deve **partir do SDK vanilla** e só
-> depois ampliar ergonomia, UX ou governança.
+> sempre que existir um conceito análogo no `@github/copilot-sdk`, o código local deve **partir do
+> SDK vanilla** e só depois ampliar ergonomia, UX ou governança.
 
 ## Fluxo canônico de ponta a ponta
 
@@ -41,6 +41,27 @@ SDK/agent events
 | `config/`           | defaults, builders e configuração declarativa                                            |
 | `core/`             | erros, constantes, contratos centrais e utilitários base                                 |
 
+## Critério rápido de responsabilidade por camada
+
+| Se a responsabilidade é…                                           | Camada preferencial |
+| ------------------------------------------------------------------ | ------------------- |
+| contrato vanilla do SDK                                            | `sdk/`              |
+| tradução de `SessionEvent` cru                                     | `event-handlers/`   |
+| source-of-truth do runtime contínuo                                | `agent/`            |
+| façade pública estratégica do runtime / SDK                        | `agent/facades/`    |
+| payload/shared handler compartilhado entre `server/` e `terminal/` | `presentation/`     |
+| seleção compartilhada de `runtimeId`                               | `presentation/`     |
+| REPL, prompt, render, waiting UX                                   | `terminal/`         |
+| logging, métricas, tracing, timelines                              | `observability/`    |
+
+Em resumo:
+
+- `agent/` governa o runtime;
+- `presentation/` governa o acesso compartilhado das bordas ao runtime;
+- `terminal/` governa a UX local;
+- `server/` governa protocolo HTTP;
+- `sdk/` continua sendo a SSOT do vanilla.
+
 ## Perguntas rápidas de arquitetura
 
 ### “Quero consumir `mode/plan`, sessions, agents ou outras capabilities vanilla do SDK”
@@ -57,10 +78,12 @@ SDK/agent events
 
 ### “Quero melhorar a UX do terminal”
 
-- se a verdade do runtime puder ser compartilhada com outras bordas, comece em `presentation/agent-runtime.js`
+- se a verdade do runtime puder ser compartilhada com outras bordas, comece em
+  `presentation/agent-runtime.js`
 - se for consumo de runtime: `terminal/frontend/`
 - se for render/prompt/SSE: `terminal/dialog/`
-- se for reação visível a eventos do runtime: `terminal/repl-listeners.js` e `terminal/sdk-session-events.js`
+- se for reação visível a eventos do runtime: `terminal/repl-listeners.js` e
+  `terminal/sdk-session-events.js`
 
 ### “Quero saber por que um evento aparece no terminal”
 
@@ -85,6 +108,7 @@ sdk/generated/session-events.d.ts
 
 ## Anti-drift
 
-- não recriar `plan mode`, `usage`, `streaming`, `mode`, `plan.md`, `ask_user` ou qualquer conceito já existente no SDK
-  como semântica paralela;
-- quando o runtime ampliar algo, deixar explícito **qual é a base vanilla** e **qual é o valor agregado local**.
+- não recriar `plan mode`, `usage`, `streaming`, `mode`, `plan.md`, `ask_user` ou qualquer conceito
+  já existente no SDK como semântica paralela;
+- quando o runtime ampliar algo, deixar explícito **qual é a base vanilla** e **qual é o valor
+  agregado local**.

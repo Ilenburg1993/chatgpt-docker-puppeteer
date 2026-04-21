@@ -12,20 +12,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-const mockLog = vi.fn();
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
-
-vi.mock('#copilot/core/error-handlers', () => ({
+const mocks = vi.hoisted(() => ({
+    mockLog: vi.fn(),
     logSwallowed: vi.fn(),
+    toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
+    withSkipPermission: vi.fn((tool) => Object.assign(tool, { skipPermission: true })),
 }));
 
-/** @type {{
- *  readFile: import('vitest').Mock;
- *  writeFile: import('vitest').Mock;
- *  mkdir: import('vitest').Mock;
- *  stat: import('vitest').Mock;
- *  readdir: import('vitest').Mock;
- * }} */
+vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+    log: mocks.mockLog,
+}));
+
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        logSwallowed: mocks.logSwallowed,
+        toError: mocks.toError,
+    };
+});
+
+/**
+ * @type {{
+ *     readFile: import('vitest').Mock;
+ *     writeFile: import('vitest').Mock;
+ *     mkdir: import('vitest').Mock;
+ *     stat: import('vitest').Mock;
+ *     readdir: import('vitest').Mock;
+ * }}
+ */
 const fsMock = {
     readFile: vi.fn(),
     writeFile: vi.fn(),
@@ -42,11 +57,13 @@ vi.mock('node:child_process', () => ({
 
 // createTool: passthrough para obter handler
 vi.mock('#copilot/sdk', () => ({
-    createTool: vi.fn((config) => config), SYSTEM_PROMPT_SECTIONS: {},}));
+    createTool: vi.fn((config) => config),
+    SYSTEM_PROMPT_SECTIONS: {},
+}));
 
 // withSkipPermission: passthrough
 vi.mock('#copilot/tools/tool-factory', () => ({
-    withSkipPermission: vi.fn((tool) => Object.assign(tool, { skipPermission: true })),
+    withSkipPermission: mocks.withSkipPermission,
 }));
 
 // ─── Import após mocks ──────────────────────────────────────────────────────
@@ -157,7 +174,7 @@ describe('F36 — write_pending_task (F191-F192)', () => {
 
         await callTool(handler, { title: 'Logged task' });
 
-        expect(mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_pending_task'));
+        expect(mocks.mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_pending_task'));
     });
 });
 
@@ -227,7 +244,7 @@ describe('F36 — set_session_context (F194)', () => {
     it('loga a operação', async () => {
         await callTool(handler, { key: 'log_test', value: 'x' });
 
-        expect(mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('set_session_context'));
+        expect(mocks.mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('set_session_context'));
     });
 });
 

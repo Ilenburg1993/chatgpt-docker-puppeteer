@@ -10,10 +10,13 @@ import {
 } from '../../../src/copilot/agent/runtime-registry.js';
 import {
     getAgentRuntime,
+    getAgentRuntimeOrDefault,
     getDefaultAgentRuntime,
     getDefaultAgentRuntimeId,
     listKnownAgentRuntimes,
     requireAgentRuntime,
+    resolveAgentRuntimeId,
+    resolveAgentRuntimeSelection,
 } from '../../../src/copilot/presentation/agent-runtime.js';
 
 describe('presentation/agent-runtime', () => {
@@ -27,6 +30,11 @@ describe('presentation/agent-runtime', () => {
 
         expect(runtime).toBe(getAgent());
         expect(getAgentRuntime()).toBe(runtime);
+        expect(getAgentRuntimeOrDefault()).toBe(runtime);
+        expect(resolveAgentRuntimeId()).toBe('default');
+        expect(resolveAgentRuntimeSelection()).toEqual(
+            expect.objectContaining({ requestedRuntimeId: null, runtimeId: 'default', runtimeFound: true }),
+        );
         expect(getDefaultAgentRuntimeId()).toBe('default');
     });
 
@@ -41,6 +49,17 @@ describe('presentation/agent-runtime', () => {
 
         expect(getDefaultAgentRuntime()).toBe(auditRuntime);
         expect(getAgentRuntime('audit')).toBe(auditRuntime);
+        expect(getAgentRuntimeOrDefault('audit')).toBe(auditRuntime);
+        expect(getAgentRuntimeOrDefault('missing')).toBe(auditRuntime);
+        expect(resolveAgentRuntimeId('  audit  ')).toBe('audit');
+        expect(resolveAgentRuntimeSelection('missing')).toEqual(
+            expect.objectContaining({
+                requestedRuntimeId: 'missing',
+                runtimeId: 'audit',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+            }),
+        );
         expect(requireAgentRuntime('audit')).toBe(auditRuntime);
         expect(listKnownAgentRuntimes()).toEqual([
             {

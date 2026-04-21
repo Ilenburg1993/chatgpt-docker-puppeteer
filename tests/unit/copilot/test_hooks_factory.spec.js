@@ -48,14 +48,16 @@ const errorInput = (overrides = {}) => ({
  * @param {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput} input
  * @param {{ sessionId: string }} [invocation]
  */
-const callPreTool = async (hooks, input, invocation = makeInvocation()) => /** @type {any} */ (await hooks.onPreToolUse?.(input, invocation));
+const callPreTool = async (hooks, input, invocation = makeInvocation()) =>
+    /** @type {any} */ (await hooks.onPreToolUse?.(input, invocation));
 
 /**
  * @param {ReturnType<typeof createHooks>} hooks
  * @param {import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput} input
  * @param {{ sessionId: string }} [invocation]
  */
-const callErrorHook = async (hooks, input, invocation = makeInvocation()) => /** @type {any} */ (await hooks.onErrorOccurred?.(input, invocation));
+const callErrorHook = async (hooks, input, invocation = makeInvocation()) =>
+    /** @type {any} */ (await hooks.onErrorOccurred?.(input, invocation));
 
 // ─── createHooks ──────────────────────────────────────────────────────────────
 
@@ -200,7 +202,7 @@ describe('hooks/factory › onErrorOccurred', () => {
         const hooks = createHooks();
         const result = await callErrorHook(hooks, errorInput({ error: 'rate_limit', errorContext: 'model_call' }));
         expect(result.errorHandling).toBe('retry');
-        expect(result.retryCount).toBe(3);
+        expect(result.retryCount).toBe(1);
     });
 
     it('retorna skip para tool_execution recuperável', async () => {
@@ -211,7 +213,10 @@ describe('hooks/factory › onErrorOccurred', () => {
 
     it('retorna abort para erro não-recuperável', async () => {
         const hooks = createHooks();
-        const result = await callErrorHook(hooks, errorInput({ error: 'fatal', errorContext: 'system', recoverable: false }));
+        const result = await callErrorHook(
+            hooks,
+            errorInput({ error: 'fatal', errorContext: 'system', recoverable: false }),
+        );
         expect(result.errorHandling).toBe('abort');
     });
 });
@@ -298,6 +303,6 @@ describe('hooks/factory › createErrorNotifierHook', () => {
         const cb = vi.fn();
         const hook = createErrorNotifierHook(cb);
         await hook(errorInput({ error: 'x', errorContext: 'system', recoverable: false }), /** @type {any} */ ({}));
-        expect(cb).toHaveBeenCalledWith('x', 'y', false, '');
+        expect(cb).toHaveBeenCalledWith('x', 'system', false, '');
     });
 });

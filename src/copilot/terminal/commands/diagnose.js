@@ -19,6 +19,7 @@
  */
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
  * @typedef {object} DiagnoseContext
@@ -42,10 +43,12 @@ const C = {
  * Exibe diagnóstico completo do terminal LLM-B.
  *
  * @param {DiagnoseContext} ctx
+ * @param {string} [arg]
  * @returns {Promise<void>}
  */
-export async function cmdDiagnose({ hubSessionId, println }) {
-    const configProjection = readTerminalConfigProjection();
+export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
         snap,
         health,
@@ -60,7 +63,7 @@ export async function cmdDiagnose({ hubSessionId, println }) {
         topToolStats,
         activity,
         display,
-    } = await readTerminalDiagnoseProjection({ hubSessionId: hubSessionId ?? null });
+    } = await readTerminalDiagnoseProjection(withRuntimeTarget({ hubSessionId: hubSessionId ?? null }, runtimeId));
 
     const agentStatusColor =
         snap['status'] === 'waiting_for_input' ? C.green : snap['status'] === 'idle' ? C.yellow : C.red;
@@ -120,6 +123,15 @@ export async function cmdDiagnose({ hubSessionId, println }) {
     const planOpLine = configProjection.sdkPlanOperation
         ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${new Date(configProjection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}${C.reset}` : ''}`
         : `${C.grey}(sem alteração)${C.reset}`;
+    const runtimesLine =
+        Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0
+            ? configProjection.agentRuntimes
+                  .map((runtime) => {
+                      const marker = runtime.isDefault ? '*' : '-';
+                      return `${marker}${runtime.runtimeId}:${runtime.model}/${runtime.status}`;
+                  })
+                  .join('  •  ')
+            : '(nenhum runtime registrado)';
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -133,6 +145,8 @@ ${C.cyan}  AGENTE${C.reset}
     reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
     modo sdk      ${sdkModeLine}
     plan arquivo  ${planOpLine}
+    runtime id    ${C.grey}${configProjection.runtimeId}${C.reset}
+    runtimes      ${C.grey}${runtimesLine}${C.reset}
     runtime       ${runtimeSessionId ? `${C.grey}${runtimeSessionId}${C.reset}` : `${C.grey}(sem runtime)${C.reset}`}
     sdk session   ${binding.sdkSessionId ? `${C.grey}${binding.sdkSessionId}${C.reset}` : `${C.grey}(sem sdk)${C.reset}`}
     hub session   ${hub.activeHubSessionId ? `${C.grey}${hub.activeHubSessionId}${C.reset}` : `${C.grey}(sem hub)${C.reset}`}
@@ -161,4 +175,10 @@ ${C.cyan}  TOOL STATS — MAIOR LATÊNCIA (top-5)${C.reset}
 ${statsLines}
 ${C.bold}${C.cyan}╚══════════════════════════════════════════════════════════════╝${C.reset}
 `);
+
+    if (configProjection.usedDefaultRuntimeFallback) {
+        println(
+            `${C.yellow}  Nota: runtime solicitado ${configProjection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
+        );
+    }
 }

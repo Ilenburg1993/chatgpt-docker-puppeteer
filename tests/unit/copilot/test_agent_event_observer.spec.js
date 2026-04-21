@@ -6,9 +6,10 @@
  * task.started, task.delta, task.reasoning, dialog turns e demais eventos.
  */
 
+import { AGENT_TASK_ERROR } from '#copilot/events';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { describe, it, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { createAgentEventObserver } from '../../../src/copilot/observability/agent-event-observer.js';
 
@@ -135,7 +136,7 @@ describe('agent-event-observer — F29.3: task metrics via events', () => {
 
         assert.strictEqual(errors.length, 1, 'deve ter 1 erro no tracker');
         assert.strictEqual(errors[0].err, testErr, 'erro propagado deve ser o mesmo');
-        assert.strictEqual(errors[0].ctx.source, 'agent:task.error');
+        assert.strictEqual(errors[0].ctx.source, AGENT_TASK_ERROR);
     });
 
     // ── task.queued ──────────────────────────────────────────────────────────

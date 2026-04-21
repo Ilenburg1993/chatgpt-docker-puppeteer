@@ -30,7 +30,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import * as url from 'node:url';
-import { describe, it, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 import { getCopilotDb } from '../../../src/copilot/db/sqlite.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

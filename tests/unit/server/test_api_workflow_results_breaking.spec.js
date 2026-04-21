@@ -3,7 +3,7 @@ import express from 'express';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, before, after, beforeEach } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
 import request from 'supertest';
 

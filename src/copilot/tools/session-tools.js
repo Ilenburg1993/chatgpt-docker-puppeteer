@@ -10,7 +10,7 @@
  * @see module:copilot/always-alive
  */
 
-import { toError, logSwallowed } from '#copilot/core';
+import { logSwallowed, toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';

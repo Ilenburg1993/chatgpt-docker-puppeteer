@@ -26,6 +26,7 @@ import {
     readTerminalStatusProjection,
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
@@ -41,15 +42,22 @@ import {
  * Exibe snapshot de status do agente.
  *
  * @param {SessionContext} ctx
+ * @param {string} [arg]
  * @returns {void}
  */
-export function cmdStatus({ hubSessionId, injectPort, println }) {
-    const configProjection = readTerminalConfigProjection();
+export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const activityProjection = readTerminalActivityProjection(3);
-    const projection = readTerminalStatusProjection({
-        hubSessionId: hubSessionId ?? null,
-        ...(typeof injectPort === 'number' ? { injectPort } : {}),
-    });
+    const projection = readTerminalStatusProjection(
+        withRuntimeTarget(
+            {
+                hubSessionId: hubSessionId ?? null,
+                ...(typeof injectPort === 'number' ? { injectPort } : {}),
+            },
+            runtimeId,
+        ),
+    );
     const { snap, health } = projection;
     const active = projection.dialogLoopActive;
     const statusColor =
@@ -93,6 +101,15 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
     const activity = projection.activity;
     const modelMeta = configProjection.modelMeta;
     const display = readTerminalDisplayProjection();
+    const runtimeTopology =
+        Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0
+            ? configProjection.agentRuntimes
+                  .map((runtime) => {
+                      const marker = runtime.isDefault ? '*' : '-';
+                      return `${marker}${runtime.runtimeId}:${runtime.model}/${runtime.status}`;
+                  })
+                  .join('  •  ')
+            : '(nenhum runtime registrado)';
     const activitySeverityColor =
         activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
@@ -111,6 +128,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
         issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
         ação sugerida    ${projection.recommendedAction ?? 'none'}
     runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
+    runtime id       \x1b[90m${projection.runtimeId}\x1b[0m
+    runtimes         \x1b[90m${runtimeTopology}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos (memória) ${projection.turnCount}
@@ -164,6 +183,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }) {
     if (projection.sdkSessionMode === 'plan') {
         println(
             '  \x1b[90mNota: a sessão SDK está em plan mode vanilla; use /plan off para voltar a interactive.\x1b[0m',
+        );
+    }
+    if (projection.usedDefaultRuntimeFallback) {
+        println(
+            `  \x1b[33mNota: runtime solicitado ${projection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; usando runtime default (${projection.runtimeId}).\x1b[0m`,
         );
     }
 }
@@ -271,8 +295,9 @@ export function cmdDbSessions({ hubSessionId, println }, n = 10) {
  * @param {SessionContext} ctx
  * @returns {void}
  */
-export function cmdWho({ injectPort, println }) {
-    const { currentModel, currentReasoningEffort } = readTerminalConfigProjection();
+export function cmdWho({ injectPort, println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const { currentModel, currentReasoningEffort } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     println(`
   \x1b[36mAtores ativos nesta sessão:\x1b[0m
   👤  \x1b[32mVocê\x1b[0m          — stdin (digitar diretamente aqui)
@@ -325,12 +350,13 @@ export function cmdClear({ println }) {
  * @returns {void}
  */
 export function cmdAnswer({ println }, arg) {
-    const ok = answerPendingTerminalQuestion(arg);
+    const { runtimeId, arg: answer } = extractRuntimeTarget(arg);
+    const ok = callWithRuntimeTarget(answerPendingTerminalQuestion, runtimeId, answer);
     if (ok) {
-        println(`[answer] Resposta enviada: "${arg}"`);
+        println(`[answer] Resposta enviada: "${answer}"`);
         return;
     }
-    const projection = readTerminalStatusProjection();
+    const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));
     if (projection.pendingQuestionShadowExpired) {
         println('[answer] Nenhuma pergunta viva. Há uma shadow expirada de ask_user pendente de limpeza.');
         return;
@@ -344,8 +370,9 @@ export function cmdAnswer({ println }, arg) {
  * @param {SessionContext} ctx
  * @returns {void}
  */
-export function cmdClearShadow({ println }) {
-    const ok = clearPendingTerminalQuestionShadow();
+export function cmdClearShadow({ println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const ok = callWithRuntimeTarget(clearPendingTerminalQuestionShadow, runtimeId);
     println(
         ok
             ? '[clear-shadow] Shadow persistida de ask_user limpa.'
@@ -361,7 +388,12 @@ export function cmdClearShadow({ println }) {
  * @returns {Promise<void>}
  */
 export async function cmdSessionSave({ println }, reason) {
-    const { data, path } = await saveTerminalSnapshotProjection(reason);
+    const { runtimeId, arg: cleanReason } = extractRuntimeTarget(reason);
+    const { data, path } = await callWithRuntimeTarget(
+        saveTerminalSnapshotProjection,
+        runtimeId,
+        cleanReason || undefined,
+    );
     println(`\x1b[32m  ✓ Snapshot salvo: ${String(data['snapshotId'] ?? '(sem id)')}\x1b[0m`);
     println(`\x1b[90m    Path: ${path}\x1b[0m`);
 }

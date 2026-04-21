@@ -19,7 +19,13 @@ import { describe, expect, it, vi } from 'vitest';
  * Cria snapshot de quota mock.
  *
  * @param {number} remainingPercentage
- * @returns {{ entitlementRequests: number; usedRequests: number; remainingPercentage: number; overage: number; overageAllowedWithExhaustedQuota: boolean }}
+ * @returns {{
+ *     entitlementRequests: number;
+ *     usedRequests: number;
+ *     remainingPercentage: number;
+ *     overage: number;
+ *     overageAllowedWithExhaustedQuota: boolean;
+ * }}
  */
 function makeSnapshot(remainingPercentage) {
     return {
@@ -273,7 +279,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
 // ─── F118/F119: integração boot-wiring e lifecycle ───────────────────────────
 
 describe('F118 — boot-wiring importa e usa createQuotaMonitor', () => {
-    it('boot-wiring.js importa createQuotaMonitor de #copilot/sdk/quota-monitor', async () => {
+    it('boot-wiring.js importa createQuotaMonitor do barrel #copilot/sdk', async () => {
         // Verifica que o import existe no arquivo (estrutural)
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
@@ -281,7 +287,7 @@ describe('F118 — boot-wiring importa e usa createQuotaMonitor', () => {
             'utf8',
         );
         expect(content).toContain('createQuotaMonitor');
-        expect(content).toContain('#copilot/sdk/quota-monitor');
+        expect(content).toContain("from '#copilot/sdk'");
     });
 
     it('boot-wiring.js chama createQuotaMonitor no performBootWiring', async () => {
@@ -301,7 +307,8 @@ describe('F118 — boot-wiring importa e usa createQuotaMonitor', () => {
             'utf8',
         );
         expect(content).toContain('quotaMonitor');
-        expect(content).toContain('return { unsubs, agentObserver, metricsTimer, mcpReconnectCancel, quotaMonitor }');
+        expect(content).toContain('bootReport');
+        expect(content).toContain('quotaMonitor,');
     });
 });
 
@@ -312,7 +319,7 @@ describe('F119 — lifecycle para quotaMonitor no shutdown', () => {
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/lifecycle/agent-lifecycle.js',
             'utf8',
         );
-        expect(content).toContain('ctx.quotaMonitor = bootResult.quotaMonitor');
+        expect(content).toContain('ctx.setQuotaMonitor(bootResult.quotaMonitor)');
     });
 
     it('agent-lifecycle.js chama ctx.quotaMonitor.stop() no shutdown', async () => {

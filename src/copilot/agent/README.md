@@ -2,7 +2,8 @@
 
 **Camada**: L4 — runtime contínuo do agente (`AlwaysAliveAgent`).
 
-O `agent/` é o núcleo operacional que mantém sessão, loop, reconnect, health e wiring de eventos do SDK.
+O `agent/` é o núcleo operacional que mantém sessão, loop, reconnect, health e wiring de eventos do
+SDK.
 
 ## Estrutura por domínio
 
@@ -18,13 +19,13 @@ O `agent/` é o núcleo operacional que mantém sessão, loop, reconnect, health
 
 ## Arquivos raiz
 
-| Arquivo            | Função                                                     |
-| ------------------ | ---------------------------------------------------------- |
-| `always-alive.js`  | fachada pública fina do runtime do agente                  |
-| `agent-context.js` | composição do estado interno + mutation/read API semântica |
-| `runtime-registry.js` | registry explícita dos runtimes de agent conhecidos     |
-| `types.js`         | typedefs do módulo                                         |
-| `index.js`         | barrel                                                     |
+| Arquivo               | Função                                                     |
+| --------------------- | ---------------------------------------------------------- |
+| `always-alive.js`     | fachada pública fina do runtime do agente                  |
+| `agent-context.js`    | composição do estado interno + mutation/read API semântica |
+| `runtime-registry.js` | registry explícita dos runtimes de agent conhecidos        |
+| `types.js`            | typedefs do módulo                                         |
+| `index.js`            | barrel                                                     |
 
 ## Diretriz arquitetural atual
 
@@ -43,7 +44,8 @@ O objetivo agora é:
 O `agent/` agora opera com duas noções compatíveis:
 
 - `getAgent()` continua sendo o accessor lazy do runtime default para compatibilidade;
-- `runtime-registry.js` passa a registrar explicitamente o runtime default e futuros runtimes nomeados.
+- `runtime-registry.js` passa a registrar explicitamente o runtime default e futuros runtimes
+  nomeados.
 
 Em outras palavras:
 
@@ -54,12 +56,30 @@ Em outras palavras:
 
 `agent/` continua sendo o dono do runtime.
 
-Mas as bordas compartilhadas (`server/`, partes compartilhadas do `terminal/`) não devem decidir sozinhas como obter esse
-runtime. Essa função agora começa a ser centralizada em `presentation/agent-runtime.js`.
+Mas as bordas compartilhadas (`server/`, partes compartilhadas do `terminal/`) não devem decidir
+sozinhas como obter esse runtime. Essa função agora começa a ser centralizada em
+`presentation/agent-runtime.js`.
+
+### Critério prático: o que fica em `agent/` e o que sobe para `presentation/`
+
+Fica em `agent/` quando:
+
+- é source-of-truth do runtime;
+- envolve lifecycle, reconnect, dialog loop, `ask_user`, queue ou health;
+- precisa tocar handles reais do SDK/sessão;
+- precisa manter invariantes do `AgentContext`.
+
+Sobe para `presentation/` quando:
+
+- é payload/projection compartilhada entre `server/` e `terminal/`;
+- é seleção compartilhada de `runtimeId`;
+- é composição de deps de router ou parsing compartilhado de request;
+- é façade de borda que não deve reabrir a topologia do runtime em vários lugares.
 
 ## Relação com o SDK
 
-Sempre que a capacidade nasce no SDK vanilla, o `agent/` deve consumi-la por `sdk/` ou `facades/agent-sdk-access.js`.
+Sempre que a capacidade nasce no SDK vanilla, o `agent/` deve consumi-la por `sdk/` ou
+`facades/agent-sdk-access.js`.
 
 Exemplos já consolidados:
 
@@ -68,7 +88,8 @@ Exemplos já consolidados:
 - server/session RPC handles
 - hooks tipados
 - `onUserInputRequest` / `allowFreeform`
-- eventos vanilla como `session.plan_changed`, `assistant.streaming_delta`, `tool.execution_progress`, `session.workspace_file_changed`
+- eventos vanilla como `session.plan_changed`, `assistant.streaming_delta`,
+  `tool.execution_progress`, `session.workspace_file_changed`
 
 ## Regras de importação
 

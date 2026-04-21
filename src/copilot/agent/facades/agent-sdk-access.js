@@ -47,11 +47,27 @@ function hasRpcNamespace(value, key) {
 
 /**
  * @param {AgentContext} ctx
+ * @returns {import('#copilot/sdk/types').CopilotClient | null}
+ */
+function getClientRef(ctx) {
+    return ctx.client ?? ctx.ioState?.client ?? null;
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {import('#copilot/sdk/types').CopilotSession | null}
+ */
+function getSessionRef(ctx) {
+    return ctx.session ?? ctx.sessionState?.session ?? null;
+}
+
+/**
+ * @param {AgentContext} ctx
  * @param {string} caller
  * @returns {import('#copilot/sdk/types').CopilotClient}
  */
 function requireClient(ctx, caller) {
-    const client = ctx.client;
+    const client = getClientRef(ctx);
     if (!client) {
         throw new SessionError(`[AlwaysAlive] ${caller}: client SDK indisponível.`, 'SDK_CLIENT_UNAVAILABLE');
     }
@@ -64,7 +80,7 @@ function requireClient(ctx, caller) {
  * @returns {import('#copilot/sdk/types').CopilotSession}
  */
 function requireSession(ctx, caller) {
-    const session = ctx.session;
+    const session = getSessionRef(ctx);
     if (!session) {
         throw new SessionError(`[AlwaysAlive] ${caller}: sessão SDK indisponível.`, 'SDK_SESSION_UNAVAILABLE');
     }
@@ -78,8 +94,8 @@ function requireSession(ctx, caller) {
  * @returns {AgentSdkHandles}
  */
 export function getSdkHandles(ctx) {
-    const client = ctx.client ?? null;
-    const session = ctx.session ?? null;
+    const client = getClientRef(ctx);
+    const session = getSessionRef(ctx);
     return {
         client,
         session,

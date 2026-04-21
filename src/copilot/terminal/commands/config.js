@@ -18,6 +18,7 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /** @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort */
 
@@ -43,9 +44,10 @@ const VALID_EFFORTS = /** @type {const} */ (['low', 'medium', 'high', 'xhigh']);
  * @returns {Promise<void>}
  */
 export async function cmdModel({ println }, arg) {
-    const { currentModel: current, modelMeta: meta } = readTerminalConfigProjection();
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const { currentModel: current, modelMeta: meta } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
 
-    if (!arg || arg.trim() === '') {
+    if (!cleanArg || cleanArg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
         if (meta) {
             const contextWindowLabel =
@@ -59,10 +61,10 @@ export async function cmdModel({ println }, arg) {
         return;
     }
 
-    const trimmed = arg.trim().toLowerCase();
+    const trimmed = cleanArg.trim().toLowerCase();
 
     if (trimmed === 'stats') {
-        const { stats } = readTerminalModelStatsProjection();
+        const { stats } = callWithRuntimeTarget(readTerminalModelStatsProjection, runtimeId);
         if (stats.length === 0) {
             println('  \x1b[33mSem estatísticas coletadas ainda.\x1b[0m\n');
             return;
@@ -84,7 +86,7 @@ export async function cmdModel({ println }, arg) {
     if (trimmed === 'list') {
         println('\x1b[90m  Consultando modelos disponíveis…\x1b[0m');
         try {
-            const { models } = await listTerminalAvailableModelsProjection();
+            const { models } = await callWithRuntimeTarget(listTerminalAvailableModelsProjection, runtimeId);
             if (models.length === 0) {
                 println('  \x1b[33mNenhum modelo retornado pelo SDK.\x1b[0m\n');
                 return;
@@ -111,7 +113,7 @@ export async function cmdModel({ println }, arg) {
         currentReasoningEffort,
         reasoningAdjusted,
         modelMeta,
-    } = setTerminalModelProjection(trimmed);
+    } = callWithRuntimeTarget(setTerminalModelProjection, runtimeId, trimmed);
     println(`\n  🔄  Modelo trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
@@ -141,18 +143,19 @@ export async function cmdModel({ println }, arg) {
  * @returns {void}
  */
 export function cmdReasoning({ println }, arg) {
-    const { currentReasoningEffort: current } = readTerminalConfigProjection();
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const { currentReasoningEffort: current } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
 
-    if (!arg || arg.trim() === '') {
+    if (!cleanArg || cleanArg.trim() === '') {
         println(`\n  🧠  Reasoning effort: \x1b[36m${current}\x1b[0m`);
         println(`  \x1b[90mUso: /reasoning low | medium | high | xhigh | off\x1b[0m\n`);
         return;
     }
 
-    const trimmed = arg.trim().toLowerCase();
+    const trimmed = cleanArg.trim().toLowerCase();
 
     if (trimmed === 'off' || trimmed === 'none') {
-        setTerminalReasoningProjection(undefined);
+        callWithRuntimeTarget(setTerminalReasoningProjection, runtimeId, undefined);
         println(`\n  🧠  Raciocínio extendido \x1b[33mdesativado\x1b[0m (modelo decide autonomamente)\n`);
         return;
     }
@@ -162,7 +165,9 @@ export function cmdReasoning({ println }, arg) {
         return;
     }
 
-    const { previousReasoningEffort: previous } = setTerminalReasoningProjection(
+    const { previousReasoningEffort: previous } = callWithRuntimeTarget(
+        setTerminalReasoningProjection,
+        runtimeId,
         /** @type {ReasoningEffort} */ (trimmed),
     );
     println(`\n  🧠  Reasoning trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);

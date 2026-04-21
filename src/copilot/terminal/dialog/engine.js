@@ -14,6 +14,7 @@ import { embedMultiple, readFileContext } from '../file-context.js';
 import {
     getTerminalAgentRuntime,
     readTerminalDialogStreamMeta,
+    readTerminalRuntimeState,
     runTerminalDialogTurn,
     startTerminalDialogMode,
 } from '../frontend/llm-b-runtime.js';
@@ -229,7 +230,8 @@ export function sendTurn(message, actor = 'user') {
  */
 async function _executeTurn(message, actor) {
     const agent = getTerminalAgentRuntime();
-    const ctxState = agent.getStatusSnapshot().contextWindow;
+    const runtimeState = readTerminalRuntimeState();
+    const ctxState = runtimeState.contextWindow;
     if (ctxState) {
         const u = ctxState.utilization;
         if (u >= 0.95) {
@@ -331,9 +333,9 @@ async function _executeTurn(message, actor) {
         log('INFO', `[TerminalServer] Turno ${actor} concluído em ${durationMs}ms`);
 
         if (getShowUsage()) {
-            const snap = agent.getStatusSnapshot();
-            const ctxWin = snap?.contextWindow;
-            const prInfo = agent.lastPrInfo;
+            const latestRuntimeState = readTerminalRuntimeState();
+            const ctxWin = latestRuntimeState.contextWindow;
+            const prInfo = latestRuntimeState.lastPrInfo;
             if (ctxWin || prInfo) {
                 const parts = [];
                 if (prInfo) {

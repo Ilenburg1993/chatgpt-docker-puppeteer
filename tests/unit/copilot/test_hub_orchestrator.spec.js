@@ -16,7 +16,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
@@ -77,7 +77,7 @@ const mockBridge = {
 };
 
 /** Mock mínimo do AlwaysAliveAgent */
-const mockAgent = { getStatusSnapshot: () => ({ sessionId: 'mock-sdk-session-id' }) };
+const mockAgent = { sessionId: 'mock-sdk-session-id' };
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
@@ -190,11 +190,11 @@ describe('HubOrchestrator.injectUserMessage', () => {
 // ─── pollUserMessages ─────────────────────────────────────────────────────────
 
 describe('HubOrchestrator.pollUserMessages', () => {
-    it('retorna mensagens pendentes e as marca como lidas', () => {
+    it('retorna mensagens pendentes e as marca como lidas', async () => {
         const sessionId = orchestrator.createSession();
 
-        orchestrator.injectUserMessage(sessionId, 'Pendente 1');
-        orchestrator.injectUserMessage(sessionId, 'Pendente 2');
+        await orchestrator.injectUserMessage(sessionId, 'Pendente 1');
+        await orchestrator.injectUserMessage(sessionId, 'Pendente 2');
 
         const msgs = orchestrator.pollUserMessages(sessionId);
         assert.ok(msgs.length >= 2, 'deve retornar pelo menos 2 mensagens');

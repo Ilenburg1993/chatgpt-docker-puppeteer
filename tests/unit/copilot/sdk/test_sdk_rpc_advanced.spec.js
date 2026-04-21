@@ -7,13 +7,17 @@
  * toolsHandlePendingCall
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
 }));
 
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: mockLog,
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('@github/copilot-sdk', () => ({
     CopilotClient: vi.fn(),

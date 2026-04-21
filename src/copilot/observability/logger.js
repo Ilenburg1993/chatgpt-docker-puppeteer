@@ -86,7 +86,9 @@ function cleanOldFiles(prefix) {
             });
         }
     } catch (e) {
-        console.error(`[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? toError(e).message : String(e)}`);
+        console.error(
+            `[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? toError(e).message : String(e)}`,
+        );
     }
 }
 
@@ -110,7 +112,9 @@ function rotateFile(filePath, prefix, maxSize) {
             cleanOldFiles(prefix);
         }
     } catch (e) {
-        console.error(`[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? toError(e).message : String(e)}`);
+        console.error(
+            `[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? toError(e).message : String(e)}`,
+        );
     }
 }
 

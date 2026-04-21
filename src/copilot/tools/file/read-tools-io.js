@@ -12,10 +12,10 @@ import * as fs from 'node:fs';
 import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { MAX_CONTENT_BYTES, MAX_LIST_ENTRIES, WORKSPACE_ROOT, validatePath } from './shared.js';
-import { toError } from '../../core/error-handlers.js';
 
 // ---------------------------------------------------------------------------
 // Tool: read_file_content

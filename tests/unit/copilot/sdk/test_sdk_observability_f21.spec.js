@@ -32,7 +32,7 @@ function readSource(relPath) {
 describe('F21 — F113: event-collector usa onSessionEvent typed', () => {
     it('event-collector.js importa onSessionEvent de #copilot/sdk (barrel ou events.js)', () => {
         const src = readSource('observability/event-collector.js');
-        expect(src).toMatch(/from '#copilot\/sdk(?:\/events\.js)?'/);
+        expect(src).toContain("from '#copilot/events'");
         expect(src).toContain('onSessionEvent');
     });
 
@@ -84,11 +84,11 @@ describe('F21 — F115: createQuotaMonitor', () => {
 
     it('quota-monitor.js existe', () => {
         const { existsSync } = require('node:fs');
-        expect(existsSync(join(SRC_COPILOT, 'sdk/quota-monitor.js'))).toBe(true);
+        expect(existsSync(join(SRC_COPILOT, 'sdk/telemetry/quota-monitor.js'))).toBe(true);
     });
 
     it('quota-monitor.js exporta createQuotaMonitor', () => {
-        const src = readSource('sdk/quota-monitor.js');
+        const src = readSource('sdk/telemetry/quota-monitor.js');
         expect(src).toContain('export function createQuotaMonitor');
     });
 
@@ -111,7 +111,7 @@ describe('F21 — F115: createQuotaMonitor', () => {
     });
 
     it('createQuotaMonitor suporta callbacks onUpdate e onWarning (interface)', () => {
-        const src = readSource('sdk/quota-monitor.js');
+        const src = readSource('sdk/telemetry/quota-monitor.js');
         expect(src).toContain('onUpdate');
         expect(src).toContain('onWarning');
         expect(src).toContain('warningThreshold');
@@ -137,12 +137,12 @@ describe('F21 — F116: checkAuthStatus no barrel e health.js', () => {
     });
 
     it('health.js tem getAuthStatus implementado', () => {
-        const src = readSource('sdk/health.js');
+        const src = readSource('sdk/telemetry/health.js');
         expect(src).toContain('export async function getAuthStatus');
     });
 
     it('health.js getAuthStatus delega para accountGetQuota (proxy de auth)', () => {
-        const src = readSource('sdk/health.js');
+        const src = readSource('sdk/telemetry/health.js');
         // Verifica que getAuthStatus existe e chama accountGetQuota
         expect(src).toContain('export async function getAuthStatus');
         // A ordem de aparição garante que está dentro da função (getAuthStatus antes de accountGetQuota no corpo)
@@ -156,12 +156,12 @@ describe('F21 — F116: checkAuthStatus no barrel e health.js', () => {
 
 describe('F21 — F117: integração observability', () => {
     it('sdk/events.js exporta onSessionEvent', () => {
-        const src = readSource('sdk/events.js');
+        const src = readSource('sdk/session/events.js');
         expect(src).toContain('export function onSessionEvent');
     });
 
     it('sdk/events.js exporta onSessionEvents (multi-event)', () => {
-        const src = readSource('sdk/events.js');
+        const src = readSource('sdk/session/events.js');
         expect(src).toContain('export function onSessionEvents');
     });
 
@@ -171,9 +171,9 @@ describe('F21 — F117: integração observability', () => {
     });
 
     it('sdk/quota-monitor.js importa de server-rpc.js (não de @github/copilot-sdk direto)', () => {
-        const src = readSource('sdk/quota-monitor.js');
+        const src = readSource('sdk/telemetry/quota-monitor.js');
         expect(src).not.toContain("from '@github/copilot-sdk'");
-        expect(src).toContain("from './server-rpc.js'");
+        expect(src).toContain("from '../rpc/server.js'");
     });
 
     it('event-collector não importa @github/copilot-sdk direto (runtime)', () => {

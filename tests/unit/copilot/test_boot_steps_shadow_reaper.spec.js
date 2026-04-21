@@ -2,10 +2,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const persistStateWithPolicy = vi.fn(async () => ({ ok: true, value: undefined }));
+const mocks = vi.hoisted(() => ({
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
+}));
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
-    persistStateWithPolicy,
+    persistStateWithPolicy: mocks.persistStateWithPolicy,
     readStateAsync: vi.fn(async () => null),
 }));
 
@@ -13,7 +15,7 @@ import { reapExpiredPendingQuestionShadow } from '../../../src/copilot/agent/ses
 
 describe('boot-steps › pendingQuestionShadow reaper', () => {
     beforeEach(() => {
-        persistStateWithPolicy.mockClear();
+        mocks.persistStateWithPolicy.mockClear();
     });
 
     it('limpa shadow expirada em runtime quando não há pergunta viva', async () => {
@@ -34,7 +36,7 @@ describe('boot-steps › pendingQuestionShadow reaper', () => {
 
         expect(reaped).toBe(true);
         expect(clearPendingQuestionShadow).toHaveBeenCalled();
-        expect(persistStateWithPolicy).toHaveBeenCalledWith(
+        expect(mocks.persistStateWithPolicy).toHaveBeenCalledWith(
             { pendingQuestion: null, pendingQuestionMeta: null },
             { label: 'state.pendingQuestionShadow.reap' },
         );

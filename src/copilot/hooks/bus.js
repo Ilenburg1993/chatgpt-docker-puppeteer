@@ -21,8 +21,8 @@ import {
     HOOK_SESSION_START,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { log } from './logger.js';
 import { toError } from '../core/error-handlers.js';
+import { log } from './logger.js';
 
 /**
  * @typedef {import('./types.js').HookBusEvent} HookBusEvent

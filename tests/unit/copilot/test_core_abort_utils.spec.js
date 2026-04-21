@@ -5,8 +5,8 @@
  * Testes unitários — core/retry.js: withTimeout com AbortController.
  */
 
-import { describe, it, expect } from 'vitest';
 import assert from 'node:assert/strict';
+import { describe, it } from 'vitest';
 
 import { TimeoutError } from '../../../src/copilot/core/errors.js';
 import { withTimeout } from '../../../src/copilot/core/retry.js';

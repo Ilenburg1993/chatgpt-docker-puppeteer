@@ -14,11 +14,15 @@ describe('scripts/arch-health.mjs', () => {
         assert.ok(report.barrel);
         assert.ok(typeof report.barrel.total === 'number');
         assert.ok(typeof report.barrel.withBarrel === 'number');
-        assert.ok(typeof report.singletons === 'number');
+        assert.ok(report.singletons);
+        assert.ok(typeof report.singletons.total === 'number');
+        assert.ok(typeof report.singletons.refined === 'number');
         assert.ok(report.fanOut);
         assert.ok(typeof report.fanOut.max === 'number');
         assert.ok(typeof report.fanOut.avg === 'number');
-        assert.ok(typeof report.deepImports === 'number');
+        assert.ok(report.deepImports);
+        assert.ok(typeof report.deepImports.total === 'number');
+        assert.ok(typeof report.deepImports.refined === 'number');
         assert.ok(typeof report.diTokens === 'number');
         assert.ok(typeof report.tests === 'number');
         assert.ok(report.health);

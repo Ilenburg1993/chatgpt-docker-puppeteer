@@ -1,7 +1,7 @@
 // @ts-check
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { createKernel } from '#kernel/kernel';
 

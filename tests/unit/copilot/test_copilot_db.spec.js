@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
 // ─── Source-code analysis helpers ───────────────────────────────────────────────
 

@@ -13,6 +13,11 @@
 
 import { log } from '#copilot/observability';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import {
+    sendRuntimeDialogTurnOnActiveLoop,
+    startRuntimeDialogLoop,
+    stopRuntimeDialogLoopAuthorized,
+} from '../../../presentation/runtime-dialog.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -22,16 +27,32 @@ import { projectAgentHttpError } from '../../../presentation/agent-http-errors.j
  * @typedef {import('express').Router} BridgeRouter
  *
  * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ *
+ * @typedef {{ agent: AlwaysAliveAgentLike; runtimeId: string }} RuntimeRouteDeps
+ *
+ * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
  */
+
+/**
+ * @param {RuntimeRouteBinding} binding
+ * @param {Req} req
+ * @returns {RuntimeRouteDeps}
+ */
+function resolveRuntimeRouteDeps(binding, req) {
+    if (typeof binding === 'function') {
+        return binding(req);
+    }
+    return { agent: binding, runtimeId: 'default' };
+}
 
 /**
  * Registra rotas do Dialog Loop no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde as rotas serão registradas
- * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
+ * @param {RuntimeRouteBinding} binding - Runtime fixo legado ou resolver por requisição
  * @returns {void}
  */
-export function registerDialogRoutes(bridge, agent) {
+export function registerDialogRoutes(bridge, binding) {
     // G2-API-09: flag de rate limiting — impede turnos concorrentes na camada HTTP
     let _turnInFlight = false;
 
@@ -45,6 +66,7 @@ export function registerDialogRoutes(bridge, agent) {
      * Padrão §15.8: todas as iterações usam o mesmo PR (sem custo por turno).
      */
     bridge.post('/dialog/start', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
         const { bootPrompt } = req.body ?? {};
 
         if (agent.status !== 'idle') {
@@ -57,7 +79,7 @@ export function registerDialogRoutes(bridge, agent) {
         }
 
         try {
-            await agent.startDialogLoop(bootPrompt ?? undefined);
+            await startRuntimeDialogLoop(bootPrompt ?? undefined, agent);
             return res.json({ ok: true, message: 'Modo diálogo ativo. Use POST /dialog/turn para interagir.' });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -78,6 +100,7 @@ export function registerDialogRoutes(bridge, agent) {
      * retorna.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
         // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
         if (_turnInFlight) {
             return res.status(429).json({
@@ -102,7 +125,7 @@ export function registerDialogRoutes(bridge, agent) {
 
         _turnInFlight = true;
         try {
-            const reply = await agent.sendDialogTurn(message, { timeout });
+            const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
             return res.json({ ok: true, reply });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -128,6 +151,7 @@ export function registerDialogRoutes(bridge, agent) {
      * Returns: { ok: true, message: string }
      */
     bridge.post('/dialog/stop', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
         const { force } = req.body ?? {};
         if (!force) {
             return res.status(403).json({
@@ -136,7 +160,7 @@ export function registerDialogRoutes(bridge, agent) {
             });
         }
         try {
-            await agent.stopDialogLoop({ authorized: true });
+            await stopRuntimeDialogLoopAuthorized(agent);
             return res.json({ ok: true, message: 'Modo diálogo encerrado por autorização do usuário.' });
         } catch (err) {
             const projection = projectAgentHttpError(err);

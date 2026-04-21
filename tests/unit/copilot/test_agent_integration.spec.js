@@ -89,7 +89,10 @@ vi.mock('#copilot/core/errors', () => {
 });
 
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('#copilot/sdk/event-helpers', () => ({
     waitForEvent: vi.fn(
@@ -113,6 +116,7 @@ vi.mock('#copilot/sdk/event-helpers', () => ({
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistState: vi.fn(),
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
     readState: vi.fn(() => null),
     writeStateAsync: vi.fn().mockResolvedValue(undefined),
 }));

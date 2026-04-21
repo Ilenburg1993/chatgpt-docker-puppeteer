@@ -69,8 +69,8 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
         const dir = dirname(fileURLToPath(import.meta.url));
         src = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
         assert.ok(
-            src.includes("emit('turn_timeout'"),
-            "dialog-loop-manager deve emitir 'turn_timeout' no handler de erro de boot",
+            src.includes('emit(EMITTER_LOOP_TURN_TIMEOUT') || src.includes("emit('turn_timeout'"),
+            'dialog-loop-manager deve emitir turn_timeout no handler de erro de boot',
         );
     });
 

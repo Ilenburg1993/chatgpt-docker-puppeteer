@@ -19,4 +19,17 @@ describe('P4 — superfícies compartilhadas de agent-control', () => {
         assert.ok(!src.includes('const ALLOWED_FROM = new Set'));
         assert.ok(!src.includes('recordInjectHistory'));
     });
+
+    it('presentation/agent-control.js não conhece mais terminal/* diretamente', async () => {
+        const src = await readFile(
+            new URL('../../../src/copilot/presentation/agent-control.js', import.meta.url),
+            'utf8',
+        );
+
+        assert.ok(src.includes("'./runtime-dialog.js'"));
+        assert.ok(src.includes("'./runtime-ui-state.js'"));
+        assert.ok(!src.includes("'../terminal/dialog.js'"));
+        assert.ok(!src.includes("'../terminal/file-context.js'"));
+        assert.ok(!src.includes("'../terminal/state.js'"));
+    });
 });

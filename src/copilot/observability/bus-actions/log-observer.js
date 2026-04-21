@@ -8,6 +8,7 @@
  * @module copilot/observability/bus-actions/log-observer
  */
 
+import { toError } from '../../core/error-handlers.js';
 import {
     AGENT_DIALOG_LOOP_CHANGED,
     AGENT_DIALOG_STALLED,
@@ -26,7 +27,6 @@ import {
     HUB_SESSION_CREATED,
 } from '../../events/index.js';
 import { log } from '../logger.js';
-import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus

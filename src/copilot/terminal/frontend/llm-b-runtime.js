@@ -7,24 +7,44 @@
  *   transversais em cada arquivo.
  */
 
-import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '#copilot/agent';
 import { llmBridgeClient } from '#copilot/channel';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getSharedSessionBinding } from '#copilot/core';
-import { getDefaultAgentRuntime, getDefaultAgentRuntimeId } from '../../presentation/agent-runtime.js';
+import { getAgentRuntimeOrDefault } from '../../presentation/agent-runtime.js';
+import {
+    createAgentRuntimeSnapshot,
+    listAgentRuntimeSnapshots,
+    loadAgentRuntimeSnapshot,
+    pauseAgentDialogLoop,
+    pingDefaultAgentDialogWatchdog,
+    readAgentHandoffHistory,
+    resumeAgentDialogLoop,
+    saveAgentRuntimeSnapshot,
+    stopAgentRuntimeDialogLoopAuthorized,
+} from '../../presentation/runtime-controls.js';
+import { readAgentRuntimeOverview } from '../../presentation/runtime-overview.js';
+import {
+    deleteAgentSdkPlan,
+    getAgentSdkSessionMode,
+    readAgentSdkPlan,
+    setAgentSdkSessionMode,
+    updateAgentSdkPlan,
+} from '../../presentation/runtime-sdk-session.js';
 
 /**
  * Retorna a instância singleton canônica do runtime do agente.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {import('#copilot/agent').AlwaysAliveAgent}
  */
-export function getTerminalAgentRuntime() {
-    return getDefaultAgentRuntime();
+export function getTerminalAgentRuntime(runtimeId) {
+    return getAgentRuntimeOrDefault(runtimeId);
 }
 
 /**
  * Lê o estado mínimo do runtime para exibição/streaming no terminal.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     runtimeId: string;
  *     model: string;
@@ -43,10 +63,12 @@ export function getTerminalAgentRuntime() {
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
  *     pendingQuestionShadowRemainingMs: number | null;
+ *     contextWindow: { tokens: number; tokenLimit: number; utilization: number } | null;
+ *     lastPrInfo: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null;
  * }}
  */
-export function readTerminalRuntimeState() {
-    const agent = getTerminalAgentRuntime();
+export function readTerminalRuntimeState(runtimeId) {
+    const { agent, runtimeId: resolvedRuntimeId, contextWindow } = readAgentRuntimeOverview(runtimeId);
     const pendingQuestion = agent.pendingQuestion ?? null;
     const pendingQuestionShadow = agent.pendingQuestionShadow ?? null;
     const pendingQuestionKind =
@@ -67,7 +89,7 @@ export function readTerminalRuntimeState() {
         agent.pendingQuestionShadowState ??
         (pendingQuestionShadow !== null ? (agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
     return {
-        runtimeId: getDefaultAgentRuntimeId(),
+        runtimeId: resolvedRuntimeId,
         model: String(agent.model ?? 'unknown'),
         reasoningEffort: String(agent.reasoningEffort ?? 'off'),
         status: String(agent.status ?? 'unknown'),
@@ -84,6 +106,8 @@ export function readTerminalRuntimeState() {
         pendingQuestionShadowAgeMs: agent.pendingQuestionShadowAgeMs ?? null,
         pendingQuestionShadowExpiresAt: agent.pendingQuestionShadowExpiresAt ?? null,
         pendingQuestionShadowRemainingMs: agent.pendingQuestionShadowRemainingMs ?? null,
+        contextWindow,
+        lastPrInfo: agent.lastPrInfo ?? null,
     };
 }
 
@@ -99,10 +123,11 @@ export function readTerminalSessionBinding() {
 /**
  * Metadados de streaming/renderização para o frontend local.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{ model: string; reasoningEffort: string }}
  */
-export function readTerminalDialogStreamMeta() {
-    const state = readTerminalRuntimeState();
+export function readTerminalDialogStreamMeta(runtimeId) {
+    const state = readTerminalRuntimeState(runtimeId);
     return {
         model: state.model,
         reasoningEffort: state.reasoningEffort,
@@ -112,10 +137,11 @@ export function readTerminalDialogStreamMeta() {
 /**
  * Obtém o histórico atual de handoffs do runtime.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {import('../../agent/infra/handoff-manager.js').HandoffRequest[]}
  */
-export function readTerminalHandoffHistory() {
-    return getTerminalAgentRuntime().getHandoffManager?.()?.getHistory?.() ?? [];
+export function readTerminalHandoffHistory(runtimeId) {
+    return readAgentHandoffHistory(runtimeId);
 }
 
 /**
@@ -124,81 +150,89 @@ export function readTerminalHandoffHistory() {
  * @returns {void}
  */
 export function pingTerminalDialogWatchdog() {
-    getTerminalAgentRuntime().pingDialogWatchdog();
+    pingDefaultAgentDialogWatchdog();
 }
 
 /**
  * Pausa explicitamente o dialog loop.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<void>}
  */
-export async function pauseTerminalDialogLoop() {
-    await getTerminalAgentRuntime().pauseDialogLoop();
+export async function pauseTerminalDialogLoop(runtimeId) {
+    await pauseAgentDialogLoop(runtimeId);
 }
 
 /**
  * Retoma explicitamente o dialog loop.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<void>}
  */
-export async function resumeTerminalDialogLoop() {
-    await getTerminalAgentRuntime().resumeDialogLoop();
+export async function resumeTerminalDialogLoop(runtimeId) {
+    await resumeAgentDialogLoop(runtimeId);
 }
 
 /**
  * Encerra o runtime do agente com autorização explícita do usuário.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<void>}
  */
-export async function stopTerminalAgentRuntime() {
-    await getTerminalAgentRuntime().stopDialogLoop({ authorized: true, reason: 'authorized_stop' });
+export async function stopTerminalAgentRuntime(runtimeId) {
+    await stopAgentRuntimeDialogLoopAuthorized(runtimeId);
 }
 
 /**
  * Lê o modo vanilla atual da sessão SDK.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
  */
-export async function getTerminalSdkSessionMode() {
-    return getTerminalAgentRuntime().getSdkSessionMode();
+export async function getTerminalSdkSessionMode(runtimeId) {
+    return getAgentSdkSessionMode(runtimeId);
 }
 
 /**
  * Altera o modo vanilla da sessão SDK.
  *
  * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
  */
-export async function setTerminalSdkSessionMode(mode) {
-    return getTerminalAgentRuntime().setSdkSessionMode(mode);
+export async function setTerminalSdkSessionMode(mode, runtimeId) {
+    return setAgentSdkSessionMode(mode, runtimeId);
 }
 
 /**
  * Lê o plan.md vanilla da sessão SDK.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
  */
-export async function readTerminalSdkPlan() {
-    return getTerminalAgentRuntime().readSdkPlan();
+export async function readTerminalSdkPlan(runtimeId) {
+    return readAgentSdkPlan(runtimeId);
 }
 
 /**
  * Atualiza o plan.md vanilla da sessão SDK.
  *
  * @param {string} content
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<object>}
  */
-export async function updateTerminalSdkPlan(content) {
-    return getTerminalAgentRuntime().updateSdkPlan(content);
+export async function updateTerminalSdkPlan(content, runtimeId) {
+    return updateAgentSdkPlan(content, runtimeId);
 }
 
 /**
  * Remove o plan.md vanilla da sessão SDK.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<object>}
  */
-export async function deleteTerminalSdkPlan() {
-    return getTerminalAgentRuntime().deleteSdkPlan();
+export async function deleteTerminalSdkPlan(runtimeId) {
+    return deleteAgentSdkPlan(runtimeId);
 }
 
 /**
@@ -437,40 +471,40 @@ export function searchTerminalHubTurns(opts) {
 /**
  * Cria um snapshot do runtime do agente para uso do frontend do terminal.
  *
- * @param {Parameters<typeof createSnapshot>[0]} data
- * @returns {ReturnType<typeof createSnapshot>}
+ * @param {Parameters<typeof createAgentRuntimeSnapshot>[0]} data
+ * @returns {ReturnType<typeof createAgentRuntimeSnapshot>}
  */
 export function createTerminalSnapshot(data) {
-    return createSnapshot(data);
+    return createAgentRuntimeSnapshot(data);
 }
 
 /**
  * Persiste um snapshot do terminal.
  *
- * @param {Parameters<typeof saveSnapshotAsync>[0]} data
- * @returns {ReturnType<typeof saveSnapshotAsync>}
+ * @param {Parameters<typeof saveAgentRuntimeSnapshot>[0]} data
+ * @returns {ReturnType<typeof saveAgentRuntimeSnapshot>}
  */
 export function saveTerminalSnapshot(data) {
-    return saveSnapshotAsync(data);
+    return saveAgentRuntimeSnapshot(data);
 }
 
 /**
  * Lista snapshots persistidos do runtime/terminal.
  *
- * @returns {ReturnType<typeof listSnapshotsAsync>}
+ * @returns {ReturnType<typeof listAgentRuntimeSnapshots>}
  */
 export function listTerminalSnapshots() {
-    return listSnapshotsAsync();
+    return listAgentRuntimeSnapshots();
 }
 
 /**
  * Carrega um snapshot persistido do runtime/terminal.
  *
  * @param {string} snapshotId
- * @returns {ReturnType<typeof loadSnapshotAsync>}
+ * @returns {ReturnType<typeof loadAgentRuntimeSnapshot>}
  */
 export function loadTerminalSnapshot(snapshotId) {
-    return loadSnapshotAsync(snapshotId);
+    return loadAgentRuntimeSnapshot(snapshotId);
 }
 
 /**

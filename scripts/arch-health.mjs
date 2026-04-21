@@ -292,16 +292,19 @@ function layerViolations() {
 }
 
 /**
- * Conta tokens DI definidos.
+ * Conta tokens DI definidos em todos os módulos copilot que expõem `di-tokens.js`.
  *
  * @returns {number}
  */
 function diTokenCount() {
-    const tokensFile = join(COPILOT_ROOT, 'core', 'di-tokens.js');
-    if (!existsSync(tokensFile)) return 0;
-    const src = readFileSync(tokensFile, 'utf-8');
-    const matches = src.match(/export const \w+ = createToken/g);
-    return matches ? matches.length : 0;
+    const files = walkJs(COPILOT_ROOT).filter((file) => file.endsWith('di-tokens.js'));
+    let total = 0;
+    for (const file of files) {
+        const src = readFileSync(file, 'utf-8');
+        const matches = src.match(/export const \w+ = createToken/g);
+        total += matches ? matches.length : 0;
+    }
+    return total;
 }
 
 /**

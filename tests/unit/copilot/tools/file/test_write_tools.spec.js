@@ -12,19 +12,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-const mockLog = vi.fn();
-vi.mock('#copilot/observability/logger', () => ({ log: mockLog, LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+const mocks = vi.hoisted(() => ({
+    mockLog: vi.fn(),
+    buildTool: vi.fn((config) => config),
+}));
 
-/** @type {{
- *  access: import('vitest').Mock;
- *  writeFile: import('vitest').Mock;
- *  rename: import('vitest').Mock;
- *  mkdir: import('vitest').Mock;
- *  stat: import('vitest').Mock;
- *  unlink: import('vitest').Mock;
- *  copyFile: import('vitest').Mock;
- *  readFile: import('vitest').Mock;
- * }} */
+vi.mock('../../../../../src/copilot/tools/logger.js', () => ({
+    log: mocks.mockLog,
+}));
+
+/**
+ * @type {{
+ *     access: import('vitest').Mock;
+ *     writeFile: import('vitest').Mock;
+ *     rename: import('vitest').Mock;
+ *     mkdir: import('vitest').Mock;
+ *     stat: import('vitest').Mock;
+ *     unlink: import('vitest').Mock;
+ *     copyFile: import('vitest').Mock;
+ *     readFile: import('vitest').Mock;
+ * }}
+ */
 const fsMock = {
     access: vi.fn(),
     writeFile: vi.fn(),
@@ -46,7 +54,7 @@ vi.mock('#copilot/tools/file/shared', () => ({
 
 // buildTool mock: retorna o handler diretamente para teste isolado
 vi.mock('#copilot/tools/tool-factory', () => ({
-    buildTool: vi.fn((config) => config),
+    buildTool: mocks.buildTool,
 }));
 
 // crypto mock para atomicWrite
@@ -167,7 +175,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         await handler({ path: 'logged.txt', content: 'x', encoding: 'utf8' });
 
-        expect(mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_file_content'));
+        expect(mocks.mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_file_content'));
     });
 });
 

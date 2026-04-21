@@ -34,7 +34,7 @@ function pathParam(name) {
     return { name, in: 'path', required: true, schema: { type: 'string' } };
 }
 
-function queryParam(name, type = 'string') {
+function _queryParam(name, type = 'string') {
     return { name, in: 'query', schema: { type } };
 }
 

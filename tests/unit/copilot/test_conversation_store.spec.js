@@ -23,7 +23,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { describe, it, beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';

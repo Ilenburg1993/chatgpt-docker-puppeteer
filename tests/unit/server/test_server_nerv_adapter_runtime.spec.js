@@ -2,7 +2,7 @@
 import ServerNERVAdapter from '#server/nerv_adapter/server_nerv_adapter';
 import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 
 class MockNerv {
     constructor() {

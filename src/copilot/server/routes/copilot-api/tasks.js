@@ -23,6 +23,10 @@ import { projectAgentHttpError } from '../../../presentation/agent-http-errors.j
  *
  * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  *
+ * @typedef {{ agent: AlwaysAliveAgentLike; runtimeId: string }} RuntimeRouteDeps
+ *
+ * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ *
  * @typedef {Object} SendRequestBody
  * @property {string} message - Texto da mensagem a enviar ao agente
  * @property {boolean} [waitForResponse] - Aguardar resposta síncrona (default: false)
@@ -31,13 +35,25 @@ import { projectAgentHttpError } from '../../../presentation/agent-http-errors.j
  */
 
 /**
+ * @param {RuntimeRouteBinding} binding
+ * @param {Req} req
+ * @returns {RuntimeRouteDeps}
+ */
+function resolveRuntimeRouteDeps(binding, req) {
+    if (typeof binding === 'function') {
+        return binding(req);
+    }
+    return { agent: binding, runtimeId: 'default' };
+}
+
+/**
  * Registra rotas de tarefas do agente no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde as rotas serão registradas
- * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
+ * @param {RuntimeRouteBinding} binding - Runtime fixo legado ou resolver por requisição
  * @returns {void}
  */
-export function registerTaskRoutes(bridge, agent) {
+export function registerTaskRoutes(bridge, binding) {
     // ─── POST /send ───────────────────────────────────────────────────────────
 
     /**
@@ -46,6 +62,7 @@ export function registerTaskRoutes(bridge, agent) {
      * Body: { message: string, waitForResponse?: boolean, timeoutMs?: number, attachments?: Array }
      */
     bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
         const { message, waitForResponse = false, timeoutMs = 30000, attachments } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
@@ -139,6 +156,7 @@ export function registerTaskRoutes(bridge, agent) {
      * Body: { answer: string }
      */
     bridge.post('/answer', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
         const { answer } = req.body ?? {};
 
         if (!answer || typeof answer !== 'string') {
@@ -158,6 +176,7 @@ export function registerTaskRoutes(bridge, agent) {
      * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
      */
     bridge.post('/answer/clear-shadow', (_req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, /** @type {Req} */ (_req));
         if (typeof agent.clearPendingQuestionShadow !== 'function') {
             return res.status(501).json({
                 ok: false,

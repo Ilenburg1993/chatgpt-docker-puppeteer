@@ -31,7 +31,7 @@ function assertSession(session, caller) {
     if (
         !session ||
         typeof session !== 'object' ||
-        typeof /** @type {Record<string, unknown>} */ (session)['rpc'] !== 'object'
+        typeof (/** @type {Record<string, unknown>} */ (session)['rpc']) !== 'object'
     ) {
         throw new TypeError(`[sdk/experimental-rpc/${caller}] CopilotSession inválida ou não conectada.`);
     }

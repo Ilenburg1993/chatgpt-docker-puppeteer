@@ -114,7 +114,8 @@ describe('F150 — observability/ usa barrel para onSessionEvent', () => {
     });
 
     it('event-collector.js importa de #copilot/sdk', () => {
-        expect(src('observability/event-collector.js')).toContain("from '#copilot/sdk'");
+        const content = src('observability/event-collector.js');
+        expect(content.includes("from '#copilot/sdk'") || content.includes("from '#copilot/events'")).toBe(true);
     });
 
     it('dialog-task-handlers.js não importa de #copilot/sdk/models/registry', () => {
@@ -123,8 +124,8 @@ describe('F150 — observability/ usa barrel para onSessionEvent', () => {
         );
     });
 
-    it('dialog-task-handlers.js importa modelStatsTracker de #copilot/sdk', () => {
-        expect(src('observability/observers/dialog-task-handlers.js')).toContain("from '#copilot/sdk'");
+    it('dialog-task-handlers.js não depende mais do sdk barrel para modelStatsTracker', () => {
+        expect(src('observability/observers/dialog-task-handlers.js')).not.toContain("from '#copilot/sdk'");
     });
 });
 
@@ -139,8 +140,10 @@ describe('F151 — terminal/ usa barrel para models e tools-state', () => {
         expect(src('terminal/commands/config.js')).not.toContain("from '#copilot/sdk/models/helpers'");
     });
 
-    it('commands/config.js importa de #copilot/sdk', () => {
-        expect(src('terminal/commands/config.js')).toContain("from '#copilot/sdk'");
+    it('commands/config.js não reabre o sdk; usa frontend compartilhado', () => {
+        const content = src('terminal/commands/config.js');
+        expect(content).not.toContain("from '#copilot/sdk'");
+        expect(content).toContain("from '../frontend/index.js'");
     });
 
     it('handlers/system-config.js não importa de #copilot/sdk/custom-tools', () => {

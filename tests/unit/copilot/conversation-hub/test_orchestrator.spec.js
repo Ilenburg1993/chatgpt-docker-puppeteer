@@ -43,7 +43,7 @@ function applyCopilotMigrations(db) {
  */
 function createMockAgent(overrides = {}) {
     return {
-        getStatusSnapshot: () => ({ sessionId: 'sdk-test-001', status: 'running' }),
+        sessionId: 'sdk-test-001',
         dialogLoopActive: false,
         status: 'running',
         ...overrides,

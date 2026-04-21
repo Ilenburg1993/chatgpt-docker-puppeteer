@@ -8,11 +8,23 @@
  */
 
 import { toError } from '#copilot/core';
-import { sendTurn } from '../terminal/dialog.js';
-import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../terminal/file-context.js';
-import { recordInjectHistory } from '../terminal/state.js';
 import { projectAgentHttpError } from './agent-http-errors.js';
-import { getDefaultAgentRuntime } from './agent-runtime.js';
+import {
+    getAgentHandoffManager,
+    getAgentRuntimeControlsTarget,
+    pauseAgentDialogLoop,
+    resumeAgentDialogLoop,
+} from './runtime-controls.js';
+import {
+    attachmentToRuntimeEmbed,
+    embedRuntimeMultiple,
+    MAX_EMBED_BYTES,
+    readRuntimeFileContext,
+    sendRuntimeDialogTurn,
+} from './runtime-dialog.js';
+import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readRuntimeIdFromParams } from './runtime-targeting.js';
+import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
 
 /**
  * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
@@ -25,9 +37,38 @@ import { getDefaultAgentRuntime } from './agent-runtime.js';
  */
 const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
 
-/** @returns {import('../agent/always-alive.js').AlwaysAliveAgent} */
-function getAgent() {
-    return getDefaultAgentRuntime();
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {import('../agent/always-alive.js').AlwaysAliveAgent}
+ */
+function getAgent(runtimeId = null) {
+    return getAgentRuntimeControlsTarget(runtimeId);
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} [params]
+ * @returns {string | null}
+ */
+function resolveRuntimeIdParam(params) {
+    return readRuntimeIdFromParams(params);
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} [params]
+ * @returns {Record<string, unknown> | null}
+ */
+function extractRequestBody(params) {
+    if (!params || typeof params !== 'object') return null;
+    const body = params['body'];
+    return body && typeof body === 'object' ? /** @type {Record<string, unknown>} */ (body) : null;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} [params]
+ * @returns {Record<string, unknown>}
+ */
+function resolveAgentControlInput(params) {
+    return extractRequestBody(params) ?? (params && typeof params === 'object' ? params : {});
 }
 
 /**
@@ -35,9 +76,9 @@ function getAgent() {
  *
  * @returns {HandlerResult}
  */
-export function handleGetContext() {
-    const snapshot = getAgent().getStatusSnapshot();
-    const cw = snapshot.contextWindow;
+export function handleGetContext(params = {}) {
+    const runtimeId = resolveRuntimeIdParam(params);
+    const { snap: snapshot, contextWindow: cw } = readAgentRuntimeOverview(runtimeId);
     if (!cw) {
         return {
             status: 200,
@@ -77,10 +118,12 @@ export function handleGetContext() {
 /**
  * Executa uma sequência ordenada de turnos (pipeline).
  *
- * @param {{ steps?: { prompt: string; waitMs?: number; from?: string }[]; from?: string } | null} body
+ * @param {Record<string, unknown> | null | undefined} [params]
  * @returns {Promise<HandlerResult>}
  */
-export async function handlePipeline(body) {
+export async function handlePipeline(params = {}) {
+    const body = resolveAgentControlInput(params);
+    const runtimeId = resolveRuntimeIdParam(params);
     if (!Array.isArray(body?.steps) || body.steps.length === 0) {
         return { status: 400, body: { ok: false, error: '"steps" deve ser um array não vazio' } };
     }
@@ -114,7 +157,7 @@ export async function handlePipeline(body) {
 
         const t0 = Date.now();
         try {
-            const reply = await sendTurn(step.prompt, from);
+            const reply = await sendRuntimeDialogTurn(step.prompt, from, undefined, getAgent(runtimeId));
             results.push({ step: i + 1, prompt: step.prompt, reply: reply ?? null, durationMs: Date.now() - t0 });
 
             if (reply === null) {
@@ -147,24 +190,49 @@ export async function handlePipeline(body) {
  * Injeta uma mensagem na LLM-B e aguarda resposta.
  *
  * @param {{
- *     message?: string;
- *     from?: string;
- *     timeout?: number;
- *     context_files?: string[];
- *     attachments?: {
- *         type?: string;
- *         content?: string;
- *         path?: string;
- *         displayName?: string;
- *         filePath?: string;
- *         selection?: object;
- *         text?: string;
- *     }[];
- * } | null} body
+ *           runtimeId?: string;
+ *           body?: {
+ *               runtimeId?: string;
+ *               message?: string;
+ *               content?: string;
+ *               from?: string;
+ *               timeout?: number;
+ *               context_files?: string[];
+ *               attachments?: {
+ *                   type?: string;
+ *                   content?: string;
+ *                   path?: string;
+ *                   displayName?: string;
+ *                   filePath?: string;
+ *                   selection?: object;
+ *                   text?: string;
+ *               }[];
+ *           };
+ *           message?: string;
+ *           content?: string;
+ *           from?: string;
+ *           timeout?: number;
+ *           context_files?: string[];
+ *           attachments?: {
+ *               type?: string;
+ *               content?: string;
+ *               path?: string;
+ *               displayName?: string;
+ *               filePath?: string;
+ *               selection?: object;
+ *               text?: string;
+ *           }[];
+ *       }
+ *     | null
+ *     | undefined} [params]
  * @returns {Promise<HandlerResult>}
  */
-export async function handleInject(body) {
-    const message = body?.message?.trim();
+export async function handleInject(params = {}) {
+    const body = resolveAgentControlInput(params);
+    const runtimeId = resolveRuntimeIdParam(params);
+    const rawMessage =
+        typeof body?.message === 'string' ? body.message : typeof body?.content === 'string' ? body.content : '';
+    const message = rawMessage.trim();
     if (!message) {
         return { status: 400, body: { ok: false, error: '"message" é obrigatório' } };
     }
@@ -176,8 +244,8 @@ export async function handleInject(body) {
     const contextFiles = Array.isArray(body?.context_files) ? body.context_files : [];
     if (contextFiles.length > 0) {
         try {
-            const ctxs = await Promise.all(contextFiles.map(readFileContext));
-            enrichedMessage = embedMultiple(ctxs, message);
+            const ctxs = await Promise.all(contextFiles.map(readRuntimeFileContext));
+            enrichedMessage = embedRuntimeMultiple(ctxs, message);
         } catch (embedErr) {
             return {
                 status: 400,
@@ -190,7 +258,7 @@ export async function handleInject(body) {
     if (rawAttachments.length > 0) {
         let embedParts;
         try {
-            embedParts = await Promise.all(rawAttachments.map(attachmentToEmbed));
+            embedParts = await Promise.all(rawAttachments.map(attachmentToRuntimeEmbed));
         } catch (attErr) {
             return {
                 status: 400,
@@ -215,9 +283,9 @@ export async function handleInject(body) {
 
     const t0 = Date.now();
     try {
-        const reply = await sendTurn(enrichedMessage, from);
+        const reply = await sendRuntimeDialogTurn(enrichedMessage, from, undefined, getAgent(runtimeId));
         const durationMs = Date.now() - t0;
-        recordInjectHistory({
+        recordRuntimeInjectHistory({
             ts: t0,
             from,
             message: message.slice(0, 200),
@@ -230,7 +298,7 @@ export async function handleInject(body) {
             body: { ok: reply !== null, reply: reply ?? null, durationMs, from },
         };
     } catch (e) {
-        recordInjectHistory({
+        recordRuntimeInjectHistory({
             ts: t0,
             from,
             message: message.slice(0, 200),
@@ -247,12 +315,13 @@ export async function handleInject(body) {
  *
  * @returns {Promise<{ status: number; body: object }>}
  */
-export async function handleDialogPause() {
-    if (!getAgent().dialogLoopActive) {
+export async function handleDialogPause(params = {}) {
+    const runtimeId = resolveRuntimeIdParam(params);
+    if (!getAgent(runtimeId).dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop não está ativo.' } };
     }
     try {
-        await getAgent().pauseDialogLoop();
+        await pauseAgentDialogLoop(runtimeId);
         return {
             status: 200,
             body: { ok: true, message: 'Dialog loop pausado. Use POST /dialog/resume para retomar.' },
@@ -267,12 +336,13 @@ export async function handleDialogPause() {
  *
  * @returns {Promise<{ status: number; body: object }>}
  */
-export async function handleDialogResume() {
-    if (getAgent().dialogLoopActive) {
+export async function handleDialogResume(params = {}) {
+    const runtimeId = resolveRuntimeIdParam(params);
+    if (getAgent(runtimeId).dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop já está ativo.' } };
     }
     try {
-        await getAgent().resumeDialogLoop();
+        await resumeAgentDialogLoop(runtimeId);
         return { status: 200, body: { ok: true, message: 'Dialog loop retomado.' } };
     } catch (e) {
         return projectAgentHttpError(e);
@@ -284,8 +354,9 @@ export async function handleDialogResume() {
  *
  * @returns {HandlerResult}
  */
-export function handleGetHandoffs() {
-    const handoffMgr = getAgent().getHandoffManager?.();
+export function handleGetHandoffs(params = {}) {
+    const runtimeId = resolveRuntimeIdParam(params);
+    const handoffMgr = getAgentHandoffManager(runtimeId);
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }
@@ -302,11 +373,12 @@ export function handleGetHandoffs() {
 /**
  * POST /handoff/:id/accept — aceita um handoff pendente.
  *
- * @param {{ handoffId?: string }} params
+ * @param {{ runtimeId?: string; handoffId?: string } | null | undefined} params
  * @returns {HandlerResult}
  */
 export function handleAcceptHandoff(params) {
-    const handoffMgr = getAgent().getHandoffManager?.();
+    const runtimeId = resolveRuntimeIdParam(params);
+    const handoffMgr = getAgentHandoffManager(runtimeId);
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }
@@ -321,12 +393,13 @@ export function handleAcceptHandoff(params) {
 /**
  * POST /handoff/:id/reject — rejeita um handoff pendente.
  *
- * @param {{ handoffId?: string }} params
+ * @param {{ runtimeId?: string; handoffId?: string } | null | undefined} params
  * @param {{ reason?: string }} [body]
  * @returns {HandlerResult}
  */
 export function handleRejectHandoff(params, body) {
-    const handoffMgr = getAgent().getHandoffManager?.();
+    const runtimeId = resolveRuntimeIdParam(params);
+    const handoffMgr = getAgentHandoffManager(runtimeId);
     if (!handoffMgr) {
         return { status: 501, body: { ok: false, error: 'HandoffManager não disponível.' } };
     }

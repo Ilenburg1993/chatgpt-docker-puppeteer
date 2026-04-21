@@ -13,26 +13,35 @@ import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridg
 import { container, toError } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../infra/sse/state.js';
-import { getInjectHistory } from '../terminal/state.js';
-import { getDefaultAgentRuntime } from './agent-runtime.js';
 import { clearRateLimiters } from './realtime.js';
+import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readRuntimeIdFromParams } from './runtime-targeting.js';
+import { readRuntimeInjectHistory } from './runtime-ui-state.js';
 
 /**
  * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
  */
 
 /**
+ * @param {Record<string, unknown> | null | undefined} [params]
+ * @returns {string | null}
+ */
+function resolveRuntimeIdParam(params) {
+    return readRuntimeIdFromParams(params);
+}
+
+/**
  * Endpoint `/metrics` compatível com Prometheus.
  *
+ * @param {Record<string, unknown>} [params]
  * @returns {{ status: number; contentType: string; body: string }}
  */
-export function handleMetrics() {
-    const snapshot = getDefaultAgentRuntime().getStatusSnapshot();
+export function handleMetrics(params = {}) {
+    const { snap: snapshot, contextWindow: cw } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
     const statusValue = snapshot.status !== 'stopped' ? 1 : 0;
     const queueSize = snapshot.queueSize ?? 0;
     const sendCount = snapshot.sendCount ?? 0;
     const sseClients = getSseClients().size;
-    const cw = snapshot.contextWindow;
 
     const lines = [
         '# HELP llmb_agent_status Current agent status (1=active, 0=inactive)',
@@ -209,7 +218,7 @@ export function handleGetToolStats() {
  * @returns {HandlerResult}
  */
 export function handleGetHistory({ limit = 50 } = {}) {
-    const entries = getInjectHistory(limit);
+    const entries = readRuntimeInjectHistory(limit);
     return {
         status: 200,
         cors: true,
@@ -325,16 +334,17 @@ export async function handleGitLog({ n = 20 } = {}) {
 /**
  * GET /quota — retorna dados de cota de PRs.
  *
+ * @param {Record<string, unknown>} [params]
  * @returns {{ status: number; body: object }}
  */
-export function handleGetQuota() {
-    const agent = getDefaultAgentRuntime();
-    const snapshot = agent.getStatusSnapshot();
+export function handleGetQuota(params = {}) {
+    const { agent, snap: snapshot, runtimeId } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
     const prInfo = agent.lastPrInfo ?? null;
     return {
         status: 200,
         body: {
             ok: true,
+            runtimeId,
             sendCount: snapshot?.sendCount ?? 0,
             dialogLoopActive: agent.dialogLoopActive,
             sessionId: agent.sessionId ?? null,
@@ -349,17 +359,18 @@ export function handleGetQuota() {
 /**
  * GET /pr-budget — métricas detalhadas de consumo de Premium Requests.
  *
+ * @param {Record<string, unknown>} [params]
  * @returns {{ status: number; body: object }}
  */
-export function handleGetPrBudget() {
-    const agent = getDefaultAgentRuntime();
+export function handleGetPrBudget(params = {}) {
+    const { agent, snap: snapshot, runtimeId } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
     const prMetrics = agent.dialogPrMetrics;
     const prInfo = agent.lastPrInfo ?? null;
-    const snapshot = agent.getStatusSnapshot();
     return {
         status: 200,
         body: {
             ok: true,
+            runtimeId,
             prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
             sendCount: snapshot?.sendCount ?? 0,
             dialogLoopActive: agent.dialogLoopActive,

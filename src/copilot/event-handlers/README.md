@@ -1,6 +1,7 @@
 # event-handlers/
 
-Boundary de tradução entre **eventos vanilla da sessão SDK** e os eventos internos consumidos pelo runtime.
+Boundary de tradução entre **eventos vanilla da sessão SDK** e os eventos internos consumidos pelo
+runtime.
 
 ## Pergunta que esta pasta responde
 
@@ -10,9 +11,10 @@ Boundary de tradução entre **eventos vanilla da sessão SDK** e os eventos int
 ## Regra arquitetural principal
 
 - Se o SDK já emite um evento vanilla, **o primeiro lugar a tocar esse evento é aqui**.
-- O restante do sistema deve preferir os sinais traduzidos daqui, em vez de re-interpretar o payload do SDK em
-  múltiplos lugares.
-- Ampliações são permitidas, mas **sempre em cima** do payload vanilla do SDK — nunca por semântica paralela.
+- O restante do sistema deve preferir os sinais traduzidos daqui, em vez de re-interpretar o payload
+  do SDK em múltiplos lugares.
+- Ampliações são permitidas, mas **sempre em cima** do payload vanilla do SDK — nunca por semântica
+  paralela.
 
 ## Arquivos
 
@@ -43,7 +45,17 @@ SDK SessionEvent
 
 ## Heurística prática
 
-- Se a dúvida é **"qual é o payload real do SDK?"**, olhe `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts`.
+- Se a dúvida é **"qual é o payload real do SDK?"**, olhe
+  `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts`.
 - Se a dúvida é **"qual é a forma estável usada internamente?"**, olhe esta pasta.
-- Se a dúvida é **"como isso aparece para o operador do terminal?"**, olhe `terminal/sdk-session-events.js` e
-  `terminal/repl-listeners.js`.
+- Se a dúvida é **"como isso aparece para o operador do terminal?"**, olhe
+  `terminal/sdk-session-events.js` e `terminal/repl-listeners.js`.
+
+## Critério de fronteira com `agent/` e `observability/`
+
+- `event-handlers/` traduz;
+- `agent/` orquestra e mantém estado;
+- `observability/` coleta o sinal já estabilizado.
+
+Se um módulo daqui começar a montar payload HTTP, fazer health do runtime ou guardar estado mutável
+de sessão, a fronteira está errada.

@@ -114,9 +114,12 @@ const BANNER = `
  * ][]}
  */
 const CMD_ROUTES = [
-    [['status'], (ctx) => _cmdStatus({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println })],
+    [
+        ['status'],
+        (ctx, arg) => _cmdStatus({ hubSessionId: ctx.hubSessionId, injectPort: ctx.injectPort, println }, arg),
+    ],
     [['activity'], (_, arg) => _cmdActivity({ println }, arg)],
-    [['diagnose', 'diag'], (ctx) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println })],
+    [['diagnose', 'diag'], (ctx, arg) => _cmdDiagnose({ hubSessionId: ctx.hubSessionId, println }, arg)],
     [['history'], (_, arg) => _cmdHistory({ println }, Number(arg) || 10)],
     [
         ['db-history'],
@@ -137,8 +140,8 @@ const CMD_ROUTES = [
     [['model'], (_, arg) => _cmdModel({ println }, arg)],
     [['reasoning'], (_, arg) => _cmdReasoning({ println }, arg)],
     [['attach'], (_, arg) => _cmdAttach({ println }, arg)],
-    [['context'], () => _cmdContext({ println })],
-    [['compact'], () => _cmdCompact({ println })],
+    [['context'], (_, arg) => _cmdContext({ println }, arg)],
+    [['compact'], (_, arg) => _cmdCompact({ println }, arg)],
     [['plan'], (_, arg) => _cmdPlan({ println }, arg)],
     [['resume'], (ctx, arg) => _cmdResume({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['pause'], () => _cmdPauseDialogLoop()],
@@ -152,7 +155,7 @@ const CMD_ROUTES = [
     [['audit'], (_, arg) => _cmdAudit({ println }, arg)],
     [['display'], (_, arg, rest) => _cmdDisplay({ println }, arg, rest)],
     [['export'], (_, arg) => _cmdExport({ println }, arg)],
-    [['metrics'], () => _cmdMetrics({ println })],
+    [['metrics'], (_, arg) => _cmdMetrics({ println }, arg)],
     [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['session'], (_, arg, rest) => _cmdSessionDispatch(arg, rest)],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],

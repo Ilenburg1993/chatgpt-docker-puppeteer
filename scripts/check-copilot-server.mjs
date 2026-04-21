@@ -3,12 +3,11 @@
 /**
  * @file Smoke test do servidor copilot dedicado (server/).
  *
- * Verifica que startCopilotServer() sobe, responde em /health,
- * e encerra limpo. Usado manualmente e em CI.
+ *   Verifica que startCopilotServer() sobe, responde em /health, e encerra limpo. Usado manualmente e em CI.
  *
- * Uso: node scripts/check-copilot-server.mjs
+ *   Uso: node scripts/check-copilot-server.mjs
  *
- * Onda 3.2 — L56.5.
+ *   Onda 3.2 — L56.5.
  */
 
 import { startCopilotServer } from '../src/copilot/server/index.js';

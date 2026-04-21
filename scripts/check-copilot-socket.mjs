@@ -3,12 +3,12 @@
 /**
  * @file Smoke test de socket.io do servidor copilot.
  *
- * Verifica que o namespace /copilot responde a events básicos.
- * Precisa que um servidor copilot esteja rodando (porta 3009 por default).
+ *   Verifica que o namespace /copilot responde a events básicos. Precisa que um servidor copilot esteja rodando (porta
+ *   3009 por default).
  *
- * Uso: node scripts/check-copilot-socket.mjs [porta]
+ *   Uso: node scripts/check-copilot-socket.mjs [porta]
  *
- * Onda 3.4 — L58.4.
+ *   Onda 3.4 — L58.4.
  */
 
 import { io as socketClient } from 'socket.io-client';

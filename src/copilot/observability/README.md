@@ -32,5 +32,21 @@ Coleta transversal do runtime: logging, métricas, tracing, timelines e snapshot
 - `agent/` = executa o runtime
 - `observability/` = coleta, mede e registra
 
-Se você estiver escrevendo código e pensar “vou parsear esse `SessionEvent` do SDK aqui dentro”, provavelmente o lugar
-certo não é esta pasta.
+## Critério prático
+
+Se a pergunta for “quem decide o significado do evento?” a resposta não é `observability/`.
+
+Esta pasta deve:
+
+- consumir sinais já estabilizados;
+- registrar, medir e correlacionar;
+- produzir timelines, alertas e snapshots observáveis.
+
+Ela não deve:
+
+- selecionar runtime;
+- criar payload HTTP canônico;
+- reinterpretar `SessionEvent` cru em paralelo a `event-handlers/`.
+
+Se você estiver escrevendo código e pensar “vou parsear esse `SessionEvent` do SDK aqui dentro”,
+provavelmente o lugar certo não é esta pasta.

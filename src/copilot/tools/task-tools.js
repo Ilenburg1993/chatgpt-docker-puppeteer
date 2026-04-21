@@ -16,10 +16,10 @@ import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { toError } from '../core/error-handlers.js';
 import { httpRequest } from '../sdk/http-request.js';
 import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
-import { toError } from '../core/error-handlers.js';
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.

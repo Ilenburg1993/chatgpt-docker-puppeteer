@@ -19,6 +19,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { isToolDisabled as defaultIsToolDisabled } from '#copilot/tools';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
 import { createPermissionHandler } from '../permission-handler.js';
@@ -139,7 +140,7 @@ export function createProductionHooks(opts = {}) {
         circuitBreakerMaxRetries = 3,
         circuitBreakerResetMs = 60_000,
         auditSink,
-        isToolDisabled = () => false,
+        isToolDisabled = defaultIsToolDisabled,
     } = opts;
 
     if (toolAllowList.length === 0) {

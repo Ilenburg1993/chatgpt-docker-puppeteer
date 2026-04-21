@@ -115,7 +115,7 @@ describe('F41 — assertSession error messages', () => {
         ['toolsHandlePendingCall', (/** @type {any} */ s) => toolsHandlePendingCall(s, 'r1')],
     ];
 
-    for (const [name, fn] of /** @type {Array<[string, (s: any) => Promise<unknown>]>} */ (fns)) {
+    for (const [name, fn] of /** @type {[string, (s: any) => Promise<unknown>][]} */ (fns)) {
         it(`${name}: rejeita objeto sem rpc com TypeError`, async () => {
             await expect(fn({})).rejects.toThrow(TypeError);
         });

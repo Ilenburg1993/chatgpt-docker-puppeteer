@@ -12,6 +12,7 @@
  */
 
 import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
  * Renderiza uma barra de progresso ASCII.
@@ -35,10 +36,12 @@ function progressBar(used, total, width = 20) {
  * Exibe o uso do context window — usa tokens reais do SDK quando disponíveis; fallback para heurística.
  *
  * @param {{ println: (text: string) => void }} ctx
+ * @param {string} [arg]
  * @returns {void}
  */
-export function cmdContext({ println }) {
-    const projection = readTerminalContextProjection();
+export function cmdContext({ println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const projection = callWithRuntimeTarget(readTerminalContextProjection, runtimeId);
 
     if (!projection.isRealData && !projection.hasHistory) {
         println('\x1b[90m  Nenhum histórico em memória ainda. Envie um turno primeiro.\x1b[0m');
@@ -95,12 +98,14 @@ export function cmdContext({ println }) {
  * file-context.js).
  *
  * @param {{ println: (text: string) => void }} ctx
+ * @param {string} [arg]
  * @returns {Promise<void>}
  */
-export async function cmdCompact({ println }) {
+export async function cmdCompact({ println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
     println('\x1b[90m  ⚙️  Solicitando compactação à LLM-B… aguarde.\x1b[0m');
 
-    const result = await requestTerminalCompactionProjection();
+    const result = await callWithRuntimeTarget(requestTerminalCompactionProjection, runtimeId);
     if (!result.ok || !result.reply) {
         println('\x1b[31m  ✗ LLM-B ocupada ou sem resposta. Tente novamente.\x1b[0m');
         return;

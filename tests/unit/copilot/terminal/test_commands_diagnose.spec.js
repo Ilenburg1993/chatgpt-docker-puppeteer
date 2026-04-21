@@ -34,12 +34,50 @@ const defaultRuntime = /** @type {any} */ ({
     }),
 });
 
+const altRuntime = /** @type {any} */ ({
+    status: 'idle',
+    model: 'gpt-4.1-mini',
+    reasoningEffort: 'medium',
+    dialogLoopActive: false,
+    getStatusSnapshot: () => ({
+        status: 'idle',
+        model: 'gpt-4.1-mini',
+        reasoningEffort: 'medium',
+    }),
+    getHealthSnapshot: () => ({
+        ok: true,
+        healthy: true,
+        status: 'healthy',
+        pendingQuestion: false,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: false,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowRemainingMs: null,
+        backgroundPendingCount: 0,
+        issues: [],
+        recommendedAction: 'none',
+        checks: {
+            io: { keepaliveRunning: true },
+            quota: { running: true },
+        },
+    }),
+});
+
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
-    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
-    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
 }));
 
 vi.mock('#copilot/bridges', () => ({
@@ -119,5 +157,25 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('streaming=');
         expect(ctx.output()).toContain('ask_user');
         expect(ctx.output()).toContain('shadow expirando');
+        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('*default:gpt-5/processing');
+    });
+
+    it('aceita runtimeId explícito no comando', async () => {
+        const ctx = mockCtx();
+
+        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime alt');
+
+        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('alt');
+        expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
+    it('explica explicitamente quando o runtime solicitado não existe', async () => {
+        const ctx = mockCtx();
+
+        await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime missing');
+
+        expect(ctx.output()).toContain('runtime default (default)');
     });
 });

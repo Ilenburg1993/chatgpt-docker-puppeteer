@@ -28,9 +28,9 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
-import { toError } from '../core/error-handlers.js';
 const execFileAsync = promisify(execFile);
 
 /**

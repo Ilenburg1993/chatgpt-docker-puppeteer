@@ -9,9 +9,9 @@
  * @see EventBus
  */
 
+import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { AuditRingBuffer } from './ring-buffer.js';
-import { toError } from '../core/error-handlers.js';
 
 /** @param {string} key @param {number} def @returns {number} */
 const envInt = (key, def) => {

@@ -181,11 +181,11 @@ describe('F40 — stopDialogMode', () => {
         const agent = createMockAgent();
         agent.stopDialogLoop = vi.fn().mockResolvedValue(undefined);
 
-        await stopDialogMode(agent, 'user_request');
+        await stopDialogMode(agent, 'authorized_stop');
 
         expect(agent.stopDialogLoop).toHaveBeenCalledWith({
             authorized: true,
-            reason: 'user_request',
+            reason: 'authorized_stop',
         });
     });
 

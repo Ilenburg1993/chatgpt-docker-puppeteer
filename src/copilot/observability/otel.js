@@ -41,8 +41,8 @@ const PROJECT_ROOT = path.resolve(__otel_dirname, '..', '..', '..');
  */
 const LOGS_DIR = COPILOT_OTEL_ENDPOINT
     ? ''
-        : process.env['COPILOT_LOG_DIR']
-            ? path.resolve(process.env['COPILOT_LOG_DIR'])
+    : process.env['COPILOT_LOG_DIR']
+      ? path.resolve(process.env['COPILOT_LOG_DIR'])
       : path.join(PROJECT_ROOT, 'var', 'logs', 'copilot');
 
 const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');

@@ -7,8 +7,8 @@
  * @module copilot/observability/bus-actions/error-alerter
  */
 
-import { log } from '../logger.js';
 import { toError } from '../../core/error-handlers.js';
+import { log } from '../logger.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus

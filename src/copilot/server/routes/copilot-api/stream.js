@@ -19,6 +19,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { buildAgentConnectedSsePayload } from '../../../presentation/runtime-status.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -29,23 +30,46 @@ import {
  *
  * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
  *
+ * @typedef {{
+ *     agent: AlwaysAliveAgentLike;
+ *     runtimeId: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }} RuntimeRouteDeps
+ *
+ *
+ * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ *
  * @typedef {import('#copilot/core').AgentEventName} AgentEventName
  */
+
+/**
+ * @param {RuntimeRouteBinding} binding
+ * @param {Req} req
+ * @returns {RuntimeRouteDeps}
+ */
+function resolveRuntimeRouteDeps(binding, req) {
+    if (typeof binding === 'function') {
+        return binding(req);
+    }
+    return {
+        agent: binding,
+        runtimeId: 'default',
+        requestedRuntimeId: null,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+    };
+}
 
 /**
  * Registra a rota SSE GET /stream no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde a rota será registrada
- * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
+ * @param {RuntimeRouteBinding} binding - Runtime fixo legado ou resolver por requisição
  * @returns {void}
  */
-export function registerStreamRoutes(bridge, agent) {
-    // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
-    // G2-ARCH-21: limite bounded em vez de ilimitado (0) para que o warning ainda apareça
-    // caso haja leak real de connections.
-    // INC-CORE-001 (fix): usar MAX_SSE_CLIENTS de core/constants.js (padrão 50 via env MAX_SSE_CLIENTS)
-    agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2)); // +2 para heartbeat + reconnect
-
+export function registerStreamRoutes(bridge, binding) {
     // UPG-SE-004: buffer de replay para reconexão SSE via Last-Event-ID
     const replayBuffer = new SseReplayBuffer();
 
@@ -72,6 +96,10 @@ export function registerStreamRoutes(bridge, agent) {
      * Uso: `GET /api/copilot/stream` com `Accept: text/event-stream`
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const deps = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = deps;
+        // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
+        agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2));
         // BUG-EVDUP-03 (fix): verificar limite de conexões SSE antes de aceitar
         if (!tracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
@@ -96,7 +124,7 @@ export function registerStreamRoutes(bridge, agent) {
         });
 
         // Evento inicial com snapshot do estado atual
-        sse.send('connected', { ...agent.getStatusSnapshot(), timestamp: Date.now() });
+        sse.send('connected', buildAgentConnectedSsePayload(agent, deps));
 
         // G2-PERF-05: handler genérico com bind leve por evento AGENT_EVENTS
         /**
@@ -141,6 +169,8 @@ export function registerStreamRoutes(bridge, agent) {
     ]);
 
     bridge.get('/stream/tasks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        agent.setMaxListeners?.(MAX_SSE_CLIENTS * (TASK_EVENTS.length + 2));
         if (!taskTracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE task atingido' });
             return;

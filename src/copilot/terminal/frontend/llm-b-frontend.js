@@ -12,7 +12,11 @@
 import { getMcpStatus } from '#copilot/bridges';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
-import { getDefaultAgentRuntimeId } from '../../presentation/agent-runtime.js';
+import { sendRuntimeDialogTurn } from '../../presentation/runtime-dialog.js';
+import {
+    normalizeAgentContextWindowProjection,
+    readAgentRuntimeOverview,
+} from '../../presentation/runtime-overview.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 import {
     getLastSdkPlanChangedAt,
@@ -30,7 +34,6 @@ import {
     clearTerminalHistoryFeed,
     createTerminalSnapshot,
     deleteTerminalHubMemory,
-    getTerminalAgentRuntime,
     isTerminalHubReady,
     listTerminalSnapshots,
     loadTerminalSnapshot,
@@ -60,7 +63,17 @@ import {
 /**
  * @typedef {{
  *     agent: import('#copilot/agent').AlwaysAliveAgent;
+ *     requestedRuntimeId: string | null;
  *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ *     agentRuntimes: {
+ *         runtimeId: string;
+ *         status: string;
+ *         model: string;
+ *         sessionId: string | null;
+ *         isDefault: boolean;
+ *     }[];
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
@@ -76,41 +89,48 @@ import {
  * @returns {ContextWindowProjection | null}
  */
 export function normalizeContextWindowProjection(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-    const data = /** @type {Record<string, unknown>} */ (raw);
-    const tokens = Number(data['tokens'] ?? NaN);
-    const tokenLimit = Number(data['tokenLimit'] ?? NaN);
-    const utilization = Number(data['utilization'] ?? NaN);
-    if (!Number.isFinite(tokens) || !Number.isFinite(tokenLimit) || !Number.isFinite(utilization)) {
-        return null;
-    }
-    return { tokens, tokenLimit, utilization };
+    return normalizeAgentContextWindowProjection(raw);
 }
 
 /**
  * Lê a base canônica de runtime que o terminal precisa para atuar como frontend principal da LLM-B.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {TerminalRuntimeBase}
  */
-export function readTerminalRuntimeBase() {
-    const agent = getTerminalAgentRuntime();
-    const runtimeId = getDefaultAgentRuntimeId();
-    const snap = /** @type {Record<string, unknown>} */ (agent.getStatusSnapshot());
-    const health = typeof agent.getHealthSnapshot === 'function' ? agent.getHealthSnapshot() : null;
+export function readTerminalRuntimeBase(runtimeId) {
+    const {
+        agent,
+        requestedRuntimeId,
+        runtimeId: resolvedRuntimeId,
+        runtimeFound,
+        usedDefaultRuntimeFallback,
+        agentRuntimes,
+        snap,
+        health,
+        runtimeSessionId,
+        contextWindow,
+    } = readAgentRuntimeOverview(runtimeId);
     const binding = readTerminalSessionBinding();
-    const runtimeSessionId =
-        agent.sessionId ??
-        (typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null) ??
-        binding.sdkSessionId ??
-        null;
-    const contextWindow = normalizeContextWindowProjection(snap['contextWindow'] ?? snap['contextState'] ?? null);
-    return { agent, runtimeId, snap, health, binding, runtimeSessionId, contextWindow };
+    return {
+        agent,
+        requestedRuntimeId,
+        runtimeId: resolvedRuntimeId,
+        runtimeFound,
+        usedDefaultRuntimeFallback,
+        agentRuntimes,
+        snap,
+        health,
+        binding,
+        runtimeSessionId: runtimeSessionId ?? binding.sdkSessionId ?? null,
+        contextWindow,
+    };
 }
 
 /**
  * Projeção de status do terminal/LLM-B para UX local.
  *
- * @param {{ hubSessionId?: string | null; injectPort?: number }} input
+ * @param {{ hubSessionId?: string | null; injectPort?: number; runtimeId?: string | null }} input
  * @returns {{
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
@@ -133,15 +153,25 @@ export function readTerminalRuntimeBase() {
  *     injectPort: number | null;
  *     hubSessionId: string | null;
  *     sdkSessionId: string | null;
+ *     requestedRuntimeId: string | null;
  *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ *     agentRuntimes: {
+ *         runtimeId: string;
+ *         status: string;
+ *         model: string;
+ *         sessionId: string | null;
+ *         isDefault: boolean;
+ *     }[];
  *     runtimeSessionId: string | null;
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
  *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  * }}
  */
-export function readTerminalStatusProjection({ hubSessionId = null, injectPort } = {}) {
-    const base = readTerminalRuntimeBase();
+export function readTerminalStatusProjection({ hubSessionId = null, injectPort, runtimeId = null } = {}) {
+    const base = readTerminalRuntimeBase(runtimeId);
     const pendingQuestion = base.agent.pendingQuestion ?? null;
     const pendingQuestionShadow = base.agent.pendingQuestionShadow ?? null;
     const pendingQuestionKind =
@@ -186,7 +216,11 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort }
         injectPort: typeof injectPort === 'number' ? injectPort : null,
         hubSessionId: hubSessionId ?? base.binding.hubSessionId ?? null,
         sdkSessionId: base.binding.sdkSessionId,
+        requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,
+        runtimeFound: base.runtimeFound,
+        usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
         workspace: getWorkspaceContext(),
         turnCount: readTerminalTurnCount(),
@@ -228,6 +262,7 @@ export function readTerminalDisplayProjection() {
 /**
  * Retorna a projeção canônica de configuração do runtime da LLM-B para o terminal.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     currentModel: string;
  *     currentReasoningEffort: string;
@@ -242,11 +277,22 @@ export function readTerminalDisplayProjection() {
  *         supportsVision?: boolean;
  *     } | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
+ *     requestedRuntimeId: string | null;
+ *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ *     agentRuntimes: {
+ *         runtimeId: string;
+ *         status: string;
+ *         model: string;
+ *         sessionId: string | null;
+ *         isDefault: boolean;
+ *     }[];
  *     runtimeSessionId: string | null;
  * }}
  */
-export function readTerminalConfigProjection() {
-    const base = readTerminalRuntimeBase();
+export function readTerminalConfigProjection(runtimeId) {
+    const base = readTerminalRuntimeBase(runtimeId);
     const currentModel = String(base.agent.model ?? base.snap['model'] ?? 'unknown');
     const currentReasoningEffort = String(base.agent.reasoningEffort ?? base.snap['reasoningEffort'] ?? 'off');
     const rawMeta = modelRegistry.get(currentModel);
@@ -266,6 +312,11 @@ export function readTerminalConfigProjection() {
               }
             : null,
         binding: base.binding,
+        requestedRuntimeId: base.requestedRuntimeId,
+        runtimeId: base.runtimeId,
+        runtimeFound: base.runtimeFound,
+        usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };
 }
@@ -273,14 +324,15 @@ export function readTerminalConfigProjection() {
 /**
  * Lista modelos disponíveis com o modelo atual anotado pela camada frontend do terminal.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
  *     currentModel: string;
  *     models: import('#copilot/sdk/types').ModelInfo[];
  * }>}
  */
-export async function listTerminalAvailableModelsProjection() {
+export async function listTerminalAvailableModelsProjection(runtimeId) {
     return {
-        currentModel: readTerminalConfigProjection().currentModel,
+        currentModel: readTerminalConfigProjection(runtimeId).currentModel,
         models: await listModels(),
     };
 }
@@ -288,11 +340,12 @@ export async function listTerminalAvailableModelsProjection() {
 /**
  * Estatísticas de modelos para a UX local do terminal.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{ currentModel: string; stats: ReturnType<typeof modelStatsTracker.allStats> }}
  */
-export function readTerminalModelStatsProjection() {
+export function readTerminalModelStatsProjection(runtimeId) {
     return {
-        currentModel: readTerminalConfigProjection().currentModel,
+        currentModel: readTerminalConfigProjection(runtimeId).currentModel,
         stats: modelStatsTracker.allStats(),
     };
 }
@@ -301,6 +354,7 @@ export function readTerminalModelStatsProjection() {
  * Troca o modelo do runtime do agente e devolve a projeção pós-operação.
  *
  * @param {string} modelId
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     previousModel: string;
  *     previousReasoningEffort: string;
@@ -315,10 +369,11 @@ export function readTerminalModelStatsProjection() {
  *         supportsVision?: boolean;
  *     } | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
+ *     runtimeId: string;
  * }}
  */
-export function setTerminalModelProjection(modelId) {
-    const { agent, binding } = readTerminalRuntimeBase();
+export function setTerminalModelProjection(modelId, runtimeId) {
+    const { agent, binding, runtimeId: resolvedRuntimeId } = readTerminalRuntimeBase(runtimeId);
     const previousModel = String(agent.model ?? 'unknown');
     const previousReasoningEffort = String(agent.reasoningEffort ?? 'off');
     const rawMeta = modelRegistry.get(modelId);
@@ -345,6 +400,7 @@ export function setTerminalModelProjection(modelId) {
               }
             : null,
         binding,
+        runtimeId: resolvedRuntimeId,
     };
 }
 
@@ -352,15 +408,17 @@ export function setTerminalModelProjection(modelId) {
  * Ajusta o reasoning effort do runtime do agente.
  *
  * @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} effort
- * @returns {{ previousReasoningEffort: string; currentReasoningEffort: string }}
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{ previousReasoningEffort: string; currentReasoningEffort: string; runtimeId: string }}
  */
-export function setTerminalReasoningProjection(effort) {
-    const { agent } = readTerminalRuntimeBase();
+export function setTerminalReasoningProjection(effort, runtimeId) {
+    const { agent, runtimeId: resolvedRuntimeId } = readTerminalRuntimeBase(runtimeId);
     const previousReasoningEffort = String(agent.reasoningEffort ?? 'off');
     agent.setReasoningEffort(effort);
     return {
         previousReasoningEffort,
         currentReasoningEffort: String(effort ?? 'off'),
+        runtimeId: resolvedRuntimeId,
     };
 }
 
@@ -382,6 +440,7 @@ export function readTerminalHistoryProjection(limitPairs = 10) {
 /**
  * Projeção consolidada do uso de contexto da LLM-B para o terminal.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     hasHistory: boolean;
  *     totalChars: number;
@@ -393,8 +452,8 @@ export function readTerminalHistoryProjection(limitPairs = 10) {
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  * }}
  */
-export function readTerminalContextProjection() {
-    const base = readTerminalRuntimeBase();
+export function readTerminalContextProjection(runtimeId) {
+    const base = readTerminalRuntimeBase(runtimeId);
     const history = /** @type {{ role: string; content: string }[]} */ (readTerminalHistoryFeed());
 
     let totalChars = 0;
@@ -425,19 +484,22 @@ export function readTerminalContextProjection() {
 /**
  * Solicita compactação ao runtime da LLM-B e reconstrói o histórico local com o resumo final.
  *
- * @returns {Promise<{ ok: boolean; reply: string | null; estimatedTokens: number | null }>}
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<{ ok: boolean; reply: string | null; estimatedTokens: number | null; runtimeId: string | null }>}
  */
-export async function requestTerminalCompactionProjection() {
-    const { sendTurn } = await import('../dialog.js');
-    const reply = await sendTurn(
+export async function requestTerminalCompactionProjection(runtimeId) {
+    const { agent, runtimeId: resolvedRuntimeId } = readTerminalRuntimeBase(runtimeId);
+    const reply = await sendRuntimeDialogTurn(
         '[SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve: ' +
             'todos os fatos, código, decisões, estados e contexto de arquivos discutidos. ' +
             'Responda APENAS com esse resumo. Após isso, considere o resumo como o novo ' +
             'contexto inicial desta sessão.',
         'user',
+        undefined,
+        agent,
     );
     if (!reply) {
-        return { ok: false, reply: null, estimatedTokens: null };
+        return { ok: false, reply: null, estimatedTokens: null, runtimeId: resolvedRuntimeId };
     }
 
     clearTerminalHistoryFeed();
@@ -447,6 +509,7 @@ export async function requestTerminalCompactionProjection() {
         ok: true,
         reply,
         estimatedTokens: Math.ceil((reply?.length ?? 0) / 4),
+        runtimeId: resolvedRuntimeId,
     };
 }
 
@@ -463,19 +526,21 @@ export function clearTerminalHistory() {
  * Encaminha uma resposta à pergunta pendente do runtime.
  *
  * @param {string} answer
+ * @param {string | null | undefined} [runtimeId]
  * @returns {boolean}
  */
-export function answerPendingTerminalQuestion(answer) {
-    return readTerminalRuntimeBase().agent.answerPendingQuestion(answer);
+export function answerPendingTerminalQuestion(answer, runtimeId) {
+    return readTerminalRuntimeBase(runtimeId).agent.answerPendingQuestion(answer);
 }
 
 /**
  * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {boolean}
  */
-export function clearPendingTerminalQuestionShadow() {
-    const agent = readTerminalRuntimeBase().agent;
+export function clearPendingTerminalQuestionShadow(runtimeId) {
+    const agent = readTerminalRuntimeBase(runtimeId).agent;
     return typeof agent.clearPendingQuestionShadow === 'function' ? agent.clearPendingQuestionShadow() : false;
 }
 
@@ -564,10 +629,11 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
  * Salva snapshot manual da sessão atual.
  *
  * @param {string | undefined} reason
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{ data: Record<string, any>; path: string }>}
  */
-export async function saveTerminalSnapshotProjection(reason) {
-    const { agent, snap } = readTerminalRuntimeBase();
+export async function saveTerminalSnapshotProjection(reason, runtimeId) {
+    const { agent, snap } = readTerminalRuntimeBase(runtimeId);
     const pendingQuestion =
         agent.pendingQuestion && typeof agent.pendingQuestion === 'object' ? agent.pendingQuestion : null;
     const pendingQuestionShadow =
@@ -638,6 +704,7 @@ export async function loadTerminalSnapshotProjection(snapshotId) {
 /**
  * Lê o estado vanilla de mode/plan da sessão SDK.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
  *     currentMode: 'interactive' | 'plan' | 'autopilot';
  *     plan: import('#copilot/sdk/types').PlanReadResult;
@@ -645,46 +712,49 @@ export async function loadTerminalSnapshotProjection(snapshotId) {
  *     lastObservedPlanChangedAt: number | null;
  * }>}
  */
-export async function readTerminalPlanProjection() {
-    return readTerminalSdkSessionProjectionImpl();
+export async function readTerminalPlanProjection(runtimeId) {
+    return readTerminalSdkSessionProjectionImpl(runtimeId);
 }
 
 /**
  * Altera o modo vanilla da sessão SDK e devolve a projeção antes/depois.
  *
  * @param {'interactive' | 'plan' | 'autopilot'} mode
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
  *     previousMode: 'interactive' | 'plan' | 'autopilot';
  *     currentMode: 'interactive' | 'plan' | 'autopilot';
  * }>}
  */
-export async function setTerminalPlanModeProjection(mode) {
-    return setTerminalSdkModeProjectionImpl(mode);
+export async function setTerminalPlanModeProjection(mode, runtimeId) {
+    return setTerminalSdkModeProjectionImpl(mode, runtimeId);
 }
 
 /**
  * Atualiza o plan.md vanilla da sessão SDK.
  *
  * @param {string} content
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
  */
-export async function updateTerminalPlanProjection(content) {
-    return updateTerminalSdkPlanProjectionImpl(content);
+export async function updateTerminalPlanProjection(content, runtimeId) {
+    return updateTerminalSdkPlanProjectionImpl(content, runtimeId);
 }
 
 /**
  * Remove o plan.md vanilla da sessão SDK e retorna o estado atualizado.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
  */
-export async function deleteTerminalPlanProjection() {
-    return deleteTerminalSdkPlanProjectionImpl();
+export async function deleteTerminalPlanProjection(runtimeId) {
+    return deleteTerminalSdkPlanProjectionImpl(runtimeId);
 }
 
 /**
  * Lê a projeção diagnóstica consolidada do terminal.
  *
- * @param {{ hubSessionId?: string | null }} input
+ * @param {{ hubSessionId?: string | null; runtimeId?: string | null }} input
  * @returns {Promise<{
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
@@ -705,8 +775,8 @@ export async function deleteTerminalPlanProjection() {
  *     sdkPlanChangedAt: number | null;
  * }>}
  */
-export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
-    const base = readTerminalRuntimeBase();
+export async function readTerminalDiagnoseProjection({ hubSessionId = null, runtimeId = null } = {}) {
+    const base = readTerminalRuntimeBase(runtimeId);
     const mcp = getMcpStatus();
     const memMB = Math.round(process.memoryUsage().rss / 1_048_576);
     const uptimeSec = Math.round(process.uptime());
@@ -767,10 +837,12 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
 /**
  * Consolida métricas da sessão e do runtime para a UX local.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
+ *     runtimeId: string;
  *     runtimeSessionId: string | null;
  *     contextWindow: ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
@@ -781,8 +853,8 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null }) {
  *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  * }}
  */
-export function readTerminalMetricsProjection() {
-    const base = readTerminalRuntimeBase();
+export function readTerminalMetricsProjection(runtimeId) {
+    const base = readTerminalRuntimeBase(runtimeId);
     const pr = /** @type {Record<string, any> | null} */ (base.agent.lastPrInfo ?? null);
     const toolStats = getToolStats();
     let toolCallCount = 0;
@@ -799,6 +871,7 @@ export function readTerminalMetricsProjection() {
         snap: base.snap,
         health: base.health,
         binding: base.binding,
+        runtimeId: base.runtimeId,
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
         pr,
@@ -841,18 +914,21 @@ export function readTerminalErrorsProjection(limit) {
 /**
  * Projeção instantânea de uso/context window para `/usage now`.
  *
+ * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     contextWindow: ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
+ *     runtimeId: string;
  *     runtimeSessionId: string | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
  * }}
  */
-export function readTerminalUsageNowProjection() {
-    const base = readTerminalRuntimeBase();
+export function readTerminalUsageNowProjection(runtimeId) {
+    const base = readTerminalRuntimeBase(runtimeId);
     return {
         contextWindow: base.contextWindow,
         pr: /** @type {Record<string, any> | null} */ (base.agent.lastPrInfo ?? null),
+        runtimeId: base.runtimeId,
         runtimeSessionId: base.runtimeSessionId,
         binding: base.binding,
     };

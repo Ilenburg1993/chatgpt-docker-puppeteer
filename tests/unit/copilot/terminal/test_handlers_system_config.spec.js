@@ -36,7 +36,9 @@ vi.mock('#copilot/agent', () => ({
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
     getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
     listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
-    setBackgroundCompactionThreshold: vi.fn(),
+    readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    setRuntimeBackgroundCompactionThreshold: vi.fn(),
 }));
 vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
     getMcpStatus: () => ({ available: false, toolCount: 0, circuitOpen: false }),
@@ -155,9 +157,7 @@ describe('handlers/system-config — infiniteSession', () => {
     });
 
     it('handleSetInfiniteSessionConfig rejeita tipo não-numérico', () => {
-        const result = handleSetInfiniteSessionConfig(
-            /** @type {any} */ ({ backgroundCompactionThreshold: 'high' }),
-        );
+        const result = handleSetInfiniteSessionConfig(/** @type {any} */ ({ backgroundCompactionThreshold: 'high' }));
         const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(400);
         expect(body.ok).toBe(false);

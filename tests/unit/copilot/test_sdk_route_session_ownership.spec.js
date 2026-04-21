@@ -72,10 +72,7 @@ describe('sdk routes session ownership SSOT', () => {
             CONVERSATION_STORE,
             () =>
                 /** @type {any} */ ({
-                    updateSdkSession(
-                        /** @type {string} */ hubSessionId,
-                        /** @type {string} */ sdkSessionId,
-                    ) {
+                    updateSdkSession(/** @type {string} */ hubSessionId, /** @type {string} */ sdkSessionId) {
                         persistedBindings.push({ hubSessionId, sdkSessionId });
                     },
                     createHubSession: () => 'hub-test',

@@ -2,10 +2,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const persistStateWithPolicy = vi.fn(async () => ({ ok: true, value: undefined }));
+const mocks = vi.hoisted(() => ({
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
+}));
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
-    persistStateWithPolicy,
+    persistStateWithPolicy: mocks.persistStateWithPolicy,
 }));
 
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
@@ -25,7 +27,7 @@ function createCtx(/** @type {boolean} */ dialogLoopActive) {
 
 describe('agent/dialog/user-input-handler', () => {
     beforeEach(() => {
-        persistStateWithPolicy.mockClear();
+        mocks.persistStateWithPolicy.mockClear();
     });
 
     it('classifica READY como ready e persiste metadados semânticos', async () => {
@@ -41,7 +43,7 @@ describe('agent/dialog/user-input-handler', () => {
         expect(pending.kind).toBe('ready');
         expect(pending.protocolControlled).toBe(true);
 
-        expect(persistStateWithPolicy).toHaveBeenCalledWith(
+        expect(mocks.persistStateWithPolicy).toHaveBeenCalledWith(
             expect.objectContaining({
                 pendingQuestion: 'READY: aguardando próxima mensagem',
                 pendingQuestionMeta: expect.objectContaining({ kind: 'ready', protocolControlled: true }),
@@ -59,7 +61,7 @@ describe('agent/dialog/user-input-handler', () => {
 
         const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
         expect(pending.kind).toBe('reply');
-        expect(persistStateWithPolicy).not.toHaveBeenCalled();
+        expect(mocks.persistStateWithPolicy).not.toHaveBeenCalled();
 
         pending.resolve('next');
         await expect(promise).resolves.toEqual({ answer: 'next', wasFreeform: true });
@@ -75,7 +77,7 @@ describe('agent/dialog/user-input-handler', () => {
         const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
         expect(pending.kind).toBe('question');
         expect(pending.protocolControlled).toBe(false);
-        expect(persistStateWithPolicy).toHaveBeenCalledWith(
+        expect(mocks.persistStateWithPolicy).toHaveBeenCalledWith(
             expect.objectContaining({
                 pendingQuestion: 'Qual o próximo passo?',
                 pendingQuestionMeta: expect.objectContaining({

@@ -20,6 +20,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+const mocks = vi.hoisted(() => ({
+    log: vi.fn(),
+    getToolStats: vi.fn(() => ({
+        web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
+        git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
+        shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
+    })),
+    getSummary: vi.fn(() => ({
+        tools: {
+            web_fetch: { totalCalls: 10, successCount: 9, errorCount: 1 },
+            git_status: { totalCalls: 5, successCount: 5, errorCount: 0 },
+        },
+        dialog: { totalTurns: 3 },
+        sessions: { active: 1 },
+        tasks: { completed: 2 },
+    })),
+    withSkipPermission: vi.fn((tool) => tool),
+}));
+
 vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: 'test-server',
     COPILOT_MODEL: 'gpt-4.1-test',
@@ -28,38 +47,13 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_DISABLED_AGENTS: '',
 }));
 
-vi.mock('#copilot/observability', () => ({
-    log: vi.fn(),
-    getToolStats: vi.fn(() => ({
-        web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
-        git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
-        shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
-    })),
-    defaultMetrics: {
-        getSummary: vi.fn(() => ({
-            tools: {
-                web_fetch: { totalCalls: 10, successCount: 9, errorCount: 1 },
-                git_status: { totalCalls: 5, successCount: 5, errorCount: 0 },
-            },
-            dialog: { totalTurns: 3 },
-            sessions: { active: 1 },
-            tasks: { completed: 2 },
-        })),
-    },
+vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+    log: mocks.log,
 }));
 
-vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-    LOG_DIR: '/tmp/test-logs',
-    getRecentLogs: vi.fn(() => []),
-}));
-
-vi.mock('#copilot/observability/tool-stats', () => ({
-    getToolStats: vi.fn(() => ({
-        web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
-        git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
-        shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
-    })),
+vi.mock('../../../../src/copilot/tools/metrics-proxy.js', () => ({
+    getSummary: mocks.getSummary,
+    getToolStats: mocks.getToolStats,
 }));
 
 vi.mock('#copilot/sdk', () => ({
@@ -79,7 +73,8 @@ vi.mock('#copilot/sdk', () => ({
 }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
-    withSkipPermission: vi.fn((tool) => tool),
+    buildTool: vi.fn((config) => config),
+    withSkipPermission: mocks.withSkipPermission,
 }));
 
 // ─── Suite ────────────────────────────────────────────────────────────────────

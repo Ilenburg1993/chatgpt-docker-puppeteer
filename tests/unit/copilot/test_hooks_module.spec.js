@@ -271,10 +271,7 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
     it('mode deny-all: nega ferramentas listadas', async () => {
         const handler = createPermissionHandler({ denyTools: ['shell'] });
         const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
-        assert.ok(
-            result?.kind === 'denied-by-rules',
-            `esperado denied-by-rules, recebido: ${JSON.stringify(result)}`,
-        );
+        assert.ok(result?.kind === 'denied-by-rules', `esperado denied-by-rules, recebido: ${JSON.stringify(result)}`);
     });
 });
 
@@ -759,10 +756,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
             },
         });
         const { onErrorOccurred } = createSessionHooks(ctx);
-        onErrorOccurred(
-            errorInput({ error: 'Too many requests', errorContext: 'rate_limit' }),
-            { sessionId: 'sess' },
-        );
+        onErrorOccurred(errorInput({ error: 'Too many requests', errorContext: 'rate_limit' }), { sessionId: 'sess' });
         assert.strictEqual(scheduled, 'gpt-3.5-turbo');
         delete process.env['COPILOT_FALLBACK_MODEL'];
     });
@@ -789,7 +783,9 @@ describe('createErrorHandler', () => {
 
     it('retorna estratégia fixa "skip"', async () => {
         const handler = createErrorHandler({ strategy: 'skip' });
-        const result = await handler(errorInput({ error: 'err', errorContext: 'tool', recoverable: false }), { sessionId: 's' });
+        const result = await handler(errorInput({ error: 'err', errorContext: 'tool', recoverable: false }), {
+            sessionId: 's',
+        });
         assert.strictEqual(result.errorHandling, 'skip');
     });
 
@@ -799,13 +795,17 @@ describe('createErrorHandler', () => {
         });
         const r1 = await handler(errorInput({ error: 'e', errorContext: 'rate_limit' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'retry');
-        const r2 = await handler(errorInput({ error: 'e', errorContext: 'other', recoverable: false }), { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'other', recoverable: false }), {
+            sessionId: 's',
+        });
         assert.strictEqual(r2.errorHandling, 'abort');
     });
 
     it('usa "abort" como padrão quando nenhuma opção passada', async () => {
         const handler = createErrorHandler();
-        const result = await handler(errorInput({ error: 'err', errorContext: '', recoverable: false }), { sessionId: 's' });
+        const result = await handler(errorInput({ error: 'err', errorContext: '', recoverable: false }), {
+            sessionId: 's',
+        });
         assert.strictEqual(result.errorHandling, 'abort');
     });
 
@@ -813,14 +813,12 @@ describe('createErrorHandler', () => {
         const handler = createErrorHandler({ strategy: 'retry', maxRetries: 1 });
 
         const first = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's1' });
-        const secondSameSession = await handler(
-            errorInput({ error: 'oops', errorContext: 'tool' }),
-            { sessionId: 's1' },
-        );
-        const firstOtherSession = await handler(
-            errorInput({ error: 'oops', errorContext: 'tool' }),
-            { sessionId: 's2' },
-        );
+        const secondSameSession = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), {
+            sessionId: 's1',
+        });
+        const firstOtherSession = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), {
+            sessionId: 's2',
+        });
 
         assert.strictEqual(first.errorHandling, 'retry');
         assert.strictEqual(secondSameSession.errorHandling, 'abort');
@@ -914,14 +912,10 @@ describe('createCircuitBreakerHandler', () => {
     it('isola o circuit breaker por sessionId para o mesmo errorContext', async () => {
         const handler = createCircuitBreakerHandler({ maxRetries: 2, resetAfterMs: 10_000 });
 
-        const firstSession = await handler(
-            errorInput({ error: 'e', errorContext: 'ctx-shared' }),
-            { sessionId: 's1' },
-        );
-        const secondSession = await handler(
-            errorInput({ error: 'e', errorContext: 'ctx-shared' }),
-            { sessionId: 's2' },
-        );
+        const firstSession = await handler(errorInput({ error: 'e', errorContext: 'ctx-shared' }), { sessionId: 's1' });
+        const secondSession = await handler(errorInput({ error: 'e', errorContext: 'ctx-shared' }), {
+            sessionId: 's2',
+        });
 
         assert.strictEqual(firstSession.errorHandling, 'retry');
         assert.strictEqual(firstSession.retryCount, 1);
@@ -935,9 +929,13 @@ describe('createContextualErrorHandler', () => {
         const handler = createContextualErrorHandler({ rate_limit: 'retry', permission: 'skip' }, 'abort');
         const r1 = await handler(errorInput({ error: 'e', errorContext: 'rate_limit' }), { sessionId: 's' });
         assert.strictEqual(r1.errorHandling, 'retry');
-        const r2 = await handler(errorInput({ error: 'e', errorContext: 'permission', recoverable: false }), { sessionId: 's' });
+        const r2 = await handler(errorInput({ error: 'e', errorContext: 'permission', recoverable: false }), {
+            sessionId: 's',
+        });
         assert.strictEqual(r2.errorHandling, 'skip');
-        const r3 = await handler(errorInput({ error: 'e', errorContext: 'unknown', recoverable: false }), { sessionId: 's' });
+        const r3 = await handler(errorInput({ error: 'e', errorContext: 'unknown', recoverable: false }), {
+            sessionId: 's',
+        });
         assert.strictEqual(r3.errorHandling, 'abort');
     });
 });

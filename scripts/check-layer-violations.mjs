@@ -40,6 +40,39 @@ const LAYER_MAP = {
 };
 
 /**
+ * Deliberate, documented boundary imports that are allowed to cross layers.
+ *
+ * - `observability/bootstrap.js` is the canonical bootstrap seam that wires lower-layer singletons to higher-layer
+ *   logging/hooks/tools dependencies during app startup.
+ * - `types/index.js` is a public aggregation barrel for shared tokens/contracts across modules.
+ *
+ * These are not accidental layer leaks; they are explicit composition boundaries.
+ *
+ * @param {string} relFile
+ * @param {string} targetModule
+ * @param {string} spec
+ * @returns {boolean}
+ */
+function isAllowedBoundaryImport(relFile, targetModule, spec) {
+    if (relFile === 'observability/bootstrap.js') {
+        return (
+            targetModule === 'hooks' ||
+            targetModule === 'tools' ||
+            spec.startsWith('#copilot/hooks') ||
+            spec.startsWith('#copilot/tools') ||
+            spec.startsWith('../hooks/') ||
+            spec.startsWith('../tools/')
+        );
+    }
+
+    if (relFile === 'types/index.js') {
+        return ['audit', 'bridges', 'conversation-hub', 'sdk'].includes(targetModule);
+    }
+
+    return false;
+}
+
+/**
  * Recursivamente lista todos os .js no diretório.
  *
  * @param {string} dir
@@ -188,6 +221,9 @@ export function checkViolations() {
 
                 const toLayer = LAYER_MAP[targetModule];
                 if (toLayer > fromLayer) {
+                    if (isAllowedBoundaryImport(relFile, targetModule, spec)) {
+                        continue;
+                    }
                     // Encontrar número da linha
                     const beforeMatch = src.substring(0, match.index);
                     const lineNum = (beforeMatch.match(/\n/g) || []).length + 1;

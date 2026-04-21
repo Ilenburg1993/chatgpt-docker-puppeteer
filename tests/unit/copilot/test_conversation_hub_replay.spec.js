@@ -219,7 +219,7 @@ describe('F35.5 — HubOrchestrator standalone flow', () => {
         orchStore = new ConversationStore();
         orchStore.init(orchDb);
 
-        const mockAgent = { getStatusSnapshot: () => ({ sessionId: 'test-session' }) };
+        const mockAgent = { sessionId: 'test-session' };
         orch = new HubOrchestrator(orchStore, mockAgent);
 
         const mockBridge = {

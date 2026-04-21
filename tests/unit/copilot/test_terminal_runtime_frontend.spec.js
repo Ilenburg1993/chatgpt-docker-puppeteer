@@ -18,6 +18,16 @@ const createHubSession = vi.fn(() => 'hub-1');
 const getHubSession = vi.fn(() => ({ id: 'hub-1', title: 'Hub' }));
 const getTurn = vi.fn(() => ({ turn_number: 7 }));
 const writeTurn = vi.fn(async () => 42);
+const defaultGetSdkSessionMode = vi.fn(async () => ({ mode: 'interactive' }));
+const defaultSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
+const defaultReadSdkPlan = vi.fn(async () => ({ path: '/tmp/default-plan.md', content: 'default plan' }));
+const defaultUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
+const defaultDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
+const altGetSdkSessionMode = vi.fn(async () => ({ mode: 'plan' }));
+const altSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
+const altReadSdkPlan = vi.fn(async () => ({ path: '/tmp/alt-plan.md', content: 'alt plan' }));
+const altUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
+const altDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
 
 const defaultRuntime = /** @type {any} */ ({
     model: 'gpt-5',
@@ -46,19 +56,73 @@ const defaultRuntime = /** @type {any} */ ({
     pendingQuestionShadowAgeMs: 1200,
     pendingQuestionShadowExpiresAt: 3,
     pendingQuestionShadowRemainingMs: 0,
+    lastPrInfo: { model: 'gpt-5', cost: 0.1234, ts: 10 },
     pauseDialogLoop,
     resumeDialogLoop,
     stopDialogLoop,
     pingDialogWatchdog,
+    getSdkSessionMode: defaultGetSdkSessionMode,
+    setSdkSessionMode: defaultSetSdkSessionMode,
+    readSdkPlan: defaultReadSdkPlan,
+    updateSdkPlan: defaultUpdateSdkPlan,
+    deleteSdkPlan: defaultDeleteSdkPlan,
     getHandoffManager: () => ({ getHistory: () => [{ fromAgent: 'llm-a', toAgent: 'llm-b', status: 'done' }] }),
+    getStatusSnapshot: () => ({
+        contextWindow: { tokens: 32000, tokenLimit: 128000, utilization: 0.25 },
+    }),
 });
 
+const altRuntime = /** @type {any} */ ({
+    model: 'gpt-5-mini',
+    reasoningEffort: 'medium',
+    status: 'processing',
+    sessionId: 'sdk-alt',
+    dialogLoopActive: false,
+    dialogPaused: true,
+    queueSize: 1,
+    pendingQuestion: null,
+    pendingQuestionShadow: null,
+    pendingQuestionShadowState: null,
+    pendingQuestionShadowExpired: false,
+    pendingQuestionShadowAgeMs: null,
+    pendingQuestionShadowExpiresAt: null,
+    pendingQuestionShadowRemainingMs: null,
+    lastPrInfo: { model: 'gpt-5-mini', cost: 0.02, ts: 20 },
+    pauseDialogLoop: vi.fn(async () => {}),
+    resumeDialogLoop: vi.fn(async () => {}),
+    stopDialogLoop: vi.fn(async () => {}),
+    pingDialogWatchdog: vi.fn(),
+    getSdkSessionMode: altGetSdkSessionMode,
+    setSdkSessionMode: altSetSdkSessionMode,
+    readSdkPlan: altReadSdkPlan,
+    updateSdkPlan: altUpdateSdkPlan,
+    deleteSdkPlan: altDeleteSdkPlan,
+    getHandoffManager: () => ({ getHistory: () => [{ fromAgent: 'llm-a', toAgent: 'llm-b', status: 'queued' }] }),
+    getStatusSnapshot: () => ({
+        contextWindow: { tokens: 12000, tokenLimit: 64000, utilization: 0.18 },
+    }),
+});
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
-    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
-    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
+    getRegisteredAgentRuntime: (/** @type {string | null | undefined} */ runtimeId = 'default') => {
+        if (runtimeId === 'alt') return altRuntime;
+        return runtimeId === 'default' ? defaultRuntime : null;
+    },
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+    readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => ({ ok: true, status: 'healthy' }),
+    getRuntimeHandoffManager: (/** @type {any} */ runtime) => runtime.getHandoffManager(),
+    getRuntimeHandoffHistory: (/** @type {any} */ runtime) => runtime.getHandoffManager().getHistory(),
+    stopAgentDialogLoopAuthorized: vi.fn(
+        async (/** @type {any} */ runtime, /** @type {string | undefined} */ reason) => {
+            await runtime.stopDialogLoop({ authorized: true, reason: reason ?? 'authorized_stop' });
+        },
+    ),
 }));
 
 vi.mock('#copilot/channel', () => ({
@@ -113,6 +177,19 @@ describe('terminal/frontend/llm-b-runtime', () => {
         expect(state.pendingQuestionShadowAgeMs).toBe(1200);
         expect(state.pendingQuestionShadowExpiresAt).toBe(3);
         expect(state.pendingQuestionShadowRemainingMs).toBe(0);
+        expect(state.contextWindow).toEqual({ tokens: 32000, tokenLimit: 128000, utilization: 0.25 });
+        expect(state.lastPrInfo).toEqual({ model: 'gpt-5', cost: 0.1234, ts: 10 });
+    });
+
+    it('lê runtime explícito sem quebrar o caminho default', () => {
+        const state = runtime.readTerminalRuntimeState('alt');
+
+        expect(state.runtimeId).toBe('alt');
+        expect(state.model).toBe('gpt-5-mini');
+        expect(state.reasoningEffort).toBe('medium');
+        expect(state.sessionId).toBe('sdk-alt');
+        expect(state.contextWindow).toEqual({ tokens: 12000, tokenLimit: 64000, utilization: 0.18 });
+        expect(runtime.readTerminalHandoffHistory('alt')).toHaveLength(1);
     });
 
     it('encapsula operações de dialog mode e histórico do channel', async () => {
@@ -162,5 +239,17 @@ describe('terminal/frontend/llm-b-runtime', () => {
         expect(initHub).toHaveBeenCalled();
         expect(attachSocketIO).toHaveBeenCalled();
         expect(notifyTerminalTurn).toHaveBeenCalled();
+    });
+
+    it('encapsula mode/plan vanilla da sessão SDK por runtime explícito', async () => {
+        expect(await runtime.getTerminalSdkSessionMode('alt')).toEqual({ mode: 'plan' });
+        expect(await runtime.setTerminalSdkSessionMode('autopilot', 'alt')).toEqual({ mode: 'autopilot' });
+        expect(await runtime.readTerminalSdkPlan('alt')).toEqual({ path: '/tmp/alt-plan.md', content: 'alt plan' });
+        await runtime.updateTerminalSdkPlan('novo plano', 'alt');
+        await runtime.deleteTerminalSdkPlan('alt');
+
+        expect(altSetSdkSessionMode).toHaveBeenCalledWith('autopilot');
+        expect(altUpdateSdkPlan).toHaveBeenCalledWith('novo plano');
+        expect(altDeleteSdkPlan).toHaveBeenCalled();
     });
 });

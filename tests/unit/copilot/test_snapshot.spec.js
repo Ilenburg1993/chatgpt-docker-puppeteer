@@ -1,9 +1,22 @@
 // @ts-check
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const fsMocks = vi.hoisted(() => {
+    const mockAccess = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+    const mockMkdir = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+    const mockReaddir = /** @type {any} */ (vi.fn(() => Promise.resolve([])));
+    const mockReadFile = /** @type {any} */ (vi.fn(() => Promise.resolve('{}')));
+    const mockWriteFile = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+    const mockRm = /** @type {any} */ (vi.fn(() => Promise.resolve()));
+    return { mockAccess, mockMkdir, mockReaddir, mockReadFile, mockWriteFile, mockRm };
+});
+
 /* ── mocks ── */
 vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 vi.mock('../../../src/copilot/agent/config.js', () => ({
     SNAPSHOT_DIR: null,
@@ -12,6 +25,7 @@ vi.mock('../../../src/copilot/agent/config.js', () => ({
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     readState: vi.fn(() => ({ key: 'value' })),
+    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
 }));
 
 vi.mock('#copilot/core/error-handlers', () => ({
@@ -34,33 +48,13 @@ vi.mock('#copilot/core/schemas', () => ({
 }));
 
 /* fs/promises mock */
-const mockAccess = /** @type {any} */ (vi.fn(() => Promise.resolve()));
-const mockMkdir = /** @type {any} */ (vi.fn(() => Promise.resolve()));
-const mockReaddir = /** @type {any} */ (vi.fn(() => Promise.resolve([])));
-const mockReadFile = /** @type {any} */ (vi.fn(() => Promise.resolve('{}')));
-const mockWriteFile = /** @type {any} */ (vi.fn(() => Promise.resolve()));
-const mockRm = /** @type {any} */ (vi.fn(() => Promise.resolve()));
-
-/** @param {...any} args */
-const accessProxy = (...args) => mockAccess(...args);
-/** @param {...any} args */
-const mkdirProxy = (...args) => mockMkdir(...args);
-/** @param {...any} args */
-const readdirProxy = (...args) => mockReaddir(...args);
-/** @param {...any} args */
-const readFileProxy = (...args) => mockReadFile(...args);
-/** @param {...any} args */
-const writeFileProxy = (...args) => mockWriteFile(...args);
-/** @param {...any} args */
-const rmProxy = (...args) => mockRm(...args);
-
 vi.mock('node:fs/promises', () => ({
-    access: accessProxy,
-    mkdir: mkdirProxy,
-    readdir: readdirProxy,
-    readFile: readFileProxy,
-    writeFile: writeFileProxy,
-    rm: rmProxy,
+    access: fsMocks.mockAccess,
+    mkdir: fsMocks.mockMkdir,
+    readdir: fsMocks.mockReaddir,
+    readFile: fsMocks.mockReadFile,
+    writeFile: fsMocks.mockWriteFile,
+    rm: fsMocks.mockRm,
 }));
 
 /* ── SUT ── */
@@ -75,8 +69,8 @@ import {
 describe('snapshot', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockAccess.mockResolvedValue(undefined);
-        mockReaddir.mockResolvedValue([]);
+        fsMocks.mockAccess.mockResolvedValue(undefined);
+        fsMocks.mockReaddir.mockResolvedValue([]);
     });
 
     describe('createSnapshot', () => {
@@ -121,7 +115,7 @@ describe('snapshot', () => {
 
     describe('saveSnapshotAsync', () => {
         it('cria diretório e escreve JSON', async () => {
-            mockReaddir.mockResolvedValue([]);
+            fsMocks.mockReaddir.mockResolvedValue([]);
 
             const snap = createSnapshot({
                 sessionId: null,
@@ -135,21 +129,21 @@ describe('snapshot', () => {
 
             const path = await saveSnapshotAsync(snap);
 
-            expect(mockMkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
-            expect(mockWriteFile).toHaveBeenCalledTimes(1);
+            expect(fsMocks.mockMkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
+            expect(fsMocks.mockWriteFile).toHaveBeenCalledTimes(1);
             expect(path).toContain(snap.snapshotId);
         });
     });
 
     describe('listSnapshotsAsync', () => {
         it('retorna array vazio se diretório não existe', async () => {
-            mockAccess.mockRejectedValue(new Error('ENOENT'));
+            fsMocks.mockAccess.mockRejectedValue(new Error('ENOENT'));
             expect(await listSnapshotsAsync()).toEqual([]);
         });
 
         it('lista e ordena por createdAt desc', async () => {
-            mockReaddir.mockResolvedValue(['snap-1.json', 'snap-2.json']);
-            mockReadFile
+            fsMocks.mockReaddir.mockResolvedValue(['snap-1.json', 'snap-2.json']);
+            fsMocks.mockReadFile
                 .mockResolvedValueOnce(JSON.stringify({ snapshotId: 'snap-1', createdAt: 100, model: 'gpt-4o' }))
                 .mockResolvedValueOnce(JSON.stringify({ snapshotId: 'snap-2', createdAt: 200, model: 'gpt-4o' }));
 
@@ -163,29 +157,29 @@ describe('snapshot', () => {
     describe('loadSnapshotAsync', () => {
         it('carrega snapshot por ID exato', async () => {
             const data = { snapshotId: 'snap-abc', createdAt: 100, model: 'gpt-4o' };
-            mockReadFile.mockResolvedValue(JSON.stringify(data));
+            fsMocks.mockReadFile.mockResolvedValue(JSON.stringify(data));
 
             const snap = await loadSnapshotAsync('snap-abc');
             expect(snap).toEqual(data);
         });
 
         it('retorna null se não encontrado', async () => {
-            mockAccess.mockRejectedValue(new Error('ENOENT'));
+            fsMocks.mockAccess.mockRejectedValue(new Error('ENOENT'));
             expect(await loadSnapshotAsync('nope')).toBeNull();
         });
     });
 
     describe('pruneSnapshotsAsync', () => {
         it('remove snapshots antigos além do limite', async () => {
-            /** @type {{ snapshotId: string, createdAt: number, model: string }[]} */
+            /** @type {{ snapshotId: string; createdAt: number; model: string }[]} */
             const snaps = [
                 { snapshotId: 's1', createdAt: 300, model: 'm' },
                 { snapshotId: 's2', createdAt: 200, model: 'm' },
                 { snapshotId: 's3', createdAt: 100, model: 'm' },
                 { snapshotId: 's4', createdAt: 50, model: 'm' },
             ];
-            mockReaddir.mockResolvedValue(snaps.map((s) => `${s.snapshotId}.json`));
-            mockReadFile.mockImplementation(
+            fsMocks.mockReaddir.mockResolvedValue(snaps.map((s) => `${s.snapshotId}.json`));
+            fsMocks.mockReadFile.mockImplementation(
                 /** @param {string} p */
                 (p) => {
                     const id = String(p).split('/').pop()?.replace('.json', '');
@@ -196,12 +190,12 @@ describe('snapshot', () => {
 
             const removed = await pruneSnapshotsAsync(2);
             expect(removed).toBe(2);
-            expect(mockRm).toHaveBeenCalledTimes(2);
+            expect(fsMocks.mockRm).toHaveBeenCalledTimes(2);
         });
 
         it('não remove nada se dentro do limite', async () => {
-            mockReaddir.mockResolvedValue(['s1.json']);
-            mockReadFile.mockResolvedValue(JSON.stringify({ snapshotId: 's1', createdAt: 100, model: 'm' }));
+            fsMocks.mockReaddir.mockResolvedValue(['s1.json']);
+            fsMocks.mockReadFile.mockResolvedValue(JSON.stringify({ snapshotId: 's1', createdAt: 100, model: 'm' }));
 
             const removed = await pruneSnapshotsAsync(5);
             expect(removed).toBe(0);

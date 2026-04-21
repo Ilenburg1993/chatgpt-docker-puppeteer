@@ -112,12 +112,14 @@ export async function buildHookSystemContext() {
         if (jsonResult.ok && !parseResult.success) {
             log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error?.message}`);
         }
-        const state = /** @type {{
-         *   compliance?: { consecutive_unauthorized?: number };
-         *   current_turn?: { number?: number };
-         *   close_key?: string;
-         *   strict_turn_close?: boolean;
-         * }} */ (parseResult.success ? parseResult.data : jsonResult.ok ? jsonResult.data : {});
+        const state = /**
+         * @type {{
+         *     compliance?: { consecutive_unauthorized?: number };
+         *     current_turn?: { number?: number };
+         *     close_key?: string;
+         *     strict_turn_close?: boolean;
+         * }}
+         */ (parseResult.success ? parseResult.data : jsonResult.ok ? jsonResult.data : {});
         // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
         // antes de usá-los no system prompt para prevenir prompt injection
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;

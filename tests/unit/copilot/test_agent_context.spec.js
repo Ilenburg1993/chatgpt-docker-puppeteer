@@ -5,6 +5,7 @@
  * F41.1: Testes unitários para AgentContext (F35).
  */
 
+import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import * as assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { describe, it } from 'vitest';
@@ -102,7 +103,7 @@ describe('AgentContext', () => {
         const ctx = new AgentContext(emitter);
 
         let emitted = false;
-        emitter.on('__processQueue', () => {
+        emitter.on(EMITTER_PROCESS_QUEUE, () => {
             emitted = true;
         });
 
@@ -115,7 +116,7 @@ describe('AgentContext', () => {
             enqueuedAt: Date.now(),
         };
         ctx.messageQueue.enqueue(task);
-        assert.ok(emitted, '__processQueue deve ser emitido quando task é enfileirada');
+        assert.ok(emitted, 'EMITTER_PROCESS_QUEUE deve ser emitido quando task é enfileirada');
     });
 
     it('messageQueue.onChanged invalida statusSnapshotCache', () => {

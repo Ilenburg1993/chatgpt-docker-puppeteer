@@ -1,13 +1,13 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { ALWAYS_ALIVE_AGENT, alwaysAliveAgent } from '#copilot/agent';
+import { ALWAYS_ALIVE_AGENT, alwaysAliveAgent, clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import express from 'express';
-import request from 'supertest';
+import supertest from 'supertest';
 
 import { buildAgentModuleHealth, buildLegacyAgentHealth } from '../../../src/copilot/server/routes/agent-health.js';
 import { registerControlRoutes } from '../../../src/copilot/server/routes/copilot-api/control.js';
@@ -27,6 +27,7 @@ describe('agent health routes', () => {
     let hadConversationStore = false;
 
     beforeEach(() => {
+        clearAgentRuntimeRegistry();
         hadAgent = container.has(ALWAYS_ALIVE_AGENT);
         hadConversationStore = container.has(CONVERSATION_STORE);
         previousAgent = hadAgent ? container.resolve(ALWAYS_ALIVE_AGENT) : undefined;
@@ -34,6 +35,8 @@ describe('agent health routes', () => {
     });
 
     afterEach(() => {
+        clearAgentRuntimeRegistry();
+        registerAgentRuntime(/** @type {any} */ (hadAgent ? previousAgent : alwaysAliveAgent));
         container.register(ALWAYS_ALIVE_AGENT, () => (hadAgent ? previousAgent : alwaysAliveAgent), 'singleton');
         container.register(
             CONVERSATION_STORE,
@@ -50,27 +53,51 @@ describe('agent health routes', () => {
     });
 
     it('GET /health/agent retorna o snapshot canônico do agente', async () => {
-        container.register(
-            ALWAYS_ALIVE_AGENT,
-            () =>
-                /** @type {any} */ ({
-                    status: 'idle',
-                    sessionId: 'session-123',
-                    dialogLoopActive: false,
-                    queueSize: 0,
-                    model: 'gpt-5',
-                    reasoningEffort: 'high',
-                    pendingQuestion: null,
-                    dialogPaused: false,
-                    getHealthSnapshot: () => ({
+        const agent = /** @type {any} */ ({
+            status: 'idle',
+            sessionId: 'session-123',
+            dialogLoopActive: false,
+            queueSize: 0,
+            model: 'gpt-5',
+            reasoningEffort: 'high',
+            pendingQuestion: null,
+            dialogPaused: false,
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                agentStatus: 'idle',
+                sessionId: 'session-123',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: false,
+                pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                backgroundPendingCount: 0,
+                backgroundPendingLabels: [],
+                riskFlags: [],
+                recommendedAction: 'none',
+                uptime: 1234,
+                issues: [],
+                bootReport: null,
+                checks: {
+                    runtime: { ok: true, status: 'idle', operational: true },
+                    client: { ok: true, available: true },
+                    session: { ok: true, active: true, resumed: false },
+                    dialog: { ok: true, active: false, attached: true, paused: false },
+                    queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                    io: {
                         ok: true,
-                        healthy: true,
-                        status: 'healthy',
-                        agentStatus: 'idle',
-                        sessionId: 'session-123',
-                        model: 'gpt-5',
-                        reasoningEffort: 'high',
-                        dialogLoopActive: false,
                         pendingQuestion: false,
                         pendingQuestionKind: null,
                         pendingQuestionShadow: false,
@@ -80,57 +107,30 @@ describe('agent health routes', () => {
                         pendingQuestionShadowAgeMs: null,
                         pendingQuestionShadowExpiresAt: null,
                         pendingQuestionShadowRemainingMs: null,
-                        queueSize: 0,
-                        oldestTaskWaitMs: 0,
-                        starvationAlert: false,
+                        waitingForInput: false,
+                        keepaliveRunning: true,
                         backgroundPendingCount: 0,
-                        backgroundPendingLabels: [],
-                        riskFlags: [],
-                        recommendedAction: 'none',
-                        uptime: 1234,
-                        issues: [],
-                        bootReport: null,
-                        checks: {
-                            runtime: { ok: true, status: 'idle', operational: true },
-                            client: { ok: true, available: true },
-                            session: { ok: true, active: true, resumed: false },
-                            dialog: { ok: true, active: false, attached: true, paused: false },
-                            queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
-                            io: {
-                                ok: true,
-                                pendingQuestion: false,
-                                pendingQuestionKind: null,
-                                pendingQuestionShadow: false,
-                                pendingQuestionShadowKind: null,
-                                pendingQuestionShadowState: null,
-                                pendingQuestionShadowExpired: false,
-                                pendingQuestionShadowAgeMs: null,
-                                pendingQuestionShadowExpiresAt: null,
-                                pendingQuestionShadowRemainingMs: null,
-                                waitingForInput: false,
-                                keepaliveRunning: true,
-                                backgroundPendingCount: 0,
-                            },
-                            background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
-                            boot: {
-                                ok: true,
-                                reportAvailable: false,
-                                failedSteps: 0,
-                                degradedSteps: 0,
-                                lastCompletedAt: null,
-                            },
-                            quota: { ok: true, configured: true, running: true },
-                        },
-                        ts: Date.now(),
-                    }),
-                }),
-            'singleton',
-        );
+                    },
+                    background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                    boot: {
+                        ok: true,
+                        reportAvailable: false,
+                        failedSteps: 0,
+                        degradedSteps: 0,
+                        lastCompletedAt: null,
+                    },
+                    quota: { ok: true, configured: true, running: true },
+                },
+                ts: Date.now(),
+            }),
+        });
+        container.register(ALWAYS_ALIVE_AGENT, () => agent, 'singleton');
+        registerAgentRuntime(agent);
 
         const app = express();
         app.use(createHealthRouter());
 
-        const res = await request(app).get('/health/agent').expect(200);
+        const res = await supertest(app).get('/health/agent').expect(200);
 
         assert.equal(res.body.ok, true);
         assert.equal(res.body.status, 'healthy');
@@ -138,28 +138,52 @@ describe('agent health routes', () => {
         assert.equal(res.body.checks.client.ok, true);
     });
 
-    it('GET /health/agent responde 503 quando o snapshot indica unhealthy', async () => {
-        container.register(
-            ALWAYS_ALIVE_AGENT,
-            () =>
-                /** @type {any} */ ({
-                    status: 'stopped',
-                    sessionId: null,
-                    dialogLoopActive: false,
-                    queueSize: 0,
-                    model: 'gpt-5',
-                    reasoningEffort: 'high',
-                    pendingQuestion: null,
-                    dialogPaused: false,
-                    getHealthSnapshot: () => ({
-                        ok: false,
-                        healthy: false,
-                        status: 'unhealthy',
-                        agentStatus: 'stopped',
-                        sessionId: null,
-                        model: 'gpt-5',
-                        reasoningEffort: 'high',
-                        dialogLoopActive: false,
+    it('GET /health/agent aceita runtimeId explícito via query string', async () => {
+        const defaultAgent = /** @type {any} */ ({
+            status: 'idle',
+            sessionId: 'default-session',
+            dialogLoopActive: false,
+            queueSize: 0,
+            model: 'gpt-5',
+            reasoningEffort: 'high',
+            pendingQuestion: null,
+            dialogPaused: false,
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                agentStatus: 'idle',
+                sessionId: 'default-session',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: false,
+                pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                backgroundPendingCount: 0,
+                backgroundPendingLabels: [],
+                riskFlags: [],
+                recommendedAction: 'none',
+                uptime: 100,
+                issues: [],
+                bootReport: null,
+                checks: {
+                    runtime: { ok: true, status: 'idle', operational: true },
+                    client: { ok: true, available: true },
+                    session: { ok: true, active: true, resumed: false },
+                    dialog: { ok: true, active: false, attached: true, paused: false },
+                    queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                    io: {
+                        ok: true,
                         pendingQuestion: false,
                         pendingQuestionKind: null,
                         pendingQuestionShadow: false,
@@ -169,57 +193,203 @@ describe('agent health routes', () => {
                         pendingQuestionShadowAgeMs: null,
                         pendingQuestionShadowExpiresAt: null,
                         pendingQuestionShadowRemainingMs: null,
-                        queueSize: 0,
-                        oldestTaskWaitMs: 0,
-                        starvationAlert: false,
+                        waitingForInput: false,
+                        keepaliveRunning: true,
                         backgroundPendingCount: 0,
-                        backgroundPendingLabels: [],
-                        riskFlags: ['runtime.stopped', 'client.missing', 'session.missing'],
-                        recommendedAction: 'restart_agent',
-                        uptime: null,
-                        issues: ['runtime.not_operational.stopped', 'client.unavailable', 'session.inactive'],
-                        bootReport: null,
-                        checks: {
-                            runtime: { ok: false, status: 'stopped', operational: false },
-                            client: { ok: false, available: false },
-                            session: { ok: false, active: false, resumed: false },
-                            dialog: { ok: true, active: false, attached: true, paused: false },
-                            queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
-                            io: {
-                                ok: true,
-                                pendingQuestion: false,
-                                pendingQuestionKind: null,
-                                pendingQuestionShadow: false,
-                                pendingQuestionShadowKind: null,
-                                pendingQuestionShadowState: null,
-                                pendingQuestionShadowExpired: false,
-                                pendingQuestionShadowAgeMs: null,
-                                pendingQuestionShadowExpiresAt: null,
-                                pendingQuestionShadowRemainingMs: null,
-                                waitingForInput: false,
-                                keepaliveRunning: false,
-                                backgroundPendingCount: 0,
-                            },
-                            background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
-                            boot: {
-                                ok: true,
-                                reportAvailable: false,
-                                failedSteps: 0,
-                                degradedSteps: 0,
-                                lastCompletedAt: null,
-                            },
-                            quota: { ok: false, configured: true, running: false },
-                        },
-                        ts: Date.now(),
-                    }),
-                }),
-            'singleton',
-        );
+                    },
+                    background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                    boot: { ok: true, reportAvailable: false, failedSteps: 0, degradedSteps: 0, lastCompletedAt: null },
+                    quota: { ok: true, configured: true, running: true },
+                },
+                ts: Date.now(),
+            }),
+        });
+        const altAgent = /** @type {any} */ ({
+            ...defaultAgent,
+            sessionId: 'alt-session',
+            getHealthSnapshot: () => ({
+                ...defaultAgent.getHealthSnapshot(),
+                sessionId: 'alt-session',
+            }),
+        });
+
+        container.register(ALWAYS_ALIVE_AGENT, () => defaultAgent, 'singleton');
+        registerAgentRuntime(defaultAgent, 'default');
+        registerAgentRuntime(altAgent, 'alt');
 
         const app = express();
         app.use(createHealthRouter());
 
-        const res = await request(app).get('/health/agent').expect(503);
+        const res = await supertest(app).get('/health/agent?runtimeId=alt').expect(200);
+
+        assert.equal(res.body.runtimeId, 'alt');
+        assert.equal(res.body.requestedRuntimeId, 'alt');
+        assert.equal(res.body.runtimeFound, true);
+        assert.equal(res.body.usedDefaultRuntimeFallback, false);
+        assert.equal(res.body.sessionId, 'alt-session');
+    });
+
+    it('GET /health/agent explicita fallback quando o runtime pedido não existe', async () => {
+        const defaultAgent = /** @type {any} */ ({
+            status: 'idle',
+            sessionId: 'default-session',
+            dialogLoopActive: false,
+            queueSize: 0,
+            model: 'gpt-5',
+            reasoningEffort: 'high',
+            pendingQuestion: null,
+            dialogPaused: false,
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                agentStatus: 'idle',
+                sessionId: 'default-session',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: false,
+                pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                backgroundPendingCount: 0,
+                backgroundPendingLabels: [],
+                riskFlags: [],
+                recommendedAction: 'none',
+                uptime: 100,
+                issues: [],
+                bootReport: null,
+                checks: {
+                    runtime: { ok: true, status: 'idle', operational: true },
+                    client: { ok: true, available: true },
+                    session: { ok: true, active: true, resumed: false },
+                    dialog: { ok: true, active: false, attached: true, paused: false },
+                    queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                    io: {
+                        ok: true,
+                        pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: false,
+                        pendingQuestionShadowKind: null,
+                        pendingQuestionShadowState: null,
+                        pendingQuestionShadowExpired: false,
+                        pendingQuestionShadowAgeMs: null,
+                        pendingQuestionShadowExpiresAt: null,
+                        pendingQuestionShadowRemainingMs: null,
+                        waitingForInput: false,
+                        keepaliveRunning: true,
+                        backgroundPendingCount: 0,
+                    },
+                    background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                    boot: { ok: true, reportAvailable: false, failedSteps: 0, degradedSteps: 0, lastCompletedAt: null },
+                    quota: { ok: true, configured: true, running: true },
+                },
+                ts: Date.now(),
+            }),
+        });
+
+        container.register(ALWAYS_ALIVE_AGENT, () => defaultAgent, 'singleton');
+        registerAgentRuntime(defaultAgent, 'default');
+
+        const app = express();
+        app.use(createHealthRouter());
+
+        const res = await supertest(app).get('/health/agent?runtimeId=missing').expect(200);
+
+        assert.equal(res.body.runtimeId, 'default');
+        assert.equal(res.body.requestedRuntimeId, 'missing');
+        assert.equal(res.body.runtimeFound, false);
+        assert.equal(res.body.usedDefaultRuntimeFallback, true);
+        assert.equal(res.body.sessionId, 'default-session');
+    });
+
+    it('GET /health/agent responde 503 quando o snapshot indica unhealthy', async () => {
+        const agent = /** @type {any} */ ({
+            status: 'stopped',
+            sessionId: null,
+            dialogLoopActive: false,
+            queueSize: 0,
+            model: 'gpt-5',
+            reasoningEffort: 'high',
+            pendingQuestion: null,
+            dialogPaused: false,
+            getHealthSnapshot: () => ({
+                ok: false,
+                healthy: false,
+                status: 'unhealthy',
+                agentStatus: 'stopped',
+                sessionId: null,
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: false,
+                pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                backgroundPendingCount: 0,
+                backgroundPendingLabels: [],
+                riskFlags: ['runtime.stopped', 'client.missing', 'session.missing'],
+                recommendedAction: 'restart_agent',
+                uptime: null,
+                issues: ['runtime.not_operational.stopped', 'client.unavailable', 'session.inactive'],
+                bootReport: null,
+                checks: {
+                    runtime: { ok: false, status: 'stopped', operational: false },
+                    client: { ok: false, available: false },
+                    session: { ok: false, active: false, resumed: false },
+                    dialog: { ok: true, active: false, attached: true, paused: false },
+                    queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                    io: {
+                        ok: true,
+                        pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: false,
+                        pendingQuestionShadowKind: null,
+                        pendingQuestionShadowState: null,
+                        pendingQuestionShadowExpired: false,
+                        pendingQuestionShadowAgeMs: null,
+                        pendingQuestionShadowExpiresAt: null,
+                        pendingQuestionShadowRemainingMs: null,
+                        waitingForInput: false,
+                        keepaliveRunning: false,
+                        backgroundPendingCount: 0,
+                    },
+                    background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                    boot: {
+                        ok: true,
+                        reportAvailable: false,
+                        failedSteps: 0,
+                        degradedSteps: 0,
+                        lastCompletedAt: null,
+                    },
+                    quota: { ok: false, configured: true, running: false },
+                },
+                ts: Date.now(),
+            }),
+        });
+        container.register(ALWAYS_ALIVE_AGENT, () => agent, 'singleton');
+        registerAgentRuntime(agent);
+
+        const app = express();
+        app.use(createHealthRouter());
+
+        const res = await supertest(app).get('/health/agent').expect(503);
 
         assert.equal(res.body.ok, false);
         assert.equal(res.body.status, 'unhealthy');
@@ -322,7 +492,7 @@ describe('agent health routes', () => {
         app.use(express.json());
         app.use(router);
 
-        const res = await request(app).get('/health').expect(200);
+        const res = await supertest(app).get('/health').expect(200);
 
         assert.equal(res.body.ok, true);
         assert.equal(res.body.status, 'healthy');
@@ -333,6 +503,49 @@ describe('agent health routes', () => {
         assert.equal(res.body.pendingQuestionShadowExpired, true);
         assert.equal(res.body.permissionMode, 'selective');
         assert.equal(res.body.hubStore.ok, true);
+    });
+
+    it('GET /status e /session expõem metadata de fallback quando o runtime pedido não existe', async () => {
+        const defaultAgent = /** @type {any} */ ({
+            status: 'idle',
+            sessionId: 'default-session',
+            dialogLoopActive: false,
+            getStatusSnapshot: () => ({
+                status: 'idle',
+                sessionId: 'default-session',
+                model: 'gpt-5',
+                isResumed: false,
+                resumeCount: 0,
+                sendCount: 3,
+                startedAt: 123,
+            }),
+        });
+
+        const app = express();
+        const router = express.Router();
+        registerControlRoutes(router, () => ({
+            agent: defaultAgent,
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+        }));
+        app.use(express.json());
+        app.use(router);
+
+        const statusRes = await supertest(app).get('/status').expect(200);
+        const sessionRes = await supertest(app).get('/session').expect(200);
+
+        assert.equal(statusRes.body.runtimeId, 'default');
+        assert.equal(statusRes.body.requestedRuntimeId, 'missing');
+        assert.equal(statusRes.body.runtimeFound, false);
+        assert.equal(statusRes.body.usedDefaultRuntimeFallback, true);
+
+        assert.equal(sessionRes.body.runtimeId, 'default');
+        assert.equal(sessionRes.body.requestedRuntimeId, 'missing');
+        assert.equal(sessionRes.body.runtimeFound, false);
+        assert.equal(sessionRes.body.usedDefaultRuntimeFallback, true);
+        assert.equal(sessionRes.body.sessionId, 'default-session');
     });
 
     it('buildLegacyAgentHealth cria fallback canônico com issues e checks expandidos', () => {

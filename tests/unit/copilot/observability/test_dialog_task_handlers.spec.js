@@ -50,6 +50,8 @@ describe('dialog-task-handlers', () => {
     let metrics;
     /** @type {Record<string, any>} */
     let errorTracker;
+    /** @type {{ record: import('vitest').Mock }} */
+    let modelStatsTracker;
     /**
      * @type {ReturnType<
      *     typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js').attachDialogTaskHandlers
@@ -72,11 +74,13 @@ describe('dialog-task-handlers', () => {
             recordGauge: vi.fn(),
         };
         errorTracker = { trackError: vi.fn() };
+        modelStatsTracker = { record: vi.fn() };
 
         const mod = await import('../../../../src/copilot/observability/observers/dialog-task-handlers.js');
         const ctx = {
             metrics,
             errorTracker,
+            modelStatsTracker,
             agent,
             on: (/** @type {EventEmitter} */ emitter, /** @type {string} */ event, /** @type {Function} */ fn) => {
                 emitter.on(event, /** @type {any} */ (fn));
@@ -283,8 +287,7 @@ describe('dialog-task-handlers', () => {
     // ── session.usage ─────────────────────────────────────────────────────
 
     describe('session.usage', () => {
-        it('registra session.usage counter e chama modelStatsTracker', async () => {
-            const { modelStatsTracker } = await import('#copilot/sdk/models/registry');
+        it('registra session.usage counter e chama modelStatsTracker injetado', async () => {
             agent.emit('session.usage', { model: 'gpt-4o', inputTokens: 100, outputTokens: 50 });
             expect(metrics.recordCounter).toHaveBeenCalledWith('session.usage');
             expect(modelStatsTracker.record).toHaveBeenCalledWith(

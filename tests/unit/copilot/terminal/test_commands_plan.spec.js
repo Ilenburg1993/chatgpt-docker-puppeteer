@@ -106,4 +106,12 @@ describe('terminal/commands/plan', () => {
         expect(deleteTerminalSdkPlanProjection).toHaveBeenCalled();
         expect(ctx.output()).toContain('plan.md removido');
     });
+
+    it('encaminha runtimeId explícito para o fluxo vanilla do SDK', async () => {
+        const ctx = mockCtx();
+
+        await cmdPlan({ println: ctx.println }, '--runtime alt on');
+
+        expect(setTerminalSdkModeProjection).toHaveBeenCalledWith('plan', 'alt');
+    });
 });

@@ -125,8 +125,10 @@ describe('F160 — getToolStats retorna snapshot com campos corretos', () => {
 // ─── F161: wrapWithStats não altera retorno ────────────────────────────────
 
 describe('F161 — wrapWithStats não altera retorno da tool', () => {
-    /** @param {string} name @param {string} [returnValue]
-     * @returns {{ name: string; description: string; handler: (p: any, i: any) => Promise<string> }} */
+    /**
+     * @param {string} name @param {string} [returnValue]
+     * @returns {{ name: string; description: string; handler: (p: any, i: any) => Promise<string> }}
+     */
     function makeToolWithHandler(name, returnValue = 'result') {
         return {
             name,

@@ -6,7 +6,7 @@ import { createNERV } from '#nerv/nerv';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { ContextManager } from '#orchestrator/context_manager';
 import assert from 'node:assert';
-import { describe, it, before } from 'node:test';
+import { before, describe, it } from 'node:test';
 
 describe('Boot Integration - Phase 2 Components', () => {
     /** @type {any} */ let nerv;

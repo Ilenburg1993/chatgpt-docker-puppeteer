@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import {
     _resetForTesting,

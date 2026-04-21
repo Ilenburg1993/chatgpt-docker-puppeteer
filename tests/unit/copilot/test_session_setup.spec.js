@@ -148,10 +148,11 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest =
-                /** @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>} */ (
-                    options.onUserInputRequest
-                );
+            const onUserInputRequest = /** @type {(input: {
+    question: string;
+    choices?: string[];
+    allowFreeform?: boolean;
+}) => Promise<unknown>} */ (options.onUserInputRequest);
 
             await onUserInputRequest({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
 
@@ -176,10 +177,11 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest =
-                /** @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>} */ (
-                    options.onUserInputRequest
-                );
+            const onUserInputRequest = /** @type {(input: {
+    question: string;
+    choices?: string[];
+    allowFreeform?: boolean;
+}) => Promise<unknown>} */ (options.onUserInputRequest);
 
             await onUserInputRequest({ question: 'Escolha', allowFreeform: false });
 

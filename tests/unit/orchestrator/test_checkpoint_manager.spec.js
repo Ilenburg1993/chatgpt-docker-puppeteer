@@ -3,7 +3,7 @@ import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import fs from 'fs/promises';
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 describe('CheckpointManager Unit Tests', () => {
     /** @type {any} */ let checkpointManager;

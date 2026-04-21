@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { test, after } from 'node:test';
+import { after, test } from 'node:test';
 
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
 import { __mainTestHooks } from '../../src/main.js';

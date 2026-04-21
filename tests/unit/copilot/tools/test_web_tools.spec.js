@@ -16,8 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-// Mock url-validator
-vi.mock('../../../../src/copilot/core/security/url-validator.js', () => ({
+const mocks = vi.hoisted(() => ({
     validateUrl: vi.fn((/** @type {URL} */ url) => {
         const host = url.hostname;
         if (host === '127.0.0.1' || host === 'localhost' || host === '10.0.0.1' || host === '192.168.1.1') {
@@ -25,7 +24,31 @@ vi.mock('../../../../src/copilot/core/security/url-validator.js', () => ({
         }
         return { safe: true, reason: '' };
     }),
+    logSwallowed: vi.fn(),
+    toError: vi.fn((error) => {
+        if (error instanceof Error) return error;
+        return new Error(String(error));
+    }),
+    log: vi.fn(),
+    buildTool: vi.fn((opts) => ({
+        name: opts.name,
+        description: opts.description,
+        handler: opts.handler,
+        parameters: opts.parameters,
+    })),
+    withSkipPermission: vi.fn((tool) => tool),
 }));
+
+// Mock url-validator
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        logSwallowed: mocks.logSwallowed,
+        toError: mocks.toError,
+        validateUrl: mocks.validateUrl,
+    };
+});
 
 // Mock config/env
 vi.mock('#copilot/config/env', () => ({
@@ -37,26 +60,14 @@ vi.mock('#copilot/config/env', () => ({
 }));
 
 // Mock logger
-vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-    LOG_DIR: '/tmp/test-logs',
-    getRecentLogs: vi.fn(() => []),
-}));
-
-// Mock error-handlers
-vi.mock('#copilot/core/error-handlers', () => ({
-    logSwallowed: vi.fn(),
+vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+    log: mocks.log,
 }));
 
 // Mock tool-factory
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
-    buildTool: vi.fn((opts) => ({
-        name: opts.name,
-        description: opts.description,
-        handler: opts.handler,
-        parameters: opts.parameters,
-    })),
-    withSkipPermission: vi.fn((tool) => tool),
+    buildTool: mocks.buildTool,
+    withSkipPermission: mocks.withSkipPermission,
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

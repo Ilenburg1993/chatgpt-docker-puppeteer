@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeAll } from 'vitest';
+import { beforeAll, describe, it } from 'vitest';
 
 describe('HandoffManager', async () => {
     /** @type {typeof import('#copilot/agent/infra/handoff-manager').HandoffManager} */

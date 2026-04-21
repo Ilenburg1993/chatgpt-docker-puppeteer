@@ -85,7 +85,17 @@ export { HookBus, attachBus, defaultBus } from './bus.js';
 export { HookRegistry, SDK_HOOKS } from './registry.js';
 
 // ─── Composer (composição de handlers) ───────────────────────────────────────
-export { composeHandlers, conditional, fallback, forTools, loggingMiddleware, memoize, middleware, pipeline, raceWithTimeout } from './composer.js';
+export {
+    composeHandlers,
+    conditional,
+    fallback,
+    forTools,
+    loggingMiddleware,
+    memoize,
+    middleware,
+    pipeline,
+    raceWithTimeout,
+} from './composer.js';
 
 // ─── Presets standalone (Gap 7) ───────────────────────────────────────────────
 // ARCH-OBS-003 fix: audit preset agora reside em hooks/presets/ (antes: observability/)

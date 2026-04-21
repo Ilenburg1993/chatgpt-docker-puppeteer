@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
     DIALOG_PROTO_DONE,
     DIALOG_PROTO_READY,

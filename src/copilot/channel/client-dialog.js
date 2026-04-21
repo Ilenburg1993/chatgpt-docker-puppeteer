@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
 import {
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
@@ -69,7 +70,7 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
     const { cleanup } = registerDialogListeners(agent, opts);
 
     try {
-        await agent.startDialogLoop(bootPrompt);
+        await startAgentDialogLoop(agent, bootPrompt);
         log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
     } catch (err) {
         cleanup();
@@ -109,7 +110,11 @@ export async function dialogTurn(agent, message, opts = {}) {
     if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
 
     try {
-        return await agent.sendDialogTurn(message, { timeout });
+        const reply = await sendAgentDialogTurn(agent, message, { timeout });
+        if (reply === null) {
+            throw new Error('[LlmBridgeClient] sendDialogTurn retornou null.');
+        }
+        return reply;
     } finally {
         if (onDeltaTemp) agent.off('task.delta', onDeltaTemp);
         if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
@@ -120,10 +125,10 @@ export async function dialogTurn(agent, message, opts = {}) {
  * Encerra o modo de diálogo direto.
  *
  * @param {BridgeAgentLike} agent
- * @param {string} [reason='watchdog_restart'] Default is `'watchdog_restart'`
+ * @param {'watchdog_restart' | 'authorized_stop'} [reason='watchdog_restart'] Default is `'watchdog_restart'`
  * @returns {Promise<void>}
  */
 export async function stopDialogMode(agent, reason = 'watchdog_restart') {
-    await agent.stopDialogLoop({ authorized: true, reason });
+    await stopAgentDialogLoopAuthorized(agent, reason);
     log('INFO', `[LlmBridgeClient] Modo diálogo encerrado (reason=${reason}).`);
 }

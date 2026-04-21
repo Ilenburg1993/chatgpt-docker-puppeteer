@@ -50,16 +50,27 @@ const _agentReplayBuffer = new SseReplayBuffer();
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('@github/copilot-sdk').CopilotClient>} getClient - Factory do SDK client.
+ * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  */
+
+/** @typedef {AgentRouterDeps | ((req: Req) => AgentRouterDeps)} AgentRouterBinding */
+
+/**
+ * @param {AgentRouterBinding} binding
+ * @param {Req} req
+ * @returns {AgentRouterDeps}
+ */
+function resolveAgentRouterDeps(binding, req) {
+    return typeof binding === 'function' ? binding(req) : binding;
+}
 
 /**
  * Factory que cria o router de rotas `/agent/*` com dependências injetadas.
  *
- * @param {AgentRouterDeps} deps
+ * @param {AgentRouterBinding} deps
  * @returns {import('express').Router}
  */
 export default function createAgentRouter(deps) {
-    const { agent, metrics, getClient } = deps;
     const router = Router();
 
     /**
@@ -81,10 +92,12 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/info', (_req, res) => {
         void (async () => {
+            const { agent, getClient, runtimeId } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
             const client = agent.status !== 'stopped' ? await getClient() : null;
             const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, client?.getState?.() ?? null);
             res.json({
                 ok: true,
+                ...(runtimeId ? { runtimeId } : {}),
                 running: agent.status !== 'stopped',
                 sessionId: agent.sessionId ?? null,
                 uptime: Math.floor(process.uptime()),
@@ -107,6 +120,7 @@ export default function createAgentRouter(deps) {
      * ?category=hook&page=1&limit=20 para filtragem e paginação.
      */
     router.get('/agent/tools', (req, res) => {
+        const { agent } = resolveAgentRouterDeps(deps, req);
         const registry = agent.toolsRegistry;
         if (!registry) {
             res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
@@ -151,7 +165,8 @@ export default function createAgentRouter(deps) {
      * @param {import('express').Response} res
      */
     function handleGetTelemetry(_req, res) {
-        res.json({ ok: true, summary: metrics.getSummary() });
+        const { metrics, runtimeId } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+        res.json({ ok: true, ...(runtimeId ? { runtimeId } : {}), summary: metrics.getSummary() });
     }
 
     router.get('/agent/telemetry', handleGetTelemetry);
@@ -161,6 +176,7 @@ export default function createAgentRouter(deps) {
      * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
      */
     router.post('/agent/telemetry/clear', (_req, res) => {
+        const { metrics } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
         metrics.reset();
         log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
         res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
@@ -179,10 +195,11 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/state', (req, res) => {
         void withErrorHandler(req, res, async () => {
+            const { agent, getClient, runtimeId } = resolveAgentRouterDeps(deps, req);
             const client = await getClient();
             const state = client.getState();
             const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
-            res.json({ ok: true, state, ...runtimeProjection });
+            res.json({ ok: true, state, ...(runtimeId ? { runtimeId } : {}), ...runtimeProjection });
         });
     });
 
@@ -205,6 +222,7 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/stream', (req, res) => {
         void withErrorHandler(req, res, async () => {
+            const { getClient, runtimeId } = resolveAgentRouterDeps(deps, req);
             if (!_agentTracker.accept()) {
                 res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
                 return;
@@ -220,7 +238,11 @@ export default function createAgentRouter(deps) {
                 maxLifetimeMs: 24 * 60 * 60 * 1000,
             });
 
-            sse.send('connected', { state: client.getState(), timestamp: Date.now() });
+            sse.send('connected', {
+                ...(runtimeId ? { runtimeId } : {}),
+                state: client.getState(),
+                timestamp: Date.now(),
+            });
 
             // FASE-11.3: filtro de eventos via ?events= query param
             const eventFilter = createEventFilter(

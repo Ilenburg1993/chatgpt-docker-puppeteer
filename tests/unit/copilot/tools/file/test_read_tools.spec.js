@@ -10,7 +10,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 import {
     diffFilesTool,
@@ -19,8 +23,10 @@ import {
     searchInFilesTool,
 } from '../../../../../src/copilot/tools/file/read-tools.js';
 
-/** Extract handler from buildTool result
- * @param {{ handler?: Function, execute?: Function, run?: Function }} tool
+/**
+ * Extract handler from buildTool result
+ *
+ * @param {{ handler?: Function; execute?: Function; run?: Function }} tool
  */
 function getHandler(tool) {
     // buildTool returns { name, description, parameters, handler }

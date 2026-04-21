@@ -24,6 +24,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+const mocks = vi.hoisted(() => ({
+    log: vi.fn(),
+    withSkipPermission: vi.fn((tool) => tool),
+    buildTool: vi.fn((config) => config),
+    toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
+}));
+
 vi.mock('#copilot/config/env', () => ({
     COPILOT_RPC_TIMEOUT_MS: 5000,
 
@@ -32,26 +39,22 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_DISABLED_AGENTS: '',
 }));
 
-vi.mock('#copilot/core/errors', () => ({
-    CopilotError: class CopilotError extends Error {
-        constructor(/** @type {string} */ msg, /** @type {any} */ opts = {}) {
-            super(msg);
-            this.name = 'CopilotError';
-            this.code = opts.code ?? 'UNKNOWN';
-        }
-    },
-    TimeoutError: class TimeoutError extends Error {
-        constructor(/** @type {string} */ msg) {
-            super(msg);
-            this.name = 'TimeoutError';
-        }
-    },
-}));
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        TimeoutError: class TimeoutError extends Error {
+            constructor(/** @type {string} */ msg) {
+                super(msg);
+                this.name = 'TimeoutError';
+            }
+        },
+        toError: mocks.toError,
+    };
+});
 
-vi.mock('#copilot/observability/logger', () => ({
-    log: vi.fn(),
-    LOG_DIR: '/tmp/test-logs',
-    getRecentLogs: vi.fn(() => []),
+vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+    log: mocks.log,
 }));
 
 vi.mock('#copilot/sdk', () => ({
@@ -69,7 +72,8 @@ vi.mock('#copilot/sdk', () => ({
 }));
 
 vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
-    withSkipPermission: vi.fn((tool) => tool),
+    withSkipPermission: mocks.withSkipPermission,
+    buildTool: mocks.buildTool,
 }));
 
 // ─── Fake RPC ─────────────────────────────────────────────────────────────────
@@ -78,18 +82,18 @@ function createFakeRpc() {
     return {
         mode: {
             get: vi.fn(async () => ({ mode: 'interactive' })),
-            set: vi.fn(async (/** @type {any} */ opts) => ({ mode: opts.mode })),
+            set: vi.fn(async (/** @type {'interactive' | 'plan' | 'autopilot'} */ mode) => ({ mode })),
         },
         plan: {
             read: vi.fn(async () => ({ exists: true, filePath: '/plan.md', content: '# Plan' })),
-            update: vi.fn(async () => ({ updated: true })),
+            update: vi.fn(async (/** @type {string} */ _content) => ({ updated: true })),
             delete: vi.fn(async () => ({ deleted: true })),
         },
         agent: {
             list: vi.fn(async () => ({
                 agents: [{ name: 'auditor', displayName: 'Auditor', description: 'Audit agent' }],
             })),
-            select: vi.fn(async (/** @type {any} */ opts) => ({ agent: { name: opts.name } })),
+            select: vi.fn(async (/** @type {string} */ name) => ({ agent: { name } })),
             deselect: vi.fn(async () => ({})),
         },
         compaction: {
@@ -167,7 +171,7 @@ describe('session-rpc-tools', () => {
             const result = await /** @type {any} */ (tool).handler({ mode: 'plan' });
 
             expect(result.mode).toBe('plan');
-            expect(fakeRpc.mode.set).toHaveBeenCalledWith({ mode: 'plan' });
+            expect(fakeRpc.mode.set).toHaveBeenCalledWith('plan');
         });
 
         it('muda modo para autopilot', async () => {
@@ -198,7 +202,7 @@ describe('session-rpc-tools', () => {
             const result = await /** @type {any} */ (tool).handler({ content: '# New Plan' });
 
             expect(result.updated).toBe(true);
-            expect(fakeRpc.plan.update).toHaveBeenCalledWith({ content: '# New Plan' });
+            expect(fakeRpc.plan.update).toHaveBeenCalledWith('# New Plan');
         });
     });
 
@@ -233,7 +237,7 @@ describe('session-rpc-tools', () => {
             const result = await /** @type {any} */ (tool).handler({ name: 'auditor' });
 
             expect(result.agent.name).toBe('auditor');
-            expect(fakeRpc.agent.select).toHaveBeenCalledWith({ name: 'auditor' });
+            expect(fakeRpc.agent.select).toHaveBeenCalledWith('auditor');
         });
 
         it('deselect com nome vazio', async () => {

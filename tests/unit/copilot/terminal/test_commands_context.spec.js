@@ -69,6 +69,11 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('Nenhum histórico');
     });
 
+    it('encaminha runtimeId explícito para a projection de contexto', () => {
+        cmdContext({ println }, '--runtime alt');
+        expect(frontendMocks.readTerminalContextProjection).toHaveBeenCalledWith('alt');
+    });
+
     it('exibe estimativa heurística quando sem SDK', () => {
         frontendMocks.readTerminalContextProjection.mockReturnValue({
             isRealData: false,
@@ -198,6 +203,11 @@ describe('terminal/commands/cmdCompact', () => {
         const output = lines.join('\n');
         expect(output).toContain('compactado');
         expect(frontendMocks.requestTerminalCompactionProjection).toHaveBeenCalled();
+    });
+
+    it('encaminha runtimeId explícito para a compactação', async () => {
+        await cmdCompact({ println }, '--runtime alt');
+        expect(frontendMocks.requestTerminalCompactionProjection).toHaveBeenCalledWith('alt');
     });
 
     it('exibe erro quando sendTurn retorna null', async () => {

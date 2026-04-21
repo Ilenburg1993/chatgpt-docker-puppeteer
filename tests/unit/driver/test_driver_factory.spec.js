@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert';
-import { test, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 
 describe('Driver Factory - Fábrica de Drivers', () => {
     describe('1. Registro de Drivers', () => {

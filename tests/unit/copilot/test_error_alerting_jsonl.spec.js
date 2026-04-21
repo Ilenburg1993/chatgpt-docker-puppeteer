@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
 
-vi.mock('#copilot/observability/logger', () => ({ log: vi.fn(), LOG_DIR: '/tmp/test-logs', getRecentLogs: vi.fn(() => []), }));
+vi.mock('#copilot/observability/logger', () => ({
+    log: vi.fn(),
+    LOG_DIR: '/tmp/test-logs',
+    getRecentLogs: vi.fn(() => []),
+}));
 
 // ─── Mock timer-registry (usado por error-alerting) ─────────────────────────
 
@@ -179,7 +183,9 @@ describe('F49 — createJsonlWriter', () => {
         // Flush is scheduled via setImmediate — wait for it
         await new Promise((r) => setTimeout(r, 50));
         expect(mockFs.appendFile).toHaveBeenCalled();
-        const written = /** @type {string | undefined} */ (/** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1]);
+        const written = /** @type {string | undefined} */ (
+            /** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1]
+        );
         expect(typeof written).toBe('string');
         expect(written).toContain('"event":"test"');
     });

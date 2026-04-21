@@ -96,12 +96,7 @@ export async function agentStart(ctx, host) {
     const runtimeState = ctx.runtimeState ?? ctx;
 
     if (ctx.status !== 'stopped') {
-        const err = new SessionError(
-            `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.status}'.`,
-            'AGENT_ALREADY_ACTIVE',
-        );
-        log('WARN', err.message);
-        host.emit(EMITTER_ERROR, err);
+        log('WARN', `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.status}'.`);
         return;
     }
 

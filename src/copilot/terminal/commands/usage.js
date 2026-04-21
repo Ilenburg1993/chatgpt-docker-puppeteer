@@ -12,6 +12,7 @@
 
 import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
 import { getShowUsage, setShowUsage } from '../state.js';
+import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
  * @typedef {object} UsageContext
@@ -31,11 +32,12 @@ import { getShowUsage, setShowUsage } from '../state.js';
  * @returns {void}
  */
 export function cmdUsage({ println }, arg) {
-    const trimmed = (arg ?? '').trim().toLowerCase();
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const trimmed = cleanArg.trim().toLowerCase();
 
     if (trimmed === 'now') {
-        const projection = readTerminalUsageNowProjection();
-        const configProjection = readTerminalConfigProjection();
+        const projection = callWithRuntimeTarget(readTerminalUsageNowProjection, runtimeId);
+        const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
         const ctx = projection.contextWindow;
         if (ctx) {
             const pct = (ctx.utilization * 100).toFixed(0);

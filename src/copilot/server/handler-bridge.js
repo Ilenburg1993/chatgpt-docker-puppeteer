@@ -13,6 +13,8 @@
  */
 
 import { log } from '#copilot/observability';
+import { resolveRequestedRuntimeId } from '../presentation/runtime-request.js';
+import { normalizeRuntimeId } from '../presentation/runtime-targeting.js';
 
 /**
  * @typedef {{ status: number; body: unknown; cors?: boolean }} HandlerResult
@@ -31,6 +33,25 @@ function extractParams(req) {
         ...req.params,
         ...Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, typeof v === 'string' ? v : v])),
         body: req.body,
+        runtimeId: resolveRequestedRuntimeId(req),
+    };
+}
+
+/**
+ * Combina os parâmetros-base extraídos do request com um extrator customizado, preservando `runtimeId` canônico.
+ *
+ * @param {import('express').Request} req
+ * @param {((req: import('express').Request) => Record<string, unknown>) | undefined} paramsExtractor
+ * @returns {Record<string, unknown>}
+ */
+function resolveHandlerParams(req, paramsExtractor) {
+    const base = extractParams(req);
+    if (!paramsExtractor) return base;
+    const custom = paramsExtractor(req);
+    return {
+        ...base,
+        ...custom,
+        runtimeId: normalizeRuntimeId(custom?.['runtimeId']) ?? base.runtimeId,
     };
 }
 
@@ -56,7 +77,7 @@ export function callHandler(handler, req, res, next) {
     }
 
     // Handler síncrono
-    if (!result || typeof /** @type {{ then?: unknown }} */ (result).then !== 'function') {
+    if (!result || typeof (/** @type {{ then?: unknown }} */ (result).then) !== 'function') {
         const r = /** @type {HandlerResult} */ (result);
         try {
             res.status(r.status).json(r.body);
@@ -85,7 +106,7 @@ export function callHandler(handler, req, res, next) {
  */
 export function bridgeHandler(handler, paramsExtractor) {
     return function bridgedRequestHandler(req, res, next) {
-        const params = paramsExtractor ? paramsExtractor(req) : extractParams(req);
+        const params = resolveHandlerParams(req, paramsExtractor);
         let result;
         try {
             result = handler(params);
@@ -94,7 +115,7 @@ export function bridgeHandler(handler, paramsExtractor) {
             return;
         }
 
-        if (!result || typeof /** @type {{ then?: unknown }} */ (result).then !== 'function') {
+        if (!result || typeof (/** @type {{ then?: unknown }} */ (result).then) !== 'function') {
             const r = /** @type {HandlerResult} */ (result);
             res.status(r.status).json(r.body);
             return;

@@ -23,8 +23,8 @@
  * @typedef {object} ObserverContext
  * @property {import('../metrics.js').MetricsStore} metrics
  * @property {import('../error-tracker.js').ErrorTracker | null | undefined} errorTracker
- * @property {import('node:events').EventEmitter | null} agent EventEmitter do agente (modo emitter) ou `null` (modo
- *   bus — sem emitter disponível).
+ * @property {import('node:events').EventEmitter | null} agent EventEmitter do agente (modo emitter) ou `null` (modo bus
+ *   — sem emitter disponível).
  * @property {{
  *           record: (
  *               model: string,

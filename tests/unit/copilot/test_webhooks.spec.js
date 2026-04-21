@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeAll, afterEach } from 'vitest';
+import { afterEach, beforeAll, describe, it } from 'vitest';
 
 import { AlwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 

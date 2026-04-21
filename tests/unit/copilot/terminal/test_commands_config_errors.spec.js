@@ -34,8 +34,20 @@ const setTerminalModelProjection = vi.fn((modelId) => ({
     reasoningAdjusted: modelId === 'gpt-4.1',
     modelMeta:
         modelId === 'gpt-4.1'
-            ? { costTier: 'medium', speedTier: 'fast', contextWindow: 1047576, supportsReasoning: false, supportsVision: false }
-            : { costTier: 'high', speedTier: 'fast', contextWindow: 128000, supportsReasoning: true, supportsVision: true },
+            ? {
+                  costTier: 'medium',
+                  speedTier: 'fast',
+                  contextWindow: 1047576,
+                  supportsReasoning: false,
+                  supportsVision: false,
+              }
+            : {
+                  costTier: 'high',
+                  speedTier: 'fast',
+                  contextWindow: 128000,
+                  supportsReasoning: true,
+                  supportsVision: true,
+              },
 }));
 const setTerminalReasoningProjection = vi.fn((effort) => ({
     previousReasoningEffort: 'high',
@@ -100,6 +112,14 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(listTerminalAvailableModelsProjection).toHaveBeenCalled();
     });
 
+    it('cmdModel encaminha runtimeId explícito para a projection', async () => {
+        const ctx = mockCtx();
+
+        await cmdModel({ println: ctx.println }, '--runtime alt list');
+
+        expect(listTerminalAvailableModelsProjection).toHaveBeenCalledWith('alt');
+    });
+
     it('cmdReasoning atualiza via projection canônica', () => {
         const ctx = mockCtx();
 
@@ -107,6 +127,14 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         expect(setTerminalReasoningProjection).toHaveBeenCalledWith('medium');
         expect(ctx.output()).toContain('Reasoning trocado');
+    });
+
+    it('cmdReasoning encaminha runtimeId explícito para a mutation', () => {
+        const ctx = mockCtx();
+
+        cmdReasoning({ println: ctx.println }, '--runtime alt medium');
+
+        expect(setTerminalReasoningProjection).toHaveBeenCalledWith('medium', 'alt');
     });
 
     it('cmdModel explica ajuste de reasoning quando o modelo alvo não suporta capability', async () => {

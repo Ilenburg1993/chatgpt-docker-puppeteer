@@ -91,22 +91,17 @@ function detachAbortListener(signal, listener) {
     signal?.removeEventListener?.('abort', listener);
 }
 
-class AbortTurnError extends Error {
-    /**
-     * @param {string} message
-     */
-    constructor(message) {
-        super(message);
-        this.name = 'AbortError';
-    }
-}
-
 /**
  * @param {string} message
  * @returns {Error}
  */
 function createAbortError(message) {
-    return new AbortTurnError(message);
+    if (typeof DOMException === 'function') {
+        return new DOMException(message, 'AbortError');
+    }
+    const error = new Error(message);
+    error.name = 'AbortError';
+    return error;
 }
 
 /**

@@ -21,7 +21,7 @@ import { executeSendToLlmB } from './send-pipeline.js';
 
 /**
  * @typedef {{
- *     getStatusSnapshot(): object;
+ *     sessionId?: string | null;
  *     dialogLoopActive?: boolean;
  *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
  *     getPermissionMode?(): string;
@@ -453,8 +453,7 @@ export class HubOrchestrator extends EventEmitter {
             // BUG-06 (fix): usar agentOverride quando fornecido em vez de hardcodar alwaysAliveAgent
             const activeAgent = this.#agent ?? _fallbackAgent;
             if (!activeAgent) return undefined;
-            const snap = /** @type {{ sessionId?: string }} */ (activeAgent.getStatusSnapshot());
-            return snap.sessionId;
+            return activeAgent.sessionId ?? undefined;
         } catch {
             return undefined;
         }

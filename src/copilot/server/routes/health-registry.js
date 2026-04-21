@@ -7,11 +7,10 @@
  * @module copilot/server/routes/health-registry
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { bridgeEmitter, container } from '#copilot/core';
 import { getObservabilityBusDiagnostics } from '#copilot/observability';
-import { buildAgentModuleHealth } from './agent-health.js';
+import { buildDefaultAgentModuleHealth } from '../../presentation/runtime-health.js';
 import { registerModuleHealth } from './health-modules.js';
 
 /**
@@ -21,10 +20,7 @@ import { registerModuleHealth } from './health-modules.js';
  */
 export function registerCopilotHealthChecks() {
     // ── Agent ────────────────────────────────────────────────────────────────
-    registerModuleHealth('agent', () => {
-        const agent = container.resolve(ALWAYS_ALIVE_AGENT);
-        return buildAgentModuleHealth(agent);
-    });
+    registerModuleHealth('agent', () => buildDefaultAgentModuleHealth());
 
     // ── ConversationHub ──────────────────────────────────────────────────────
     registerModuleHealth('conversation-hub', () => {

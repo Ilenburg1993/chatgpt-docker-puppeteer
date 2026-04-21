@@ -24,6 +24,7 @@ import {
     setTerminalSdkModeProjection,
     updateTerminalSdkPlanProjection,
 } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
  * @param {{ println: (text: string) => void }} ctx
@@ -31,11 +32,12 @@ import {
  * @returns {Promise<void>}
  */
 export async function cmdPlan({ println }, arg) {
-    const trimmed = (arg ?? '').trim();
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const trimmed = cleanArg.trim();
     const lower = trimmed.toLowerCase();
 
     if (!lower) {
-        const projection = await readTerminalSdkSessionProjection();
+        const projection = await callWithRuntimeTarget(readTerminalSdkSessionProjection, runtimeId);
         const exists = projection.plan.exists;
         const path = projection.plan.path ?? '(sem workspace)';
         const preview = projection.plan.content
@@ -58,25 +60,25 @@ export async function cmdPlan({ println }, arg) {
     }
 
     if (lower === 'on' || lower === 'plan') {
-        const result = await setTerminalSdkModeProjection('plan');
+        const result = await callWithRuntimeTarget(setTerminalSdkModeProjection, runtimeId, 'plan');
         println(`\x1b[32m  ✓ Modo SDK: ${result.previousMode} → ${result.currentMode}\x1b[0m`);
         return;
     }
 
     if (lower === 'off' || lower === 'interactive') {
-        const result = await setTerminalSdkModeProjection('interactive');
+        const result = await callWithRuntimeTarget(setTerminalSdkModeProjection, runtimeId, 'interactive');
         println(`\x1b[90m  Modo SDK: ${result.previousMode} → ${result.currentMode}\x1b[0m`);
         return;
     }
 
     if (lower === 'autopilot' || lower === 'auto') {
-        const result = await setTerminalSdkModeProjection('autopilot');
+        const result = await callWithRuntimeTarget(setTerminalSdkModeProjection, runtimeId, 'autopilot');
         println(`\x1b[36m  Modo SDK: ${result.previousMode} → ${result.currentMode}\x1b[0m`);
         return;
     }
 
     if (lower === 'read' || lower === 'show') {
-        const projection = await readTerminalSdkSessionProjection();
+        const projection = await callWithRuntimeTarget(readTerminalSdkSessionProjection, runtimeId);
         if (!projection.plan.exists || !projection.plan.content) {
             println('\x1b[90m  plan.md ausente na sessão atual.\x1b[0m');
             return;
@@ -96,7 +98,7 @@ export async function cmdPlan({ println }, arg) {
             println('\x1b[33m  Uso: /plan set <conteúdo do plan.md>\x1b[0m');
             return;
         }
-        const plan = await updateTerminalSdkPlanProjection(content);
+        const plan = await callWithRuntimeTarget(updateTerminalSdkPlanProjection, runtimeId, content);
         println(
             `\x1b[32m  plan.md atualizado (${plan.path ?? 'sem path'}). Existe? ${plan.exists ? 'sim' : 'não'}\x1b[0m`,
         );
@@ -109,9 +111,9 @@ export async function cmdPlan({ println }, arg) {
             println('\x1b[33m  Uso: /plan append <texto>\x1b[0m');
             return;
         }
-        const current = await readTerminalSdkSessionProjection();
+        const current = await callWithRuntimeTarget(readTerminalSdkSessionProjection, runtimeId);
         const base = current.plan.content ? `${current.plan.content.trimEnd()}\n` : '';
-        const plan = await updateTerminalSdkPlanProjection(`${base}${addition}`);
+        const plan = await callWithRuntimeTarget(updateTerminalSdkPlanProjection, runtimeId, `${base}${addition}`);
         println(
             `\x1b[32m  plan.md expandido (${plan.path ?? 'sem path'}). Existe? ${plan.exists ? 'sim' : 'não'}\x1b[0m`,
         );
@@ -119,7 +121,7 @@ export async function cmdPlan({ println }, arg) {
     }
 
     if (lower === 'clear' || lower === 'delete') {
-        const plan = await deleteTerminalSdkPlanProjection();
+        const plan = await callWithRuntimeTarget(deleteTerminalSdkPlanProjection, runtimeId);
         println(`\x1b[33m  plan.md removido. Existe agora? ${plan.exists ? 'sim' : 'não'}\x1b[0m`);
         return;
     }

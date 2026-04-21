@@ -48,6 +48,16 @@ describe('M-02 — remoção de services/ e uso de módulos de origem', () => {
         assert.equal(typeof mod.loadSnapshotAsync, 'function', 'loadSnapshotAsync deve ser função');
         assert.equal(typeof mod.saveSnapshotAsync, 'function', 'saveSnapshotAsync deve ser função');
         assert.equal(
+            typeof mod.readAgentRuntimeStatusSnapshot,
+            'function',
+            'readAgentRuntimeStatusSnapshot deve ser exposto por #copilot/agent',
+        );
+        assert.equal(
+            typeof mod.readAgentRuntimeHealthSnapshot,
+            'function',
+            'readAgentRuntimeHealthSnapshot deve ser exposto por #copilot/agent',
+        );
+        assert.equal(
             typeof mod.setBackgroundCompactionThreshold,
             'function',
             'setBackgroundCompactionThreshold deve ser exposto por #copilot/agent',

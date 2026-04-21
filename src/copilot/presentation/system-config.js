@@ -8,7 +8,6 @@
  *   terminal para health/config.
  */
 
-import { setBackgroundCompactionThreshold } from '#copilot/agent';
 import { getMcpStatus } from '#copilot/bridges';
 import { LLM_B_TERMINAL_PORT } from '#copilot/config';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
@@ -27,9 +26,16 @@ import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/
 import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../core/safe-json.js';
 import { getSseClients, getSseCriticalClients } from '../infra/sse/state.js';
-import { getFileCacheStats } from '../terminal/file-context.js';
-import { getBusy, getHubSessionId, getLastSdkPlanOperation, getSdkSessionMode } from '../terminal/state.js';
-import { getDefaultAgentRuntime, getDefaultAgentRuntimeId, listKnownAgentRuntimes } from './agent-runtime.js';
+import { setDefaultAgentBackgroundCompactionThreshold } from './runtime-controls.js';
+import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readRuntimeIdFromParams } from './runtime-targeting.js';
+import {
+    readRuntimeBusyState,
+    readRuntimeFileCacheStats,
+    readRuntimeHubSessionId,
+    readRuntimeLastSdkPlanOperation,
+    readRuntimeSdkSessionMode,
+} from './runtime-ui-state.js';
 
 /**
  * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
@@ -40,14 +46,21 @@ import { getDefaultAgentRuntime, getDefaultAgentRuntimeId, listKnownAgentRuntime
 /**
  * Retorna o status atual do agente e do dialog loop.
  *
+ * @param {Record<string, unknown> | null | undefined} [params]
  * @returns {HandlerResult}
  */
-export function handleHealth() {
-    const agent = getDefaultAgentRuntime();
-    const runtimeId = getDefaultAgentRuntimeId();
-    const agentRuntimes = listKnownAgentRuntimes();
-    const snapshot = agent.getStatusSnapshot();
-    const health = typeof agent.getHealthSnapshot === 'function' ? agent.getHealthSnapshot() : null;
+export function handleHealth(params = {}) {
+    const requestedRuntimeId = readRuntimeIdFromParams(params && typeof params === 'object' ? params : null);
+    const {
+        agent,
+        requestedRuntimeId: requestedRuntime,
+        runtimeId,
+        runtimeFound,
+        usedDefaultRuntimeFallback,
+        agentRuntimes,
+        snap: snapshot,
+        health,
+    } = readAgentRuntimeOverview(requestedRuntimeId);
     const metricsSummary = (() => {
         try {
             return container.resolve(METRICS_STORE).getSummary();
@@ -77,9 +90,12 @@ export function handleHealth() {
             dialogLoopActive: agent.dialogLoopActive,
             agentStatus: agent.status,
             runtimeId,
+            requestedRuntimeId: requestedRuntime,
+            runtimeFound,
+            usedDefaultRuntimeFallback,
             agentRuntimes,
-            busy: getBusy(),
-            hubSessionId: getHubSessionId(),
+            busy: readRuntimeBusyState(),
+            hubSessionId: readRuntimeHubSessionId(),
             sseClients: getSseClients().size,
             model: agent.model,
             reasoningEffort: agent.reasoningEffort ?? 'high',
@@ -87,7 +103,7 @@ export function handleHealth() {
             backgroundPendingCount: health?.backgroundPendingCount ?? 0,
             keepaliveRunning: health?.checks.io.keepaliveRunning ?? false,
             quotaMonitorRunning: health?.checks.quota.running ?? false,
-            cacheStats: { fileContext: getFileCacheStats() },
+            cacheStats: { fileContext: readRuntimeFileCacheStats() },
             hub: hubInfo,
             metrics: {
                 tokens: {
@@ -126,27 +142,37 @@ export function getSseClientSets() {
 /**
  * Retorna configuração dinâmica atual da sessão LLM-B.
  *
+ * @param {Record<string, unknown> | null | undefined} [params]
  * @returns {HandlerResult}
  */
-export function handleGetConfig() {
-    const agent = getDefaultAgentRuntime();
-    const runtimeId = getDefaultAgentRuntimeId();
-    const agentRuntimes = listKnownAgentRuntimes();
-    const snapshot = agent.getStatusSnapshot();
+export function handleGetConfig(params = {}) {
+    const requestedRuntimeId = readRuntimeIdFromParams(params && typeof params === 'object' ? params : null);
+    const {
+        agent,
+        requestedRuntimeId: requestedRuntime,
+        runtimeId,
+        runtimeFound,
+        usedDefaultRuntimeFallback,
+        agentRuntimes,
+        snap: snapshot,
+    } = readAgentRuntimeOverview(requestedRuntimeId);
     return {
         status: 200,
         cors: true,
         body: {
             ok: true,
             runtimeId,
+            requestedRuntimeId: requestedRuntime,
+            runtimeFound,
+            usedDefaultRuntimeFallback,
             agentRuntimes,
             model: agent.model,
             reasoningEffort: agent.reasoningEffort ?? 'high',
-            sdkSessionMode: getSdkSessionMode(),
-            sdkPlanOperation: getLastSdkPlanOperation(),
+            sdkSessionMode: readRuntimeSdkSessionMode(),
+            sdkPlanOperation: readRuntimeLastSdkPlanOperation(),
             dialogLoopActive: agent.dialogLoopActive,
-            busy: getBusy(),
-            hubSessionId: getHubSessionId(),
+            busy: readRuntimeBusyState(),
+            hubSessionId: readRuntimeHubSessionId(),
             port: LLM_B_TERMINAL_PORT,
             contextWindow: snapshot.contextWindow,
             lastCheckpointPath: snapshot.lastCheckpointPath,
@@ -189,7 +215,7 @@ export function handleSetInfiniteSessionConfig(body) {
             };
         }
         _infiniteSessionConfig = { ..._infiniteSessionConfig, backgroundCompactionThreshold };
-        setBackgroundCompactionThreshold(backgroundCompactionThreshold);
+        setDefaultAgentBackgroundCompactionThreshold(backgroundCompactionThreshold);
     }
     return { status: 200, cors: true, body: { ok: true, infiniteSession: getInfiniteSessionConfig() } };
 }

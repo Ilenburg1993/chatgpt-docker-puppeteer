@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, before, after } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import { io as ioClient } from 'socket.io-client';
 

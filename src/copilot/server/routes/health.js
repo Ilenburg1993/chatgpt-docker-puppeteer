@@ -9,15 +9,14 @@
  *   src/copilot/server/routes/health.js
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
 import { Router } from 'express';
 import { toError } from '../../core/error-handlers.js';
 import { handleHubHealth } from '../../presentation/conversation-hub.js';
+import { getAgentHealthHttpStatus, resolveAgentHealthSelection } from '../../presentation/runtime-health.js';
+import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import { handleHealth } from '../../presentation/system-config.js';
 import { callHandler } from '../handler-bridge.js';
 import { getCopilotNamespace } from '../socket/hub-ns.js';
-import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from './agent-health.js';
 
 /**
  * Cria o router de health do servidor copilot. Rotas: GET /health, GET /hub-health, GET /ws/info
@@ -30,12 +29,19 @@ export function createHealthRouter() {
     // Auth-exempt: skipAuth no route-table original
     router.get('/health', (req, res, next) => callHandler(handleHealth, req, res, next));
     router.get('/hub-health', (req, res, next) => callHandler(handleHubHealth, req, res, next));
-    router.get('/health/agent', (_req, res) => {
+    router.get('/health/agent', (req, res) => {
         try {
-            const agent = container.resolve(ALWAYS_ALIVE_AGENT);
-            const health = getAgentHealthSnapshotCompat(agent);
+            const runtimeId = resolveRequestedRuntimeId(req);
+            const selection = resolveAgentHealthSelection(runtimeId);
+            const health = selection.health;
 
-            res.status(getAgentHealthHttpStatus(health)).json(health);
+            res.status(getAgentHealthHttpStatus(health)).json({
+                runtimeId: selection.runtimeId,
+                requestedRuntimeId: selection.requestedRuntimeId,
+                runtimeFound: selection.runtimeFound,
+                usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+                ...health,
+            });
         } catch (error) {
             res.status(503).json({
                 ok: false,

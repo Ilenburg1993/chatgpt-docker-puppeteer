@@ -25,11 +25,19 @@ import { chatStructured as _chatStructured } from './client-structured.js';
  *
  * @typedef {Object} BridgeAgentLike
  * @property {string} status
+ * @property {string | null} [sessionId]
+ * @property {string} [model]
+ * @property {number} [queueSize]
+ * @property {boolean} [dialogLoopActive]
+ * @property {boolean} [dialogPaused]
  * @property {Function} sendMessage
- * @property {() => object} getStatusSnapshot
  * @property {(bootPrompt?: string) => Promise<void>} startDialogLoop
  * @property {(message: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn
- * @property {Function} stopDialogLoop
+ * @property {(opts?: {
+ *     authorized?: boolean;
+ *     reason?: 'watchdog_restart' | 'authorized_stop';
+ *     shutdownTimeoutMs?: number;
+ * }) => Promise<void>} stopDialogLoop
  * @property {(answer: string) => boolean} answerPendingQuestion
  * @property {(event: string, listener: (...args: any[]) => void) => void} on
  * @property {(event: string, listener: (...args: any[]) => void) => void} once
@@ -284,11 +292,11 @@ export class LlmBridgeClient {
      * @returns {Promise<import('#copilot/core/structured-message').StructuredChatResult>}
      */
     async chatStructured(input, opts = {}) {
-        const snap = /** @type {{ sessionId?: string }} */ (requireAgent().getStatusSnapshot());
+        const sessionId = requireAgent().sessionId ?? undefined;
         return _chatStructured(
             {
                 chat: (msg, chatOpts) => this.chat(msg, chatOpts),
-                getSessionId: () => snap.sessionId,
+                getSessionId: () => sessionId,
             },
             input,
             opts,
@@ -384,7 +392,7 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto.
      *
-     * @param {string} [reason='watchdog_restart'] Default is `'watchdog_restart'`
+     * @param {'watchdog_restart' | 'authorized_stop'} [reason='watchdog_restart'] Default is `'watchdog_restart'`
      * @returns {Promise<void>}
      */
     async stopDialogMode(reason = 'watchdog_restart') {
@@ -495,12 +503,27 @@ export class LlmBridgeClient {
     }
 
     /**
-     * Retorna o snapshot de status do agente subjacente.
+     * Retorna uma projection mínima e estável do runtime do agente subjacente.
      *
-     * @returns {object} Snapshot de status do AlwaysAliveAgent
+     * @returns {{
+     *     status: string;
+     *     sessionId: string | null;
+     *     model: string | null;
+     *     queueSize: number;
+     *     dialogLoopActive: boolean;
+     *     dialogPaused: boolean;
+     * }}
      */
     getAgentStatus() {
-        return requireAgent().getStatusSnapshot();
+        const agent = requireAgent();
+        return {
+            status: String(agent.status ?? 'unknown'),
+            sessionId: agent.sessionId ?? null,
+            model: typeof agent.model === 'string' ? agent.model : null,
+            queueSize: Number(agent.queueSize ?? 0),
+            dialogLoopActive: Boolean(agent.dialogLoopActive),
+            dialogPaused: Boolean(agent.dialogPaused),
+        };
     }
 }
 /**

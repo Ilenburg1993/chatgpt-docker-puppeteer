@@ -42,23 +42,63 @@ const defaultRuntime = /** @type {any} */ ({
     pendingQuestionShadowRemainingMs: 0,
 });
 
+const altAnswerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
+const altClearPendingQuestionShadow = vi.fn(() => true);
+
+const altRuntime = /** @type {any} */ ({
+    status: 'waiting_for_input',
+    model: 'gpt-4.1-mini',
+    reasoningEffort: 'medium',
+    dialogLoopActive: true,
+    sessionId: 'alt-session-id',
+    getHealthSnapshot: () => ({
+        ok: true,
+        healthy: true,
+        status: 'degraded',
+        issues: ['runtime.alt_waiting'],
+        backgroundPendingCount: 1,
+        recommendedAction: 'answer_pending_question',
+    }),
+    getStatusSnapshot: () => ({
+        status: 'waiting_for_input',
+        model: 'gpt-4.1-mini',
+        reasoningEffort: 'medium',
+        sendCount: 8,
+        dialogPaused: false,
+        pendingQuestion: 'Responder alt?',
+        contextWindow: 64000,
+    }),
+    dialogPrMetrics: null,
+    answerPendingQuestion: altAnswerPendingQuestion,
+    clearPendingQuestionShadow: altClearPendingQuestionShadow,
+    pendingQuestionShadowState: null,
+    pendingQuestionShadowExpired: false,
+    pendingQuestionShadowRemainingMs: null,
+});
+
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: defaultRuntime,
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
-    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
-    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
-    createSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
         snapshotId: 'snap-001',
         createdAt: Date.now(),
         ...data,
     })),
-    saveSnapshotAsync: vi.fn(async () => '/tmp/snap-001.json'),
-    listSnapshotsAsync: vi.fn(async () => [
+    saveRuntimeSnapshot: vi.fn(async () => '/tmp/snap-001.json'),
+    listRuntimeSnapshots: vi.fn(async () => [
         { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-5-mini', reason: 'manual' },
     ]),
-    loadSnapshotAsync: vi.fn(async (/** @type {string} */ id) => {
+    loadRuntimeSnapshot: vi.fn(async (/** @type {string} */ id) => {
         if (id === 'snap-001') {
             return {
                 snapshotId: 'snap-001',
@@ -81,6 +121,10 @@ vi.mock('#copilot/agent', () => ({
         }
         return null;
     }),
+    createSnapshot: vi.fn(),
+    saveSnapshotAsync: vi.fn(),
+    listSnapshotsAsync: vi.fn(async () => []),
+    loadSnapshotAsync: vi.fn(async () => null),
 }));
 
 vi.mock('#copilot/core', async () => {
@@ -154,6 +198,22 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('display');
         expect(ctx.output()).toContain('shadow expirada');
         expect(ctx.output()).toContain('perfil modelo');
+        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
+    });
+
+    it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
+        const ctx = mockCtx();
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt');
+        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('alt');
+        expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
+    it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {
+        const ctx = mockCtx();
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing');
+        expect(ctx.output()).toContain('runtime default (default)');
     });
 
     it('cmdHistory imprime histórico', () => {
@@ -171,6 +231,12 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('gpt-5-mini');
     });
 
+    it('cmdWho aceita runtimeId explícito e projeta o modelo alvo', () => {
+        const ctx = mockCtx();
+        cmdWho({ injectPort: 3009, println: ctx.println }, '--runtime alt');
+        expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
     it('cmdClear chama clearHistory', async () => {
         const ctx = mockCtx();
         cmdClear({ println: ctx.println });
@@ -182,6 +248,13 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
         expect(ctx.output()).toContain('Resposta enviada');
+    });
+
+    it('cmdAnswer aceita runtimeId explícito e usa o runtime alvo', () => {
+        const ctx = mockCtx();
+        cmdAnswer({ println: ctx.println }, '--runtime alt resposta-alt');
+        expect(altAnswerPendingQuestion).toHaveBeenCalledWith('resposta-alt');
+        expect(ctx.output()).toContain('resposta-alt');
     });
 
     it('cmdAnswer explica quando só resta shadow expirada', () => {
@@ -196,6 +269,12 @@ describe('commands/session — sync commands', () => {
         cmdClearShadow({ println: ctx.println });
         expect(ctx.output()).toContain('Shadow persistida');
         expect(clearPendingQuestionShadow).toHaveBeenCalled();
+    });
+
+    it('cmdClearShadow aceita runtimeId explícito', () => {
+        const ctx = mockCtx();
+        cmdClearShadow({ println: ctx.println }, '--runtime alt');
+        expect(altClearPendingQuestionShadow).toHaveBeenCalled();
     });
 
     it('cmdDbHistory sem hubSessionId avisa', () => {
@@ -233,6 +312,12 @@ describe('commands/session — async commands', () => {
     it('cmdSessionSave salva e imprime path', async () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, 'test-reason');
+        expect(ctx.output()).toContain('Snapshot salvo');
+    });
+
+    it('cmdSessionSave aceita runtimeId explícito na cauda do comando', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSave({ println: ctx.println }, '--runtime alt nightly');
         expect(ctx.output()).toContain('Snapshot salvo');
     });
 

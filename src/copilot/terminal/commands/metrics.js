@@ -9,6 +9,7 @@
  */
 
 import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
+import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
  * @typedef {object} MetricsContext
@@ -19,11 +20,13 @@ import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../
  * Exibe métricas consolidadas da sessão.
  *
  * @param {MetricsContext} ctx
+ * @param {string} [arg]
  * @returns {void}
  */
-export function cmdMetrics({ println }) {
-    const projection = readTerminalMetricsProjection();
-    const configProjection = readTerminalConfigProjection();
+export function cmdMetrics({ println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const projection = callWithRuntimeTarget(readTerminalMetricsProjection, runtimeId);
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
         snap,
         pr,
@@ -62,6 +65,7 @@ export function cmdMetrics({ println }) {
   \x1b[36mMétricas da Sessão\x1b[0m
   ═════════════════════════════════════
   sessão      \x1b[90m${sessionId}\x1b[0m
+    runtime id   \x1b[90m${projection.runtimeId}\x1b[0m
     sdk sessão  \x1b[90m${binding.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub sessão  \x1b[90m${binding.hubSessionId ?? '(sem hub)'}\x1b[0m
   status      ${status}

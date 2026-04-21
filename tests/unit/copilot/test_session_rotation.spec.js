@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeAll } from 'vitest';
+import { beforeAll, describe, it } from 'vitest';
 
 describe('shouldRotateSession', async () => {
     /** @type {typeof import('../../../src/copilot/agent/session/rotation.js').shouldRotateSession} */

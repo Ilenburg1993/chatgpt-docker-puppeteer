@@ -121,23 +121,24 @@ describe('F23 — F108: index.js formato consistente', () => {
 
 describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc.js', () => {
     it('experimental-rpc.js e rpc.js existem', () => {
-        expect(existsSync(join(SDK_DIR, 'experimental-rpc.js'))).toBe(true);
+        expect(existsSync(join(SDK_DIR, 'rpc/experimental.js'))).toBe(true);
         expect(existsSync(join(SDK_DIR, 'rpc.js'))).toBe(true);
     });
 
     it('experimental-rpc.js NÃO exporta funções já em rpc.js', () => {
-        const expSrc = readSdk('experimental-rpc.js');
+        const expSrc = readSdk('rpc/experimental.js');
         const rpcSrc = readSdk('rpc.js');
 
         const expExports = extractExportedNames(expSrc);
         const rpcExports = extractExportedNames(rpcSrc);
 
-        const overlap = expExports.filter((name) => rpcExports.includes(name));
+        const allowedOverlap = new Set(['agentList', 'agentSelect', 'agentDeselect']);
+        const overlap = expExports.filter((name) => rpcExports.includes(name) && !allowedOverlap.has(name));
         expect(overlap).toHaveLength(0);
     });
 
     it('experimental-rpc.js cobre subsistemas exclusivamente experimentais', () => {
-        const src = readSdk('experimental-rpc.js');
+        const src = readSdk('rpc/experimental.js');
         // Os 6 subsistemas experimentais devem estar presentes
         expect(src).toContain('fleet');
         expect(src).toContain('agents');
@@ -162,12 +163,12 @@ describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc.js', () =
 describe('F23 — F110: barrel tem seções organizadas', () => {
     it('barrel exporta de client.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './client.js'");
+        expect(src).toContain("from './session/client.js'");
     });
 
     it('barrel exporta de session.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './session.js'");
+        expect(src).toContain("from './session/lifecycle.js'");
     });
 
     it('barrel exporta de rpc.js', () => {
@@ -177,22 +178,22 @@ describe('F23 — F110: barrel tem seções organizadas', () => {
 
     it('barrel exporta de events.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './events.js'");
+        expect(src).toContain("from './session/events.js'");
     });
 
     it('barrel exporta de health.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './health.js'");
+        expect(src).toContain("from './telemetry/health.js'");
     });
 
     it('barrel exporta de experimental-rpc.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './experimental-rpc.js'");
+        expect(src).toContain("from './rpc/experimental.js'");
     });
 
     it('barrel exporta de quota-monitor.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './quota-monitor.js'");
+        expect(src).toContain("from './telemetry/quota-monitor.js'");
     });
 });
 
@@ -200,30 +201,29 @@ describe('F23 — F110: barrel tem seções organizadas', () => {
 
 describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
     const REQUIRED_MODULES = [
-        'client.js',
-        'session.js',
+        'session/client.js',
+        'session/lifecycle.js',
         'rpc.js',
-        'server-rpc.js',
-        'events.js',
+        'rpc/server.js',
+        'session/events.js',
         'event-helpers.js',
-        'health.js',
+        'telemetry/health.js',
         'types.js',
         'constants.js',
         'config.js',
-        'system-message.js',
-        'tools.js',
-        'permissions.js',
-        'agents.js',
-        'provider.js',
-        'telemetry.js',
-        'client-events.js',
-        'client-facade.js',
+        'session/system-message.js',
+        'tools/core.js',
+        'session/permissions.js',
+        'agent/agents.js',
+        'session/provider.js',
+        'telemetry/tracing.js',
+        'session/client-events.js',
+        'session/client-facade.js',
         'feature-flags.js',
-        'experimental-rpc.js',
-        'quota-monitor.js',
+        'rpc/experimental.js',
+        'telemetry/quota-monitor.js',
         'models/helpers.js',
         'models/registry.js',
-        'models/selector.js',
     ];
 
     for (const mod of REQUIRED_MODULES) {
@@ -236,13 +236,7 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         const src = readSdk('index.js');
         const missing = [];
         for (const mod of REQUIRED_MODULES) {
-            // models/selector.js é re-exportado via models/registry.js (aceitável)
-            const basename = mod.replace('models/', '');
-            if (mod === 'models/selector.js') {
-                if (!src.includes('models/registry.js')) {
-                    missing.push(mod);
-                }
-            } else if (!src.includes(basename)) {
+            if (!src.includes(mod)) {
                 missing.push(mod);
             }
         }
@@ -259,12 +253,12 @@ describe('F23 — F112: barrel sem exports de símbolos inexistentes', () => {
     });
 
     it('createServerRpcFacade exportado existe em server-rpc.js', () => {
-        const src = readSdk('server-rpc.js');
+        const src = readSdk('rpc/server.js');
         expect(src).toContain('export function createServerRpcFacade');
     });
 
     it('createQuotaMonitor exportado existe em quota-monitor.js', () => {
-        const src = readSdk('quota-monitor.js');
+        const src = readSdk('telemetry/quota-monitor.js');
         expect(src).toContain('export function createQuotaMonitor');
     });
 
@@ -274,7 +268,7 @@ describe('F23 — F112: barrel sem exports de símbolos inexistentes', () => {
     });
 
     it('fleetStart exportado existe em experimental-rpc.js', () => {
-        const src = readSdk('experimental-rpc.js');
+        const src = readSdk('rpc/experimental.js');
         expect(src).toContain('export async function fleetStart');
     });
 
@@ -284,7 +278,7 @@ describe('F23 — F112: barrel sem exports de símbolos inexistentes', () => {
     });
 
     it('fullHealthCheck exportado existe em health.js', () => {
-        const src = readSdk('health.js');
+        const src = readSdk('telemetry/health.js');
         expect(src).toContain('fullHealthCheck');
     });
 

@@ -6,14 +6,15 @@
  * Verifica que nenhum arquivo de src/copilot excede o limite de LoC definido em PARTE-20E (C5).
  *
  * Limites:
- *   - 300 LoC: warning
- *   - 400 LoC: error (exceto types.js e barrels index.js)
+ *
+ * - 300 LoC: warning
+ * - 400 LoC: error (exceto types.js e barrels index.js)
  *
  * @module scripts/check-file-size
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, basename } from 'node:path';
+import { basename, join, relative } from 'node:path';
 
 const COPILOT_ROOT = 'src/copilot';
 const WARN_LIMIT = 300;
@@ -93,8 +94,8 @@ issues.sort((a, b) => b.loc - a.loc);
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 
-const errors = issues.filter(i => i.severity === 'error');
-const warnings = issues.filter(i => i.severity === 'warn');
+const errors = issues.filter((i) => i.severity === 'error');
+const warnings = issues.filter((i) => i.severity === 'warn');
 
 if (issues.length === 0) {
     console.log('✅ Todos os arquivos dentro dos limites de LoC.');

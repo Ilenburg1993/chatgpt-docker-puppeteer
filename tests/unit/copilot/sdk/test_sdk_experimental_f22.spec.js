@@ -118,10 +118,9 @@ describe('F22 — F124 runtime: feature-flags API', () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const snapshot = featureFlags.getExperimentalFlags();
         expect(snapshot.mcp).toBe(true);
-        // Snapshot deve ser congelado (não deve permitir mutação)
-        expect(() => {
-            Reflect.set(snapshot, 'mcp', false);
-        }).toThrow();
+        expect(Reflect.isExtensible(snapshot)).toBe(false);
+        expect(Reflect.set(snapshot, 'mcp', false)).toBe(false);
+        expect(snapshot.mcp).toBe(true);
     });
 
     it('EXPERIMENTAL_FEATURES tem exatamente 6 elementos', () => {

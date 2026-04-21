@@ -22,16 +22,42 @@ const defaultRuntime = /** @type {any} */ ({
     }),
 });
 
+const altRuntime = /** @type {any} */ ({
+    sessionId: 'runtime-alt',
+    dialogLoopActive: false,
+    dialogPrMetrics: null,
+    lastPrInfo: { model: 'gpt-4.1-mini', cost: 0.0123 },
+    answerPendingQuestion: vi.fn(() => true),
+    getStatusSnapshot: () => ({
+        status: 'waiting_for_input',
+        model: 'gpt-4.1-mini',
+        reasoningEffort: 'low',
+        contextState: { tokens: 1000, tokenLimit: 2000, utilization: 0.5 },
+    }),
+    getHealthSnapshot: () => ({
+        status: 'healthy',
+        backgroundPendingCount: 0,
+        issues: [],
+        checks: { io: { keepaliveRunning: true }, quota: { running: true } },
+    }),
+});
+
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
-    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
-    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
-    createSnapshot: vi.fn(),
-    saveSnapshotAsync: vi.fn(),
-    listSnapshotsAsync: vi.fn(async () => []),
-    loadSnapshotAsync: vi.fn(async () => null),
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    createRuntimeSnapshot: vi.fn(),
+    saveRuntimeSnapshot: vi.fn(),
+    listRuntimeSnapshots: vi.fn(async () => []),
+    loadRuntimeSnapshot: vi.fn(async () => null),
 }));
 
 vi.mock('#copilot/channel', () => ({
@@ -105,6 +131,16 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Processando mensagem');
     });
 
+    it('cmdMetrics encaminha runtimeId explícito para as projections', () => {
+        const ctx = mockCtx();
+
+        cmdMetrics({ println: ctx.println }, '--runtime alt');
+
+        expect(ctx.output()).toContain('runtime id');
+        expect(ctx.output()).toContain('alt');
+        expect(ctx.output()).toContain('gpt-4.1-mini');
+    });
+
     it('cmdUsage now exibe contexto e binding runtime/sdk/hub', () => {
         const ctx = mockCtx();
 
@@ -114,5 +150,15 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Binding: runtime=');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-5-mini');
+    });
+
+    it('cmdUsage now aceita runtimeId explícito', () => {
+        const ctx = mockCtx();
+
+        cmdUsage({ println: ctx.println }, 'now --runtime alt');
+
+        expect(ctx.output()).toContain('Binding: runtime=');
+        expect(ctx.output()).toContain('Modo: sdk=');
+        expect(ctx.output()).toContain('gpt-4.1-mini');
     });
 });

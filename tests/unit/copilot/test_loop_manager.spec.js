@@ -60,7 +60,9 @@ vi.mock('#copilot/observability/logger', () => ({
 }));
 
 // Mock waitForEvent — resolve imediatamente por padrão
-const mockWaitForEvent = vi.fn((/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) => Promise.resolve({}));
+const mockWaitForEvent = vi.fn((/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) =>
+    Promise.resolve({}),
+);
 vi.mock('#copilot/sdk/event-helpers', () => ({
     waitForEvent: (
         /** @type {import('node:events').EventEmitter} */ emitter,

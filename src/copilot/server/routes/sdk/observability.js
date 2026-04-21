@@ -36,6 +36,7 @@ import {
 } from '#copilot/observability';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
+import { readAgentStatusSnapshot, readAgentStatusValue } from '../../../presentation/runtime-status.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
@@ -49,16 +50,27 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  *
  * @typedef {object} ObservabilityRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
+ * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  */
+
+/** @typedef {ObservabilityRouterDeps | ((req: Req) => ObservabilityRouterDeps)} ObservabilityRouterBinding */
+
+/**
+ * @param {ObservabilityRouterBinding} binding
+ * @param {Req} req
+ * @returns {ObservabilityRouterDeps}
+ */
+function resolveObservabilityRouterDeps(binding, req) {
+    return typeof binding === 'function' ? binding(req) : binding;
+}
 
 /**
  * Factory que cria o router de rotas `/observability/*` com dependências injetadas.
  *
- * @param {ObservabilityRouterDeps} deps
+ * @param {ObservabilityRouterBinding} deps
  * @returns {import('express').Router}
  */
 export default function createObservabilityRouter(deps) {
-    const { agent } = deps;
     const router = Router();
 
     /**
@@ -92,8 +104,9 @@ export default function createObservabilityRouter(deps) {
             /** @type {Record<string, unknown> | null} */
             let agentSnapshot = null;
             let agentAvailable = false;
+            const { agent, runtimeId } = resolveObservabilityRouterDeps(deps, req);
             try {
-                agentSnapshot = agent.getStatusSnapshot();
+                agentSnapshot = readAgentStatusSnapshot(agent);
                 agentAvailable = true;
             } catch (e) {
                 logSwallowed(e, 'api.observability.getAgent');
@@ -109,9 +122,7 @@ export default function createObservabilityRouter(deps) {
                     status: componentStatus(agentAvailable, hasRecentAgentErrors),
                     ...(agentSnapshot
                         ? {
-                              details: String(
-                                  /** @type {Record<string, unknown>} */ (agentSnapshot)['status'] ?? 'unknown',
-                              ),
+                              details: readAgentStatusValue(agent),
                           }
                         : { details: 'not started' }),
                 },
@@ -142,6 +153,7 @@ export default function createObservabilityRouter(deps) {
 
             res.status(overallHealthy ? 200 : 503).json({
                 ok: overallHealthy,
+                ...(runtimeId ? { runtimeId } : {}),
                 status: overallStatus,
                 agent: agentSnapshot,
                 components,

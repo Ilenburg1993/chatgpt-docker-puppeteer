@@ -13,11 +13,17 @@
  * @module copilot/server/routes/webhooks
  */
 
-import { container, validateUrlString } from '#copilot/core';
+import { validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
+import {
+    listRuntimeWebhooks,
+    registerRuntimeWebhook,
+    resolveRuntimeWebhookSelection,
+    unregisterRuntimeWebhook,
+} from '../../presentation/runtime-webhooks.js';
 import { validate } from '../middleware/validate.js';
 
 /**
@@ -35,10 +41,18 @@ const router = Router();
 /**
  * Lista todos os webhooks registrados no agente Always-Alive.
  */
-router.get('/webhooks', (_req, /** @type {Res} */ res) => {
-    const agent = container.resolve(ALWAYS_ALIVE_AGENT);
-    const list = agent.listWebhooks();
-    res.json({ ok: true, count: list.length, webhooks: list });
+router.get('/webhooks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+    const selection = resolveRuntimeWebhookSelection(resolveRequestedRuntimeId(req));
+    const list = listRuntimeWebhooks(selection.requestedRuntimeId ?? selection.runtimeId);
+    res.json({
+        ok: true,
+        runtimeId: selection.runtimeId,
+        requestedRuntimeId: selection.requestedRuntimeId,
+        runtimeFound: selection.runtimeFound,
+        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+        count: list.length,
+        webhooks: list,
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +68,7 @@ const webhookBodySchema = z.object({ url: z.string().url() });
  */
 router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req} */ req, /** @type {Res} */ res) => {
     const { url } = /** @type {{ url: string }} */ (req.body);
+    const runtimeId = resolveRequestedRuntimeId(req);
 
     const validation = validateUrlString(url);
     if (!validation.safe) {
@@ -61,8 +76,16 @@ router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req}
         return;
     }
 
-    const result = container.resolve(ALWAYS_ALIVE_AGENT).registerWebhook(url);
-    res.status(201).json({ ok: true, ...result });
+    const selection = resolveRuntimeWebhookSelection(runtimeId);
+    const result = registerRuntimeWebhook(url, selection.requestedRuntimeId ?? selection.runtimeId);
+    res.status(201).json({
+        ok: true,
+        runtimeId: selection.runtimeId,
+        requestedRuntimeId: selection.requestedRuntimeId,
+        runtimeFound: selection.runtimeFound,
+        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+        ...result,
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,12 +102,20 @@ router.delete(
     validate({ params: webhookParamsSchema }),
     (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const id = /** @type {string} */ (req.params['id']);
-        const removed = container.resolve(ALWAYS_ALIVE_AGENT).unregisterWebhook(id);
+        const selection = resolveRuntimeWebhookSelection(resolveRequestedRuntimeId(req));
+        const removed = unregisterRuntimeWebhook(id, selection.requestedRuntimeId ?? selection.runtimeId);
         if (!removed) {
             res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
             return;
         }
-        res.json({ ok: true, id });
+        res.json({
+            ok: true,
+            runtimeId: selection.runtimeId,
+            requestedRuntimeId: selection.requestedRuntimeId,
+            runtimeFound: selection.runtimeFound,
+            usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+            id,
+        });
     },
 );
 

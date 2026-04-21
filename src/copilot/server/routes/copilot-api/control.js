@@ -18,7 +18,8 @@ import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
-import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../agent-health.js';
+import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
+import { buildAgentSessionHttpPayload, buildAgentStatusHttpPayload } from '../../../presentation/runtime-status.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
 const _sdkVersion = (() => {
@@ -37,47 +38,78 @@ const _sdkVersion = (() => {
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {{
- *     status: string;
- *     sessionId: string | null;
- *     model: string;
- *     queueSize: number;
- *     pendingQuestion: object | null;
- *     isResumed: boolean;
- *     resumeCount: number;
- *     sendCount: number;
- *     startedAt: number | null;
- *     starvationAlert: boolean;
- *     oldestTaskWaitMs: number;
- * }} AgentSnap
- *
- *
  * @typedef {import('../../../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
+ *
+ * @typedef {{
+ *     agent: AlwaysAliveAgentLike;
+ *     runtimeId: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }} RuntimeRouteDeps
+ *
+ *
+ * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
  */
+
+/**
+ * @param {RuntimeRouteBinding} binding
+ * @param {Req} req
+ * @returns {RuntimeRouteDeps}
+ */
+function resolveRuntimeRouteDeps(binding, req) {
+    if (typeof binding === 'function') {
+        return binding(req);
+    }
+    return {
+        agent: binding,
+        runtimeId: 'default',
+        requestedRuntimeId: null,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+    };
+}
 
 /**
  * Registra rotas de controle do agente no router fornecido.
  *
  * @param {BridgeRouter} bridge - Express Router onde as rotas serão registradas
- * @param {AlwaysAliveAgentLike} agent - Instância do AlwaysAliveAgent
+ * @param {RuntimeRouteBinding} binding - Runtime fixo legado ou resolver por requisição
  * @returns {void}
  */
-export function registerControlRoutes(bridge, agent) {
+export function registerControlRoutes(bridge, binding) {
     const requireAdmin = _makeAdminAuthMiddleware();
 
-    bridge.get('/status', (_req, /** @type {Res} */ res) => res.json({ ok: true, ...agent.getStatusSnapshot() }));
-    bridge.get('/health', (_req, /** @type {Res} */ res) => _handleHealth(res, agent));
-    bridge.get('/session', (_req, /** @type {Res} */ res) => _handleSession(res, agent));
+    bridge.get('/status', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const deps = resolveRuntimeRouteDeps(binding, req);
+        res.json(buildAgentStatusHttpPayload(deps.agent, deps));
+    });
+    bridge.get('/health', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent, runtimeId } = resolveRuntimeRouteDeps(binding, req);
+        _handleHealth(res, agent, runtimeId);
+    });
+    bridge.get('/session', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const deps = resolveRuntimeRouteDeps(binding, req);
+        _handleSession(res, deps.agent, deps);
+    });
     // SEC-API-001: POST /start e /stop protegidas com requireAdmin (defesa em profundidade)
-    bridge.post('/start', requireAdmin, (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStart(res, agent));
-    bridge.post('/stop', requireAdmin, (/** @type {Req} */ _req, /** @type {Res} */ res) => _handleStop(res, agent));
-    bridge.get('/permissions', (_req, /** @type {Res} */ res) => _handleGetPermissions(res, agent));
+    bridge.post('/start', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
+        _handleStart(res, resolveRuntimeRouteDeps(binding, req).agent),
+    );
+    bridge.post('/stop', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
+        _handleStop(res, resolveRuntimeRouteDeps(binding, req).agent),
+    );
+    bridge.get('/permissions', (/** @type {Req} */ req, /** @type {Res} */ res) =>
+        _handleGetPermissions(res, resolveRuntimeRouteDeps(binding, req).agent),
+    );
     bridge.post('/permissions', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleSetPermissions(req, res, agent),
+        _handleSetPermissions(req, res, resolveRuntimeRouteDeps(binding, req).agent),
     );
 
     // GAP-SE-001b (STREAMING-EVENTS-AUDIT Fase 2.2): endpoint de steering (immediate mode)
-    bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) => _handleSteer(req, res, agent));
+    bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) =>
+        _handleSteer(req, res, resolveRuntimeRouteDeps(binding, req).agent),
+    );
 
     // E3.2 — Dashboard de compliance: decisões de hooks e estatísticas
     bridge.get('/compliance', (_req, /** @type {Res} */ res) => {
@@ -136,8 +168,9 @@ function _makeAdminAuthMiddleware() {
  *
  * @param {Res} res
  * @param {AlwaysAliveAgentLike} agent
+ * @param {string | null | undefined} [runtimeId]
  */
-function _handleHealth(res, agent) {
+function _handleHealth(res, agent, runtimeId) {
     const health = getAgentHealthSnapshotCompat(agent);
 
     // ARCH-04: verificar conectividade do ConversationStore (SQLite)
@@ -156,6 +189,7 @@ function _handleHealth(res, agent) {
 
     res.status(getAgentHealthHttpStatus(health)).json({
         ...health,
+        ...(runtimeId ? { runtimeId } : {}),
         // G2-API-14: permissionMode para rastreabilidade de configuração de auditoria
         permissionMode: typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all',
         channelVersion: CHANNEL_VERSION,
@@ -174,18 +208,10 @@ function _handleHealth(res, agent) {
 /**
  * @param {Res} res
  * @param {AlwaysAliveAgentLike} agent
+ * @param {string | RuntimeRouteDeps | null | undefined} [runtimeIdOrDeps]
  */
-function _handleSession(res, agent) {
-    const snap = /** @type {AgentSnap} */ (agent.getStatusSnapshot());
-    res.json({
-        ok: true,
-        sessionId: snap.sessionId,
-        model: snap.model,
-        isResumed: snap.isResumed,
-        resumeCount: snap.resumeCount,
-        sendCount: snap.sendCount,
-        startedAt: snap.startedAt,
-    });
+function _handleSession(res, agent, runtimeIdOrDeps) {
+    res.json(buildAgentSessionHttpPayload(agent, runtimeIdOrDeps));
 }
 
 /**

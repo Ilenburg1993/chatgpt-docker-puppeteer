@@ -16,7 +16,7 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //

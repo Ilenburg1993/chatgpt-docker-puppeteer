@@ -8,7 +8,6 @@
  *   projete metadados diferentes.
  */
 
-import { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import {
     container,
@@ -17,6 +16,7 @@ import {
     getSharedSessionBinding,
     setSharedSdkSessionId,
 } from '#copilot/core';
+import { clearSharedSdkSessionOwnership, syncSharedSdkSessionOwnership } from './runtime-ownership.js';
 
 /**
  * Obtém o ConversationStore se estiver registrado no container.
@@ -75,7 +75,7 @@ export function attachSdkSessionOwnership(payload, sessionId) {
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; persistedToStore: boolean }}
  */
 export function rememberSdkSessionOwnership(sdkSessionId) {
-    return syncActiveSessionOwnership(sdkSessionId, {
+    return syncSharedSdkSessionOwnership(sdkSessionId, {
         getHubSessionId,
         setSharedSdkSessionId,
         conversationStore: getConversationStoreMaybe(),
@@ -92,7 +92,7 @@ export function forgetSdkSessionOwnership(sessionId) {
     if (getSharedSdkSessionId() !== sessionId) {
         return getSdkSessionBindingProjection();
     }
-    const cleared = clearActiveSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
+    const cleared = clearSharedSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
     return {
         ...cleared,
         isBound: Boolean(cleared.hubSessionId && cleared.sdkSessionId),
@@ -184,7 +184,7 @@ export async function resolveSdkRuntimeProjection(agent, client, connectionState
  * @returns {{ hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean }}
  */
 export function clearSdkRuntimeBinding() {
-    const cleared = clearActiveSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
+    const cleared = clearSharedSdkSessionOwnership({ getHubSessionId, setSharedSdkSessionId });
     return {
         ...cleared,
         isBound: Boolean(cleared.hubSessionId && cleared.sdkSessionId),

@@ -14,12 +14,12 @@
  * - chat() chama onQuestion quando há pergunta pendente
  * - clearHistory() limpa histórico e turnCount
  * - answer() delega para alwaysAliveAgent.answerPendingQuestion()
- * - getAgentStatus() delega para alwaysAliveAgent.getStatusSnapshot()
+ * - getAgentStatus() retorna projection mínima estável do runtime
  * - Propriedades history e turnCount são readonly/corretas
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeAll } from 'vitest';
+import { beforeAll, describe, it } from 'vitest';
 
 import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
 
@@ -238,6 +238,7 @@ describe('LlmBridgeClient › getAgentStatus() e answer()', () => {
         const snap = llmBridgeClient.getAgentStatus();
         assert.ok(typeof snap === 'object' && snap !== null, 'deve retornar objeto');
         assert.ok('status' in snap, 'deve ter campo status');
+        assert.ok('sessionId' in snap, 'deve ter campo sessionId');
     });
 
     it('answer() retorna false quando não há pergunta pendente', async () => {

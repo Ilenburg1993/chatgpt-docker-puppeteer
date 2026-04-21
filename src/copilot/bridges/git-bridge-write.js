@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { toError, container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { METRICS_STORE, startSpanImmediate } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';

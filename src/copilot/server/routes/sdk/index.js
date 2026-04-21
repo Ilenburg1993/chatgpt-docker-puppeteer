@@ -17,12 +17,8 @@
  * @module copilot/server/routes/sdk
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
-import { container } from '#copilot/core';
-import { METRICS_STORE } from '#copilot/observability';
-import { forceStopClient, getClient, getClientState, stopClient } from '#copilot/sdk';
-import { getAllTools } from '#copilot/tools';
 import { Router } from 'express';
+import { resolveSdkRouteSharedDeps } from '../../../presentation/runtime-request.js';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
 import hooksRouter from './hooks.js';
@@ -39,21 +35,20 @@ import sessionsRouter from './sessions.js';
 function createSdkApiRouter() {
     const router = Router();
 
-    const sharedDeps = {
-        agent: container.resolve(ALWAYS_ALIVE_AGENT),
-        metrics: container.resolve(METRICS_STORE),
-        getClient,
-        getClientState,
-        stopClient,
-        forceStopClient,
-        allTools: getAllTools(),
-    };
-
-    router.use('/', createClientRouter(sharedDeps));
+    router.use(
+        '/',
+        createClientRouter((req) => resolveSdkRouteSharedDeps(req)),
+    );
     router.use('/', sessionsRouter);
-    router.use('/', createAgentRouter(sharedDeps));
+    router.use(
+        '/',
+        createAgentRouter((req) => resolveSdkRouteSharedDeps(req)),
+    );
     router.use('/', hooksRouter);
-    router.use('/', createObservabilityRouter(sharedDeps));
+    router.use(
+        '/',
+        createObservabilityRouter((req) => resolveSdkRouteSharedDeps(req)),
+    );
 
     return router;
 }

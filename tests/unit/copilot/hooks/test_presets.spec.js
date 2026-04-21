@@ -35,10 +35,11 @@ vi.mock('../../../src/copilot/hooks/error-handler.js', () => ({
     createCircuitBreakerHandler: vi.fn(() => vi.fn().mockResolvedValue({ errorHandling: 'retry', retryCount: 3 })),
     createErrorHandler: vi.fn((opts = {}) => {
         const strategy = opts.strategy ?? 'abort';
+        const maxRetries = opts.maxRetries ?? 1;
         return vi.fn().mockImplementation(async (input) => {
             const decided = typeof strategy === 'function' ? strategy(input) : strategy;
             if (decided === 'retry') {
-                return { errorHandling: 'retry', retryCount: 1 };
+                return { errorHandling: 'retry', retryCount: 1 <= maxRetries ? 1 : maxRetries };
             }
             return { errorHandling: decided };
         });
@@ -59,7 +60,6 @@ import { createSafePreset } from '../../../../src/copilot/hooks/presets/safe.js'
 /** @param {string} toolName */
 const makeInput = (toolName) => /** @type {any} */ ({ toolName, toolArgs: {}, timestamp: Date.now(), cwd: '/tmp' });
 
-/** @param {string} [sid='sess-1'] . . . . Default is `'sess-1'` */
 const makeInvocation = (sid = 'sess-1') => /** @type {any} */ ({ sessionId: sid });
 
 const makePromptInput = (prompt = 'hello') => /** @type {any} */ ({ prompt });
@@ -245,7 +245,7 @@ describe('hooks/presets/safe', () => {
         const { hooks } = /** @type {any} */ (createSafePreset());
         const r = await hooks.onErrorOccurred(makeErrorInput({ recoverable: true }), makeInvocation());
         expect(r.errorHandling).toBe('retry');
-        expect(r.retryCount).toBe(2);
+        expect(r.retryCount).toBe(1);
     });
 
     it('onErrorOccurred sem recoverable retorna abort', async () => {

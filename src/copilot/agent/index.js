@@ -50,6 +50,11 @@ export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, Agent
 
 // ── Subsistemas ──────────────────────────────────────────────
 export * from './dialog/index.js';
+export * from './facades/agent-dialog-runtime.js';
+export * from './facades/agent-runtime-controls.js';
+export * from './facades/agent-runtime-ownership.js';
+export * from './facades/agent-runtime-status.js';
+export * from './facades/agent-runtime-webhooks.js';
 export * from './health-check.js';
 export * from './infra/index.js';
 export * from './lifecycle/index.js';
