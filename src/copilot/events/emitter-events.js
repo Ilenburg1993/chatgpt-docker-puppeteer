@@ -34,6 +34,19 @@ export const EMITTER_SESSION_FATAL = 'session.fatal';
 export const EMITTER_SESSION_ERROR = 'session.error';
 export const EMITTER_SESSION_CLEANUP = 'session.cleanup';
 export const EMITTER_SESSION_IDLE = 'session.idle';
+export const EMITTER_SESSION_INFO = 'session.info';
+export const EMITTER_SESSION_WARNING = 'session.warning';
+export const EMITTER_SESSION_MODEL_CHANGED = 'session.model_changed';
+export const EMITTER_SESSION_TITLE_CHANGED = 'session.title_changed';
+export const EMITTER_SESSION_CONTEXT_CHANGED = 'session.context_changed';
+export const EMITTER_SESSION_MODE_CHANGED = 'session.mode_changed';
+export const EMITTER_SESSION_PLAN_CHANGED = 'session.plan_changed';
+export const EMITTER_SESSION_TASK_COMPLETE = 'session.task_complete';
+export const EMITTER_SESSION_TRUNCATION = 'session.truncation';
+export const EMITTER_SESSION_SNAPSHOT_REWIND = 'session.snapshot_rewind';
+export const EMITTER_SESSION_SHUTDOWN = 'session.shutdown';
+export const EMITTER_SESSION_HANDOFF = 'session.handoff';
+export const EMITTER_SESSION_WORKSPACE_FILE_CHANGED = 'session.workspace_file_changed';
 export const EMITTER_SESSION_USAGE = 'session.usage';
 export const EMITTER_SESSION_COMPACTION_START = 'session.compaction_start';
 export const EMITTER_SESSION_COMPACTION_COMPLETE = 'session.compaction_complete';
@@ -75,6 +88,7 @@ export const EMITTER_TASK_REASONING = 'task.reasoning';
 export const EMITTER_TOOL_EXECUTION_START = 'tool.execution_start';
 export const EMITTER_TOOL_EXECUTION_PROGRESS = 'tool.execution_progress';
 export const EMITTER_TOOL_EXECUTION_COMPLETE = 'tool.execution_complete';
+export const EMITTER_TOOL_EXECUTION_PARTIAL_RESULT = 'tool.execution_partial_result';
 
 // ── Question/Answer ──────────────────────────────────────────
 export const EMITTER_QUESTION_PENDING = 'question.pending';
@@ -98,7 +112,10 @@ export const EMITTER_SUBAGENT_FAILED = 'subagent.failed';
 
 // ── Assistant ────────────────────────────────────────────────
 export const EMITTER_ASSISTANT_INTENT = 'assistant.intent';
+export const EMITTER_ASSISTANT_TURN_START = 'assistant.turn_start';
+export const EMITTER_ASSISTANT_TURN_END = 'assistant.turn_end';
 export const EMITTER_ASSISTANT_STREAMING_DELTA = 'assistant.streaming_delta';
+export const EMITTER_ASSISTANT_REASONING_COMPLETE = 'assistant.reasoning_complete';
 
 // ── Steering ─────────────────────────────────────────────────
 export const EMITTER_STEERING_SENT = 'steering.sent';
@@ -108,3 +125,10 @@ export const EMITTER_SDK_LIFECYCLE = 'sdk.lifecycle';
 export const EMITTER_AGENT_METRICS = 'agent.metrics';
 export const EMITTER_MCP_RECONNECTED = 'mcp.reconnected';
 export const EMITTER_QUOTA_WARNING = 'quota.warning';
+
+// ── Background / Shell ──────────────────────────────────────
+export const EMITTER_AGENT_BACKGROUND_COMPLETED = 'agent.background.completed';
+export const EMITTER_AGENT_BACKGROUND_IDLE = 'agent.background.idle';
+
+// ── Plan Mode / External Tools ──────────────────────────────
+export const EMITTER_EXIT_PLAN_MODE_COMPLETED = 'exit_plan_mode.completed';

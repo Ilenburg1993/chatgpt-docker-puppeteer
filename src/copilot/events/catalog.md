@@ -1,9 +1,11 @@
 # Catálogo de Eventos — Copilot System
 
-**Última atualização**: 2026-04-12 | **FAIXA-2A** | **Fonte**: `src/copilot/events/`
+**Última atualização**: 2026-04-22 | **FAIXA-2A/F0.3** | **Fonte**: `src/copilot/events/`
 
 > **SSOT**: Todas as strings de evento devem ser importadas de `#copilot/events`. Strings literais
-> de evento fora deste módulo são violações arquiteturais (C11).
+> de evento de domínio ou legacy emitter fora deste módulo são violações arquiteturais (C11).
+> Eventos locais de processo, UI e infraestrutura são classificados pelo auditor, mas não entram no
+> catálogo global por padrão.
 
 ---
 
@@ -15,6 +17,31 @@
 | `namespace:sub:ação` | `agent:dialog:stalled` | Eventos de subsistema |
 | `dot.notation`       | `task.started`         | Eventos legados SDK   |
 | `socket:event`       | `join:session`         | Eventos de socket     |
+
+## Classificação do Auditor
+
+O auditor `scripts/audit-event-strings.mjs` separa achados em cinco famílias:
+
+| Categoria        | Entra como violação? | Uso                                                                 |
+| ---------------- | -------------------- | ------------------------------------------------------------------- |
+| `domain`         | Sim                  | Evento de domínio Copilot fora de `events/`                         |
+| `legacy-emitter` | Sim                  | Evento local/legado de `EventEmitter` sem constante importada       |
+| `node-process`   | Não                  | Sinais e eventos do processo Node.js, como `SIGTERM` e `SIGINT`     |
+| `ui-local`       | Não                  | Eventos locais de projection/UX, como `activity:changed`            |
+| `infra-local`    | Não                  | Streams, sockets, HTTP, readline e eventos locais de infraestrutura |
+
+Baseline atual:
+
+```text
+ssotCount=198
+violationCount=0
+findingCount=39
+domain=0
+legacy-emitter=0
+node-process=9
+ui-local=4
+infra-local=26
+```
 
 ---
 

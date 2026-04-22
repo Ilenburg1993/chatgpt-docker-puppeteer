@@ -160,6 +160,8 @@
   ],
   "scripts": {
     "analyze:arch:filesize": "node scripts/check-file-size.mjs",
+    "analyze:arch:global": "node scripts/check-copilot-global-architecture.mjs",
+    "analyze:arch:global:strict": "node scripts/check-copilot-global-architecture.mjs --strict",
     "analyze:arch:health": "node scripts/arch-health.mjs",
     "analyze:arch:layers": "node scripts/check-layer-violations.mjs",
     "analyze:circular": "node scripts/analysis/analyze-code-graph.js --circular",
