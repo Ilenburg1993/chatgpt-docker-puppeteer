@@ -121,6 +121,10 @@ describe('url-validator (infra)', () => {
             expect(() => validateWebhookUrl('http://192.168.1.1')).toThrow(/Host privado/);
         });
 
+        it('rejeita hosts de metadata cloud ja cobertos pelo validator funcional', () => {
+            expect(() => validateWebhookUrl('http://metadata.google.internal')).toThrow(/Host privado/);
+        });
+
         it('permite IPs privados com allowPrivate=true', () => {
             expect(() => validateWebhookUrl('http://localhost:8080', { allowPrivate: true })).not.toThrow();
             expect(() => validateWebhookUrl('http://10.0.0.1', { allowPrivate: true })).not.toThrow();

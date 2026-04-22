@@ -24,6 +24,7 @@ vi.mock('#copilot/sdk/index', () => ({
         XHIGH: 'xhigh',
     },
     SYSTEM_PROMPT_SECTIONS: {},
+    approveAll: vi.fn(async () => ({ kind: 'approved' })),
     createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
     createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
     defineTool: vi.fn(() => ({ name: 'mock-defined', execute: vi.fn() })),
@@ -69,6 +70,9 @@ describe('session-setup (F63)', () => {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
             model: 'gpt-4',
+            getModelSnapshot: vi.fn(function () {
+                return this.model;
+            }),
             permissions: { handler: vi.fn() },
             webhooks: { emit: vi.fn() },
             dialogLoop: {
@@ -77,6 +81,9 @@ describe('session-setup (F63)', () => {
                 handleProtocolInput: vi.fn(),
             },
             reasoningEffort: 'medium',
+            getReasoningEffortSnapshot: vi.fn(function () {
+                return this.reasoningEffort;
+            }),
             pendingQuestion: null,
             session: null,
             isResumed: false,
@@ -88,7 +95,7 @@ describe('session-setup (F63)', () => {
             }),
             setReasoningEffort: vi.fn(),
             setStatus: vi.fn(),
-            backgroundTasks: { track: vi.fn() },
+            trackBackgroundTask: vi.fn(),
         };
         host = {
             emit: vi.fn(),
@@ -148,11 +155,9 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest = /** @type {(input: {
-    question: string;
-    choices?: string[];
-    allowFreeform?: boolean;
-}) => Promise<unknown>} */ (options.onUserInputRequest);
+            const onUserInputRequest = /**
+             * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
+             */ (options.onUserInputRequest);
 
             await onUserInputRequest({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
 
@@ -177,11 +182,9 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest = /** @type {(input: {
-    question: string;
-    choices?: string[];
-    allowFreeform?: boolean;
-}) => Promise<unknown>} */ (options.onUserInputRequest);
+            const onUserInputRequest = /**
+             * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
+             */ (options.onUserInputRequest);
 
             await onUserInputRequest({ question: 'Escolha', allowFreeform: false });
 

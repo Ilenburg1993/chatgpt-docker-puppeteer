@@ -548,6 +548,132 @@ describe('agent health routes', () => {
         assert.equal(sessionRes.body.sessionId, 'default-session');
     });
 
+    it('GET /capabilities expõe capability map canônico com metadata de runtime', async () => {
+        const agent = /** @type {any} */ ({
+            status: 'idle',
+            sessionId: 'cap-session',
+            dialogLoopActive: true,
+            dialogPaused: false,
+            startDialogLoop: async () => {},
+            getPermissionMode: () => 'selective',
+            listWebhooks: () => [{ url: 'https://example.test/hook' }],
+            getHandoffManager: () => ({}),
+            getStatusSnapshot: () => ({
+                status: 'idle',
+                sessionId: 'cap-session',
+                model: 'gpt-5',
+                permissionMode: 'selective',
+                isResumed: true,
+                resumeCount: 2,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                startedAt: 123,
+            }),
+            getSdkResourceSnapshot: () => ({
+                resources: {
+                    clientAvailable: true,
+                    sessionAvailable: true,
+                },
+                missingResources: [],
+                allCoreResourcesAvailable: true,
+                allRuntimeResourcesAvailable: true,
+            }),
+            getHealthSnapshot: () => ({
+                ok: true,
+                healthy: true,
+                status: 'healthy',
+                agentStatus: 'idle',
+                sessionId: 'cap-session',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+                dialogLoopActive: true,
+                pendingQuestion: false,
+                pendingQuestionKind: null,
+                pendingQuestionShadow: false,
+                pendingQuestionShadowKind: null,
+                pendingQuestionShadowState: null,
+                pendingQuestionShadowExpired: false,
+                pendingQuestionShadowAgeMs: null,
+                pendingQuestionShadowExpiresAt: null,
+                pendingQuestionShadowRemainingMs: null,
+                queueSize: 0,
+                oldestTaskWaitMs: 0,
+                starvationAlert: false,
+                backgroundPendingCount: 0,
+                backgroundPendingLabels: [],
+                riskFlags: [],
+                recommendedAction: 'none',
+                uptime: 100,
+                issues: [],
+                bootReport: null,
+                sdkResources: null,
+                checks: {
+                    runtime: { ok: true, status: 'idle', operational: true },
+                    client: { ok: true, available: true },
+                    session: { ok: true, active: true, resumed: true },
+                    dialog: { ok: true, active: true, attached: true, paused: false },
+                    queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                    io: {
+                        ok: true,
+                        pendingQuestion: false,
+                        pendingQuestionKind: null,
+                        pendingQuestionShadow: false,
+                        pendingQuestionShadowKind: null,
+                        pendingQuestionShadowState: null,
+                        pendingQuestionShadowExpired: false,
+                        pendingQuestionShadowAgeMs: null,
+                        pendingQuestionShadowExpiresAt: null,
+                        pendingQuestionShadowRemainingMs: null,
+                        waitingForInput: false,
+                        keepaliveRunning: true,
+                        backgroundPendingCount: 0,
+                    },
+                    background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                    sdkResources: {
+                        ok: true,
+                        available: true,
+                        allCoreResourcesAvailable: true,
+                        allRuntimeResourcesAvailable: true,
+                        missingResources: [],
+                    },
+                    boot: {
+                        ok: true,
+                        reportAvailable: true,
+                        failedSteps: 0,
+                        degradedSteps: 0,
+                        lastCompletedAt: 456,
+                    },
+                    quota: { ok: true, configured: true, running: true },
+                },
+                ts: Date.now(),
+            }),
+        });
+
+        const app = express();
+        const router = express.Router();
+        registerControlRoutes(router, () => ({
+            agent,
+            runtimeId: 'default',
+            requestedRuntimeId: 'default',
+            runtimeFound: true,
+            usedDefaultRuntimeFallback: false,
+        }));
+        app.use(express.json());
+        app.use(router);
+
+        const res = await supertest(app).get('/capabilities').expect(200);
+
+        assert.equal(res.body.ok, true);
+        assert.equal(res.body.runtimeId, 'default');
+        assert.equal(res.body.capabilities['runtime.lifecycle'].state, 'ready');
+        assert.equal(res.body.capabilities['sdk.session'].details.sessionId, 'cap-session');
+        assert.equal(res.body.capabilities['governance.permissions'].details.mode, 'selective');
+        assert.equal(res.body.capabilities['integration.webhooks'].details.registered, 1);
+        assert.ok(res.body.readyCount > 0);
+        assert.equal(res.body.capabilityCount, res.body.list.length);
+    });
+
     it('buildLegacyAgentHealth cria fallback canônico com issues e checks expandidos', () => {
         const health = buildLegacyAgentHealth(
             /** @type {any} */ ({

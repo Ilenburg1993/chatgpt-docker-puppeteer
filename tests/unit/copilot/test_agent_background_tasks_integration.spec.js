@@ -36,12 +36,12 @@ describe('agent › K4 background task tracker integration', () => {
     });
 
     it('agent-lifecycle faz track de background tasks e drena no shutdown', () => {
-        assert.ok(lifecycleSrc.includes('backgroundTasks.track('));
-        assert.ok(lifecycleSrc.includes('backgroundTasks.drain(5000)'));
+        assert.ok(lifecycleSrc.includes('trackBackgroundTask('));
+        assert.ok(lifecycleSrc.includes('drainBackgroundTasks(5000)'));
     });
 
-    it('boot-steps usa backgroundTasks.track nas tarefas fire-and-forget', () => {
-        assert.ok(bootStepsSrc.includes('backgroundTasks.track('));
+    it('boot-steps usa trackBackgroundTask nas tarefas fire-and-forget', () => {
+        assert.ok(bootStepsSrc.includes('trackBackgroundTask('));
         assert.ok(bootStepsSrc.includes('dialog.boot_recovery.run'));
         assert.ok(bootStepsSrc.includes('hooks.question_answered.relay'));
     });

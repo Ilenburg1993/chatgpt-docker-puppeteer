@@ -68,4 +68,29 @@ describe('BackgroundTasks', () => {
         assert.equal(drained, true);
         assert.equal(tracker.pendingCount, 0);
     });
+
+    it('não rastreia novas tarefas acima de maxPending e evita rejeição não tratada', async () => {
+        /** @type {Record<string, unknown>[]} */
+        const completed = [];
+        const tracker = new BackgroundTasks({
+            maxPending: 1,
+            onCompleted: (evt) => completed.push(/** @type {Record<string, unknown>} */ (evt)),
+        });
+        /** @type {(value?: unknown) => void} */
+        let release = () => {};
+        const pending = new Promise((resolve) => {
+            release = resolve;
+        });
+
+        void tracker.track(pending, { label: 'task.pending' });
+        const overflow = tracker.track(Promise.reject(new Error('ignored')), { label: 'task.overflow' });
+
+        assert.equal(tracker.pendingCount, 1);
+        await overflow;
+        assert.equal(completed[0]?.status, 'error');
+        assert.match(String(completed[0]?.error), /limite/);
+
+        release(undefined);
+        await tracker.drain(1000);
+    });
 });

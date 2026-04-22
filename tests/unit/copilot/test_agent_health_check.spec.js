@@ -13,6 +13,7 @@ import { getAgentHealthSnapshot } from '../../../src/copilot/agent/health-check.
  *     oldestTaskWaitMs?: number;
  *     starvationAlert?: boolean;
  *     isResumed?: boolean;
+ *     sdkResources?: import('../../../src/copilot/agent/types.js').AgentSdkAccessSnapshot | null;
  * }} [overrides]
  */
 function createHost(overrides = {}) {
@@ -36,6 +37,53 @@ function createHost(overrides = {}) {
                 permissionMode: 'approve_all',
             });
         },
+        getSdkResourceSnapshot() {
+            return overrides.sdkResources ?? null;
+        },
+    };
+}
+
+/**
+ * @param {Partial<import('../../../src/copilot/agent/types.js').AgentSdkAccessSnapshot>} [overrides]
+ * @returns {import('../../../src/copilot/agent/types.js').AgentSdkAccessSnapshot}
+ */
+function createSdkResources(overrides = {}) {
+    return {
+        handles: {
+            client: /** @type {any} */ ({}),
+            session: /** @type {any} */ ({}),
+            serverRpc: /** @type {any} */ ({}),
+            sessionRpc: /** @type {any} */ ({}),
+            workspacePath: '/workspace',
+        },
+        resources: {
+            clientAvailable: true,
+            sessionAvailable: true,
+            serverRpcAvailable: true,
+            sessionRpcAvailable: true,
+            workspacePathAvailable: true,
+            permissionHandlerAvailable: true,
+            userInputHandlerAvailable: true,
+            hooksAvailable: true,
+            toolRegistryAvailable: true,
+            modelSwitchAvailable: true,
+            abortAvailable: true,
+            sessionLogAvailable: true,
+            historyAvailable: true,
+            lastSessionLookupAvailable: true,
+            foregroundControlAvailable: true,
+            customAgentsAvailable: true,
+            experimentalAgentsAvailable: true,
+            skillsAvailable: true,
+            mcpAvailable: true,
+            pluginsAvailable: true,
+            extensionsAvailable: true,
+            fleetAvailable: true,
+        },
+        missingResources: [],
+        allCoreResourcesAvailable: true,
+        allRuntimeResourcesAvailable: true,
+        ...overrides,
     };
 }
 
@@ -168,6 +216,9 @@ describe('agent/health-check', () => {
         assert.equal(health.recommendedAction, 'none');
         assert.equal(health.checks.boot.ok, true);
         assert.equal(health.checks.boot.degradedSteps, 0);
+        assert.equal(health.sdkResources, null);
+        assert.equal(health.checks.sdkResources.ok, true);
+        assert.equal(health.checks.sdkResources.available, false);
     });
 
     it('retorna degraded quando há inconsistência de dialog, starvation e backlog alto', () => {
@@ -263,6 +314,28 @@ describe('agent/health-check', () => {
         assert.equal(health.checks.session.ok, false);
         assert.ok(health.riskFlags.includes('runtime.stopped'));
         assert.equal(health.recommendedAction, 'restart_agent');
+    });
+
+    it('retorna degraded acionável quando recursos SDK core estão incompletos', () => {
+        const sdkResources = createSdkResources({
+            missingResources: ['sessionRpc'],
+            allCoreResourcesAvailable: false,
+            allRuntimeResourcesAvailable: false,
+        });
+        const health = getAgentHealthSnapshot(
+            createContext({ quotaMonitorRunning: true }),
+            createHost({ sdkResources }),
+        );
+
+        assert.equal(health.ok, true);
+        assert.equal(health.status, 'degraded');
+        assert.equal(health.sdkResources, sdkResources);
+        assert.ok(health.issues.includes('sdk.resources_incomplete'));
+        assert.ok(health.riskFlags.includes('sdk.resources_incomplete'));
+        assert.equal(health.recommendedAction, 'inspect_sdk_resources');
+        assert.equal(health.checks.sdkResources.ok, false);
+        assert.equal(health.checks.sdkResources.available, true);
+        assert.deepEqual(health.checks.sdkResources.missingResources, ['sessionRpc']);
     });
 
     it('retorna degraded quando existe sombra persistida de ask_user sem pergunta viva', () => {

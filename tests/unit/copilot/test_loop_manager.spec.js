@@ -199,6 +199,14 @@ describe('DialogLoopManager', () => {
             await dlm.start('Hello');
             await expect(dlm.start('Hello')).rejects.toThrow(/DIALOG_ALREADY_ACTIVE|já está ativo/);
         });
+
+        it('start() limpa active/watchdog quando boot timeout rejeita', async () => {
+            mockWaitForEvent.mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+
+            await expect(dlm.start('Hello')).rejects.toThrow(/Boot timeout/);
+
+            expect(dlm.active).toBe(false);
+        });
     });
 
     // ── F64.2: Turn serialization ────────────────────────────────────
@@ -213,6 +221,27 @@ describe('DialogLoopManager', () => {
             const result = await dlm.sendTurn('test');
             expect(vi.mocked(executeTurnImpl)).toHaveBeenCalled();
             expect(result).toBe('REPLY: ok');
+        });
+
+        it('sendTurn() rejeita enquanto stop() esta drenando', async () => {
+            await dlm.start('Hello');
+            /** @type {(value: string) => void} */
+            let release = () => {};
+            vi.mocked(executeTurnImpl).mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        release = resolve;
+                    }),
+            );
+
+            const firstTurn = dlm.sendTurn('first');
+            const stopPromise = dlm.stop({ authorized: true, shutdownTimeoutMs: 1000 });
+
+            await expect(dlm.sendTurn('second')).rejects.toThrow(/não está ativo/);
+
+            release('done');
+            await firstTurn;
+            await stopPromise;
         });
 
         it('queueDepth inicia em 0', () => {

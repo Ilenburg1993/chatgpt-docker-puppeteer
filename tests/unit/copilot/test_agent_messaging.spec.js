@@ -104,6 +104,34 @@ describe('agent-messaging › enqueueTask', () => {
         assert.equal(ctx.messageQueue.size, 1);
         assert.ok(taskId.startsWith('task-'));
     });
+
+    it('remove timeoutMs invalido antes de enfileirar', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        enqueueTask(ctx, emitter, 'test', {
+            timeoutMs: Number.NaN,
+            resolve: () => {},
+            reject: () => {},
+        });
+
+        const task = ctx.messageQueue.shift();
+        assert.equal(task?.timeoutMs, undefined);
+    });
+
+    it('preserva timeoutMs positivo finito', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        enqueueTask(ctx, emitter, 'test', {
+            timeoutMs: 1234,
+            resolve: () => {},
+            reject: () => {},
+        });
+
+        const task = ctx.messageQueue.shift();
+        assert.equal(task?.timeoutMs, 1234);
+    });
 });
 
 describe('agent-messaging › answerPendingQuestion', () => {

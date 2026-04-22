@@ -30,7 +30,7 @@ describe('boot-steps › pendingQuestionShadow reaper', () => {
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => true,
                 clearPendingQuestionShadow,
-                backgroundTasks: { track },
+                trackBackgroundTask: track,
             }),
         );
 
@@ -53,7 +53,7 @@ describe('boot-steps › pendingQuestionShadow reaper', () => {
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => true,
                 clearPendingQuestionShadow,
-                backgroundTasks: { track },
+                trackBackgroundTask: track,
             }),
         );
         const withValidShadow = reapExpiredPendingQuestionShadow(
@@ -62,7 +62,7 @@ describe('boot-steps › pendingQuestionShadow reaper', () => {
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => false,
                 clearPendingQuestionShadow,
-                backgroundTasks: { track },
+                trackBackgroundTask: track,
             }),
         );
 

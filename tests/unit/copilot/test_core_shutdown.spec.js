@@ -76,6 +76,30 @@ describe('core/shutdown.js', () => {
         assert.equal(calls, 1);
     });
 
+    it('registerShutdownHandler substitui handler existente com mesmo nome', async () => {
+        /** @type {string[]} */
+        const calls = [];
+
+        registerShutdownHandler(
+            'same',
+            async () => {
+                calls.push('old');
+            },
+            30,
+        );
+        registerShutdownHandler(
+            'same',
+            async () => {
+                calls.push('new');
+            },
+            10,
+        );
+
+        await runShutdown('test');
+
+        assert.deepEqual(calls, ['new']);
+    });
+
     it('handler que falha não impede execução dos próximos', async () => {
         /** @type {string[]} */
         const order = [];

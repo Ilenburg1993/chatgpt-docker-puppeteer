@@ -67,6 +67,11 @@ describe('copilot/db/sqlite.js — structural', () => {
         assert.ok(SQLITE_SRC.includes('exitHandlerRegistered'));
     });
 
+    it('deve registrar exit handler global por processo para reimports em testes/hot reload', () => {
+        assert.ok(SQLITE_SRC.includes("Symbol.for('copilot.db.sqlite.exitHandlerState')"));
+        assert.ok(SQLITE_SRC.includes('exitState.registered'));
+    });
+
     it('closeCopilotDb deve setar copilotDb = null no finally', () => {
         assert.ok(SQLITE_SRC.includes('copilotDb = null'));
     });

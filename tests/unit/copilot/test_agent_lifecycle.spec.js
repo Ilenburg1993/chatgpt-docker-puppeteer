@@ -66,8 +66,8 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes('shutdownTimeoutMs'), 'agentStop deve usar shutdownTimeoutMs');
     });
 
-    it('agentStop chama messageQueue.drain()', () => {
-        assert.ok(src.includes('messageQueue.drain('), 'agentStop deve limpar fila via drain()');
+    it('agentStop chama drainMessageQueue()', () => {
+        assert.ok(src.includes('drainMessageQueue('), 'agentStop deve limpar fila via AgentContext');
     });
 
     it('agentStop chama persistState com gracefulShutdown=true', () => {

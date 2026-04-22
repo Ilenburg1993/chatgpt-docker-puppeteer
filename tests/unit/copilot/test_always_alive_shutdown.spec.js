@@ -56,10 +56,10 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
         );
     });
 
-    it('stop() deve usar messageQueue.drain() para limpar a fila no shutdown', () => {
+    it('stop() deve usar AgentContext para limpar a fila no shutdown', () => {
         assert.ok(
-            sourceCode.includes('messageQueue.drain('),
-            'stop() deve limpar a fila via messageQueue.drain() durante o shutdown gracioso',
+            sourceCode.includes('drainMessageQueue('),
+            'stop() deve limpar a fila via AgentContext.drainMessageQueue() durante o shutdown gracioso',
         );
     });
 
@@ -134,7 +134,7 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
     it('stop() aguarda processing status antes de parar', () => {
         // Verifica que há lógica para checar status processing/waiting_for_input
         assert.ok(
-            sourceCode.includes("'processing'") && sourceCode.includes("'waiting_for_input'"),
+            sourceCode.includes('isProcessing()') && sourceCode.includes('isWaitingForInput()'),
             'stop() deve checar status processing e waiting_for_input antes de parar',
         );
     });
@@ -183,11 +183,8 @@ describe('always-alive › MAX_QUEUE_SIZE: limite de fila', () => {
             'utf-8',
         );
         const combined = src + msg;
-        // F.4: lógica de verificação de limite migrou para MessageQueue.enqueue()
-        assert.ok(
-            combined.includes('messageQueue.enqueue(task'),
-            'sendMessage deve delegar enqueue ao messageQueue (F.4)',
-        );
+        // F.4/K1: lógica de verificação de limite passa por AgentContext.enqueueMessageTask()
+        assert.ok(combined.includes('enqueueMessageTask(task'), 'sendMessage deve delegar enqueue ao AgentContext');
     });
 
     it('mensagem de erro ao atingir limite deve conter "Fila cheia" em message-queue.js', async () => {
@@ -219,10 +216,10 @@ describe('always-alive › stop() idempotência', async () => {
         sourceCode = main + '\n' + lifecycle;
     });
 
-    it('stop() deve ter guard de idempotência verificando status === stopped', () => {
+    it('stop() deve ter guard de idempotência verificando isStopped()', () => {
         assert.ok(
-            sourceCode.includes("ctx.status === 'stopped'") && sourceCode.includes('return;'),
-            "stop()/agentStop() deve conter guard 'if (ctx.status === stopped) return'",
+            sourceCode.includes('ctx.isStopped()') && sourceCode.includes('return;'),
+            'stop()/agentStop() deve conter guard semântico ctx.isStopped()',
         );
     });
 

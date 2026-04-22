@@ -336,6 +336,47 @@ describe('AgentContext', () => {
         assert.equal(ctx.client, null);
     });
 
+    it('accessors semânticos governam status, fila, cache e background sem expor subestado cru', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        ctx.setRuntimeStatus('idle');
+        assert.equal(ctx.getRuntimeStatus(), 'idle');
+        assert.equal(ctx.isIdle(), true);
+        assert.equal(ctx.isStopped(), false);
+
+        ctx.cacheStatusSnapshot(/** @type {any} */ ({ status: 'idle', queueSize: 0 }));
+        assert.deepEqual(ctx.getFreshStatusSnapshotCache(1_000), /** @type {any} */ ({ status: 'idle', queueSize: 0 }));
+        assert.deepEqual(ctx.getQueueSnapshot(), { size: 0, oldest: undefined });
+
+        const task = {
+            id: 'semantic-task',
+            message: 'hello',
+            resolve: () => {},
+            reject: () => {},
+            enqueuedAt: Date.now(),
+        };
+        ctx.enqueueMessageTask(task);
+        assert.equal(ctx.hasQueuedMessages(), true);
+        assert.equal(ctx.getQueueSnapshot().size, 1);
+        assert.equal(ctx.getQueueSnapshot().oldest?.id, 'semantic-task');
+        assert.equal(ctx.shiftMessageTask()?.id, 'semantic-task');
+
+        ctx.unshiftMessageTask(task);
+        const drained = ctx.drainMessageQueue(new Error('drain'));
+        assert.deepEqual(
+            drained.map((queuedTask) => queuedTask.id),
+            ['semantic-task'],
+        );
+        assert.equal(ctx.hasQueuedMessages(), false);
+
+        await ctx.trackBackgroundTask(Promise.resolve('ok'), {
+            label: 'semantic.background',
+            description: 'semantic background task',
+        });
+        assert.equal(await ctx.drainBackgroundTasks(10), true);
+    });
+
     it('startKeepalive usa accessors semânticos e falha sem sessão ativa', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

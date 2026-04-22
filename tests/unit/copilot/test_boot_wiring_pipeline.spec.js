@@ -78,6 +78,6 @@ describe('boot-wiring › pipeline nomeado', () => {
 
     it('passa o contexto para steps que usam o tracker de background', () => {
         assert.match(SRC, /stepWireQuestionAnsweredRelay\(agentEmitter, ctx\)/);
-        assert.match(STEPS_SRC, /backgroundTasks\.track\(/);
+        assert.match(STEPS_SRC, /trackBackgroundTask\(/);
     });
 });

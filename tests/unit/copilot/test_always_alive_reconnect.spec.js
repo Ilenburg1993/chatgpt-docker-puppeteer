@@ -80,11 +80,11 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
         );
     });
 
-    it('deve reenfileirar tarefa via messageQueue.unshift quando reconexão bem-sucedida', () => {
-        // F.4: requeue migrou para MessageQueue.unshift() via ctx
+    it('deve reenfileirar tarefa via AgentContext quando reconexão bem-sucedida', () => {
+        // F.4/K1: requeue migrou para AgentContext.unshiftMessageTask()
         assert.ok(
-            sourceCode.includes('messageQueue.unshift('),
-            'ao reconectar, a tarefa deve ser reenfileirada no início via messageQueue.unshift() (F.4)',
+            sourceCode.includes('unshiftMessageTask('),
+            'ao reconectar, a tarefa deve ser reenfileirada no início via AgentContext.unshiftMessageTask()',
         );
     });
 
