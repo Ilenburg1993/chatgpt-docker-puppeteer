@@ -11,8 +11,8 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { log } from './ports/observability-port.js';
 import { toError } from '../core/error-handlers.js';
+import { log } from './ports/observability-port.js';
 
 /**
  * @typedef {import('./types.js').AgentEventHost} AgentEventHost

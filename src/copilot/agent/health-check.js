@@ -10,10 +10,12 @@
  * @typedef {import('./agent-context.js').AgentContext} AgentContext
  */
 
-/** @typedef {{
-    getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot;
-    getSdkResourceSnapshot?: () => import('./types.js').AgentSdkAccessSnapshot;
-}} HealthHost */
+/**
+ * @typedef {{
+ *     getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot;
+ *     getSdkResourceSnapshot?: () => import('./types.js').AgentSdkAccessSnapshot;
+ * }} HealthHost
+ */
 
 const BACKGROUND_PENDING_WARN_THRESHOLD = 8;
 

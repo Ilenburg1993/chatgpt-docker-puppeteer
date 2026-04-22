@@ -1,12 +1,10 @@
 # 11 — Agent Module: Situação Ideal Compatível
 
-**Data de atualização**: 2026-04-22
-**Escopo primário**: `src/copilot/agent/`
-**Escopo contextual**: evolução compatível do `agent/` dentro de `src/copilot/`
-**Documento superior**:
-[12-SRC-COPILOT-ARQUITETURA-GLOBAL.md](./12-SRC-COPILOT-ARQUITETURA-GLOBAL.md)
-**Documento base**: [10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md)
-**Status**: proposta ideal reconstruída após reavaliação da situação atual
+**Data de atualização**: 2026-04-22 **Escopo primário**: `src/copilot/agent/` **Escopo contextual**:
+evolução compatível do `agent/` dentro de `src/copilot/` **Documento superior**:
+[12-SRC-COPILOT-ARQUITETURA-GLOBAL.md](./12-SRC-COPILOT-ARQUITETURA-GLOBAL.md) **Documento base**:
+[10-AGENT-SITUACAO-ATUAL.md](./10-AGENT-SITUACAO-ATUAL.md) **Status**: proposta ideal reconstruída
+após reavaliação da situação atual
 
 > **Leitura correta deste documento**: esta versão abandona a hipótese de uma arquitetura totalmente
 > nova. A situação atual não justifica um big bang. O estado ideal passa a ser uma evolução

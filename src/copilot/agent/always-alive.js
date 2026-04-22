@@ -13,8 +13,8 @@
 
 import { container, logSwallowed } from '#copilot/core';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
-import { METRICS_STORE } from './ports/observability-port.js';
 import { EventEmitter } from 'node:events';
+import { METRICS_STORE } from './ports/observability-port.js';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 

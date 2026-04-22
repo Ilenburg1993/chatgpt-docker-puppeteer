@@ -1,12 +1,10 @@
 # 10 — Agent Module: Situação Atual Reavaliada
 
-**Data de atualização**: 2026-04-22
-**Escopo primário**: `src/copilot/agent/`
-**Escopo contextual**: relação do `agent/` com `sdk/`, `event-handlers/`, `presentation/`,
-`server/`, `terminal/`, `conversation-hub/`, `tools/`, `hooks/` e `observability/`
-**Status**: auditoria reavaliada a partir do código vivo, corrigindo o excesso de otimismo da versão
-anterior
-**Documento par**: [11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md)
+**Data de atualização**: 2026-04-22 **Escopo primário**: `src/copilot/agent/` **Escopo contextual**:
+relação do `agent/` com `sdk/`, `event-handlers/`, `presentation/`, `server/`, `terminal/`,
+`conversation-hub/`, `tools/`, `hooks/` e `observability/` **Status**: auditoria reavaliada a partir
+do código vivo, corrigindo o excesso de otimismo da versão anterior **Documento par**:
+[11-AGENT-SITUACAO-IDEAL.md](./11-AGENT-SITUACAO-IDEAL.md)
 
 > **Leitura correta deste documento**: este arquivo descreve o estado real do `agent/` hoje. Ele não
 > é plano aspiracional. O objetivo é evitar que a situação ideal parta de uma fotografia falsa: o
