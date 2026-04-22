@@ -206,6 +206,7 @@ export function buildLegacyAgentHealth(agent) {
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
         bootReport: null,
+        sdkResources: null,
         checks: {
             runtime: {
                 ok: operational,
@@ -258,6 +259,13 @@ export function buildLegacyAgentHealth(agent) {
                 pendingCount: 0,
                 warnThreshold: 8,
                 labels: [],
+            },
+            sdkResources: {
+                ok: true,
+                available: false,
+                allCoreResourcesAvailable: null,
+                allRuntimeResourcesAvailable: null,
+                missingResources: [],
             },
             boot: {
                 ok: true,

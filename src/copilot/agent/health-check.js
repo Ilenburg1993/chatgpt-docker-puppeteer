@@ -10,7 +10,10 @@
  * @typedef {import('./agent-context.js').AgentContext} AgentContext
  */
 
-/** @typedef {{ getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot }} HealthHost */
+/** @typedef {{
+    getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot;
+    getSdkResourceSnapshot?: () => import('./types.js').AgentSdkAccessSnapshot;
+}} HealthHost */
 
 const BACKGROUND_PENDING_WARN_THRESHOLD = 8;
 
@@ -29,6 +32,7 @@ const BACKGROUND_PENDING_WARN_THRESHOLD = 8;
  *     bootOk: boolean;
  *     bootNeedsAttention: boolean;
  *     quotaOk: boolean;
+ *     sdkResourcesOk: boolean;
  * }} state
  * @returns {import('./types.js').AgentRecommendedAction}
  */
@@ -43,6 +47,7 @@ function selectRecommendedAction(state) {
     if (!state.keepaliveOk) return 'restart_keepalive';
     if (!state.bootOk || state.bootNeedsAttention) return 'inspect_boot_report';
     if (!state.quotaOk) return 'restart_quota_monitor';
+    if (!state.sdkResourcesOk) return 'inspect_sdk_resources';
     if (!state.backgroundOk) return 'drain_background_tasks';
     if (!state.queueOk) return 'inspect_queue_starvation';
     return 'none';
@@ -71,6 +76,7 @@ export function getAgentHealthSnapshot(ctx, host) {
     const pendingQuestionShadowRemainingMs = ctx.getPendingQuestionShadowRemainingMs();
     const backgroundPendingLabels = ctx.getBackgroundPendingLabels(5);
     const bootReport = ctx.getBootReportSnapshot();
+    const sdkResources = typeof host.getSdkResourceSnapshot === 'function' ? host.getSdkResourceSnapshot() : null;
 
     const runtimeOperational =
         snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
@@ -94,6 +100,7 @@ export function getAgentHealthSnapshot(ctx, host) {
     const quotaMonitorRunning = ctx.getQuotaMonitorSnapshot() !== null;
     const quotaConfigured = clientAvailable || sessionActive;
     const quotaOk = !quotaConfigured || quotaMonitorRunning;
+    const sdkResourcesOk = sdkResources === null || sdkResources.allCoreResourcesAvailable;
 
     /** @type {import('./types.js').AgentHealthRiskFlag[]} */
     const riskFlags = [];
@@ -154,6 +161,10 @@ export function getAgentHealthSnapshot(ctx, host) {
         issues.push('quota.monitor_missing');
         riskFlags.push('quota.monitor_missing');
     }
+    if (!sdkResourcesOk) {
+        issues.push('sdk.resources_incomplete');
+        riskFlags.push('sdk.resources_incomplete');
+    }
 
     /** @type {import('./types.js').AgentHealthStatus} */
     let status = 'healthy';
@@ -168,7 +179,8 @@ export function getAgentHealthSnapshot(ctx, host) {
         !backgroundOk ||
         !bootOk ||
         bootNeedsAttention ||
-        !quotaOk
+        !quotaOk ||
+        !sdkResourcesOk
     ) {
         status = 'degraded';
     }
@@ -188,6 +200,7 @@ export function getAgentHealthSnapshot(ctx, host) {
         bootOk,
         bootNeedsAttention,
         quotaOk,
+        sdkResourcesOk,
     });
 
     return {
@@ -218,6 +231,7 @@ export function getAgentHealthSnapshot(ctx, host) {
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
         bootReport,
+        sdkResources,
         checks: {
             runtime: {
                 ok: runtimeOperational,
@@ -265,6 +279,13 @@ export function getAgentHealthSnapshot(ctx, host) {
                 pendingCount: backgroundPendingCount,
                 warnThreshold: BACKGROUND_PENDING_WARN_THRESHOLD,
                 labels: backgroundPendingLabels,
+            },
+            sdkResources: {
+                ok: sdkResourcesOk,
+                available: sdkResources !== null,
+                allCoreResourcesAvailable: sdkResources?.allCoreResourcesAvailable ?? null,
+                allRuntimeResourcesAvailable: sdkResources?.allRuntimeResourcesAvailable ?? null,
+                missingResources: sdkResources?.missingResources ?? [],
             },
             boot: {
                 ok: bootOk && !bootNeedsAttention,

@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log } from '../ports/observability-port.js';
 
 /**
  * Aborta a mensagem SDK em processamento na sessão atual.

@@ -16,8 +16,8 @@
  */
 
 import { EMITTER_HANDOFF_ACCEPTED, EMITTER_HANDOFF_RECEIVED, EMITTER_HANDOFF_REJECTED } from '#copilot/events';
-import { log } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
+import { log } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} HandoffRequest

@@ -4,8 +4,8 @@
  * @file SSOT operacional do vínculo entre sessão SDK ativa e hub session conversacional.
  */
 
-import { log } from '#copilot/observability';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log } from '../ports/observability-port.js';
 
 /**
  * @param {string} label

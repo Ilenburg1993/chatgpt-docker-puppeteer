@@ -12,6 +12,7 @@ export * as agentHttpErrors from './agent-http-errors.js';
 export * from './agent-runtime.js';
 export * as conversationHubPresentation from './conversation-hub.js';
 export * as realtimePresentation from './realtime.js';
+export * from './runtime-capabilities.js';
 export * from './runtime-controls.js';
 export * from './runtime-dialog.js';
 export * from './runtime-file-context.js';

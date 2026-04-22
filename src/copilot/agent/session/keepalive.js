@@ -11,9 +11,9 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} SessionKeepaliveOptions

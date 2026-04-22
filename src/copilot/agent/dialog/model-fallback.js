@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} AgentHostForFallback

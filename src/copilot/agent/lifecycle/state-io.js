@@ -15,13 +15,13 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { log } from '#copilot/observability';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log } from '../ports/observability-port.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');

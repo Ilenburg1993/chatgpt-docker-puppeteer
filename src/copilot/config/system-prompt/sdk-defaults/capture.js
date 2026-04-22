@@ -11,7 +11,7 @@
  * @module copilot/config/system-prompt/sdk-defaults/capture
  */
 
-import { SYSTEM_PROMPT_SECTIONS } from '#copilot/sdk';
+import { SYSTEM_PROMPT_SECTIONS } from '../../sdk-config-port.js';
 
 /**
  * @typedef {{ mode: 'customize'; sections: Record<string, { action: Function }>; _captured: Record<string, string> }} CaptureConfig

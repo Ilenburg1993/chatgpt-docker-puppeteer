@@ -52,9 +52,10 @@ export { defineTool };
  * Tenta converter um schema Zod para JSON Schema. Retorna `undefined` se a conversão falhar ou o input não for Zod.
  *
  * @param {import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} schema
+ * @param {string} toolName
  * @returns {Record<string, unknown> | undefined}
  */
-function tryZodToJsonSchema(schema) {
+function tryZodToJsonSchema(schema, toolName) {
     if (!schema) return undefined;
 
     // Detecta Zod v3 (`_def`) ou v4 (`_zod`)
@@ -62,8 +63,10 @@ function tryZodToJsonSchema(schema) {
     if (!isZod) return /** @type {Record<string, unknown>} */ (schema);
 
     if (!_zodToJsonSchema) {
-        log('WARN', '[sdk/tools] zod-to-json-schema não disponível, ignorando conversão Zod');
-        return undefined;
+        throw new Error(
+            `[sdk/tools] Tool '${toolName}' usa Zod schema mas 'zod-to-json-schema' não está disponível. ` +
+                'Instale a dependência ou forneça JSON Schema manual.',
+        );
     }
 
     try {
@@ -71,8 +74,9 @@ function tryZodToJsonSchema(schema) {
             _zodToJsonSchema(/** @type {import('zod/v3').ZodTypeAny} */ (schema))
         );
     } catch (err) {
-        log('WARN', `[sdk/tools] Falha ao converter Zod schema: ${/** @type {Error} */ (err).message}`);
-        return undefined;
+        const message = err instanceof Error ? err.message : String(err);
+        log('WARN', `[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`);
+        throw new Error(`[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`, { cause: err });
     }
 }
 
@@ -111,7 +115,7 @@ export function createTool({
         throw new TypeError('[sdk/tools] createTool: handler (function) é obrigatório');
     }
 
-    const jsonSchema = tryZodToJsonSchema(parameters);
+    const jsonSchema = tryZodToJsonSchema(parameters, name);
 
     /** @type {import('@github/copilot-sdk').ToolHandler<T>} */
     const wrappedHandler = async (args, invocation) => {
@@ -156,9 +160,11 @@ export function createToolSync({
         return handler(args, invocation);
     };
 
+    const jsonSchema = tryZodToJsonSchema(parameters, name);
+
     return defineTool(name, {
         description,
-        ...(parameters !== undefined ? { parameters } : {}),
+        ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
         handler: wrappedHandler,
         skipPermission,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),

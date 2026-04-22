@@ -17,14 +17,22 @@
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config';
-import { log } from '#copilot/observability';
-import { DEFAULT_MODEL, getToolsConfig, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import { toError } from '#copilot/core';
+import {
+    DEFAULT_MODEL,
+    createSession,
+    getToolsConfig,
+    loadToolsConfigAsync,
+    pickDefined,
+    resumeOrCreate,
+} from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
     persistStateWithPolicy as _persistStateWithPolicy,
     readStateAsync as _readStateAsync,
 } from '../lifecycle/state-io.js';
+import { defaultMetrics, log } from '../ports/observability-port.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
 
 // Re-exports para backward compatibility
@@ -49,6 +57,30 @@ await loadToolsConfigAsync();
  * @type {number}
  */
 let _backgroundCompactionThreshold = 0.75;
+
+const RESUMED_SESSION_HEALTH_TIMEOUT_MS = 5_000;
+
+/**
+ * Verifica se uma sessao retomada responde a uma chamada leve antes de declarar sucesso.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<boolean>}
+ */
+async function _validateResumedSession(session) {
+    if (typeof session.getMessages !== 'function') return true;
+    try {
+        await Promise.race([
+            session.getMessages(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('resume-health-timeout')), RESUMED_SESSION_HEALTH_TIMEOUT_MS),
+            ),
+        ]);
+        return true;
+    } catch (e) {
+        log('WARN', `[PersistentSession] Sessão retomada falhou no health-check: ${toError(e).message}`);
+        return false;
+    }
+}
 
 /**
  * Atualiza o threshold de compaction. Aplicado na próxima sessão criada/retomada.
@@ -168,12 +200,15 @@ export async function initOrResumeSession(client, sessionOptions) {
         const decision = shouldRotateSession(rotationCtx);
         if (decision.shouldRotate) {
             log('INFO', `[PersistentSession] F43.2: Rotacionando sessão — ${decision.reason}`);
-            const { defaultMetrics } = await import('#copilot/observability');
             defaultMetrics.recordSessionRotation();
             savedSessionId = null;
         }
     }
-    const result = await resumeOrCreate(client, savedSessionId, opts);
+    let result = await resumeOrCreate(client, savedSessionId, opts);
+    if (result.isResumed && !(await _validateResumedSession(result.session))) {
+        log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
+        result = await createSession(client, opts);
+    }
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {

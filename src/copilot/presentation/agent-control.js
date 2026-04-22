@@ -238,7 +238,11 @@ export async function handleInject(params = {}) {
     const body = resolveAgentControlInput(params);
     const runtimeId = resolveRuntimeIdParam(params);
     const rawMessage =
-        typeof body['message'] === 'string' ? body['message'] : typeof body['content'] === 'string' ? body['content'] : '';
+        typeof body['message'] === 'string'
+            ? body['message']
+            : typeof body['content'] === 'string'
+              ? body['content']
+              : '';
     const message = rawMessage.trim();
     if (!message) {
         return { status: 400, body: { ok: false, error: '"message" é obrigatório' } };

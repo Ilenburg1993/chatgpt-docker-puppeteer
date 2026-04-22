@@ -12,8 +12,8 @@
  */
 
 import { toError } from '#copilot/core';
-import { log, startSpan } from '#copilot/observability';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log, startSpan } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} ReconnectCallbacks

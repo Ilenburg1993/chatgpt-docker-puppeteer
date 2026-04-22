@@ -23,10 +23,10 @@
 
 import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
-import { defaultMetrics, log } from '#copilot/observability';
 import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor } from '#copilot/sdk';
 import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { defaultMetrics, log } from '../ports/observability-port.js';
 import {
     createBootWiringState,
     stepAttachAgentObserver,
@@ -79,8 +79,8 @@ import {
  * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive —
  *   Inicia o keepalive usando o contexto semântico atual do runtime
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
- * @property {import('../background-tasks.js').BackgroundTasks} backgroundTasks — Tracker central de tarefas em
- *   background do agente
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
+ *   — Tracker central de tarefas em background do agente
  * @property {() => {
  *     startAutoReconnect: (
  *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,

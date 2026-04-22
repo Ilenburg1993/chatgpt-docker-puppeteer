@@ -10,7 +10,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '#copilot/sdk';
+import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-config-port.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig

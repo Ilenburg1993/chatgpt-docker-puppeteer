@@ -18,6 +18,7 @@ import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { buildAgentRuntimeCapabilities } from '../../../presentation/runtime-capabilities.js';
 import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
 import { buildAgentSessionHttpPayload, buildAgentStatusHttpPayload } from '../../../presentation/runtime-status.js';
 
@@ -91,6 +92,10 @@ export function registerControlRoutes(bridge, binding) {
     bridge.get('/session', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveRuntimeRouteDeps(binding, req);
         _handleSession(res, deps.agent, deps);
+    });
+    bridge.get('/capabilities', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const deps = resolveRuntimeRouteDeps(binding, req);
+        res.json(buildAgentRuntimeCapabilities(deps.agent, deps));
     });
     // SEC-API-001: POST /start e /stop protegidas com requireAdmin (defesa em profundidade)
     bridge.post('/start', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>

@@ -14,17 +14,37 @@
 
 import { SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { log, METRICS_STORE } from '#copilot/observability';
 import { createRegistry, modelRegistry } from '#copilot/sdk';
-import { buildMcpTools } from '../../bridges/mcp-tool-bridge.js';
-import { buildMcpConfig } from '../../config/mcp-servers.js';
+import { log, METRICS_STORE } from '../ports/observability-port.js';
 
-import { attachBus, createHooks, createSessionHooks } from '#copilot/hooks';
-import * as bootstrapRuntime from '../../tools/bootstrap.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
+import { buildAgentBusHooks } from '../ports/hook-port.js';
+import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
+import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.js';
 
 /**
- * @typedef {import('../agent-context.js').AgentContext} AgentContext
+ * @typedef {object} SessionSetupContext
+ * @property {{ invalidate: () => void }} messagesCache
+ * @property {import('#copilot/sdk/tools-registry').ToolRegistry | null} toolsRegistry
+ * @property {() => {
+ *     buildTools: () => Promise<import('#copilot/sdk/types').Tool[]>;
+ *     buildConfig: () => Record<string, unknown> | null | undefined;
+ * } | null} [getMcpBridgeSnapshot]
+ * @property {{ emit: (event: string, payload: object) => Promise<void> }} webhooks
+ * @property {() => string} getModelSnapshot
+ * @property {{
+ *     scheduleFallback: (model: string) => unknown;
+ *     handleProtocolInput: (input: { question: string }) => unknown;
+ * }} dialogLoop
+ * @property {{ handler: import('#copilot/sdk/types').PermissionHandler }} permissions
+ * @property {() => import('#copilot/sdk/types').ReasoningEffort | undefined} getReasoningEffortSnapshot
+ * @property {(value: import('#copilot/sdk/types').ReasoningEffort | undefined) => void} setReasoningEffort
+ * @property {() => boolean} isDialogLoopActive
+ * @property {(status: import('../types.js').AgentStatus, host: LifecycleHost) => void} setStatus
+ * @property {(question: import('../types.js').PendingQuestion | null) => void} setPendingQuestion
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
+ * @property {(session: import('#copilot/sdk/types').CopilotSession) => void} setSession
+ * @property {(isResumed: boolean) => void} setIsResumed
  *
  * @typedef {import('../types.js').LifecycleHost} LifecycleHost
  *
@@ -34,18 +54,18 @@ import { handleUserInputRequest } from '../dialog/user-input-handler.js';
 /**
  * Prepara tools para a sessão: MCP bridge + registry + bootstrap.
  *
- * @param {AgentContext} ctx
+ * @param {SessionSetupContext} ctx
  * @returns {Promise<{ tools: import('#copilot/sdk/types').Tool[] }>}
  */
 export async function buildSessionTools(ctx) {
     ctx.messagesCache.invalidate();
-    const mcpBridge = ctx.getMcpBridgeSnapshot();
-    const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildMcpTools();
+    const mcpBridge = typeof ctx.getMcpBridgeSnapshot === 'function' ? ctx.getMcpBridgeSnapshot() : null;
+    const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildDefaultMcpTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
     ctx.toolsRegistry = createRegistry();
-    const tools = bootstrapRuntime.bootstrapTools(ctx.toolsRegistry, mcpTools);
+    const tools = bootstrapAgentTools(ctx.toolsRegistry, mcpTools);
     log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
     return { tools };
 }
@@ -53,7 +73,7 @@ export async function buildSessionTools(ctx) {
 /**
  * Prepara hooks para a sessão: lifecycle hooks + bus attachment.
  *
- * @param {AgentContext} ctx
+ * @param {SessionSetupContext} ctx
  * @param {LifecycleHost} host
  * @returns {{ busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']> }}
  */
@@ -69,28 +89,22 @@ export function buildSessionHooks(ctx, host) {
         // fallback no-op para testes unitários que não registram o token no container
     }
 
-    const lifecycleHooks = createSessionHooks({
-        emitWebhook: (event, payload) => ctx.webhooks.emit(event, payload),
-        getModel: () => ctx.model,
+    const busHooks = buildAgentBusHooks({
+        emitWebhook: async (event, payload) => {
+            await Promise.resolve(ctx.webhooks.emit(event, payload));
+        },
+        getModel: () => ctx.getModelSnapshot(),
         scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
     });
-
-    const hooks = createHooks({
-        auditLog: true,
-        onSessionStart: lifecycleHooks.onSessionStart,
-        onSessionEnd: lifecycleHooks.onSessionEnd,
-        onErrorOccurred: lifecycleHooks.onErrorOccurred,
-    });
-
-    return { busHooks: attachBus(hooks) };
+    return { busHooks };
 }
 
 /**
  * Constrói as opções de sessão SDK incluindo onUserInputRequest wiring.
  *
- * @param {AgentContext} ctx
+ * @param {SessionSetupContext} ctx
  * @param {LifecycleHost} host
  * @param {{
  *     tools: import('#copilot/sdk/types').Tool[];
@@ -99,12 +113,12 @@ export function buildSessionHooks(ctx, host) {
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
-    const mcpBridge = ctx.getMcpBridgeSnapshot();
+    const mcpBridge = typeof ctx.getMcpBridgeSnapshot === 'function' ? ctx.getMcpBridgeSnapshot() : null;
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
-        mcpBridge ? mcpBridge.buildConfig() : buildMcpConfig()
+        mcpBridge ? mcpBridge.buildConfig() : buildDefaultMcpConfig()
     );
     const builder = new SessionConfigBuilder()
-        .model(ctx.model)
+        .model(ctx.getModelSnapshot())
         .clientName('chatgpt-docker-puppeteer')
         .workingDirectory(process.cwd())
         .onPermissionRequest(ctx.permissions.handler)
@@ -115,20 +129,17 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         builder.mcpServers(mcpConfig);
     }
 
-    if (ctx.reasoningEffort) {
-        const modelMeta = modelRegistry.get(ctx.model);
+    const reasoningEffort = ctx.getReasoningEffortSnapshot();
+    if (reasoningEffort) {
+        const modelMeta = modelRegistry.get(ctx.getModelSnapshot());
         if (modelMeta?.supportsReasoning === false) {
             log(
                 'INFO',
-                `[session-setup] reasoningEffort omitido para '${ctx.model}' — modelo sem suporte explícito a reasoning.`,
+                `[session-setup] reasoningEffort omitido para '${ctx.getModelSnapshot()}' — modelo sem suporte explícito a reasoning.`,
             );
-            if (typeof ctx.setReasoningEffort === 'function') {
-                ctx.setReasoningEffort(undefined);
-            } else {
-                ctx.reasoningEffort = undefined;
-            }
+            ctx.setReasoningEffort(undefined);
         } else {
-            builder.reasoningEffort(ctx.reasoningEffort);
+            builder.reasoningEffort(reasoningEffort);
         }
     }
 
@@ -144,7 +155,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
                 handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
                 setStatus: (s) => ctx.setStatus(s, host),
                 setPendingQuestion: (pq) => ctx.setPendingQuestion(pq),
-                trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
+                trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
                 emit: (event, payload) => host.emit(event, payload),
             },
         ),
@@ -162,20 +173,12 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
 /**
  * Finaliza a sessão após criação: atualiza ctx e RPC.
  *
- * @param {AgentContext} ctx
+ * @param {SessionSetupContext} ctx
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @param {boolean} isResumed
  */
 export function finalizeSessionInit(ctx, session, isResumed) {
     ctx.setSession(session);
     ctx.setIsResumed(isResumed);
-    bootstrapRuntime.setSessionRpc(session.rpc);
-    try {
-        const maybeSetExperimentalSession = bootstrapRuntime.setExperimentalSession;
-        if (typeof maybeSetExperimentalSession === 'function') {
-            maybeSetExperimentalSession(session);
-        }
-    } catch {
-        // mock parcial em testes pode omitir este export; runtime real continua cobrindo o caminho completo
-    }
+    bindAgentSessionTools(session);
 }

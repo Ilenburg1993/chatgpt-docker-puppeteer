@@ -25,8 +25,6 @@ import {
     toError,
     withRetry,
 } from '#copilot/core';
-import { defaultBus } from '#copilot/hooks';
-import { ERROR_TRACKER, log } from '#copilot/observability';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import { CopilotClient } from '#copilot/sdk';
 import {
@@ -49,7 +47,11 @@ import {
     HOOK_SESSION_START,
 } from '../../events/index.js';
 import { getAgent } from '../always-alive.js';
+import { getDefaultHookBus } from '../ports/hook-port.js';
+import { ERROR_TRACKER, log } from '../ports/observability-port.js';
 import { drainStateWrites } from './state-io.js';
+
+let processSignalHandlersRegistered = false;
 
 /**
  * Inicializa o agent lifecycle: plugin discovery, event wiring, retries, shutdown, IPC.
@@ -73,7 +75,7 @@ export async function startAgentLoop() {
     // FAIXA-2A: bridge HookBus → EventBus central para observabilidade cross-module
     const _bus = container.resolve(EVENT_BUS);
     if (_bus) {
-        bridgeEmitter(defaultBus, _bus, {
+        bridgeEmitter(getDefaultHookBus(), _bus, {
             pre_tool_use: HOOK_PRE_TOOL_USE,
             post_tool_use: HOOK_POST_TOOL_USE,
             prompt_submitted: HOOK_PROMPT_SUBMITTED,
@@ -145,8 +147,11 @@ export async function startAgentLoop() {
         5,
     );
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    if (!processSignalHandlersRegistered) {
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT', () => shutdown('SIGINT'));
+        processSignalHandlersRegistered = true;
+    }
 
     // ─── Handlers de erros não tratados ──────────────────────────────────────────
     // Delegado ao error-tracker singleton que já implementa trackError + log.
@@ -194,8 +199,10 @@ export async function startAgentLoop() {
     // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
     // Verifica conectividade do CLI antes do primeiro start para falhar rápido em caso de indisponibilidade.
+    let pingClient = null;
     try {
-        const pingClient = new CopilotClient();
+        pingClient = new CopilotClient();
+        await pingClient.start();
         await Promise.race([
             pingClient.ping(),
             new Promise((_, reject) =>
@@ -219,12 +226,12 @@ export async function startAgentLoop() {
         } catch (authErr) {
             log('DEBUG', `[copilot/agent] Verificação de auth ignorada: ${toError(authErr).message ?? authErr}`);
         }
-
-        // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
-        pingClient.stop().catch((e) => logSwallowed(e, 'agent.entry.pingStop'));
     } catch (e) {
         log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${toError(e).message}`);
         // Continuar de qualquer forma — startWithRetry() tratará a falha
+    } finally {
+        // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
+        pingClient?.stop().catch((e) => logSwallowed(e, 'agent.entry.pingStop'));
     }
 
     // Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.

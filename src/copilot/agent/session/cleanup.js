@@ -12,11 +12,11 @@
  * @see EventBus
  */
 
-import { log, startSpan } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log, startSpan } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -144,13 +144,19 @@ export async function cleanupStaleSessions(client, options = {}) {
  */
 export async function cleanupStaleSessionsWithPolicy(client, options = {}, policy = {}) {
     const label = policy.label ?? 'session.cleanup.stale';
-    /** @type {{
+    /**
+     * @type {{
      *     label: string;
      *     phase: string;
      *     taskId?: string;
      *     sessionId?: string;
-     *     onError: (error: Error, disposition: import('../error-policy.js').AgentErrorDisposition, context: import('../error-policy.js').AgentErrorContext) => void;
-     * }} */
+     *     onError: (
+     *         error: Error,
+     *         disposition: import('../error-policy.js').AgentErrorDisposition,
+     *         context: import('../error-policy.js').AgentErrorContext,
+     *     ) => void;
+     * }}
+     */
     const policyOptions = {
         label,
         phase: policy.phase ?? 'boot',

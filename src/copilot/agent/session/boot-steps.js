@@ -19,19 +19,20 @@ import {
     EMITTER_SESSION_CLEANUP,
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
+import { isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
+import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
+import { logSwallowed, toError } from '../../core/error-handlers.js';
+import { registerTimer } from '../../core/timer-registry.js';
+import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
+import { startDefaultMcpAutoReconnect } from '../ports/mcp-port.js';
 import {
     createAgentEventObserver,
     defaultErrorTracker,
     defaultEventCollector,
     defaultMetrics,
     log,
-} from '#copilot/observability';
-import { isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
-import { startMcpAutoReconnect } from '../../bridges/mcp-tool-bridge.js';
-import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
-import { registerTimer } from '../../core/timer-registry.js';
-import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
+} from '../ports/observability-port.js';
+import { resolveAgentUserInput } from '../ports/tool-port.js';
 import { cleanupStaleSessionsWithPolicy } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';
 
@@ -72,7 +73,7 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => Promise<void>} startDialogLoop
  * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
- * @property {import('../background-tasks.js').BackgroundTasks} backgroundTasks
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
  * @property {() => {
  *     startAutoReconnect: (
  *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
@@ -179,7 +180,7 @@ export function stepAttachAgentObserver(agentEmitter, state, options) {
  * @returns {void}
  */
 export function stepCleanupStaleSessions(client, session, ctx) {
-    void ctx.backgroundTasks.track(
+    void ctx.trackBackgroundTask(
         cleanupStaleSessionsWithPolicy(
             client,
             { currentSessionId: session.sessionId },
@@ -214,7 +215,7 @@ export function scheduleDialogBootRecovery(ctx) {
             return;
         }
 
-        void ctx.backgroundTasks.track(runDialogBootRecovery(ctx), {
+        void ctx.trackBackgroundTask(runDialogBootRecovery(ctx), {
             label: 'dialog.boot_recovery.run',
             description: 'Retry dialog loop recovery after resumed session boot',
         });
@@ -276,7 +277,7 @@ export function stepScheduleDialogRecovery(isResumed, ctx) {
         return;
     }
 
-    void ctx.backgroundTasks.track(
+    void ctx.trackBackgroundTask(
         readStateAsync().then((savedState) => {
             if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
                 scheduleDialogBootRecovery(ctx);
@@ -323,7 +324,7 @@ export function reapExpiredPendingQuestionShadow(ctx) {
     }
 
     ctx.clearPendingQuestionShadow();
-    void ctx.backgroundTasks.track(
+    void ctx.trackBackgroundTask(
         persistStateWithPolicy(
             { pendingQuestion: null, pendingQuestionMeta: null },
             { label: 'state.pendingQuestionShadow.reap' },
@@ -348,7 +349,7 @@ export function reapExpiredPendingQuestionShadow(ctx) {
  */
 export function stepStartMcpReconnect(ctx, state) {
     const mcpBridge = ctx.getMcpBridgeSnapshot?.() ?? ctx.mcpBridge ?? null;
-    const _mcpBridgeFn = mcpBridge?.startAutoReconnect ?? startMcpAutoReconnect;
+    const _mcpBridgeFn = mcpBridge?.startAutoReconnect ?? startDefaultMcpAutoReconnect;
     state.mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
         ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
     }, MCP_RECONNECT_MS);
@@ -405,12 +406,9 @@ export function stepWireQuestionAnsweredRelay(agentEmitter, ctx) {
     agentEmitter.on(EMITTER_QUESTION_ANSWERED, (/** @type {{ answer?: string }} */ evt) => {
         if (typeof evt?.answer !== 'string') return;
         const answer = evt.answer;
-        void ctx.backgroundTasks.track(
-            import('../../tools/hook-tools.js').then(({ resolveUserInput }) => resolveUserInput(answer)),
-            {
-                label: 'hooks.question_answered.relay',
-                description: 'Relay question.answered answers into hook tools resolver',
-            },
-        );
+        void ctx.trackBackgroundTask(Promise.resolve(resolveAgentUserInput(answer)), {
+            label: 'hooks.question_answered.relay',
+            description: 'Relay question.answered answers into hook tools resolver',
+        });
     });
 }

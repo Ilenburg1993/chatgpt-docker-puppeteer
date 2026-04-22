@@ -12,13 +12,13 @@
  */
 
 import { logSwallowed } from '#copilot/core';
-import { log, startSpan } from '#copilot/observability';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 import { readState } from '../lifecycle/state-io.js';
+import { log, startSpan } from '../ports/observability-port.js';
 
 const ROOT = resolve(import.meta.dirname, '../../');
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV

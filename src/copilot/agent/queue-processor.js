@@ -5,7 +5,7 @@
  *
  *   A implementação canônica de `processQueue()` agora vive em `agent/messaging/agent-messaging.js`.
  *
- *   Nota estrutural de retrocompatibilidade: o re-enqueue interno continua usando `ctx.messageQueue.unshift(task)` no
+ *   Nota estrutural de retrocompatibilidade: o re-enqueue interno passa por `AgentContext.unshiftMessageTask()` no
  *   processador canônico.
  * @deprecated Use `#copilot/agent` / `agent/messaging/agent-messaging.js`.
  * @see EventBus

@@ -58,6 +58,8 @@ import {
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection
+ *
+ * @typedef {import('#copilot/agent/types').AgentRecommendedAction} AgentRecommendedAction
  */
 
 /**
@@ -191,7 +193,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const pendingQuestionShadowState =
         base.agent.pendingQuestionShadowState ??
         (pendingQuestionShadow !== null ? (base.agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
-    const recommendedAction = /** @type {import('#copilot/agent/types').AgentRecommendedAction | null} */ (
+    const recommendedAction = /** @type {AgentRecommendedAction | null} */ (
         typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
     );
     return {

@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log } from '../ports/observability-port.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession

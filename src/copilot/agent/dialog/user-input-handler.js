@@ -11,8 +11,8 @@
  */
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
-import { log } from '#copilot/observability';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { log } from '../ports/observability-port.js';
 import { DialogProtocol } from './protocol.js';
 
 /**

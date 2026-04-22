@@ -20,10 +20,10 @@ import {
     EMITTER_TASK_QUEUED,
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
-import { log, startSpan, startSpanImmediate } from '#copilot/observability';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { log, startSpan, startSpanImmediate } from '../ports/observability-port.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -32,6 +32,16 @@ import { persistStateWithPolicy } from '../lifecycle/state-io.js';
  */
 
 /** @typedef {import('../types.js').MessagingHost} MessagingHost */
+
+/**
+ * Normaliza timeouts externos antes de repassar ao SDK.
+ *
+ * @param {number | undefined} timeoutMs
+ * @returns {number | undefined}
+ */
+function normalizeTimeoutMs(timeoutMs) {
+    return typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : undefined;
+}
 
 /**
  * @typedef {Object} QueueProcessorCallbacks
@@ -76,17 +86,18 @@ import { persistStateWithPolicy } from '../lifecycle/state-io.js';
  * }} opts
  */
 export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal, resolve, reject }) {
+    const safeTimeoutMs = normalizeTimeoutMs(timeoutMs);
     const task = /** @type {AgentTask} */ ({
         id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,
         message,
         resolve,
         reject,
         enqueuedAt: Date.now(),
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        ...(safeTimeoutMs !== undefined ? { timeoutMs: safeTimeoutMs } : {}),
         ...(attachments !== undefined ? { attachments } : {}),
     });
     try {
-        ctx.messageQueue.enqueue(task, ...(signal ? [{ signal }] : []));
+        ctx.enqueueMessageTask(task, ...(signal ? [{ signal }] : []));
     } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
         return;
@@ -307,11 +318,11 @@ export async function executeTask(session, task, callbacks) {
 export function processQueue(ctx, host, callbacks) {
     // G1-ARCH-03: bloqueia processamento durante reconexão ativa
     const session = ctx.getSessionSnapshot();
-    if (ctx.isReconnecting || ctx.status !== 'idle' || ctx.messageQueue.size === 0 || !session) {
+    if (ctx.isReconnectActive() || !ctx.isIdle() || !ctx.hasQueuedMessages() || !session) {
         return;
     }
 
-    const task = ctx.messageQueue.shift();
+    const task = ctx.shiftMessageTask();
     if (!task) {
         return;
     }
@@ -329,7 +340,7 @@ export function processQueue(ctx, host, callbacks) {
         setStatus: (status) => ctx.setStatus(status, host),
         emit: (event, payload) => host.emit(event, payload),
         tryReconnect: (error) => callbacks.tryReconnect(error),
-        requeueTask: (queuedTask) => ctx.messageQueue.unshift(queuedTask),
+        requeueTask: (queuedTask) => ctx.unshiftMessageTask(queuedTask),
         scheduleNext: () => processQueue(ctx, host, callbacks),
     });
 }
@@ -349,7 +360,7 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
     if (!session) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
-    return startSpan('copilot.agent.steer', { model: ctx.model ?? '', actor: 'agent' }, async () => {
+    return startSpan('copilot.agent.steer', { model: ctx.getModelSnapshot(), actor: 'agent' }, async () => {
         const messageId = await session.send({ prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
         host.emit(EMITTER_STEERING_SENT, { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
@@ -378,7 +389,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     }
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.resolvePendingQuestion(answer);
-    void ctx.backgroundTasks.track(
+    void ctx.trackBackgroundTask(
         persistStateWithPolicy(
             { pendingQuestion: null, pendingQuestionMeta: null },
             { label: 'question.clear.pending' },

@@ -26,7 +26,6 @@ import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { container } from '../core/di-container.js';
 import { registerTimer } from '../core/timer-registry.js';
-import { startCopilotServer } from '../server/index.js';
 import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { recordTerminalActivity, terminalActivityEmitter } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
@@ -82,6 +81,18 @@ let _reflectionTimer = null;
 let _sighupHandlerRegistered = false;
 
 /**
+ * @typedef {import('../server/index.js').CopilotServerOptions} TerminalCopilotServerOptions
+ *
+ * @typedef {import('../server/index.js').CopilotServer} TerminalCopilotServer
+ *
+ * @typedef {object} TerminalServerStartDeps
+ * @property {(opts?: TerminalCopilotServerOptions) => Promise<TerminalCopilotServer>} startCopilotServer
+ *
+ * @typedef {object} TerminalServerStartOptions
+ * @property {TerminalServerStartDeps['startCopilotServer']} [startCopilotServer]
+ */
+
+/**
  * Ativa o reflection loop periódico se `LLM_B_REFLECTION_INTERVAL_MIN` > 0.
  *
  * @returns {void}
@@ -118,9 +129,14 @@ function startReflectionLoop() {
 /**
  * Inicia o Terminal Permanente LLM-B.
  *
+ * @param {TerminalServerStartOptions} [options]
  * @returns {Promise<void>}
  */
-export async function startTerminalServer() {
+export async function startTerminalServer(options = {}) {
+    if (typeof options.startCopilotServer !== 'function') {
+        throw new TypeError('[TerminalServer] startCopilotServer dependency is required by the composition root.');
+    }
+
     recordTerminalActivity('boot', 'Inicializando terminal', {
         detail: 'Preparando aliases, DI, hub e servidor HTTP',
         source: 'terminal',
@@ -214,14 +230,14 @@ export async function startTerminalServer() {
     // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
     // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
     const _hubReady = isTerminalHubReady();
-    /** @type {import('../server/index.js').CopilotServerOptions} */
+    /** @type {TerminalCopilotServerOptions} */
     const _serverOpts = {};
     if (_hubReady) {
         _serverOpts.orchestrator = readTerminalHubOrchestrator();
         _serverOpts.store = readTerminalHubStore();
     }
     recordTerminalActivity('boot', 'Subindo servidor copilot', { source: 'terminal', recordHistory: false });
-    const copilotServer = await startCopilotServer(_serverOpts);
+    const copilotServer = await options.startCopilotServer(_serverOpts);
 
     registerAgentEventListeners(printStandaloneBanner);
     startReflectionLoop();

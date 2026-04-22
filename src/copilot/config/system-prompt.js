@@ -15,7 +15,7 @@
 /**
  * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
  */
-import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '#copilot/sdk';
+import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from './sdk-config-port.js';
 import { buildHookContextMessage, buildSystemMessage } from './system-prompt/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

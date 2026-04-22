@@ -17,8 +17,8 @@ import {
     EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { log, METRICS_STORE, startSpan } from '#copilot/observability';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { log, METRICS_STORE, startSpan } from '../ports/observability-port.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.

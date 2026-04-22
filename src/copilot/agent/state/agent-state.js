@@ -13,8 +13,8 @@
 
 import { AGENT_EVENTS } from '#copilot/events';
 import { STATUS_SNAPSHOT_TTL_MS } from '../../config/agent.js';
-import { buildStatusSnapshot } from '../../observability/snapshots.js';
 import { readState } from '../lifecycle/state-io.js';
+import { buildStatusSnapshot } from '../ports/observability-port.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -30,25 +30,23 @@ import { readState } from '../lifecycle/state-io.js';
  * @returns {import('../types.js').AgentStatusSnapshot}
  */
 export function getStatusSnapshot(ctx, host) {
-    if (ctx.statusSnapshotCache) {
-        const age = Date.now() - ctx.statusSnapshotCache.at;
-        if (age < STATUS_SNAPSHOT_TTL_MS) {
-            return ctx.statusSnapshotCache.snapshot;
-        }
-        ctx.invalidateStatusSnapshot();
+    const cachedSnapshot = ctx.getFreshStatusSnapshotCache(STATUS_SNAPSHOT_TTL_MS);
+    if (cachedSnapshot) {
+        return cachedSnapshot;
     }
     const state = readState();
+    const queue = ctx.getQueueSnapshot();
     const snapshot = buildStatusSnapshot({
-        status: ctx.status,
+        status: ctx.getRuntimeStatus(),
         sessionId: host.sessionId,
-        model: ctx.model,
-        reasoningEffort: ctx.reasoningEffort,
-        queueSize: ctx.messageQueue.size,
-        queueOldest: ctx.messageQueue.oldest,
-        pendingQuestion: ctx.pendingQuestion,
-        isResumed: ctx.isResumed,
+        model: ctx.getModelSnapshot(),
+        reasoningEffort: ctx.getReasoningEffortSnapshot(),
+        queueSize: queue.size,
+        queueOldest: queue.oldest,
+        pendingQuestion: ctx.getPendingQuestionForStatusSnapshot(),
+        isResumed: ctx.getIsResumedSnapshot(),
         resumeCount: state?.resumeCount ?? 0,
-        sendCount: ctx.sendCount,
+        sendCount: ctx.getSendCountSnapshot(),
         startedAt: state?.startedAt ?? null,
         contextWindow: ctx.getContextStateSnapshot(),
         lastCheckpointPath: ctx.getLastCheckpointPathSnapshot(),

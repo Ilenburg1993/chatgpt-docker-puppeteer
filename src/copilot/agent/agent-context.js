@@ -15,11 +15,15 @@
  * @see EventBus
  */
 
-import { EMITTER_PERMISSION_MODE_CHANGED, EMITTER_PROCESS_QUEUE, EMITTER_STATUS } from '#copilot/events';
-import { log } from '#copilot/observability';
+import {
+    EMITTER_AGENT_BACKGROUND_COMPLETED,
+    EMITTER_AGENT_BACKGROUND_IDLE,
+    EMITTER_PERMISSION_MODE_CHANGED,
+    EMITTER_PROCESS_QUEUE,
+    EMITTER_STATUS,
+} from '#copilot/events';
 import { createRegistry } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
-import { PermissionController } from '../hooks/permission-controller.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
@@ -32,6 +36,8 @@ import {
 } from './dialog/pending-question-shadow.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
+import { log } from './ports/observability-port.js';
+import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history-sync.js';
 import { SessionKeepalive } from './session/keepalive.js';
 
@@ -41,6 +47,8 @@ import { SessionKeepalive } from './session/keepalive.js';
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('./types.js').PendingQuestion} PendingQuestion
+ *
+ * @typedef {import('./types.js').AgentTask} AgentTask
  *
  * @typedef {import('./types.js').AgentStatus} AgentStatus
  *
@@ -97,7 +105,7 @@ export class AgentContext {
     /** @type {WebhookManager} */
     webhooks;
 
-    /** @type {PermissionController} */
+    /** @type {ReturnType<typeof createAgentPermissionController>} */
     permissions;
 
     /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
@@ -172,7 +180,7 @@ export class AgentContext {
 
         this.dialogLoop = new DialogLoopManager();
         this.webhooks = new WebhookManager();
-        this.permissions = new PermissionController({
+        this.permissions = createAgentPermissionController({
             onModeChanged: (mode) => emitter.emit(EMITTER_PERMISSION_MODE_CHANGED, { mode }),
         });
         this.toolsRegistry = createRegistry();
@@ -181,10 +189,10 @@ export class AgentContext {
         this.messagesCache = new SessionMessagesCache(MESSAGES_CACHE_TTL_MS);
         this.backgroundTasks = new BackgroundTasks({
             onCompleted: (event) => {
-                emitter.emit('agent.background.completed', { agentType: 'always_alive', ...event });
+                emitter.emit(EMITTER_AGENT_BACKGROUND_COMPLETED, { agentType: 'always_alive', ...event });
             },
             onIdle: (event) => {
-                emitter.emit('agent.background.idle', { agentType: 'always_alive', ...event });
+                emitter.emit(EMITTER_AGENT_BACKGROUND_IDLE, { agentType: 'always_alive', ...event });
             },
         });
     }
@@ -246,7 +254,7 @@ export class AgentContext {
 
     /** @param {AgentStatus} value */
     set status(value) {
-        this.runtimeState.status = value;
+        this.setRuntimeStatus(value);
     }
 
     /** @returns {boolean} */
@@ -300,7 +308,7 @@ export class AgentContext {
 
     /** @param {string} value */
     set model(value) {
-        this.configState.model = value;
+        this.setModel(value);
     }
 
     /** @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined} */
@@ -441,6 +449,232 @@ export class AgentContext {
     /** @param {AgentBootReport | null} value */
     set bootReport(value) {
         this.setBootReport(value);
+    }
+
+    /**
+     * Atualiza o status operacional sem emitir eventos. Use `setStatus()` quando o host precisa ser notificado.
+     *
+     * @param {AgentStatus} status
+     * @returns {void}
+     */
+    setRuntimeStatus(status) {
+        if (this.runtimeState.status === status) {
+            return;
+        }
+        this.runtimeState.status = status;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Retorna o status operacional atual sem expor `runtimeState`.
+     *
+     * @returns {AgentStatus}
+     */
+    getRuntimeStatus() {
+        return this.runtimeState.status;
+    }
+
+    /**
+     * Indica se o status atual corresponde ao valor informado.
+     *
+     * @param {AgentStatus} status
+     * @returns {boolean}
+     */
+    isStatus(status) {
+        return this.runtimeState.status === status;
+    }
+
+    /** @returns {boolean} */
+    isStopped() {
+        return this.isStatus('stopped');
+    }
+
+    /** @returns {boolean} */
+    isStarting() {
+        return this.isStatus('starting');
+    }
+
+    /** @returns {boolean} */
+    isIdle() {
+        return this.isStatus('idle');
+    }
+
+    /** @returns {boolean} */
+    isProcessing() {
+        return this.isStatus('processing');
+    }
+
+    /** @returns {boolean} */
+    isWaitingForInput() {
+        return this.isStatus('waiting_for_input');
+    }
+
+    /**
+     * Retorna a configuração de modelo atual.
+     *
+     * @returns {string}
+     */
+    getModelSnapshot() {
+        return this.configState.model;
+    }
+
+    /**
+     * Retorna o esforço de reasoning atual.
+     *
+     * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
+     */
+    getReasoningEffortSnapshot() {
+        return this.configState.reasoningEffort;
+    }
+
+    /**
+     * Retorna se a sessão atual foi retomada.
+     *
+     * @returns {boolean}
+     */
+    getIsResumedSnapshot() {
+        return this.sessionState.isResumed;
+    }
+
+    /**
+     * Retorna o contador atual de envios.
+     *
+     * @returns {number}
+     */
+    getSendCountSnapshot() {
+        return this.metricsState.sendCount;
+    }
+
+    /**
+     * Retorna o estado atual de reconexão.
+     *
+     * @returns {boolean}
+     */
+    isReconnectActive() {
+        return this.sessionState.isReconnecting;
+    }
+
+    /**
+     * Retorna o cache de status ainda válido para o TTL informado.
+     *
+     * @param {number} ttlMs
+     * @returns {import('./types.js').AgentStatusSnapshot | null}
+     */
+    getFreshStatusSnapshotCache(ttlMs) {
+        const cached = this.metricsState.statusSnapshotCache;
+        if (!cached) {
+            return null;
+        }
+        if (Date.now() - cached.at < ttlMs) {
+            return cached.snapshot;
+        }
+        this.invalidateStatusSnapshot();
+        return null;
+    }
+
+    /**
+     * Retorna dados mínimos da fila para snapshot/diagnóstico, sem expor o manager vivo.
+     *
+     * @returns {{ size: number; oldest: AgentTask | undefined }}
+     */
+    getQueueSnapshot() {
+        return {
+            size: this.messageQueue.size,
+            oldest: this.messageQueue.oldest,
+        };
+    }
+
+    /**
+     * Indica se há tarefas aguardando na fila de mensagens.
+     *
+     * @returns {boolean}
+     */
+    hasQueuedMessages() {
+        return this.messageQueue.size > 0;
+    }
+
+    /**
+     * Enfileira uma task de mensagem usando o manager governado pelo contexto.
+     *
+     * @param {AgentTask} task
+     * @param {{ signal?: AbortSignal }} [options]
+     * @returns {void}
+     */
+    enqueueMessageTask(task, options = {}) {
+        this.messageQueue.enqueue(task, ...(options.signal ? [{ signal: options.signal }] : []));
+    }
+
+    /**
+     * Retira a próxima task de mensagem da fila.
+     *
+     * @returns {AgentTask | undefined}
+     */
+    shiftMessageTask() {
+        return this.messageQueue.shift();
+    }
+
+    /**
+     * Reinsere uma task no início da fila.
+     *
+     * @param {AgentTask} task
+     * @returns {void}
+     */
+    unshiftMessageTask(task) {
+        this.messageQueue.unshift(task);
+    }
+
+    /**
+     * Drena a fila de mensagens rejeitando tasks pendentes com erro explícito.
+     *
+     * @param {Error} error
+     * @returns {AgentTask[]}
+     */
+    drainMessageQueue(error) {
+        return this.messageQueue.drain(error);
+    }
+
+    /**
+     * Rastreia uma tarefa de background através do manager governado pelo contexto.
+     *
+     * @param {Promise<unknown>} task
+     * @param {{ label?: string; description?: string }} [meta]
+     * @returns {Promise<void>}
+     */
+    trackBackgroundTask(task, meta) {
+        return this.backgroundTasks.track(task, meta);
+    }
+
+    /**
+     * Aguarda o esvaziamento das tarefas de background.
+     *
+     * @param {number} timeoutMs
+     * @returns {Promise<boolean>}
+     */
+    drainBackgroundTasks(timeoutMs) {
+        return this.backgroundTasks.drain(timeoutMs);
+    }
+
+    /**
+     * Para o quota monitor ativo e limpa sua referência.
+     *
+     * @returns {void}
+     */
+    stopQuotaMonitor() {
+        const quotaMonitor = this.runtimeState.quotaMonitor;
+        if (!quotaMonitor) {
+            return;
+        }
+        quotaMonitor.stop();
+        this.clearQuotaMonitor();
+    }
+
+    /**
+     * Retorna a pergunta pendente viva para builders internos que ainda exigem o shape completo.
+     *
+     * @returns {PendingQuestion | null}
+     */
+    getPendingQuestionForStatusSnapshot() {
+        return this.dialogState.pendingQuestion;
     }
 
     /**

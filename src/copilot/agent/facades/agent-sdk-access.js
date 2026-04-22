@@ -50,7 +50,11 @@ function hasRpcNamespace(value, key) {
  * @returns {import('#copilot/sdk/types').CopilotClient | null}
  */
 function getClientRef(ctx) {
-    return ctx.getClientSnapshot();
+    if (typeof ctx.getClientSnapshot === 'function') return ctx.getClientSnapshot();
+    const compat = /** @type {{ client?: unknown; ioState?: { client?: unknown } }} */ (ctx);
+    return /** @type {import('#copilot/sdk/types').CopilotClient | null} */ (
+        compat.ioState?.client ?? compat.client ?? null
+    );
 }
 
 /**
@@ -58,7 +62,11 @@ function getClientRef(ctx) {
  * @returns {import('#copilot/sdk/types').CopilotSession | null}
  */
 function getSessionRef(ctx) {
-    return ctx.getSessionSnapshot();
+    if (typeof ctx.getSessionSnapshot === 'function') return ctx.getSessionSnapshot();
+    const compat = /** @type {{ session?: unknown; sessionState?: { session?: unknown } }} */ (ctx);
+    return /** @type {import('#copilot/sdk/types').CopilotSession | null} */ (
+        compat.sessionState?.session ?? compat.session ?? null
+    );
 }
 
 /**

@@ -43,6 +43,15 @@ import { isFatalError, toError } from '#copilot/core';
  */
 
 /**
+ * @param {unknown} error
+ * @returns {Error}
+ */
+function normalizeAgentError(error) {
+    if (typeof toError === 'function') return toError(error);
+    return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
  * Classifica um erro do subsistema `agent` em três categorias operacionais:
  *
  * - `ignore`: não tentar reconexão nem retry automático
@@ -59,11 +68,11 @@ import { isFatalError, toError } from '#copilot/core';
  * @returns {AgentErrorDisposition}
  */
 export function classifyAgentError(error) {
-    const normalized = toError(error);
+    const normalized = normalizeAgentError(error);
     if (normalized instanceof DOMException && normalized.name === 'AbortError') {
         return 'ignore';
     }
-    if (isFatalError(normalized)) {
+    if (typeof isFatalError === 'function' && isFatalError(normalized)) {
         return 'fatal';
     }
     return 'retry';
@@ -110,7 +119,7 @@ export async function withAgentErrorPolicy(fn, opts = {}) {
     try {
         return { ok: true, value: await Promise.resolve(fn()) };
     } catch (error) {
-        const normalized = toError(error);
+        const normalized = normalizeAgentError(error);
         const disposition = classify(normalized);
         await opts.onError?.(normalized, disposition, context);
         return { ok: false, error: normalized, disposition, context };

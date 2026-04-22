@@ -21,6 +21,7 @@ import {
     EMITTER_SUBAGENT_FAILED,
     EMITTER_SUBAGENT_STARTED,
     EMITTER_TOOL_EXECUTION_COMPLETE,
+    EMITTER_TOOL_EXECUTION_PARTIAL_RESULT,
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
@@ -273,7 +274,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);
     agent.on(EMITTER_STOPPED, onStopped);
     agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
-    agent.on('tool.execution_partial_result', onToolPartialResult);
+    agent.on(EMITTER_TOOL_EXECUTION_PARTIAL_RESULT, onToolPartialResult);
     agent.on(EMITTER_TOOL_EXECUTION_PROGRESS, onToolProgress);
     agent.on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
     agent.on(EMITTER_SESSION_ERROR, onSessionError);
@@ -288,7 +289,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
         agent.off('question.pending', onQuestion);
         agent.off('stopped', onStopped);
         agent.off('tool.execution_start', onToolStart);
-        agent.off('tool.execution_partial_result', onToolPartialResult);
+        agent.off(EMITTER_TOOL_EXECUTION_PARTIAL_RESULT, onToolPartialResult);
         agent.off('tool.execution_progress', onToolProgress);
         agent.off('tool.execution_complete', onToolComplete);
         agent.off('session.error', onSessionError);

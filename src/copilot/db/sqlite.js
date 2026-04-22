@@ -58,6 +58,32 @@ const ENV_DB_PATH = process.env['COPILOT_DB_PATH'] || '';
 let copilotDb = null;
 
 /**
+ * @typedef {Object} SqliteExitHandlerState
+ * @property {boolean} registered
+ * @property {Set<() => void>} handlers
+ */
+
+const EXIT_HANDLER_STATE_KEY = Symbol.for('copilot.db.sqlite.exitHandlerState');
+
+/**
+ * @returns {SqliteExitHandlerState}
+ */
+function getExitHandlerState() {
+    const existing = /** @type {SqliteExitHandlerState | undefined} */ (
+        Reflect.get(globalThis, EXIT_HANDLER_STATE_KEY)
+    );
+    if (existing) return existing;
+
+    /** @type {SqliteExitHandlerState} */
+    const state = {
+        registered: false,
+        handlers: new Set(),
+    };
+    Reflect.set(globalThis, EXIT_HANDLER_STATE_KEY, state);
+    return state;
+}
+
+/**
  * Resolve o caminho do arquivo `copilot.sqlite`.
  *
  * @returns {string}
@@ -195,6 +221,7 @@ let exitHandlerRegistered = false;
 function registerExitHandler() {
     if (exitHandlerRegistered) return;
     exitHandlerRegistered = true;
+    const exitState = getExitHandlerState();
 
     const handler = () => {
         if (copilotDb) {
@@ -206,15 +233,25 @@ function registerExitHandler() {
             copilotDb = null;
         }
     };
+    exitState.handlers.add(handler);
+
+    const runExitHandlers = () => {
+        for (const closeHandler of exitState.handlers) {
+            closeHandler();
+        }
+    };
 
     // DB-P3-01: registrar também SIGTERM/SIGINT para garantir flush do WAL em
     // graceful shutdown PM2 (SIGTERM → 1600ms timeout).
-    process.on('exit', handler);
-    process.once('SIGTERM', handler);
-    process.once('SIGINT', handler);
+    if (!exitState.registered) {
+        process.on('exit', runExitHandlers);
+        process.once('SIGTERM', runExitHandlers);
+        process.once('SIGINT', runExitHandlers);
+        exitState.registered = true;
+    }
 
     // Participar do shutdown gracioso centralizado (prioridade 15: após agent.stop)
-    registerShutdownHandler('copilot-db.close', async () => handler(), 15);
+    registerShutdownHandler('copilot-db.close', async () => runExitHandlers(), 15);
 }
 
 /**

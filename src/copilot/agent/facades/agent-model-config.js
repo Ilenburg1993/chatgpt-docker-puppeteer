@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { toError } from '../../core/error-handlers.js';
+import { log } from '../ports/observability-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
 
 /**
@@ -20,7 +20,7 @@ import { trySetLiveSessionModel } from '../runtime-contracts.js';
  * @returns {string}
  */
 export function getModel(ctx) {
-    return ctx.model;
+    return ctx.getModelSnapshot();
 }
 
 /**
@@ -59,7 +59,7 @@ export async function listAvailableModels(ctx) {
  * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
  */
 export function getReasoningEffort(ctx) {
-    return ctx.reasoningEffort;
+    return ctx.getReasoningEffortSnapshot();
 }
 
 /**

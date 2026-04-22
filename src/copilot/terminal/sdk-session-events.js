@@ -15,6 +15,25 @@
  * @module copilot/terminal/sdk-session-events
  */
 
+import {
+    EMITTER_ASSISTANT_REASONING_COMPLETE,
+    EMITTER_ASSISTANT_TURN_END,
+    EMITTER_ASSISTANT_TURN_START,
+    EMITTER_EXIT_PLAN_MODE_COMPLETED,
+    EMITTER_SESSION_CONTEXT_CHANGED,
+    EMITTER_SESSION_HANDOFF,
+    EMITTER_SESSION_INFO,
+    EMITTER_SESSION_MODE_CHANGED,
+    EMITTER_SESSION_MODEL_CHANGED,
+    EMITTER_SESSION_PLAN_CHANGED,
+    EMITTER_SESSION_SHUTDOWN,
+    EMITTER_SESSION_SNAPSHOT_REWIND,
+    EMITTER_SESSION_TASK_COMPLETE,
+    EMITTER_SESSION_TITLE_CHANGED,
+    EMITTER_SESSION_TRUNCATION,
+    EMITTER_SESSION_WARNING,
+    EMITTER_SESSION_WORKSPACE_FILE_CHANGED,
+} from '#copilot/events';
 import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, println } from './dialog.js';
 import { setLastSdkPlanOperation, setSdkSessionMode } from './state.js';
@@ -300,41 +319,41 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
     };
 
-    agent.on('assistant.turn_start', onAssistantTurnStart);
-    agent.on('assistant.turn_end', onAssistantTurnEnd);
-    agent.on('session.info', onSessionInfo);
-    agent.on('session.warning', onSessionWarning);
-    agent.on('session.model_changed', onSessionModelChanged);
-    agent.on('session.title_changed', onSessionTitleChanged);
-    agent.on('session.context_changed', onSessionContextChanged);
-    agent.on('session.mode_changed', onSessionModeChanged);
-    agent.on('session.plan_changed', onSessionPlanChanged);
-    agent.on('session.task_complete', onSessionTaskComplete);
-    agent.on('session.truncation', onSessionTruncation);
-    agent.on('session.snapshot_rewind', onSessionSnapshotRewind);
-    agent.on('session.shutdown', onSessionShutdown);
-    agent.on('session.handoff', onSessionHandoff);
-    agent.on('session.workspace_file_changed', onWorkspaceFileChanged);
-    agent.on('exit_plan_mode.completed', onExitPlanModeCompleted);
-    agent.on('assistant.reasoning_complete', onAssistantReasoningComplete);
+    agent.on(EMITTER_ASSISTANT_TURN_START, onAssistantTurnStart);
+    agent.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+    agent.on(EMITTER_SESSION_INFO, onSessionInfo);
+    agent.on(EMITTER_SESSION_WARNING, onSessionWarning);
+    agent.on(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);
+    agent.on(EMITTER_SESSION_TITLE_CHANGED, onSessionTitleChanged);
+    agent.on(EMITTER_SESSION_CONTEXT_CHANGED, onSessionContextChanged);
+    agent.on(EMITTER_SESSION_MODE_CHANGED, onSessionModeChanged);
+    agent.on(EMITTER_SESSION_PLAN_CHANGED, onSessionPlanChanged);
+    agent.on(EMITTER_SESSION_TASK_COMPLETE, onSessionTaskComplete);
+    agent.on(EMITTER_SESSION_TRUNCATION, onSessionTruncation);
+    agent.on(EMITTER_SESSION_SNAPSHOT_REWIND, onSessionSnapshotRewind);
+    agent.on(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
+    agent.on(EMITTER_SESSION_HANDOFF, onSessionHandoff);
+    agent.on(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
+    agent.on(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
+    agent.on(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
 
     return () => {
-        agent.off('assistant.turn_start', onAssistantTurnStart);
-        agent.off('assistant.turn_end', onAssistantTurnEnd);
-        agent.off('session.info', onSessionInfo);
-        agent.off('session.warning', onSessionWarning);
-        agent.off('session.model_changed', onSessionModelChanged);
-        agent.off('session.title_changed', onSessionTitleChanged);
-        agent.off('session.context_changed', onSessionContextChanged);
-        agent.off('session.mode_changed', onSessionModeChanged);
-        agent.off('session.plan_changed', onSessionPlanChanged);
-        agent.off('session.task_complete', onSessionTaskComplete);
-        agent.off('session.truncation', onSessionTruncation);
-        agent.off('session.snapshot_rewind', onSessionSnapshotRewind);
-        agent.off('session.shutdown', onSessionShutdown);
-        agent.off('session.handoff', onSessionHandoff);
-        agent.off('session.workspace_file_changed', onWorkspaceFileChanged);
-        agent.off('exit_plan_mode.completed', onExitPlanModeCompleted);
-        agent.off('assistant.reasoning_complete', onAssistantReasoningComplete);
+        agent.off(EMITTER_ASSISTANT_TURN_START, onAssistantTurnStart);
+        agent.off(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+        agent.off(EMITTER_SESSION_INFO, onSessionInfo);
+        agent.off(EMITTER_SESSION_WARNING, onSessionWarning);
+        agent.off(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);
+        agent.off(EMITTER_SESSION_TITLE_CHANGED, onSessionTitleChanged);
+        agent.off(EMITTER_SESSION_CONTEXT_CHANGED, onSessionContextChanged);
+        agent.off(EMITTER_SESSION_MODE_CHANGED, onSessionModeChanged);
+        agent.off(EMITTER_SESSION_PLAN_CHANGED, onSessionPlanChanged);
+        agent.off(EMITTER_SESSION_TASK_COMPLETE, onSessionTaskComplete);
+        agent.off(EMITTER_SESSION_TRUNCATION, onSessionTruncation);
+        agent.off(EMITTER_SESSION_SNAPSHOT_REWIND, onSessionSnapshotRewind);
+        agent.off(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
+        agent.off(EMITTER_SESSION_HANDOFF, onSessionHandoff);
+        agent.off(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
+        agent.off(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
+        agent.off(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
     };
 }

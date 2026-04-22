@@ -9,12 +9,13 @@ Fachadas finas do `AlwaysAliveAgent`.
 
 ## Arquivos
 
-| Arquivo                 | Função                                                                                       |
-| ----------------------- | -------------------------------------------------------------------------------------------- |
-| `agent-sdk-access.js`   | handles crus do SDK + operações vanilla de alto valor (status, mode, plan, sessions, agents) |
-| `agent-session-ops.js`  | operações diretas de sessão (abort, log, watchdog, histórico)                                |
-| `agent-model-config.js` | modelo, reasoning e listagem de modelos                                                      |
-| `agent-webhook-ops.js`  | operações de webhook/integração expostas pela fachada do agente                              |
+| Arquivo                         | Função                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `agent-sdk-access.js`           | handles crus do SDK + operações vanilla de alto valor (status, mode, plan, sessions, agents) |
+| `agent-session-ops.js`          | operações diretas de sessão (abort, log, watchdog, histórico)                                |
+| `agent-model-config.js`         | modelo, reasoning e listagem de modelos                                                      |
+| `agent-webhook-ops.js`          | operações de webhook/integração expostas pela fachada do agente                              |
+| `agent-runtime-capabilities.js` | mapa canônico das capabilities públicas atuais do runtime                                    |
 
 ## Regra de uso
 

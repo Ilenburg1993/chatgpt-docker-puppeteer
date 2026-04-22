@@ -7,6 +7,9 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
+import { log } from './ports/observability-port.js';
+
+const DEFAULT_MAX_PENDING_BACKGROUND_TASKS = 1000;
 
 /**
  * @typedef {Object} BackgroundTaskMeta
@@ -29,6 +32,7 @@ import { logSwallowed, toError } from '#copilot/core';
  * @typedef {Object} BackgroundTasksOptions
  * @property {(event: BackgroundTaskCompletedEvent) => void} [onCompleted] - Callback por conclusão individual.
  * @property {(event: { pendingCount: 0; ts: number }) => void} [onIdle] - Callback quando a fila zera.
+ * @property {number} [maxPending] - Limite defensivo de tasks pendentes.
  */
 
 /**
@@ -50,12 +54,19 @@ export class BackgroundTasks {
     /** @type {((event: { pendingCount: 0; ts: number }) => void) | undefined} */
     #onIdle;
 
+    /** @type {number} */
+    #maxPending;
+
     /**
      * @param {BackgroundTasksOptions} [options]
      */
     constructor(options = {}) {
         this.#onCompleted = options.onCompleted;
         this.#onIdle = options.onIdle;
+        this.#maxPending =
+            typeof options.maxPending === 'number' && Number.isFinite(options.maxPending) && options.maxPending > 0
+                ? Math.trunc(options.maxPending)
+                : DEFAULT_MAX_PENDING_BACKGROUND_TASKS;
     }
 
     /**
@@ -90,6 +101,22 @@ export class BackgroundTasks {
         const label = meta.label ?? `background-task-${++this.#sequence}`;
         const description = meta.description ?? label;
         const startedAt = Date.now();
+
+        if (this.#tasks.size >= this.#maxPending) {
+            const reason = `limite de ${this.#maxPending} tarefas em background atingido`;
+            log('WARN', `[BackgroundTasks] ${reason}; tarefa '${label}' não será rastreada.`);
+            Promise.resolve(task).catch((error) => logSwallowed(error, `agent.background.untracked.${label}`));
+            this.#onCompleted?.({
+                label,
+                description,
+                status: 'error',
+                error: reason,
+                durationMs: Date.now() - startedAt,
+                pendingCount: this.#tasks.size,
+                ts: Date.now(),
+            });
+            return Promise.resolve();
+        }
 
         /** @type {Promise<void>} */
         const tracked = Promise.resolve(task)

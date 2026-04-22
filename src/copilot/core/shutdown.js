@@ -58,7 +58,13 @@ export function setShutdownLogger(logFn) {
  * @param {number} [priority=50] - Prioridade (menor = executa primeiro). Default is `50`
  */
 export function registerShutdownHandler(name, fn, priority = 50) {
-    handlers.push({ name, priority, fn });
+    const nextHandler = { name, priority, fn };
+    const existingIndex = handlers.findIndex((handler) => handler.name === name);
+    if (existingIndex >= 0) {
+        handlers.splice(existingIndex, 1, nextHandler);
+    } else {
+        handlers.push(nextHandler);
+    }
     handlers.sort((a, b) => a.priority - b.priority);
 }
 

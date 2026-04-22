@@ -11,13 +11,13 @@
  * @see EventBus
  */
 
-import { log, startSpanImmediate } from '#copilot/observability';
 import {
     ROTATION_MAX_AGE_MS,
     ROTATION_MAX_COMPACTIONS,
     ROTATION_MAX_TURNS,
     ROTATION_MAX_UTIL,
 } from '../../config/agent.js';
+import { log, startSpanImmediate } from '../ports/observability-port.js';
 
 /**
  * @typedef {Object} RotationDecision

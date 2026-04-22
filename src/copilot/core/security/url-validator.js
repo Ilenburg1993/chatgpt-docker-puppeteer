@@ -158,12 +158,16 @@ export function validateWebhookUrl(url, opts) {
     }
     const allowPrivate = opts?.allowPrivate ?? WEBHOOK_ALLOW_PRIVATE_HOSTS;
     if (!allowPrivate) {
-        const hostname = parsed.hostname;
-        if (hostname === 'localhost' || hostname === '0.0.0.0' || isPrivateIp(hostname)) {
-            throw new ConfigError(
-                `[URLValidator] Host privado/loopback bloqueado por segurança: ${hostname}. Use WEBHOOK_ALLOW_PRIVATE_HOSTS=true para permitir em dev.`,
-            );
+        const result = validateUrl(parsed);
+        if (!result.safe) {
+            if (result.reason?.includes('privado') || result.reason?.includes('interno')) {
+                throw new ConfigError(
+                    `[URLValidator] Host privado/loopback bloqueado por segurança: ${parsed.hostname}. ${result.reason}`,
+                );
+            }
+            throw new ConfigError(`[URLValidator] ${result.reason}`);
         }
+        return;
     }
 }
 

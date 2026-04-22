@@ -21,6 +21,7 @@ import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { container } from './core/di-container.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
+import { startCopilotServer } from './server/index.js';
 
 /** @type {boolean} */
 let _booted = false;
@@ -76,5 +77,5 @@ export async function bootCopilot() {
     // wireTerminalDI() é idempotente; startTerminalServer() pode chamá-la novamente sem efeito.
     wireTerminalDI();
 
-    await startTerminalServer();
+    await startTerminalServer({ startCopilotServer });
 }

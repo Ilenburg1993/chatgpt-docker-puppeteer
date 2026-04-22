@@ -207,6 +207,7 @@
  *     | 'boot.failed'
  *     | 'boot.degraded'
  *     | 'quota.monitor_missing'
+ *     | 'sdk.resources_incomplete'
  *     | 'queue.starvation'} AgentHealthRiskFlag
  */
 
@@ -223,6 +224,7 @@
  *     | 'drain_background_tasks'
  *     | 'inspect_boot_report'
  *     | 'restart_quota_monitor'
+ *     | 'inspect_sdk_resources'
  *     | 'inspect_queue_starvation'} AgentRecommendedAction
  */
 
@@ -340,6 +342,7 @@
  * @property {number | null} uptime - Tempo em ms desde `startedAt`, quando disponível.
  * @property {string[]} issues - Lista canônica de issues operacionais detectadas na coleta.
  * @property {AgentBootReport | null} bootReport - Último relatório de boot conhecido, quando disponível.
+ * @property {AgentSdkAccessSnapshot | null} sdkResources - Cobertura verificável dos recursos SDK expostos ao agent.
  * @property {{
  *     runtime: { ok: boolean; status: AgentStatus; operational: boolean };
  *     client: { ok: boolean; available: boolean };
@@ -362,6 +365,13 @@
  *         backgroundPendingCount: number;
  *     };
  *     background: { ok: boolean; pendingCount: number; warnThreshold: number; labels: string[] };
+ *     sdkResources: {
+ *         ok: boolean;
+ *         available: boolean;
+ *         allCoreResourcesAvailable: boolean | null;
+ *         allRuntimeResourcesAvailable: boolean | null;
+ *         missingResources: string[];
+ *     };
  *     boot: {
  *         ok: boolean;
  *         reportAvailable: boolean;

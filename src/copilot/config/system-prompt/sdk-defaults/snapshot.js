@@ -11,10 +11,10 @@
  * @module copilot/config/system-prompt/sdk-defaults/snapshot
  */
 
-import { SYSTEM_PROMPT_SECTIONS } from '#copilot/sdk';
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SYSTEM_PROMPT_SECTIONS } from '../../sdk-config-port.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

@@ -11,7 +11,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { log } from '#copilot/observability';
+import { log } from './ports/observability-port.js';
 import { toError } from '../core/error-handlers.js';
 
 /**

@@ -14,9 +14,9 @@
 
 import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
-import { log, METRICS_STORE } from '#copilot/observability';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { log, METRICS_STORE } from '../ports/observability-port.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,
@@ -87,9 +87,9 @@ function startKeepaliveIfPossible(ctx, host) {
  * @returns {Promise<void>}
  */
 export async function dialogStart(ctx, host, bootPrompt) {
-    if (ctx.status !== 'idle') {
+    if (!ctx.isIdle()) {
         throw new SessionError(
-            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.status}'`,
+            `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.getRuntimeStatus()}'`,
             'INVALID_STATE',
         );
     }
@@ -147,9 +147,9 @@ export async function dialogStop(ctx, host, opts) {
  * @returns {Promise<void>}
  */
 export async function dialogResume(ctx) {
-    if (ctx.status !== 'idle' && ctx.status !== 'waiting_for_input') {
+    if (!ctx.isIdle() && !ctx.isWaitingForInput()) {
         throw new SessionError(
-            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.status}'`,
+            `[AlwaysAlive] resumeDialogLoop() requer status 'idle' ou 'waiting_for_input'. Status atual: '${ctx.getRuntimeStatus()}'`,
             'INVALID_STATE',
         );
     }
@@ -172,13 +172,13 @@ export function ensureDialogLoopAttached(ctx, host) {
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),
         answerPendingQuestion: (answer) => host.answerPendingQuestion(answer),
         getSessionId: () => host.sessionId,
-        getModel: () => ctx.model,
+        getModel: () => ctx.getModelSnapshot(),
         setModel: (modelId) => {
             ctx.setModel(modelId);
             trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
         },
         hasPendingQuestion: () => ctx.hasPendingQuestion(),
-        trackBackgroundTask: (task, meta) => ctx.backgroundTasks.track(task, meta),
+        trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
     };
     // Sempre atualiza host — necessário após reconexão.
     ctx.dialogLoop.attach(agentHost);

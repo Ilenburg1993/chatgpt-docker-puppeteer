@@ -13,7 +13,7 @@
 
 import { container, logSwallowed } from '#copilot/core';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
-import { METRICS_STORE } from '#copilot/observability';
+import { METRICS_STORE } from './ports/observability-port.js';
 import { EventEmitter } from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
@@ -189,7 +189,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return this.ctx.status;
+        return this.ctx.getRuntimeStatus();
     }
 
     /**
@@ -216,7 +216,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number}
      */
     get queueSize() {
-        return this.ctx.messageQueue.size;
+        return this.ctx.getQueueSnapshot().size;
     }
 
     /**
@@ -225,7 +225,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return this.ctx.pendingQuestion;
+        return this.ctx.getPendingQuestionForStatusSnapshot();
     }
 
     /**
@@ -310,7 +310,7 @@ export class AlwaysAliveAgent extends EventEmitter {
             return false;
         }
         this.ctx.clearPendingQuestionShadow();
-        void this.ctx.backgroundTasks.track(
+        void this.ctx.trackBackgroundTask(
             persistStateWithPolicy(
                 { pendingQuestion: null, pendingQuestionMeta: null },
                 { label: 'state.pendingQuestionShadow.clear' },

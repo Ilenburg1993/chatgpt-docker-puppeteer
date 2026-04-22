@@ -12,7 +12,6 @@
  * @see EventBus
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { EVENT_BUS, SessionError, toError } from '#copilot/core';
 import {
     EMITTER_BEFORE_STOP,
@@ -22,6 +21,9 @@ import {
     EMITTER_STATUS,
     EMITTER_STOPPED,
 } from '#copilot/events';
+import { CopilotClient, raceEvents } from '#copilot/sdk';
+import { container } from '../../core/di-container.js';
+import { logSwallowed } from '../../core/error-handlers.js';
 import {
     buildTelemetryConfig,
     defaultErrorTracker,
@@ -29,14 +31,10 @@ import {
     initEventCollector,
     log,
     startSpan,
-} from '#copilot/observability';
-import { CopilotClient, raceEvents } from '#copilot/sdk';
-import { container } from '../../core/di-container.js';
-import { logSwallowed } from '../../core/error-handlers.js';
+} from '../ports/observability-port.js';
 
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
-import { setExperimentalSession, setSessionRpc } from '../../tools/bootstrap.js';
 import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
@@ -46,6 +44,8 @@ import {
     finalizeSessionInit,
 } from '../lifecycle/session-setup.js';
 import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
+import { resolveConversationStore } from '../ports/conversation-port.js';
+import { unbindAgentSessionTools } from '../ports/tool-port.js';
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
 import { initOrResumeSession } from '../session/initializer.js';
@@ -92,15 +92,15 @@ export async function initSession(ctx, client, host) {
  * @returns {Promise<void>}
  */
 export async function agentStart(ctx, host) {
-    if (ctx.status !== 'stopped') {
-        log('WARN', `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.status}'.`);
+    if (!ctx.isStopped()) {
+        log('WARN', `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.getRuntimeStatus()}'.`);
         return;
     }
 
     ctx.setStatus('starting', host);
     log('INFO', '[AlwaysAlive] Iniciando agente...');
 
-    void ctx.backgroundTasks.track(
+    void ctx.trackBackgroundTask(
         persistStateWithPolicy({ gracefulShutdown: false }, { label: 'state.gracefulShutdown.reset' }).then(
             () => undefined,
         ),
@@ -126,7 +126,7 @@ export async function agentStart(ctx, host) {
         const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
         ctx.setClient(client);
 
-        const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.model }, () =>
+        const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.getModelSnapshot() }, () =>
             initSession(ctx, client, host),
         );
 
@@ -135,7 +135,7 @@ export async function agentStart(ctx, host) {
             {
                 getHubSessionId,
                 setSharedSdkSessionId,
-                conversationStore: container.resolve(CONVERSATION_STORE) ?? null,
+                conversationStore: resolveConversationStore(container),
             },
             { label: 'agent.start.ownership.sync' },
         );
@@ -165,7 +165,7 @@ export async function agentStart(ctx, host) {
                 },
                 onPrInfo: (info) => {
                     ctx.setLastPrInfo(info);
-                    void ctx.backgroundTasks.track(
+                    void ctx.trackBackgroundTask(
                         persistStateWithPolicy(
                             {
                                 pendingTurnConsumedPR: true,
@@ -182,10 +182,10 @@ export async function agentStart(ctx, host) {
                         },
                     );
                 },
-                isProcessing: () => ctx.status === 'processing',
+                isProcessing: () => ctx.isProcessing(),
                 dialogLoopActive: () => ctx.isDialogLoopActive(),
                 getSessionId: () => host.sessionId,
-                getStatus: () => ctx.status,
+                getStatus: () => ctx.getRuntimeStatus(),
                 hasPendingQuestion: () => ctx.hasPendingQuestion(),
                 hasPendingQuestionShadow: () => ctx.hasPendingQuestionShadow(),
                 isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
@@ -198,7 +198,7 @@ export async function agentStart(ctx, host) {
                 startDialogLoop: () => host.startDialogLoop(),
                 startKeepalive: (options) => ctx.startKeepalive(options),
                 getDialogPrMetrics: () => host.dialogPrMetrics,
-                backgroundTasks: ctx.backgroundTasks,
+                trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
                 mcpBridge: ctx.getMcpBridgeSnapshot(),
                 getMcpBridgeSnapshot: () => ctx.getMcpBridgeSnapshot(),
             },
@@ -240,7 +240,7 @@ export async function agentStart(ctx, host) {
             );
             ctx.setPendingQuestionShadow(pendingQuestionShadow);
             if (isPendingQuestionShadowExpired(pendingQuestionShadow)) {
-                void ctx.backgroundTasks.track(
+                void ctx.trackBackgroundTask(
                     persistStateWithPolicy(
                         { pendingQuestion: null, pendingQuestionMeta: null },
                         { label: 'state.pendingQuestionShadow.expire' },
@@ -261,10 +261,9 @@ export async function agentStart(ctx, host) {
         );
 
         if (isResumed) {
-            /** @type {import('../../conversation-hub/store.js').ConversationStore | null} */
-            const convStore = container.resolve(CONVERSATION_STORE) ?? null;
+            const convStore = resolveConversationStore(container);
             if (convStore) {
-                void ctx.backgroundTasks.track(
+                void ctx.trackBackgroundTask(
                     syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
                         getHubSessionId,
                         conversationStore: convStore,
@@ -295,7 +294,7 @@ export async function agentStart(ctx, host) {
  * @returns {Promise<void>}
  */
 export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
-    if (ctx.status === 'stopped') return;
+    if (ctx.isStopped()) return;
 
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
         log('INFO', '[AlwaysAlive] Parando agente...');
@@ -303,19 +302,19 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         host.emit(EMITTER_BEFORE_STOP);
         host.removeAllListeners('before-stop');
 
-        if (ctx.status === 'starting') {
+        if (ctx.isStarting()) {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
             await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((e) =>
                 logSwallowed(e, 'agent.lifecycle.stopBootWait'),
             );
         }
 
-        if (ctx.status === 'processing' || ctx.status === 'waiting_for_input') {
+        if (ctx.isProcessing() || ctx.isWaitingForInput()) {
             log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
             await Promise.race([
                 new Promise((resolve) => {
                     const onIdle = () => {
-                        if (ctx.status !== 'processing' && ctx.status !== 'waiting_for_input') {
+                        if (!ctx.isProcessing() && !ctx.isWaitingForInput()) {
                             host.off(EMITTER_STATUS, onIdle);
                             resolve(undefined);
                         }
@@ -339,9 +338,9 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             const pendingQuestion = ctx.getPendingQuestionSnapshot();
             const snap = createSnapshot({
                 sessionId: host.sessionId ?? null,
-                model: ctx.model,
-                status: ctx.status,
-                sendCount: ctx.sendCount,
+                model: ctx.getModelSnapshot(),
+                status: ctx.getRuntimeStatus(),
+                sendCount: ctx.getSendCountSnapshot(),
                 dialogLoopActive: false,
                 dialogPaused: ctx.isDialogLoopPaused(),
                 pendingQuestion: pendingQuestion?.question ?? null,
@@ -364,7 +363,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         const persistedShutdown = await persistStateWithPolicy(
-            { sendCount: ctx.sendCount, gracefulShutdown: true },
+            { sendCount: ctx.getSendCountSnapshot(), gracefulShutdown: true },
             { label: 'state.gracefulShutdown.persist' },
         );
         if (!persistedShutdown.ok) {
@@ -381,22 +380,18 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             mcpReconnectCancel();
             ctx.clearMcpReconnectCancel();
         }
-        const quotaMonitor = ctx.getQuotaMonitorSnapshot();
-        if (quotaMonitor) {
-            quotaMonitor.stop();
-            ctx.clearQuotaMonitor();
-        }
+        ctx.stopQuotaMonitor();
         ctx.stopKeepalive('agent_shutdown');
         defaultMetrics.stopPeriodicSnapshot();
 
-        const drainedBackgroundTasks = await ctx.backgroundTasks.drain(5000);
+        const drainedBackgroundTasks = await ctx.drainBackgroundTasks(5000);
         if (!drainedBackgroundTasks) {
             log('WARN', '[AlwaysAlive] Background tasks ainda pendentes após drain(5000ms).');
         }
 
         ctx.setStatus('stopped', host);
 
-        const remainingTasks = ctx.messageQueue.drain(
+        const remainingTasks = ctx.drainMessageQueue(
             new SessionError('[AlwaysAlive] Agente parado durante shutdown gracioso.', 'AGENT_STOPPED'),
         );
         ctx.invalidateStatusSnapshot();
@@ -423,8 +418,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
             }
             ctx.clearSession();
             ctx.messagesCache.invalidate();
-            setSessionRpc(null);
-            setExperimentalSession(null);
+            unbindAgentSessionTools();
         }
 
         const client = ctx.getClientSnapshot();
@@ -473,7 +467,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
         return await tryReconnect(
             originalError,
             /** @type {import('#copilot/sdk/types').CopilotClient} */ (ctx.getClientSnapshot()),
-            ctx.status,
+            ctx.getRuntimeStatus(),
             {
                 emit: (event, payload) => host.emit(event, payload),
                 initSession: (client) => initSession(ctx, client, host),

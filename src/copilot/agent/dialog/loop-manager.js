@@ -24,7 +24,6 @@ import {
     EMITTER_LOOP_STALLED,
     EMITTER_LOOP_TURN_TIMEOUT,
 } from '#copilot/events';
-import { log, startSpanImmediate } from '#copilot/observability';
 import { waitForEvent } from '#copilot/sdk';
 import { EventEmitter } from 'node:events';
 import {
@@ -37,6 +36,7 @@ import {
 } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
+import { log, startSpanImmediate } from '../ports/observability-port.js';
 import { TurnQueue } from './backpressure.js';
 import { ModelFallbackState } from './model-fallback.js';
 import { DialogProtocol } from './protocol.js';
@@ -315,7 +315,26 @@ export class DialogLoopManager extends EventEmitter {
             }
         });
 
-        await bootPromise;
+        try {
+            await bootPromise;
+        } catch (bootErr) {
+            const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
+            this.#active = false;
+            this.#stopping = false;
+            this.#watchdog?.stop();
+            this.#watchdog = null;
+            this.#endLoopSpan(false);
+            this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
+            this.emit('stopped', { reason });
+            void this.#trackPersistedState(
+                { dialogLoopActive: false },
+                {
+                    label: 'dialog.state.boot_failed',
+                    description: 'Persist dialogLoopActive=false after boot failure',
+                },
+            );
+            throw bootErr;
+        }
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#prMetrics.boots++;
         // F42.4: persistir prMetrics após boot bem-sucedido
@@ -337,7 +356,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<string>}
      */
     sendTurn(message, { timeout = 60_000, signal } = {}) {
-        if (!this.#active) {
+        if (!this.#active || this.#stopping) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
             );

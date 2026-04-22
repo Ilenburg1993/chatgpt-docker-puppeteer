@@ -8,17 +8,17 @@
 
 export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#copilot/audit';
 export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
-export { PermissionController } from '../../hooks/permission-controller.js';
 export { WebhookManager } from '../../infra/webhooks.js';
-export { buildStatusSnapshot } from '../../observability/snapshots.js';
+export { executeTask } from '../messaging/agent-messaging.js';
+export { buildStatusSnapshot } from '../ports/observability-port.js';
+export { PermissionController } from '../ports/permission-port.js';
 export {
-    bootstrapTools,
+    bootstrapAgentTools as bootstrapTools,
     configureHookTools,
     setExperimentalSession,
     setHub,
     setPermissionAgent,
     setSessionRpc,
-} from '../../tools/bootstrap.js';
-export { executeTask } from '../messaging/agent-messaging.js';
+} from '../ports/tool-port.js';
 export { HandoffManager } from './handoff-manager.js';
 export { MessageQueue } from './message-queue.js';
