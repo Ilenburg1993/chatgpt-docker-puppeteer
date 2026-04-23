@@ -38,6 +38,34 @@ vi.mock('#copilot/agent', () => ({
     listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
     readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    readRuntimeControlState: (/** @type {any} */ runtime) => ({
+        status: runtime.status,
+        model: runtime.model,
+        reasoningEffort: runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? 0),
+    }),
+    readRuntimeInteractionState: () => ({
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+    }),
+    readRuntimePrBudgetSnapshot: () => ({
+        sendCount: 0,
+        dialogLoopActive: false,
+        sessionId: null,
+        prMetrics: { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+        lastPrInfo: null,
+    }),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     setRuntimeBackgroundCompactionThreshold: vi.fn(),
 }));
 vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
@@ -77,6 +105,7 @@ vi.mock('#copilot/sdk/tools-state', () => ({
     patchToolsConfig: async (/** @type {Record<string, unknown>} */ patch) => {
         Object.assign(_toolsState.current, patch);
     },
+    loadToolsConfigAsync: vi.fn(async () => ({ ..._toolsState.current })),
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

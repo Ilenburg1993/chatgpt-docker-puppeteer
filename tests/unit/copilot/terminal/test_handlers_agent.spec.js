@@ -89,6 +89,7 @@ vi.mock('#copilot/agent', () => ({
     readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
     getRuntimeHandoffManager: (/** @type {any} */ runtime) => runtime.getHandoffManager(),
     getRuntimeHandoffHistory: (/** @type {any} */ runtime) => runtime.getHandoffManager().getHistory(),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     startAgentDialogLoop: mockStartAgentDialogLoop,
     sendAgentDialogTurn: mockSendAgentDialogTurn,
     stopAgentDialogLoopAuthorized: mockStopAgentDialogLoopAuthorized,

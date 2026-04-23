@@ -239,23 +239,17 @@ describe('DialogWatchdog › F31: DLM pause/resume integração source analysis'
         dlmSrc = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
     });
 
-    it('pause() chama #watchdog?.stop() para evitar falsos-positivos', () => {
+    it('pause() chama watchdog supervisor stop() para evitar falsos-positivos', () => {
         const pauseIdx = dlmSrc.indexOf('async pause(');
         assert.ok(pauseIdx >= 0, 'pause() deve existir no DLM');
         const pauseBody = dlmSrc.slice(pauseIdx, pauseIdx + 600);
-        assert.ok(
-            pauseBody.includes('#watchdog?.stop()') || pauseBody.includes('watchdog?.stop()'),
-            'pause() deve parar o watchdog',
-        );
+        assert.ok(pauseBody.includes('#watchdogSupervisor.stop()'), 'pause() deve parar o watchdog');
     });
 
-    it('resume() chama #watchdog?.start() para reativar monitoramento', () => {
+    it('resume() chama watchdog supervisor start() para reativar monitoramento', () => {
         const resumeIdx = dlmSrc.indexOf('async resume()');
         assert.ok(resumeIdx >= 0, 'resume() deve existir no DLM');
         const resumeBody = dlmSrc.slice(resumeIdx, resumeIdx + 1500);
-        assert.ok(
-            resumeBody.includes('#watchdog?.start()') || resumeBody.includes('watchdog?.start()'),
-            'resume() deve reiniciar o watchdog',
-        );
+        assert.ok(resumeBody.includes('#watchdogSupervisor.start()'), 'resume() deve reiniciar o watchdog');
     });
 });

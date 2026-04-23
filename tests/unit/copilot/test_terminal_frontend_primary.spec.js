@@ -114,6 +114,39 @@ const altRuntime = /** @type {any} */ ({
     }),
 });
 
+const modelMeta = new Map([
+    [
+        'gpt-5',
+        {
+            costTier: 'high',
+            speedTier: 'fast',
+            contextWindow: 128000,
+            supportsReasoning: true,
+            supportsVision: true,
+        },
+    ],
+    [
+        'gpt-5-mini',
+        {
+            costTier: 'low',
+            speedTier: 'fast',
+            contextWindow: 128000,
+            supportsReasoning: true,
+            supportsVision: false,
+        },
+    ],
+    [
+        'gpt-4.1',
+        {
+            costTier: 'medium',
+            speedTier: 'fast',
+            contextWindow: 1047576,
+            supportsReasoning: false,
+            supportsVision: true,
+        },
+    ],
+]);
+
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
@@ -132,12 +165,64 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    readRuntimeControlState: (/** @type {any} */ runtime) => ({
+        status: runtime.status,
+        model: runtime.model,
+        reasoningEffort: runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? 0),
+    }),
+    readRuntimeInteractionState: (/** @type {any} */ runtime) => ({
+        pendingQuestion: runtime.pendingQuestion ?? null,
+        pendingQuestionKind: runtime.pendingQuestionKind ?? runtime.pendingQuestion?.kind ?? null,
+        pendingQuestionShadow: runtime.pendingQuestionShadow ?? null,
+        pendingQuestionShadowKind:
+            runtime.pendingQuestionShadowKind ?? runtime.pendingQuestionShadow?.meta?.kind ?? null,
+        pendingQuestionShadowState: runtime.pendingQuestionShadowState ?? null,
+        pendingQuestionShadowExpired: Boolean(runtime.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs ?? null,
+    }),
+    readRuntimePrBudgetSnapshot: (/** @type {any} */ runtime) => ({
+        sendCount: Number(runtime.getStatusSnapshot().sendCount ?? 0),
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        sessionId: runtime.sessionId ?? null,
+        prMetrics: runtime.dialogPrMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+        lastPrInfo: runtime.lastPrInfo ?? null,
+    }),
+    readRuntimeModelSelection: (/** @type {any} */ runtime) => ({
+        model: runtime.model,
+        reasoningEffort: runtime.reasoningEffort,
+    }),
+    setRuntimeModel: (/** @type {any} */ runtime, /** @type {string} */ modelId) => runtime.setModel(modelId),
+    setRuntimeReasoningEffort: (/** @type {any} */ runtime, /** @type {any} */ effort) =>
+        runtime.setReasoningEffort(effort),
+    answerRuntimePendingQuestion: (/** @type {any} */ runtime, /** @type {string} */ answer) =>
+        runtime.answerPendingQuestion(answer),
+    clearRuntimePendingQuestionShadow: (/** @type {any} */ runtime) => runtime.clearPendingQuestionShadow(),
+    readAgentSdkSessionMode: (/** @type {any} */ runtime) => runtime.getSdkSessionMode(),
+    setAgentSdkSessionMode: (/** @type {any} */ runtime, /** @type {any} */ mode) => runtime.setSdkSessionMode(mode),
+    readAgentSdkPlan: (/** @type {any} */ runtime) => runtime.readSdkPlan(),
+    updateAgentSdkPlan: (/** @type {any} */ runtime, /** @type {string} */ content) => runtime.updateSdkPlan(content),
+    deleteAgentSdkPlan: (/** @type {any} */ runtime) => runtime.deleteSdkPlan(),
+    listSdkCatalogModels: vi.fn(async () => [
+        { id: 'gpt-5', capabilities: { supports: { reasoningEffort: true, vision: true } } },
+    ]),
+    readSdkModelMetadata: (/** @type {string} */ modelId) => modelMeta.get(modelId) ?? null,
+    readSdkModelStats: () => [{ modelId: 'gpt-5', totalCalls: 2, avgLatencyMs: 44, successRate: 1, totalTokens: 200 }],
     getRuntimeHandoffManager: (/** @type {any} */ runtime) => ({
         getHistory: () => [{ runtimeId: runtime === altRuntime ? 'alt' : 'default' }],
     }),
     getRuntimeHandoffHistory: (/** @type {any} */ runtime) => [
         { runtimeId: runtime === altRuntime ? 'alt' : 'default' },
     ],
+    readAgentRuntimeTodoSummaries: vi.fn(async () => [
+        { id: 'todo-1', title: 'Revisar fronteiras', status: 'todo' },
+        { id: 'todo-2', title: 'Validar contratos', status: 'in_progress' },
+    ]),
     startAgentDialogLoop,
     sendAgentDialogTurn,
     createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
@@ -191,7 +276,8 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-vi.mock('#copilot/core', () => ({
+vi.mock('#copilot/core', async (importOriginal) => ({
+    ...(await importOriginal()),
     getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
 }));
 
@@ -249,13 +335,15 @@ vi.mock('#copilot/sdk', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
     loadCustomTools: vi.fn(async () => []),
     loadToolsConfig: vi.fn(async () => ({ categories: [] })),
+    loadToolsConfigAsync: vi.fn(async () => ({ categories: [] })),
 }));
 
 vi.mock('../../../src/copilot/terminal/workspace-context.js', () => ({
     getWorkspaceContext: () => ({ cwd: '/repo', gitRoot: '/repo', currentBranch: 'main' }),
 }));
 
-vi.mock('../../../src/copilot/tools/todo/store.js', () => ({
+vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     readStore: async () => ({
         tasks: {
             a1: { id: 'a1', title: 'Primeira task', status: 'todo' },
@@ -283,7 +371,7 @@ describe('terminal/frontend/llm-b-frontend', () => {
         expect(projection.agentRuntimes).toEqual([
             {
                 runtimeId: 'default',
-                status: 'idle',
+                status: 'waiting_for_input',
                 model: 'gpt-5',
                 sessionId: 'runtime-123',
                 isDefault: true,

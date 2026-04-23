@@ -19,7 +19,7 @@
  * - stopDialogLoop() existe como método público
  * - Eventos dialog.ready, dialog.reply, dialog.stopped são emitidos corretamente
  * - Interceptação de READY:, REPLY:, DONE:, STOPPED no #handleUserInputRequest
- * - DialogLoopManager encapsula campos privados (#active, #turnMutex, #watchdog)
+ * - DialogLoopManager delega estado operacional para DialogLoopStateMachine
  * - startDialogLoop() lança erro se status não é 'idle'
  * - sendDialogTurn() lança erro se dialog loop não está ativo
  */
@@ -64,11 +64,10 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         assert.ok(sourceCode.includes('async stopDialogLoop('), 'stopDialogLoop() deve ser método público async');
     });
 
-    it('#dialogLoopActive campo privado está definido (E.1: agora em DialogLoopManager como #active)', () => {
-        // E.1: o campo foi movido para DialogLoopManager como #active; always-alive.js usa #dialogLoop
+    it('DialogLoopManager delega estado operacional para DialogLoopStateMachine', () => {
         assert.ok(
-            dlmSourceCode.includes('#active = false') || dlmSourceCode.includes('#active=false'),
-            '#active deve ser inicializado como false no DialogLoopManager',
+            dlmSourceCode.includes('DialogLoopStateMachine') && dlmSourceCode.includes('#state'),
+            'DialogLoopManager deve usar DialogLoopStateMachine para active/stopping/paused/resuming',
         );
         assert.ok(
             sourceCode.includes('#dialogLoop') || sourceCode.includes('DialogLoopManager'),
@@ -286,12 +285,12 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     });
 
     it('DL-PERM-04: sendTurn() pinga watchdog antes de serializar o turno', () => {
-        // DL-PERM-04: #watchdog?.ping() deve ocorrer dentro de sendTurn, antes do enqueue
-        const pingIdx = dlmSourceCode.indexOf('#watchdog?.ping()');
+        // DL-PERM-04: ping do watchdog deve ocorrer dentro de sendTurn, antes do enqueue
+        const pingIdx = dlmSourceCode.indexOf('#watchdogSupervisor.ping()');
         const enqueueIdx = dlmSourceCode.indexOf('#turnQueue.enqueue(');
-        assert.ok(pingIdx !== -1, 'sendTurn deve chamar this.#watchdog?.ping()');
+        assert.ok(pingIdx !== -1, 'sendTurn deve chamar this.#watchdogSupervisor.ping()');
         assert.ok(enqueueIdx !== -1, 'sendTurn deve delegar para #turnQueue.enqueue()');
-        assert.ok(pingIdx < enqueueIdx, '#watchdog?.ping() deve ocorrer antes de #turnQueue.enqueue()');
+        assert.ok(pingIdx < enqueueIdx, '#watchdogSupervisor.ping() deve ocorrer antes de #turnQueue.enqueue()');
     });
 
     it('DL-PERM-05: stop() aceita campo reason', () => {

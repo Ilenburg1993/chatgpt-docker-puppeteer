@@ -7,21 +7,15 @@ const mocks = vi.hoisted(() => ({
         agent: { status: 'idle' },
         runtimeId: runtimeId ?? 'default',
     })),
-    buildDefaultSdkRouteSharedDeps: vi.fn((runtimeId) => ({
-        agent: { status: 'idle' },
-        runtimeId: runtimeId ?? 'default',
-    })),
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-route-deps.js', () => ({
     buildDefaultCopilotApiRouteDeps: mocks.buildDefaultCopilotApiRouteDeps,
-    buildDefaultSdkRouteSharedDeps: mocks.buildDefaultSdkRouteSharedDeps,
 }));
 
 import {
     resolveCopilotApiRouteDeps,
     resolveRequestedRuntimeId,
-    resolveSdkRouteSharedDeps,
 } from '../../../src/copilot/presentation/runtime-request.js';
 
 describe('presentation/runtime-request.js', () => {
@@ -82,7 +76,7 @@ describe('presentation/runtime-request.js', () => {
         expect(resolveRequestedRuntimeId(req)).toBe('alt-runtime');
     });
 
-    it('resolve deps compartilhadas a partir do runtimeId resolvido', () => {
+    it('resolve deps do copilot-api a partir do runtimeId resolvido', () => {
         const req = /** @type {import('express').Request} */ (
             /** @type {unknown} */ ({
                 query: { runtimeId: 'default' },
@@ -93,8 +87,6 @@ describe('presentation/runtime-request.js', () => {
         );
 
         expect(resolveCopilotApiRouteDeps(req).runtimeId).toBe('default');
-        expect(resolveSdkRouteSharedDeps(req).runtimeId).toBe('default');
         expect(mocks.buildDefaultCopilotApiRouteDeps).toHaveBeenCalledWith('default');
-        expect(mocks.buildDefaultSdkRouteSharedDeps).toHaveBeenCalledWith('default');
     });
 });

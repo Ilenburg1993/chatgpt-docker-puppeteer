@@ -145,11 +145,11 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
         }
     });
 
-    it('config/system-prompt.js: SYSTEM_PROMPT_SECTIONS importado de #copilot/sdk', () => {
+    it('config/system-prompt.js: SYSTEM_PROMPT_SECTIONS importado via sdk-config-port', () => {
         const src = readSource('config/system-prompt.js');
         const hasCorrectImport = src
             .split('\n')
-            .some((line) => /import.*SYSTEM_PROMPT_SECTIONS.*from\s+['"]#copilot\/sdk['"]/.test(line));
+            .some((line) => /import.*SYSTEM_PROMPT_SECTIONS.*from\s+['"].\/sdk-config-port\.js['"]/.test(line));
         expect(hasCorrectImport).toBe(true);
     });
 });

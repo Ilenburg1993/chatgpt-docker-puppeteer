@@ -3,40 +3,49 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    readAgentRuntimeOverview: vi.fn((runtimeId) => ({
-        agent: {
+    readAgentRuntimeOverview: vi.fn((runtimeId) => {
+        const lastPrInfo =
+            runtimeId === 'alt'
+                ? {
+                      ts: 222,
+                      model: 'gpt-5',
+                      cost: 7,
+                      quotaSnapshots: [{ remaining: 3 }],
+                  }
+                : {
+                      ts: 111,
+                      model: 'gpt-5-mini',
+                      cost: 1,
+                      quotaSnapshots: [{ remaining: 9 }],
+                  };
+        const dialogPrMetrics =
+            runtimeId === 'alt'
+                ? { boots: 2, resumesWithPR: 1, resumesZeroPR: 0, totalPR: 7 }
+                : { boots: 1, resumesWithPR: 0, resumesZeroPR: 1, totalPR: 1 };
+        return {
+            agent: {
+                dialogLoopActive: runtimeId === 'alt',
+                sessionId: runtimeId === 'alt' ? 'sess-alt' : 'sess-default',
+                lastPrInfo,
+                dialogPrMetrics,
+            },
+            runtimeId: runtimeId ?? 'default',
+            snap: { sendCount: runtimeId === 'alt' ? 99 : 10 },
+            health: null,
+            runtimeSessionId: runtimeId === 'alt' ? 'sess-alt' : 'sess-default',
+            contextWindow: null,
+            agentRuntimes: [],
             dialogLoopActive: runtimeId === 'alt',
             sessionId: runtimeId === 'alt' ? 'sess-alt' : 'sess-default',
-            lastPrInfo:
-                runtimeId === 'alt'
-                    ? {
-                          ts: 222,
-                          model: 'gpt-5',
-                          cost: 7,
-                          quotaSnapshots: [{ remaining: 3 }],
-                      }
-                    : {
-                          ts: 111,
-                          model: 'gpt-5-mini',
-                          cost: 1,
-                          quotaSnapshots: [{ remaining: 9 }],
-                      },
-            dialogPrMetrics:
-                runtimeId === 'alt'
-                    ? { boots: 2, resumesWithPR: 1, resumesZeroPR: 0, totalPR: 7 }
-                    : { boots: 1, resumesWithPR: 0, resumesZeroPR: 1, totalPR: 1 },
-        },
-        runtimeId: runtimeId ?? 'default',
-        snap: { sendCount: runtimeId === 'alt' ? 99 : 10 },
-        health: null,
-        runtimeSessionId: runtimeId === 'alt' ? 'sess-alt' : 'sess-default',
-        contextWindow: null,
-        agentRuntimes: [],
-    })),
+            lastPrInfo,
+            dialogPrMetrics,
+        };
+    }),
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-overview.js', () => ({
     readAgentRuntimeOverview: mocks.readAgentRuntimeOverview,
+    readAgentRuntimeOverviewProjection: mocks.readAgentRuntimeOverview,
 }));
 
 import { handleGetPrBudget, handleGetQuota } from '../../../src/copilot/presentation/system-metrics.js';

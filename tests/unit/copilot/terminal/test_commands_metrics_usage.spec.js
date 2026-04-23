@@ -54,6 +54,8 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readSdkModelMetadata: () => null,
     createRuntimeSnapshot: vi.fn(),
     saveRuntimeSnapshot: vi.fn(),
     listRuntimeSnapshots: vi.fn(async () => []),
@@ -78,7 +80,8 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-vi.mock('#copilot/core', () => ({
+vi.mock('#copilot/core', async (importOriginal) => ({
+    ...(await importOriginal()),
     getSharedSessionBinding: () => ({ hubSessionId: 'hub-456', sdkSessionId: 'sdk-456' }),
 }));
 

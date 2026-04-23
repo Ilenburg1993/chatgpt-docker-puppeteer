@@ -89,6 +89,8 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readSdkModelMetadata: () => null,
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
         snapshotId: 'snap-001',
         createdAt: Date.now(),

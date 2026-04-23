@@ -55,8 +55,20 @@ describe('presentation/runtime-route-deps.js', () => {
         });
     });
 
-    it('compõe deps compartilhadas do sdk router a partir das superfícies canônicas', async () => {
+    it('aceita runtimeId explícito para preparar multi-agent futuro', async () => {
         const mod = await import('../../../src/copilot/presentation/runtime-route-deps.js');
+        const deps = mod.buildDefaultCopilotApiRouteDeps('alt');
+        expect(deps.requestedRuntimeId).toBe('alt');
+        expect(deps.runtimeId).toBe('default');
+        expect(deps.runtimeFound).toBe(false);
+        expect(deps.usedDefaultRuntimeFallback).toBe(true);
+        expect(deps.agent).toBe(mocks.agent);
+    });
+});
+
+describe('server/routes/sdk/deps.js', () => {
+    it('compõe deps compartilhadas do sdk router no adapter HTTP do SDK', async () => {
+        const mod = await import('../../../src/copilot/server/routes/sdk/deps.js');
         const deps = mod.buildDefaultSdkRouteSharedDeps();
 
         expect(deps.agent).toBe(mocks.agent);
@@ -68,15 +80,5 @@ describe('presentation/runtime-route-deps.js', () => {
         expect(deps.getClientState).toBe(mocks.getClientState);
         expect(deps.stopClient).toBe(mocks.stopClient);
         expect(deps.forceStopClient).toBe(mocks.forceStopClient);
-    });
-
-    it('aceita runtimeId explícito para preparar multi-agent futuro', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-route-deps.js');
-        const deps = mod.buildDefaultCopilotApiRouteDeps('alt');
-        expect(deps.requestedRuntimeId).toBe('alt');
-        expect(deps.runtimeId).toBe('default');
-        expect(deps.runtimeFound).toBe(false);
-        expect(deps.usedDefaultRuntimeFallback).toBe(true);
-        expect(deps.agent).toBe(mocks.agent);
     });
 });

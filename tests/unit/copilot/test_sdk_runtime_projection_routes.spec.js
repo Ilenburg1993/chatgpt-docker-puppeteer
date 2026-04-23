@@ -27,7 +27,32 @@ function createMockAgent() {
     return {
         status: 'running',
         sessionId: 'sdk-runtime',
-        toolsRegistry: null,
+        getToolRegistryEntriesSnapshot: () => [
+            {
+                name: 'read_file',
+                description: 'Read a file',
+                category: 'file',
+                tags: ['read'],
+                readOnly: true,
+                skipPermission: true,
+            },
+            {
+                name: 'write_file',
+                description: 'Write a file',
+                category: 'file',
+                tags: ['write'],
+                readOnly: false,
+                skipPermission: false,
+            },
+            {
+                name: 'shell_exec',
+                description: 'Run shell',
+                category: 'shell',
+                tags: ['exec'],
+                readOnly: false,
+                skipPermission: false,
+            },
+        ],
     };
 }
 
@@ -166,6 +191,76 @@ describe('sdk runtime projection routes', () => {
             hubSessionId: 'hub-shared',
             sdkSessionId: 'sdk-shared',
             isBound: true,
+        });
+    });
+
+    it('GET /tools usa a projeção semântica de tools do agent', async () => {
+        const app = express();
+        app.use(
+            createClientRouter({
+                agent: createMockAgent(),
+                getClient: async () => createMockClient(),
+                getClientState: () => 'connected',
+                stopClient: async () => [],
+                forceStopClient: async () => {},
+                allTools: [{ name: 'static_tool' }],
+            }),
+        );
+
+        const res = await request(app).get('/tools').expect(200);
+
+        assert.equal(res.body.source, 'registry');
+        assert.equal(res.body.count, 3);
+        assert.deepEqual(
+            res.body.tools.map((tool) => tool.name),
+            ['read_file', 'write_file', 'shell_exec'],
+        );
+    });
+
+    it('GET /tools usa fallback estático quando o registry runtime não está disponível', async () => {
+        const app = express();
+        app.use(
+            createClientRouter({
+                agent: { status: 'stopped', sessionId: null, toolsRegistry: null },
+                getClient: async () => createMockClient(),
+                getClientState: () => 'connected',
+                stopClient: async () => [],
+                forceStopClient: async () => {},
+                allTools: [{ name: 'static_tool', description: 'Static', skipPermission: true }],
+            }),
+        );
+
+        const res = await request(app).get('/tools').expect(200);
+
+        assert.equal(res.body.source, 'static');
+        assert.equal(res.body.count, 1);
+        assert.equal(res.body.tools[0].name, 'static_tool');
+        assert.equal(res.body.tools[0].skipPermission, true);
+    });
+
+    it('GET /agent/tools filtra e pagina a projeção semanticamente governada pelo agent', async () => {
+        const app = express();
+        app.use(
+            createAgentRouter({
+                agent: createMockAgent(),
+                metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
+                getClient: async () => createMockClient(),
+            }),
+        );
+
+        const res = await request(app).get('/agent/tools?category=file&page=1&limit=1').expect(200);
+
+        assert.equal(res.body.source, 'registry');
+        assert.equal(res.body.total, 2);
+        assert.equal(res.body.count, 1);
+        assert.equal(res.body.pages, 2);
+        assert.deepEqual(res.body.tools[0], {
+            name: 'read_file',
+            description: 'Read a file',
+            category: 'file',
+            tags: ['read'],
+            readOnly: true,
+            skipPermission: true,
         });
     });
 });

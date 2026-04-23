@@ -74,6 +74,107 @@ describe('AgentContext', () => {
         assert.ok(ctx.backgroundTasks, 'backgroundTasks deve existir');
     });
 
+    it('manager boundary API expõe permissões, registry e handoff sem acesso cru obrigatório', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        const initialHandler = ctx.getPermissionHandlerSnapshot();
+        assert.equal(typeof initialHandler, 'function');
+        assert.equal(ctx.getPermissionModeSnapshot(), ctx.permissions.getMode());
+
+        ctx.setPermissionMode('selective', { denyShell: true });
+        assert.equal(ctx.getPermissionModeSnapshot(), 'selective');
+        assert.equal(ctx.getPermissionHandlerSnapshot(), initialHandler, 'handler SDK deve ser referência estável');
+        assert.equal(
+            (await initialHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 'ctx-session' })).kind,
+            'denied-by-rules',
+        );
+
+        const originalRegistry = ctx.getToolRegistrySnapshot();
+        const nextRegistry = ctx.resetToolsRegistry();
+        assert.notEqual(nextRegistry, originalRegistry);
+        assert.equal(ctx.getToolRegistrySnapshot(), nextRegistry);
+        nextRegistry.entries.set('demo_tool', {
+            tool: { name: 'demo_tool', description: 'Demo tool', skipPermission: true },
+            category: 'demo',
+            tags: ['test'],
+            readOnly: true,
+        });
+        assert.deepEqual(ctx.getToolRegistryEntriesSnapshot(), [
+            {
+                name: 'demo_tool',
+                description: 'Demo tool',
+                category: 'demo',
+                tags: ['test'],
+                readOnly: true,
+                skipPermission: true,
+            },
+        ]);
+
+        assert.equal(ctx.getHandoffManagerSnapshot(), ctx.handoff);
+    });
+
+    it('aceita factory de permission capability sem construir controller concreto no contexto', async () => {
+        const emitter = new EventEmitter();
+        /** @type {'approve_all' | 'audit_only' | 'selective'} */
+        let mode = 'approve_all';
+        const injectedHandler = async () =>
+            /** @type {import('../../../src/copilot/sdk/types.js').PermissionRequestResult} */ ({
+                kind: mode === 'selective' ? 'denied-by-rules' : 'approved',
+                ...(mode === 'selective' ? { rules: [] } : {}),
+            });
+
+        const ctx = new AgentContext(emitter, {
+            factories: {
+                createPermissions: () => ({
+                    getMode: () => mode,
+                    setMode: (nextMode) => {
+                        mode = nextMode;
+                    },
+                    get handler() {
+                        return injectedHandler;
+                    },
+                }),
+            },
+        });
+
+        assert.equal(ctx.getPermissionHandlerSnapshot(), injectedHandler);
+        assert.deepEqual(
+            {
+                mode: ctx.getPermissionCapabilitySnapshot().mode,
+                handlerAvailable: ctx.getPermissionCapabilitySnapshot().handlerAvailable,
+            },
+            { mode: 'approve_all', handlerAvailable: true },
+        );
+        assert.equal(
+            (await ctx.getPermissionHandlerSnapshot()(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' }))
+                .kind,
+            'approved',
+        );
+        ctx.setPermissionMode('selective', { denyShell: true });
+        assert.equal(ctx.getPermissionModeSnapshot(), 'selective');
+        assert.equal(ctx.getPermissionCapabilitySnapshot().mode, 'selective');
+        assert.equal(
+            (await injectedHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind,
+            'denied-by-rules',
+        );
+    });
+
+    it('expõe metadata defensiva do factory set para capability map', () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+
+        const metadata = ctx.getContextFactoryCapabilitiesSnapshot();
+        assert.equal(metadata['governance.permissions']?.runtimeAuthority, 'agent');
+        assert.equal(metadata['governance.permissions']?.sdkFirst, true);
+        assert.equal(metadata['tools.registry']?.provider, 'sdk/tools-registry');
+        assert.equal(metadata['tools.registry']?.sdkFirst, true);
+        assert.equal(metadata['dialog.loop']?.provider, 'agent/dialog/loop-manager');
+
+        metadata['dialog.loop'] = { provider: 'mutated' };
+        assert.equal(ctx.getContextFactoryCapabilitiesSnapshot()['dialog.loop']?.provider, 'agent/dialog/loop-manager');
+    });
+
     it('backgroundTasks emite completed e idle via emitter', async () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

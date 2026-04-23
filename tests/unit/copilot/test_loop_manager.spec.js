@@ -91,7 +91,11 @@ vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
     },
 }));
 
+import { DialogCompactionPolicy } from '../../../src/copilot/agent/dialog/compaction-policy.js';
+import { DialogCostLedger } from '../../../src/copilot/agent/dialog/cost-ledger.js';
 import { DialogLoopManager } from '../../../src/copilot/agent/dialog/loop-manager.js';
+import { selectDialogResumeStrategy } from '../../../src/copilot/agent/dialog/resume-policy.js';
+import { DialogLoopStateMachine } from '../../../src/copilot/agent/dialog/state-machine.js';
 import { executeTurnImpl } from '../../../src/copilot/agent/dialog/turn-executor.js';
 import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/lifecycle/state-io.js';
 
@@ -323,6 +327,29 @@ describe('DialogLoopManager', () => {
             dlm.handleTokenBudget({ currentTokens: 90000, tokenLimit: 100000, ratio: 90 });
             expect(spy).toHaveBeenCalledWith(expect.objectContaining({ urgency: 'proactive' }));
         });
+
+        it('não duplica compaction proativa antes do reset', async () => {
+            await dlm.start('Hello');
+            const spy = vi.fn();
+            dlm.on('compaction.requested', spy);
+
+            dlm.handleTokenBudget({ currentTokens: 90000, tokenLimit: 100000, ratio: 90 });
+            dlm.handleTokenBudget({ currentTokens: 91000, tokenLimit: 100000, ratio: 91 });
+
+            expect(spy).toHaveBeenCalledTimes(1);
+        });
+
+        it('volta a emitir compaction proativa após resetCompactionFlag()', async () => {
+            await dlm.start('Hello');
+            const spy = vi.fn();
+            dlm.on('compaction.requested', spy);
+
+            dlm.handleTokenBudget({ currentTokens: 90000, tokenLimit: 100000, ratio: 90 });
+            dlm.resetCompactionFlag();
+            dlm.handleTokenBudget({ currentTokens: 91000, tokenLimit: 100000, ratio: 91 });
+
+            expect(spy).toHaveBeenCalledTimes(2);
+        });
     });
 
     // ── F64.6: prMetrics ─────────────────────────────────────────────
@@ -332,6 +359,19 @@ describe('DialogLoopManager', () => {
             await dlm.start('Hello');
             expect(dlm.prMetrics.boots).toBe(1);
             expect(dlm.prMetrics.totalPR).toBe(1);
+        });
+
+        it('restaura métricas persistidas no ledger extraído', () => {
+            vi.mocked(readState).mockReturnValue(
+                /** @type {any} */ ({ prMetrics: { boots: 2, resumesWithPR: 1, resumesZeroPR: 3 } }),
+            );
+            const fresh = new DialogLoopManager({
+                bootTimeoutMs: 500,
+                watchdogIntervalMs: 60000,
+                watchdogStallMs: 120000,
+            });
+
+            expect(fresh.prMetrics).toEqual({ boots: 2, resumesWithPR: 1, resumesZeroPR: 3, totalPR: 3 });
         });
     });
 
@@ -403,5 +443,83 @@ describe('DialogLoopManager', () => {
             controller.abort();
             await expect(dlm.sendTurn('test', { signal: controller.signal })).rejects.toThrow(/AbortError|abortado/);
         });
+    });
+});
+
+describe('DialogCostLedger', () => {
+    it('normaliza entradas persistidas e calcula totalPR sem contar zero-PR', () => {
+        const ledger = new DialogCostLedger({ boots: 2, resumesWithPR: 1, resumesZeroPR: 4 });
+
+        expect(ledger.snapshot()).toEqual({ boots: 2, resumesWithPR: 1, resumesZeroPR: 4, totalPR: 3 });
+    });
+});
+
+describe('DialogCompactionPolicy', () => {
+    it('deduplica proactive e permite critical recorrente', () => {
+        const policy = new DialogCompactionPolicy();
+
+        expect(policy.evaluate({ currentTokens: 90, tokenLimit: 100, ratio: 90 })?.urgency).toBe('proactive');
+        expect(policy.evaluate({ currentTokens: 91, tokenLimit: 100, ratio: 91 })).toBeNull();
+        expect(policy.evaluate({ currentTokens: 95, tokenLimit: 100, ratio: 95 })?.urgency).toBe('critical');
+        expect(policy.evaluate({ currentTokens: 96, tokenLimit: 100, ratio: 96 })?.urgency).toBe('critical');
+    });
+});
+
+describe('DialogLoopStateMachine', () => {
+    it('governa active/stopping/paused/resuming sem side effects', () => {
+        const state = new DialogLoopStateMachine({ paused: true });
+
+        expect(state.paused).toBe(true);
+        expect(state.active).toBe(false);
+
+        state.activate();
+        expect(state.active).toBe(true);
+        expect(state.paused).toBe(false);
+        expect(state.canSendTurn).toBe(true);
+
+        expect(state.beginStop()).toBe('started');
+        expect(state.canSendTurn).toBe(false);
+        expect(state.beginStop()).toBe('already-stopping');
+
+        state.finishStop();
+        expect(state.active).toBe(false);
+        expect(state.stopping).toBe(false);
+    });
+
+    it('bloqueia resume concorrente até finishResume()', () => {
+        const state = new DialogLoopStateMachine();
+
+        expect(state.beginResume()).toBe(true);
+        expect(state.beginResume()).toBe(false);
+        state.finishResume();
+        expect(state.beginResume()).toBe(true);
+    });
+});
+
+describe('selectDialogResumeStrategy', () => {
+    it('seleciona zero-pr imediato quando host já tem pending question', async () => {
+        const host = { ...createMockHost(), hasPendingQuestion: vi.fn(() => true) };
+
+        const strategy = await selectDialogResumeStrategy({
+            host,
+            fallbackTarget: new DialogLoopManager(),
+        });
+
+        expect(strategy.kind).toBe('zero-pr-immediate');
+        expect(strategy.prConsumed).toBe(false);
+    });
+
+    it('seleciona restart com PR quando pending question não é preservado', async () => {
+        mockWaitForEvent.mockRejectedValueOnce(new Error('timeout'));
+        const host = createMockHost();
+
+        const strategy = await selectDialogResumeStrategy({
+            host,
+            fallbackTarget: new DialogLoopManager(),
+            timeoutMs: 1,
+        });
+
+        expect(strategy.kind).toBe('restart-with-pr');
+        expect(strategy.prConsumed).toBe(true);
     });
 });

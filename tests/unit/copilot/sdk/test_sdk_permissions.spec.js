@@ -110,6 +110,17 @@ describe('sdk/permissions.js', () => {
             expect(approved.kind).toBe('approved');
         });
 
+        it('denyKinds: nega pelo kind canônico do SDK antes de allowAll', async () => {
+            const handler = perms.createPermissionHandler({
+                allowAll: true,
+                denyKinds: ['shell'],
+            });
+            const denied = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: 'tc-1' }), {
+                sessionId: 's1',
+            });
+            expect(denied.kind).toBe('denied-by-rules');
+        });
+
         it('denyPatterns: nega tools com match no regex', async () => {
             const handler = perms.createPermissionHandler({
                 denyPatterns: [/^shell/],

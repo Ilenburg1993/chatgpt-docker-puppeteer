@@ -556,8 +556,55 @@ describe('agent health routes', () => {
             dialogPaused: false,
             startDialogLoop: async () => {},
             getPermissionMode: () => 'selective',
+            getPermissionCapabilitySnapshot: () => ({
+                mode: 'selective',
+                handlerAvailable: true,
+                provider: 'agent/ports/permission-port',
+                factory: 'test.createPermissions',
+                sdkFirst: true,
+                stableHandler: true,
+                runtimeAuthority: 'agent',
+            }),
+            getContextFactoryCapabilitiesSnapshot: () => ({
+                'runtime.queue': {
+                    provider: 'agent/infra/message-queue',
+                    factory: 'test.createMessageQueue',
+                    runtimeAuthority: 'agent',
+                },
+                'dialog.loop': {
+                    provider: 'agent/dialog/loop-manager',
+                    factory: 'test.createDialogLoop',
+                    runtimeAuthority: 'agent',
+                },
+                'tools.registry': {
+                    provider: 'sdk/tools-registry',
+                    factory: 'test.createToolsRegistry',
+                    sdkFirst: true,
+                    runtimeAuthority: 'agent',
+                },
+                'integration.webhooks': {
+                    provider: 'infra/webhooks',
+                    factory: 'test.createWebhooks',
+                    runtimeAuthority: 'agent',
+                },
+                'integration.handoff': {
+                    provider: 'agent/infra/handoff-manager',
+                    factory: 'test.createHandoff',
+                    runtimeAuthority: 'agent',
+                },
+            }),
             listWebhooks: () => [{ url: 'https://example.test/hook' }],
             getHandoffManager: () => ({}),
+            getToolRegistryEntriesSnapshot: () => [
+                {
+                    name: 'read_file',
+                    description: 'Read a file',
+                    category: 'file',
+                    tags: ['read'],
+                    readOnly: true,
+                    skipPermission: true,
+                },
+            ],
             getStatusSnapshot: () => ({
                 status: 'idle',
                 sessionId: 'cap-session',
@@ -574,6 +621,7 @@ describe('agent health routes', () => {
                 resources: {
                     clientAvailable: true,
                     sessionAvailable: true,
+                    toolRegistryAvailable: true,
                 },
                 missingResources: [],
                 allCoreResourcesAvailable: true,
@@ -669,7 +717,16 @@ describe('agent health routes', () => {
         assert.equal(res.body.capabilities['runtime.lifecycle'].state, 'ready');
         assert.equal(res.body.capabilities['sdk.session'].details.sessionId, 'cap-session');
         assert.equal(res.body.capabilities['governance.permissions'].details.mode, 'selective');
+        assert.equal(res.body.capabilities['governance.permissions'].details.handlerAvailable, true);
+        assert.equal(res.body.capabilities['governance.permissions'].details.sdkFirst, true);
+        assert.equal(res.body.capabilities['governance.permissions'].details.runtimeAuthority, 'agent');
+        assert.equal(res.body.capabilities['tools.registry'].details.count, 1);
+        assert.equal(res.body.capabilities['tools.registry'].details.factory, 'test.createToolsRegistry');
+        assert.equal(res.body.capabilities['tools.registry'].details.sdkFirst, true);
+        assert.equal(res.body.capabilities['runtime.queue'].details.provider, 'agent/infra/message-queue');
+        assert.equal(res.body.capabilities['dialog.loop'].details.factory, 'test.createDialogLoop');
         assert.equal(res.body.capabilities['integration.webhooks'].details.registered, 1);
+        assert.equal(res.body.capabilities['integration.webhooks'].details.factory, 'test.createWebhooks');
         assert.ok(res.body.readyCount > 0);
         assert.equal(res.body.capabilityCount, res.body.list.length);
     });

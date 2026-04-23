@@ -273,6 +273,26 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
         const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
         assert.ok(result?.kind === 'denied-by-rules', `esperado denied-by-rules, recebido: ${JSON.stringify(result)}`);
     });
+
+    it('SDK first: denyKinds nega pelo kind canônico do SDK mesmo sem toolName', async () => {
+        const handler = createPermissionHandler({ denyKinds: ['shell'] });
+        const result = await handler({ kind: 'shell', toolCallId: '1' }, inv());
+        assert.equal(result?.kind, 'denied-by-rules');
+    });
+
+    it('SDK first: onRequest pode devolver PermissionRequestResult canônico sem tradução booleana', async () => {
+        const handler = createPermissionHandler({
+            onRequest: (_request, invocation) => ({
+                kind: 'denied-interactively-by-user',
+                feedback: `session=${invocation.sessionId}`,
+            }),
+        });
+        const result = await handler({ kind: 'write', toolCallId: '2' }, inv('sdk-session'));
+        assert.deepEqual(result, {
+            kind: 'denied-interactively-by-user',
+            feedback: 'session=sdk-session',
+        });
+    });
 });
 
 // ─── Seção 3: prompt-transformer.js (Gap 1) ───────────────────────────────────

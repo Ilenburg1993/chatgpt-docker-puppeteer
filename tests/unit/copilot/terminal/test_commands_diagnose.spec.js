@@ -78,6 +78,8 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readSdkModelMetadata: () => null,
 }));
 
 vi.mock('#copilot/bridges', () => ({
@@ -106,7 +108,8 @@ vi.mock('#copilot/core', async () => {
     };
 });
 
-vi.mock('../../../../src/copilot/tools/todo/store.js', () => ({
+vi.mock('../../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     readStore: async () => ({
         tasks: {
             a1: { id: 'a1', title: 'Primeira task', status: 'todo' },
