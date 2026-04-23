@@ -15,8 +15,8 @@ import { bridgeEmitter, container, logSwallowed } from '#copilot/core';
 /**
  * @typedef {import('node:events').EventEmitter & {
  *     ctx: {
- *         dialogLoop: import('node:events').EventEmitter;
- *         handoff: import('node:events').EventEmitter;
+ *         getDialogLoopManagerSnapshot: () => import('node:events').EventEmitter;
+ *         getHandoffManagerSnapshot: () => import('node:events').EventEmitter;
  *     };
  * }} AgentBridgeHost
  */
@@ -74,8 +74,8 @@ export function ensureAgentEventBusBridge(agent, options) {
             }
 
             bridgeEmitter(agent, bus, AGENT_EVENT_BRIDGE_MAP);
-            bridgeEmitter(agent.ctx.dialogLoop, bus, DIALOG_LOOP_EVENT_BRIDGE_MAP);
-            bridgeEmitter(agent.ctx.handoff, bus, HANDOFF_EVENT_BRIDGE_MAP);
+            bridgeEmitter(agent.ctx.getDialogLoopManagerSnapshot(), bus, DIALOG_LOOP_EVENT_BRIDGE_MAP);
+            bridgeEmitter(agent.ctx.getHandoffManagerSnapshot(), bus, HANDOFF_EVENT_BRIDGE_MAP);
 
             _eventBusBridgeWired = true;
         } catch (_busWiringErr) {

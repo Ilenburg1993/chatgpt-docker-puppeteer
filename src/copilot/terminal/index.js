@@ -26,19 +26,17 @@ import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { container } from '../core/di-container.js';
 import { registerTimer } from '../core/timer-registry.js';
-import { startTodoCleanupJob } from '../tools/todo/store.js';
 import { recordTerminalActivity, terminalActivityEmitter } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
-import { wireTerminalDI } from './di-wiring.js';
 import { broadcastSse, println, sendTurn } from './dialog.js';
 import {
     attachTerminalHubSocketIO,
     createTerminalHubSession,
-    getTerminalAgentRuntime,
     initTerminalConversationHub,
     isTerminalHubReady,
     readTerminalHubOrchestrator,
     readTerminalHubStore,
+    readTerminalRuntimeState,
 } from './frontend/llm-b-runtime.js';
 import { startRepl } from './repl.js';
 import { getHubSessionId, setHubSessionId } from './state.js';
@@ -90,6 +88,8 @@ let _sighupHandlerRegistered = false;
  *
  * @typedef {object} TerminalServerStartOptions
  * @property {TerminalServerStartDeps['startCopilotServer']} [startCopilotServer]
+ * @property {() => void} [wireRuntime]
+ * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  */
 
 /**
@@ -105,10 +105,10 @@ function startReflectionLoop() {
     log('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
 
     const runReflection = () => {
-        const agent = getTerminalAgentRuntime();
-        if (!agent.dialogLoopActive) return;
+        const runtimeState = readTerminalRuntimeState();
+        if (!runtimeState.dialogLoopActive) return;
         // ARCH-07 (fix): skip reflection se fila já tem tarefas para evitar acúmulo
-        if (agent.queueSize > 0) {
+        if (runtimeState.queueSize > 0) {
             log('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
             return;
         }
@@ -136,6 +136,12 @@ export async function startTerminalServer(options = {}) {
     if (typeof options.startCopilotServer !== 'function') {
         throw new TypeError('[TerminalServer] startCopilotServer dependency is required by the composition root.');
     }
+    if (typeof options.wireRuntime !== 'function') {
+        throw new TypeError('[TerminalServer] wireRuntime dependency is required by the composition root.');
+    }
+    if (typeof options.startTodoCleanupJob !== 'function') {
+        throw new TypeError('[TerminalServer] startTodoCleanupJob dependency is required by the composition root.');
+    }
 
     recordTerminalActivity('boot', 'Inicializando terminal', {
         detail: 'Preparando aliases, DI, hub e servidor HTTP',
@@ -146,9 +152,8 @@ export async function startTerminalServer(options = {}) {
     recordTerminalActivity('boot', 'Carregando aliases', { source: 'terminal', recordHistory: false });
     await loadAliasesAsync();
 
-    // DI wiring extraído para di-wiring.js — registra tokens agent/tools e injeta setters legados
-    recordTerminalActivity('boot', 'Configurando DI do terminal', { source: 'terminal', recordHistory: false });
-    wireTerminalDI();
+    recordTerminalActivity('boot', 'Configurando runtime Copilot', { source: 'terminal', recordHistory: false });
+    options.wireRuntime();
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files
@@ -252,7 +257,7 @@ export async function startTerminalServer(options = {}) {
 
     // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
     // F152: registrar no timer-registry para evitar leak (handle era descartado)
-    const todoCleanupTimer = startTodoCleanupJob();
+    const todoCleanupTimer = options.startTodoCleanupJob();
     if (typeof todoCleanupTimer.unref === 'function') todoCleanupTimer.unref();
     registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
@@ -332,8 +337,8 @@ export async function startTerminalServer(options = {}) {
         })(),
         mcpToolCount: getMcpStatus().toolCount,
         hubSessionId: getHubSessionId(),
-        dialogLoopActive: getTerminalAgentRuntime().dialogLoopActive,
-        model: getTerminalAgentRuntime().model,
+        dialogLoopActive: readTerminalRuntimeState().dialogLoopActive,
+        model: readTerminalRuntimeState().model,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
 

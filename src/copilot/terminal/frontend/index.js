@@ -54,7 +54,6 @@ export {
     createTerminalSnapshot,
     deleteTerminalHubMemory,
     deleteTerminalSdkPlan,
-    getTerminalAgentRuntime,
     getTerminalSdkSessionMode,
     initTerminalConversationHub,
     isTerminalHubReady,

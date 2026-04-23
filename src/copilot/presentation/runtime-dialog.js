@@ -8,7 +8,8 @@
  */
 
 import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
-import { getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
+import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
+import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './runtime-file-context.js';
 
 export { MAX_EMBED_BYTES };
@@ -66,13 +67,25 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
  */
 export async function sendRuntimeDialogTurn(message, from, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
+    const state = readRuntimeControlState(/** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent));
 
-    if (!agent.dialogLoopActive && !agent.dialogPaused) {
+    if (!state.dialogLoopActive && !state.dialogPaused) {
         await startRuntimeDialogLoop(undefined, agent);
     }
 
     void from;
     return sendRuntimeDialogTurnOnActiveLoop(message, options, agent);
+}
+
+/**
+ * @param {string} message
+ * @param {string} from
+ * @param {{ timeout?: number }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<string | null>}
+ */
+export async function sendRuntimeDialogTurnForRuntime(message, from, options, runtimeId) {
+    return sendRuntimeDialogTurn(message, from, options, getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**

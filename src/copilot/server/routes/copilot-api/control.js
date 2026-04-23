@@ -20,6 +20,7 @@ import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { buildAgentRuntimeCapabilities } from '../../../presentation/runtime-capabilities.js';
 import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 import { buildAgentSessionHttpPayload, buildAgentStatusHttpPayload } from '../../../presentation/runtime-status.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
@@ -39,37 +40,10 @@ const _sdkVersion = (() => {
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('../../../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
+ * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {{
- *     agent: AlwaysAliveAgentLike;
- *     runtimeId: string;
- *     requestedRuntimeId?: string | null;
- *     runtimeFound?: boolean;
- *     usedDefaultRuntimeFallback?: boolean;
- * }} RuntimeRouteDeps
- *
- *
- * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
  */
-
-/**
- * @param {RuntimeRouteBinding} binding
- * @param {Req} req
- * @returns {RuntimeRouteDeps}
- */
-function resolveRuntimeRouteDeps(binding, req) {
-    if (typeof binding === 'function') {
-        return binding(req);
-    }
-    return {
-        agent: binding,
-        runtimeId: 'default',
-        requestedRuntimeId: null,
-        runtimeFound: true,
-        usedDefaultRuntimeFallback: false,
-    };
-}
 
 /**
  * Registra rotas de controle do agente no router fornecido.
@@ -82,38 +56,38 @@ export function registerControlRoutes(bridge, binding) {
     const requireAdmin = _makeAdminAuthMiddleware();
 
     bridge.get('/status', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const deps = resolveRuntimeRouteDeps(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
         res.json(buildAgentStatusHttpPayload(deps.agent, deps));
     });
     bridge.get('/health', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent, runtimeId } = resolveRuntimeRouteDeps(binding, req);
+        const { agent, runtimeId } = resolveCopilotApiRouteBinding(binding, req);
         _handleHealth(res, agent, runtimeId);
     });
     bridge.get('/session', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const deps = resolveRuntimeRouteDeps(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
         _handleSession(res, deps.agent, deps);
     });
     bridge.get('/capabilities', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const deps = resolveRuntimeRouteDeps(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
         res.json(buildAgentRuntimeCapabilities(deps.agent, deps));
     });
     // SEC-API-001: POST /start e /stop protegidas com requireAdmin (defesa em profundidade)
     bridge.post('/start', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleStart(res, resolveRuntimeRouteDeps(binding, req).agent),
+        _handleStart(res, resolveCopilotApiRouteBinding(binding, req).agent),
     );
     bridge.post('/stop', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleStop(res, resolveRuntimeRouteDeps(binding, req).agent),
+        _handleStop(res, resolveCopilotApiRouteBinding(binding, req).agent),
     );
     bridge.get('/permissions', (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleGetPermissions(res, resolveRuntimeRouteDeps(binding, req).agent),
+        _handleGetPermissions(res, resolveCopilotApiRouteBinding(binding, req).agent),
     );
     bridge.post('/permissions', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleSetPermissions(req, res, resolveRuntimeRouteDeps(binding, req).agent),
+        _handleSetPermissions(req, res, resolveCopilotApiRouteBinding(binding, req).agent),
     );
 
     // GAP-SE-001b (STREAMING-EVENTS-AUDIT Fase 2.2): endpoint de steering (immediate mode)
     bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleSteer(req, res, resolveRuntimeRouteDeps(binding, req).agent),
+        _handleSteer(req, res, resolveCopilotApiRouteBinding(binding, req).agent),
     );
 
     // E3.2 — Dashboard de compliance: decisões de hooks e estatísticas
@@ -172,7 +146,7 @@ function _makeAdminAuthMiddleware() {
  * Health check: 200 = operacional, 503 = parado.
  *
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  * @param {string | null | undefined} [runtimeId]
  */
 function _handleHealth(res, agent, runtimeId) {
@@ -212,7 +186,7 @@ function _handleHealth(res, agent, runtimeId) {
 
 /**
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  * @param {string | RuntimeRouteDeps | null | undefined} [runtimeIdOrDeps]
  */
 function _handleSession(res, agent, runtimeIdOrDeps) {
@@ -221,7 +195,7 @@ function _handleSession(res, agent, runtimeIdOrDeps) {
 
 /**
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  * @returns {Promise<void>}
  */
 async function _handleStart(res, agent) {
@@ -240,7 +214,7 @@ async function _handleStart(res, agent) {
 
 /**
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  * @returns {Promise<void>}
  */
 async function _handleStop(res, agent) {
@@ -259,7 +233,7 @@ async function _handleStop(res, agent) {
 
 /**
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  */
 function _handleGetPermissions(res, agent) {
     const mode = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
@@ -269,7 +243,7 @@ function _handleGetPermissions(res, agent) {
 /**
  * @param {Req} req
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  */
 function _handleSetPermissions(req, res, agent) {
     const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
@@ -306,7 +280,7 @@ function _handleSetPermissions(req, res, agent) {
  *
  * @param {Req} req
  * @param {Res} res
- * @param {AlwaysAliveAgentLike} agent
+ * @param {RuntimeRouteDeps['agent']} agent
  */
 async function _handleSteer(req, res, agent) {
     const { message } = req.body ?? {};

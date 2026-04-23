@@ -19,6 +19,18 @@ import {
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent';
 import {
+    abortRuntimeCurrentMessage,
+    answerRuntimePendingQuestion,
+    clearRuntimePendingQuestionShadow,
+    offRuntimeEvent,
+    onRuntimeEvent,
+    onceRuntimeEvent,
+    pauseRuntimeDialogLoop,
+    readRuntimeControlState,
+    resumeRuntimeDialogLoop,
+    startRuntime,
+} from '../agent/facades/agent-runtime-controls.js';
+import {
     getAgentRuntime,
     getDefaultAgentRuntime,
     getDefaultAgentRuntimeId,
@@ -53,10 +65,89 @@ export function pingDefaultAgentDialogWatchdog() {
 
 /**
  * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     status: string;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     sessionId: string | null;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ * }}
+ */
+export function readAgentRuntimeControlState(runtimeId) {
+    return readRuntimeControlState(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<void>}
+ */
+export async function startAgentRuntime(runtimeId) {
+    await startRuntime(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<void>}
+ */
+export async function abortAgentRuntimeCurrentMessage(runtimeId) {
+    await abortRuntimeCurrentMessage(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string} answer
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function answerAgentPendingQuestion(answer, runtimeId) {
+    return answerRuntimePendingQuestion(getAgentRuntimeControlsTarget(runtimeId), answer);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function clearAgentPendingQuestionShadow(runtimeId) {
+    return clearRuntimePendingQuestionShadow(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function onAgentRuntimeEvent(event, handler, runtimeId) {
+    onRuntimeEvent(getAgentRuntimeControlsTarget(runtimeId), event, handler);
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function onceAgentRuntimeEvent(event, handler, runtimeId) {
+    onceRuntimeEvent(getAgentRuntimeControlsTarget(runtimeId), event, handler);
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function offAgentRuntimeEvent(event, handler, runtimeId) {
+    offRuntimeEvent(getAgentRuntimeControlsTarget(runtimeId), event, handler);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<void>}
  */
 export async function pauseAgentDialogLoop(runtimeId) {
-    await getAgentRuntimeControlsTarget(runtimeId).pauseDialogLoop();
+    await pauseRuntimeDialogLoop(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**
@@ -71,7 +162,7 @@ export async function pauseDefaultAgentDialogLoop() {
  * @returns {Promise<void>}
  */
 export async function resumeAgentDialogLoop(runtimeId) {
-    await getAgentRuntimeControlsTarget(runtimeId).resumeDialogLoop();
+    await resumeRuntimeDialogLoop(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**

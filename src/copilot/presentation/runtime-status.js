@@ -4,15 +4,25 @@
  * @file Projeções compartilhadas de status/session/stream do runtime do agent.
  *
  *   Esta camada evita que rotas HTTP e canais SSE remontem snapshots do agent manualmente em cada arquivo.
+ *
+ *   A semântica bruta de runtime vem de `agent/facades/agent-runtime-status.js`; esta projection só adiciona envelope de
+ *   borda (`ok`, runtime metadata, campos HTTP-safe) e shapes compartilhados entre REST/SSE.
  */
 
 /**
+ * Runtime compatível com as projections de status.
+ *
  * @typedef {import('../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
 
 import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent';
 
 /**
+ * Metadata de seleção do runtime.
+ *
+ * Esses campos acompanham endpoints de status/session para que clientes consigam distinguir "runtime pedido" de
+ * "runtime usado após fallback".
+ *
  * @typedef {{
  *     runtimeId?: string | null;
  *     requestedRuntimeId?: string | null;
@@ -22,6 +32,8 @@ import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#co
  */
 
 /**
+ * Normaliza metadata antiga (`runtimeId` string) e metadata nova (`RuntimeRouteDeps`).
+ *
  * @param {string | null | undefined | RuntimeStatusMeta} meta
  * @returns {RuntimeStatusMeta}
  */

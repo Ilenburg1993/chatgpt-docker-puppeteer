@@ -8,6 +8,7 @@
  *   projete metadados diferentes.
  */
 
+import { readAgentRuntimeStatusSnapshot } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import {
     container,
@@ -153,7 +154,11 @@ export async function resolveSdkSessionRouteMeta(client) {
  */
 export async function resolveSdkRuntimeProjection(agent, client, connectionState) {
     const sharedBinding = getSdkSessionBindingProjection();
-    const runtimeSessionId = agent.sessionId ?? null;
+    const runtimeStatus =
+        typeof (/** @type {{ getStatusSnapshot?: unknown }} */ (agent).getStatusSnapshot) === 'function'
+            ? readAgentRuntimeStatusSnapshot(/** @type {import('../agent/types.js').IAlwaysAliveAgent} */ (agent))
+            : /** @type {Record<string, unknown>} */ (agent);
+    const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
     let foregroundSessionId = null;
     let lastSessionId = null;
 

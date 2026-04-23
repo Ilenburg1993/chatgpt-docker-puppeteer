@@ -209,17 +209,24 @@
  *
  * - `true` - aprovado
  * - `false` ou `'deny'` - negado (denied-by-rules)
+ * - `PermissionRequestResult` - resultado canônico do SDK, repassado sem tradução
  * - `undefined` - delega a lógica padrão do createPermissionHandler
  *
  * @callback OnPermissionRequestCallback
  * @param {PermissionRequest} request
- * @returns {Promise<boolean | 'deny' | undefined> | boolean | 'deny' | undefined}
+ * @param {{ sessionId: string }} invocation
+ * @returns {Promise<boolean | 'deny' | PermissionRequestResult | undefined>
+ *     | boolean
+ *     | 'deny'
+ *     | PermissionRequestResult
+ *     | undefined}
  */
 
 /**
  * @typedef {object} PermissionHandlerConfig
  * @property {boolean} [allowAll] - Aprovar todas as requisições
  * @property {string[]} [allowTools] - Whitelist: apenas estas tools são aprovadas
+ * @property {PermissionRequest['kind'][]} [denyKinds] - Blacklist por tipo canônico do SDK, ex.: `shell` ou `write`
  * @property {string[]} [denyTools] - Blacklist de tools negadas
  * @property {RegExp[]} [denyPatterns] - Regex: tools cujo nome corresponder são negadas
  * @property {boolean} [auditMode] - Loga cada decisão sem alterar o resultado

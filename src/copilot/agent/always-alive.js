@@ -134,14 +134,14 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {'approve_all' | 'audit_only' | 'selective'}
      */
     getPermissionMode() {
-        return this.ctx.permissions.getMode();
+        return this.ctx.getPermissionModeSnapshot();
     }
 
     /**
      * Altera o modo de aprovação de tools em runtime — sem reiniciar o agente.
      *
-     * A mudança é aplicada na PRÓXIMA reconexão/reinício real de sessão. Para sessões já ativas, apenas novos
-     * `initOrResumeSession` usarão o handler atualizado.
+     * A mudança afeta as próximas requisições de permissão da sessão viva. O agent entrega ao SDK um handler estável e
+     * troca apenas a policy delegada por ele.
      *
      * O dialog loop não é uma tool e não passa por este handler. Não é possível bloquear o encerramento do dialog loop
      * via configuração de permissão.
@@ -151,7 +151,43 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setPermissionMode(mode, opts = {}) {
-        this.ctx.permissions.setMode(mode, opts);
+        this.ctx.setPermissionMode(mode, opts);
+    }
+
+    /**
+     * Retorna readiness e metadata da capability de permissões governada pelo agent.
+     *
+     * @returns {ReturnType<AgentContext['getPermissionCapabilitySnapshot']>}
+     */
+    getPermissionCapabilitySnapshot() {
+        return this.ctx.getPermissionCapabilitySnapshot();
+    }
+
+    /**
+     * Retorna metadata do conjunto de factories que materializou managers/capabilities vivos do contexto.
+     *
+     * @returns {Record<string, Record<string, unknown>>}
+     */
+    getContextFactoryCapabilitiesSnapshot() {
+        return this.ctx.getContextFactoryCapabilitiesSnapshot();
+    }
+
+    /**
+     * Retorna o registry ativo de tools sem expor o manager como contrato preferencial.
+     *
+     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     */
+    getToolRegistrySnapshot() {
+        return this.ctx.getToolRegistrySnapshot();
+    }
+
+    /**
+     * Retorna uma projeção serializável das tools registradas no runtime.
+     *
+     * @returns {ReturnType<AgentContext['getToolRegistryEntriesSnapshot']>}
+     */
+    getToolRegistryEntriesSnapshot() {
+        return this.ctx.getToolRegistryEntriesSnapshot();
     }
 
     /**
@@ -207,7 +243,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./infra/handoff-manager.js').HandoffManager}
      */
     getHandoffManager() {
-        return this.ctx.handoff;
+        return this.ctx.getHandoffManagerSnapshot();
     }
 
     /**
@@ -353,7 +389,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     get toolsRegistry() {
-        return this.ctx.toolsRegistry;
+        return this.getToolRegistrySnapshot();
     }
 
     /**
@@ -732,7 +768,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<string>}
      */
     sendDialogTurn(message, opts) {
-        return this.ctx.dialogLoop.sendTurn(message, opts);
+        return this.ctx.sendDialogTurn(message, opts);
     }
 
     /**
@@ -755,7 +791,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<void>}
      */
     async pauseDialogLoop() {
-        await this.ctx.dialogLoop.pause(this.sessionId);
+        await this.ctx.pauseDialogLoop(this.sessionId);
     }
 
     /**

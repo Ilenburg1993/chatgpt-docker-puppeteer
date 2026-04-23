@@ -72,3 +72,14 @@ export { SessionConfigBuilder } from './session-config.js';
 export { ClientOptionsBuilder } from './client-options.js';
 
 export { PinnedFilesLoader } from './pinned-files.js';
+
+export {
+    readDeclarativeCustomToolsConfig,
+    readDeclarativeToolsConfig,
+    readSkillsConfig,
+    registerDeclarativeCustomToolConfig,
+    removeDeclarativeCustomToolConfig,
+    updateDeclarativeToolsConfig,
+    updateSkillsConfig,
+    writeSkillsConfig,
+} from './declarative-runtime-config.js';

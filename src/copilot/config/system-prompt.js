@@ -12,11 +12,27 @@
  * @see module:copilot/config/system-prompt
  */
 
-/**
- * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
- */
 import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from './sdk-config-port.js';
 import { buildHookContextMessage, buildSystemMessage } from './system-prompt/index.js';
+
+/**
+ * System message estrutural compatível com o SDK.
+ *
+ * A fachada legada fica na camada `config/`, então ela não deve importar tipos do wrapper interno do runtime.
+ *
+ * @typedef {object} SystemMessageSection
+ * @property {import('@github/copilot-sdk').SectionOverrideAction} action
+ * @property {string} content
+ *
+ * @typedef {{ mode: 'append'; content: string }} SystemMessageAppendConfig
+ *
+ * @typedef {{ mode: 'replace'; content: string }} SystemMessageReplaceConfig
+ *
+ * @typedef {{ mode: 'customize'; content?: string; sections: Record<string, SystemMessageSection> }} SystemMessageCustomizeConfig
+ *
+ *
+ * @typedef {SystemMessageAppendConfig | SystemMessageReplaceConfig | SystemMessageCustomizeConfig} SystemMessageConfig
+ */
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de identidade e instruções do LLM-B (backward compat)

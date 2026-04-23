@@ -14,12 +14,12 @@ import { container, toError } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../infra/sse/state.js';
 import { clearRateLimiters } from './realtime.js';
-import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from './runtime-overview.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
 import { readRuntimeInjectHistory } from './runtime-ui-state.js';
 
 /**
- * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
+ * @typedef {import('./types.js').HandlerResult} HandlerResult
  */
 
 /**
@@ -338,20 +338,25 @@ export async function handleGitLog({ n = 20 } = {}) {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetQuota(params = {}) {
-    const { agent, snap: snapshot, runtimeId } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
-    const prInfo = agent.lastPrInfo ?? null;
+    const {
+        snap: snapshot,
+        runtimeId,
+        dialogLoopActive,
+        sessionId,
+        lastPrInfo: prInfo,
+    } = readAgentRuntimeOverviewProjection(resolveRuntimeIdParam(params));
     return {
         status: 200,
         body: {
             ok: true,
             runtimeId,
             sendCount: Number(snapshot?.['sendCount'] ?? 0),
-            dialogLoopActive: agent.dialogLoopActive,
-            sessionId: agent.sessionId ?? null,
-            lastPrConsumedAt: prInfo?.ts ?? null,
-            lastPrModel: prInfo?.model ?? null,
-            lastPrCost: prInfo?.cost ?? null,
-            lastQuotaSnapshots: prInfo?.quotaSnapshots ?? null,
+            dialogLoopActive,
+            sessionId,
+            lastPrConsumedAt: prInfo?.['ts'] ?? null,
+            lastPrModel: prInfo?.['model'] ?? null,
+            lastPrCost: prInfo?.['cost'] ?? null,
+            lastQuotaSnapshots: prInfo?.['quotaSnapshots'] ?? null,
         },
     };
 }
@@ -363,9 +368,14 @@ export function handleGetQuota(params = {}) {
  * @returns {{ status: number; body: object }}
  */
 export function handleGetPrBudget(params = {}) {
-    const { agent, snap: snapshot, runtimeId } = readAgentRuntimeOverview(resolveRuntimeIdParam(params));
-    const prMetrics = agent.dialogPrMetrics;
-    const prInfo = agent.lastPrInfo ?? null;
+    const {
+        snap: snapshot,
+        runtimeId,
+        dialogLoopActive,
+        sessionId,
+        dialogPrMetrics: prMetrics,
+        lastPrInfo: prInfo,
+    } = readAgentRuntimeOverviewProjection(resolveRuntimeIdParam(params));
     return {
         status: 200,
         body: {
@@ -373,11 +383,11 @@ export function handleGetPrBudget(params = {}) {
             runtimeId,
             prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
             sendCount: Number(snapshot?.['sendCount'] ?? 0),
-            dialogLoopActive: agent.dialogLoopActive,
-            sessionId: agent.sessionId ?? null,
-            lastPrConsumedAt: prInfo?.ts ?? null,
-            lastPrModel: prInfo?.model ?? null,
-            lastPrCost: prInfo?.cost ?? null,
+            dialogLoopActive,
+            sessionId,
+            lastPrConsumedAt: prInfo?.['ts'] ?? null,
+            lastPrModel: prInfo?.['model'] ?? null,
+            lastPrCost: prInfo?.['cost'] ?? null,
             uptime: Math.round(process.uptime()),
         },
     };

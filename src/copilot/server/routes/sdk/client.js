@@ -23,6 +23,7 @@
 
 import { log } from '#copilot/observability';
 import { Router } from 'express';
+import { readAgentRuntimeToolsProjection } from '../../../presentation/runtime-tools.js';
 import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -214,40 +215,7 @@ export default function createClientRouter(deps) {
      */
     router.get('/tools', (_req, res) => {
         const { agent, allTools } = resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
-        const registry = /** @type {{ toolsRegistry?: { entries?: Map<string, Record<string, unknown>> } }} */ (agent)
-            .toolsRegistry;
-
-        if (registry?.entries instanceof Map && registry.entries.size > 0) {
-            // Registry rico disponível
-            const list = [];
-            for (const [name, entry] of registry.entries) {
-                const t = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (entry['tool']));
-                list.push({
-                    name,
-                    description: /** @type {string | null} */ (t['description'] ?? null),
-                    category: /** @type {string} */ (entry['category'] ?? 'uncategorized'),
-                    tags: /** @type {string[]} */ (entry['tags'] ?? []),
-                    readOnly: /** @type {boolean} */ (entry['readOnly'] ?? false),
-                    skipPermission: /** @type {boolean} */ (t['skipPermission'] ?? false),
-                });
-            }
-            res.json({ ok: true, source: 'registry', count: list.length, tools: list });
-            return;
-        }
-
-        // Fallback: allTools estático (agente não iniciado)
-        const list = allTools.map((tool) => {
-            const t = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (tool));
-            return {
-                name: /** @type {string} */ (t['name'] ?? '(unknown)'),
-                description: /** @type {string | null} */ (t['description'] ?? null),
-                category: 'uncategorized',
-                tags: /** @type {string[]} */ ([]),
-                readOnly: false,
-                skipPermission: /** @type {boolean} */ (t['skipPermission'] ?? false),
-            };
-        });
-        res.json({ ok: true, source: 'static', count: list.length, tools: list });
+        res.json(readAgentRuntimeToolsProjection(agent, { allTools }));
     });
 
     return router;

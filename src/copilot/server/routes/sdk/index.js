@@ -18,9 +18,9 @@
  */
 
 import { Router } from 'express';
-import { resolveSdkRouteSharedDeps } from '../../../presentation/runtime-request.js';
 import createAgentRouter from './agent.js';
 import createClientRouter from './client.js';
+import { resolveSdkRouteSharedDeps } from './deps.js';
 import hooksRouter from './hooks.js';
 import createObservabilityRouter from './observability.js';
 import sessionsRouter from './sessions.js';

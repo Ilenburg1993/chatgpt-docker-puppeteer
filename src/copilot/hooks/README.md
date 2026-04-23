@@ -96,10 +96,12 @@ const session = await client.createSession({
 {
     allowAll?: boolean;                                            // permite tudo
     allowTools?: string[];                                         // whitelist
+    denyKinds?: PermissionRequest['kind'][];                       // SDK-first: shell/write/mcp/etc.
     denyTools?: string[];                                          // blacklist
     denyPatterns?: RegExp[];                                       // regex
     auditMode?: boolean;                                           // loga sem alterar
-    onRequest?: (request) => Promise<boolean | 'deny' | undefined>;
+    onRequest?: (request, invocation) =>
+        Promise<boolean | 'deny' | PermissionRequestResult | undefined>;
 }
 ```
 

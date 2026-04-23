@@ -52,12 +52,15 @@ import { PERMISSION_MODE } from '../config/agent.js';
  * - Expor `getMode()` e `setMode()` como interface de controle
  * - Emitir callback `onModeChanged` quando o modo é alterado
  *
- * O `PermissionHandler` é aplicado na **próxima** reconexão/criação de sessão SDK. Sessões já ativas não percebem a
- * mudança até o próximo `initOrResumeSession`.
+ * O `PermissionHandler` entregue ao SDK é uma função estável que delega para a policy atual. Sessões já ativas passam a
+ * usar a nova policy nas próximas requisições de permissão, sem recriar a sessão.
  */
 export class PermissionController {
     /** @type {import('#copilot/sdk/types').PermissionHandler} */
-    #handler = approveAll;
+    #policyHandler = approveAll;
+
+    /** @type {import('#copilot/sdk/types').PermissionHandler} */
+    #handler = (request, invocation) => this.#policyHandler(request, invocation);
 
     /** @type {PermissionMode} */
     // G2-DX-12: modo padrão configurável via AGENT_PERMISSION_MODE env var.
@@ -76,6 +79,9 @@ export class PermissionController {
      */
     constructor(opts = {}) {
         this.#onModeChanged = opts.onModeChanged;
+        if (!this.#applyMode(this.#mode, {}, false)) {
+            this.#applyMode('approve_all', {}, false);
+        }
     }
 
     // ─── Getters ─────────────────────────────────────────────────────────────
@@ -103,8 +109,8 @@ export class PermissionController {
     /**
      * Altera o modo de aprovação de tools em runtime — sem reiniciar o agente.
      *
-     * A mudança é aplicada na próxima reconexão/reinício real de sessão. Para sessões já ativas, apenas novos
-     * `initOrResumeSession` usarão o handler atualizado.
+     * A mudança afeta as próximas requisições de permissão porque o SDK mantém a função `handler` estável, e o
+     * controller troca a policy delegada por essa função.
      *
      * O dialog loop não é uma tool e não passa por este handler.
      *
@@ -113,14 +119,28 @@ export class PermissionController {
      * @returns {void}
      */
     setMode(mode, opts = {}) {
+        this.#applyMode(mode, opts, true);
+    }
+
+    /**
+     * Aplica a policy mantendo `handler` como função estável, porque o SDK registra o handler na criação/resume da
+     * sessão. A troca de modo altera a policy delegada e, assim, afeta próximas requisições de permissão da sessão
+     * viva.
+     *
+     * @param {PermissionMode} mode
+     * @param {SelectiveModeOpts} opts
+     * @param {boolean} notify
+     * @returns {boolean}
+     */
+    #applyMode(mode, opts, notify) {
         const { allowTools, denyTools, denyShell } = opts;
         switch (mode) {
             case 'approve_all':
-                this.#handler = approveAll;
+                this.#policyHandler = approveAll;
                 this.#mode = 'approve_all';
                 break;
             case 'audit_only':
-                this.#handler = createAuditOnlyPermission();
+                this.#policyHandler = createAuditOnlyPermission();
                 this.#mode = 'audit_only';
                 break;
             case 'selective': {
@@ -135,22 +155,26 @@ export class PermissionController {
                     : defaultShellTools;
                 /** @type {import('#copilot/hooks/permission').PermissionHandlerConfig} */
                 const cfg = {
+                    denyKinds: denyShell ? ['shell'] : [],
                     denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],
                     auditMode: true,
                 };
                 if (allowTools?.length) cfg.allowTools = allowTools;
-                this.#handler = createPermissionHandler(cfg);
+                this.#policyHandler = createPermissionHandler(cfg);
                 this.#mode = 'selective';
                 break;
             }
             default:
                 log('WARN', `[PermissionController] setMode: modo inv\u00e1lido '${/** @type {string} */ (mode)}'`);
-                return;
+                return false;
         }
-        log(
-            'INFO',
-            `[PermissionController] Modo de permissão alterado para '${mode}'. Nota: a mudança é aplicada imediatamente e afeta apenas requisições futuras nesta sessão.`,
-        );
-        this.#onModeChanged?.(mode);
+        if (notify) {
+            log(
+                'INFO',
+                `[PermissionController] Modo de permissão alterado para '${mode}'. Nota: a mudança é aplicada imediatamente e afeta apenas requisições futuras nesta sessão.`,
+            );
+            this.#onModeChanged?.(mode);
+        }
+        return true;
     }
 }

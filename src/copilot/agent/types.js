@@ -466,6 +466,17 @@
  * @property {(() => AgentSdkHandles) | undefined} getSdkHandles - Retorna os handles crus do SDK atualmente acoplados
  * @property {(() => AgentSdkAccessSnapshot) | undefined} getSdkResourceSnapshot - Retorna um snapshot verificável da
  *   cobertura de recursos SDK
+ * @property {(() => {
+ *           name: string;
+ *           description: string | null;
+ *           category: string;
+ *           tags: string[];
+ *           readOnly: boolean;
+ *           skipPermission: boolean;
+ *       }[])
+ *     | undefined} getToolRegistryEntriesSnapshot
+ *   - Retorna uma projeção serializável das tools registradas no runtime
+ *
  * @property {boolean | undefined} [dialogPaused] - Indica se o dialog loop está pausado
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente

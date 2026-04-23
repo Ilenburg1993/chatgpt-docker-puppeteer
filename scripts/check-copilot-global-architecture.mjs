@@ -69,6 +69,63 @@ const exportFromRegex = /^\s*export\s+(?:\{[^}]*\}|\*)\s+from\s+['"]([^'"]+)['"]
 const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
 /**
+ * @typedef {{
+ *     pattern: RegExp;
+ *     fromModule?: string;
+ *     filePrefix?: string;
+ *     filePrefixNot?: string;
+ *     severity: 'hard' | 'soft' | 'info';
+ *     rule: string;
+ *     message: string;
+ * }} ContentRule
+ */
+
+/** @type {ContentRule[]} */
+const CONTENT_RULES = [
+    {
+        fromModule: 'terminal',
+        pattern: /import\(['"]#copilot\/(?:agent|sdk|tools)(?:\/[^'"]*)?['"]\)/g,
+        severity: 'hard',
+        rule: 'terminal-jsdoc-must-use-presentation-types',
+        message:
+            '`terminal/` não deve referenciar tipos internos de agent/sdk/tools; use contratos de `presentation/`.',
+    },
+    {
+        fromModule: 'presentation',
+        pattern: /import\(['"]#copilot\/sdk(?:\/[^'"]*)?['"]\)/g,
+        severity: 'hard',
+        rule: 'presentation-jsdoc-must-use-presentation-types',
+        message: '`presentation/` deve expor contratos próprios de borda, sem typedefs do SDK wrapper.',
+    },
+    {
+        fromModule: 'presentation',
+        pattern:
+            /\b(?:agent|runtime|selection\.runtime)\.(?:status|model|sessionId|dialogLoopActive|dialogPaused|queueSize|reasoningEffort|lastPrInfo|dialogPrMetrics|pendingQuestion(?:Kind|Shadow|ShadowKind|ShadowState|ShadowExpired|ShadowAgeMs|ShadowExpiresAt|ShadowRemainingMs)?)(?![A-Za-z0-9_$])/g,
+        severity: 'hard',
+        rule: 'presentation-must-use-agent-facade-state',
+        message:
+            '`presentation/` deve ler estado vivo do agent por façades semânticas, não por propriedades cruas da instância.',
+    },
+    {
+        filePrefix: 'server/routes/copilot-api/',
+        pattern:
+            /import\(['"][^'"]*(?:#copilot\/agent|agent\/types|#copilot\/sdk\/types)[^'"]*['"]\)|\b(?:AlwaysAliveAgentLike|IAlwaysAliveAgent)\b/g,
+        severity: 'hard',
+        rule: 'copilot-api-routes-must-use-route-deps-contract',
+        message:
+            '`server/routes/copilot-api/*` deve usar o contrato de route deps de `presentation/`, sem agent/sdk types locais.',
+    },
+    {
+        fromModule: 'config',
+        filePrefixNot: 'config/sdk-config-port.js',
+        pattern: /import\(['"]#copilot\/sdk(?:\/[^'"]*)?['"]\)/g,
+        severity: 'hard',
+        rule: 'config-jsdoc-sdk-access-must-use-port',
+        message: '`config/` só pode referenciar SDK pelo port `config/sdk-config-port.js`.',
+    },
+];
+
+/**
  * @param {string} dir
  * @returns {string[]}
  */
@@ -141,6 +198,16 @@ function resolveTargetModule(spec, relFile, fileModule) {
 }
 
 /**
+ * @param {string} src
+ * @param {number} matchIndex
+ * @returns {number}
+ */
+function lineForIndex(src, matchIndex) {
+    const beforeMatch = src.substring(0, matchIndex);
+    return (beforeMatch.match(/\n/g) || []).length + 1;
+}
+
+/**
  * @param {string} relFile
  * @param {string} to
  * @param {string} spec
@@ -161,10 +228,6 @@ function isDocumentedCompositionImport(relFile, to, spec) {
 
     if (relFile === 'config/sdk-config-port.js') {
         return to === 'sdk';
-    }
-
-    if (relFile === 'terminal/di-wiring.js') {
-        return to === 'agent' || to === 'conversation-hub' || to === 'channel';
     }
 
     return spec.startsWith('#copilot/types') && to === 'types';
@@ -213,6 +276,22 @@ function classifyImport(from, to, relFile, spec) {
         };
     }
 
+    if (from === 'config' && to === 'sdk' && relFile !== 'config/sdk-config-port.js') {
+        return {
+            severity: 'hard',
+            rule: 'config-sdk-access-must-use-port',
+            message: '`config/` só pode acessar SDK por `config/sdk-config-port.js`.',
+        };
+    }
+
+    if (from === 'presentation' && to === 'sdk') {
+        return {
+            severity: 'hard',
+            rule: 'presentation-must-not-import-sdk',
+            message: '`presentation/` deve falar com SDK vivo por façades do `agent/` ou ports de `config/`.',
+        };
+    }
+
     if (from === 'server' && to === 'terminal') {
         return {
             severity: 'hard',
@@ -226,6 +305,30 @@ function classifyImport(from, to, relFile, spec) {
             severity: 'hard',
             rule: 'terminal-must-not-import-server',
             message: '`terminal/` não deve depender de server routes/middleware.',
+        };
+    }
+
+    if (from === 'terminal' && ['agent', 'sdk', 'tools'].includes(to)) {
+        return {
+            severity: 'hard',
+            rule: 'terminal-must-use-presentation-contracts',
+            message: '`terminal/` é borda local e deve consumir projections/comandos, não runtime SDK/agent/tools.',
+        };
+    }
+
+    if (from === 'server' && to === 'agent') {
+        return {
+            severity: 'hard',
+            rule: 'server-must-use-presentation-contracts',
+            message: '`server/` deve acessar runtime do agent por projections/route deps, não por import direto.',
+        };
+    }
+
+    if (from === 'server' && ['sdk', 'tools'].includes(to) && !relFile.startsWith('server/routes/sdk/')) {
+        return {
+            severity: 'hard',
+            rule: 'server-sdk-access-must-stay-in-sdk-routes',
+            message: '`server/` só pode acessar SDK/tools crus dentro do adapter `server/routes/sdk/*`.',
         };
     }
 
@@ -250,14 +353,6 @@ function classifyImport(from, to, relFile, spec) {
             severity: 'soft',
             rule: 'agent-observability-boundary-import',
             message: '`agent/` deve preferir port/projection para snapshots e sinais de observabilidade.',
-        };
-    }
-
-    if ((from === 'server' || from === 'terminal') && to === 'agent') {
-        return {
-            severity: 'soft',
-            rule: 'edge-should-use-presentation',
-            message: 'Bordas devem preferir `presentation/` ao acessar runtime do agent.',
         };
     }
 
@@ -304,6 +399,27 @@ export function checkGlobalArchitecture() {
         if (!from) continue;
 
         const content = readFileSync(file, 'utf8');
+        for (const rule of CONTENT_RULES) {
+            if (rule.fromModule && rule.fromModule !== from) continue;
+            if (rule.filePrefix && !relFile.startsWith(rule.filePrefix)) continue;
+            if (rule.filePrefixNot && relFile.startsWith(rule.filePrefixNot)) continue;
+
+            rule.pattern.lastIndex = 0;
+            let match;
+            while ((match = rule.pattern.exec(content)) !== null) {
+                findings.push({
+                    file: relFile,
+                    line: lineForIndex(content, match.index),
+                    from,
+                    to: 'content',
+                    spec: match[0],
+                    severity: rule.severity,
+                    rule: rule.rule,
+                    message: rule.message,
+                });
+            }
+        }
+
         /** @type {RegExp[]} */
         const regexes = [importRegex, exportFromRegex, dynamicImportRegex];
 
@@ -322,11 +438,9 @@ export function checkGlobalArchitecture() {
                 const classification = classifyImport(from, to, relFile, spec);
                 if (!classification) continue;
 
-                const beforeMatch = content.substring(0, match.index);
-                const line = (beforeMatch.match(/\n/g) || []).length + 1;
                 findings.push({
                     file: relFile,
-                    line,
+                    line: lineForIndex(content, match.index),
                     from,
                     to,
                     spec,

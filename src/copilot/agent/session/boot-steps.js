@@ -43,8 +43,6 @@ import { wireSessionEvents } from './event-wirer.js';
  *
  * @typedef {import('../dialog/loop-manager.js').DialogLoopManager} DialogLoopManager
  *
- * @typedef {import('../infra/handoff-manager.js').HandoffManager} HandoffManager
- *
  * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
  */
 
@@ -67,7 +65,12 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => void} clearPendingQuestionShadow
  * @property {DialogLoopManager} dialogLoop
  * @property {SessionKeepalive} keepalive
- * @property {HandoffManager} handoff
+ * @property {(event: {
+ *     fromAgent: string;
+ *     toAgent: string;
+ *     reason?: string;
+ *     context?: Record<string, unknown>;
+ * }) => void} receiveHandoff
  * @property {() => void} ensureDialogLoopAttached
  * @property {() => Promise<void>} resumeDialogLoop
  * @property {() => Promise<void>} startDialogLoop
@@ -388,7 +391,7 @@ export function stepWireHandoff(agentEmitter, ctx) {
                  * }}
                  */ data,
             ) => {
-                ctx.handoff.receive(data);
+                ctx.receiveHandoff(data);
                 defaultMetrics.recordHandoff();
             },
         );

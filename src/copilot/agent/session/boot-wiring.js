@@ -48,8 +48,6 @@ import {
  *
  * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
  *
- * @typedef {import('../infra/handoff-manager.js').HandoffManager} HandoffManager
- *
  * @typedef {import('../dialog/loop-manager.js').DialogLoopManager} DialogLoopManager
  */
 
@@ -72,7 +70,12 @@ import {
  * @property {() => void} clearPendingQuestionShadow — Limpa a shadow persistida restaurada do disco
  * @property {DialogLoopManager} dialogLoop — Referência ao DialogLoopManager
  * @property {SessionKeepalive} keepalive — Referência ao SessionKeepalive
- * @property {HandoffManager} handoff — Referência ao HandoffManager
+ * @property {(event: {
+ *     fromAgent: string;
+ *     toAgent: string;
+ *     reason?: string;
+ *     context?: Record<string, unknown>;
+ * }) => void} receiveHandoff
  * @property {() => void} ensureDialogLoopAttached — Garante DLM attached
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop

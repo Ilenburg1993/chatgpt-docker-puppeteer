@@ -19,8 +19,8 @@ import {
 /**
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
- *     currentMode: 'interactive' | 'plan' | 'autopilot';
- *     plan: import('#copilot/sdk/types').PlanReadResult;
+ *     currentMode: import('../../presentation/types.js').RuntimeSdkMode | string;
+ *     plan: import('../../presentation/types.js').RuntimeSdkPlanReadResult;
  *     lastObservedPlanOperation: 'create' | 'update' | 'delete' | null;
  *     lastObservedPlanChangedAt: number | null;
  * }>}
@@ -41,8 +41,8 @@ export async function readTerminalSdkSessionProjection(runtimeId) {
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
- *     previousMode: 'interactive' | 'plan' | 'autopilot';
- *     currentMode: 'interactive' | 'plan' | 'autopilot';
+ *     previousMode: import('../../presentation/types.js').RuntimeSdkMode | string;
+ *     currentMode: import('../../presentation/types.js').RuntimeSdkMode | string;
  * }>}
  */
 export async function setTerminalSdkModeProjection(mode, runtimeId) {
@@ -61,7 +61,7 @@ export async function setTerminalSdkModeProjection(mode, runtimeId) {
 /**
  * @param {string} content
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ * @returns {Promise<import('../../presentation/types.js').RuntimeSdkPlanReadResult>}
  */
 export async function updateTerminalSdkPlanProjection(content, runtimeId) {
     if (runtimeId !== undefined) {
@@ -74,7 +74,7 @@ export async function updateTerminalSdkPlanProjection(content, runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ * @returns {Promise<import('../../presentation/types.js').RuntimeSdkPlanReadResult>}
  */
 export async function deleteTerminalSdkPlanProjection(runtimeId) {
     if (runtimeId !== undefined) {

@@ -190,9 +190,9 @@ export async function agentStart(ctx, host) {
                 hasPendingQuestionShadow: () => ctx.hasPendingQuestionShadow(),
                 isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
                 clearPendingQuestionShadow: () => ctx.clearPendingQuestionShadow(),
-                dialogLoop: ctx.dialogLoop,
-                keepalive: ctx.keepalive,
-                handoff: ctx.handoff,
+                dialogLoop: ctx.getDialogLoopManagerSnapshot(),
+                keepalive: ctx.getKeepaliveManagerSnapshot(),
+                receiveHandoff: (event) => ctx.receiveHandoff(event),
                 ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
                 resumeDialogLoop: () => host.resumeDialogLoop(),
                 startDialogLoop: () => host.startDialogLoop(),
@@ -326,11 +326,10 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         if (ctx.getDialogLoopAttachedSnapshot()) {
-            ctx.dialogLoop.removeAllListeners();
-            ctx.setDialogLoopAttached(false);
+            ctx.detachDialogLoopListeners();
         }
         if (ctx.isDialogLoopActive()) {
-            ctx.dialogLoop.forceDeactivate();
+            ctx.forceDeactivateDialogLoop();
             host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: false, ts: Date.now() });
         }
 
@@ -417,7 +416,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
             ctx.clearSession();
-            ctx.messagesCache.invalidate();
+            ctx.invalidateMessagesCache();
             unbindAgentSessionTools();
         }
 
@@ -471,7 +470,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
             {
                 emit: (event, payload) => host.emit(event, payload),
                 initSession: (client) => initSession(ctx, client, host),
-                dialogLoop: ctx.dialogLoop,
+                dialogLoop: ctx.getDialogLoopManagerSnapshot(),
                 clearSessionEventUnsubs: () => {
                     const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
                     for (const unsub of sessionEventUnsubscribers) unsub();

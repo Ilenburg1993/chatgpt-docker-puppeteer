@@ -22,6 +22,7 @@ export {
     getAgentHealthHttpStatus,
     getAgentHealthSnapshotCompat,
 } from './runtime-health.js';
+export * from './runtime-models.js';
 export * from './runtime-overview.js';
 export * from './runtime-ownership.js';
 export * from './runtime-route-deps.js';
@@ -34,6 +35,8 @@ export {
     readAgentStatusValue,
 } from './runtime-status.js';
 export * from './runtime-targeting.js';
+export * from './runtime-todos.js';
+export * from './runtime-tools.js';
 export * from './runtime-ui-state.js';
 export * from './runtime-webhooks.js';
 export * as sdkSessionsPresentation from './sdk-sessions.js';

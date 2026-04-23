@@ -30,7 +30,6 @@ import {
     BOOT_TIMEOUT_MS,
     DIALOG_QUEUE_MAX,
     LONG_TASK_TIMEOUT_MS,
-    RESUME_QUESTION_WAIT_MS,
     WATCHDOG_INTERVAL_MS,
     WATCHDOG_STALL_MS,
 } from '../../config/agent.js';
@@ -38,10 +37,14 @@ import { logSwallowed } from '../../core/error-handlers.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 import { log, startSpanImmediate } from '../ports/observability-port.js';
 import { TurnQueue } from './backpressure.js';
+import { DialogCompactionPolicy } from './compaction-policy.js';
+import { DialogCostLedger } from './cost-ledger.js';
 import { ModelFallbackState } from './model-fallback.js';
 import { DialogProtocol } from './protocol.js';
+import { selectDialogResumeStrategy } from './resume-policy.js';
+import { DialogLoopStateMachine } from './state-machine.js';
 import { executeTurnImpl } from './turn-executor.js';
-import { DialogWatchdog } from './watchdog.js';
+import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
 
 /**
  * @typedef {Object} DialogLoopManagerOptions
@@ -75,23 +78,14 @@ import { DialogWatchdog } from './watchdog.js';
  * @extends EventEmitter
  */
 export class DialogLoopManager extends EventEmitter {
-    /** @type {boolean} */
-    #active = false;
+    /** @type {DialogLoopStateMachine} */
+    #state;
 
     /** @type {TurnQueue} F59: serialização e backpressure delegadas */
     #turnQueue;
 
-    /** @type {boolean} */
-    #stopping = false;
-
-    /** @type {boolean} Estado canônico de pause em memória; bootstrap inicial vem do estado persistido. */
-    #paused = false;
-
-    /** @type {boolean} F42.6 (BUG-SD-007 fix): guard atômico para prevenir interleaving entre resume/start */
-    #resuming = false;
-
-    /** @type {DialogWatchdog | null} */
-    #watchdog = null;
+    /** @type {DialogWatchdogSupervisor} */
+    #watchdogSupervisor;
 
     /** @type {import('#copilot/observability/otel').OtelSpan | null} F68: span do ciclo de vida do dialog loop */
     #loopSpan = null;
@@ -99,17 +93,11 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {ModelFallbackState} F60: estado de fallback de modelo delegado */
     #modelFallback;
 
-    /** @type {boolean} F31.3: flag para evitar compaction duplicada */
-    #compactionRequested = false;
+    /** @type {DialogCompactionPolicy} F5: policy de compaction extraída do orquestrador */
+    #compactionPolicy;
 
     /** @type {number} */
     #bootTimeoutMs;
-
-    /** @type {number} */
-    #watchdogIntervalMs;
-
-    /** @type {number} */
-    #watchdogStallMs;
 
     /** @type {AgentHost | null} */
     #host = null;
@@ -117,8 +105,8 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {{ sendCount: number }} Ref mutável para o contador de sends — usado pelo dialog-turn-executor. */
     #sendCountRef = { sendCount: 0 };
 
-    /** @type {{ boots: number; resumesWithPR: number; resumesZeroPR: number }} F41B.8: contadores de PR */
-    #prMetrics = { boots: 0, resumesWithPR: 0, resumesZeroPR: 0 };
+    /** @type {DialogCostLedger} F5: ledger de PR consumido por boot/resume */
+    #costLedger;
 
     /**
      * @param {DialogLoopManagerOptions} [options]
@@ -127,23 +115,22 @@ export class DialogLoopManager extends EventEmitter {
         super();
         this.#turnQueue = new TurnQueue({ maxSize: options.maxQueueSize ?? DIALOG_QUEUE_MAX });
         this.#bootTimeoutMs = options.bootTimeoutMs ?? BOOT_TIMEOUT_MS;
-        this.#watchdogIntervalMs = options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS;
-        this.#watchdogStallMs = options.watchdogStallMs ?? WATCHDOG_STALL_MS;
+        this.#watchdogSupervisor = new DialogWatchdogSupervisor({
+            intervalMs: options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS,
+            stallThresholdMs: options.watchdogStallMs ?? WATCHDOG_STALL_MS,
+            onStall: (stalledMs) => this.emit(EMITTER_LOOP_STALLED, { stalledMs }),
+            onPreStallWarning: (stalledMs) => this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs }),
+        });
         this.#modelFallback = new ModelFallbackState({
             defaultModel: options.fallbackModel ?? getCopilotFallbackModel(),
         });
+        this.#compactionPolicy = new DialogCompactionPolicy();
 
         // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
         const persistedState = readState();
-        this.#paused = Boolean(persistedState?.dialogPaused);
+        this.#state = new DialogLoopStateMachine({ paused: Boolean(persistedState?.dialogPaused) });
         const saved = persistedState?.prMetrics;
-        if (saved && typeof saved === 'object') {
-            this.#prMetrics = {
-                boots: Number(saved.boots) || 0,
-                resumesWithPR: Number(saved.resumesWithPR) || 0,
-                resumesZeroPR: Number(saved.resumesZeroPR) || 0,
-            };
-        }
+        this.#costLedger = new DialogCostLedger(saved && typeof saved === 'object' ? saved : null);
     }
 
     /**
@@ -157,12 +144,12 @@ export class DialogLoopManager extends EventEmitter {
 
     /** @returns {boolean} */
     get active() {
-        return this.#active;
+        return this.#state.active;
     }
 
     /** @returns {boolean} */
     get stopping() {
-        return this.#stopping;
+        return this.#state.stopping;
     }
 
     /** @returns {number} */
@@ -190,7 +177,7 @@ export class DialogLoopManager extends EventEmitter {
      * Pinga o watchdog — sinaliza atividade para evitar disparo de stall.
      */
     pingWatchdog() {
-        this.#watchdog?.ping();
+        this.#watchdogSupervisor.ping();
     }
 
     /**
@@ -199,8 +186,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }}
      */
     get prMetrics() {
-        const { boots, resumesWithPR, resumesZeroPR } = this.#prMetrics;
-        return { boots, resumesWithPR, resumesZeroPR, totalPR: boots + resumesWithPR };
+        return this.#costLedger.snapshot();
     }
 
     /**
@@ -210,10 +196,10 @@ export class DialogLoopManager extends EventEmitter {
      * pendente após a nova sessão ser estabelecida.
      */
     notifyReconnect() {
-        if (this.#active) {
-            this.#active = false;
+        if (this.#state.active) {
+            this.#state.deactivate();
             // F41B.4: parar watchdog ao reconectar — sem loop ativo, watchdog não deve rodar
-            this.#watchdog?.stop();
+            this.#watchdogSupervisor.stop();
             this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'reconnect' });
         }
     }
@@ -224,7 +210,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {boolean}
      */
     get paused() {
-        return this.#paused;
+        return this.#state.paused;
     }
 
     /**
@@ -243,15 +229,14 @@ export class DialogLoopManager extends EventEmitter {
         }
 
         // F42.6: permitir start() durante resume (Estratégia B) mas bloquear duplicatas externas
-        if (this.#active) {
+        if (this.#state.active) {
             throw new SessionError(
                 '[DialogLoopManager] Dialog loop já está ativo. Chame stop() primeiro.',
                 'DIALOG_ALREADY_ACTIVE',
             );
         }
 
-        this.#active = true;
-        this.#paused = false;
+        this.#state.activate();
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
         void this.#trackPersistedState(
             { dialogLoopActive: true, dialogPaused: false },
@@ -277,14 +262,7 @@ export class DialogLoopManager extends EventEmitter {
             timeoutError: `[DialogLoopManager] Boot timeout após ${this.#bootTimeoutMs}ms`,
         });
 
-        this.#watchdog = new DialogWatchdog({
-            intervalMs: this.#watchdogIntervalMs,
-            stallThresholdMs: this.#watchdogStallMs,
-            onStall: (stalledMs) => this.emit(EMITTER_LOOP_STALLED, { stalledMs }),
-            // F41B.7: aviso pré-stall a 80% do threshold
-            onPreStallWarning: (stalledMs) => this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs }),
-        });
-        this.#watchdog.start();
+        this.#watchdogSupervisor.start();
 
         // G2-ARCH-02: usar sendMessageDialogBoot() para evitar a heurística frágil timeoutMs===24h.
         // O boot prompt tem timeout muito longo pois o dialog loop não emite session.idle organicamente.
@@ -296,9 +274,9 @@ export class DialogLoopManager extends EventEmitter {
                       host.sendMessage(msg, { ...opts, timeoutMs: LONG_TASK_TIMEOUT_MS });
 
         Promise.resolve(bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS })).catch((/** @type {Error} */ e) => {
-            if (this.#active) {
+            if (this.#state.active) {
                 log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
-                this.#active = false;
+                this.#state.deactivate();
                 this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
                 this.emit('stopped', { reason: e.message });
             }
@@ -319,10 +297,8 @@ export class DialogLoopManager extends EventEmitter {
             await bootPromise;
         } catch (bootErr) {
             const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
-            this.#active = false;
-            this.#stopping = false;
-            this.#watchdog?.stop();
-            this.#watchdog = null;
+            this.#state.deactivate();
+            this.#watchdogSupervisor.clear();
             this.#endLoopSpan(false);
             this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
             this.emit('stopped', { reason });
@@ -336,15 +312,9 @@ export class DialogLoopManager extends EventEmitter {
             throw bootErr;
         }
         // F41B.8: contabilizar boot como 1 PR consumido
-        this.#prMetrics.boots++;
+        this.#costLedger.recordBoot();
         // F42.4: persistir prMetrics após boot bem-sucedido
-        void this.#trackPersistedState(
-            { prMetrics: { ...this.#prMetrics } },
-            {
-                label: 'dialog.prMetrics.boot',
-                description: 'Persist dialog loop PR metrics after boot',
-            },
-        );
+        void this.#persistPrMetrics('dialog.prMetrics.boot', 'Persist dialog loop PR metrics after boot');
         log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
@@ -356,7 +326,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<string>}
      */
     sendTurn(message, { timeout = 60_000, signal } = {}) {
-        if (!this.#active || this.#stopping) {
+        if (!this.#state.canSendTurn) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
             );
@@ -366,7 +336,7 @@ export class DialogLoopManager extends EventEmitter {
             return Promise.reject(new DOMException('[DialogLoopManager] sendTurn abortado.', 'AbortError'));
         }
 
-        this.#watchdog?.ping();
+        this.#watchdogSupervisor.ping();
 
         return this.#turnQueue.enqueue(() =>
             this.#executeTurn(message, { timeout, ...(signal !== undefined && { signal }) }),
@@ -387,7 +357,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<void>}
      */
     async stop({ authorized = false, reason = 'authorized_stop', shutdownTimeoutMs = 30_000 } = {}) {
-        if (!this.#active) return;
+        if (!this.#state.active) return;
         if (!authorized) {
             log(
                 'WARN',
@@ -395,8 +365,8 @@ export class DialogLoopManager extends EventEmitter {
             );
             return;
         }
-        if (this.#stopping) return;
-        this.#stopping = true;
+        const transition = this.#state.beginStop();
+        if (transition === 'already-stopping') return;
 
         if (this.#host?.hasPendingQuestion()) {
             this.#host.answerPendingQuestion('STOP_DIALOG');
@@ -423,8 +393,7 @@ export class DialogLoopManager extends EventEmitter {
             }),
         ]);
 
-        this.#active = false;
-        this.#stopping = false;
+        this.#state.finishStop();
         this.#endLoopSpan(true);
         void this.#trackPersistedState(
             { dialogLoopActive: false },
@@ -433,7 +402,7 @@ export class DialogLoopManager extends EventEmitter {
                 description: 'Persist dialogLoopActive=false',
             },
         );
-        this.#watchdog?.stop();
+        this.#watchdogSupervisor.stop();
         this.emit('stopped', { reason, authorized: true });
     }
 
@@ -444,7 +413,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<void>}
      */
     async pause(sessionId) {
-        if (!this.#active) {
+        if (!this.#state.active) {
             log('WARN', '[DialogLoopManager] pause() com loop inativo — ignorado.');
             return;
         }
@@ -452,9 +421,9 @@ export class DialogLoopManager extends EventEmitter {
             { dialogPaused: true, pausedAt: Date.now(), dialogLoopActive: true },
             'dialog.state.pause',
         );
-        this.#paused = true;
+        this.#state.pause();
         // F31: pausar watchdog durante pause para evitar falsos-positivos de stall
-        this.#watchdog?.stop();
+        this.#watchdogSupervisor.stop();
         log('INFO', `[DialogLoopManager] Dialog loop pausado. SessionId: ${sessionId}.`);
         this.emit(EMITTER_LOOP_PAUSED, { sessionId, pausedAt: Date.now() });
     }
@@ -466,75 +435,38 @@ export class DialogLoopManager extends EventEmitter {
      */
     async resume() {
         // F42.6 (BUG-SD-007 fix): previne interleaving entre resume() e start() concorrentes
-        if (this.#resuming) {
+        if (!this.#state.beginResume()) {
             log('WARN', '[DialogLoopManager] resume() já em andamento — ignorado.');
             return;
         }
         const state = await readStateAsync();
-        if (!this.#paused && !state?.dialogPaused) {
+        if (!this.#state.paused && !state?.dialogPaused) {
             log('WARN', '[DialogLoopManager] resume() sem dialogPaused=true — ignorado.');
+            this.#state.finishResume();
             return;
         }
 
-        this.#resuming = true;
         try {
             await this.#persistStateNow({ dialogPaused: false }, 'dialog.state.resume');
-            this.#paused = false;
+            this.#state.resume();
 
-            // Estratégia A: ask_user já disponível sincronicamente (0 PR, 0 espera)
-            if (this.#host?.hasPendingQuestion()) {
-                log('INFO', '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.');
-                // F31: reiniciar watchdog após resume
-                this.#watchdog?.start();
-                // F41B.8: contabilizar resume zero-PR
-                this.#prMetrics.resumesZeroPR++;
-                // F42.4: persistir prMetrics após resume
-                void this.#trackPersistedState(
-                    { prMetrics: { ...this.#prMetrics } },
-                    {
-                        label: 'dialog.prMetrics.resume_zero_pr',
-                        description: 'Persist dialog loop PR metrics after zero-PR resume',
-                    },
-                );
-                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
-                return;
-            }
+            const strategy = await selectDialogResumeStrategy({ host: this.#host, fallbackTarget: this });
+            log('INFO', strategy.logMessage);
 
-            // Estratégia A (async): aguardar ask_user preservado (0 PR)
-            // G2-BUG-03: 'question.pending' é emitido pelo agente host (AlwaysAliveAgent),
-            // não pelo DialogLoopManager — ouvir no host se ele for EventEmitter.
-            const pendingTarget = isEventEmitterTarget(this.#host) ? this.#host : this;
-            const preserved = await waitForEvent(pendingTarget, 'question.pending', {
-                timeoutMs: RESUME_QUESTION_WAIT_MS,
-            })
-                .then(() => true)
-                .catch(() => false);
-
-            if (preserved) {
-                log('INFO', '[DialogLoopManager] ask_user preservado — retomada zero-PR.');
-                // F31: reiniciar watchdog após resume
-                this.#watchdog?.start();
-                // F41B.8: contabilizar resume zero-PR
-                this.#prMetrics.resumesZeroPR++;
-                // F42.4: persistir prMetrics após resume zero-PR
-                void this.#trackPersistedState(
-                    { prMetrics: { ...this.#prMetrics } },
-                    {
-                        label: 'dialog.prMetrics.resume_preserved',
-                        description: 'Persist dialog loop PR metrics after preserved resume',
-                    },
-                );
-                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: false });
+            if (strategy.kind !== 'restart-with-pr') {
+                this.#watchdogSupervisor.start();
+                this.#costLedger.recordZeroPrResume();
+                if (strategy.persistenceLabel && strategy.persistenceDescription) {
+                    void this.#persistPrMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
+                }
+                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: strategy.prConsumed });
                 return;
             }
 
             // Estratégia B: reenviar boot prompt (1 PR)
-            log('INFO', '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt (1 PR).');
             // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
-            this.#watchdog?.stop();
-            this.#watchdog = null;
-            this.#active = false;
-            this.#paused = false;
+            this.#watchdogSupervisor.clear();
+            this.#state.prepareResumeRestart();
             const deactivated = await persistStateWithPolicy(
                 { dialogLoopActive: false },
                 { label: 'dialog.state.resume_restart' },
@@ -544,18 +476,14 @@ export class DialogLoopManager extends EventEmitter {
             }
             await this.start();
             // F41B.8: contabilizar resume com PR
-            this.#prMetrics.resumesWithPR++;
+            this.#costLedger.recordPrResume();
             // F42.4: persistir prMetrics após resume com PR
-            void this.#trackPersistedState(
-                { prMetrics: { ...this.#prMetrics } },
-                {
-                    label: 'dialog.prMetrics.resume_with_pr',
-                    description: 'Persist dialog loop PR metrics after PR-consuming resume',
-                },
-            );
-            this.emit(EMITTER_LOOP_RESUMED, { prConsumed: true });
+            if (strategy.persistenceLabel && strategy.persistenceDescription) {
+                void this.#persistPrMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
+            }
+            this.emit(EMITTER_LOOP_RESUMED, { prConsumed: strategy.prConsumed });
         } finally {
-            this.#resuming = false;
+            this.#state.finishResume();
         }
     }
 
@@ -568,10 +496,10 @@ export class DialogLoopManager extends EventEmitter {
         const kind = DialogProtocol.classify(question);
 
         if (kind === 'ready') {
-            this.#watchdog?.ping();
+            this.#watchdogSupervisor.ping();
             this.emit(EMITTER_LOOP_READY, {});
         } else if (kind === 'reply') {
-            this.#watchdog?.ping();
+            this.#watchdogSupervisor.ping();
             const reply = DialogProtocol.extractReply(question);
             this.emit(EMITTER_LOOP_REPLY, { reply });
         } else if (kind === 'stopped') {
@@ -600,13 +528,11 @@ export class DialogLoopManager extends EventEmitter {
      * enfileirados que continuariam executando após desativação.
      */
     forceDeactivate() {
-        this.#active = false;
-        this.#stopping = false;
+        this.#state.deactivate();
         this.#endLoopSpan(false);
         // F42.3: reset completo do mutex pipeline — previne turns fantasma
         this.#turnQueue.reset();
-        this.#watchdog?.stop();
-        this.#watchdog = null;
+        this.#watchdogSupervisor.clear();
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
         this.emit('stopped', { reason: 'force_deactivate', authorized: false });
         this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'force_deactivate' });
@@ -619,29 +545,24 @@ export class DialogLoopManager extends EventEmitter {
      * @param {{ currentTokens: number; tokenLimit: number; ratio: number }} budget
      */
     handleTokenBudget({ currentTokens, tokenLimit, ratio }) {
-        if (!this.#active) return;
+        if (!this.#state.active) return;
 
-        // F31.4: compaction urgente em 95%+
-        if (ratio >= 95) {
+        const request = this.#compactionPolicy.evaluate({ currentTokens, tokenLimit, ratio });
+        if (!request) return;
+
+        if (request.urgency === 'critical') {
             log('WARN', `[DialogLoopManager] F31.4: Token budget CRÍTICO em ${ratio}% — compaction urgente.`);
-            this.#compactionRequested = false; // Permite re-emissão
-            this.emit(EMITTER_LOOP_COMPACTION_REQUESTED, { ratio, currentTokens, tokenLimit, urgency: 'critical' });
-            return;
-        }
-
-        // F31.3: compaction proativa em 90%+
-        if (ratio >= 90 && !this.#compactionRequested) {
+        } else {
             log('WARN', `[DialogLoopManager] F31.3: Token budget em ${ratio}% — compaction proativa solicitada.`);
-            this.#compactionRequested = true;
-            this.emit(EMITTER_LOOP_COMPACTION_REQUESTED, { ratio, currentTokens, tokenLimit, urgency: 'proactive' });
         }
+        this.emit(EMITTER_LOOP_COMPACTION_REQUESTED, request);
     }
 
     /**
      * Reseta o flag de compaction solicitada (chamado após compaction concluída com sucesso).
      */
     resetCompactionFlag() {
-        this.#compactionRequested = false;
+        this.#compactionPolicy.reset();
     }
 
     /**
@@ -704,6 +625,17 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
+     * Persiste o ledger de PR do dialog loop.
+     *
+     * @param {string} label
+     * @param {string} description
+     * @returns {Promise<void>}
+     */
+    #persistPrMetrics(label, description) {
+        return this.#trackPersistedState({ prMetrics: this.#costLedger.snapshot() }, { label, description });
+    }
+
+    /**
      * Persiste estado imediatamente sem derrubar o runtime do dialog loop se houver falha de I/O.
      *
      * @param {Record<string, unknown>} data
@@ -718,14 +650,6 @@ export class DialogLoopManager extends EventEmitter {
         }
         return true;
     }
-}
-
-/**
- * @param {AgentHost | DialogLoopManager | null | undefined} candidate
- * @returns {candidate is EventEmitter}
- */
-function isEventEmitterTarget(candidate) {
-    return candidate instanceof EventEmitter;
 }
 
 // F61: wireDialogLoopEvents extraído para event-wiring.js — re-exportado para compatibilidade

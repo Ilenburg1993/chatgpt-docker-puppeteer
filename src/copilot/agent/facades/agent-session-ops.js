@@ -39,7 +39,7 @@ export async function abortCurrentMessage(ctx) {
  * @returns {void}
  */
 export function pingDialogWatchdog(ctx) {
-    ctx.dialogLoop.pingWatchdog();
+    ctx.pingDialogWatchdog();
 }
 
 /**
@@ -68,5 +68,5 @@ export async function sessionLog(ctx, message, options) {
  */
 export async function getSessionMessages(ctx) {
     const session = ctx.getSessionSnapshot();
-    return ctx.messagesCache.get(session);
+    return ctx.getCachedSessionMessages(session);
 }

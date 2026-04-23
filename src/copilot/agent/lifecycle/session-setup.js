@@ -4,8 +4,15 @@
  *
  * F63: Funções de configuração de sessão extraídas de agent-lifecycle.js.
  *
- * Encapsula a preparação de tools (MCP + registry) e hooks (lifecycle + bus) necessárias para criar/retomar uma sessão
- * SDK.
+ * Encapsula a preparação de tools (MCP + registry), hooks (lifecycle + bus), permissões e `ask_user` necessárias para
+ * criar/retomar uma sessão SDK.
+ *
+ * Regra arquitetural:
+ *
+ * - este módulo conhece o formato de configuração da sessão SDK;
+ * - ele não deve conhecer implementações concretas de `tools/`, `hooks/` ou MCP bridge;
+ * - esses acoplamentos entram por `agent/ports/*`, mantendo lifecycle/session legíveis durante a migração para runtime
+ *   façade/capabilities.
  *
  * @module copilot/agent/lifecycle/session-setup
  * @internal
@@ -23,33 +30,136 @@ import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.j
 import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.js';
 
 /**
+ * Contrato mínimo do `AgentContext` exigido pelo setup de sessão.
+ *
+ * Este typedef é intencionalmente local e mais estreito que `AgentContext`: ele documenta quais partes do estado vivo
+ * são necessárias para montar uma sessão SDK. Ao ampliar o boot, prefira adicionar um método semântico aqui em vez de
+ * passar o contexto inteiro adiante.
+ *
  * @typedef {object} SessionSetupContext
- * @property {{ invalidate: () => void }} messagesCache
- * @property {import('#copilot/sdk/tools-registry').ToolRegistry | null} toolsRegistry
+ * @property {() => void} invalidateMessagesCache - Invalida o cache de mensagens antes de rebuilar tools para evitar
+ *   replay/estado obsoleto.
+ * @property {() => import('#copilot/sdk/tools-registry').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
+ *   tools para o boot/resume atual.
  * @property {() => {
  *     buildTools: () => Promise<import('#copilot/sdk/types').Tool[]>;
  *     buildConfig: () => Record<string, unknown> | null | undefined;
  * } | null} [getMcpBridgeSnapshot]
- * @property {{ emit: (event: string, payload: object) => Promise<void> }} webhooks
- * @property {() => string} getModelSnapshot
- * @property {{
- *     scheduleFallback: (model: string) => unknown;
- *     handleProtocolInput: (input: { question: string }) => unknown;
- * }} dialogLoop
- * @property {{ handler: import('#copilot/sdk/types').PermissionHandler }} permissions
- * @property {() => import('#copilot/sdk/types').ReasoningEffort | undefined} getReasoningEffortSnapshot
- * @property {(value: import('#copilot/sdk/types').ReasoningEffort | undefined) => void} setReasoningEffort
- * @property {() => boolean} isDialogLoopActive
- * @property {(status: import('../types.js').AgentStatus, host: LifecycleHost) => void} setStatus
- * @property {(question: import('../types.js').PendingQuestion | null) => void} setPendingQuestion
+ *   - Snapshot opcional do bridge MCP injetado. Quando ausente, a porta MCP default é usada.
+ *
+ * @property {(event: string, payload: object) => Promise<void>} emitWebhook - Porta semântica de webhooks usada pelos
+ *   hooks de sessão.
+ * @property {() => string} getModelSnapshot - Lê o modelo efetivo no momento de construir a sessão.
+ * @property {(model: string) => unknown} scheduleDialogFallback - Agenda fallback de modelo no dialog loop.
+ * @property {(input: { question: string }) => unknown} handleDialogProtocolInput - Encaminha protocolo `ask_user`.
+ * @property {() => import('#copilot/sdk/types').PermissionHandler} getPermissionHandlerSnapshot - Policy efetiva de
+ *   permissão para `onPermissionRequest`.
+ * @property {() => import('#copilot/sdk/types').ReasoningEffort | undefined} getReasoningEffortSnapshot - Lê a opção de
+ *   reasoning antes de aplicar compatibilidade por modelo.
+ * @property {(value: import('#copilot/sdk/types').ReasoningEffort | undefined) => void} setReasoningEffort - Atualiza a
+ *   opção de reasoning quando ela precisa ser omitida para um modelo sem suporte explícito.
+ * @property {() => boolean} isDialogLoopActive - Distingue `ask_user` controlado pelo protocolo de input manual.
+ * @property {(status: import('../types.js').AgentStatus, host: LifecycleHost) => void} setStatus - Atualiza status via
+ *   host para preservar eventos/observabilidade do runtime.
+ * @property {(question: import('../types.js').PendingQuestion | null) => void} setPendingQuestion - Registra ou limpa a
+ *   pergunta pendente viva.
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
- * @property {(session: import('#copilot/sdk/types').CopilotSession) => void} setSession
- * @property {(isResumed: boolean) => void} setIsResumed
+ *   - Registra tarefas fire-and-forget originadas por respostas de input.
+ *
+ * @property {(session: import('#copilot/sdk/types').CopilotSession) => void} setSession - Persiste a sessão SDK ativa
+ *   no contexto.
+ * @property {(isResumed: boolean) => void} setIsResumed - Marca se a sessão veio de resume ou criação nova.
  *
  * @typedef {import('../types.js').LifecycleHost} LifecycleHost
  *
  * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
+ *
+ * @typedef {{
+ *     tools: import('#copilot/sdk/types').Tool[];
+ *     busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>;
+ * }} PreparedSessionDeps
  */
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @returns {void}
+ */
+function invalidateMessagesCache(ctx) {
+    if (typeof ctx.invalidateMessagesCache === 'function') {
+        ctx.invalidateMessagesCache();
+        return;
+    }
+    const compat = /** @type {{ messagesCache?: { invalidate?: () => void } }} */ (ctx);
+    compat.messagesCache?.invalidate?.();
+}
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+ */
+function resetToolsRegistry(ctx) {
+    if (typeof ctx.resetToolsRegistry === 'function') {
+        return ctx.resetToolsRegistry();
+    }
+    const compat = /** @type {{ toolsRegistry?: import('#copilot/sdk/tools-registry').ToolRegistry | null }} */ (ctx);
+    compat.toolsRegistry = createRegistry();
+    return compat.toolsRegistry;
+}
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @param {string} event
+ * @param {object} payload
+ * @returns {Promise<void>}
+ */
+async function emitWebhook(ctx, event, payload) {
+    if (typeof ctx.emitWebhook === 'function') {
+        await ctx.emitWebhook(event, payload);
+        return;
+    }
+    const compat = /** @type {{ webhooks?: { emit?: (event: string, payload: object) => unknown } }} */ (ctx);
+    await Promise.resolve(compat.webhooks?.emit?.(event, payload));
+}
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @returns {import('#copilot/sdk/types').PermissionHandler}
+ */
+function getPermissionHandler(ctx) {
+    if (typeof ctx.getPermissionHandlerSnapshot === 'function') {
+        return ctx.getPermissionHandlerSnapshot();
+    }
+    const compat = /** @type {{ permissions?: { handler?: import('#copilot/sdk/types').PermissionHandler } }} */ (ctx);
+    return compat.permissions?.handler ?? (() => ({ kind: 'approved' }));
+}
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @param {string} model
+ * @returns {unknown}
+ */
+function scheduleDialogFallback(ctx, model) {
+    if (typeof ctx.scheduleDialogFallback === 'function') {
+        return ctx.scheduleDialogFallback(model);
+    }
+    const compat = /** @type {{ dialogLoop?: { scheduleFallback?: (model: string) => unknown } }} */ (ctx);
+    return compat.dialogLoop?.scheduleFallback?.(model);
+}
+
+/**
+ * @param {SessionSetupContext} ctx
+ * @param {{ question: string }} input
+ * @returns {unknown}
+ */
+function handleDialogProtocolInput(ctx, input) {
+    if (typeof ctx.handleDialogProtocolInput === 'function') {
+        return ctx.handleDialogProtocolInput(input);
+    }
+    const compat = /** @type {{ dialogLoop?: { handleProtocolInput?: (input: { question: string }) => unknown } }} */ (
+        ctx
+    );
+    return compat.dialogLoop?.handleProtocolInput?.(input);
+}
 
 /**
  * Prepara tools para a sessão: MCP bridge + registry + bootstrap.
@@ -58,14 +168,14 @@ import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.j
  * @returns {Promise<{ tools: import('#copilot/sdk/types').Tool[] }>}
  */
 export async function buildSessionTools(ctx) {
-    ctx.messagesCache.invalidate();
+    invalidateMessagesCache(ctx);
     const mcpBridge = typeof ctx.getMcpBridgeSnapshot === 'function' ? ctx.getMcpBridgeSnapshot() : null;
     const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildDefaultMcpTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
-    ctx.toolsRegistry = createRegistry();
-    const tools = bootstrapAgentTools(ctx.toolsRegistry, mcpTools);
+    const toolsRegistry = resetToolsRegistry(ctx);
+    const tools = bootstrapAgentTools(toolsRegistry, mcpTools);
     log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);
     return { tools };
 }
@@ -91,10 +201,10 @@ export function buildSessionHooks(ctx, host) {
 
     const busHooks = buildAgentBusHooks({
         emitWebhook: async (event, payload) => {
-            await Promise.resolve(ctx.webhooks.emit(event, payload));
+            await emitWebhook(ctx, event, payload);
         },
         getModel: () => ctx.getModelSnapshot(),
-        scheduleFallback: (model) => ctx.dialogLoop.scheduleFallback(model),
+        scheduleFallback: (model) => scheduleDialogFallback(ctx, model),
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
     });
@@ -106,10 +216,7 @@ export function buildSessionHooks(ctx, host) {
  *
  * @param {SessionSetupContext} ctx
  * @param {LifecycleHost} host
- * @param {{
- *     tools: import('#copilot/sdk/types').Tool[];
- *     busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>;
- * }} prepared
+ * @param {PreparedSessionDeps} prepared
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
@@ -121,7 +228,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .model(ctx.getModelSnapshot())
         .clientName('chatgpt-docker-puppeteer')
         .workingDirectory(process.cwd())
-        .onPermissionRequest(ctx.permissions.handler)
+        .onPermissionRequest(getPermissionHandler(ctx))
         .tools(tools);
 
     builder.hooks(busHooks);
@@ -152,7 +259,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             },
             {
                 isDialogLoopActive: () => ctx.isDialogLoopActive(),
-                handleProtocolInput: (q) => ctx.dialogLoop.handleProtocolInput(q),
+                handleProtocolInput: (q) => handleDialogProtocolInput(ctx, q),
                 setStatus: (s) => ctx.setStatus(s, host),
                 setPendingQuestion: (pq) => ctx.setPendingQuestion(pq),
                 trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),

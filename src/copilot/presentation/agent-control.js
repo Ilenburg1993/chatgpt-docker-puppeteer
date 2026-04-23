@@ -27,7 +27,7 @@ import { readRuntimeIdFromParams } from './runtime-targeting.js';
 import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
 
 /**
- * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
+ * @typedef {import('./types.js').HandlerResult} HandlerResult
  */
 
 /**

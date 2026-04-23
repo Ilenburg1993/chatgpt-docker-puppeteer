@@ -71,6 +71,26 @@ function getSessionRef(ctx) {
 
 /**
  * @param {AgentContext} ctx
+ * @returns {import('#copilot/sdk/types').PermissionHandler | null}
+ */
+function getPermissionHandlerRef(ctx) {
+    if (typeof ctx.getPermissionHandlerSnapshot === 'function') return ctx.getPermissionHandlerSnapshot();
+    const compat = /** @type {{ permissions?: { handler?: unknown } }} */ (ctx);
+    return /** @type {import('#copilot/sdk/types').PermissionHandler | null} */ (compat.permissions?.handler ?? null);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {import('#copilot/sdk/tools-registry').ToolRegistry | null}
+ */
+function getToolRegistryRef(ctx) {
+    if (typeof ctx.getToolRegistrySnapshot === 'function') return ctx.getToolRegistrySnapshot();
+    const compat = /** @type {{ toolsRegistry?: unknown }} */ (ctx);
+    return /** @type {import('#copilot/sdk/tools-registry').ToolRegistry | null} */ (compat.toolsRegistry ?? null);
+}
+
+/**
+ * @param {AgentContext} ctx
  * @param {string} caller
  * @returns {import('#copilot/sdk/types').CopilotClient}
  */
@@ -128,8 +148,11 @@ export function getSdkResourceSnapshot(ctx) {
     if (!handles.session) missingResources.push('session');
     if (!handles.serverRpc) missingResources.push('serverRpc');
     if (!handles.sessionRpc) missingResources.push('sessionRpc');
-    if (typeof ctx.permissions?.handler !== 'function') missingResources.push('permissionHandler');
-    if (!ctx.toolsRegistry) missingResources.push('toolRegistry');
+    const permissionHandler = getPermissionHandlerRef(ctx);
+    const toolRegistry = getToolRegistryRef(ctx);
+
+    if (typeof permissionHandler !== 'function') missingResources.push('permissionHandler');
+    if (!toolRegistry) missingResources.push('toolRegistry');
 
     const resources = {
         clientAvailable: Boolean(handles.client),
@@ -137,10 +160,10 @@ export function getSdkResourceSnapshot(ctx) {
         serverRpcAvailable: Boolean(handles.serverRpc),
         sessionRpcAvailable: Boolean(handles.sessionRpc),
         workspacePathAvailable: typeof handles.workspacePath === 'string' && handles.workspacePath.length > 0,
-        permissionHandlerAvailable: typeof ctx.permissions?.handler === 'function',
+        permissionHandlerAvailable: typeof permissionHandler === 'function',
         userInputHandlerAvailable: true,
         hooksAvailable: true,
-        toolRegistryAvailable: Boolean(ctx.toolsRegistry),
+        toolRegistryAvailable: Boolean(toolRegistry),
         modelSwitchAvailable: typeof handles.session?.setModel === 'function',
         abortAvailable: typeof handles.session?.abort === 'function',
         sessionLogAvailable: typeof handles.session?.log === 'function',

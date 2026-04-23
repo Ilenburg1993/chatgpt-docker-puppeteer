@@ -11,7 +11,7 @@ import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getHubSessionId, toError } from '#copilot/core';
 
 /**
- * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
+ * @typedef {import('./types.js').HandlerResult} HandlerResult
  */
 
 /** Statuses válidos para filtragem de sessions do hub. */

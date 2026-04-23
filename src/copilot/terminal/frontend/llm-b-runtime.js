@@ -10,19 +10,26 @@
 import { llmBridgeClient } from '#copilot/channel';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { getSharedSessionBinding } from '#copilot/core';
-import { getAgentRuntimeOrDefault } from '../../presentation/agent-runtime.js';
 import {
+    abortAgentRuntimeCurrentMessage,
+    answerAgentPendingQuestion,
+    clearAgentPendingQuestionShadow,
     createAgentRuntimeSnapshot,
     listAgentRuntimeSnapshots,
     loadAgentRuntimeSnapshot,
+    offAgentRuntimeEvent,
+    onAgentRuntimeEvent,
+    onceAgentRuntimeEvent,
     pauseAgentDialogLoop,
     pingDefaultAgentDialogWatchdog,
     readAgentHandoffHistory,
+    readAgentRuntimeControlState,
     resumeAgentDialogLoop,
     saveAgentRuntimeSnapshot,
+    startAgentRuntime,
     stopAgentRuntimeDialogLoopAuthorized,
 } from '../../presentation/runtime-controls.js';
-import { readAgentRuntimeOverview } from '../../presentation/runtime-overview.js';
+import { readAgentRuntimeOverviewProjection } from '../../presentation/runtime-overview.js';
 import {
     deleteAgentSdkPlan,
     getAgentSdkSessionMode,
@@ -30,16 +37,6 @@ import {
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
 } from '../../presentation/runtime-sdk-session.js';
-
-/**
- * Retorna a instância singleton canônica do runtime do agente.
- *
- * @param {string | null | undefined} [runtimeId]
- * @returns {import('#copilot/agent').AlwaysAliveAgent}
- */
-export function getTerminalAgentRuntime(runtimeId) {
-    return getAgentRuntimeOrDefault(runtimeId);
-}
 
 /**
  * Lê o estado mínimo do runtime para exibição/streaming no terminal.
@@ -54,11 +51,11 @@ export function getTerminalAgentRuntime(runtimeId) {
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     queueSize: number;
- *     pendingQuestion: import('#copilot/agent/types').PendingQuestion | null;
- *     pendingQuestionKind: import('#copilot/agent/types').PendingQuestionKind | null;
- *     pendingQuestionShadow: import('#copilot/agent/types').PendingQuestionShadow | null;
- *     pendingQuestionShadowKind: import('#copilot/agent/types').PendingQuestionKind | null;
- *     pendingQuestionShadowState: import('#copilot/agent/types').PendingQuestionShadowState | null;
+ *     pendingQuestion: import('../../presentation/types.js').RuntimePendingQuestion | null;
+ *     pendingQuestionKind: import('../../presentation/types.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadow: import('../../presentation/types.js').RuntimePendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('../../presentation/types.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('../../presentation/types.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
@@ -68,46 +65,117 @@ export function getTerminalAgentRuntime(runtimeId) {
  * }}
  */
 export function readTerminalRuntimeState(runtimeId) {
-    const { agent, runtimeId: resolvedRuntimeId, contextWindow } = readAgentRuntimeOverview(runtimeId);
-    const pendingQuestion = agent.pendingQuestion ?? null;
-    const pendingQuestionShadow = agent.pendingQuestionShadow ?? null;
-    const pendingQuestionKind =
-        agent.pendingQuestionKind ??
-        (pendingQuestion && typeof pendingQuestion === 'object' && typeof pendingQuestion.kind === 'string'
-            ? pendingQuestion.kind
-            : null);
-    const pendingQuestionShadowKind =
-        agent.pendingQuestionShadowKind ??
-        (pendingQuestionShadow &&
-        typeof pendingQuestionShadow === 'object' &&
-        pendingQuestionShadow.meta &&
-        typeof pendingQuestionShadow.meta === 'object' &&
-        typeof pendingQuestionShadow.meta.kind === 'string'
-            ? pendingQuestionShadow.meta.kind
-            : null);
-    const pendingQuestionShadowState =
-        agent.pendingQuestionShadowState ??
-        (pendingQuestionShadow !== null ? (agent.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
+    const runtime = readAgentRuntimeOverviewProjection(runtimeId);
     return {
-        runtimeId: resolvedRuntimeId,
-        model: String(agent.model ?? 'unknown'),
-        reasoningEffort: String(agent.reasoningEffort ?? 'off'),
-        status: String(agent.status ?? 'unknown'),
-        sessionId: agent.sessionId ?? null,
-        dialogLoopActive: agent.dialogLoopActive,
-        dialogPaused: Boolean(agent.dialogPaused),
-        queueSize: Number(agent.queueSize ?? 0),
-        pendingQuestion,
-        pendingQuestionKind,
-        pendingQuestionShadow,
-        pendingQuestionShadowKind,
-        pendingQuestionShadowState,
-        pendingQuestionShadowExpired: Boolean(agent.pendingQuestionShadowExpired),
-        pendingQuestionShadowAgeMs: agent.pendingQuestionShadowAgeMs ?? null,
-        pendingQuestionShadowExpiresAt: agent.pendingQuestionShadowExpiresAt ?? null,
-        pendingQuestionShadowRemainingMs: agent.pendingQuestionShadowRemainingMs ?? null,
-        contextWindow,
-        lastPrInfo: agent.lastPrInfo ?? null,
+        runtimeId: runtime.runtimeId,
+        model: runtime.model,
+        reasoningEffort: runtime.reasoningEffort,
+        status: runtime.status,
+        sessionId: runtime.sessionId,
+        dialogLoopActive: runtime.dialogLoopActive,
+        dialogPaused: runtime.dialogPaused,
+        queueSize: runtime.queueSize,
+        pendingQuestion: runtime.pendingQuestion,
+        pendingQuestionKind: runtime.pendingQuestionKind,
+        pendingQuestionShadow: runtime.pendingQuestionShadow,
+        pendingQuestionShadowKind: runtime.pendingQuestionShadowKind,
+        pendingQuestionShadowState: runtime.pendingQuestionShadowState,
+        pendingQuestionShadowExpired: runtime.pendingQuestionShadowExpired,
+        pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs,
+        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
+        pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
+        contextWindow: runtime.contextWindow,
+        lastPrInfo:
+            /** @type {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} */ (
+                runtime.lastPrInfo
+            ),
+    };
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<typeof readAgentRuntimeControlState>}
+ */
+export function readTerminalRuntimeControlState(runtimeId) {
+    return readAgentRuntimeControlState(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<void>}
+ */
+export async function startTerminalAgentRuntime(runtimeId) {
+    await startAgentRuntime(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<void>}
+ */
+export async function abortTerminalCurrentMessage(runtimeId) {
+    await abortAgentRuntimeCurrentMessage(runtimeId);
+}
+
+/**
+ * @param {string} answer
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function answerTerminalPendingQuestion(answer, runtimeId) {
+    return answerAgentPendingQuestion(answer, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function clearTerminalPendingQuestionShadow(runtimeId) {
+    return clearAgentPendingQuestionShadow(runtimeId);
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function onTerminalAgentRuntimeEvent(event, handler, runtimeId) {
+    onAgentRuntimeEvent(event, handler, runtimeId);
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function onceTerminalAgentRuntimeEvent(event, handler, runtimeId) {
+    onceAgentRuntimeEvent(event, handler, runtimeId);
+}
+
+/**
+ * @param {string} event
+ * @param {(...args: any[]) => void} handler
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {void}
+ */
+export function offTerminalAgentRuntimeEvent(event, handler, runtimeId) {
+    offAgentRuntimeEvent(event, handler, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     on: (event: string, handler: (...args: any[]) => void) => void;
+ *     once: (event: string, handler: (...args: any[]) => void) => void;
+ *     off: (event: string, handler: (...args: any[]) => void) => void;
+ * }}
+ */
+export function readTerminalAgentRuntimeEventHost(runtimeId) {
+    return {
+        on: (event, handler) => onTerminalAgentRuntimeEvent(event, handler, runtimeId),
+        once: (event, handler) => onceTerminalAgentRuntimeEvent(event, handler, runtimeId),
+        off: (event, handler) => offTerminalAgentRuntimeEvent(event, handler, runtimeId),
     };
 }
 
@@ -138,7 +206,7 @@ export function readTerminalDialogStreamMeta(runtimeId) {
  * Obtém o histórico atual de handoffs do runtime.
  *
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../agent/infra/handoff-manager.js').HandoffRequest[]}
+ * @returns {import('../../presentation/types.js').RuntimeHandoffRequest[]}
  */
 export function readTerminalHandoffHistory(runtimeId) {
     return readAgentHandoffHistory(runtimeId);
@@ -187,7 +255,7 @@ export async function stopTerminalAgentRuntime(runtimeId) {
  * Lê o modo vanilla atual da sessão SDK.
  *
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ * @returns {Promise<import('../../presentation/types.js').RuntimeSdkModeResult>}
  */
 export async function getTerminalSdkSessionMode(runtimeId) {
     return getAgentSdkSessionMode(runtimeId);
@@ -198,7 +266,7 @@ export async function getTerminalSdkSessionMode(runtimeId) {
  *
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ * @returns {Promise<import('../../presentation/types.js').RuntimeSdkModeResult>}
  */
 export async function setTerminalSdkSessionMode(mode, runtimeId) {
     return setAgentSdkSessionMode(mode, runtimeId);
@@ -208,7 +276,7 @@ export async function setTerminalSdkSessionMode(mode, runtimeId) {
  * Lê o plan.md vanilla da sessão SDK.
  *
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ * @returns {Promise<import('../../presentation/types.js').RuntimeSdkPlanReadResult>}
  */
 export async function readTerminalSdkPlan(runtimeId) {
     return readAgentSdkPlan(runtimeId);

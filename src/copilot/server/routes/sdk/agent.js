@@ -28,6 +28,10 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import {
+    paginateAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjection,
+} from '../../../presentation/runtime-tools.js';
 import { resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -121,36 +125,19 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/tools', (req, res) => {
         const { agent } = resolveAgentRouterDeps(deps, req);
-        const registry = agent.toolsRegistry;
-        if (!registry) {
-            res.status(503).json({ ok: false, error: 'ToolsRegistry não disponível (agente não iniciado)' });
+        const projection = readAgentRuntimeToolsProjection(agent, { requireRegistry: true });
+        if (!projection.ok) {
+            res.status(503).json({ ok: false, error: projection.error });
             return;
         }
 
-        let entries = [...registry.entries.values()];
-
-        // G2-API-11: filtro por categoria
-        const category = typeof req.query['category'] === 'string' ? req.query['category'].trim() : '';
-        if (category) {
-            entries = entries.filter((e) => e.category === category);
-        }
-
-        const total = entries.length;
-
-        // G2-API-11: paginação
-        const page = Math.max(1, parseInt(String(req.query['page'] ?? ''), 10) || 1);
-        const limit = Math.min(200, Math.max(1, parseInt(String(req.query['limit'] ?? ''), 10) || total));
-        const start = (page - 1) * limit;
-        const paged = entries.slice(start, start + limit);
-
-        res.json({
-            ok: true,
-            total,
-            page,
-            limit,
-            pages: Math.ceil(total / limit) || 1,
-            tools: paged.map((e) => ({ name: e.tool.name, category: e.category, tags: e.tags, readOnly: e.readOnly })),
-        });
+        res.json(
+            paginateAgentRuntimeToolsProjection(projection, {
+                category: req.query['category'],
+                page: req.query['page'],
+                limit: req.query['limit'],
+            }),
+        );
     });
 
     // ─────────────────────────────────────────────────────────────────────────────

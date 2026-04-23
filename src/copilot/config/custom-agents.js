@@ -148,7 +148,18 @@ export function removeCustomAgent(name) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {import('#copilot/sdk/types').CustomAgentConfig} SdkCustomAgentConfig
+ * Configuração estrutural compatível com `SessionConfig.customAgents` do SDK.
+ *
+ * `config/` não importa tipos do wrapper interno do runtime; quando o agent montar a sessão, o adapter SDK valida esse
+ * objeto contra o SDK canônico.
+ *
+ * @typedef {object} SdkCustomAgentConfig
+ * @property {string} name
+ * @property {string} [displayName]
+ * @property {string} description
+ * @property {string[]} tools
+ * @property {string} prompt
+ * @property {boolean} [infer]
  */
 
 /**

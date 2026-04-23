@@ -171,8 +171,8 @@ export const TOOL_AUDIT_MAX_LOG_BYTES = AGENT_TOOL_AUDIT_MAX_LOG_BYTES;
 
 // ── Permission Controller ────────────────────────────────────
 
-/** Modo de permissão padrão @type {'approve_all' | 'deny_all' | 'interactive'} */
-export const PERMISSION_MODE = /** @type {'approve_all' | 'deny_all' | 'interactive'} */ (AGENT_PERMISSION_MODE);
+/** Modo de permissão padrão @type {'approve_all' | 'audit_only' | 'selective'} */
+export const PERMISSION_MODE = /** @type {'approve_all' | 'audit_only' | 'selective'} */ (AGENT_PERMISSION_MODE);
 
 // ── Context Utilization Thresholds ───────────────────────────
 

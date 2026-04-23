@@ -7,11 +7,15 @@
  *   operacional real para bordas HTTP, sem forçar cada router a reimplementar parsing de `query/header/body`.
  */
 
-import { buildDefaultCopilotApiRouteDeps, buildDefaultSdkRouteSharedDeps } from './runtime-route-deps.js';
+import { buildDefaultCopilotApiRouteDeps } from './runtime-route-deps.js';
 import { pickRuntimeId } from './runtime-targeting.js';
 
 /**
  * @typedef {import('express').Request} ExpressRequest
+ *
+ * @typedef {import('./runtime-route-deps.js').CopilotApiRouteDeps} CopilotApiRouteDeps
+ *
+ * @typedef {CopilotApiRouteDeps['agent'] | ((req: ExpressRequest) => CopilotApiRouteDeps)} CopilotApiRouteBinding
  */
 
 /**
@@ -49,11 +53,21 @@ export function resolveCopilotApiRouteDeps(req) {
 }
 
 /**
- * Resolve as dependências canônicas das rotas `/sdk/*` para a requisição atual.
+ * Resolve bindings legados ou resolvers atuais para o contrato canônico de rotas.
  *
+ * @param {CopilotApiRouteBinding} binding
  * @param {ExpressRequest} req
- * @returns {ReturnType<typeof buildDefaultSdkRouteSharedDeps>}
+ * @returns {CopilotApiRouteDeps}
  */
-export function resolveSdkRouteSharedDeps(req) {
-    return buildDefaultSdkRouteSharedDeps(resolveRequestedRuntimeId(req));
+export function resolveCopilotApiRouteBinding(binding, req) {
+    if (typeof binding === 'function') {
+        return binding(req);
+    }
+    return {
+        agent: binding,
+        runtimeId: 'default',
+        requestedRuntimeId: null,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+    };
 }

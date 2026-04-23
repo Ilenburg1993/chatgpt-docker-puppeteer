@@ -27,6 +27,11 @@ import { getAgentHealthSnapshotCompat } from './runtime-health.js';
  */
 
 /**
+ * Payload estável para bordas.
+ *
+ * A camada `agent/facades` decide quais capabilities existem e qual é o readiness delas. A camada `presentation`
+ * acrescenta somente envelope comum de borda: `ok`, timestamp e metadata de seleção/fallback do runtime.
+ *
  * @typedef {ReturnType<typeof readAgentRuntimeCapabilities> & {
  *     ok: true;
  *     generatedAt: number;
@@ -38,6 +43,8 @@ import { getAgentHealthSnapshotCompat } from './runtime-health.js';
  */
 
 /**
+ * Normaliza metadata recebida de rotas antigas (`string`) e rotas novas (`RuntimeRouteDeps`).
+ *
  * @param {RuntimeCapabilitiesMeta | string | null | undefined} meta
  * @returns {RuntimeCapabilitiesMeta}
  */
@@ -48,6 +55,11 @@ function normalizeMeta(meta) {
 }
 
 /**
+ * Monta a projection de capabilities para consumidores de borda.
+ *
+ * Não adicione decisão operacional aqui. Se uma capability nova precisar de readiness real, a origem correta é
+ * `agent/facades/agent-runtime-capabilities.js` ou um port/facade específico do domínio.
+ *
  * @param {CapabilityAgent} agent
  * @param {RuntimeCapabilitiesMeta | string | null | undefined} [meta]
  * @returns {RuntimeCapabilitiesPayload}

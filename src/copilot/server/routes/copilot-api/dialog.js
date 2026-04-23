@@ -18,6 +18,7 @@ import {
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,
 } from '../../../presentation/runtime-dialog.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -26,24 +27,10 @@ import {
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {{ agent: AlwaysAliveAgentLike; runtimeId: string }} RuntimeRouteDeps
- *
- * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
  */
-
-/**
- * @param {RuntimeRouteBinding} binding
- * @param {Req} req
- * @returns {RuntimeRouteDeps}
- */
-function resolveRuntimeRouteDeps(binding, req) {
-    if (typeof binding === 'function') {
-        return binding(req);
-    }
-    return { agent: binding, runtimeId: 'default' };
-}
 
 /**
  * Registra rotas do Dialog Loop no router fornecido.
@@ -66,7 +53,7 @@ export function registerDialogRoutes(bridge, binding) {
      * Padrão §15.8: todas as iterações usam o mesmo PR (sem custo por turno).
      */
     bridge.post('/dialog/start', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         const { bootPrompt } = req.body ?? {};
 
         if (agent.status !== 'idle') {
@@ -100,7 +87,7 @@ export function registerDialogRoutes(bridge, binding) {
      * retorna.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
         if (_turnInFlight) {
             return res.status(429).json({
@@ -151,7 +138,7 @@ export function registerDialogRoutes(bridge, binding) {
      * Returns: { ok: true, message: string }
      */
     bridge.post('/dialog/stop', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         const { force } = req.body ?? {};
         if (!force) {
             return res.status(403).json({

@@ -60,9 +60,11 @@ import {
 import { buildUserPrompt, ensureDialogLoop, println, sendTurn } from './dialog.js';
 import { extractAtReferences } from './file-context.js';
 import {
-    getTerminalAgentRuntime,
+    offTerminalAgentRuntimeEvent,
+    onceTerminalAgentRuntimeEvent,
     pauseTerminalDialogLoop,
     readTerminalHandoffHistory,
+    readTerminalRuntimeControlState,
     resumeTerminalDialogLoop,
     stopTerminalAgentRuntime,
     stopTerminalDialogMode,
@@ -245,15 +247,14 @@ async function _cmdRestart() {
             clearTimeout(timeout);
             resolveReady();
         };
-        const agent = getTerminalAgentRuntime();
-        agent.once(EMITTER_DIALOG_READY, onReady);
+        onceTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
         await stopTerminalDialogMode();
-        if (!agent.dialogLoopActive) {
+        if (!readTerminalRuntimeControlState().dialogLoopActive) {
             await readyPromise;
         } else {
             // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout
             clearTimeout(timeout);
-            agent.off('dialog.ready', onReady);
+            offTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
         }
     } catch (e) {
         println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);

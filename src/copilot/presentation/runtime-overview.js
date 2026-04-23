@@ -8,6 +8,11 @@
  */
 
 import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '#copilot/agent';
+import {
+    readRuntimeControlState,
+    readRuntimeInteractionState,
+    readRuntimePrBudgetSnapshot,
+} from '../agent/facades/agent-runtime-controls.js';
 import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from './agent-runtime.js';
 
 /**
@@ -55,8 +60,7 @@ export function readAgentRuntimeOverview(runtimeId) {
     const agentRuntimes = listKnownAgentRuntimes();
     const snap = readAgentRuntimeStatusSnapshot(agent);
     const health = readAgentRuntimeHealthSnapshot(agent);
-    const runtimeSessionId =
-        agent.sessionId ?? (typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null) ?? null;
+    const runtimeSessionId = readRuntimeControlState(agent).sessionId;
     const contextWindow = normalizeAgentContextWindowProjection(snap['contextWindow'] ?? snap['contextState'] ?? null);
     return {
         agent,
@@ -69,6 +73,76 @@ export function readAgentRuntimeOverview(runtimeId) {
         health,
         runtimeSessionId,
         contextWindow,
+    };
+}
+
+/**
+ * Lê uma projection sem expor a instância viva do agent para bordas.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     requestedRuntimeId: string | null;
+ *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ *     agentRuntimes: ReturnType<typeof listKnownAgentRuntimes>;
+ *     snap: Record<string, unknown>;
+ *     health: Record<string, any> | null;
+ *     runtimeSessionId: string | null;
+ *     contextWindow: ContextWindowProjection | null;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     status: string;
+ *     sessionId: string | null;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ *     pendingQuestion: import('../agent/types.js').PendingQuestion | null;
+ *     pendingQuestionKind: import('../agent/types.js').PendingQuestionKind | null;
+ *     pendingQuestionShadow: import('../agent/types.js').PendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('../agent/types.js').PendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('../agent/types.js').PendingQuestionShadowState | null;
+ *     pendingQuestionShadowExpired: boolean;
+ *     pendingQuestionShadowAgeMs: number | null;
+ *     pendingQuestionShadowExpiresAt: number | null;
+ *     pendingQuestionShadowRemainingMs: number | null;
+ *     lastPrInfo: Record<string, any> | null;
+ *     dialogPrMetrics: Record<string, any> | null;
+ * }}
+ */
+export function readAgentRuntimeOverviewProjection(runtimeId) {
+    const base = readAgentRuntimeOverview(runtimeId);
+    const controlState = readRuntimeControlState(base.agent);
+    const interactionState = readRuntimeInteractionState(base.agent);
+    const prBudget = readRuntimePrBudgetSnapshot(base.agent);
+    return {
+        requestedRuntimeId: base.requestedRuntimeId,
+        runtimeId: base.runtimeId,
+        runtimeFound: base.runtimeFound,
+        usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        agentRuntimes: base.agentRuntimes,
+        snap: base.snap,
+        health: base.health,
+        runtimeSessionId: base.runtimeSessionId,
+        contextWindow: base.contextWindow,
+        model: controlState.model,
+        reasoningEffort: controlState.reasoningEffort,
+        status: controlState.status,
+        sessionId: controlState.sessionId,
+        dialogLoopActive: controlState.dialogLoopActive,
+        dialogPaused: controlState.dialogPaused,
+        queueSize: controlState.queueSize,
+        pendingQuestion: interactionState.pendingQuestion,
+        pendingQuestionKind: interactionState.pendingQuestionKind,
+        pendingQuestionShadow: interactionState.pendingQuestionShadow,
+        pendingQuestionShadowKind: interactionState.pendingQuestionShadowKind,
+        pendingQuestionShadowState: interactionState.pendingQuestionShadowState,
+        pendingQuestionShadowExpired: interactionState.pendingQuestionShadowExpired,
+        pendingQuestionShadowAgeMs: interactionState.pendingQuestionShadowAgeMs,
+        pendingQuestionShadowExpiresAt: interactionState.pendingQuestionShadowExpiresAt,
+        pendingQuestionShadowRemainingMs: interactionState.pendingQuestionShadowRemainingMs,
+        lastPrInfo: /** @type {Record<string, any> | null} */ (prBudget.lastPrInfo),
+        dialogPrMetrics: /** @type {Record<string, any> | null} */ (prBudget.prMetrics),
     };
 }
 

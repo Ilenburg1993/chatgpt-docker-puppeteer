@@ -11,7 +11,7 @@
 
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
 import { buildUserPrompt } from './dialog.js';
-import { getTerminalAgentRuntime } from './frontend/llm-b-runtime.js';
+import { readTerminalAgentRuntimeEventHost } from './frontend/llm-b-runtime.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 import { getBusy } from './state.js';
 
@@ -22,15 +22,15 @@ import { getBusy } from './state.js';
  * @returns {() => void} Função de cleanup
  */
 export function setupAgentListeners(rl) {
-    const agent = getTerminalAgentRuntime();
+    const agentRuntimeEvents = readTerminalAgentRuntimeEventHost();
     const refreshPromptIfIdle = () => {
         if (getBusy()) return;
         rl.setPrompt(buildUserPrompt());
         rl.prompt();
     };
-    const cleanupAgentRuntimeEvents = setupTerminalAgentRuntimeEventListeners({ agent, rl });
+    const cleanupAgentRuntimeEvents = setupTerminalAgentRuntimeEventListeners({ agent: agentRuntimeEvents, rl });
     const cleanupSdkSessionEvents = setupTerminalSdkSessionEventListeners({
-        agent,
+        agent: agentRuntimeEvents,
         refreshPromptIfIdle,
     });
 

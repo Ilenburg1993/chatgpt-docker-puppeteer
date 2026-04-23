@@ -114,7 +114,7 @@ export async function dialogStart(ctx, host, bootPrompt) {
     // F42.2: pausar keepalive enquanto dialog loop está ativo
     ctx.stopKeepalive('dialog_loop_active');
     try {
-        await runDialogOperationWithPolicy('dialog.start', () => ctx.dialogLoop.start(bootPrompt));
+        await runDialogOperationWithPolicy('dialog.start', () => ctx.startDialogLoop(bootPrompt));
     } catch (error) {
         startKeepaliveIfPossible(ctx, host);
         throw error;
@@ -135,7 +135,7 @@ export async function dialogStart(ctx, host, bootPrompt) {
  * @returns {Promise<void>}
  */
 export async function dialogStop(ctx, host, opts) {
-    await runDialogOperationWithPolicy('dialog.stop', () => ctx.dialogLoop.stop(opts));
+    await runDialogOperationWithPolicy('dialog.stop', () => ctx.stopDialogLoop(opts));
     // F42.2: reiniciar keepalive quando dialog loop para
     startKeepaliveIfPossible(ctx, host);
 }
@@ -153,7 +153,7 @@ export async function dialogResume(ctx) {
             'INVALID_STATE',
         );
     }
-    await runDialogOperationWithPolicy('dialog.resume', () => ctx.dialogLoop.resume());
+    await runDialogOperationWithPolicy('dialog.resume', () => ctx.resumeDialogLoop());
 }
 
 /**
@@ -181,19 +181,19 @@ export function ensureDialogLoopAttached(ctx, host) {
         trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
     };
     // Sempre atualiza host — necessário após reconexão.
-    ctx.dialogLoop.attach(agentHost);
+    ctx.attachDialogLoop(agentHost);
     // Wiring de eventos: somente na primeira vez.
     if (ctx.getDialogLoopAttachedSnapshot()) return;
     ctx.setDialogLoopAttached(true);
-    wireDialogLoopEvents(ctx.dialogLoop, (event, payload) => host.emit(event, payload));
+    wireDialogLoopEvents(ctx.getDialogLoopManagerSnapshot(), (event, payload) => host.emit(event, payload));
 
     // F31.3/F31.4: Proxy token_budget_warning → DLM
     emitterHost.on('session.token_budget_warning', (rawEvt) => {
-        ctx.dialogLoop.handleTokenBudget(normalizeTokenBudgetWarning(rawEvt));
+        ctx.handleDialogTokenBudget(normalizeTokenBudgetWarning(rawEvt));
     });
 
     // F31.3: Reset compaction flag
     emitterHost.on('session.compaction_complete', (rawEvt) => {
-        if (normalizeCompactionComplete(rawEvt).success) ctx.dialogLoop.resetCompactionFlag();
+        if (normalizeCompactionComplete(rawEvt).success) ctx.resetDialogCompactionFlag();
     });
 }

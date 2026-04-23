@@ -19,6 +19,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 import { buildAgentConnectedSsePayload } from '../../../presentation/runtime-status.js';
 
 /**
@@ -28,39 +29,12 @@ import { buildAgentConnectedSsePayload } from '../../../presentation/runtime-sta
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {{
- *     agent: AlwaysAliveAgentLike;
- *     runtimeId: string;
- *     requestedRuntimeId?: string | null;
- *     runtimeFound?: boolean;
- *     usedDefaultRuntimeFallback?: boolean;
- * }} RuntimeRouteDeps
- *
- *
- * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
  *
  * @typedef {import('#copilot/core').AgentEventName} AgentEventName
  */
-
-/**
- * @param {RuntimeRouteBinding} binding
- * @param {Req} req
- * @returns {RuntimeRouteDeps}
- */
-function resolveRuntimeRouteDeps(binding, req) {
-    if (typeof binding === 'function') {
-        return binding(req);
-    }
-    return {
-        agent: binding,
-        runtimeId: 'default',
-        requestedRuntimeId: null,
-        runtimeFound: true,
-        usedDefaultRuntimeFallback: false,
-    };
-}
 
 /**
  * Registra a rota SSE GET /stream no router fornecido.
@@ -96,7 +70,7 @@ export function registerStreamRoutes(bridge, binding) {
      * Uso: `GET /api/copilot/stream` com `Accept: text/event-stream`
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const deps = resolveRuntimeRouteDeps(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
         const { agent } = deps;
         // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
         agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2));
@@ -169,7 +143,7 @@ export function registerStreamRoutes(bridge, binding) {
     ]);
 
     bridge.get('/stream/tasks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         agent.setMaxListeners?.(MAX_SSE_CLIENTS * (TASK_EVENTS.length + 2));
         if (!taskTracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE task atingido' });

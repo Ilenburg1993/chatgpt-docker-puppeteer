@@ -9,25 +9,22 @@
  */
 
 import { getMcpStatus } from '#copilot/bridges';
-import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import {
+    LLM_B_TERMINAL_PORT,
+    readDeclarativeCustomToolsConfig,
+    readDeclarativeToolsConfig,
+    readSkillsConfig,
+    registerDeclarativeCustomToolConfig,
+    removeDeclarativeCustomToolConfig,
+    updateDeclarativeToolsConfig,
+    updateSkillsConfig,
+} from '#copilot/config';
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
-import {
-    BUILTIN_HANDLER_MAP,
-    getCustomToolDefinitions,
-    getToolsConfig,
-    patchToolsConfig,
-    registerCustomTool,
-    removeCustomTool,
-} from '#copilot/sdk';
-import { existsSync } from 'node:fs';
-import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { safeJsonParse } from '../core/safe-json.js';
 import { getSseClients, getSseCriticalClients } from '../infra/sse/state.js';
 import { setDefaultAgentBackgroundCompactionThreshold } from './runtime-controls.js';
-import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readAgentRuntimeOverviewProjection } from './runtime-overview.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
 import {
     readRuntimeBusyState,
@@ -38,7 +35,7 @@ import {
 } from './runtime-ui-state.js';
 
 /**
- * @typedef {import('../terminal/handlers/shared.js').HandlerResult} HandlerResult
+ * @typedef {import('./types.js').HandlerResult} HandlerResult
  */
 
 // ─── GET /health ──────────────────────────────────────────────────────────────
@@ -52,7 +49,6 @@ import {
 export function handleHealth(params = {}) {
     const requestedRuntimeId = readRuntimeIdFromParams(params && typeof params === 'object' ? params : null);
     const {
-        agent,
         requestedRuntimeId: requestedRuntime,
         runtimeId,
         runtimeFound,
@@ -60,7 +56,11 @@ export function handleHealth(params = {}) {
         agentRuntimes,
         snap: snapshot,
         health,
-    } = readAgentRuntimeOverview(requestedRuntimeId);
+        dialogLoopActive,
+        status: agentStatus,
+        model,
+        reasoningEffort,
+    } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     const healthRecord = health && typeof health === 'object' ? /** @type {Record<string, unknown>} */ (health) : null;
     const healthChecks =
         healthRecord && typeof healthRecord['checks'] === 'object'
@@ -100,8 +100,8 @@ export function handleHealth(params = {}) {
             ok: healthRecord?.['ok'] ?? true,
             healthStatus: healthRecord?.['status'] ?? 'healthy',
             issues: healthRecord?.['issues'] ?? [],
-            dialogLoopActive: agent.dialogLoopActive,
-            agentStatus: agent.status,
+            dialogLoopActive,
+            agentStatus,
             runtimeId,
             requestedRuntimeId: requestedRuntime,
             runtimeFound,
@@ -110,8 +110,8 @@ export function handleHealth(params = {}) {
             busy: readRuntimeBusyState(),
             hubSessionId: readRuntimeHubSessionId(),
             sseClients: getSseClients().size,
-            model: agent.model,
-            reasoningEffort: agent.reasoningEffort ?? 'high',
+            model,
+            reasoningEffort,
             contextWindow: snapshot['contextWindow'],
             backgroundPendingCount: healthRecord?.['backgroundPendingCount'] ?? 0,
             keepaliveRunning: ioChecks?.['keepaliveRunning'] ?? false,
@@ -161,14 +161,16 @@ export function getSseClientSets() {
 export function handleGetConfig(params = {}) {
     const requestedRuntimeId = readRuntimeIdFromParams(params && typeof params === 'object' ? params : null);
     const {
-        agent,
         requestedRuntimeId: requestedRuntime,
         runtimeId,
         runtimeFound,
         usedDefaultRuntimeFallback,
         agentRuntimes,
         snap: snapshot,
-    } = readAgentRuntimeOverview(requestedRuntimeId);
+        model,
+        reasoningEffort,
+        dialogLoopActive,
+    } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     return {
         status: 200,
         cors: true,
@@ -179,11 +181,11 @@ export function handleGetConfig(params = {}) {
             runtimeFound,
             usedDefaultRuntimeFallback,
             agentRuntimes,
-            model: agent.model,
-            reasoningEffort: agent.reasoningEffort ?? 'high',
+            model,
+            reasoningEffort,
             sdkSessionMode: readRuntimeSdkSessionMode(),
             sdkPlanOperation: readRuntimeLastSdkPlanOperation(),
-            dialogLoopActive: agent.dialogLoopActive,
+            dialogLoopActive,
             busy: readRuntimeBusyState(),
             hubSessionId: readRuntimeHubSessionId(),
             port: LLM_B_TERMINAL_PORT,
@@ -235,39 +237,6 @@ export function handleSetInfiniteSessionConfig(body) {
 
 // ── GET /config/skills + PUT /config/skills (AG.3) ───────────────────────────
 
-const SKILLS_PATH = join(resolve(import.meta.dirname, '../../..'), 'skills.json');
-
-/**
- * @typedef {Object} SkillsConfig
- * @property {string[]} paths
- */
-
-/**
- * Lê o skills.json do disco.
- *
- * @returns {Promise<SkillsConfig>}
- */
-async function readSkillsConfig() {
-    if (!existsSync(SKILLS_PATH)) return { paths: [] };
-    try {
-        const raw = await readFileAsync(SKILLS_PATH, 'utf8');
-        const result = safeJsonParse(raw, '[presentation/system-config.readSkillsConfig]');
-        return result.ok ? /** @type {SkillsConfig} */ (result.data) : { paths: [] };
-    } catch {
-        return { paths: [] };
-    }
-}
-
-/**
- * Persiste o skills.json no disco.
- *
- * @param {SkillsConfig} config
- * @returns {Promise<void>}
- */
-async function writeSkillsConfig(config) {
-    await writeFileAsync(SKILLS_PATH, JSON.stringify(config, null, 2), 'utf8');
-}
-
 /**
  * GET /config/skills — retorna a lista de skills configurados.
  *
@@ -285,13 +254,9 @@ export async function handleGetSkills() {
  * @returns {Promise<HandlerResult>}
  */
 export async function handleSetSkills(body) {
-    const { paths } = /** @type {Record<string, unknown>} */ (body) ?? {};
-    if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string')) {
-        return { status: 400, body: { ok: false, error: 'body deve conter { paths: string[] }' } };
-    }
-    const config = { paths };
-    await writeSkillsConfig(config);
-    return { status: 200, cors: true, body: { ok: true, skills: config } };
+    const result = await updateSkillsConfig(body);
+    if (!result.ok) return { status: 400, body: { ok: false, error: result.error } };
+    return { status: 200, cors: true, body: { ok: true, skills: result.skills } };
 }
 
 // ── GET /config/tools + PUT /config/tools (AH.2) ─────────────────────────────
@@ -302,7 +267,7 @@ export async function handleSetSkills(body) {
  * @returns {HandlerResult}
  */
 export function handleGetToolsConfig() {
-    return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
+    return { status: 200, cors: true, body: { ok: true, tools: readDeclarativeToolsConfig() } };
 }
 
 /**
@@ -312,30 +277,9 @@ export function handleGetToolsConfig() {
  * @returns {Promise<HandlerResult>}
  */
 export async function handleSetToolsConfig(rawBody) {
-    const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
-
-    if ('allowlist' in body) {
-        if (
-            body['allowlist'] !== null &&
-            (!Array.isArray(body['allowlist']) ||
-                body['allowlist'].some((/** @type {unknown} */ t) => typeof t !== 'string'))
-        ) {
-            return { status: 400, body: { ok: false, error: 'allowlist deve ser string[] ou null' } };
-        }
-        await patchToolsConfig({ allowlist: body['allowlist'] });
-    }
-
-    if ('denylist' in body) {
-        if (
-            !Array.isArray(body['denylist']) ||
-            body['denylist'].some((/** @type {unknown} */ t) => typeof t !== 'string')
-        ) {
-            return { status: 400, body: { ok: false, error: 'denylist deve ser string[]' } };
-        }
-        await patchToolsConfig({ denylist: body['denylist'] });
-    }
-
-    return { status: 200, cors: true, body: { ok: true, tools: getToolsConfig() } };
+    const result = await updateDeclarativeToolsConfig(rawBody);
+    if (!result.ok) return { status: 400, body: { ok: false, error: result.error } };
+    return { status: 200, cors: true, body: { ok: true, tools: result.tools } };
 }
 
 // ── Custom tools (AI.2) ─────────────────────────────────────────────────────
@@ -346,8 +290,7 @@ export async function handleSetToolsConfig(rawBody) {
  * @returns {HandlerResult}
  */
 export function handleGetCustomTools() {
-    const tools = getCustomToolDefinitions();
-    const availableHandlers = [...BUILTIN_HANDLER_MAP.keys()];
+    const { tools, availableHandlers } = readDeclarativeCustomToolsConfig();
     return { status: 200, cors: true, body: { ok: true, tools, availableHandlers } };
 }
 
@@ -358,26 +301,9 @@ export function handleGetCustomTools() {
  * @returns {Promise<HandlerResult>}
  */
 export async function handleRegisterCustomTool(rawBody) {
-    const body = /** @type {Record<string, unknown>} */ (rawBody) ?? {};
-    if (typeof body['name'] !== 'string' || !body['name']) {
-        return { status: 400, body: { ok: false, error: 'name (string) é obrigatório' } };
-    }
-    if (typeof body['description'] !== 'string' || !body['description']) {
-        return { status: 400, body: { ok: false, error: 'description (string) é obrigatória' } };
-    }
-    if (typeof body['handlerId'] !== 'string' || !body['handlerId']) {
-        return { status: 400, body: { ok: false, error: 'handlerId (string) é obrigatório' } };
-    }
-    const result = await registerCustomTool({
-        name: body['name'],
-        description: body['description'],
-        handlerId: body['handlerId'],
-        ...(body['parameters'] != null && {
-            parameters: /** @type {Record<string, unknown>} */ (body['parameters']),
-        }),
-    });
+    const result = await registerDeclarativeCustomToolConfig(rawBody);
     if (!result.ok) return { status: 400, body: { ok: false, error: result.error } };
-    return { status: 201, cors: true, body: { ok: true, tool: { name: body['name'], handlerId: body['handlerId'] } } };
+    return { status: 201, cors: true, body: { ok: true, tool: result.tool } };
 }
 
 /**
@@ -387,9 +313,10 @@ export async function handleRegisterCustomTool(rawBody) {
  * @returns {Promise<HandlerResult>}
  */
 export async function handleDeleteCustomTool(params) {
-    const name = typeof params['name'] === 'string' ? params['name'] : undefined;
-    if (!name) return { status: 400, body: { ok: false, error: 'name é obrigatório' } };
-    const result = await removeCustomTool(name);
-    if (!result.ok) return { status: 404, body: { ok: false, error: result.error } };
+    const result = await removeDeclarativeCustomToolConfig(params);
+    if (!result.ok) {
+        const status = result.error === 'name é obrigatório' ? 400 : 404;
+        return { status, body: { ok: false, error: result.error } };
+    }
     return { status: 200, cors: true, body: { ok: true } };
 }

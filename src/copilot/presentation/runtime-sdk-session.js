@@ -3,10 +3,19 @@
  * @module copilot/presentation/runtime-sdk-session
  * @file Façade compartilhada das operações vanilla de sessão SDK (`mode/plan`) por runtime.
  *
- *   Esta camada evita que `terminal/` e futuras bordas runtime-aware chamem `getSdkSessionMode()` / `readSdkPlan()`
- *   diretamente no runtime, mantendo a seleção por `runtimeId` concentrada no accessor canônico de `presentation/`.
+ *   Esta camada resolve `runtimeId`; a semântica de `mode/plan` fica em `agent/facades/agent-sdk-session`.
+ * @typedef {import('./types.js').RuntimeSdkModeResult} RuntimeSdkModeResult
+ *
+ * @typedef {import('./types.js').RuntimeSdkPlanReadResult} RuntimeSdkPlanReadResult
  */
 
+import {
+    deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
+    readAgentSdkPlan as readAgentSdkPlanFromAgent,
+    readAgentSdkSessionMode,
+    setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
+    updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
+} from '#copilot/agent';
 import { getAgentRuntimeOrDefault } from './agent-runtime.js';
 
 /**
@@ -19,27 +28,27 @@ export function getAgentSdkSessionTarget(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ * @returns {Promise<RuntimeSdkModeResult>}
  */
 export async function getAgentSdkSessionMode(runtimeId) {
-    return getAgentSdkSessionTarget(runtimeId).getSdkSessionMode();
+    return readAgentSdkSessionMode(getAgentSdkSessionTarget(runtimeId));
 }
 
 /**
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
+ * @returns {Promise<RuntimeSdkModeResult>}
  */
 export async function setAgentSdkSessionMode(mode, runtimeId) {
-    return getAgentSdkSessionTarget(runtimeId).setSdkSessionMode(mode);
+    return setAgentSdkSessionModeOnAgent(getAgentSdkSessionTarget(runtimeId), mode);
 }
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('#copilot/sdk/types').PlanReadResult>}
+ * @returns {Promise<RuntimeSdkPlanReadResult>}
  */
 export async function readAgentSdkPlan(runtimeId) {
-    return getAgentSdkSessionTarget(runtimeId).readSdkPlan();
+    return readAgentSdkPlanFromAgent(getAgentSdkSessionTarget(runtimeId));
 }
 
 /**
@@ -48,7 +57,7 @@ export async function readAgentSdkPlan(runtimeId) {
  * @returns {Promise<object>}
  */
 export async function updateAgentSdkPlan(content, runtimeId) {
-    return getAgentSdkSessionTarget(runtimeId).updateSdkPlan(content);
+    return updateAgentSdkPlanOnAgent(getAgentSdkSessionTarget(runtimeId), content);
 }
 
 /**
@@ -56,5 +65,5 @@ export async function updateAgentSdkPlan(content, runtimeId) {
  * @returns {Promise<object>}
  */
 export async function deleteAgentSdkPlan(runtimeId) {
-    return getAgentSdkSessionTarget(runtimeId).deleteSdkPlan();
+    return deleteAgentSdkPlanOnAgent(getAgentSdkSessionTarget(runtimeId));
 }

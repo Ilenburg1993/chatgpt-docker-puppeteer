@@ -8,6 +8,13 @@
  * quentes de lifecycle/session devem depender desta porta, não de `tools/bootstrap.js` ou `tools/hook-tools.js`
  * diretamente.
  *
+ * Responsabilidades desta porta:
+ *
+ * - montar o registry de tools do agent;
+ * - vincular/desvincular a sessão SDK ativa aos helpers legados de tools;
+ * - resolver respostas de `ask_user` que vieram por tools/hook-tools;
+ * - preservar shims temporários até `tools/` também falar em capabilities explícitas.
+ *
  * @module copilot/agent/ports/tool-port
  * @internal
  */
@@ -24,6 +31,11 @@ import {
 import { resolveUserInput } from '../../tools/hook-tools.js';
 
 /**
+ * Registra tools do runtime e tools vindas do MCP no registry recebido.
+ *
+ * O caller continua dono do lifecycle do registry; esta porta só executa o bootstrap concreto para que `session-setup`
+ * não precise importar `tools/bootstrap.js`.
+ *
  * @param {import('#copilot/sdk/tools-registry').ToolRegistry} registry
  * @param {import('#copilot/sdk/types').Tool[]} mcpTools
  * @returns {import('#copilot/sdk/types').Tool[]}
@@ -33,6 +45,11 @@ export function bootstrapAgentTools(registry, mcpTools) {
 }
 
 /**
+ * Propaga a sessão SDK ativa para helpers de tools que ainda dependem de estado global legado.
+ *
+ * Quando essa compatibilidade desaparecer, este método deve virar no-op ou ser removido junto com os shims
+ * correspondentes em `tools/`.
+ *
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @returns {void}
  */
@@ -48,6 +65,8 @@ export function bindAgentSessionTools(session) {
 }
 
 /**
+ * Resolve uma resposta pendente de input do usuário através do canal legado de hook-tools.
+ *
  * @param {string} answer
  * @returns {boolean}
  */
@@ -56,6 +75,8 @@ export function resolveAgentUserInput(answer) {
 }
 
 /**
+ * Remove referências da sessão SDK ativa nos helpers legados de tools durante shutdown.
+ *
  * @returns {void}
  */
 export function unbindAgentSessionTools() {
@@ -70,6 +91,8 @@ export function unbindAgentSessionTools() {
 }
 
 /**
+ * Lê o TODO store exposto por `tools/` através da porta do agent.
+ *
  * @returns {Promise<Awaited<ReturnType<typeof readStore>>>}
  */
 export function readAgentTodoStore() {

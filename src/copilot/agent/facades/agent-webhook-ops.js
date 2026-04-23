@@ -16,7 +16,7 @@
  * @returns {{ id: string; url: string }}
  */
 export function registerWebhook(ctx, url) {
-    return ctx.webhooks.register(url);
+    return ctx.registerWebhook(url);
 }
 
 /**
@@ -27,7 +27,7 @@ export function registerWebhook(ctx, url) {
  * @returns {boolean} true se removido, false se não encontrado
  */
 export function unregisterWebhook(ctx, id) {
-    return ctx.webhooks.unregister(id);
+    return ctx.unregisterWebhook(id);
 }
 
 /**
@@ -37,5 +37,5 @@ export function unregisterWebhook(ctx, id) {
  * @returns {{ id: string; url: string }[]}
  */
 export function listWebhooks(ctx) {
-    return ctx.webhooks.list();
+    return ctx.listWebhooks();
 }

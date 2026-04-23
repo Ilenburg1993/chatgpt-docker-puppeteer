@@ -16,10 +16,13 @@ Fachadas finas do `AlwaysAliveAgent`.
 | `agent-model-config.js`         | modelo, reasoning e listagem de modelos                                                      |
 | `agent-webhook-ops.js`          | operações de webhook/integração expostas pela fachada do agente                              |
 | `agent-runtime-capabilities.js` | mapa canônico das capabilities públicas atuais do runtime                                    |
+| `index.js`                      | barrel canônico das façades modernas reexportadas por `agent/index.js`                       |
 
 ## Regra de uso
 
 - `always-alive.js` deve delegar aqui em vez de carregar lógica operacional densa.
+- novas bordas devem preferir imports de façades/projections nomeadas, não crescer o barrel amplo de
+  `agent/index.js`.
 - Toda capability análoga ao SDK deve nascer de `sdk/` e ser exposta aqui só quando fizer sentido
   como API pública do runtime.
 - Esta pasta não é lugar para UI, REPL ou formatting.

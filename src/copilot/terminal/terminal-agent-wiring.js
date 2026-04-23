@@ -25,8 +25,9 @@ import { markTerminalActivityIdle, recordTerminalActivity } from './activity-sta
 import { registerUnhandledAgentSseFallback } from './agent-sse-fallback.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog.js';
 import {
-    getTerminalAgentRuntime,
+    abortTerminalCurrentMessage,
     pingTerminalDialogWatchdog,
+    readTerminalAgentRuntimeEventHost,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
     stopTerminalDialogMode,
@@ -48,8 +49,8 @@ export function registerAgentEventListeners(printBanner) {
     // T-14: guard contra registros duplicados (ex: hot-reload, tests)
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
-    const agent = getTerminalAgentRuntime();
-    agent.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
+    const agentEvents = readTerminalAgentRuntimeEventHost();
+    agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         recordTerminalActivity('system', 'Watchdog disparou', {
             detail: `${secs}s sem progresso`,
@@ -60,7 +61,7 @@ export function registerAgentEventListeners(printBanner) {
 
         // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
         // 1. Abortar mensagem travada (session.abort — 0 PR)
-        await agent.abortCurrentMessage();
+        await abortTerminalCurrentMessage();
 
         // 2. Aguardar até 5s para o ask_user reaparecer (0 PR se reaparecer)
         const recovered = await new Promise((resolve) => {
@@ -118,7 +119,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
-    agent.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
+    agentEvents.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         broadcastSse('dialog.reply', {
             content: evt.reply,
@@ -128,10 +129,10 @@ export function registerAgentEventListeners(printBanner) {
         });
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    agent.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
+    agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
         broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
     });
-    agent.on(EMITTER_DIALOG_READY, () => {
+    agentEvents.on(EMITTER_DIALOG_READY, () => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         markTerminalActivityIdle('Aguardando próxima mensagem');
         broadcastSse('dialog.ready', {
@@ -140,7 +141,7 @@ export function registerAgentEventListeners(printBanner) {
             reasoningEffort,
         });
     });
-    agent.on(EMITTER_ASSISTANT_STREAMING_DELTA, (/** @type {{ totalResponseSizeBytes?: number }} */ evt) => {
+    agentEvents.on(EMITTER_ASSISTANT_STREAMING_DELTA, (/** @type {{ totalResponseSizeBytes?: number }} */ evt) => {
         const totalBytes = Number(evt?.totalResponseSizeBytes ?? 0);
         if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
             return;
@@ -153,7 +154,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
-    agent.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
+    agentEvents.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
         if (reason === 'authorized_stop') {
@@ -195,7 +196,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AA.4: SSE 'context' event
-    agent.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
+    agentEvents.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
             broadcastSse('session.usage', {
@@ -208,7 +209,7 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // AB.4: SSE 'cache.hit'
-    agent.on(
+    agentEvents.on(
         'session.compaction_complete',
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
             const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
@@ -219,23 +220,26 @@ export function registerAgentEventListeners(printBanner) {
     );
 
     // Persiste reconexões e sessões fatais no Hub
-    agent.on('ready', async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
-        // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
-        if (!evt.reconected) {
-            printBanner();
-        }
-        const _hubSessionId = getHubSessionId();
-        if (!_hubSessionId || !evt.reconected) return;
-        try {
-            await writeTerminalHubSystemTurn(
-                _hubSessionId,
-                `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
-            );
-        } catch (e) {
-            logSwallowed(e, 'terminal.index.reconnectWriteTurn');
-        }
-    });
-    agent.on(EMITTER_SESSION_FATAL, async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
+    agentEvents.on(
+        'ready',
+        async (/** @type {{ sessionId: string; isResumed: boolean; reconected?: boolean }} */ evt) => {
+            // F10.3: banner de status após agente pronto (só na primeira vez, não em reconexões)
+            if (!evt.reconected) {
+                printBanner();
+            }
+            const _hubSessionId = getHubSessionId();
+            if (!_hubSessionId || !evt.reconected) return;
+            try {
+                await writeTerminalHubSystemTurn(
+                    _hubSessionId,
+                    `[SISTEMA] Session reconectada: ${evt.sessionId} (retomada: ${evt.isResumed})`,
+                );
+            } catch (e) {
+                logSwallowed(e, 'terminal.index.reconnectWriteTurn');
+            }
+        },
+    );
+    agentEvents.on(EMITTER_SESSION_FATAL, async (/** @type {{ originalError: string; attempts: number }} */ evt) => {
         const _hubSessionId = getHubSessionId();
         if (!_hubSessionId) return;
         try {
@@ -248,7 +252,7 @@ export function registerAgentEventListeners(printBanner) {
         }
     });
 
-    setupTerminalTaskStreamListeners({ agent });
+    setupTerminalTaskStreamListeners({ agent: agentEvents });
 
     // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
     // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
@@ -295,5 +299,5 @@ export function registerAgentEventListeners(printBanner) {
         'task.error',
         'task.reasoning',
     ]);
-    registerUnhandledAgentSseFallback({ agent, handledEvents });
+    registerUnhandledAgentSseFallback({ agent: agentEvents, handledEvents });
 }

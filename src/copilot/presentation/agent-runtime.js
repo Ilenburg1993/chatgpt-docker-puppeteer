@@ -15,6 +15,7 @@ import {
     listAgentRuntimes,
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
 } from '#copilot/agent';
+import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
 import { normalizeRuntimeId } from './runtime-targeting.js';
 
 /**
@@ -124,11 +125,14 @@ export function requireAgentRuntime(runtimeId) {
  */
 export function listKnownAgentRuntimes() {
     const defaultRuntimeId = readDefaultAgentRuntimeId();
-    return listAgentRuntimes().map(({ runtimeId, runtime }) => ({
-        runtimeId,
-        status: String(runtime.status ?? 'unknown'),
-        model: String(runtime.model ?? 'unknown'),
-        sessionId: runtime.sessionId ?? null,
-        isDefault: runtimeId === defaultRuntimeId,
-    }));
+    return listAgentRuntimes().map(({ runtimeId, runtime }) => {
+        const state = readRuntimeControlState(runtime);
+        return {
+            runtimeId,
+            status: state.status,
+            model: state.model,
+            sessionId: state.sessionId,
+            isDefault: runtimeId === defaultRuntimeId,
+        };
+    });
 }

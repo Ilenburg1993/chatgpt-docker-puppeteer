@@ -68,6 +68,35 @@ Com isso, `lifecycle/session-setup.js`, `lifecycle/agent-lifecycle.js` e `health
 a dependência do shape cru de `configState/sessionState/dialogState/runtimeState/...`, aproximando o
 módulo do critério CA-3 da consolidação arquitetural.
 
+## Padrão de factories do `AgentContext`
+
+Managers vivos do runtime não devem ser materializados diretamente dentro do corpo do `AgentContext`
+quando puderem evoluir como capability.
+
+O padrão atual é:
+
+- `agent/ports/*` define a fronteira com capacidades externas ao agent;
+- `agent/context-factories.js` materializa os managers/capabilities default do contexto;
+- `AgentContext` recebe overrides estreitos via `options.factories`;
+- `agent/facades/*` expõe apenas capabilities públicas do runtime para bordas.
+
+Use esse padrão quando uma dependência:
+
+- precisa existir durante todo o ciclo de vida do agent;
+- tem callbacks para o emitter ou para invalidação de estado;
+- pode ganhar implementação alternativa em testes, multi-runtime ou runtime secundário;
+- não deve vazar como manager cru para `server/`, `terminal/` ou `presentation/`.
+
+Exemplo já consolidado: permissões. O `PermissionController` continua atrás de
+`agent/ports/permission-port.js`, mas o `AgentContext` o recebe por factory e consome apenas a
+superfície semântica (`getPermissionHandlerSnapshot()`, `getPermissionModeSnapshot()`,
+`setPermissionMode()`).
+
+Factories também devem se autodescrever quando virarem parte do capability map. O snapshot
+`getContextFactoryCapabilitiesSnapshot()` expõe metadata defensiva de origem/autoridade (`provider`,
+`factory`, `runtimeAuthority`) sem transformar isso em readiness operacional. Readiness continua
+sendo decisão das façades/capabilities, combinando metadata da factory com estado vivo.
+
 ## Relação com `presentation/`
 
 `agent/` continua sendo o dono do runtime.

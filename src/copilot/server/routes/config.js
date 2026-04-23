@@ -33,7 +33,8 @@ const infiniteSessionBodySchema = z.object({
 });
 
 const skillsBodySchema = z.object({
-    skills: z.array(z.string()).min(0),
+    paths: z.array(z.string()).min(0).optional(),
+    skills: z.array(z.string()).min(0).optional(),
 });
 
 const toolsConfigBodySchema = z.object({
@@ -43,8 +44,9 @@ const toolsConfigBodySchema = z.object({
 
 const customToolBodySchema = z.object({
     name: z.string().min(1).max(128),
-    description: z.string().max(1024).optional(),
-    schema: z.record(z.string(), z.unknown()).optional(),
+    description: z.string().min(1).max(1024),
+    handlerId: z.string().min(1),
+    parameters: z.record(z.string(), z.unknown()).optional(),
 });
 
 const customToolParamsSchema = z.object({

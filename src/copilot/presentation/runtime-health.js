@@ -8,6 +8,8 @@
  */
 
 import { readAgentRuntimeHealthSnapshot } from '#copilot/agent';
+import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
+import { readAgentRuntimeSdkResourceSnapshot } from '../agent/facades/agent-runtime-status.js';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
@@ -113,7 +115,7 @@ export function getAgentHealthHttpStatus(health) {
  */
 export function buildAgentModuleHealth(agent) {
     const health = getAgentHealthSnapshotCompat(agent);
-    const sdkResources = typeof agent.getSdkResourceSnapshot === 'function' ? agent.getSdkResourceSnapshot() : null;
+    const sdkResources = readAgentRuntimeSdkResourceSnapshot(agent);
 
     return {
         ok: health.ok,
@@ -164,6 +166,7 @@ export function buildDefaultAgentModuleHealth(runtimeId) {
  */
 export function buildLegacyAgentHealth(agent) {
     const snap = /** @type {LegacyAgentSnap} */ (readAgentStatusSnapshot(agent));
+    const controlState = readRuntimeControlState(agent);
     const operational = snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
 
     /** @type {string[]} */
@@ -183,7 +186,7 @@ export function buildLegacyAgentHealth(agent) {
         sessionId: snap.sessionId,
         model: snap.model,
         reasoningEffort: undefined,
-        dialogLoopActive: Boolean(agent.dialogLoopActive),
+        dialogLoopActive: controlState.dialogLoopActive,
         pendingQuestion: snap.pendingQuestion !== null,
         pendingQuestionKind:
             snap.pendingQuestion && typeof snap.pendingQuestion === 'object'
@@ -224,9 +227,9 @@ export function buildLegacyAgentHealth(agent) {
             },
             dialog: {
                 ok: true,
-                active: Boolean(agent.dialogLoopActive),
+                active: controlState.dialogLoopActive,
                 attached: true,
-                paused: Boolean(agent.dialogPaused),
+                paused: controlState.dialogPaused,
             },
             queue: {
                 ok: !snap.starvationAlert,

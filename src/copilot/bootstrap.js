@@ -68,14 +68,28 @@ export async function bootCopilot() {
     ]);
 
     // ── Phase 3: Terminal (único modo) ──────────────────────────────────
-    const [{ wireTerminalDI }, { startTerminalServer }] = await Promise.all([
-        import('./terminal/di-wiring.js'),
+    const [{ wireCopilotRuntimeDI }, { startTerminalServer }, { startTodoCleanupJob }] = await Promise.all([
+        import('./runtime-wiring.js'),
         import('./terminal/index.js'),
+        import('./tools/todo/store.js'),
     ]);
 
     // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
-    // wireTerminalDI() é idempotente; startTerminalServer() pode chamá-la novamente sem efeito.
-    wireTerminalDI();
+    // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
+    const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
+    wireRuntime();
 
-    await startTerminalServer({ startCopilotServer });
+    await startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob });
+}
+
+/**
+ * Adapter tardio para evitar que `runtime-wiring` importe a borda terminal.
+ *
+ * @param {string} event
+ * @param {unknown} [payload]
+ * @returns {void}
+ */
+function startTerminalServerBroadcast(event, payload) {
+    const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
+    void import('./terminal/dialog.js').then(({ broadcastSse }) => broadcastSse(event, data));
 }

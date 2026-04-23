@@ -13,6 +13,7 @@ import { log } from '#copilot/observability';
 import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -21,30 +22,16 @@ import { projectAgentHttpError } from '../../../presentation/agent-http-errors.j
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('./control.js').AlwaysAliveAgentLike} AlwaysAliveAgentLike
+ * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {{ agent: AlwaysAliveAgentLike; runtimeId: string }} RuntimeRouteDeps
- *
- * @typedef {AlwaysAliveAgentLike | ((req: Req) => RuntimeRouteDeps)} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
  *
  * @typedef {Object} SendRequestBody
  * @property {string} message - Texto da mensagem a enviar ao agente
  * @property {boolean} [waitForResponse] - Aguardar resposta síncrona (default: false)
  * @property {number} [timeoutMs] - Timeout em ms ao aguardar resposta (default: 30000)
- * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Arquivos/contexto extras
+ * @property {unknown[]} [attachments] - Arquivos/contexto extras já validados pela borda chamadora
  */
-
-/**
- * @param {RuntimeRouteBinding} binding
- * @param {Req} req
- * @returns {RuntimeRouteDeps}
- */
-function resolveRuntimeRouteDeps(binding, req) {
-    if (typeof binding === 'function') {
-        return binding(req);
-    }
-    return { agent: binding, runtimeId: 'default' };
-}
 
 /**
  * Registra rotas de tarefas do agente no router fornecido.
@@ -62,7 +49,7 @@ export function registerTaskRoutes(bridge, binding) {
      * Body: { message: string, waitForResponse?: boolean, timeoutMs?: number, attachments?: Array }
      */
     bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         const { message, waitForResponse = false, timeoutMs = 30000, attachments } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
@@ -112,10 +99,12 @@ export function registerTaskRoutes(bridge, binding) {
 
             // Enfileira sem aguardar — G2-API-07: retornar taskId para rastreabilidade no SSE
             const taskId = randomUUID();
-            const sendPromise = agent.sendMessage(message, {
-                ...(attachments !== undefined ? { attachments } : {}),
-                taskId,
-            });
+            const sendOptions =
+                /** @type {Parameters<RuntimeRouteDeps['agent']['sendMessage']>[1] & { taskId: string }} */ ({
+                    ...(attachments !== undefined ? { attachments } : {}),
+                    taskId,
+                });
+            const sendPromise = agent.sendMessage(message, sendOptions);
             // Aguarda exatamente uma microtask para capturar rejeição imediata (ex.: QUEUE_FULL)
             // sem transformar o endpoint assíncrono em wait-for-response completo.
             /** @type {unknown} */
@@ -156,7 +145,7 @@ export function registerTaskRoutes(bridge, binding) {
      * Body: { answer: string }
      */
     bridge.post('/answer', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, req);
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
         const { answer } = req.body ?? {};
 
         if (!answer || typeof answer !== 'string') {
@@ -176,7 +165,7 @@ export function registerTaskRoutes(bridge, binding) {
      * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
      */
     bridge.post('/answer/clear-shadow', (_req, /** @type {Res} */ res) => {
-        const { agent } = resolveRuntimeRouteDeps(binding, /** @type {Req} */ (_req));
+        const { agent } = resolveCopilotApiRouteBinding(binding, /** @type {Req} */ (_req));
         if (typeof agent.clearPendingQuestionShadow !== 'function') {
             return res.status(501).json({
                 ok: false,

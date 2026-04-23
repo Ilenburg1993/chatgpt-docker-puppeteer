@@ -12,10 +12,11 @@ import { log } from '#copilot/observability';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import { embedMultiple, readFileContext } from '../file-context.js';
 import {
-    getTerminalAgentRuntime,
     readTerminalDialogStreamMeta,
+    readTerminalRuntimeControlState,
     readTerminalRuntimeState,
     runTerminalDialogTurn,
+    startTerminalAgentRuntime,
     startTerminalDialogMode,
 } from '../frontend/llm-b-runtime.js';
 import {
@@ -71,10 +72,11 @@ let _ensureDialogLoopInFlight = null;
  * @returns {Promise<void>}
  */
 export function ensureDialogLoop() {
-    if (getTerminalAgentRuntime().dialogLoopActive) {
+    const runtimeState = readTerminalRuntimeControlState();
+    if (runtimeState.dialogLoopActive) {
         return Promise.resolve();
     }
-    if (getTerminalAgentRuntime().dialogPaused) {
+    if (runtimeState.dialogPaused) {
         log('INFO', '[dialog] ensureDialogLoop() ignorado — dialogPaused=true (pausado pelo usuário)');
         return Promise.resolve();
     }
@@ -130,19 +132,18 @@ async function _doEnsureDialogLoop() {
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
-    const agent = getTerminalAgentRuntime();
-    const status = agent.status;
+    const status = readTerminalRuntimeControlState().status;
     if (status === 'stopped') {
         recordTerminalActivity('boot', 'Iniciando agente', {
             detail: 'AlwaysAliveAgent start()',
             source: 'dialog',
         });
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
-        await agent.start();
+        await startTerminalAgentRuntime();
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timeout aguardando idle')), 30_000);
             const check = () => {
-                if (agent.status === 'idle') {
+                if (readTerminalRuntimeControlState().status === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
                 } else {
@@ -153,7 +154,7 @@ async function _tryStartDialogLoop() {
         });
     }
 
-    if (agent.status === 'processing') {
+    if (readTerminalRuntimeControlState().status === 'processing') {
         recordTerminalActivity('boot', 'Aguardando agente ficar idle', {
             detail: 'Há trabalho em andamento antes do dialog loop',
             source: 'dialog',
@@ -165,7 +166,7 @@ async function _tryStartDialogLoop() {
                 30_000,
             );
             const check = () => {
-                const s = agent.status;
+                const s = readTerminalRuntimeControlState().status;
                 if (s === 'idle') {
                     clearTimeout(timeout);
                     resolve(undefined);
@@ -229,7 +230,6 @@ export function sendTurn(message, actor = 'user') {
  * @returns {Promise<string | null>}
  */
 async function _executeTurn(message, actor) {
-    const agent = getTerminalAgentRuntime();
     const runtimeState = readTerminalRuntimeState();
     const ctxState = runtimeState.contextWindow;
     if (ctxState) {
@@ -370,7 +370,7 @@ async function _executeTurn(message, actor) {
         });
         println(`[erro] ${toError(e).message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
-        if (!agent.dialogLoopActive) {
+        if (!readTerminalRuntimeControlState().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             setTimeout(() => {
                 ensureDialogLoop().catch((restartErr) => {
@@ -381,7 +381,7 @@ async function _executeTurn(message, actor) {
         return null;
     } finally {
         setBusy(false);
-        if (agent.dialogLoopActive) {
+        if (readTerminalRuntimeControlState().dialogLoopActive) {
             markTerminalActivityIdle();
         }
         broadcastSse('busy', { busy: false });

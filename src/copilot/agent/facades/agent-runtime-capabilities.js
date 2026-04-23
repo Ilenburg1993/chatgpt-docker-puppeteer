@@ -13,6 +13,9 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  * @typedef {import('../types.js').IAlwaysAliveAgent & {
  *     listWebhooks?: () => unknown[];
  *     getHandoffManager?: () => unknown;
+ *     getPermissionCapabilitySnapshot?: () => Record<string, unknown>;
+ *     getContextFactoryCapabilitiesSnapshot?: () => Record<string, Record<string, unknown>>;
+ *     getToolRegistryEntriesSnapshot?: (() => unknown[]) | undefined;
  * }} CapabilityAgent
  */
 
@@ -21,10 +24,18 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  */
 
 /**
+ * Capability pública observável do runtime.
+ *
+ * A diferença entre `available` e `state` é deliberada:
+ *
+ * - `available=false` significa que a superfície não existe nesse runtime/adaptador;
+ * - `available=true` com `state=degraded` significa que a superfície existe, mas o health atual indica risco;
+ * - `state=unknown` é usado para compat/shims que existem, mas ainda não têm readiness própria.
+ *
  * @typedef {{
  *     id: string;
  *     title: string;
- *     layer: 'runtime' | 'sdk' | 'dialog' | 'integration' | 'governance' | 'observability' | 'recovery';
+ *     layer: 'runtime' | 'sdk' | 'tools' | 'dialog' | 'integration' | 'governance' | 'observability' | 'recovery';
  *     available: boolean;
  *     state: AgentRuntimeCapabilityState;
  *     degraded: boolean;
@@ -34,6 +45,10 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  */
 
 /**
+ * Snapshot agregado de capabilities do runtime.
+ *
+ * `capabilities` é otimizado para lookup por id; `list` preserva ordem estável para UI, logs e comparação em testes.
+ *
  * @typedef {{
  *     capabilityCount: number;
  *     readyCount: number;
@@ -45,12 +60,18 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  */
 
 /**
+ * Opções de leitura do capability map.
+ *
+ * `healthSnapshot` pode ser injetado para evitar dupla coleta quando `presentation/` já precisou montar health compat.
+ *
  * @typedef {{
  *     healthSnapshot?: import('../types.js').AgentHealthSnapshot | Record<string, unknown> | null;
  * }} AgentRuntimeCapabilitiesOptions
  */
 
 /**
+ * Normaliza acesso defensivo a snapshots vindos de runtimes compat.
+ *
  * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
@@ -59,6 +80,8 @@ function asRecord(value) {
 }
 
 /**
+ * Lê paths aninhados sem assumir que o snapshot veio completo.
+ *
  * @param {Record<string, unknown> | null} root
  * @param {string[]} path
  * @returns {unknown}
@@ -105,6 +128,11 @@ function capability(id, title, layer, available, state, options = {}) {
 }
 
 /**
+ * Converte checks opcionais de health em readiness de capability.
+ *
+ * A falta de check explícito vira `unknown`, não `degraded`, para não punir runtimes compat que ainda não reportam
+ * health por subsistema.
+ *
  * @param {boolean | null} ok
  * @param {boolean} available
  * @returns {AgentRuntimeCapabilityState}
@@ -117,6 +145,11 @@ function stateFromCheck(ok, available) {
 }
 
 /**
+ * Lê o mapa canônico de capabilities públicas do runtime atual.
+ *
+ * Esta função não deve produzir payload HTTP nem aplicar regras de roteamento/fallback de runtime. Esse embrulho fica
+ * em `presentation/runtime-capabilities.js`.
+ *
  * @param {CapabilityAgent} agent
  * @param {AgentRuntimeCapabilitiesOptions} [options]
  * @returns {AgentRuntimeCapabilitiesSnapshot}
@@ -137,8 +170,32 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             : typeof snap['permissionMode'] === 'string'
               ? snap['permissionMode']
               : 'approve_all';
+    const permissionCapability =
+        typeof agent.getPermissionCapabilitySnapshot === 'function' ? agent.getPermissionCapabilitySnapshot() : null;
+    const permissionCapabilityRecord = asRecord(permissionCapability);
+    const factoryCapabilities =
+        typeof agent.getContextFactoryCapabilitiesSnapshot === 'function'
+            ? asRecord(agent.getContextFactoryCapabilitiesSnapshot())
+            : null;
+    const queueFactory = asRecord(factoryCapabilities?.['runtime.queue']);
+    const dialogFactory = asRecord(factoryCapabilities?.['dialog.loop']);
+    const permissionsFactory = asRecord(factoryCapabilities?.['governance.permissions']);
+    const toolsFactory = asRecord(factoryCapabilities?.['tools.registry']);
+    const webhooksFactory = asRecord(factoryCapabilities?.['integration.webhooks']);
+    const handoffFactory = asRecord(factoryCapabilities?.['integration.handoff']);
+    const permissionHandlerAvailable = readBoolean(permissionCapabilityRecord?.['handlerAvailable']);
+    const permissionCapabilityAvailable =
+        permissionCapabilityRecord !== null || typeof agent.getPermissionMode === 'function';
+    const permissionCapabilityState =
+        permissionHandlerAvailable === false ? 'degraded' : permissionCapabilityAvailable ? 'ready' : 'unknown';
     const webhookCount = typeof agent.listWebhooks === 'function' ? agent.listWebhooks().length : null;
     const hasHandoffManager = typeof agent.getHandoffManager === 'function';
+    const toolRegistryEntries =
+        typeof agent.getToolRegistryEntriesSnapshot === 'function' ? agent.getToolRegistryEntriesSnapshot() : null;
+    const toolRegistryAvailableFlag = readBoolean(sdkResourceFlags?.['toolRegistryAvailable']);
+    const toolRegistryAvailable = toolRegistryEntries !== null || toolRegistryAvailableFlag === true;
+    const toolRegistryState =
+        toolRegistryAvailableFlag === false ? 'degraded' : toolRegistryAvailable ? 'ready' : 'unknown';
 
     const runtimeOk = readBoolean(readPath(checks, ['runtime', 'ok']));
     const sessionOk = readBoolean(readPath(checks, ['session', 'ok']));
@@ -163,6 +220,9 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
                 queueSize: snap['queueSize'] ?? 0,
                 oldestTaskWaitMs: snap['oldestTaskWaitMs'] ?? 0,
                 starvationAlert: Boolean(snap['starvationAlert']),
+                provider: queueFactory?.['provider'] ?? null,
+                factory: queueFactory?.['factory'] ?? null,
+                runtimeAuthority: queueFactory?.['runtimeAuthority'] ?? null,
             },
         }),
         capability('sdk.client', 'SDK client', 'sdk', true, stateFromCheck(clientOk, true), {
@@ -192,6 +252,15 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
                 },
             },
         ),
+        capability('tools.registry', 'Tool registry', 'tools', toolRegistryAvailable, toolRegistryState, {
+            details: {
+                count: Array.isArray(toolRegistryEntries) ? toolRegistryEntries.length : null,
+                provider: toolsFactory?.['provider'] ?? null,
+                factory: toolsFactory?.['factory'] ?? null,
+                sdkFirst: toolsFactory?.['sdkFirst'] ?? null,
+                runtimeAuthority: toolsFactory?.['runtimeAuthority'] ?? null,
+            },
+        }),
         capability(
             'dialog.loop',
             'Dialog loop',
@@ -204,6 +273,9 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
                     paused: Boolean(agent.dialogPaused),
                     pendingQuestion: Boolean(health?.['pendingQuestion']),
                     pendingQuestionKind: health?.['pendingQuestionKind'] ?? null,
+                    provider: dialogFactory?.['provider'] ?? null,
+                    factory: dialogFactory?.['factory'] ?? null,
+                    runtimeAuthority: dialogFactory?.['runtimeAuthority'] ?? null,
                 },
             },
         ),
@@ -218,10 +290,21 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             'governance.permissions',
             'Permission policy',
             'governance',
-            typeof agent.getPermissionMode === 'function',
-            typeof agent.getPermissionMode === 'function' ? 'ready' : 'unknown',
+            permissionCapabilityAvailable,
+            permissionCapabilityState,
             {
-                details: { mode: permissionMode },
+                details: {
+                    mode: permissionCapabilityRecord?.['mode'] ?? permissionMode,
+                    handlerAvailable: permissionHandlerAvailable,
+                    provider: permissionCapabilityRecord?.['provider'] ?? permissionsFactory?.['provider'] ?? null,
+                    factory: permissionCapabilityRecord?.['factory'] ?? permissionsFactory?.['factory'] ?? null,
+                    sdkFirst: permissionCapabilityRecord?.['sdkFirst'] ?? null,
+                    stableHandler: permissionCapabilityRecord?.['stableHandler'] ?? null,
+                    runtimeAuthority:
+                        permissionCapabilityRecord?.['runtimeAuthority'] ??
+                        permissionsFactory?.['runtimeAuthority'] ??
+                        null,
+                },
             },
         ),
         capability(
@@ -231,7 +314,12 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             typeof agent.listWebhooks === 'function',
             typeof agent.listWebhooks === 'function' ? 'ready' : 'unknown',
             {
-                details: { registered: webhookCount },
+                details: {
+                    registered: webhookCount,
+                    provider: webhooksFactory?.['provider'] ?? null,
+                    factory: webhooksFactory?.['factory'] ?? null,
+                    runtimeAuthority: webhooksFactory?.['runtimeAuthority'] ?? null,
+                },
             },
         ),
         capability(
@@ -240,6 +328,13 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             'integration',
             hasHandoffManager,
             hasHandoffManager ? 'ready' : 'unknown',
+            {
+                details: {
+                    provider: handoffFactory?.['provider'] ?? null,
+                    factory: handoffFactory?.['factory'] ?? null,
+                    runtimeAuthority: handoffFactory?.['runtimeAuthority'] ?? null,
+                },
+            },
         ),
         capability(
             'observability.health',

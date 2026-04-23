@@ -9,4 +9,15 @@
  * @internal
  */
 
-export { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, SYSTEM_PROMPT_SECTIONS, approveAll } from '#copilot/sdk';
+export {
+    BUILTIN_HANDLER_MAP,
+    INFINITE_SESSION_DEFAULTS,
+    REASONING_EFFORTS,
+    SYSTEM_PROMPT_SECTIONS,
+    approveAll,
+    getCustomToolDefinitions,
+    getToolsConfig,
+    patchToolsConfig,
+    registerCustomTool,
+    removeCustomTool,
+} from '#copilot/sdk';

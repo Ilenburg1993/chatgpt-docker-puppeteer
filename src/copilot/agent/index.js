@@ -50,12 +50,54 @@ export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, Agent
 
 // ── Subsistemas ──────────────────────────────────────────────
 export * from './dialog/index.js';
-export * from './facades/agent-dialog-runtime.js';
-export * from './facades/agent-runtime-capabilities.js';
-export * from './facades/agent-runtime-controls.js';
-export * from './facades/agent-runtime-ownership.js';
-export * from './facades/agent-runtime-status.js';
-export * from './facades/agent-runtime-webhooks.js';
+export {
+    abortRuntimeCurrentMessage,
+    answerRuntimePendingQuestion,
+    clearRuntimePendingQuestionShadow,
+    clearRuntimeSdkSessionOwnership,
+    createRuntimeSnapshot,
+    deleteAgentSdkPlan,
+    getRuntimeHandoffHistory,
+    getRuntimeHandoffManager,
+    listAgentRuntimeWebhooks,
+    listRuntimeSnapshots,
+    listSdkCatalogModels,
+    loadRuntimeSnapshot,
+    offRuntimeEvent,
+    onRuntimeEvent,
+    onceRuntimeEvent,
+    pauseRuntimeDialogLoop,
+    readAgentRuntimeCapabilities,
+    readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeSdkResourceSnapshot,
+    readAgentRuntimeStatusSnapshot,
+    readAgentRuntimeStatusValue,
+    readAgentRuntimeTodoSummaries,
+    readAgentRuntimeToolEntries,
+    readAgentRuntimeTools,
+    readAgentSdkPlan,
+    readAgentSdkSessionMode,
+    readRuntimeControlState,
+    readRuntimeInteractionState,
+    readRuntimeModelSelection,
+    readRuntimePrBudgetSnapshot,
+    readSdkModelMetadata,
+    readSdkModelStats,
+    registerAgentRuntimeWebhook,
+    resumeRuntimeDialogLoop,
+    saveRuntimeSnapshot,
+    sendAgentDialogTurn,
+    setAgentSdkSessionMode,
+    setRuntimeBackgroundCompactionThreshold,
+    setRuntimeModel,
+    setRuntimeReasoningEffort,
+    startAgentDialogLoop,
+    startRuntime,
+    stopAgentDialogLoopAuthorized,
+    syncRuntimeSdkSessionOwnership,
+    unregisterAgentRuntimeWebhook,
+    updateAgentSdkPlan,
+} from './facades/index.js';
 export * from './health-check.js';
 export * from './infra/index.js';
 export * from './lifecycle/index.js';

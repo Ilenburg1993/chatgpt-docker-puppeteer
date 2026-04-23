@@ -15,18 +15,9 @@
  * @see EventBus
  */
 
-import {
-    EMITTER_AGENT_BACKGROUND_COMPLETED,
-    EMITTER_AGENT_BACKGROUND_IDLE,
-    EMITTER_PERMISSION_MODE_CHANGED,
-    EMITTER_PROCESS_QUEUE,
-    EMITTER_STATUS,
-} from '#copilot/events';
-import { createRegistry } from '#copilot/sdk';
-import { COPILOT_MODEL, COPILOT_REASONING_EFFORT, MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
-import { WebhookManager } from '../infra/webhooks.js';
-import { BackgroundTasks } from './background-tasks.js';
-import { DialogLoopManager } from './dialog/loop-manager.js';
+import { EMITTER_PROCESS_QUEUE, EMITTER_STATUS } from '#copilot/events';
+import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '../config/agent.js';
+import { createAgentContextFactories } from './context-factories.js';
 import {
     getPendingQuestionShadowAgeMs,
     getPendingQuestionShadowExpiresAt,
@@ -34,12 +25,7 @@ import {
     getPendingQuestionShadowState,
     isPendingQuestionShadowExpired,
 } from './dialog/pending-question-shadow.js';
-import { HandoffManager } from './infra/handoff-manager.js';
-import { MessageQueue } from './infra/message-queue.js';
 import { log } from './ports/observability-port.js';
-import { createAgentPermissionController } from './ports/permission-port.js';
-import { SessionMessagesCache } from './session/history-sync.js';
-import { SessionKeepalive } from './session/keepalive.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -70,12 +56,60 @@ import { SessionKeepalive } from './session/keepalive.js';
  */
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+    return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+}
+
+/**
+ * @param {string} name
+ * @param {unknown} entryValue
+ * @returns {{
+ *     name: string;
+ *     description: string | null;
+ *     category: string;
+ *     tags: string[];
+ *     readOnly: boolean;
+ *     skipPermission: boolean;
+ * }}
+ */
+function normalizeToolRegistryEntry(name, entryValue) {
+    const entry = asRecord(entryValue);
+    const tool = asRecord(entry['tool']);
+    const toolName = typeof tool['name'] === 'string' && tool['name'] ? tool['name'] : name;
+    return {
+        name: toolName,
+        description: typeof tool['description'] === 'string' ? tool['description'] : null,
+        category: typeof entry['category'] === 'string' ? entry['category'] : 'uncategorized',
+        tags: asStringArray(entry['tags']),
+        readOnly: entry['readOnly'] === true,
+        skipPermission: tool['skipPermission'] === true,
+    };
+}
+
+/**
  * Contexto compartilhado entre todos os módulos internos do agente.
  *
  * Ciclo de vida: criado uma vez no constructor do AlwaysAliveAgent, passado por referência a todos os sub-módulos. Em
  * `K1a`, o contexto passa a manter subestados nomeados, preservando accessors compatíveis para rollout gradual.
  */
 export class AgentContext {
+    /** @type {import('./context-factories.js').AgentContextFactories} */
+    #factories;
+
+    /** @type {import('./context-factories.js').AgentContextFactoryHost} */
+    #factoryHost;
+
     /** @type {AgentSessionState} */
     sessionState;
 
@@ -96,36 +130,40 @@ export class AgentContext {
 
     // ─── Managers (instâncias com lifecycle) ───────────────────────────────
 
-    /** @type {DialogLoopManager} */
+    /** @type {import('./dialog/loop-manager.js').DialogLoopManager} */
     dialogLoop;
 
-    /** @type {MessageQueue} */
+    /** @type {import('./infra/message-queue.js').MessageQueue} */
     messageQueue;
 
-    /** @type {WebhookManager} */
+    /** @type {import('../infra/webhooks.js').WebhookManager} */
     webhooks;
 
-    /** @type {ReturnType<typeof createAgentPermissionController>} */
+    /** @type {import('./ports/permission-port.js').AgentPermissionController} */
     permissions;
 
     /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
     toolsRegistry;
 
-    /** @type {SessionKeepalive} */
+    /** @type {import('./session/keepalive.js').SessionKeepalive} */
     keepalive;
 
-    /** @type {HandoffManager} */
+    /** @type {import('./infra/handoff-manager.js').HandoffManager} */
     handoff;
 
-    /** @type {SessionMessagesCache} */
+    /** @type {import('./session/history-sync.js').SessionMessagesCache} */
     messagesCache;
 
-    /** @type {BackgroundTasks} */
+    /** @type {import('./background-tasks.js').BackgroundTasks} */
     backgroundTasks;
 
     /**
      * @param {import('node:events').EventEmitter} emitter - Referência ao AlwaysAliveAgent (para emit)
-     * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
+     * @param {{
+     *     model?: string;
+     *     reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+     *     factories?: Partial<import('./context-factories.js').AgentContextFactories>;
+     * }} [options]
      */
     constructor(emitter, options = {}) {
         this.sessionState = {
@@ -172,29 +210,22 @@ export class AgentContext {
             client: null,
         };
 
-        // Instanciar managers com callbacks para o emitter
-        this.messageQueue = new MessageQueue({
-            onEnqueue: () => emitter.emit(EMITTER_PROCESS_QUEUE),
-            onChanged: () => this.invalidateStatusSnapshot(),
-        });
+        this.#factories = createAgentContextFactories(options.factories);
+        this.#factoryHost = {
+            emitter,
+            emitProcessQueue: () => emitter.emit(EMITTER_PROCESS_QUEUE),
+            invalidateStatusSnapshot: () => this.invalidateStatusSnapshot(),
+        };
 
-        this.dialogLoop = new DialogLoopManager();
-        this.webhooks = new WebhookManager();
-        this.permissions = createAgentPermissionController({
-            onModeChanged: (mode) => emitter.emit(EMITTER_PERMISSION_MODE_CHANGED, { mode }),
-        });
-        this.toolsRegistry = createRegistry();
-        this.keepalive = new SessionKeepalive();
-        this.handoff = new HandoffManager();
-        this.messagesCache = new SessionMessagesCache(MESSAGES_CACHE_TTL_MS);
-        this.backgroundTasks = new BackgroundTasks({
-            onCompleted: (event) => {
-                emitter.emit(EMITTER_AGENT_BACKGROUND_COMPLETED, { agentType: 'always_alive', ...event });
-            },
-            onIdle: (event) => {
-                emitter.emit(EMITTER_AGENT_BACKGROUND_IDLE, { agentType: 'always_alive', ...event });
-            },
-        });
+        this.messageQueue = this.#factories.createMessageQueue(this.#factoryHost);
+        this.dialogLoop = this.#factories.createDialogLoop(this.#factoryHost);
+        this.webhooks = this.#factories.createWebhooks(this.#factoryHost);
+        this.permissions = this.#factories.createPermissions(this.#factoryHost);
+        this.toolsRegistry = this.#factories.createToolsRegistry(this.#factoryHost);
+        this.keepalive = this.#factories.createKeepalive(this.#factoryHost);
+        this.handoff = this.#factories.createHandoff(this.#factoryHost);
+        this.messagesCache = this.#factories.createMessagesCache(this.#factoryHost);
+        this.backgroundTasks = this.#factories.createBackgroundTasks(this.#factoryHost);
     }
 
     // ─── Compat accessors (K1a) ─────────────────────────────────────────────
@@ -1409,6 +1440,353 @@ export class AgentContext {
      */
     stopKeepalive(reason = 'manual') {
         this.keepalive.stop(reason);
+    }
+
+    // ─── Manager Boundary API ────────────────────────────────────────────
+
+    /**
+     * Retorna o modo de permissão efetivo sem expor o controller vivo.
+     *
+     * @returns {'approve_all' | 'audit_only' | 'selective'}
+     */
+    getPermissionModeSnapshot() {
+        return this.permissions.getMode();
+    }
+
+    /**
+     * Atualiza a policy de permissão de tools.
+     *
+     * @param {'approve_all' | 'audit_only' | 'selective'} mode
+     * @param {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} [opts]
+     * @returns {void}
+     */
+    setPermissionMode(mode, opts = {}) {
+        this.permissions.setMode(mode, opts);
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
+     * Retorna o handler SDK de permissões atualmente governado pelo contexto.
+     *
+     * @returns {import('#copilot/sdk/types').PermissionHandler}
+     */
+    getPermissionHandlerSnapshot() {
+        return this.permissions.handler;
+    }
+
+    /**
+     * Retorna readiness/metadata da capability de permissões governada pelo agent.
+     *
+     * O shape é intencionalmente semântico: consumers não precisam saber se a implementação concreta é
+     * `PermissionController`, mock de teste ou runtime alternativo.
+     *
+     * @returns {{
+     *     mode: 'approve_all' | 'audit_only' | 'selective';
+     *     handlerAvailable: boolean;
+     *     provider?: unknown;
+     *     factory?: unknown;
+     *     sdkFirst?: unknown;
+     *     stableHandler?: unknown;
+     *     runtimeAuthority?: unknown;
+     *     [key: string]: unknown;
+     * }}
+     */
+    getPermissionCapabilitySnapshot() {
+        const factorySet = this.getContextFactoryCapabilitiesSnapshot();
+        const metadata = {
+            ...this.#factories.describePermissionsCapability(this.#factoryHost),
+            ...(factorySet['governance.permissions'] ?? {}),
+        };
+        const handler = this.getPermissionHandlerSnapshot();
+        return {
+            ...metadata,
+            mode: this.getPermissionModeSnapshot(),
+            handlerAvailable: typeof handler === 'function',
+        };
+    }
+
+    /**
+     * Retorna metadata do conjunto de factories que materializou os managers vivos do contexto.
+     *
+     * Essa leitura não é fonte de readiness operacional por si só; ela explica origem/autoridade dos componentes para
+     * capability maps, diagnósticos e runtimes alternativos.
+     *
+     * @returns {Record<string, Record<string, unknown>>}
+     */
+    getContextFactoryCapabilitiesSnapshot() {
+        const metadata = this.#factories.describeFactorySet(this.#factoryHost);
+        return Object.fromEntries(
+            Object.entries(metadata).map(([key, value]) => [
+                key,
+                {
+                    ...value,
+                },
+            ]),
+        );
+    }
+
+    /**
+     * Retorna o registry ativo de tools.
+     *
+     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     */
+    getToolRegistrySnapshot() {
+        return this.toolsRegistry;
+    }
+
+    /**
+     * Retorna uma leitura defensiva e serializável das tools registradas no runtime.
+     *
+     * @returns {{
+     *     name: string;
+     *     description: string | null;
+     *     category: string;
+     *     tags: string[];
+     *     readOnly: boolean;
+     *     skipPermission: boolean;
+     * }[]}
+     */
+    getToolRegistryEntriesSnapshot() {
+        const registry = this.getToolRegistrySnapshot();
+        if (!(registry?.entries instanceof Map)) return [];
+        return [...registry.entries.entries()].map(([name, entry]) => normalizeToolRegistryEntry(name, entry));
+    }
+
+    /**
+     * Recria o registry de tools para um novo boot/resume de sessão.
+     *
+     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     */
+    resetToolsRegistry() {
+        this.toolsRegistry = this.#factories.createToolsRegistry(this.#factoryHost);
+        return this.toolsRegistry;
+    }
+
+    /**
+     * Retorna o manager de handoff governado pelo contexto.
+     *
+     * @returns {import('./infra/handoff-manager.js').HandoffManager}
+     */
+    getHandoffManagerSnapshot() {
+        return this.handoff;
+    }
+
+    /**
+     * Registra um evento de handoff recebido do SDK.
+     *
+     * @param {{ fromAgent: string; toAgent: string; reason?: string; context?: Record<string, unknown> }} event
+     * @returns {void}
+     */
+    receiveHandoff(event) {
+        this.handoff.receive(event);
+    }
+
+    /**
+     * Retorna o manager vivo do dialog loop para integrações que ainda exigem EventEmitter/manager.
+     *
+     * @returns {import('./dialog/loop-manager.js').DialogLoopManager}
+     */
+    getDialogLoopManagerSnapshot() {
+        return this.dialogLoop;
+    }
+
+    /**
+     * Retorna o keepalive vivo para integrações legadas que ainda exigem o manager.
+     *
+     * @returns {import('./session/keepalive.js').SessionKeepalive}
+     */
+    getKeepaliveManagerSnapshot() {
+        return this.keepalive;
+    }
+
+    /**
+     * Atualiza o host do dialog loop.
+     *
+     * @param {import('./dialog/loop-manager.js').AgentHost} host
+     * @returns {void}
+     */
+    attachDialogLoop(host) {
+        this.dialogLoop.attach(host);
+    }
+
+    /**
+     * Inicia o dialog loop governado pelo contexto.
+     *
+     * @param {string} [bootPrompt]
+     * @returns {Promise<void>}
+     */
+    startDialogLoop(bootPrompt) {
+        return this.dialogLoop.start(bootPrompt);
+    }
+
+    /**
+     * Envia um turno ao dialog loop.
+     *
+     * @param {string} message
+     * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
+     * @returns {Promise<string>}
+     */
+    sendDialogTurn(message, opts) {
+        return this.dialogLoop.sendTurn(message, opts);
+    }
+
+    /**
+     * Para o dialog loop governado pelo contexto.
+     *
+     * @param {{
+     *     authorized?: boolean;
+     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     shutdownTimeoutMs?: number;
+     * }} [opts]
+     * @returns {Promise<void>}
+     */
+    stopDialogLoop(opts) {
+        return this.dialogLoop.stop(opts);
+    }
+
+    /**
+     * Pausa o dialog loop governado pelo contexto.
+     *
+     * @param {string | null} sessionId
+     * @returns {Promise<void>}
+     */
+    pauseDialogLoop(sessionId) {
+        return this.dialogLoop.pause(sessionId);
+    }
+
+    /**
+     * Retoma o dialog loop governado pelo contexto.
+     *
+     * @returns {Promise<void>}
+     */
+    resumeDialogLoop() {
+        return this.dialogLoop.resume();
+    }
+
+    /**
+     * Remove listeners do dialog loop e marca o wiring como desacoplado.
+     *
+     * @returns {void}
+     */
+    detachDialogLoopListeners() {
+        this.dialogLoop.removeAllListeners();
+        this.setDialogLoopAttached(false);
+    }
+
+    /**
+     * Força desativação local do dialog loop.
+     *
+     * @returns {void}
+     */
+    forceDeactivateDialogLoop() {
+        this.dialogLoop.forceDeactivate();
+    }
+
+    /**
+     * Pinga o watchdog do dialog loop.
+     *
+     * @returns {void}
+     */
+    pingDialogWatchdog() {
+        this.dialogLoop.pingWatchdog();
+    }
+
+    /**
+     * Agenda fallback de modelo dentro do dialog loop.
+     *
+     * @param {string} model
+     * @returns {unknown}
+     */
+    scheduleDialogFallback(model) {
+        return this.dialogLoop.scheduleFallback(model);
+    }
+
+    /**
+     * Encaminha input de protocolo `ask_user` ao dialog loop.
+     *
+     * @param {{ question: string }} input
+     * @returns {unknown}
+     */
+    handleDialogProtocolInput(input) {
+        return this.dialogLoop.handleProtocolInput(input);
+    }
+
+    /**
+     * Encaminha warning de orçamento de tokens ao dialog loop.
+     *
+     * @param {{ currentTokens: number; tokenLimit: number; ratio: number }} event
+     * @returns {void}
+     */
+    handleDialogTokenBudget(event) {
+        this.dialogLoop.handleTokenBudget(event);
+    }
+
+    /**
+     * Limpa a trava de compaction pendente no dialog loop.
+     *
+     * @returns {void}
+     */
+    resetDialogCompactionFlag() {
+        this.dialogLoop.resetCompactionFlag();
+    }
+
+    /**
+     * Invalida o cache de mensagens de sessão.
+     *
+     * @returns {void}
+     */
+    invalidateMessagesCache() {
+        this.messagesCache.invalidate();
+    }
+
+    /**
+     * Lê mensagens da sessão usando o cache governado pelo contexto.
+     *
+     * @param {CopilotSession | null} session
+     * @returns {Promise<unknown[]>}
+     */
+    getCachedSessionMessages(session) {
+        return this.messagesCache.get(session);
+    }
+
+    /**
+     * Emite webhook registrado.
+     *
+     * @param {string} event
+     * @param {object} payload
+     * @returns {Promise<void>}
+     */
+    async emitWebhook(event, payload) {
+        await Promise.resolve(this.webhooks.emit(event, payload));
+    }
+
+    /**
+     * Registra webhook sem expor o manager vivo.
+     *
+     * @param {string} url
+     * @returns {{ id: string; url: string }}
+     */
+    registerWebhook(url) {
+        return this.webhooks.register(url);
+    }
+
+    /**
+     * Remove webhook registrado.
+     *
+     * @param {string} id
+     * @returns {boolean}
+     */
+    unregisterWebhook(id) {
+        return this.webhooks.unregister(id);
+    }
+
+    /**
+     * Lista webhooks registrados.
+     *
+     * @returns {{ id: string; url: string }[]}
+     */
+    listWebhooks() {
+        return this.webhooks.list();
     }
 
     // ─── Status FSM ─────────────────────────────────────────────────────

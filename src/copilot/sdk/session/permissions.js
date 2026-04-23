@@ -30,6 +30,7 @@ export { approveAll };
  * @typedef {object} PermissionHandlerConfig
  * @property {boolean} [allowAll=false] - Aprovar tudo (semântica approveAll). Default is `false`
  * @property {string[]} [allowTools] - Whitelist de nomes de tools permitidas
+ * @property {PermissionRequest['kind'][]} [denyKinds] - Blacklist por tipo canônico do SDK
  * @property {string[]} [denyTools] - Blacklist de nomes de tools negadas
  * @property {RegExp[]} [denyPatterns] - Regex patterns para negar tools por nome
  * @property {boolean} [auditMode=false] - Logar todas as decisões sem negar. Default is `false`
@@ -50,6 +51,14 @@ function denied() {
 }
 
 /**
+ * @param {PermissionRequest} request
+ * @returns {string}
+ */
+function extractKind(request) {
+    return /** @type {{ kind?: string }} */ (request)?.kind ?? 'unknown';
+}
+
+/**
  * Extrai o nome da tool de um PermissionRequest.
  *
  * @param {PermissionRequest} request
@@ -59,6 +68,7 @@ function extractToolName(request) {
     return (
         /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??
         /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ??
+        /** @type {{ name?: string }} */ (request)?.name ??
         'unknown'
     );
 }
@@ -71,10 +81,10 @@ function extractToolName(request) {
  * Ordem de avaliação:
  *
  * 1. `onRequest(req)` — retorno não-undefined prevalece
- * 2. `allowAll: true` → aprova tudo
- * 3. `allowTools` (whitelist) — se definida, apenas tools na lista são aprovadas
- * 4. `denyPatterns` (regex) — match nega
- * 5. `denyTools` (blacklist nominal)
+ * 2. `denyKinds` — nega por `PermissionRequest.kind`, a dimensão primária do SDK
+ * 3. `denyPatterns`/`denyTools` — denies finos para custom tools/MCP
+ * 4. `allowAll: true` → aprova tudo após denies explícitos
+ * 5. `allowTools` (whitelist) — se definida, apenas tools na lista são aprovadas
  * 6. Default: aprova
  *
  * @param {PermissionHandlerConfig} [config]
@@ -84,6 +94,7 @@ export function createPermissionHandler(config) {
     const cfg = config ?? {};
     const allowAll = cfg.allowAll ?? false;
     const allowTools = cfg.allowTools;
+    const denyKinds = cfg.denyKinds ?? [];
     const denyTools = cfg.denyTools ?? [];
     const denyPatterns = cfg.denyPatterns ?? [];
     const auditMode = cfg.auditMode ?? false;
@@ -98,6 +109,7 @@ export function createPermissionHandler(config) {
 
     return /** @type {PermissionHandler} */ (
         async (request) => {
+            const kind = extractKind(request);
             const toolName = extractToolName(request);
 
             // 1. Custom handler pré-avaliação
@@ -109,9 +121,31 @@ export function createPermissionHandler(config) {
                 }
             }
 
+            if (denyKinds.includes(/** @type {PermissionRequest['kind']} */ (kind))) {
+                log('DEBUG', `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyKinds)`);
+                return denied();
+            }
+
+            for (const pattern of denyPatterns) {
+                if (pattern.test(toolName)) {
+                    log(
+                        'DEBUG',
+                        `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyPattern: ${pattern})`,
+                    );
+                    return denied();
+                }
+            }
+
+            if (denyTools.includes(toolName)) {
+                log('DEBUG', `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyTools)`);
+                return denied();
+            }
+
             // 2. Allow all
             if (allowAll) {
-                if (auditMode) log('INFO', `[sdk/permissions] AUDIT: aprovando '${toolName}' (allowAll)`);
+                if (auditMode) {
+                    log('INFO', `[sdk/permissions] AUDIT: aprovando kind='${kind}' tool='${toolName}' (allowAll)`);
+                }
                 return approved();
             }
 
@@ -119,27 +153,17 @@ export function createPermissionHandler(config) {
             if (allowTools) {
                 const result = allowTools.includes(toolName) ? approved() : denied();
                 if (auditMode) {
-                    log('INFO', `[sdk/permissions] AUDIT: '${toolName}' → ${result.kind} (allowTools)`);
+                    log(
+                        'INFO',
+                        `[sdk/permissions] AUDIT: kind='${kind}' tool='${toolName}' → ${result.kind} (allowTools)`,
+                    );
                 }
                 return result;
             }
 
-            // 4. Deny patterns
-            for (const pattern of denyPatterns) {
-                if (pattern.test(toolName)) {
-                    log('DEBUG', `[sdk/permissions] NEGADO '${toolName}' (denyPattern: ${pattern})`);
-                    return denied();
-                }
-            }
-
-            // 5. Deny list
-            if (denyTools.includes(toolName)) {
-                log('DEBUG', `[sdk/permissions] NEGADO '${toolName}' (denyTools)`);
-                return denied();
-            }
-
             // 6. Default: aprovar
-            if (auditMode) log('INFO', `[sdk/permissions] AUDIT: aprovando '${toolName}' (default)`);
+            if (auditMode)
+                log('INFO', `[sdk/permissions] AUDIT: aprovando kind='${kind}' tool='${toolName}' (default)`);
             return approved();
         }
     );

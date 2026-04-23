@@ -28,7 +28,22 @@ import * as toolEfficiency from './sections/tool-efficiency.js';
 import * as toolInstructions from './sections/tool-instructions.js';
 
 /**
- * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
+ * System message estrutural compatível com o SDK.
+ *
+ * `config/` monta declaração em repouso; o adapter de sessão no agent/sdk é quem encosta na sessão viva.
+ *
+ * @typedef {object} SystemMessageSection
+ * @property {import('@github/copilot-sdk').SectionOverrideAction} action
+ * @property {string} content
+ *
+ * @typedef {{ mode: 'append'; content: string }} SystemMessageAppendConfig
+ *
+ * @typedef {{ mode: 'replace'; content: string }} SystemMessageReplaceConfig
+ *
+ * @typedef {{ mode: 'customize'; content?: string; sections: Record<string, SystemMessageSection> }} SystemMessageCustomizeConfig
+ *
+ *
+ * @typedef {SystemMessageAppendConfig | SystemMessageReplaceConfig | SystemMessageCustomizeConfig} SystemMessageConfig
  */
 
 /**
