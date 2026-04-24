@@ -1554,6 +1554,8 @@ Gates finais da rodada:
 - `npm run typecheck:strict:src.copilot`: verde;
 - `npm run analyze:arch:global`: `hard=0`, `soft=0`; a última dependência sensível
   `agent/lifecycle/session-setup.js -> #copilot/hooks` foi drenada para `agent/ports/hook-port.js`;
+- `npm run analyze:arch:global:strict`: passa a tratar `hard` e `soft` como regressões bloqueantes,
+  preservando a topologia `hard=0 soft=0`;
 - `npx vitest run tests/unit/copilot`: 4030 testes passados, 28 pulados.
   3994 testes passados
   28 testes pulados

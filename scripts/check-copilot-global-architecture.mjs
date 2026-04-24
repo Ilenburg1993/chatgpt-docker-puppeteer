@@ -9,7 +9,7 @@
  * `presentation/`, `server/` e `terminal/` como áreas arquiteturais explícitas e reporta também acoplamentos sensíveis
  * que ainda são permitidos no curto prazo.
  *
- * Use `--strict` para sair com erro quando houver violações hard.
+ * Use `--strict` para sair com erro quando houver violações hard ou soft.
  *
  * @module scripts/check-copilot-global-architecture
  */
@@ -550,8 +550,10 @@ if (isDirectRun) {
     const findings = checkGlobalArchitecture();
     printReport(findings);
 
-    const hardCount = findings.filter((finding) => finding.severity === 'hard').length;
-    if (strict && hardCount > 0) {
+    const strictViolationCount = findings.filter(
+        (finding) => finding.severity === 'hard' || finding.severity === 'soft',
+    ).length;
+    if (strict && strictViolationCount > 0) {
         process.exit(1);
     }
 }
