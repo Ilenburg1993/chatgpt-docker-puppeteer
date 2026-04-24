@@ -66,7 +66,7 @@ const MAX_PROMPT_BYTES = 512_000;
  */
 function ensureSessionStreamState(routeDeps, id, entry) {
     if (!entry) {
-        throw new Error(`Sessão \"${id}\" não está ativa para stream SSE.`);
+        throw new Error(`Sessão "${id}" não está ativa para stream SSE.`);
     }
     const existing = _sessionStreamStates.get(id);
     if (existing && existing.sessionRef === entry.session) return existing;
@@ -131,7 +131,7 @@ async function sendAndWaitWithoutTimeout(session, messageOptions) {
             resolveIdle();
         } else if (event.type === 'session.error') {
             const error = new Error(event.data.message);
-            error.stack = event.data.stack;
+            if (event.data.stack) error.stack = event.data.stack;
             rejectIdle(error);
         }
     });

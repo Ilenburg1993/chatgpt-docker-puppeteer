@@ -50,7 +50,9 @@ describe('terminal/commands/thinking.js', () => {
 
     it('abre o latest completo', async () => {
         const lines = [];
-        mocks.getLatestThinkingHistoryEntry.mockReturnValue({
+        mocks.getLatestThinkingHistoryEntry.mockReturnValue(
+            /** @type {any} */
+            {
             id: 'dialog-latest',
             source: 'dialog',
             title: 'LLM-B',

@@ -72,8 +72,10 @@ describe('session-setup (F63)', () => {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
             model: 'gpt-4',
-            getModelSnapshot: vi.fn(function () {
-                return this.model;
+            getModelSnapshot: vi.fn(
+                /** @this {{ model: any }} */
+                function () {
+                    return this.model;
             }),
             permissions: { handler: vi.fn() },
             webhooks: { emit: vi.fn() },
@@ -83,8 +85,10 @@ describe('session-setup (F63)', () => {
                 handleProtocolInput: vi.fn(),
             },
             reasoningEffort: 'medium',
-            getReasoningEffortSnapshot: vi.fn(function () {
-                return this.reasoningEffort;
+            getReasoningEffortSnapshot: vi.fn(
+                /** @this {{ reasoningEffort: any }} */
+                function () {
+                    return this.reasoningEffort;
             }),
             pendingQuestion: null,
             session: null,
@@ -129,7 +133,11 @@ describe('session-setup (F63)', () => {
             vi.mocked(getToolsConfig).mockReturnValue({ allowlist: null, denylist: ['custom-danger'] });
 
             const result = buildSessionHooks(ctx, host);
-            const decision = await result.busHooks.onPreToolUse?.({ toolName: 'custom-danger' }, { sessionId: 's1' });
+            const decision = await result.busHooks.onPreToolUse?.(
+                /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
+                { toolName: 'custom-danger', toolArgs: {}, timestamp: 0, cwd: '/' },
+                { sessionId: 's1' }
+            );
 
             expect(decision).toEqual(expect.objectContaining({ permissionDecision: 'deny' }));
         });

@@ -201,7 +201,7 @@ export async function checkResolvedIp(hostname, opts) {
     if (allowPrivate) return;
 
     /** @type {{ address: string; family: number }[]} */
-    let records = [];
+    let records;
     try {
         records = await dns.lookup(hostname, { all: true });
     } catch {

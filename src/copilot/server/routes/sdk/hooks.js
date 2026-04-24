@@ -57,7 +57,7 @@ function ensureHookRuntimeState(routeDeps) {
         metrics: defaultMetrics,
     });
 
-    const listener = (ev) => {
+    const listener = (/** @type {import('#copilot/hooks/bus').HookBusEvent} */ ev) => {
         const payload = standardizeSsePayload(ev);
         pool.broadcast('hook', payload, { replayEvent: 'hook', filterEvent: 'hook' });
     };
@@ -74,7 +74,10 @@ function ensureHookRuntimeState(routeDeps) {
  * @param {HookRuntimeState} state
  * @returns {void}
  */
-function maybeDisposeHookRuntimeState(routeDeps, state) {
+function maybeDisposeHookRuntimeState(
+    /** @type {ReturnType<typeof resolveSdkRouteSharedDeps>} */ routeDeps,
+    state
+) {
     if (state.pool.size > 0) return;
     state.bus.off('*', state.listener);
     _hookRuntimeStates.delete(state.runtimeId);

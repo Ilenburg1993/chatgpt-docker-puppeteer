@@ -7,7 +7,7 @@ const conflicts = new Set();
 let attempt = 0;
 
 // Interceptar o log do always-alive para capturar erros de conflito
-const oldEmit = alwaysAliveAgent.emit.bind(alwaysAliveAgent);
+const _oldEmit = alwaysAliveAgent.emit.bind(alwaysAliveAgent);
 
 while (attempt < 20) {
     attempt++;

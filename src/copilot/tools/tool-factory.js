@@ -106,7 +106,10 @@ function normalizeParameters(parameters, toolName = 'unknown') {
             return jsonSchema;
         } catch (err) {
             const message = /** @type {Error} */ (err).message;
-            log('WARN', `[tool-factory] Falha ao converter Zod schema para '${toolName}': ${message}. Tool será registrada sem parâmetros.`);
+            log(
+                'WARN',
+                `[tool-factory] Falha ao converter Zod schema para '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
+            );
             // H1-FIX: Não relançar exceção — permitir tool sem parâmetros (fallback gracioso)
             return undefined;
         }

@@ -36,7 +36,9 @@ export const SESSION_JSON_FILE = resolveHooksStateFile('session.json');
  */
 export function sanitizeBriefingContent(raw) {
     const content = String(raw)
+        // eslint-disable-next-line no-control-regex
         .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+        // eslint-disable-next-line no-control-regex
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
         .replace(/<\/untrusted_session_briefing>/gi, '[redacted_close_tag]')
         .replace(/```/g, '`\\`\\`');

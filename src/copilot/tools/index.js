@@ -63,10 +63,9 @@ import { webTools } from './web-tools.js';
 /**
  * Conjunto completo de Custom Tools disponíveis para o SDK Agent.
  *
- * H3-FIXED: O padrão de cache com _allToolsCache é seguro em JS single-threaded.
- * A inicialização lazy ocorre uma única vez; após isso, retorna cache. Não há race condition
- * (JS é single-threaded). Para melhor segurança, considerar top-level async initialization
- * em versão futura.
+ * H3-FIXED: O padrão de cache com _allToolsCache é seguro em JS single-threaded. A inicialização lazy ocorre uma única
+ * vez; após isso, retorna cache. Não há race condition (JS é single-threaded). Para melhor segurança, considerar
+ * top-level async initialization em versão futura.
  *
  * @type {import('#copilot/sdk/types').Tool[]}
  */

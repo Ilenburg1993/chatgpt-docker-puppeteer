@@ -72,8 +72,8 @@ export function getDisabledTools() {
 let _CATEGORY_TOOL_MAP_DYNAMIC = {};
 
 /**
- * Registro auxiliar: tool name → category. Preenchido durante registerTools() em bootstrap.js.
- * Necessário porque o SDK Tool type não armazena metadados de categoria.
+ * Registro auxiliar: tool name → category. Preenchido durante registerTools() em bootstrap.js. Necessário porque o SDK
+ * Tool type não armazena metadados de categoria.
  *
  * @type {Map<string, string>}
  */
@@ -91,26 +91,29 @@ export function recordToolCategory(toolName, category) {
 }
 
 /**
- * Deriva as categorias das tools a partir do array _registeredTools e constrói _CATEGORY_TOOL_MAP_DYNAMIC.
- * Esta função substitui a necessidade de CATEGORY_TOOL_MAP hardcoded (TODO RF-026).
+ * Deriva as categorias das tools a partir do array _registeredTools e constrói _CATEGORY_TOOL_MAP_DYNAMIC. Esta função
+ * substitui a necessidade de CATEGORY_TOOL_MAP hardcoded (TODO RF-026).
  *
  * @returns {void}
  */
 function _deriveCategoriesFromTools() {
     _CATEGORY_TOOL_MAP_DYNAMIC = {};
-    
+
     for (const tool of _registeredTools) {
         // Procura a categoria no registro auxiliar _toolNameToCategoryMap (preenchido durante bootstrap)
         const category = _toolNameToCategoryMap.get(tool.name.toLowerCase()) ?? 'unknown';
-        
+
         if (!_CATEGORY_TOOL_MAP_DYNAMIC[category]) {
             _CATEGORY_TOOL_MAP_DYNAMIC[category] = [];
         }
-        
+
         _CATEGORY_TOOL_MAP_DYNAMIC[category].push(tool.name);
     }
-    
-    log('DEBUG', `[introspection] Categories derivadas dinamicamente: ${Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).join(', ')}`);
+
+    log(
+        'DEBUG',
+        `[introspection] Categories derivadas dinamicamente: ${Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).join(', ')}`,
+    );
 }
 
 /**
@@ -123,20 +126,23 @@ function _deriveCategoriesFromTools() {
 export function registerForIntrospection(tools) {
     // M1-FIX: Validação de tipo + schema antes de atribuir
     if (!Array.isArray(tools)) {
-        log('ERROR', `[introspection] registerForIntrospection recebeu tipo inválido: ${typeof tools}. Esperado: Tool[].`);
+        log(
+            'ERROR',
+            `[introspection] registerForIntrospection recebeu tipo inválido: ${typeof tools}. Esperado: Tool[].`,
+        );
         _registeredTools = [];
         return;
     }
-    
+
     if (tools.length === 0) {
         log('WARN', '[introspection] registerForIntrospection chamado com array vazio.');
     }
-    
+
     _registeredTools = tools;
-    
+
     // H2-FIX: Derivar categorias dinamicamente do array de tools e construir CATEGORY_TOOL_MAP_DYNAMIC
     _deriveCategoriesFromTools();
-    
+
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
 }
 // TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.

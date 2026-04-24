@@ -29,8 +29,16 @@ vi.mock('../../../src/copilot/presentation/system-metrics.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/server/middleware/rate-limiter.js', () => ({
-    injectRateMiddleware: (_req, _res, next) => next(),
-    writeRateMiddleware: (_req, _res, next) => next(),
+    injectRateMiddleware: (
+        /** @type {any} */ _req,
+        /** @type {any} */ _res,
+        /** @type {Function} */ next
+    ) => next(),
+    writeRateMiddleware: (
+        /** @type {any} */ _req,
+        /** @type {any} */ _res,
+        /** @type {Function} */ next
+    ) => next(),
 }));
 
 describe('server/routes/agent validation', () => {
