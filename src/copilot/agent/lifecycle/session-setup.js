@@ -22,13 +22,12 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { composePreToolUseHandlers, createRuntimeDisableHook } from '#copilot/hooks';
 import { createRegistry, getToolsConfig, modelRegistry } from '#copilot/sdk';
 import { log, METRICS_STORE } from '../ports/observability-port.js';
 
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
-import { buildAgentBusHooks } from '../ports/hook-port.js';
+import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../ports/hook-port.js';
 import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
 import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.js';
 
@@ -222,23 +221,16 @@ export function buildSessionHooks(ctx, host) {
         return { busHooks };
     }
 
-    const runtimeDisableHook = createRuntimeDisableHook((/** @type {string} */ toolName) => {
-        if (defaultRuntimeDenylist.includes(toolName)) {
-            return true;
-        }
-        if (toolsConfig.allowlist !== null) {
-            return !toolsConfig.allowlist.includes(toolName);
-        }
-        return false;
-    });
-
     return {
-        busHooks: {
-            ...busHooks,
-            onPreToolUse: busHooks.onPreToolUse
-                ? composePreToolUseHandlers(runtimeDisableHook, busHooks.onPreToolUse)
-                : runtimeDisableHook,
-        },
+        busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName) => {
+            if (defaultRuntimeDenylist.includes(toolName)) {
+                return true;
+            }
+            if (toolsConfig.allowlist !== null) {
+                return !toolsConfig.allowlist.includes(toolName);
+            }
+            return false;
+        }),
     };
 }
 

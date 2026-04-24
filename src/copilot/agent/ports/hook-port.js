@@ -12,8 +12,9 @@
  */
 
 import { attachBus, defaultBus } from '../../hooks/bus.js';
-import { createHooks } from '../../hooks/factory.js';
+import { composePreToolUseHandlers, createHooks } from '../../hooks/factory.js';
 import { createSessionHooks } from '../../hooks/session-hooks.js';
+import { createRuntimeDisableHook } from '../../hooks/tool-interceptor.js';
 
 /**
  * Entradas mínimas exigidas pelos hooks de sessão do agent.
@@ -49,6 +50,26 @@ export function buildAgentBusHooks(input) {
     });
 
     return attachBus(hooks);
+}
+
+/**
+ * Aplica policy runtime de tools aos hooks de sessão do agent.
+ *
+ * `session-setup` conhece a denylist/allowlist efetiva, mas não deve conhecer a implementação concreta de hooks. Esta
+ * função mantém a tradução `agent policy -> SDK preToolUse hook` dentro da porta.
+ *
+ * @param {NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>} busHooks
+ * @param {(toolName: string) => boolean} isToolDisabled
+ * @returns {NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>}
+ */
+export function withAgentRuntimeToolPolicy(busHooks, isToolDisabled) {
+    const runtimeDisableHook = createRuntimeDisableHook(isToolDisabled);
+    return {
+        ...busHooks,
+        onPreToolUse: busHooks.onPreToolUse
+            ? composePreToolUseHandlers(runtimeDisableHook, busHooks.onPreToolUse)
+            : runtimeDisableHook,
+    };
 }
 
 /**

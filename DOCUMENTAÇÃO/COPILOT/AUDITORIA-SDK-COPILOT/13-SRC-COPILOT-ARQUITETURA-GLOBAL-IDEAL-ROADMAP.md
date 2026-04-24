@@ -1552,8 +1552,8 @@ vitest tests/unit/copilot:
 Gates finais da rodada:
 
 - `npm run typecheck:strict:src.copilot`: verde;
-- `npm run analyze:arch:global`: `hard=0`, `soft=1` conhecido (`agent/lifecycle/session-setup.js`
-  ainda importa `#copilot/hooks` por compatibilidade até a próxima extração de port);
+- `npm run analyze:arch:global`: `hard=0`, `soft=0`; a última dependência sensível
+  `agent/lifecycle/session-setup.js -> #copilot/hooks` foi drenada para `agent/ports/hook-port.js`;
 - `npx vitest run tests/unit/copilot`: 4030 testes passados, 28 pulados.
   3994 testes passados
   28 testes pulados
