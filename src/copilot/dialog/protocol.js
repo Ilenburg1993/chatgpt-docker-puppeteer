@@ -86,7 +86,7 @@ export class DialogProtocol {
             `1. Chame ask_user("${DIALOG_PROTO_READY} aguardando próxima mensagem") para sinalizar prontidão.`,
             `2. Quando receber uma mensagem, processe-a completamente.`,
             `3. Chame ask_user("${DIALOG_PROTO_REPLY} " + sua_resposta) para enviar a resposta.`,
-            `4. Retorne ao passo 1 para aguardar a próxima mensagem.`,
+            `4. Ao receber CONTINUE_DIALOG_LOOP após o REPLY, chame imediatamente ask_user("${DIALOG_PROTO_READY} aguardando próxima mensagem").`,
             ``,
             `IMPORTANTE: NUNCA encerre o loop. Não use ask_user("${DIALOG_PROTO_STOPPED}") nem qualquer forma de`,
             `encerramento. Se não houver mais nada para fazer, aguarde indefinidamente com READY:.`,

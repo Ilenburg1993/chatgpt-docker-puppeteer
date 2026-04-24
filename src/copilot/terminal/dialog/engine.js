@@ -7,6 +7,7 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
+import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { computeAdaptiveDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
@@ -53,6 +54,8 @@ export { drainPendingNotifications, getPersistenceFailureCount };
 const MAX_TURN_QUEUE_SIZE = 10;
 /** @type {number} */
 let _turnQueueDepth = 0;
+
+const IDLE_TRANSITION_TIMEOUT_MS = Math.max(15_000, Math.min(120_000, Math.round(LLM_B_BOOT_TIMEOUT_MS * 0.5)));
 
 /**
  * Retorna a profundidade atual da fila de turnos.
@@ -157,7 +160,10 @@ async function _tryStartDialogLoop() {
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
         await startTerminalAgentRuntime();
         await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Timeout aguardando idle')), 30_000);
+            const timeout = setTimeout(
+                () => reject(new Error(`Timeout aguardando idle (${IDLE_TRANSITION_TIMEOUT_MS}ms)`)),
+                IDLE_TRANSITION_TIMEOUT_MS,
+            );
             const check = () => {
                 if (readTerminalRuntimeControlState().status === 'idle') {
                     clearTimeout(timeout);
@@ -178,8 +184,8 @@ async function _tryStartDialogLoop() {
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(
-                () => reject(new Error('Timeout aguardando idle após processing (30s)')),
-                30_000,
+                () => reject(new Error(`Timeout aguardando idle após processing (${IDLE_TRANSITION_TIMEOUT_MS}ms)`)),
+                IDLE_TRANSITION_TIMEOUT_MS,
             );
             const check = () => {
                 const s = readTerminalRuntimeControlState().status;

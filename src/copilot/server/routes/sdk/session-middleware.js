@@ -11,6 +11,7 @@
 import { log } from '#copilot/observability';
 import { z } from 'zod';
 import { toError } from '../../../core/error-handlers.js';
+import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -85,7 +86,7 @@ export async function withErrorHandler(req, res, fn) {
     } catch (e) {
         log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${toError(e).message}`);
         if (!res.headersSent) {
-            res.status(500).json({ ok: false, error: toError(e).message });
+            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
         }
     }
 }

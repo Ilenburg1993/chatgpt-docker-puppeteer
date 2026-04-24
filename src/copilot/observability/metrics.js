@@ -12,6 +12,7 @@
 /** @typedef {import('./metrics-histogram.js').ToolMetrics} ToolMetrics */
 /** @typedef {import('./metrics-histogram.js').TokenUsageMetrics} TokenUsageMetrics */
 /** @typedef {import('./metrics-histogram.js').DialogMetrics} DialogMetrics */
+/** @typedef {import('./metrics-histogram.js').DialogRecoveryMetrics} DialogRecoveryMetrics */
 /** @typedef {import('./metrics-histogram.js').SdkDialogMetrics} SdkDialogMetrics */
 /** @typedef {import('./metrics-histogram.js').InjectMetrics} InjectMetrics */
 /** @typedef {import('./metrics-histogram.js').TaskMetrics} TaskMetrics */
@@ -32,6 +33,10 @@
  * @property {() => void} recordSessionCleanup
  * @property {() => void} recordHandoff
  * @property {(durationMs: number, success: boolean) => void} recordDialogTurn
+ * @property {(
+ *     reason: string,
+ *     opts?: { strategy?: string; prConsumed?: boolean; success?: boolean; durationMs?: number },
+ * ) => void} recordDialogRecovery
  * @property {(durationMs: number, success: boolean) => void} recordSdkDialogTurn
  * @property {(durationMs: number, success: boolean, outcome?: 'completed' | 'timeout' | 'error') => void} recordInjectTurn
  * @property {(stalledMs: number) => void} recordDialogStall
@@ -94,6 +99,29 @@ export function createMetricsStore() {
         timeoutsTotal: 0,
         stallSumMs: 0,
         histogram: createHistogram(500),
+    };
+
+    /**
+     * @type {{
+     *     total: number;
+     *     success: number;
+     *     failed: number;
+     *     zeroPr: number;
+     *     pr: number;
+     *     byReason: Record<string, number>;
+     *     byStrategy: Record<string, number>;
+     *     histogram: ReturnType<typeof createHistogram>;
+     * }}
+     */
+    const _dialogRecovery = {
+        total: 0,
+        success: 0,
+        failed: 0,
+        zeroPr: 0,
+        pr: 0,
+        byReason: {},
+        byStrategy: {},
+        histogram: createHistogram(200),
     };
 
     /** @type {{ turnsTotal: number; turnsSuccess: number; histogram: ReturnType<typeof createHistogram> }} */
@@ -199,6 +227,27 @@ export function createMetricsStore() {
         _dialog.turnsTotal++;
         if (success) _dialog.turnsSuccess++;
         _dialog.histogram.record(durationMs);
+    }
+
+    /**
+     * Registra uma recuperação semântica do dialog loop.
+     *
+     * @param {string} reason
+     * @param {{ strategy?: string; prConsumed?: boolean; success?: boolean; durationMs?: number }} [opts]
+     * @returns {void}
+     */
+    function recordDialogRecovery(reason, opts = {}) {
+        const normalizedReason = reason || 'unknown';
+        const strategy = opts.strategy || 'unknown';
+        const success = opts.success !== false;
+        _dialogRecovery.total++;
+        if (success) _dialogRecovery.success++;
+        else _dialogRecovery.failed++;
+        if (opts.prConsumed) _dialogRecovery.pr++;
+        else _dialogRecovery.zeroPr++;
+        _dialogRecovery.byReason[normalizedReason] = (_dialogRecovery.byReason[normalizedReason] ?? 0) + 1;
+        _dialogRecovery.byStrategy[strategy] = (_dialogRecovery.byStrategy[strategy] ?? 0) + 1;
+        _dialogRecovery.histogram.record(Math.max(0, Math.round(opts.durationMs ?? 0)));
     }
 
     /**
@@ -388,6 +437,16 @@ export function createMetricsStore() {
                 turnLatency: _dialog.histogram.snapshot(),
                 stallSumMs: _dialog.stallSumMs,
             },
+            dialogRecovery: {
+                total: _dialogRecovery.total,
+                success: _dialogRecovery.success,
+                failed: _dialogRecovery.failed,
+                zeroPr: _dialogRecovery.zeroPr,
+                pr: _dialogRecovery.pr,
+                byReason: { ..._dialogRecovery.byReason },
+                byStrategy: { ..._dialogRecovery.byStrategy },
+                latency: _dialogRecovery.histogram.snapshot(),
+            },
             sdkDialog: {
                 turnsTotal: _sdkDialog.turnsTotal,
                 turnsSuccess: _sdkDialog.turnsSuccess,
@@ -439,6 +498,14 @@ export function createMetricsStore() {
         _dialog.timeoutsTotal = 0;
         _dialog.stallSumMs = 0;
         _dialog.histogram = createHistogram(500);
+        _dialogRecovery.total = 0;
+        _dialogRecovery.success = 0;
+        _dialogRecovery.failed = 0;
+        _dialogRecovery.zeroPr = 0;
+        _dialogRecovery.pr = 0;
+        Object.keys(_dialogRecovery.byReason).forEach((k) => delete _dialogRecovery.byReason[k]);
+        Object.keys(_dialogRecovery.byStrategy).forEach((k) => delete _dialogRecovery.byStrategy[k]);
+        _dialogRecovery.histogram = createHistogram(200);
         _sdkDialog.turnsTotal = 0;
         _sdkDialog.turnsSuccess = 0;
         _sdkDialog.histogram = createHistogram(500);
@@ -469,6 +536,7 @@ export function createMetricsStore() {
         recordSessionCleanup,
         recordHandoff,
         recordDialogTurn,
+        recordDialogRecovery,
         recordSdkDialogTurn,
         recordInjectTurn,
         recordDialogStall,

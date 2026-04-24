@@ -10,6 +10,7 @@
 
 import { Router } from 'express';
 import { toError } from '../../core/error-handlers.js';
+import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 
 /**
  * @typedef {object} ModuleHealthResult
@@ -56,7 +57,7 @@ export function createHealthModulesRouter() {
                 results[entry.name] = result;
                 if (!result.ok) allOk = false;
             } catch (e) {
-                results[entry.name] = { ok: false, error: toError(e).message };
+                results[entry.name] = { ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 503) };
                 allOk = false;
             }
         });

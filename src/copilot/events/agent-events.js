@@ -183,6 +183,8 @@ export const AGENT_SUBAGENT_FAILED = 'agent:subagent:failed';
 export const AGENT_DIALOG_DELTA = 'agent:dialog:delta';
 /** @readonly */
 export const AGENT_DIALOG_BOOT_RECOVERY = 'agent:dialog:boot_recovery';
+/** @readonly */
+export const AGENT_DIALOG_RECOVERY = 'agent:dialog:recovery';
 /** @readonly — FAIXA-L32: bridge completude */
 export const AGENT_DIALOG_PRE_STALL_WARNING = 'agent:dialog:pre_stall_warning';
 
@@ -313,6 +315,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'mcp.reconnected',
     'quota.warning',
     'dialog.boot_recovery',
+    'dialog.recovery',
     'dialog.compaction.requested',
     'dialog.pre_stall_warning',
     'handoff.accepted',
@@ -353,6 +356,7 @@ export const DIALOG_LOOP_EVENTS = /** @type {ReadonlySet<string>} */ (
         'dialog.turn_end',
         'dialog.turn_timeout',
         'dialog.boot_recovery',
+        'dialog.recovery',
         'dialog.compaction.requested',
         'dialog.pre_stall_warning',
     ])

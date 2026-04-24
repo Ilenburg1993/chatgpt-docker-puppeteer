@@ -201,6 +201,13 @@ export async function handlePipeline(params = {}) {
         const rawStepFrom = typeof step['from'] === 'string' ? step['from'] : globalFrom;
         const from = ALLOWED_FROM.has(rawStepFrom) ? rawStepFrom : globalFrom;
         const waitMs = typeof step['waitMs'] === 'number' ? step['waitMs'] : 0;
+        const explicitTimeoutMs =
+            typeof step['timeout'] === 'number' && Number.isFinite(step['timeout']) && step['timeout'] > 0
+                ? step['timeout']
+                : typeof body['timeout'] === 'number' && Number.isFinite(body['timeout']) && body['timeout'] > 0
+                  ? body['timeout']
+                  : undefined;
+        const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
 
         if (waitMs > 0) {
             const MAX_WAIT_MS = 30_000;
@@ -209,7 +216,15 @@ export async function handlePipeline(params = {}) {
 
         const t0 = Date.now();
         try {
-            const reply = await sendRuntimeDialogTurn(prompt, from, undefined, getAgent(runtimeId));
+            const reply = await sendRuntimeDialogTurn(
+                prompt,
+                from,
+                {
+                    timeout: timeoutDecision.timeoutMs,
+                    traceId: `${createInjectTraceId()}-pipeline-step-${i + 1}`,
+                },
+                getAgent(runtimeId),
+            );
             results.push({ step: i + 1, prompt, reply: reply ?? null, durationMs: Date.now() - t0 });
 
             if (reply === null) {

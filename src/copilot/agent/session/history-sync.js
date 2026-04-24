@@ -13,6 +13,8 @@
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log } from '../ports/observability-port.js';
 
+const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
+
 /**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
@@ -146,11 +148,16 @@ export class SessionMessagesCache {
     /** @type {number} */
     #ttlMs;
 
+    /** @type {number} */
+    #maxItems;
+
     /**
      * @param {number} ttlMs — TTL em ms (padrão do config)
+     * @param {{ maxItems?: number }} [opts]
      */
-    constructor(ttlMs) {
+    constructor(ttlMs, opts = {}) {
         this.#ttlMs = ttlMs;
+        this.#maxItems = Math.max(1, Math.trunc(opts.maxItems ?? DEFAULT_MESSAGES_CACHE_MAX_ITEMS));
     }
 
     /** Invalida o cache (ex.: reconexão). */
@@ -172,9 +179,9 @@ export class SessionMessagesCache {
         }
         try {
             const messages = await session.getMessages();
-            this.#cache = messages;
+            this.#cache = messages.length > this.#maxItems ? messages.slice(-this.#maxItems) : messages;
             this.#cacheAt = now;
-            return messages;
+            return this.#cache;
         } catch {
             return [];
         }

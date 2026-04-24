@@ -21,6 +21,7 @@
 
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
+import { SseClientPool } from '../../../infra/sse/stream-hub.js';
 import {
     createEventFilter,
     createSseWriter,
@@ -31,9 +32,6 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
 const _agentTracker = new SseConnectionTracker('agent/stream');
-
-/** FASE-11.2: replay buffer global para agent/stream. */
-const _agentReplayBuffer = new SseReplayBuffer();
 
 /**
  * @typedef {import('express').Request} Req
@@ -73,6 +71,60 @@ function resolveAgentRouterDeps(binding, req) {
  */
 export default function createAgentRouter(deps) {
     const router = Router();
+    /**
+     * @typedef {{
+     *     key: string;
+     *     runtimeId: string | undefined;
+     *     client: Awaited<ReturnType<AgentRouterDeps['getClient']>>;
+     *     pool: SseClientPool;
+     *     unsubscribe: () => void;
+     * }} AgentStreamState
+     */
+
+    /** @type {Map<string, AgentStreamState>} */
+    const streamStates = new Map();
+
+    /**
+     * @param {AgentRouterDeps} routeDeps
+     * @returns {Promise<AgentStreamState>}
+     */
+    async function ensureAgentStreamState(routeDeps) {
+        const key = routeDeps.runtimeId ?? 'default';
+        const client = await routeDeps.getClient();
+        const existing = streamStates.get(key);
+        if (existing && existing.client === client) return existing;
+
+        if (existing) {
+            existing.pool.closeAll();
+            existing.unsubscribe();
+            streamStates.delete(key);
+        }
+
+        const pool = new SseClientPool(new SseReplayBuffer(), {
+            name: `sdk.agent.stream.${key}`,
+            metrics: routeDeps.metrics,
+        });
+
+        const unsubscribe = client.on((event) => {
+            const type = /** @type {string} */ (event?.type ?? 'lifecycle');
+            const payload = standardizeSsePayload(event);
+            pool.broadcast('lifecycle', payload, { replayEvent: 'lifecycle', filterEvent: type });
+        });
+
+        const state = { key, runtimeId: routeDeps.runtimeId, client, pool, unsubscribe };
+        streamStates.set(key, state);
+        return state;
+    }
+
+    /**
+     * @param {AgentStreamState} state
+     * @returns {void}
+     */
+    function maybeDisposeAgentStreamState(state) {
+        if (state.pool.size > 0) return;
+        state.unsubscribe();
+        streamStates.delete(state.key);
+    }
 
     /**
      * Wrapper com prefixo de log para as rotas de agente.
@@ -92,7 +144,7 @@ export default function createAgentRouter(deps) {
      * Retorna informações do agente Always-Alive: status, uptime, sessão ativa.
      */
     router.get('/agent/info', (_req, res) => {
-        void (async () => {
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
             const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveAgentRouterDeps(
                 deps,
                 /** @type {Req} */ (_req),
@@ -114,8 +166,6 @@ export default function createAgentRouter(deps) {
                 env: process.env['NODE_ENV'] ?? 'development',
                 ...runtimeProjection,
             });
-        })().catch((error) => {
-            res.status(500).json({ ok: false, error: /** @type {Error} */ (error).message });
         });
     });
 
@@ -213,41 +263,43 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/stream', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { getClient, runtimeId, sdkObservability } = resolveAgentRouterDeps(deps, req);
+            const routeDeps = resolveAgentRouterDeps(deps, req);
+            const { runtimeId, sdkObservability } = routeDeps;
             if (!_agentTracker.accept()) {
                 res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
                 return;
             }
-            const client = await getClient();
+            const state = await ensureAgentStreamState(routeDeps);
 
             // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
             // FASE-11.2/11.3/11.4: replay buffer + event filter + max lifetime
             const sse = createSseWriter(req, res, {
                 heartbeatMs: 30_000,
                 tracker: _agentTracker,
-                replayBuffer: _agentReplayBuffer,
+                replayBuffer: state.pool.replayBuffer,
                 maxLifetimeMs: 24 * 60 * 60 * 1000,
             });
 
-            sse.send('connected', {
-                ...(runtimeId ? { runtimeId } : {}),
-                state: client.getState(),
-                timestamp: Date.now(),
-            });
+            sse.send(
+                'connected',
+                {
+                    ...(runtimeId ? { runtimeId } : {}),
+                    state: state.client.getState(),
+                    timestamp: Date.now(),
+                },
+                { skipBuffer: true },
+            );
 
             // FASE-11.3: filtro de eventos via ?events= query param
             const eventFilter = createEventFilter(
                 typeof req.query['events'] === 'string' ? req.query['events'] : undefined,
             );
 
-            // Inscreve nos eventos de ciclo de vida do client
-            const unsubscribe = client.on((event) => {
-                const type = /** @type {string} */ (event?.type ?? 'lifecycle');
-                if (!eventFilter || eventFilter(type)) sse.send('lifecycle', standardizeSsePayload(event));
-            });
+            const sseClient = state.pool.addClient(sse, { filter: eventFilter });
 
             req.on('close', () => {
-                unsubscribe();
+                state.pool.removeClient(sseClient);
+                maybeDisposeAgentStreamState(state);
                 sdkObservability.log('INFO', '[sdk-api] SSE agent/stream encerrado');
             });
         });

@@ -11,8 +11,10 @@
 
 import { MAX_SSE_CLIENTS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
 import { AGENT_EVENTS } from '#copilot/events';
+import { defaultMetrics } from '#copilot/observability';
 import { eventFanout } from '../../../infra/sse/fanout.js';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
+import { SseClientPool } from '../../../infra/sse/stream-hub.js';
 import {
     createEventFilter,
     createSseWriter,
@@ -44,8 +46,123 @@ import { buildAgentConnectedSsePayload } from '../../../presentation/runtime-sta
  * @returns {void}
  */
 export function registerStreamRoutes(bridge, binding) {
-    // UPG-SE-004: buffer de replay para reconexão SSE via Last-Event-ID
-    const replayBuffer = new SseReplayBuffer();
+    /** @type {ReadonlyArray<AgentEventName>} */
+    const TASK_EVENTS = /** @type {AgentEventName[]} */ ([
+        'task.started',
+        'task.completed',
+        'task.error',
+        'task.delta',
+        'task.queued',
+        'task.reasoning',
+    ]);
+
+    /**
+     * @typedef {{
+     *     runtimeId: string;
+     *     agent: RuntimeRouteDeps['agent'];
+     *     streamPool: SseClientPool;
+     *     taskPool: SseClientPool;
+     *     subscriptions: Map<AgentEventName, (data: unknown) => void>;
+     *     taskSubscriptions: Map<AgentEventName, (data: unknown) => void>;
+     * }} RuntimeSseState
+     */
+
+    /** @type {Map<string, RuntimeSseState>} */
+    const runtimeStates = new Map();
+
+    /**
+     * @param {RuntimeRouteDeps} deps
+     * @returns {RuntimeSseState}
+     */
+    function ensureRuntimeState(deps) {
+        const runtimeKey = deps.runtimeId;
+        const existing = runtimeStates.get(runtimeKey);
+        if (existing && existing.agent === deps.agent) return existing;
+        if (existing) {
+            detachRuntimeState(existing);
+        }
+
+        const state = {
+            runtimeId: runtimeKey,
+            agent: deps.agent,
+            streamPool: new SseClientPool(new SseReplayBuffer(), {
+                name: `copilot_api.stream.${runtimeKey}`,
+                metrics: defaultMetrics,
+            }),
+            taskPool: new SseClientPool(new SseReplayBuffer(64), {
+                name: `copilot_api.stream.tasks.${runtimeKey}`,
+                metrics: defaultMetrics,
+            }),
+            subscriptions: new Map(),
+            taskSubscriptions: new Map(),
+        };
+
+        wireRuntimeState(state);
+        runtimeStates.set(runtimeKey, state);
+        return state;
+    }
+
+    /**
+     * @param {RuntimeSseState} state
+     * @returns {void}
+     */
+    function wireRuntimeState(state) {
+        const { agent } = state;
+        const maxListenersTarget = AGENT_EVENTS.length + TASK_EVENTS.length + 20;
+        if (typeof agent.getMaxListeners === 'function' && typeof agent.setMaxListeners === 'function') {
+            const current = agent.getMaxListeners();
+            if (current < maxListenersTarget) {
+                agent.setMaxListeners(maxListenersTarget);
+            }
+        }
+
+        /** @type {(eventName: AgentEventName, data: unknown) => void} */
+        const broadcastStreamEvent = (eventName, data) => {
+            const payload = standardizeSsePayload(data ?? {});
+            state.streamPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
+            // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
+            eventFanout.publish('bridge', eventName, /** @type {object} */ (payload));
+        };
+
+        /** @type {(eventName: AgentEventName, data: unknown) => void} */
+        const broadcastTaskEvent = (eventName, data) => {
+            const payload = standardizeSsePayload(data ?? {});
+            state.taskPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
+        };
+
+        for (const evt of AGENT_EVENTS) {
+            const handler = /** @type {(data: unknown) => void} */ (broadcastStreamEvent.bind(null, evt));
+            state.subscriptions.set(evt, handler);
+            agent.on(evt, handler);
+        }
+
+        for (const evt of TASK_EVENTS) {
+            const handler = /** @type {(data: unknown) => void} */ (broadcastTaskEvent.bind(null, evt));
+            state.taskSubscriptions.set(evt, handler);
+            agent.on(evt, handler);
+        }
+    }
+
+    /**
+     * @param {RuntimeSseState} state
+     * @returns {void}
+     */
+    function detachRuntimeState(state) {
+        state.subscriptions.forEach((handler, evt) => state.agent.off(evt, handler));
+        state.taskSubscriptions.forEach((handler, evt) => state.agent.off(evt, handler));
+        state.subscriptions.clear();
+        state.taskSubscriptions.clear();
+    }
+
+    /**
+     * @param {RuntimeSseState} state
+     * @returns {void}
+     */
+    function maybeDisposeRuntimeState(state) {
+        if (state.streamPool.size > 0 || state.taskPool.size > 0) return;
+        detachRuntimeState(state);
+        runtimeStates.delete(state.runtimeId);
+    }
 
     // BUG-EVDUP-03 (fix): tracker centralizado para limitar conexões SSE no bridge-stream
     const tracker = new SseConnectionTracker('copilot-api-stream', MAX_SSE_CLIENTS);
@@ -71,9 +188,7 @@ export function registerStreamRoutes(bridge, binding) {
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
-        const { agent } = deps;
-        // ARCH-05 (fix): cada conexão SSE adiciona N listeners ao agent (um por AGENT_EVENT).
-        agent.setMaxListeners?.(MAX_SSE_CLIENTS * (AGENT_EVENTS.length + 2));
+        const state = ensureRuntimeState(deps);
         // BUG-EVDUP-03 (fix): verificar limite de conexões SSE antes de aceitar
         if (!tracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
@@ -92,59 +207,29 @@ export function registerStreamRoutes(bridge, binding) {
         const sse = createSseWriter(req, res, {
             heartbeatMs: 15_000,
             maxLifetimeMs: MAX_SSE_LIFETIME_MS,
-            replayBuffer,
+            replayBuffer: state.streamPool.replayBuffer,
             tracker,
             compress: true,
         });
 
         // Evento inicial com snapshot do estado atual
-        sse.send('connected', buildAgentConnectedSsePayload(agent, deps));
+        sse.send('connected', buildAgentConnectedSsePayload(state.agent, deps), { skipBuffer: true });
 
-        // G2-PERF-05: handler genérico com bind leve por evento AGENT_EVENTS
-        /**
-         * @param {AgentEventName} eventName
-         * @param {unknown} data
-         */
-        const sseHandler = (eventName, data) => {
-            const payload = standardizeSsePayload(data ?? {});
-            sse.send(eventName, payload);
-            // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
-            eventFanout.publish('bridge', eventName, /** @type {object} */ (payload));
-        };
-
-        /** @type {Map<AgentEventName, (data: unknown) => void>} */
-        const handlers = new Map(
-            AGENT_EVENTS.filter((evt) => !eventFilter || eventFilter(evt)).map((evt) => [
-                evt,
-                /** @type {(data: unknown) => void} */ (sseHandler.bind(null, evt)),
-            ]),
-        );
-
-        handlers.forEach((handler, evt) => agent.on(evt, handler));
+        const client = state.streamPool.addClient(sse, { filter: eventFilter });
 
         req.on('close', () => {
-            handlers.forEach((handler, evt) => agent.off(evt, handler));
+            state.streamPool.removeClient(client);
+            maybeDisposeRuntimeState(state);
         });
     });
 
     // ── F36.4: SSE channel dedicado para task streaming ──────────────────────
 
-    const taskReplayBuffer = new SseReplayBuffer(64);
     const taskTracker = new SseConnectionTracker('copilot-api-stream-tasks', MAX_SSE_CLIENTS);
 
-    /** @type {ReadonlyArray<AgentEventName>} */
-    const TASK_EVENTS = /** @type {AgentEventName[]} */ ([
-        'task.started',
-        'task.completed',
-        'task.error',
-        'task.delta',
-        'task.queued',
-        'task.reasoning',
-    ]);
-
     bridge.get('/stream/tasks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
-        agent.setMaxListeners?.(MAX_SSE_CLIENTS * (TASK_EVENTS.length + 2));
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const state = ensureRuntimeState(deps);
         if (!taskTracker.accept()) {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE task atingido' });
             return;
@@ -152,28 +237,17 @@ export function registerStreamRoutes(bridge, binding) {
 
         const sse = createSseWriter(req, res, {
             heartbeatMs: 30_000,
-            replayBuffer: taskReplayBuffer,
+            replayBuffer: state.taskPool.replayBuffer,
             tracker: taskTracker,
         });
 
-        sse.send('connected', { timestamp: Date.now(), channel: 'tasks' });
+        sse.send('connected', { timestamp: Date.now(), channel: 'tasks' }, { skipBuffer: true });
 
-        /** @type {Map<AgentEventName, (data: unknown) => void>} */
-        const handlers = new Map(
-            TASK_EVENTS.map((evt) => [
-                evt,
-                /** @type {(data: unknown) => void} */
-                (
-                    (data) => {
-                        sse.send(evt, standardizeSsePayload(data ?? {}));
-                    }
-                ),
-            ]),
-        );
+        const client = state.taskPool.addClient(sse);
 
-        handlers.forEach((handler, evt) => agent.on(evt, handler));
         req.on('close', () => {
-            handlers.forEach((handler, evt) => agent.off(evt, handler));
+            state.taskPool.removeClient(client);
+            maybeDisposeRuntimeState(state);
         });
     });
 }

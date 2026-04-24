@@ -11,7 +11,7 @@
  * - list_tools: listagem, filtro por search, filtro por categoria, exclui disabled
  * - get_agent_info: retorna sdkVersion, nodeVersion, model, toolsRegistered
  * - get_telemetry: retorna summary com totais, topTools, dialog, sessions
- * - report_intent: registra e retorna confirmação com timestamp
+ * - legacy_report_intent: registra e retorna confirmação com timestamp
  * - toggle_tool: enable/disable, protege tools de introspection, tool inexistente
  * - get_tool_health: retorna stats, sort, limit, tool individual
  */
@@ -23,13 +23,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     log: vi.fn(),
     getToolStats: vi.fn(() => ({
-        web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
+        legacy_web_fetch: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
         git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
         shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
     })),
     getSummary: vi.fn(() => ({
         tools: {
-            web_fetch: { totalCalls: 10, successCount: 9, errorCount: 1 },
+            legacy_web_fetch: { totalCalls: 10, successCount: 9, errorCount: 1 },
             git_status: { totalCalls: 5, successCount: 5, errorCount: 0 },
         },
         dialog: { totalTurns: 3 },
@@ -85,7 +85,7 @@ describe('introspection-tools', () => {
 
     /** Fake tools para simular registro */
     const fakeTools = [
-        { name: 'web_fetch', description: 'Fetch web content' },
+        { name: 'legacy_web_fetch', description: 'Fetch web content' },
         { name: 'git_status', description: 'Show git status' },
         { name: 'list_tools', description: 'List tools' },
         { name: 'get_agent_info', description: 'Agent info' },
@@ -112,7 +112,7 @@ describe('introspection-tools', () => {
             expect(names).toContain('list_tools');
             expect(names).toContain('get_agent_info');
             expect(names).toContain('get_telemetry');
-            expect(names).toContain('report_intent');
+            expect(names).toContain('legacy_report_intent');
             expect(names).toContain('toggle_tool');
             expect(names).toContain('get_tool_health');
         });
@@ -132,7 +132,7 @@ describe('introspection-tools', () => {
 
     describe('isToolDisabled / getDisabledTools', () => {
         it('retorna false por default', () => {
-            expect(mod.isToolDisabled('web_fetch')).toBe(false);
+            expect(mod.isToolDisabled('legacy_web_fetch')).toBe(false);
         });
 
         it('getDisabledTools retorna array vazio inicialmente', () => {
@@ -168,12 +168,12 @@ describe('introspection-tools', () => {
         });
 
         it('exclui tools desabilitadas', async () => {
-            // Desabilitar web_fetch
+            // Desabilitar legacy_web_fetch
             const toggle = mod.introspectionTools.find((t) => t.name === 'toggle_tool');
-            await /** @type {any} */ (toggle).handler({ toolName: 'web_fetch', enabled: false });
+            await /** @type {any} */ (toggle).handler({ toolName: 'legacy_web_fetch', enabled: false });
 
             const result = await find().handler({});
-            expect(result.tools.some((/** @type {{ name: string }} */ t) => t.name === 'web_fetch')).toBe(false);
+            expect(result.tools.some((/** @type {{ name: string }} */ t) => t.name === 'legacy_web_fetch')).toBe(false);
             expect(result.count).toBe(4);
         });
     });
@@ -188,7 +188,7 @@ describe('introspection-tools', () => {
             expect(result.nodeVersion).toBe(process.version);
             expect(result.model).toBe('gpt-4.1-test');
             expect(result.toolsRegistered).toBe(5);
-            expect(result.toolNames).toContain('web_fetch');
+            expect(result.toolNames).toContain('legacy_web_fetch');
             expect(result.hasTelemetry).toBe(true);
             expect(result.env.COPILOT_MCP_SERVERS).toBe('test-server');
         });
@@ -211,10 +211,10 @@ describe('introspection-tools', () => {
 
         it('filtra por toolName', async () => {
             const tool = mod.introspectionTools.find((t) => t.name === 'get_telemetry');
-            const result = await /** @type {any} */ (tool).handler({ toolName: 'web_fetch' });
+            const result = await /** @type {any} */ (tool).handler({ toolName: 'legacy_web_fetch' });
 
             expect(result.topTools.length).toBe(1);
-            expect(result.topTools[0].name).toBe('web_fetch');
+            expect(result.topTools[0].name).toBe('legacy_web_fetch');
             expect(result.topTools[0].count).toBe(10);
         });
 
@@ -226,11 +226,11 @@ describe('introspection-tools', () => {
         });
     });
 
-    // ── report_intent ─────────────────────────────────────────────────────
+    // ── legacy_report_intent ──────────────────────────────────────────────
 
-    describe('report_intent', () => {
+    describe('legacy_report_intent', () => {
         it('registra intent e retorna confirmação', async () => {
-            const tool = mod.introspectionTools.find((t) => t.name === 'report_intent');
+            const tool = mod.introspectionTools.find((t) => t.name === 'legacy_report_intent');
             const result = await /** @type {any} */ (tool).handler({
                 intent: 'Deletar arquivo temporário',
                 tool: 'delete_file',
@@ -245,7 +245,7 @@ describe('introspection-tools', () => {
         });
 
         it('usa risk=low como default', async () => {
-            const tool = mod.introspectionTools.find((t) => t.name === 'report_intent');
+            const tool = mod.introspectionTools.find((t) => t.name === 'legacy_report_intent');
             const result = await /** @type {any} */ (tool).handler({
                 intent: 'Ler arquivo',
                 tool: 'read_file',
@@ -262,21 +262,21 @@ describe('introspection-tools', () => {
         const find = () => mod.introspectionTools.find((t) => t.name === 'toggle_tool');
 
         it('desabilita uma tool', async () => {
-            const result = await find().handler({ toolName: 'web_fetch', enabled: false });
+            const result = await find().handler({ toolName: 'legacy_web_fetch', enabled: false });
 
             expect(result.success).toBe(true);
             expect(result.enabled).toBe(false);
-            expect(mod.isToolDisabled('web_fetch')).toBe(true);
-            expect(mod.getDisabledTools()).toContain('web_fetch');
+            expect(mod.isToolDisabled('legacy_web_fetch')).toBe(true);
+            expect(mod.getDisabledTools()).toContain('legacy_web_fetch');
         });
 
         it('habilita uma tool previamente desabilitada', async () => {
-            await find().handler({ toolName: 'web_fetch', enabled: false });
-            const result = await find().handler({ toolName: 'web_fetch', enabled: true });
+            await find().handler({ toolName: 'legacy_web_fetch', enabled: false });
+            const result = await find().handler({ toolName: 'legacy_web_fetch', enabled: true });
 
             expect(result.success).toBe(true);
             expect(result.enabled).toBe(true);
-            expect(mod.isToolDisabled('web_fetch')).toBe(false);
+            expect(mod.isToolDisabled('legacy_web_fetch')).toBe(false);
         });
 
         it('protege tools de introspection', async () => {
@@ -312,10 +312,10 @@ describe('introspection-tools', () => {
         });
 
         it('filtra por tool_name específico', async () => {
-            const result = await find().handler({ tool_name: 'web_fetch' });
+            const result = await find().handler({ tool_name: 'legacy_web_fetch' });
 
             expect(result.found).toBe(true);
-            expect(result.tool).toBe('web_fetch');
+            expect(result.tool).toBe('legacy_web_fetch');
             expect(result.stats.calls).toBe(10);
         });
 

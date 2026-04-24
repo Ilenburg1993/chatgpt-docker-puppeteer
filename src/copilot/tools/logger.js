@@ -64,7 +64,8 @@ export function log(level, msg, meta) {
             console.warn(text);
             break;
         case 'DEBUG':
-            // Supress em produção sem logger injetado
+            // L1-FIX: Sempre logar DEBUG via console.debug, mesmo sem logger injetado
+            console.debug(text);
             break;
         default:
             console.info(text);

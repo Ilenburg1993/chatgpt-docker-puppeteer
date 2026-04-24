@@ -10,6 +10,7 @@ import EventEmitter from 'node:events';
 import { describe, it } from 'vitest';
 import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 import {
+    dialogRecoverInputChannel,
     dialogResume,
     dialogStart,
     dialogStop,
@@ -174,5 +175,78 @@ describe('agent-dialog-controller › dialogStop', () => {
             keepaliveOptions
         );
         assert.equal(typeof restartOptions.onKeepalive, 'function');
+    });
+});
+
+describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
+    /** @returns {{ ctx: AgentContext; host: EventEmitter & Record<string, any> }} */
+    function setupRecovery() {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        const host = Object.assign(emitter, {
+            sessionId: 'test-session',
+            sendMessage: async () => '',
+            sendMessageDialogBoot: async () => '',
+            answerPendingQuestion: () => false,
+        });
+        return { ctx, host };
+    }
+
+    it('usa READY pendente como recuperação 0 PR', async () => {
+        const { ctx, host } = setupRecovery();
+        let recoveryPayload = null;
+        host.on('dialog.recovery', (payload) => {
+            recoveryPayload = payload;
+        });
+        ctx.isDialogLoopActive = () => true;
+        ctx.isWaitingForInput = () => true;
+        ctx.getPendingQuestionKind = () => 'ready';
+
+        const result = await dialogRecoverInputChannel(ctx, /** @type {any} */ (host), {
+            reason: 'input_channel_missing',
+            traceId: 'r1',
+        });
+
+        assert.equal(result.recovered, true);
+        assert.equal(result.strategy, 'zero_pr_ready');
+        assert.equal(result.prConsumed, false);
+        assert.equal(recoveryPayload?.strategy, 'zero_pr_ready');
+    });
+
+    it('reinicia com reason recovery_restart quando active+idle fica sem canal de input', async () => {
+        const { ctx, host } = setupRecovery();
+        let recoveryPayload = null;
+        host.on('dialog.recovery', (payload) => {
+            recoveryPayload = payload;
+        });
+        ctx.status = 'idle';
+        ctx.isDialogLoopPaused = () => false;
+        ctx.isDialogLoopActive = () => true;
+        ctx.isWaitingForInput = () => false;
+        ctx.isIdle = () => true;
+        ctx.hasPendingQuestion = () => false;
+        ctx.getContextStateSnapshot = () => null;
+
+        let stopOpts = null;
+        ctx.stopDialogLoop = async (opts) => {
+            stopOpts = opts;
+        };
+        let started = false;
+        ctx.startDialogLoop = async () => {
+            started = true;
+        };
+        ctx.stopKeepalive = () => {};
+        ctx.startKeepalive = () => false;
+
+        const result = await dialogRecoverInputChannel(ctx, /** @type {any} */ (host), {
+            reason: 'input_channel_missing',
+        });
+
+        assert.equal(result.recovered, true);
+        assert.equal(result.strategy, 'restart_with_pr');
+        assert.equal(result.prConsumed, true);
+        assert.deepEqual(stopOpts, { authorized: true, reason: 'recovery_restart' });
+        assert.equal(started, true);
+        assert.equal(recoveryPayload?.success, true);
     });
 });

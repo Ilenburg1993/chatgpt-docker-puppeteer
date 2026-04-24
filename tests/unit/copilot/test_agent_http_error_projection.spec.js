@@ -25,6 +25,15 @@ describe('agent-http-errors', () => {
         assert.equal(projection.body.retryable, true);
     });
 
+    it('mapeia circuit breaker de boot para 503 retryable', () => {
+        const error = Object.assign(new Error('Circuit aberto'), { code: 'DIALOG_BOOT_CIRCUIT_OPEN' });
+        const projection = projectAgentHttpError(error);
+
+        assert.equal(projection.status, 503);
+        assert.equal(projection.body.code, 'DIALOG_BOOT_CIRCUIT_OPEN');
+        assert.equal(projection.body.retryable, true);
+    });
+
     it('mapeia erros fatais para 503', () => {
         const error = Object.assign(new Error('Sessão fatal'), { code: 'SESSION_FATAL' });
         const projection = projectAgentHttpError(error);

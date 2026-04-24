@@ -11,18 +11,24 @@
 import { container, SessionError } from '#copilot/core';
 import {
     EMITTER_ASSISTANT_MESSAGE,
+    EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
     EMITTER_TASK_DELTA,
+    EMITTER_TASK_REASONING,
+    EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
+import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 import { log, METRICS_STORE, startSpan } from '../ports/observability-port.js';
+
+const MAX_DELTA_FALLBACK_CHARS = 50_000;
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -179,6 +185,79 @@ function traceLabel(traceId) {
 }
 
 /**
+ * Cria um timeout de inatividade: o relógio reinicia quando o SDK/Agent demonstra progresso observável.
+ *
+ * Isso preserva a política 0 PR. Um turno lento mas vivo não é abortado só por ser longo; só falha quando fica mudo por
+ * mais do que a janela calculada pela policy.
+ *
+ * @param {TurnEmitter} emitter
+ * @param {{ timeout: number | null; onTimeout: () => void; traceId?: string; phase: string }} opts Quando `timeout` é
+ *   `null`, nenhum timer é criado — o watchdog do dialog loop torna-se o único guardião de stall.
+ * @returns {{ timeoutHandle: ReturnType<typeof setTimeout> | null; clear: () => void }}
+ */
+function createInactivityTimeout(emitter, opts) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let handle = null;
+    let disposed = false;
+    /** @type {[string, (...args: any[]) => void][]} */
+    const listeners = [];
+
+    const detachProgressListeners = () => {
+        for (const [event, listener] of listeners) {
+            emitter.off(event, listener);
+        }
+        listeners.length = 0;
+    };
+
+    const arm = () => {
+        if (opts.timeout === null) return;
+        if (disposed) return;
+        if (handle) clearTimeout(handle);
+        handle = setTimeout(() => {
+            if (disposed) return;
+            disposed = true;
+            handle = null;
+            detachProgressListeners();
+            opts.onTimeout();
+        }, opts.timeout);
+    };
+
+    const onProgress = () => {
+        if (disposed) return;
+        arm();
+    };
+
+    for (const event of [
+        EMITTER_ASSISTANT_MESSAGE,
+        EMITTER_ASSISTANT_STREAMING_DELTA,
+        EMITTER_ASSISTANT_TURN_END,
+        EMITTER_TASK_DELTA,
+        EMITTER_TASK_REASONING,
+        EMITTER_TOOL_EXECUTION_PROGRESS,
+    ]) {
+        listeners.push([event, onProgress]);
+        emitter.on(event, onProgress);
+    }
+
+    arm();
+    const initialHandle = handle;
+    if (initialHandle === null && opts.timeout !== null) {
+        throw new SessionError('[DialogLoopManager] Falha ao armar timeout de inatividade.', 'DIALOG_TIMEOUT_SETUP');
+    }
+
+    return {
+        timeoutHandle: initialHandle,
+        clear: () => {
+            if (disposed) return;
+            disposed = true;
+            if (handle) clearTimeout(handle);
+            handle = null;
+            detachProgressListeners();
+        },
+    };
+}
+
+/**
  * Fallback semântico para o caso em que o modelo responde por `assistant.message` em vez de `ask_user("REPLY: ...")`.
  *
  * Isso preserva a política 0-PR: o turno continua sendo resolvido sobre o mesmo `ask_user`/turn em andamento, sem
@@ -224,7 +303,10 @@ function createAssistantReplyFallback(host) {
         if (!dispatched || !rawEvt || typeof rawEvt !== 'object') return;
         const chunk = Reflect.get(rawEvt, 'chunk');
         if (typeof chunk === 'string' && chunk.length > 0) {
-            deltaCandidate += chunk;
+            const remaining = MAX_DELTA_FALLBACK_CHARS - deltaCandidate.length;
+            if (remaining > 0) {
+                deltaCandidate += chunk.slice(0, remaining);
+            }
         }
     };
 
@@ -315,7 +397,7 @@ export function emitTurnStart(emitter, message, counter, host) {
  * @param {{
  *     host: TurnHost;
  *     turnStart: number;
- *     timeout: number;
+ *     timeout: number | null;
  *     message: string;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
  *     resolve: (v: string) => void;
@@ -325,7 +407,8 @@ export function emitTurnStart(emitter, message, counter, host) {
  *     traceId?: string;
  * }} opts
  * @returns {{
- *     timeoutHandle: ReturnType<typeof setTimeout>;
+ *     timeoutHandle: ReturnType<typeof setTimeout> | null;
+ *     clearTurnTimeout: () => void;
  *     onReplyOuter: (evt: unknown) => void;
  *     onReadyOuter: (evt: unknown) => void;
  *     onStopOuter: (evt: unknown) => void;
@@ -356,25 +439,33 @@ export function buildTurnResolutionListeners(emitter, opts) {
         stop: (_) => {},
     };
 
-    const timeoutHandle = setTimeout(() => {
-        if (pendingListenerRef.current) {
-            emitter.off(EMITTER_QUESTION_PENDING, pendingListenerRef.current);
-            pendingListenerRef.current = null;
-        }
-        emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
-        emitter.off(EMITTER_LOOP_READY, handlers.ready);
-        emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
-        if (tryUseReplyFallback?.()) {
-            return;
-        }
-        log('WARN', `[DialogLoopManager] sendTurn timeout (${traceLabel(traceId)}, timeout=${timeout}ms)`);
-        reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
-    }, timeout);
+    const turnTimeout = createInactivityTimeout(emitter, {
+        timeout,
+        ...(traceId ? { traceId } : {}),
+        phase: 'outer',
+        onTimeout: () => {
+            if (pendingListenerRef.current) {
+                emitter.off(EMITTER_QUESTION_PENDING, pendingListenerRef.current);
+                pendingListenerRef.current = null;
+            }
+            emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
+            emitter.off(EMITTER_LOOP_READY, handlers.ready);
+            emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
+            if (tryUseReplyFallback?.()) {
+                return;
+            }
+            log(
+                'WARN',
+                `[DialogLoopManager] sendTurn inactivity timeout (${traceLabel(traceId)}, timeout=${timeout}ms)`,
+            );
+            reject(new SessionError(`[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`, 'DIALOG_TIMEOUT'));
+        },
+    });
 
     handlers.reply = castListener(
         /** @param {{ reply: string }} evt */
         (evt) => {
-            clearTimeout(timeoutHandle);
+            turnTimeout.clear();
             emitter.off(EMITTER_LOOP_READY, handlers.ready);
             emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
             log('INFO', `[DialogLoopManager] reply resolved (${traceLabel(traceId)}, source=loop.reply)`);
@@ -390,7 +481,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
         if (!tryUseReplyFallback?.()) {
             return;
         }
-        clearTimeout(timeoutHandle);
+        turnTimeout.clear();
         emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
         emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
         log('INFO', `[DialogLoopManager] reply resolved (${traceLabel(traceId)}, source=loop.ready_fallback)`);
@@ -399,7 +490,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
     handlers.stop = castListener(
         /** @param {{ authorized?: boolean; reason?: string }} stopEvt */
         (stopEvt) => {
-            clearTimeout(timeoutHandle);
+            turnTimeout.clear();
             emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
             emitter.off(EMITTER_LOOP_READY, handlers.ready);
             if (stopEvt?.authorized) {
@@ -413,12 +504,20 @@ export function buildTurnResolutionListeners(emitter, opts) {
                     'INFO',
                     `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
                 );
-                waitForRestartAndReplyFn(opts.message, timeout, stopEvt?.reason).then(resolve).catch(reject);
+                waitForRestartAndReplyFn(opts.message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt?.reason)
+                    .then(resolve)
+                    .catch(reject);
             }
         },
     );
 
-    return { timeoutHandle, onReplyOuter: handlers.reply, onReadyOuter: handlers.ready, onStopOuter: handlers.stop };
+    return {
+        timeoutHandle: turnTimeout.timeoutHandle,
+        clearTurnTimeout: turnTimeout.clear,
+        onReplyOuter: handlers.reply,
+        onReadyOuter: handlers.ready,
+        onStopOuter: handlers.stop,
+    };
 }
 
 /**
@@ -428,9 +527,10 @@ export function buildTurnResolutionListeners(emitter, opts) {
  * @param {{
  *     host: TurnHost;
  *     message: string;
- *     timeout: number;
+ *     timeout: number | null;
  *     signal?: AbortSignal;
- *     timeoutHandle: ReturnType<typeof setTimeout>;
+ *     timeoutHandle: ReturnType<typeof setTimeout> | null;
+ *     clearTurnTimeout?: () => void;
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
  *     onReplyOuter: (evt: unknown) => void;
  *     onReadyOuter: (evt: unknown) => void;
@@ -449,6 +549,7 @@ export function dispatchTurnToHost(emitter, opts) {
         message,
         timeout,
         timeoutHandle,
+        clearTurnTimeout,
         pendingListenerRef,
         onReplyOuter,
         onReadyOuter = () => {},
@@ -502,7 +603,11 @@ export function dispatchTurnToHost(emitter, opts) {
                 onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
                 return;
             }
-            clearTimeout(timeoutHandle);
+            if (clearTurnTimeout) {
+                clearTurnTimeout();
+            } else {
+                clearTimeout(timeoutHandle ?? undefined);
+            }
             // F41B.3: remover os outer listeners registrados por buildTurnResolutionListeners
             // para evitar listener leak / double-fire quando novos listeners são registrados abaixo
             emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
@@ -510,25 +615,35 @@ export function dispatchTurnToHost(emitter, opts) {
                 emitter.off(EMITTER_LOOP_READY, onReadyOuter);
             }
             emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
-            const newTimeout = setTimeout(() => {
-                emitter.off(EMITTER_LOOP_REPLY, onReply);
-                emitter.off(EMITTER_LOOP_READY, onReady);
-                emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                if (tryUseReplyFallback?.()) {
-                    return;
-                }
-                log(
-                    'WARN',
-                    `[DialogLoopManager] sendTurn timeout after question.pending (${traceLabel(traceId)}, timeout=${timeout}ms)`,
-                );
-                reject(new SessionError(`[DialogLoopManager] sendTurn timeout após ${timeout}ms`, 'DIALOG_TIMEOUT'));
-            }, timeout);
+            const innerTimeout = createInactivityTimeout(emitter, {
+                timeout,
+                ...(traceId ? { traceId } : {}),
+                phase: 'pending',
+                onTimeout: () => {
+                    emitter.off(EMITTER_LOOP_REPLY, onReply);
+                    emitter.off(EMITTER_LOOP_READY, onReady);
+                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
+                    if (tryUseReplyFallback?.()) {
+                        return;
+                    }
+                    log(
+                        'WARN',
+                        `[DialogLoopManager] sendTurn inactivity timeout after question.pending (${traceLabel(traceId)}, timeout=${timeout}ms)`,
+                    );
+                    reject(
+                        new SessionError(
+                            `[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`,
+                            'DIALOG_TIMEOUT',
+                        ),
+                    );
+                },
+            });
             /** @type {(() => void) | null} */
             let onAbortInner = null;
             const onReply = castListener(
                 /** @param {{ reply: string }} evt */
                 (evt) => {
-                    clearTimeout(newTimeout);
+                    innerTimeout.clear();
                     emitter.off(EMITTER_LOOP_READY, onReady);
                     emitter.off(EMITTER_LOOP_STOPPED, onStop);
                     if (onAbortInner) {
@@ -542,7 +657,7 @@ export function dispatchTurnToHost(emitter, opts) {
                 if (!tryUseReplyFallback?.()) {
                     return;
                 }
-                clearTimeout(newTimeout);
+                innerTimeout.clear();
                 emitter.off(EMITTER_LOOP_REPLY, onReply);
                 emitter.off(EMITTER_LOOP_STOPPED, onStop);
                 if (onAbortInner) {
@@ -553,7 +668,7 @@ export function dispatchTurnToHost(emitter, opts) {
             const onStop = castListener(
                 /** @param {{ authorized?: boolean; reason?: string }} stopEvt2 */
                 (stopEvt2) => {
-                    clearTimeout(newTimeout);
+                    innerTimeout.clear();
                     emitter.off(EMITTER_LOOP_REPLY, onReply);
                     emitter.off(EMITTER_LOOP_READY, onReady);
                     if (onAbortInner) {
@@ -563,13 +678,15 @@ export function dispatchTurnToHost(emitter, opts) {
                     if (stopEvt2?.authorized) {
                         reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
                     } else {
-                        waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
+                        waitForRestartAndReplyFn(message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt2?.reason)
+                            .then(resolve)
+                            .catch(reject);
                     }
                 },
             );
             if (opts.signal) {
                 onAbortInner = () => {
-                    clearTimeout(newTimeout);
+                    innerTimeout.clear();
                     emitter.off(EMITTER_LOOP_REPLY, onReply);
                     emitter.off(EMITTER_LOOP_READY, onReady);
                     emitter.off(EMITTER_LOOP_STOPPED, onStop);
@@ -694,7 +811,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
  *
  * @param {TurnEmitter} emitter
  * @param {string} message
- * @param {{ timeout: number; signal?: AbortSignal; traceId?: string }} opts
+ * @param {{ timeout: number | null; signal?: AbortSignal; traceId?: string }} opts
  * @param {{
  *     host: TurnHost;
  *     sendCountRef: { sendCount: number };
@@ -749,9 +866,8 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, 
                     reject(error instanceof Error ? error : new Error(String(error)));
                 };
 
-                const { timeoutHandle, onReplyOuter, onReadyOuter, onStopOuter } = buildTurnResolutionListeners(
-                    emitter,
-                    {
+                const { timeoutHandle, clearTurnTimeout, onReplyOuter, onReadyOuter, onStopOuter } =
+                    buildTurnResolutionListeners(emitter, {
                         host,
                         turnStart,
                         timeout,
@@ -768,11 +884,10 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, 
                                     metrics: container.resolve(METRICS_STORE),
                                 }),
                             ),
-                    },
-                );
+                    });
 
                 const onAbort = () => {
-                    clearTimeout(timeoutHandle);
+                    clearTurnTimeout();
                     emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
                     emitter.off(EMITTER_LOOP_READY, onReadyOuter);
                     emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
@@ -793,6 +908,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, 
                     timeout,
                     ...(signal !== undefined && { signal }),
                     timeoutHandle,
+                    clearTurnTimeout,
                     pendingListenerRef,
                     onReplyOuter,
                     onReadyOuter,

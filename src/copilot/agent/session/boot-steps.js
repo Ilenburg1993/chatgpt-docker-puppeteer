@@ -375,26 +375,26 @@ export function stepStartKeepalive(ctx) {
 /**
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
  * @returns {void}
  */
-export function stepWireHandoff(agentEmitter, ctx) {
+export function stepWireHandoff(agentEmitter, ctx, state) {
     if (isExperimentalEnabled('fleet')) {
-        agentEmitter.on(
-            'session.handoff',
-            (
-                /**
-                 * @type {{
-                 *     fromAgent: string;
-                 *     toAgent: string;
-                 *     reason?: string;
-                 *     context?: Record<string, unknown>;
-                 * }}
-                 */ data,
-            ) => {
-                ctx.receiveHandoff(data);
-                defaultMetrics.recordHandoff();
-            },
-        );
+        const onHandoff = (
+            /**
+             * @type {{
+             *     fromAgent: string;
+             *     toAgent: string;
+             *     reason?: string;
+             *     context?: Record<string, unknown>;
+             * }}
+             */ data,
+        ) => {
+            ctx.receiveHandoff(data);
+            defaultMetrics.recordHandoff();
+        };
+        agentEmitter.on('session.handoff', onHandoff);
+        state.unsubs.push(() => agentEmitter.off('session.handoff', onHandoff));
     } else {
         log('DEBUG', '[BootWiring] Handoff wiring desabilitado (experimental.fleet não habilitado).');
     }
@@ -403,15 +403,18 @@ export function stepWireHandoff(agentEmitter, ctx) {
 /**
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
  * @returns {void}
  */
-export function stepWireQuestionAnsweredRelay(agentEmitter, ctx) {
-    agentEmitter.on(EMITTER_QUESTION_ANSWERED, (/** @type {{ answer?: string }} */ evt) => {
+export function stepWireQuestionAnsweredRelay(agentEmitter, ctx, state) {
+    const onQuestionAnswered = (/** @type {{ answer?: string }} */ evt) => {
         if (typeof evt?.answer !== 'string') return;
         const answer = evt.answer;
         void ctx.trackBackgroundTask(Promise.resolve(resolveAgentUserInput(answer)), {
             label: 'hooks.question_answered.relay',
             description: 'Relay question.answered answers into hook tools resolver',
         });
-    });
+    };
+    agentEmitter.on(EMITTER_QUESTION_ANSWERED, onQuestionAnswered);
+    state.unsubs.push(() => agentEmitter.off(EMITTER_QUESTION_ANSWERED, onQuestionAnswered));
 }

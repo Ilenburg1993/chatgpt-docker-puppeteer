@@ -62,7 +62,10 @@ describe('agent/dialog/user-input-handler', () => {
 
         expect(ctx.setPendingQuestion).not.toHaveBeenCalled();
         expect(mocks.persistStateWithPolicy).not.toHaveBeenCalled();
-        await expect(promise).resolves.toEqual({ answer: '', wasFreeform: false });
+        await expect(promise).resolves.toEqual({
+            answer: expect.stringContaining('CONTINUE_DIALOG_LOOP'),
+            wasFreeform: false,
+        });
     });
 
     it('trata READY tardio como protocolo quando shouldHandleProtocolInput autoriza recovery', async () => {

@@ -134,4 +134,21 @@ describe('core/shutdown.js', () => {
         // Deve completar em ~5s (timeout do handler), não 10s
         assert.ok(elapsed < 7_000, `Shutdown levou ${elapsed}ms, deveria ser < 7000ms`);
     });
+
+    it('permite timeout customizado por handler para drenagem controlada', async () => {
+        let completed = false;
+        registerShutdownHandler(
+            'drain',
+            async () => {
+                await new Promise((resolve) => setTimeout(resolve, 30));
+                completed = true;
+            },
+            10,
+            { timeoutMs: 100 },
+        );
+
+        await runShutdown('test');
+
+        assert.equal(completed, true);
+    });
 });

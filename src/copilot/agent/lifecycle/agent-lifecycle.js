@@ -85,6 +85,187 @@ export async function initSession(ctx, client, host) {
 }
 
 /**
+ * Finaliza o runtime governado por uma sessão SDK já criada/retomada.
+ *
+ * Este é o ponto canônico pós-`initSession`: boot inicial e reconexão precisam refazer os mesmos wirings para que
+ * eventos SDK, observabilidade, quota, MCP, keepalive, dialog recovery e relays operacionais fiquem sempre coerentes.
+ *
+ * @param {AgentContext} ctx
+ * @param {LifecycleHost & import('node:events').EventEmitter} host
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {CopilotSession} session
+ * @param {boolean} isResumed
+ * @param {{ ownershipLabel?: string; emitReady?: boolean; readyExtra?: Record<string, unknown> }} [options]
+ * @returns {Promise<void>}
+ */
+async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, options = {}) {
+    const ownershipSync = await syncActiveSessionOwnershipWithPolicy(
+        session.sessionId,
+        {
+            getHubSessionId,
+            setSharedSdkSessionId,
+            conversationStore: resolveConversationStore(container),
+        },
+        { label: options.ownershipLabel ?? 'agent.session.ownership.sync' },
+    );
+    if (!ownershipSync.ok) {
+        log('WARN', `[AlwaysAlive] Ownership sync degradado: ${ownershipSync.error.message}`);
+    }
+
+    const previousAgentObserver = ctx.getAgentObserverSnapshot();
+    if (previousAgentObserver) {
+        previousAgentObserver.detach();
+        ctx.clearAgentObserver();
+    }
+
+    const previousMetricsTimer = ctx.getMetricsTimerSnapshot();
+    if (previousMetricsTimer) {
+        clearInterval(previousMetricsTimer);
+        ctx.clearMetricsTimer();
+    }
+
+    const previousMcpReconnectCancel = ctx.getMcpReconnectCancelSnapshot();
+    if (previousMcpReconnectCancel) {
+        previousMcpReconnectCancel();
+        ctx.clearMcpReconnectCancel();
+    }
+
+    ctx.stopQuotaMonitor();
+
+    const eventBus = container.resolve(EVENT_BUS) ?? undefined;
+    const bootResult = await performBootWiring(
+        client,
+        session,
+        isResumed,
+        host,
+        {
+            emit: (event, payload) => host.emit(event, payload),
+            getStatusSnapshot: () => host.getStatusSnapshot(),
+            onCheckpointPath: (path) => {
+                ctx.setLastCheckpointPath(path);
+            },
+            onContextState: (state) => {
+                ctx.setContextState(state);
+            },
+            onPrInfo: (info) => {
+                ctx.setLastPrInfo(info);
+                void ctx.trackBackgroundTask(
+                    persistStateWithPolicy(
+                        {
+                            pendingTurnConsumedPR: true,
+                            lastPrConsumedAt: info.ts,
+                            lastPrModel: info.model ?? '',
+                            lastPrCost: info.cost ?? 0,
+                            lastQuotaSnapshots: info.quotaSnapshots ?? null,
+                        },
+                        { label: 'state.pr_consumed.persist' },
+                    ).then(() => undefined),
+                    {
+                        label: 'state.pr_consumed.persist',
+                        description: 'Persist latest PR consumption snapshot',
+                    },
+                );
+            },
+            isProcessing: () => ctx.isProcessing(),
+            dialogLoopActive: () => ctx.isDialogLoopActive(),
+            getSessionId: () => host.sessionId,
+            getStatus: () => ctx.getRuntimeStatus(),
+            hasPendingQuestion: () => ctx.hasPendingQuestion(),
+            hasPendingQuestionShadow: () => ctx.hasPendingQuestionShadow(),
+            isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
+            clearPendingQuestionShadow: () => ctx.clearPendingQuestionShadow(),
+            dialogLoop: ctx.getDialogLoopManagerSnapshot(),
+            keepalive: ctx.getKeepaliveManagerSnapshot(),
+            receiveHandoff: (event) => ctx.receiveHandoff(event),
+            ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
+            resumeDialogLoop: () => host.resumeDialogLoop(),
+            startDialogLoop: () => host.startDialogLoop(),
+            startKeepalive: (keepaliveOptions) => ctx.startKeepalive(keepaliveOptions),
+            getDialogPrMetrics: () => host.dialogPrMetrics,
+            trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
+            mcpBridge: ctx.getMcpBridgeSnapshot(),
+            getMcpBridgeSnapshot: () => ctx.getMcpBridgeSnapshot(),
+        },
+        { eventBus },
+    );
+    ctx.setBootReport(bootResult.bootReport);
+    if (bootResult.error) {
+        throw bootResult.error;
+    }
+    ctx.setSessionEventUnsubscribers(bootResult.unsubs);
+    if (bootResult.agentObserver) {
+        ctx.setAgentObserver(bootResult.agentObserver);
+    } else {
+        ctx.clearAgentObserver();
+    }
+    if (bootResult.metricsTimer) {
+        ctx.setMetricsTimer(bootResult.metricsTimer);
+    } else {
+        ctx.clearMetricsTimer();
+    }
+    if (bootResult.mcpReconnectCancel) {
+        ctx.setMcpReconnectCancel(bootResult.mcpReconnectCancel);
+    } else {
+        ctx.clearMcpReconnectCancel();
+    }
+    if (bootResult.quotaMonitor) {
+        ctx.setQuotaMonitor(bootResult.quotaMonitor);
+    } else {
+        ctx.clearQuotaMonitor();
+    }
+
+    ctx.setStatus('idle', host);
+    const persistedState = await readStateAsync();
+    ctx.setSendCount(persistedState?.sendCount ?? 0);
+    if (persistedState?.pendingQuestion && persistedState.pendingQuestionMeta) {
+        const pendingQuestionShadow = createPendingQuestionShadow(
+            persistedState.pendingQuestion,
+            persistedState.pendingQuestionMeta,
+        );
+        ctx.setPendingQuestionShadow(pendingQuestionShadow);
+        if (isPendingQuestionShadowExpired(pendingQuestionShadow)) {
+            void ctx.trackBackgroundTask(
+                persistStateWithPolicy(
+                    { pendingQuestion: null, pendingQuestionMeta: null },
+                    { label: 'state.pendingQuestionShadow.expire' },
+                ).then(() => undefined),
+                {
+                    label: 'state.pendingQuestionShadow.expire',
+                    description: 'Clear expired ask_user shadow from persisted state',
+                },
+            );
+        }
+    } else {
+        ctx.clearPendingQuestionShadow();
+    }
+
+    log(
+        'INFO',
+        `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
+    );
+
+    if (isResumed) {
+        const convStore = resolveConversationStore(container);
+        if (convStore) {
+            void ctx.trackBackgroundTask(
+                syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
+                    getHubSessionId,
+                    conversationStore: convStore,
+                }),
+                {
+                    label: 'session.history.sync',
+                    description: 'Sync resumed session history into conversation store',
+                },
+            );
+        }
+    }
+
+    if (options.emitReady !== false) {
+        host.emit(EMITTER_READY, { sessionId: session.sessionId, isResumed, ...(options.readyExtra ?? {}) });
+    }
+}
+
+/**
  * Inicia o agente: conecta ao CLI e cria/retoma sessão.
  *
  * @param {AgentContext} ctx
@@ -100,15 +281,13 @@ export async function agentStart(ctx, host) {
     ctx.setStatus('starting', host);
     log('INFO', '[AlwaysAlive] Iniciando agente...');
 
-    void ctx.trackBackgroundTask(
-        persistStateWithPolicy({ gracefulShutdown: false }, { label: 'state.gracefulShutdown.reset' }).then(
-            () => undefined,
-        ),
-        {
-            label: 'state.gracefulShutdown.reset',
-            description: 'Persist gracefulShutdown=false at startup',
-        },
+    const resetShutdown = await persistStateWithPolicy(
+        { gracefulShutdown: false },
+        { label: 'state.gracefulShutdown.reset' },
     );
+    if (!resetShutdown.ok) {
+        log('WARN', `[AlwaysAlive] gracefulShutdown=false não persistido no startup: ${resetShutdown.error.message}`);
+    }
 
     initEventCollector({
         metrics: defaultMetrics,
@@ -130,153 +309,9 @@ export async function agentStart(ctx, host) {
             initSession(ctx, client, host),
         );
 
-        const ownershipSync = await syncActiveSessionOwnershipWithPolicy(
-            session.sessionId,
-            {
-                getHubSessionId,
-                setSharedSdkSessionId,
-                conversationStore: resolveConversationStore(container),
-            },
-            { label: 'agent.start.ownership.sync' },
-        );
-        if (!ownershipSync.ok) {
-            log('WARN', `[AlwaysAlive] Ownership sync degradado no boot: ${ownershipSync.error.message}`);
-        }
-
-        const previousAgentObserver = ctx.getAgentObserverSnapshot();
-        if (previousAgentObserver) {
-            previousAgentObserver.detach();
-            ctx.clearAgentObserver();
-        }
-        const eventBus = container.resolve(EVENT_BUS) ?? undefined;
-        const bootResult = await performBootWiring(
-            client,
-            session,
-            isResumed,
-            host,
-            {
-                emit: (event, payload) => host.emit(event, payload),
-                getStatusSnapshot: () => host.getStatusSnapshot(),
-                onCheckpointPath: (path) => {
-                    ctx.setLastCheckpointPath(path);
-                },
-                onContextState: (state) => {
-                    ctx.setContextState(state);
-                },
-                onPrInfo: (info) => {
-                    ctx.setLastPrInfo(info);
-                    void ctx.trackBackgroundTask(
-                        persistStateWithPolicy(
-                            {
-                                pendingTurnConsumedPR: true,
-                                lastPrConsumedAt: info.ts,
-                                lastPrModel: info.model ?? '',
-                                lastPrCost: info.cost ?? 0,
-                                lastQuotaSnapshots: info.quotaSnapshots ?? null,
-                            },
-                            { label: 'state.pr_consumed.persist' },
-                        ).then(() => undefined),
-                        {
-                            label: 'state.pr_consumed.persist',
-                            description: 'Persist latest PR consumption snapshot',
-                        },
-                    );
-                },
-                isProcessing: () => ctx.isProcessing(),
-                dialogLoopActive: () => ctx.isDialogLoopActive(),
-                getSessionId: () => host.sessionId,
-                getStatus: () => ctx.getRuntimeStatus(),
-                hasPendingQuestion: () => ctx.hasPendingQuestion(),
-                hasPendingQuestionShadow: () => ctx.hasPendingQuestionShadow(),
-                isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
-                clearPendingQuestionShadow: () => ctx.clearPendingQuestionShadow(),
-                dialogLoop: ctx.getDialogLoopManagerSnapshot(),
-                keepalive: ctx.getKeepaliveManagerSnapshot(),
-                receiveHandoff: (event) => ctx.receiveHandoff(event),
-                ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
-                resumeDialogLoop: () => host.resumeDialogLoop(),
-                startDialogLoop: () => host.startDialogLoop(),
-                startKeepalive: (options) => ctx.startKeepalive(options),
-                getDialogPrMetrics: () => host.dialogPrMetrics,
-                trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
-                mcpBridge: ctx.getMcpBridgeSnapshot(),
-                getMcpBridgeSnapshot: () => ctx.getMcpBridgeSnapshot(),
-            },
-            { eventBus },
-        );
-        ctx.setBootReport(bootResult.bootReport);
-        if (bootResult.error) {
-            throw bootResult.error;
-        }
-        ctx.setSessionEventUnsubscribers(bootResult.unsubs);
-        if (bootResult.agentObserver) {
-            ctx.setAgentObserver(bootResult.agentObserver);
-        } else {
-            ctx.clearAgentObserver();
-        }
-        if (bootResult.metricsTimer) {
-            ctx.setMetricsTimer(bootResult.metricsTimer);
-        } else {
-            ctx.clearMetricsTimer();
-        }
-        if (bootResult.mcpReconnectCancel) {
-            ctx.setMcpReconnectCancel(bootResult.mcpReconnectCancel);
-        } else {
-            ctx.clearMcpReconnectCancel();
-        }
-        if (bootResult.quotaMonitor) {
-            ctx.setQuotaMonitor(bootResult.quotaMonitor);
-        } else {
-            ctx.clearQuotaMonitor();
-        }
-
-        ctx.setStatus('idle', host);
-        const persistedState = await readStateAsync();
-        ctx.setSendCount(persistedState?.sendCount ?? 0);
-        if (persistedState?.pendingQuestion && persistedState.pendingQuestionMeta) {
-            const pendingQuestionShadow = createPendingQuestionShadow(
-                persistedState.pendingQuestion,
-                persistedState.pendingQuestionMeta,
-            );
-            ctx.setPendingQuestionShadow(pendingQuestionShadow);
-            if (isPendingQuestionShadowExpired(pendingQuestionShadow)) {
-                void ctx.trackBackgroundTask(
-                    persistStateWithPolicy(
-                        { pendingQuestion: null, pendingQuestionMeta: null },
-                        { label: 'state.pendingQuestionShadow.expire' },
-                    ).then(() => undefined),
-                    {
-                        label: 'state.pendingQuestionShadow.expire',
-                        description: 'Clear expired ask_user shadow from persisted state',
-                    },
-                );
-            }
-        } else {
-            ctx.clearPendingQuestionShadow();
-        }
-
-        log(
-            'INFO',
-            `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
-        );
-
-        if (isResumed) {
-            const convStore = resolveConversationStore(container);
-            if (convStore) {
-                void ctx.trackBackgroundTask(
-                    syncSdkHistory(session, (event, payload) => host.emit(event, payload), {
-                        getHubSessionId,
-                        conversationStore: convStore,
-                    }),
-                    {
-                        label: 'session.history.sync',
-                        description: 'Sync resumed session history into conversation store',
-                    },
-                );
-            }
-        }
-
-        host.emit(EMITTER_READY, { sessionId: session.sessionId, isResumed });
+        await wireAgentSessionRuntime(ctx, host, client, session, isResumed, {
+            ownershipLabel: 'agent.start.ownership.sync',
+        });
     } catch (e) {
         ctx.setStatus('stopped', host);
         log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${toError(e).message}`);
@@ -290,14 +325,19 @@ export async function agentStart(ctx, host) {
  *
  * @param {AgentContext} ctx
  * @param {LifecycleHost & import('node:events').EventEmitter} host
- * @param {{ shutdownTimeoutMs?: number }} [opts]
+ * @param {{ shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }} [opts]
  * @returns {Promise<void>}
  */
-export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS } = {}) {
+export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS, preserveDialogLoopIntent = false } = {}) {
     if (ctx.isStopped()) return;
 
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
         log('INFO', '[AlwaysAlive] Parando agente...');
+
+        const restoreDialogLoopOnNextBoot =
+            preserveDialogLoopIntent &&
+            !ctx.isDialogLoopPaused() &&
+            (ctx.isDialogLoopActive() || ctx.hasPendingQuestion() || ctx.hasPendingQuestionShadow());
 
         host.emit(EMITTER_BEFORE_STOP);
         host.removeAllListeners('before-stop');
@@ -340,7 +380,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
                 model: ctx.getModelSnapshot(),
                 status: ctx.getRuntimeStatus(),
                 sendCount: ctx.getSendCountSnapshot(),
-                dialogLoopActive: false,
+                dialogLoopActive: restoreDialogLoopOnNextBoot,
                 dialogPaused: ctx.isDialogLoopPaused(),
                 pendingQuestion: pendingQuestion?.question ?? null,
                 pendingQuestionMeta:
@@ -362,7 +402,12 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         }
 
         const persistedShutdown = await persistStateWithPolicy(
-            { sendCount: ctx.getSendCountSnapshot(), gracefulShutdown: true },
+            {
+                sendCount: ctx.getSendCountSnapshot(),
+                gracefulShutdown: true,
+                dialogLoopActive: restoreDialogLoopOnNextBoot,
+                dialogPaused: ctx.isDialogLoopPaused(),
+            },
             { label: 'state.gracefulShutdown.persist' },
         );
         if (!persistedShutdown.ok) {
@@ -483,6 +528,11 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
                 updateClient: (newClient) => {
                     ctx.setClient(newClient);
                 },
+                onSessionReady: (activeClient, session, isResumed) =>
+                    wireAgentSessionRuntime(ctx, host, activeClient, session, isResumed, {
+                        ownershipLabel: 'agent.reconnect.ownership.sync',
+                        emitReady: false,
+                    }),
             },
             opts,
         );

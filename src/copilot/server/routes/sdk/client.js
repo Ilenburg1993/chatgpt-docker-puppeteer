@@ -59,6 +59,9 @@ function resolveClientRouterDeps(binding, req) {
     return typeof binding === 'function' ? binding(req) : binding;
 }
 
+/** @type {ReadonlySet<string>} */
+const DEPRECATED_CUSTOM_TOOL_NAMES = new Set(['legacy_web_fetch', 'legacy_report_intent']);
+
 /**
  * Factory que cria o router de rotas `/client/*` com dependências injetadas.
  *
@@ -217,8 +220,69 @@ export default function createClientRouter(deps) {
      * readOnly, skipPermission). Caso contrário, usa allTools estático.
      */
     router.get('/tools', (_req, res) => {
-        const { agent, allTools, sdkRuntimeProjection } = resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
-        res.json(sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { allTools }));
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const { agent, allTools, sdkRuntimeProjection, getClientState, getClient, sdkObservability } =
+                resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
+            const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { allTools });
+
+            /** @type {{ name: string; description?: string; hasParameters: boolean }[]} */
+            let cliBuiltins = [];
+            let cliToolsSource = 'unavailable';
+            const state = getClientState();
+            if (state === 'connected') {
+                try {
+                    const client = await getClient();
+                    const builtins = await client.rpc.tools.list({});
+                    cliBuiltins = (builtins.tools ?? []).map((tool) => ({
+                        name: tool.name,
+                        ...(tool.description ? { description: tool.description } : {}),
+                        hasParameters:
+                            tool.parameters !== undefined &&
+                            tool.parameters !== null &&
+                            typeof tool.parameters === 'object',
+                    }));
+                    cliToolsSource = 'rpc';
+                } catch (error) {
+                    sdkObservability.log(
+                        'WARN',
+                        `[sdk-api/tools] Falha ao consultar built-ins via RPC: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                }
+            }
+
+            const cliNames = new Set(cliBuiltins.map((tool) => tool.name));
+            const deprecatedCustomTools = projection.tools.filter((tool) =>
+                DEPRECATED_CUSTOM_TOOL_NAMES.has(tool.name),
+            );
+            const collisions = projection.tools
+                .filter((tool) => cliNames.has(tool.name))
+                .map((tool) => ({
+                    name: tool.name,
+                    resolution: 'cli_precedence',
+                }));
+
+            res.json({
+                ...projection,
+                catalog: {
+                    policy: {
+                        cliBuiltinsPrecedeCustomTools: true,
+                        deprecatedCustomOverrides: [...DEPRECATED_CUSTOM_TOOL_NAMES],
+                    },
+                    cli: {
+                        source: cliToolsSource,
+                        count: cliBuiltins.length,
+                        tools: cliBuiltins,
+                    },
+                    custom: {
+                        source: projection.source,
+                        count: projection.tools.length,
+                        tools: projection.tools,
+                    },
+                    deprecatedCustomTools,
+                    collisions,
+                },
+            });
+        });
     });
 
     return router;

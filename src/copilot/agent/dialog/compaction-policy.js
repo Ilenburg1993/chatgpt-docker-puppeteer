@@ -25,12 +25,15 @@ export class DialogCompactionPolicy {
     /** @type {boolean} */
     #proactiveRequested = false;
 
+    /** @type {boolean} */
+    #criticalRequested = false;
+
     /**
      * Avalia o budget atual.
      *
      * Regras compatíveis:
      *
-     * - `ratio >= 95`: emite sempre `critical` e libera nova emissão proativa futura;
+     * - `ratio >= 95`: emite uma vez `critical` até `reset()` ou até voltar à faixa segura;
      * - `ratio >= 90`: emite uma vez `proactive` até `reset()`;
      * - abaixo disso: não emite.
      *
@@ -39,8 +42,16 @@ export class DialogCompactionPolicy {
      */
     evaluate({ currentTokens, tokenLimit, ratio }) {
         if (ratio >= 95) {
+            if (this.#criticalRequested) return null;
+            this.#criticalRequested = true;
             this.#proactiveRequested = false;
             return { currentTokens, tokenLimit, ratio, urgency: 'critical' };
+        }
+
+        if (ratio < 90) {
+            this.#proactiveRequested = false;
+            this.#criticalRequested = false;
+            return null;
         }
 
         if (ratio >= 90 && !this.#proactiveRequested) {
@@ -56,5 +67,6 @@ export class DialogCompactionPolicy {
      */
     reset() {
         this.#proactiveRequested = false;
+        this.#criticalRequested = false;
     }
 }

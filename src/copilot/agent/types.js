@@ -555,7 +555,8 @@
  *
  * @property {boolean | undefined} [dialogPaused] - Indica se o dialog loop está pausado
  * @property {() => Promise<void>} start - Inicia o agente (conecta ao SDK e começa a processar a fila)
- * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
+ * @property {(opts?: { shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }) => Promise<void>} stop - Para
+ *   o agente graciosamente
  * @property {(() => Promise<import('#copilot/sdk/types').ModeResult>) | undefined} getSdkSessionMode - Retorna o modo
  *   vanilla atual da sessão SDK
  * @property {((mode: 'interactive' | 'plan' | 'autopilot') => Promise<import('#copilot/sdk/types').ModeResult>)
@@ -586,10 +587,13 @@
  *   loop
  * @property {(opts?: {
  *     authorized?: boolean;
- *     reason?: 'watchdog_restart' | 'authorized_stop';
+ *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
  *     shutdownTimeoutMs?: number;
  * }) => Promise<void>} stopDialogLoop
  *   - Para o dialog loop
+ *
+ * @property {((opts?: { reason?: string; traceId?: string }) => Promise<object>) | undefined} recoverDialogInputChannel
+ *   - Recupera semanticamente o canal de input do dialog loop
  *
  * @property {(() => 'approve_all' | 'audit_only' | 'selective') | undefined} getPermissionMode - Retorna o modo de
  *   permissão atual

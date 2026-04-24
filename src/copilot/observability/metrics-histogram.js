@@ -50,6 +50,18 @@
  */
 
 /**
+ * @typedef {object} DialogRecoveryMetrics
+ * @property {number} total - Total de tentativas de recuperação semântica do dialog.
+ * @property {number} success - Recuperações concluídas com sucesso.
+ * @property {number} failed - Recuperações que falharam.
+ * @property {number} zeroPr - Recuperações sem consumo de Premium Request.
+ * @property {number} pr - Recuperações que consumiram Premium Request.
+ * @property {Record<string, number>} byReason - Contagem por motivo.
+ * @property {Record<string, number>} byStrategy - Contagem por estratégia.
+ * @property {LatencyHistogram} latency - Histograma de duração da recuperação.
+ */
+
+/**
  * @typedef {object} SdkDialogMetrics
  * @property {number} turnsTotal - Total de turns concluídos pelo SDK/base model.
  * @property {number} turnsSuccess - Turns concluídos com sucesso no SDK.
@@ -101,6 +113,7 @@
  * @property {TokenUsageMetrics} tokens - Uso de tokens acumulado.
  * @property {SessionMetrics} sessions - Contadores de sessão.
  * @property {DialogMetrics} dialog - Métricas do dialog loop.
+ * @property {DialogRecoveryMetrics} dialogRecovery - Métricas de recuperação semântica do dialog.
  * @property {SdkDialogMetrics} sdkDialog - Métricas de turnos concluídos pelo SDK.
  * @property {InjectMetrics} inject - Métricas do caminho HTTP `/inject`.
  * @property {TaskMetrics} tasks - Métricas de tasks.

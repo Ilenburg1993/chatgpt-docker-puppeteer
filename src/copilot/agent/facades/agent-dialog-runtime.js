@@ -23,10 +23,22 @@
  * @typedef {{
  *     stopDialogLoop: (opts: {
  *         authorized?: boolean;
- *         reason?: 'watchdog_restart' | 'authorized_stop';
+ *         reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
  *         shutdownTimeoutMs?: number;
  *     }) => Promise<void>;
  * }} AgentDialogStopTarget
+ */
+
+/**
+ * @typedef {{
+ *     recoverDialogInputChannel?: (opts?: { reason?: string; traceId?: string }) => Promise<{
+ *         recovered: boolean;
+ *         reason: string;
+ *         strategy: string;
+ *         prConsumed: boolean;
+ *         durationMs: number;
+ *     }>;
+ * }} AgentDialogRecoveryTarget
  */
 
 /**
@@ -50,9 +62,38 @@ export async function sendAgentDialogTurn(runtime, message, options) {
 
 /**
  * @param {AgentDialogStopTarget} runtime
- * @param {'watchdog_restart' | 'authorized_stop'} [reason]
+ * @param {'watchdog_restart' | 'authorized_stop' | 'recovery_restart'} [reason]
  * @returns {Promise<void>}
  */
 export async function stopAgentDialogLoopAuthorized(runtime, reason) {
     await runtime.stopDialogLoop({ authorized: true, ...(reason ? { reason } : {}) });
+}
+
+/**
+ * Recupera o canal de input do dialog loop usando a capability semântica do Agent quando disponível.
+ *
+ * @param {AgentDialogStartTarget & AgentDialogStopTarget & AgentDialogRecoveryTarget} runtime
+ * @param {{ reason?: string; traceId?: string }} [opts]
+ * @returns {Promise<{
+ *     recovered: boolean;
+ *     reason: string;
+ *     strategy: string;
+ *     prConsumed: boolean;
+ *     durationMs: number;
+ * }>}
+ */
+export async function recoverAgentDialogInputChannel(runtime, opts) {
+    if (typeof runtime.recoverDialogInputChannel === 'function') {
+        return runtime.recoverDialogInputChannel(opts);
+    }
+    const startedAt = Date.now();
+    await stopAgentDialogLoopAuthorized(runtime, 'recovery_restart');
+    await startAgentDialogLoop(runtime);
+    return {
+        recovered: true,
+        reason: opts?.reason ?? 'input_channel_missing',
+        strategy: 'restart_with_pr',
+        prConsumed: true,
+        durationMs: Date.now() - startedAt,
+    };
 }

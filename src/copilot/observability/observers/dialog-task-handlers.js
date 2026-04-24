@@ -174,6 +174,42 @@ export function attachDialogTaskHandlers(ctx) {
         }, 'dialog.stopped'),
     );
 
+    // ── dialog.recovery ──────────────────────────────────────────────────────
+    on(
+        agent,
+        'dialog.recovery',
+        safe(
+            (
+                /**
+                 * @type {{
+                 *     reason?: string;
+                 *     strategy?: string;
+                 *     prConsumed?: boolean;
+                 *     success?: boolean;
+                 *     durationMs?: number;
+                 * }}
+                 */ evt,
+            ) => {
+                const reason = evt?.reason ?? 'unknown';
+                const strategy = evt?.strategy ?? 'unknown';
+                metrics.recordDialogRecovery(reason, {
+                    strategy,
+                    prConsumed: evt?.prConsumed === true,
+                    success: evt?.success !== false,
+                    durationMs: evt?.durationMs ?? 0,
+                });
+                metrics.recordCounter('dialog.recovery');
+                metrics.recordCounter(`dialog.recovery.${reason}`);
+                metrics.recordCounter(`dialog.recovery.strategy.${strategy}`);
+                log(
+                    evt?.success === false ? 'WARN' : 'DEBUG',
+                    `[agent-event-observer] dialog.recovery reason=${reason} strategy=${strategy} pr=${evt?.prConsumed === true}`,
+                );
+            },
+            'dialog.recovery',
+        ),
+    );
+
     // ── dialog.paused ─────────────────────────────────────────────────────────
     on(
         agent,

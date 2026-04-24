@@ -109,6 +109,24 @@ describe('reconnect-policy › reconexão bem-sucedida', () => {
         assert.strictEqual(ready[1].sessionId, 'sess-ok');
     });
 
+    it('chama onSessionReady antes de emitir ready para refazer boot wiring da sessão nova', async () => {
+        /** @type {string[]} */
+        const order = [];
+        const cbs = makeCallbacks({
+            emit: (/** @type {string} */ event, /** @type {any} */ payload) => {
+                if (event === 'ready') order.push('ready');
+                cbs._emitted.push([event, payload]);
+            },
+            onSessionReady: async () => {
+                order.push('wire');
+            },
+        });
+
+        await tryReconnect(new Error('err'), {}, 'idle', cbs, FAST_OPTS);
+
+        assert.deepStrictEqual(order, ['wire', 'ready']);
+    });
+
     it('deve emitir "status" com reconnecting:1/N na primeira tentativa', async () => {
         const cbs = makeCallbacks();
         await tryReconnect(new Error('err'), {}, 'idle', cbs, { ...FAST_OPTS, maxAttempts: 3 });

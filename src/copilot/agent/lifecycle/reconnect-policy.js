@@ -29,6 +29,11 @@ import { log, startSpan } from '../ports/observability-port.js';
  *   do client no host após criar novo
  * @property {() => import('#copilot/sdk/types').CopilotClient} [createClient] - F42.5: factory para criar novo
  *   CopilotClient
+ * @property {(
+ *     client: import('#copilot/sdk/types').CopilotClient,
+ *     session: import('@github/copilot-sdk').CopilotSession,
+ *     isResumed: boolean,
+ * ) => Promise<void>} [onSessionReady] - Reaplica o runtime governado pela sessão reconectada.
  */
 
 /**
@@ -56,7 +61,8 @@ import { log, startSpan } from '../ports/observability-port.js';
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
     // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
     const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog } = opts;
-    const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient } = callbacks;
+    const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient, onSessionReady } =
+        callbacks;
 
     // Só tenta reconectar se o cliente ainda existe e o agente não foi parado.
     if (!client || currentStatus === 'stopped') return false;
@@ -120,6 +126,8 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                                 throw pingErr; // força retry na próxima iteração
                             }
                         }
+
+                        await onSessionReady?.(activeClient, session, isResumed);
 
                         return { session, isResumed };
                     },

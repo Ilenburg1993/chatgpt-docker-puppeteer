@@ -1558,25 +1558,76 @@ Refinamento fechado na rodada seguinte:
   - o terminal reconhece `waiting_for_input + pendingQuestionKind=ready` como loop semanticamente
     vivo, evitando retry cego que consumiria novo boot.
 - o mesmo teste live expôs outro drift: `dialogLoopActive=true` com Agent `idle` e sem
-  `pendingQuestion` após `SessionEnd` do SDK. A borda canônica `presentation/runtime-dialog.js`
-  agora detecta esse estado como canal de entrada ausente, faz stop autorizado e reinicia o loop uma
-  vez antes do turno, em vez de deixar o `/inject` preso até timeout.
+  `pendingQuestion` após `SessionEnd` do SDK. Esse caso deixou de ser uma política da
+  `presentation`: a borda apenas detecta o sintoma e chama `Agent.recoverDialogInputChannel()`;
+  a decisão de custo, stop/start e métrica pertence ao Agent.
 
-vitest tests/unit/copilot:
-  268 arquivos passados
-  18 arquivos pulados
+Refinamento UX pós-regressão live em `2026-04-24`:
 
-Gates finais da rodada:
+- `READY` é estado saudável do canal, não pergunta do usuário. O prompt do terminal deixa de exibir
+  `[ASK:READY]`; marcadores `ASK:*` ficam reservados para perguntas reais ou estados que exigem ação
+  humana;
+- thinking de turno e de task interna continua capturado integralmente em
+  `runtime-ui-state-store`, `/thinking` e SSE, mas não imprime cabeçalho, resumo ou preview quando
+  `/thinking` está desligado. `TERMINAL_SHOW_THINKING` passa a ser opt-in (`true`/`1`), deixando a
+  UX padrão limpa; o modo expandido continua disponível sob comando explícito;
+- `terminal-agent-wiring.js` deixa de tratar qualquer `dialog.stopped` como restart automático. O
+  restart automático fica allowlisted para causas excepcionais (`watchdog_restart`,
+  `model_stopped`); demais razões são observadas, registradas e apresentadas como estado acionável
+  (`/dialog-resume`) sem iniciar nova task por política padrão;
+- a regra operacional passa a ser: **restart é exceção, continuidade é o default**. Se há `READY`
+  pendente ou continuidade de protocolo (`CONTINUE_DIALOG_LOOP`), o sistema preserva o canal e não
+  consome novo ciclo.
 
+## 2.23.4 Política 0 PR para fila, timeout e recuperação de canal
+
+Rodada de hardening posterior, focada em uma regra operacional mais dura: tempo não é falha por si
+só. Falha é ausência de progresso observável ou perda real do canal de input.
+
+Decisões consolidadas:
+
+- `/inject` e mensagens do terminal entram em fila serializada. Esperar na fila não consome PR e não
+  deve disparar timeout do turno; o relógio relevante começa quando o turno entra no executor.
+- timeout do dialog passa a significar **timeout de inatividade**, não duração absoluta. Eventos do
+  SDK/Agent como `assistant.message`, `assistant.streaming_delta`, `assistant.turn_end`,
+  `task.delta`, `task.reasoning` e `tool.execution_progress` renovam a janela.
+- se a LLM-B está processando e emitindo sinais de vida, o turno continua. A política 0 PR prefere
+  esperar e observar a abortar uma operação saudável.
+- recuperação de canal de input é capability do Agent:
+  - `zero_pr_ready`: o Agent encontrou `READY` pendente e não reinicia;
+  - `restart_with_pr`: o Agent confirma `active + idle + sem pendingQuestion` e reinicia uma vez;
+  - `queued_turn_input_channel_missing`: o `DialogLoopManager` detecta a perda quando um turno já
+    serializado chega à cabeça da fila após `SessionEnd` sem novo `READY`;
+  - `paused`/`not_needed`: a chamada de recovery é observada, mas não altera o loop.
+- `presentation/` não faz mais stop/start cru para esse caso. Ela só projeta a necessidade e delega
+  ao Agent, preservando a fronteira "SDK > Agent > presentation > bordas".
+- o hot path da fila também é governado pelo Agent: antes de executar um turno enfileirado sem
+  pending question, o manager aguarda uma janela curta 0 PR por `READY`; se o canal continuar
+  perdido, faz restart coordenado e só então consome o turno.
+- `dialog.recovery` vira evento canônico local, com bridge para `agent:dialog:recovery`, métricas
+  próprias em `observability/metrics.js` e projeção Prometheus:
+  `llmb_dialog_recovery_total`, `success`, `failed`, `zero_pr`, `pr` e p95 de duração.
+- `terminal/` reconhece `recovery_restart` como reinício coordenado pelo Agent, sem tratá-lo como
+  parada explícita do usuário nem acionar restart duplicado.
+
+Validação técnica da rodada:
+
+- testes focados cobrem timeout de inatividade, recovery 0 PR, recovery com restart e projection da
+  métrica;
 - `npm run typecheck:strict:src.copilot`: verde;
-- `npm run analyze:arch:global`: `hard=0`, `soft=0`; a última dependência sensível
-  `agent/lifecycle/session-setup.js -> #copilot/hooks` foi drenada para `agent/ports/hook-port.js`;
-- `npm run analyze:arch:global:strict`: passa a tratar `hard` e `soft` como regressões bloqueantes,
-  preservando a topologia `hard=0 soft=0`;
-- `npx vitest run tests/unit/copilot`: 4030 testes passados, 28 pulados.
-  3994 testes passados
-  28 testes pulados
-```
+- `npm run typecheck:node`: verde;
+- `npm run analyze:arch:global:strict`: `hard=0`, `soft=0`;
+- testes focados:
+  `test_loop_manager`, `test_agent_integration`, `test_event_wiring`, `test_turn_executor`,
+  `test_presentation_runtime_dialog`, `test_agent_dialog_controller`, `test_observability_metrics` e
+  `observability/test_agent_observer_bus`: verdes;
+- suíte completa `npx vitest run tests/unit/copilot`: 268 arquivos passados, 18 pulados; 4041
+  testes passados, 28 pulados.
+- validação live em `terminal:llm-b`: dois `/inject` concorrentes com `queueDepth=1`; o primeiro
+  respondeu, o segundo detectou `queued_turn_input_channel_missing`, executou `recovery_restart`,
+  reiniciou o loop e respondeu; `/metrics` projetou `llmb_dialog_recovery_total=1`,
+  `llmb_dialog_recovery_pr_total=1`, `llmb_dialog_recovery_failed_total=0`,
+  `llmb_inject_success_total=2` e `llmb_inject_timeouts_total=0`.
 
 ---
 
@@ -2358,3 +2409,33 @@ e observability/audit como consumidores transversais.
 
 Essa arquitetura preserva o que já funciona, cria gates reais, reduz acoplamento por ondas e prepara
 o sistema para implementação contínua sem exigir uma ruptura estrutural prematura.
+
+---
+
+## 10. Rodada de validação pós-auditoria independente
+
+Após a auditoria independente em `DOCUMENTAÇÃO/COPILOT/AUDIT_INDEPENDENTE.md`, os achados foram
+tratados como hipóteses e confrontados com o estado atual. A rodada validada reforçou os seguintes
+contratos:
+
+- `DialogLoopManager` não deve aceitar `READY`/`REPLY` durante parada em andamento, nem emitir
+  `stopped` duplicado quando o envio de boot falha antes do timeout nominal.
+- `TurnQueue` usa geração apenas como geração de reset; finalizações tardias de turnos antigos não
+  podem reduzir `depth` abaixo de zero nem afetar a fila nova.
+- Compaction crítica e proativa são deduplicadas por policy até `reset()` ou retorno a faixa segura,
+  evitando tempestade de eventos de compaction.
+- Reconnect e boot inicial compartilham o mesmo pós-init canônico de sessão: ownership, session event
+  wiring, event collector, lifecycle handlers, agent observer, stale cleanup, dialog recovery, metrics,
+  MCP reconnect, keepalive, quota monitor, handoff e hook relay.
+- Relays registrados no boot entram em `unsubs`; nenhum listener operacional deve ficar fora do
+  cleanup governado do `AgentContext`.
+- `pendingQuestionShadow` normaliza estado antigo/incompleto antes de calcular TTL e expiração.
+- Cache de mensagens SDK tem limite interno e mantém as mensagens mais recentes.
+- Webhooks e validação de URL mantêm postura anti-SSRF, incluindo IPv4-mapped IPv6 e todos os
+  registros DNS resolvidos.
+- Respostas HTTP 5xx passam por sanitização de stack/path antes de cruzar a fronteira de servidor.
+- `gracefulShutdown=false` no startup é persistido de forma aguardada para evitar sobrescrever um
+  shutdown gracioso posterior.
+
+Achados não confirmados ou já cobertos pelo estado atual não viraram regra nova; devem voltar ao
+roadmap apenas com reprodução concreta.

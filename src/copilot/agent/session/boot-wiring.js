@@ -311,13 +311,13 @@ export function createBootWiringSteps(client, session, isResumed, agentEmitter, 
             name: 'wireHandoff',
             phase: 'handoff',
             required: false,
-            run: () => stepWireHandoff(agentEmitter, ctx),
+            run: () => stepWireHandoff(agentEmitter, ctx, state),
         },
         {
             name: 'wireQuestionAnsweredRelay',
             phase: 'hooks',
             required: false,
-            run: () => stepWireQuestionAnsweredRelay(agentEmitter, ctx),
+            run: () => stepWireQuestionAnsweredRelay(agentEmitter, ctx, state),
         },
     ];
 }

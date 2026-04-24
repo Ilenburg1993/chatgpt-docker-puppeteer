@@ -12,6 +12,7 @@ import { SessionError, toError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { COPILOT_MODEL } from '../config/agent.js';
+import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
 
 /**
@@ -27,7 +28,7 @@ import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-
 /**
  * @typedef {Object} SendToLlmBOpts
  * @property {boolean} [useStructured]
- * @property {number} [timeoutMs]
+ * @property {number | null} [timeoutMs] - Timeout em ms. `null` ou `0` desabilita o inactivity guard.
  * @property {string} [model]
  */
 
@@ -64,7 +65,9 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
     }
 
     const useStructured = opts.useStructured !== false;
-    const timeoutMs = opts.timeoutMs ?? 120_000;
+    // Converte 0 → null (disable guard); usa LLM_B_TURN_TIMEOUT_MS como default.
+    const timeoutMs =
+        opts.timeoutMs === 0 ? null : opts.timeoutMs !== undefined ? opts.timeoutMs : LLM_B_TURN_TIMEOUT_MS;
     const modelLabel = opts.model ?? COPILOT_MODEL;
 
     const messageContent = typeof message === 'string' ? message : JSON.stringify(message);

@@ -7,7 +7,12 @@
  *   facilitar governança de exports e futuras migrações para runtime façade/queries.
  */
 
-export { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from './agent-dialog-runtime.js';
+export {
+    recoverAgentDialogInputChannel,
+    sendAgentDialogTurn,
+    startAgentDialogLoop,
+    stopAgentDialogLoopAuthorized,
+} from './agent-dialog-runtime.js';
 export {
     getModel,
     getReasoningEffort,

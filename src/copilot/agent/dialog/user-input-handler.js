@@ -13,6 +13,9 @@
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+
+const REPLY_PROTOCOL_CONTINUE =
+    'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';
 import { log } from '../ports/observability-port.js';
 
 /**
@@ -145,7 +148,11 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
     const kind = DialogProtocol.classify(question);
     ctx.handleProtocolInput({ question });
 
-    if (kind === 'reply' || kind === 'stopped') {
+    if (kind === 'reply') {
+        return Promise.resolve({ answer: REPLY_PROTOCOL_CONTINUE, wasFreeform: false });
+    }
+
+    if (kind === 'stopped') {
         return Promise.resolve({ answer: '', wasFreeform: false });
     }
 

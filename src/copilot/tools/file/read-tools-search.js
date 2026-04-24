@@ -8,13 +8,87 @@
  * @see EventBus
  */
 
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { toError, toExecError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
-import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
+import {
+    MAX_DIFF_OUTPUT,
+    MAX_SEARCH_OUTPUT,
+    WORKSPACE_ROOT,
+    execFileAsync,
+    isRgAvailable,
+    validatePath,
+} from './shared.js';
 
 const RG_TIMEOUT_MS = 30_000;
+
+/**
+ * @param {string} stdout
+ */
+function sanitizeSearchOutput(stdout) {
+    const SENSITIVE_LINE_RE = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
+    return stdout
+        .split('\n')
+        .filter((line) => !SENSITIVE_LINE_RE.test(line))
+        .join('\n')
+        .slice(0, MAX_SEARCH_OUTPUT);
+}
+
+/**
+ * @param {{
+ *     pattern: string;
+ *     resolved: string;
+ *     isRegex?: boolean;
+ *     caseSensitive?: boolean;
+ *     includePattern?: string;
+ *     excludePattern?: string;
+ *     contextLines?: number;
+ * }} opts
+ */
+function buildGrepArgs(opts) {
+    const args = [
+        '-R',
+        '-n',
+        ...(opts.isRegex ? ['-E'] : ['-F']),
+        ...(opts.caseSensitive ? [] : ['-i']),
+        ...(opts.contextLines ? ['-C', String(opts.contextLines)] : []),
+        '--exclude-dir=.git',
+        '--exclude-dir=node_modules',
+        '--exclude-dir=dist',
+        ...(opts.includePattern ? [`--include=${opts.includePattern}`] : []),
+        ...(opts.excludePattern ? [`--exclude=${opts.excludePattern}`] : []),
+        opts.pattern,
+        opts.resolved,
+    ];
+    return args;
+}
+
+/**
+ * @param {string} pathA
+ * @param {string} pathB
+ */
+async function buildFallbackDiff(pathA, pathB) {
+    const [aText, bText] = await Promise.all([readFile(pathA, 'utf8'), readFile(pathB, 'utf8')]);
+    const aLines = aText.split('\n');
+    const bLines = bText.split('\n');
+    const max = Math.max(aLines.length, bLines.length);
+    /** @type {string[]} */
+    const out = [`--- ${pathA}`, `+++ ${pathB}`, '@@ fallback-diff @@'];
+    for (let i = 0; i < max; i += 1) {
+        const a = aLines[i] ?? '';
+        const b = bLines[i] ?? '';
+        if (a === b) continue;
+        out.push(`-${a}`);
+        out.push(`+${b}`);
+        if (out.join('\n').length > MAX_DIFF_OUTPUT) {
+            out.push('[... diff truncado ...]');
+            break;
+        }
+    }
+    return out.join('\n');
+}
 
 // ---------------------------------------------------------------------------
 // Tool: search_in_files
@@ -90,31 +164,57 @@ const searchInFilesTool = buildTool({
         ];
 
         try {
-            if (!(await isRgAvailable())) {
-                return { success: false, error: 'ripgrep (rg) não está disponível neste ambiente.' };
+            if (await isRgAvailable()) {
+                const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
+                    cwd: WORKSPACE_ROOT,
+                    timeout: RG_TIMEOUT_MS,
+                    maxBuffer: MAX_SEARCH_OUTPUT * 4,
+                });
+                const filteredOutput = sanitizeSearchOutput(stdout);
+                return {
+                    success: true,
+                    pattern,
+                    searchPath: resolved,
+                    output: filteredOutput,
+                    truncated: stdout.length >= MAX_SEARCH_OUTPUT,
+                    engine: 'rg',
+                };
             }
-            const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
+
+            // Fallback para ambientes sem ripgrep.
+            const grepArgs = buildGrepArgs({
+                pattern,
+                resolved,
+                isRegex,
+                caseSensitive,
+                includePattern,
+                excludePattern,
+                contextLines,
+            });
+            const { stdout } = await execFileAsync('grep', grepArgs, {
                 cwd: WORKSPACE_ROOT,
                 timeout: RG_TIMEOUT_MS,
                 maxBuffer: MAX_SEARCH_OUTPUT * 4,
             });
-            const SENSITIVE_LINE_RE = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
-            const filteredOutput = stdout
-                .split('\n')
-                .filter((line) => !SENSITIVE_LINE_RE.test(line))
-                .join('\n')
-                .slice(0, MAX_SEARCH_OUTPUT);
+            const filteredOutput = sanitizeSearchOutput(stdout);
             return {
                 success: true,
                 pattern,
                 searchPath: resolved,
                 output: filteredOutput,
                 truncated: stdout.length >= MAX_SEARCH_OUTPUT,
+                engine: 'grep',
             };
         } catch (err) {
             const ex = toExecError(err);
             if ((ex.code === 1 || ex.status === 1) && !ex.stderr) {
                 return { success: true, pattern, searchPath: resolved, output: '', matchCount: 0 };
+            }
+            if ((ex.code === 'ENOENT' || ex.message.includes('ENOENT')) && !(await isRgAvailable())) {
+                return {
+                    success: false,
+                    error: 'Nem ripgrep (rg) nem grep estão disponíveis neste ambiente para search_in_files.',
+                };
             }
             return { success: false, error: ex.stderr ?? ex.message };
         }
@@ -158,17 +258,35 @@ const diffFilesTool = buildTool({
                     throw err;
                 },
             );
-            const MAX_DIFF_BYTES = 64_000;
             const diff =
-                stdout.length > MAX_DIFF_BYTES ? stdout.slice(0, MAX_DIFF_BYTES) + '\n[... diff truncado ...]' : stdout;
+                stdout.length > MAX_DIFF_OUTPUT
+                    ? stdout.slice(0, MAX_DIFF_OUTPUT) + '\n[... diff truncado ...]'
+                    : stdout;
             return {
                 success: true,
                 path_a: va.resolved,
                 path_b: vb.resolved,
                 diff,
                 identical: diff.trim() === '',
+                engine: 'diff',
             };
         } catch (err) {
+            const ex = toExecError(err);
+            if (ex.code === 'ENOENT' || ex.message.includes('ENOENT')) {
+                try {
+                    const fallback = await buildFallbackDiff(va.resolved, vb.resolved);
+                    return {
+                        success: true,
+                        path_a: va.resolved,
+                        path_b: vb.resolved,
+                        diff: fallback,
+                        identical: fallback.trim() === '' || fallback.trim() === '@@ fallback-diff @@',
+                        engine: 'fallback',
+                    };
+                } catch (fallbackErr) {
+                    return { success: false, error: toError(fallbackErr).message };
+                }
+            }
             return { success: false, error: toError(err).message };
         }
     },

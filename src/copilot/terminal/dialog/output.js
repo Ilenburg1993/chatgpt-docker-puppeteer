@@ -56,7 +56,7 @@ export function buildUserPrompt() {
     if (state.queueSize > 0) {
         tags.push(`\x1b[90m[Q:${state.queueSize}]\x1b[0m`);
     }
-    if (state.pendingQuestion && state.pendingQuestionKind) {
+    if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
         tags.push(`\x1b[36m[ASK:${state.pendingQuestionKind.toUpperCase()}]\x1b[0m`);
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
@@ -109,7 +109,7 @@ Protocolo OBRIGATÓRIO de comunicação via ask_user:
 1. Chame ask_user("READY: aguardando próxima mensagem") para sinalizar prontidão.
 2. Ao receber uma mensagem, processe-a e formule uma resposta completa.
 3. Chame ask_user("REPLY: " + sua_resposta) para enviar a resposta.
-4. Retorne ao passo 1.
+4. Ao receber CONTINUE_DIALOG_LOOP após o REPLY, chame imediatamente ask_user("READY: aguardando próxima mensagem").
 
 IMPORTANTE: NUNCA encerre o loop. Não use ask_user("STOPPED") nem qualquer variante
 de encerramento — o sistema é projetado para funcionar de forma contínua e permanente.

@@ -91,7 +91,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             'task',
             'Executando tarefa interna',
             expect.objectContaining({
-                detail: 'delta (task-1)',
+                detail: expect.stringContaining('delta (task-1)'),
                 source: 'agent',
                 recordHistory: false,
             }),
@@ -113,6 +113,10 @@ describe('terminal/task-stream-events.js — contrato', () => {
         agent.emit('task.reasoning', { taskId: 'task-1', chunk: 'pensando...' });
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalled();
+        expect(mocks.appendThinkingHistoryChunk).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'task-task-1', source: 'task', chunk: 'pensando...' }),
+        );
+        expect(mocks.println).not.toHaveBeenCalled();
         expect(stdoutSpy).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
     });

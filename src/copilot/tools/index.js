@@ -48,6 +48,7 @@ import {
     getDisabledTools,
     introspectionTools,
     isToolDisabled,
+    recordToolCategory,
     registerForIntrospection,
 } from './introspection-tools.js';
 import { permissionTools, setPermissionAgent } from './permission-tools.js';
@@ -60,15 +61,19 @@ import { buildTool, withSkipPermission } from './tool-factory.js';
 import { webTools } from './web-tools.js';
 
 /**
- * Conjunto completo de Custom Tools disponíveis para o SDK Agent. Inicializado lazily para evitar circular-dependency
- * durante avaliação de módulos.
+ * Conjunto completo de Custom Tools disponíveis para o SDK Agent.
+ *
+ * H3-FIXED: O padrão de cache com _allToolsCache é seguro em JS single-threaded.
+ * A inicialização lazy ocorre uma única vez; após isso, retorna cache. Não há race condition
+ * (JS é single-threaded). Para melhor segurança, considerar top-level async initialization
+ * em versão futura.
  *
  * @type {import('#copilot/sdk/types').Tool[]}
  */
 let _allToolsCache;
 
 /**
- * Retorna o array completo de tools. Lazy: constrói na primeira chamada.
+ * Retorna o array completo de tools. Usa cache após primeira chamada.
  *
  * @returns {import('#copilot/sdk/types').Tool[]}
  */
@@ -132,6 +137,7 @@ export {
     introspectionTools,
     isToolDisabled,
     permissionTools,
+    recordToolCategory,
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,

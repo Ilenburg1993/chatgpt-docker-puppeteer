@@ -303,6 +303,7 @@ describe('sdk runtime projection routes', () => {
             tags: ['read'],
             readOnly: true,
             skipPermission: true,
+            hasParameters: false,
         });
     });
 });

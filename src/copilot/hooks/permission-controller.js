@@ -19,6 +19,25 @@ import { log } from '#copilot/observability';
 import { approveAll } from '#copilot/sdk';
 import { PERMISSION_MODE } from '../config/agent.js';
 
+/** @type {RegExp} */
+const TOOL_NAME_RE = /^[a-zA-Z0-9_]+$/;
+
+/**
+ * @param {string[] | undefined} names
+ * @returns {string[]}
+ */
+function sanitizeToolNames(names) {
+    if (!Array.isArray(names)) return [];
+    const unique = new Set();
+    for (const raw of names) {
+        if (typeof raw !== 'string') continue;
+        const normalized = raw.trim();
+        if (!normalized || !TOOL_NAME_RE.test(normalized)) continue;
+        unique.add(normalized);
+    }
+    return [...unique];
+}
+
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
 /**
@@ -133,7 +152,9 @@ export class PermissionController {
      * @returns {boolean}
      */
     #applyMode(mode, opts, notify) {
-        const { allowTools, denyTools, denyShell } = opts;
+        const allowTools = sanitizeToolNames(opts.allowTools);
+        const denyTools = sanitizeToolNames(opts.denyTools);
+        const denyShell = opts.denyShell;
         switch (mode) {
             case 'approve_all':
                 this.#policyHandler = approveAll;
@@ -146,20 +167,28 @@ export class PermissionController {
             case 'selective': {
                 // G2-DX-13: lista de ferramentas shell configurável via AGENT_DENY_SHELL_TOOLS env var.
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
-                // P3 (permission-controller-audit): validar tool names contra regex ^[a-zA-Z0-9_]+$
-                const _toolNameRe = /^[a-zA-Z0-9_]+$/;
                 const shellTools = AGENT_DENY_SHELL_TOOLS
                     ? AGENT_DENY_SHELL_TOOLS.split(',')
                           .map((t) => t.trim())
-                          .filter((t) => Boolean(t) && _toolNameRe.test(t))
+                          .filter((t) => Boolean(t) && TOOL_NAME_RE.test(t))
                     : defaultShellTools;
+                const hasAllowRules = allowTools.length > 0;
+                const hasDenyRules = denyTools.length > 0;
+                const effectiveDenyShell =
+                    denyShell === true || (!hasAllowRules && !hasDenyRules && denyShell !== false);
+                if (!hasAllowRules && !hasDenyRules && denyShell !== true) {
+                    log(
+                        'WARN',
+                        '[PermissionController] selective sem regras explícitas — aplicando baseline seguro denyShell=true.',
+                    );
+                }
                 /** @type {import('#copilot/hooks/permission').PermissionHandlerConfig} */
                 const cfg = {
-                    denyKinds: denyShell ? ['shell'] : [],
-                    denyTools: [...(denyShell ? shellTools : []), ...(denyTools ?? [])],
+                    denyKinds: effectiveDenyShell ? ['shell'] : [],
+                    denyTools: [...(effectiveDenyShell ? shellTools : []), ...denyTools],
                     auditMode: true,
                 };
-                if (allowTools?.length) cfg.allowTools = allowTools;
+                if (hasAllowRules) cfg.allowTools = allowTools;
                 this.#policyHandler = createPermissionHandler(cfg);
                 this.#mode = 'selective';
                 break;

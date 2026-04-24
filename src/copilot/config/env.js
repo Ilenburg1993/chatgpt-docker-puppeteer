@@ -180,7 +180,7 @@ export const COPILOT_READY_WEBHOOK = envOpt('COPILOT_READY_WEBHOOK');
 
 // ── Terminal State ───────────────────────────────────────────
 
-export const TERMINAL_SHOW_THINKING = process.env['TERMINAL_SHOW_THINKING'] !== 'false';
+export const TERMINAL_SHOW_THINKING = envBool('TERMINAL_SHOW_THINKING', false);
 export const TERMINAL_SHOW_USAGE = envBool('TERMINAL_SHOW_USAGE', false);
 export const TERMINAL_SHOW_STREAMING = process.env['TERMINAL_SHOW_STREAMING'] !== 'false';
 export const TERMINAL_SHOW_TOOL_ACTIVITY = process.env['TERMINAL_SHOW_TOOL_ACTIVITY'] !== 'false';

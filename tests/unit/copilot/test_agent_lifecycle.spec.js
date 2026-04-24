@@ -74,6 +74,18 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes('gracefulShutdown: true'), 'agentStop deve marcar gracefulShutdown=true');
     });
 
+    it('agentStop pode preservar intenção de dialog loop para retomada após restart do processo', () => {
+        assert.ok(src.includes('preserveDialogLoopIntent'), 'agentStop deve aceitar preserveDialogLoopIntent');
+        assert.ok(
+            src.includes('restoreDialogLoopOnNextBoot'),
+            'agentStop deve calcular restoreDialogLoopOnNextBoot para shutdown do terminal',
+        );
+        assert.ok(
+            src.includes('dialogLoopActive: restoreDialogLoopOnNextBoot'),
+            'state persistido deve preservar intenção de loop no shutdown do processo',
+        );
+    });
+
     it('agentStart chama ctx.setStatus("starting")', () => {
         assert.ok(src.includes("setStatus('starting'"), 'agentStart deve definir status starting');
     });

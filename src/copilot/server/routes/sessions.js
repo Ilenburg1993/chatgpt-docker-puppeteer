@@ -21,6 +21,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { handleListSessions, handleListTurns, VALID_HUB_SESSION_STATUS } from '../../presentation/conversation-hub.js';
 import { bridgeHandler } from '../handler-bridge.js';
+import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 import { validate } from '../middleware/validate.js';
 
 /**
@@ -64,7 +65,7 @@ export function createSessionsRouter() {
             }
             res.json({ ok: true, session: sessionField });
         } catch (e) {
-            res.status(500).json({ ok: false, error: toError(e).message });
+            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
         }
     });
 
@@ -94,7 +95,7 @@ export function createSessionsRouter() {
                 const id = container.resolve(CONVERSATION_STORE).createHubSession(hubOpts);
                 res.status(201).json({ ok: true, id });
             } catch (e) {
-                res.status(500).json({ ok: false, error: toError(e).message });
+                res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
             }
         },
     );
@@ -116,7 +117,7 @@ export function createSessionsRouter() {
                 container.resolve(CONVERSATION_STORE).closeHubSession(sessionId);
                 res.json({ ok: true, closed: sessionId });
             } catch (e) {
-                res.status(500).json({ ok: false, error: toError(e).message });
+                res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
             }
         },
     );

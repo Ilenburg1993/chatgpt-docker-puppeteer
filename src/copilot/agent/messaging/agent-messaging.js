@@ -44,6 +44,113 @@ function normalizeTimeoutMs(timeoutMs) {
 }
 
 /**
+ * @param {number} timeoutMs
+ * @param {() => void} onTimeout
+ * @returns {{ ping: () => void; clear: () => void }}
+ */
+function createInactivityGuard(timeoutMs, onTimeout) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let handle = null;
+    let disposed = false;
+
+    const arm = () => {
+        if (disposed) return;
+        if (handle) clearTimeout(handle);
+        handle = setTimeout(() => {
+            if (disposed) return;
+            disposed = true;
+            handle = null;
+            onTimeout();
+        }, timeoutMs);
+    };
+
+    arm();
+
+    return {
+        ping: () => {
+            arm();
+        },
+        clear: () => {
+            disposed = true;
+            if (handle) clearTimeout(handle);
+            handle = null;
+        },
+    };
+}
+
+/**
+ * Espera a sessão terminar o processamento com timeout por inatividade observável, não por relógio absoluto.
+ *
+ * Enquanto o SDK continua emitindo eventos da sessão, o relógio é renovado. Isso evita falsos positivos em turnos
+ * longos de reasoning/tool use.
+ *
+ * @param {import('#copilot/sdk/types').CopilotSession} session
+ * @param {import('#copilot/sdk/types').MessageOptions} sendOpts
+ * @param {number} timeoutMs
+ * @returns {Promise<import('@github/copilot-sdk').AssistantMessageEvent | undefined>}
+ */
+async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
+    // Compatibilidade retroativa: alguns mocks/implementações antigas expõem apenas sendAndWait().
+    // Neste caso, usamos o fallback para preservar comportamento sem quebrar consumidores legados.
+    if (typeof session.send !== 'function') {
+        if (typeof session.sendAndWait === 'function') {
+            return session.sendAndWait(sendOpts, timeoutMs);
+        }
+        throw new Error('session.send is not a function');
+    }
+
+    /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */
+    let lastAssistantMessage;
+
+    /** @type {() => void} */
+    let resolveIdle = () => {};
+    /** @type {(error: Error) => void} */
+    let rejectIdle = () => {};
+
+    const waitForIdle = new Promise((resolve, reject) => {
+        resolveIdle = () => resolve(undefined);
+        rejectIdle = (error) => reject(error);
+    });
+
+    const inactivityGuard = createInactivityGuard(timeoutMs, () => {
+        rejectIdle(new Error(`[agent-messaging] Timeout por inatividade após ${timeoutMs}ms aguardando session.idle`));
+    });
+
+    const unsubscribe = session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        if (event.type === 'assistant.message') {
+            lastAssistantMessage = event;
+            inactivityGuard.ping();
+            return;
+        }
+        if (event.type === 'session.idle') {
+            inactivityGuard.clear();
+            resolveIdle();
+            return;
+        }
+        if (event.type === 'session.error') {
+            inactivityGuard.clear();
+            const error = new Error(event.data.message);
+            if (typeof event.data.stack === 'string') {
+                error.stack = event.data.stack;
+            }
+            rejectIdle(error);
+            return;
+        }
+        inactivityGuard.ping();
+    });
+
+    try {
+        inactivityGuard.ping();
+        await session.send(sendOpts);
+        await waitForIdle;
+        return lastAssistantMessage;
+    } finally {
+        inactivityGuard.clear();
+        unsubscribe();
+    }
+}
+
+/**
  * @typedef {Object} QueueProcessorCallbacks
  * @property {(error: Error) => Promise<boolean>} tryReconnect - Tenta reconectar a sessão ativa
  */
@@ -232,8 +339,9 @@ export async function executeTask(session, task, callbacks) {
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
+        const effectiveTimeoutMs = task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS;
         const execution = await withAgentErrorPolicy(
-            () => session.sendAndWait(sendOpts, task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS),
+            () => sendAndWaitWithInactivityTimeout(session, sendOpts, effectiveTimeoutMs),
             {
                 label: 'messaging.sendAndWait',
                 phase: 'messaging',

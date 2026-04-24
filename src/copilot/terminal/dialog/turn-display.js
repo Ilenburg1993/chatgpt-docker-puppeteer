@@ -94,15 +94,15 @@ function flushReasoningSummary(state) {
 
     if (state.showThinking) {
         process.stdout.write('\x1b[0m\n');
+        println(
+            `  \x1b[35m└── thinking #${shortId}\x1b[0m  \x1b[90m${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}\x1b[0m`,
+        );
+        if (preview) {
+            println(`  \x1b[90m    ${preview}\x1b[0m`);
+        }
+        println(`  \x1b[90m    /thinking show ${shortId}  ·  /thinking latest\x1b[0m`);
+        println('');
     }
-    println(
-        `  \x1b[35m└── thinking #${shortId}\x1b[0m  \x1b[90m${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}\x1b[0m`,
-    );
-    if (preview) {
-        println(`  \x1b[90m    ${preview}\x1b[0m`);
-    }
-    println(`  \x1b[90m    /thinking show ${shortId}  ·  /thinking latest\x1b[0m`);
-    println('');
     broadcastSse('reasoning.complete', {
         content: state.reasoningContent,
         reasoningId: state.reasoningId,
@@ -128,16 +128,16 @@ export function createReasoningCallback(state) {
                 detail: `${state.model} · ${state.effort}`,
                 source: 'dialog',
             });
-            const tsNow = new Date().toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            });
-            println(SEPARATOR);
-            println(
-                `  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[35mThinking capturado\x1b[0m  \x1b[90m· ${state.model} · ${state.effort}\x1b[0m`,
-            );
             if (state.showThinking) {
+                const tsNow = new Date().toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                });
+                println(SEPARATOR);
+                println(
+                    `  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[35mThinking capturado\x1b[0m  \x1b[90m· ${state.model} · ${state.effort}\x1b[0m`,
+                );
                 println('');
                 process.stdout.write('  \x1b[35m│\x1b[0m  \x1b[2m\x1b[37m');
             }

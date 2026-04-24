@@ -41,7 +41,11 @@ export function getPendingQuestionShadowTtlMs(kind = 'question') {
 export function getPendingQuestionShadowExpiresAt(shadow, ttlMs = PENDING_QUESTION_SHADOW_TTL_MS) {
     const resolvedTtlMs =
         ttlMs === PENDING_QUESTION_SHADOW_TTL_MS ? getPendingQuestionShadowTtlMs(shadow.meta.kind) : ttlMs;
-    return typeof shadow.expiresAt === 'number' ? shadow.expiresAt : shadow.meta.askedAt + resolvedTtlMs;
+    if (Number.isFinite(shadow.expiresAt) && shadow.expiresAt > 0) {
+        return shadow.expiresAt;
+    }
+    const askedAt = Number.isFinite(shadow.meta.askedAt) && shadow.meta.askedAt > 0 ? shadow.meta.askedAt : Date.now();
+    return askedAt + resolvedTtlMs;
 }
 
 /**
@@ -115,10 +119,11 @@ export function getPendingQuestionShadowState(shadow, opts = {}) {
 export function createPendingQuestionShadow(question, meta, opts = {}) {
     const now = opts.now ?? Date.now();
     const ttlMs = opts.ttlMs ?? getPendingQuestionShadowTtlMs(meta.kind);
+    const askedAt = Number.isFinite(meta.askedAt) && meta.askedAt > 0 ? meta.askedAt : now;
     return {
         question,
-        meta,
+        meta: { ...meta, askedAt },
         restoredAt: now,
-        expiresAt: meta.askedAt + ttlMs,
+        expiresAt: askedAt + ttlMs,
     };
 }

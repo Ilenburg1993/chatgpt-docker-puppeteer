@@ -83,6 +83,11 @@ describe('url-validator', () => {
             assert.strictEqual(result.safe, false);
         });
 
+        it('bloqueia IPv4-mapped IPv6 privado normalizado em hexadecimal', () => {
+            const result = validateUrl(new URL('http://[::ffff:127.0.0.1]'));
+            assert.strictEqual(result.safe, false);
+        });
+
         it('aceita IP público válido', () => {
             const result = validateUrl(new URL('http://8.8.8.8'));
             assert.strictEqual(result.safe, true);

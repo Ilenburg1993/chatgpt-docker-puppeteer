@@ -11,6 +11,22 @@
 import { log } from '#copilot/observability';
 
 /**
+ * Sanitiza erro antes de cruzar a fronteira HTTP.
+ *
+ * @param {string} message
+ * @param {number} status
+ * @returns {string}
+ */
+export function sanitizeHttpErrorMessage(message, status) {
+    if (status >= 500 && process.env['NODE_ENV'] === 'production') {
+        return 'Internal server error';
+    }
+    return (String(message).split('\n')[0] ?? 'Internal server error')
+        .replace(/\/workspaces\/[^\s)]+/g, '<workspace>')
+        .replace(/\/home\/[^\s)]+/g, '<home>');
+}
+
+/**
  * @typedef {object} AppError
  * @property {string} message
  * @property {string} [code]
@@ -43,5 +59,5 @@ export function copilotErrorHandler(err, req, res, next) {
         return;
     }
 
-    res.status(status).json({ ok: false, error: message, code });
+    res.status(status).json({ ok: false, error: sanitizeHttpErrorMessage(message, status), code });
 }

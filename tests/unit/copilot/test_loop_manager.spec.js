@@ -224,6 +224,32 @@ describe('DialogLoopManager', () => {
 
             expect(dlm.active).toBe(false);
         });
+
+        it('start() falha pelo erro de envio do boot sem emitir stopped duas vezes', async () => {
+            mockWaitForEvent.mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+            host.sendMessageDialogBoot.mockRejectedValueOnce(new Error('pipe closed'));
+            const stoppedSpy = vi.fn();
+            dlm.on('stopped', stoppedSpy);
+
+            await expect(dlm.start('Hello')).rejects.toThrow('pipe closed');
+
+            expect(dlm.active).toBe(false);
+            expect(stoppedSpy).toHaveBeenCalledTimes(1);
+            expect(stoppedSpy).toHaveBeenCalledWith(expect.objectContaining({ reason: 'pipe closed' }));
+        });
+
+        it('abre circuit breaker após falhas repetidas de boot para evitar storm de PR', async () => {
+            mockWaitForEvent.mockRejectedValue(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+            host.sendMessageDialogBoot.mockRejectedValue(new Error('pipe closed'));
+
+            await expect(dlm.start('Hello 1')).rejects.toThrow('pipe closed');
+            await expect(dlm.start('Hello 2')).rejects.toThrow('pipe closed');
+            await expect(dlm.start('Hello 3')).rejects.toThrow('pipe closed');
+
+            const callsBeforeCircuit = host.sendMessageDialogBoot.mock.calls.length;
+            await expect(dlm.start('Hello 4')).rejects.toMatchObject({ code: 'DIALOG_BOOT_CIRCUIT_OPEN' });
+            expect(host.sendMessageDialogBoot).toHaveBeenCalledTimes(callsBeforeCircuit);
+        });
     });
 
     // ── F64.2: Turn serialization ────────────────────────────────────
@@ -238,6 +264,65 @@ describe('DialogLoopManager', () => {
             const result = await dlm.sendTurn('test');
             expect(vi.mocked(executeTurnImpl)).toHaveBeenCalled();
             expect(result).toBe('REPLY: ok');
+        });
+
+        it('não reinicia automaticamente turno enfileirado quando READY ainda não reapareceu', async () => {
+            mockWaitForEvent.mockResolvedValueOnce({});
+            await dlm.start('Hello');
+            const recoverySpy = vi.fn();
+            const stoppedSpy = vi.fn();
+            dlm.on('recovery', recoverySpy);
+            dlm.on('stopped', stoppedSpy);
+
+            const result = await dlm.sendTurn('queued', { traceId: 'q1' });
+
+            expect(result).toBe('REPLY: ok');
+            expect(host.sendMessageDialogBoot).toHaveBeenCalledTimes(1);
+            expect(stoppedSpy).not.toHaveBeenCalled();
+            expect(recoverySpy).not.toHaveBeenCalled();
+        });
+
+        it('mantém o caminho normal quando READY tardio já virou pending question', async () => {
+            let pending = false;
+            host.hasPendingQuestion.mockImplementation(() => pending);
+            vi.mocked(executeTurnImpl).mockImplementationOnce(async () => {
+                pending = true;
+                return 'REPLY: ok';
+            });
+            mockWaitForEvent.mockResolvedValueOnce({});
+            await dlm.start('Hello');
+            const recoverySpy = vi.fn();
+            dlm.on('recovery', recoverySpy);
+
+            await dlm.sendTurn('queued', { traceId: 'q2' });
+
+            expect(host.sendMessageDialogBoot).toHaveBeenCalledTimes(1);
+            expect(recoverySpy).not.toHaveBeenCalled();
+        });
+
+        it('não reinicia após REPLY quando READY pós-turno não reaparece imediatamente', async () => {
+            let pending = true;
+            host.hasPendingQuestion.mockImplementation(() => pending);
+            vi.mocked(executeTurnImpl).mockImplementationOnce(async () => {
+                pending = false;
+                return 'REPLY: ok';
+            });
+            mockWaitForEvent.mockResolvedValueOnce({});
+            await dlm.start('Hello');
+            const recoverySpy = vi.fn();
+            const stoppedSpy = vi.fn();
+            dlm.on('recovery', recoverySpy);
+            dlm.on('stopped', stoppedSpy);
+            host.trackBackgroundTask = vi.fn(async (task) => {
+                await task;
+            });
+
+            await expect(dlm.sendTurn('single', { traceId: 'idle1' })).resolves.toBe('REPLY: ok');
+
+            expect(host.trackBackgroundTask).not.toHaveBeenCalled();
+            expect(host.sendMessageDialogBoot).toHaveBeenCalledTimes(1);
+            expect(stoppedSpy).not.toHaveBeenCalled();
+            expect(recoverySpy).not.toHaveBeenCalled();
         });
 
         it('sendTurn() rejeita enquanto stop() esta drenando', async () => {
@@ -274,6 +359,31 @@ describe('DialogLoopManager', () => {
             dlm.on('ready', readySpy);
             dlm.handleProtocolInput({ question: 'READY: bot is ready' });
             expect(readySpy).toHaveBeenCalled();
+        });
+
+        it('ignora READY durante stop em andamento para não rearmar watchdog nem late recovery', async () => {
+            await dlm.start('Hello');
+            /** @type {((v: string) => void) | undefined} */
+            let resolveTurn;
+            vi.mocked(executeTurnImpl).mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        resolveTurn = resolve;
+                    }),
+            );
+            const readySpy = vi.fn();
+            dlm.on('ready', readySpy);
+
+            const turnPromise = dlm.sendTurn('long turn');
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const stopPromise = dlm.stop({ authorized: true });
+
+            dlm.handleProtocolInput({ question: 'READY: late while stopping' });
+
+            expect(readySpy).not.toHaveBeenCalled();
+            resolveTurn?.('REPLY: done');
+            await turnPromise;
+            await stopPromise;
         });
 
         it('reativa o loop quando READY chega apos drift de boot', () => {
@@ -489,13 +599,17 @@ describe('DialogCostLedger', () => {
 });
 
 describe('DialogCompactionPolicy', () => {
-    it('deduplica proactive e permite critical recorrente', () => {
+    it('deduplica proactive e critical até reset ou retorno à faixa segura', () => {
         const policy = new DialogCompactionPolicy();
 
         expect(policy.evaluate({ currentTokens: 90, tokenLimit: 100, ratio: 90 })?.urgency).toBe('proactive');
         expect(policy.evaluate({ currentTokens: 91, tokenLimit: 100, ratio: 91 })).toBeNull();
         expect(policy.evaluate({ currentTokens: 95, tokenLimit: 100, ratio: 95 })?.urgency).toBe('critical');
+        expect(policy.evaluate({ currentTokens: 96, tokenLimit: 100, ratio: 96 })).toBeNull();
+        policy.reset();
         expect(policy.evaluate({ currentTokens: 96, tokenLimit: 100, ratio: 96 })?.urgency).toBe('critical');
+        expect(policy.evaluate({ currentTokens: 80, tokenLimit: 100, ratio: 80 })).toBeNull();
+        expect(policy.evaluate({ currentTokens: 95, tokenLimit: 100, ratio: 95 })?.urgency).toBe('critical');
     });
 });
 

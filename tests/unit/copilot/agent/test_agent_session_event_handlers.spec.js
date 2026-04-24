@@ -434,6 +434,24 @@ describe('F43 — SessionMessagesCache', () => {
         expect(session.getMessages).not.toHaveBeenCalled();
     });
 
+    it('limita o cache de mensagens mantendo as entradas mais recentes', async () => {
+        const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
+        const cache = new SessionMessagesCache(60000, { maxItems: 2 });
+        const session = createMockSession();
+        session.getMessages.mockResolvedValueOnce([
+            { id: '1', type: 'user', content: 'old' },
+            { id: '2', type: 'assistant', content: 'mid' },
+            { id: '3', type: 'user', content: 'new' },
+        ]);
+
+        const result = await cache.get(/** @type {any} */ (session));
+
+        expect(result).toEqual([
+            { id: '2', type: 'assistant', content: 'mid' },
+            { id: '3', type: 'user', content: 'new' },
+        ]);
+    });
+
     it('invalidate() limpa o cache', async () => {
         const { SessionMessagesCache } = await import('#copilot/agent/session/history-sync');
         const cache = new SessionMessagesCache(60000);

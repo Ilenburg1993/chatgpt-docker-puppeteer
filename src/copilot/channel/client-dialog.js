@@ -10,6 +10,7 @@
  */
 
 import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import {
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
@@ -91,7 +92,7 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
  * @returns {Promise<string>}
  */
 export async function dialogTurn(agent, message, opts = {}) {
-    const { timeout = 60_000, onDelta, onReasoning } = opts;
+    const { timeout = LLM_B_TURN_TIMEOUT_MS, onDelta, onReasoning } = opts;
 
     const onDeltaTemp = onDelta
         ? (/** @type {unknown} */ rawEvt) => {
@@ -125,7 +126,8 @@ export async function dialogTurn(agent, message, opts = {}) {
  * Encerra o modo de diálogo direto.
  *
  * @param {BridgeAgentLike} agent
- * @param {'watchdog_restart' | 'authorized_stop'} [reason='watchdog_restart'] Default is `'watchdog_restart'`
+ * @param {'watchdog_restart' | 'authorized_stop' | 'recovery_restart'} [reason='watchdog_restart'] Default is
+ *   `'watchdog_restart'`
  * @returns {Promise<void>}
  */
 export async function stopDialogMode(agent, reason = 'watchdog_restart') {

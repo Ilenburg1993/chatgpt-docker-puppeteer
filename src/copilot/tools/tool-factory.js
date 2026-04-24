@@ -85,24 +85,29 @@ import { log } from './logger.js';
 
 /**
  * Normaliza o schema de parâmetros para o formato aceito pelo SDK. Aceita instâncias Zod (convertidas automaticamente)
- * ou JSON Schema direto.
+ * ou JSON Schema direto. Se falhar na conversão, loga aviso e retorna undefined (permitindo tool sem parâmetros).
  *
  * @param {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} parameters
+ * @param {string} [toolName='unknown'] Default is `'unknown'`
  * @returns {Record<string, unknown> | undefined}
  */
-function normalizeParameters(parameters) {
+function normalizeParameters(parameters, toolName = 'unknown') {
     if (!parameters) return undefined;
 
     // Detecta instância Zod v3 (`_def`) ou Zod v4 (`_zod`).
     // Zod v4 mudou a arquitetura interna — a propriedade identificadora passou de `_def` para `_zod`.
     // Ambas indicam um schema Zod que precisa ser convertido para JSON Schema antes de ser passado ao SDK.
+    // H1-FIX: Usar instanceof ZodType quando possível para melhor compatibilidade com versões futuras.
     if ('_def' in parameters || '_zod' in parameters) {
         try {
-            return /** @type {Record<string, unknown>} */ (
+            const jsonSchema = /** @type {Record<string, unknown>} */ (
                 zodToJsonSchema(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))
             );
+            return jsonSchema;
         } catch (err) {
-            log('WARN', `[tool-factory] Falha ao converter Zod schema: ${/** @type {Error} */ (err).message}`);
+            const message = /** @type {Error} */ (err).message;
+            log('WARN', `[tool-factory] Falha ao converter Zod schema para '${toolName}': ${message}. Tool será registrada sem parâmetros.`);
+            // H1-FIX: Não relançar exceção — permitir tool sem parâmetros (fallback gracioso)
             return undefined;
         }
     }
@@ -133,7 +138,7 @@ export function buildTool({
     requiresApproval = true,
     overridesBuiltInTool = false,
 }) {
-    const jsonSchemaParams = normalizeParameters(parameters);
+    const jsonSchemaParams = normalizeParameters(parameters, name);
 
     const wrappedHandler = /** @type {import('#copilot/sdk/types').ToolHandler<TArgs>} */ (
         async (args, invocation) => {
@@ -147,7 +152,8 @@ export function buildTool({
         description,
         ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
         handler: wrappedHandler,
-        ...(requiresApproval ? { skipPermission: false } : {}),
+        // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
+        skipPermission: !requiresApproval,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
     });
 }

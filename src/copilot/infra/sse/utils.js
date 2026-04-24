@@ -9,6 +9,7 @@
  */
 
 import { MAX_SSE_CLIENTS } from '#copilot/config';
+import { defaultMetrics } from '#copilot/observability';
 import { createGzip } from 'node:zlib';
 
 /** @typedef {import('./replay-buffer.js').SseReplayBuffer} SseReplayBuffer */
@@ -33,7 +34,7 @@ import { createGzip } from 'node:zlib';
 
 /**
  * @typedef {object} SseWriter
- * @property {(event: string, data: unknown, opts?: { skipBuffer?: boolean }) => void} send
+ * @property {(event: string, data: unknown, opts?: { skipBuffer?: boolean; eventId?: number }) => void} send
  * @property {() => void} close
  */
 
@@ -126,7 +127,7 @@ export function createSseWriter(req, res, opts = {}) {
      *
      * @param {string} event
      * @param {unknown} data
-     * @param {{ skipBuffer?: boolean }} [sendOpts]
+     * @param {{ skipBuffer?: boolean; eventId?: number }} [sendOpts]
      */
     const send = (event, data, sendOpts) => {
         if (out.writableEnded) return;
@@ -139,7 +140,10 @@ export function createSseWriter(req, res, opts = {}) {
                 payload = { ...obj, content: obj['content'].slice(0, maxContentChars) + '…[truncado]' };
             }
         }
-        const id = replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, payload) : undefined;
+        const explicitEventId = Number.isFinite(sendOpts?.eventId) ? Number(sendOpts?.eventId) : undefined;
+        const id =
+            explicitEventId ??
+            (replayBuffer && !sendOpts?.skipBuffer ? replayBuffer.push(safeEvent, payload) : undefined);
         const idLine = id != null ? `id: ${id}\n` : '';
         out.write(`${idLine}event: ${safeEvent}\ndata: ${JSON.stringify(payload)}\n\n`);
     };
@@ -171,7 +175,7 @@ export function createSseWriter(req, res, opts = {}) {
     if (maxLifetimeMs > 0) {
         lifetimeTimer = setTimeout(() => {
             if (!out.writableEnded) {
-                send('reconnect', { reason: 'max_lifetime', ts: Date.now() });
+                send('reconnect', { reason: 'max_lifetime', ts: Date.now() }, { skipBuffer: true });
                 if (gzStream) gzStream.end();
                 else res.end();
             }
@@ -224,28 +228,45 @@ export class SseConnectionTracker {
     /** @type {number} */
     #count = 0;
 
+    /** @type {import('#copilot/observability/metrics.js').MetricsStore | null} */
+    #metrics;
+
     /**
      * @param {string} name - Nome do endpoint (para logging)
      * @param {number} [max] - Limite máximo de conexões simultâneas
+     * @param {import('#copilot/observability/metrics.js').MetricsStore | null} [metrics]
      */
-    constructor(name, max = MAX_SSE_CLIENTS) {
-        this.#name = name;
+    constructor(name, max = MAX_SSE_CLIENTS, metrics = defaultMetrics) {
+        this.#name = String(name).replace(/[^a-zA-Z0-9_.-]/g, '_');
         this.#max = max;
+        this.#metrics = metrics;
+        this.#metrics?.recordGauge(`sse.tracker.${this.#name}.max`, this.#max);
+        this.#metrics?.recordGauge(`sse.tracker.${this.#name}.active`, this.#count);
     }
 
     /** Verifica se pode aceitar uma nova conexão. */
     accept() {
-        return this.#count < this.#max;
+        const allowed = this.#count < this.#max;
+        if (!allowed) {
+            this.#metrics?.recordCounter(`sse.tracker.${this.#name}.limit_reached`);
+        }
+        return allowed;
     }
 
     /** Incrementa o contador. */
     increment() {
         this.#count++;
+        this.#metrics?.recordCounter(`sse.tracker.${this.#name}.accepted`);
+        this.#metrics?.recordGauge(`sse.tracker.${this.#name}.active`, this.#count);
     }
 
     /** Decrementa o contador (com proteção contra underflow). */
     decrement() {
-        if (this.#count > 0) this.#count--;
+        if (this.#count > 0) {
+            this.#count--;
+            this.#metrics?.recordCounter(`sse.tracker.${this.#name}.closed`);
+            this.#metrics?.recordGauge(`sse.tracker.${this.#name}.active`, this.#count);
+        }
     }
 
     /** Retorna o número de conexões ativas. */

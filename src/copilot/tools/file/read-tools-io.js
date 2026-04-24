@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { isUtf8 } from 'node:buffer';
 import * as fs from 'node:fs';
 import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
 import * as path from 'node:path';
@@ -15,7 +16,7 @@ import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
-import { MAX_CONTENT_BYTES, MAX_LIST_ENTRIES, WORKSPACE_ROOT, validatePath } from './shared.js';
+import { MAX_CONTENT_BYTES, MAX_LIST_ENTRIES, WORKSPACE_ROOT, concatChunks, validatePath } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Tool: read_file_content
@@ -52,6 +53,9 @@ const readFileContentTool = buildTool({
     handler: async ({ path: filePath, startLine, endLine, encoding }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'read' });
         if (!ok) return { success: false, error: reason };
+        if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
+            return { success: false, error: 'Intervalo inválido: endLine deve ser maior ou igual a startLine.' };
+        }
 
         log('INFO', `[copilot/read_file_content] ${resolved}`);
 
@@ -67,7 +71,8 @@ const readFileContentTool = buildTool({
                     stream.on('end', resolve);
                     stream.on('error', reject);
                 });
-                const raw = Buffer.concat(chunks);
+                // concatChunks computa totalLength automaticamente — evita segunda passagem interna
+                const raw = concatChunks(chunks);
                 return {
                     success: true,
                     path: resolved,
@@ -85,14 +90,25 @@ const readFileContentTool = buildTool({
                 stream.on('end', resolve);
                 stream.on('error', reject);
             });
-            const text = Buffer.concat(textChunks).toString('utf8');
+            // concatChunks computa totalLength automaticamente — evita segunda passagem interna
+            const rawText = concatChunks(textChunks);
+            // Detectar arquivo binário antes de tentar decodificar como UTF-8
+            if (!isUtf8(rawText)) {
+                return {
+                    success: false,
+                    error: 'Arquivo binário detectado (bytes inválidos para UTF-8). Use encoding: "base64" para ler arquivos binários.',
+                };
+            }
+            const text = rawText.toString('utf8');
             const lines = text.split('\n');
             const total = lines.length;
 
             const s = (startLine ?? 1) - 1;
             const e = endLine ?? total;
             const slice = lines.slice(s, e).join('\n');
-            const truncated = slice.length > MAX_CONTENT_BYTES;
+            const streamTruncated = stats.size > MAX_CONTENT_BYTES * 3;
+            const contentTruncated = slice.length > MAX_CONTENT_BYTES;
+            const truncated = streamTruncated || contentTruncated;
 
             return {
                 success: true,
@@ -102,6 +118,7 @@ const readFileContentTool = buildTool({
                 returnedLines: { start: s + 1, end: Math.min(e, total) },
                 content: truncated ? slice.slice(0, MAX_CONTENT_BYTES) + '\n[... conteúdo truncado ...]' : slice,
                 truncated,
+                ...(streamTruncated ? { truncationReason: 'input_stream_limit' } : {}),
             };
         } catch (err) {
             return { success: false, error: toError(err).message };
@@ -154,6 +171,8 @@ const listDirectoryTool = buildTool({
             const stats = await fsStat(resolved);
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
 
+            let remainingEntries = MAX_LIST_ENTRIES;
+
             /**
              * @param {string} dir
              * @param {number} currentDepth
@@ -167,10 +186,12 @@ const listDirectoryTool = buildTool({
                 } catch {
                     return [];
                 }
+                entries.sort((a, b) => a.localeCompare(b));
 
                 /** @type {DirEntry[]} */
                 const result = [];
                 for (const name of entries) {
+                    if (remainingEntries <= 0) break;
                     if (!showHidden && name.startsWith('.')) continue;
                     if (filter) {
                         const globMatch = filter.startsWith('*.') ? name.endsWith(filter.slice(1)) : name === filter;
@@ -182,7 +203,7 @@ const listDirectoryTool = buildTool({
                             }
                         }
                     }
-                    if (result.length >= MAX_LIST_ENTRIES) break;
+                    if (remainingEntries <= 0) break;
 
                     const full = path.join(dir, name);
                     const rel = path.relative(WORKSPACE_ROOT, full);
@@ -204,6 +225,7 @@ const listDirectoryTool = buildTool({
                         entry.children = await readDir(full, currentDepth + 1);
                     }
                     result.push(entry);
+                    remainingEntries -= 1;
                 }
                 return result;
             }
@@ -213,7 +235,8 @@ const listDirectoryTool = buildTool({
                 success: true,
                 path: resolved,
                 count: entries.length,
-                truncated: entries.length >= MAX_LIST_ENTRIES,
+                truncated: remainingEntries <= 0,
+                scannedBudget: MAX_LIST_ENTRIES - remainingEntries,
                 entries,
             };
         } catch (err) {

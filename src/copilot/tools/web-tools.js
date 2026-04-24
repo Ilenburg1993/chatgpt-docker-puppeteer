@@ -47,10 +47,10 @@ function checkRateLimit() {
  * Tool: web_fetch — busca o conteúdo de uma URL pública com proteção SSRF.
  */
 const webFetchTool = buildTool({
-    name: 'web_fetch',
-    overridesBuiltInTool: true,
+    name: 'legacy_web_fetch',
     requiresApproval: false,
     description:
+        '[DEPRECATED] Compat legado de fetch web. Prefira a built-in do CLI: "web_fetch". ' +
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
         'Limite: 20 requisições/minuto.',
@@ -188,7 +188,6 @@ const webFetchTool = buildTool({
  */
 const webSearchTool = buildTool({
     name: 'web_search',
-    overridesBuiltInTool: true,
     requiresApproval: false,
     description:
         'Realiza busca na web via DuckDuckGo e retorna os primeiros resultados (título, URL, snippet). ' +

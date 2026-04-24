@@ -68,13 +68,14 @@ export class TurnQueue {
 
         this.#depth++;
         const prev = this.#mutex;
+        const myGen = this.#gen;
         /** @type {Promise<T>} */
         const next = prev.then(fn);
         this.#mutex = next.then(() => {}).catch((e) => logSwallowed(e, 'agent.backpressure.mutex'));
-        const myGen = ++this.#gen;
         const finalizeTurn = () => {
-            this.#depth--;
-            if (this.#depth === 0 && this.#gen === myGen) {
+            if (this.#gen !== myGen) return;
+            this.#depth = Math.max(0, this.#depth - 1);
+            if (this.#depth === 0) {
                 this.#mutex = Promise.resolve();
             }
         };

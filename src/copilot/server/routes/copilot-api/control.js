@@ -22,6 +22,7 @@ import { buildAgentRuntimeCapabilities } from '../../../presentation/runtime-cap
 import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 import { buildAgentSessionHttpPayload, buildAgentStatusHttpPayload } from '../../../presentation/runtime-status.js';
+import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
 const _sdkVersion = (() => {
@@ -96,7 +97,7 @@ export function registerControlRoutes(bridge, binding) {
             const data = globalAuditTrail.toJSON();
             res.json({ ok: true, ...data });
         } catch (e) {
-            res.status(500).json({ ok: false, error: toError(e).message });
+            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
         }
     });
     bridge.get('/compliance/stats', (_req, /** @type {Res} */ res) => {
@@ -104,7 +105,7 @@ export function registerControlRoutes(bridge, binding) {
             const stats = globalAuditTrail.stats();
             res.json({ ok: true, ...stats });
         } catch (e) {
-            res.status(500).json({ ok: false, error: toError(e).message });
+            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
         }
     });
 }
@@ -248,11 +249,50 @@ function _handleGetPermissions(res, agent) {
 function _handleSetPermissions(req, res, agent) {
     const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
     const validModes = ['approve_all', 'audit_only', 'selective'];
+    const toolNameRe = /^[a-zA-Z0-9_]+$/;
+    /**
+     * @param {unknown} names
+     * @param {'allowTools' | 'denyTools'} label
+     * @returns {{ ok: true; value: string[] } | { ok: false; error: string }}
+     */
+    const sanitizeToolNames = (names, label) => {
+        if (names === undefined) return { ok: true, value: [] };
+        if (!Array.isArray(names)) {
+            return { ok: false, error: `Campo "${label}" deve ser array de strings.` };
+        }
+        const unique = new Set();
+        for (const raw of names) {
+            if (typeof raw !== 'string') {
+                return { ok: false, error: `Campo "${label}" deve conter apenas strings.` };
+            }
+            const normalized = raw.trim();
+            if (!normalized || !toolNameRe.test(normalized)) {
+                return {
+                    ok: false,
+                    error: `Campo "${label}" contém nome inválido: "${raw}". Use apenas [a-zA-Z0-9_].`,
+                };
+            }
+            unique.add(normalized);
+        }
+        return { ok: true, value: [...unique] };
+    };
+
     if (!mode || !validModes.includes(mode)) {
         return void res.status(400).json({
             ok: false,
             error: `Campo "mode" inválido. Valores aceitos: ${validModes.join(', ')}.`,
         });
+    }
+    if (denyShell !== undefined && typeof denyShell !== 'boolean') {
+        return void res.status(400).json({ ok: false, error: 'Campo "denyShell" deve ser boolean.' });
+    }
+    const allowNames = sanitizeToolNames(allowTools, 'allowTools');
+    if (!allowNames.ok) {
+        return void res.status(400).json({ ok: false, error: allowNames.error });
+    }
+    const denyNames = sanitizeToolNames(denyTools, 'denyTools');
+    if (!denyNames.ok) {
+        return void res.status(400).json({ ok: false, error: denyNames.error });
     }
     if (typeof agent.setPermissionMode !== 'function') {
         return void res.status(501).json({ ok: false, error: 'setPermissionMode não disponível nesta instância.' });
@@ -261,8 +301,8 @@ function _handleSetPermissions(req, res, agent) {
         const before = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
         /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */
         const opts = {};
-        if (Array.isArray(allowTools) && allowTools.length) opts.allowTools = allowTools;
-        if (Array.isArray(denyTools) && denyTools.length) opts.denyTools = denyTools;
+        if (allowNames.value.length) opts.allowTools = allowNames.value;
+        if (denyNames.value.length) opts.denyTools = denyNames.value;
         if (denyShell === true) opts.denyShell = true;
         agent.setPermissionMode(mode, opts);
         const after = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : mode;

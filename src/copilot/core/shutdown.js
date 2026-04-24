@@ -27,6 +27,7 @@ let _log = (level, msg) => {
  * @property {string} name - Nome do handler (para log)
  * @property {number} priority - Prioridade (menor = executa primeiro)
  * @property {() => Promise<void>} fn - Função de cleanup
+ * @property {number} timeoutMs - Timeout do handler em ms
  */
 
 /** @type {ShutdownHandler[]} */
@@ -56,9 +57,14 @@ export function setShutdownLogger(logFn) {
  * @param {string} name - Nome descritivo do handler
  * @param {() => Promise<void>} fn - Função de cleanup async
  * @param {number} [priority=50] - Prioridade (menor = executa primeiro). Default is `50`
+ * @param {{ timeoutMs?: number }} [options] - Opções do handler. Default timeout is `5000`
  */
-export function registerShutdownHandler(name, fn, priority = 50) {
-    const nextHandler = { name, priority, fn };
+export function registerShutdownHandler(name, fn, priority = 50, options = {}) {
+    const timeoutMs =
+        typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+            ? options.timeoutMs
+            : 5_000;
+    const nextHandler = { name, priority, fn, timeoutMs };
     const existingIndex = handlers.findIndex((handler) => handler.name === name);
     if (existingIndex >= 0) {
         handlers.splice(existingIndex, 1, nextHandler);
@@ -69,8 +75,8 @@ export function registerShutdownHandler(name, fn, priority = 50) {
 }
 
 /**
- * Executa todos os handlers de shutdown em ordem de prioridade. Cada handler tem um timeout de 5s. Se um falhar, os
- * próximos continuam. Seguro para chamar múltiplas vezes (idempotente).
+ * Executa todos os handlers de shutdown em ordem de prioridade. Cada handler tem timeout próprio; o default é 5s. Se
+ * um falhar, os próximos continuam. Seguro para chamar múltiplas vezes (idempotente).
  *
  * @param {string} [reason='unknown'] - Motivo do shutdown (para log). Default is `'unknown'`
  * @returns {Promise<void>}
@@ -83,12 +89,7 @@ export async function runShutdown(reason = 'unknown') {
 
     for (const handler of handlers) {
         try {
-            await Promise.race([
-                handler.fn(),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(`Shutdown handler "${handler.name}" timeout`)), 5_000),
-                ),
-            ]);
+            await runHandlerWithTimeout(handler);
             _log('INFO', `  ✓ ${handler.name}`);
         } catch (err) {
             _log('WARN', `  ✗ ${handler.name}: ${toError(err).message ?? err}`);
@@ -105,6 +106,28 @@ export async function runShutdown(reason = 'unknown') {
  */
 export function isShuttingDown() {
     return shuttingDown;
+}
+
+/**
+ * @param {ShutdownHandler} handler
+ * @returns {Promise<void>}
+ */
+async function runHandlerWithTimeout(handler) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timeout = null;
+    try {
+        await Promise.race([
+            handler.fn(),
+            new Promise((_, reject) => {
+                timeout = setTimeout(
+                    () => reject(new Error(`Shutdown handler "${handler.name}" timeout`)),
+                    handler.timeoutMs,
+                );
+            }),
+        ]);
+    } finally {
+        if (timeout) clearTimeout(timeout);
+    }
 }
 
 /**

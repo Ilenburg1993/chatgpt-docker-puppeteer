@@ -8,7 +8,7 @@ vi.mock('../../../../src/copilot/terminal/dialog/sse.js', () => ({
 
 const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-const { createDeltaCallback, createDisplayState } =
+const { createDeltaCallback, createDisplayState, createReasoningCallback, renderStreamingFooter } =
     await import('../../../../src/copilot/terminal/dialog/turn-display.js');
 
 describe('terminal/dialog/turn-display', () => {
@@ -45,5 +45,23 @@ describe('terminal/dialog/turn-display', () => {
 
         expect(state.streamingStarted).toBe(true);
         expect(state.streamingChars).toBe(3);
+    });
+
+    it('mantém thinking de turno silencioso quando showThinking=false', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: false,
+        });
+
+        const onReasoning = createReasoningCallback(state);
+        onReasoning('pensando...', 'r1');
+        renderStreamingFooter(state, 10);
+
+        expect(state.reasoningStarted).toBe(true);
+        expect(state.reasoningChars).toBe(11);
+        expect(writeSpy).not.toHaveBeenCalled();
     });
 });

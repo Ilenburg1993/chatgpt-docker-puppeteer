@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DLM_EVENTS, EVENT_MAP, wireDialogLoopEvents } from '../../../src/copilot/agent/dialog/event-wiring.js';
 
 describe('wireDialogLoopEvents', () => {
-    it('deve registrar listeners para todos os 13 eventos DLM', () => {
+    it('deve registrar listeners para todos os 14 eventos DLM', () => {
         const dlm = new EventEmitter();
         const emitFn = vi.fn();
         wireDialogLoopEvents(/** @type {any} */ (dlm), emitFn);
@@ -46,8 +46,8 @@ describe('wireDialogLoopEvents', () => {
         expect(emitFn2).toHaveBeenCalledWith('dialog.ready', { x: 1 });
     });
 
-    it('DLM_EVENTS deve ter 13 entradas', () => {
-        expect(DLM_EVENTS).toHaveLength(13);
+    it('DLM_EVENTS deve ter 14 entradas', () => {
+        expect(DLM_EVENTS).toHaveLength(14);
     });
 
     it('EVENT_MAP deve mapear model.fallback → pr.fallback_model', () => {

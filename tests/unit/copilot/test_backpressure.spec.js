@@ -73,7 +73,7 @@ describe('TurnQueue', () => {
     it('reset() deve zerar depth e permitir novas enqueues', async () => {
         const q = new TurnQueue({ maxSize: 2 });
         let resolve1;
-        q.enqueue(
+        const p1 = q.enqueue(
             () =>
                 new Promise((r) => {
                     resolve1 = r;
@@ -86,6 +86,33 @@ describe('TurnQueue', () => {
         // Deve funcionar normalmente após reset
         const result = await q.enqueue(async () => 42);
         expect(result).toBe(42);
+        resolve1?.('late');
+        await p1;
+        expect(q.depth).toBe(0);
+    });
+
+    it('não deixa finalização tardia de geração resetada tornar depth negativo', async () => {
+        const q = new TurnQueue({ maxSize: 2 });
+        /** @type {((v: string) => void) | undefined} */
+        let resolve1;
+        const p1 = q.enqueue(
+            () =>
+                new Promise((r) => {
+                    resolve1 = r;
+                }),
+        );
+
+        expect(q.depth).toBe(1);
+        q.reset();
+        expect(q.depth).toBe(0);
+
+        const p2 = q.enqueue(async () => 'fresh');
+        await expect(p2).resolves.toBe('fresh');
+        expect(q.depth).toBe(0);
+
+        resolve1?.('late');
+        await expect(p1).resolves.toBe('late');
+        expect(q.depth).toBe(0);
     });
 
     it('drain() deve resolver quando a fila esvaziar', async () => {

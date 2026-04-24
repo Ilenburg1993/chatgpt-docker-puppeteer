@@ -83,6 +83,8 @@ describe('url-validator (infra)', () => {
         it('detecta IPv4-mapped como privado', () => {
             expect(isPrivateIp('::ffff:127.0.0.1')).toBe(true);
             expect(isPrivateIp('::ffff:192.168.1.1')).toBe(true);
+            expect(isPrivateIp('::ffff:7f00:1')).toBe(true);
+            expect(isPrivateIp('::ffff:a00:1')).toBe(true);
         });
 
         it('retorna false para IP público', () => {
@@ -135,25 +137,31 @@ describe('url-validator (infra)', () => {
 
     describe('checkResolvedIp()', () => {
         it('permite host que resolve para IP público', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+            vi.mocked(dns.lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
             await expect(checkResolvedIp('example.com')).resolves.toBeUndefined();
         });
 
         it('rejeita host que resolve para IP privado (DNS rebinding)', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue({ address: '127.0.0.1', family: 4 });
+            vi.mocked(dns.lookup).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
             await expect(checkResolvedIp('evil.com')).rejects.toThrow(/DNS rebinding/);
         });
 
         it('rejeita host que resolve para 10.x.x.x', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue({ address: '10.0.0.5', family: 4 });
+            vi.mocked(dns.lookup).mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
             await expect(checkResolvedIp('internal.test')).rejects.toThrow(/DNS rebinding/);
         });
 
-        it('tenta IPv6 fallback quando IPv4 falha', async () => {
-            vi.mocked(dns.lookup)
-                .mockRejectedValueOnce(new Error('ENOTFOUND')) // IPv4
-                .mockResolvedValueOnce({ address: '2607:f8b0:4004:800::200e', family: 6 }); // IPv6 público
+        it('permite IPv6 público', async () => {
+            vi.mocked(dns.lookup).mockResolvedValue([{ address: '2607:f8b0:4004:800::200e', family: 6 }]);
             await expect(checkResolvedIp('v6only.test')).resolves.toBeUndefined();
+        });
+
+        it('rejeita quando qualquer registro DNS é privado', async () => {
+            vi.mocked(dns.lookup).mockResolvedValue([
+                { address: '93.184.216.34', family: 4 },
+                { address: '::ffff:7f00:1', family: 6 },
+            ]);
+            await expect(checkResolvedIp('mixed.test')).rejects.toThrow(/DNS rebinding/);
         });
 
         it('ignora DNS failure (ambos IPv4/IPv6 falham)', async () => {

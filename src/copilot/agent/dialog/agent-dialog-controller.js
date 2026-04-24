@@ -13,7 +13,7 @@
  */
 
 import { container, SessionError } from '#copilot/core';
-import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
+import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log, METRICS_STORE } from '../ports/observability-port.js';
@@ -30,6 +30,15 @@ import { wireDialogLoopEvents } from './loop-manager.js';
  */
 
 /** @typedef {import('../types.js').DialogHost} DialogHost */
+
+/**
+ * @typedef {object} DialogInputRecoveryResult
+ * @property {boolean} recovered
+ * @property {string} reason
+ * @property {'not_needed' | 'paused' | 'zero_pr_ready' | 'restart_with_pr'} strategy
+ * @property {boolean} prConsumed
+ * @property {number} durationMs
+ */
 
 /**
  * @param {'retry' | 'fatal' | 'ignore'} disposition
@@ -134,7 +143,7 @@ export async function dialogStart(ctx, host, bootPrompt) {
  * @param {DialogHost} host
  * @param {{
  *     authorized?: boolean;
- *     reason?: 'watchdog_restart' | 'authorized_stop';
+ *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
  *     shutdownTimeoutMs?: number;
  * }} [opts]
  * @returns {Promise<void>}
@@ -143,6 +152,85 @@ export async function dialogStop(ctx, host, opts) {
     await runDialogOperationWithPolicy('dialog.stop', () => ctx.stopDialogLoop(opts));
     // F42.2: reiniciar keepalive quando dialog loop para
     startKeepaliveIfPossible(ctx, host);
+}
+
+/**
+ * Recupera semanticamente o canal de input do dialog loop quando a borda detecta `active + idle + sem READY`.
+ *
+ * Regra de custo: se ainda houver `READY` pendente, a recuperação é 0 PR; só reiniciamos o loop quando o canal de input
+ * está de fato ausente. A decisão pertence ao Agent, não à presentation.
+ *
+ * @param {AgentContext} ctx
+ * @param {DialogHost} host
+ * @param {{ reason?: string; traceId?: string }} [opts]
+ * @returns {Promise<DialogInputRecoveryResult>}
+ */
+export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
+    const startedAt = Date.now();
+    const reason = opts.reason ?? 'input_channel_missing';
+    const emitRecovery = (
+        /** @type {Omit<DialogInputRecoveryResult, 'durationMs' | 'reason'> & { success?: boolean }} */ event,
+    ) => {
+        const durationMs = Date.now() - startedAt;
+        host.emit(EMITTER_DIALOG_RECOVERY, {
+            reason,
+            durationMs,
+            ...(opts.traceId ? { traceId: opts.traceId } : {}),
+            ...event,
+        });
+        return durationMs;
+    };
+
+    if (ctx.isDialogLoopPaused()) {
+        const durationMs = emitRecovery({
+            recovered: false,
+            strategy: 'paused',
+            prConsumed: false,
+            success: true,
+        });
+        return { recovered: false, reason, strategy: 'paused', prConsumed: false, durationMs };
+    }
+
+    if (ctx.isDialogLoopActive() && ctx.isWaitingForInput() && ctx.getPendingQuestionKind() === 'ready') {
+        const durationMs = emitRecovery({
+            recovered: true,
+            strategy: 'zero_pr_ready',
+            prConsumed: false,
+            success: true,
+        });
+        return { recovered: true, reason, strategy: 'zero_pr_ready', prConsumed: false, durationMs };
+    }
+
+    const mustRestart = ctx.isDialogLoopActive() && ctx.isIdle() && !ctx.hasPendingQuestion();
+    if (!mustRestart) {
+        const durationMs = emitRecovery({
+            recovered: false,
+            strategy: 'not_needed',
+            prConsumed: false,
+            success: true,
+        });
+        return { recovered: false, reason, strategy: 'not_needed', prConsumed: false, durationMs };
+    }
+
+    try {
+        await dialogStop(ctx, host, { authorized: true, reason: 'recovery_restart' });
+        await dialogStart(ctx, host);
+        const durationMs = emitRecovery({
+            recovered: true,
+            strategy: 'restart_with_pr',
+            prConsumed: true,
+            success: true,
+        });
+        return { recovered: true, reason, strategy: 'restart_with_pr', prConsumed: true, durationMs };
+    } catch (error) {
+        emitRecovery({
+            recovered: false,
+            strategy: 'restart_with_pr',
+            prConsumed: true,
+            success: false,
+        });
+        throw error;
+    }
 }
 
 /**

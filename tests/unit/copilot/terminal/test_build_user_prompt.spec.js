@@ -82,6 +82,22 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('[ASK:QUESTION]');
     });
 
+    it('não mostra READY como ASK no prompt normal', async () => {
+        readTerminalRuntimeState.mockReturnValueOnce(
+            /** @type {any} */ ({
+                ...readTerminalRuntimeState(),
+                pendingQuestion: { question: 'READY: aguardando próxima mensagem', kind: 'ready' },
+                pendingQuestionKind: 'ready',
+            }),
+        );
+        const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildUserPrompt();
+
+        expect(prompt).not.toContain('[ASK:READY]');
+        expect(prompt).toContain('gpt-5-mini');
+        expect(prompt).toContain('high');
+    });
+
     it('inclui marcador SHADOW quando só há shadow expirada', async () => {
         readTerminalRuntimeState.mockReturnValueOnce(
             /** @type {any} */ ({

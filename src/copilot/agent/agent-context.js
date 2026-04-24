@@ -81,6 +81,7 @@ function asStringArray(value) {
  *     tags: string[];
  *     readOnly: boolean;
  *     skipPermission: boolean;
+ *     hasParameters: boolean;
  * }}
  */
 function normalizeToolRegistryEntry(name, entryValue) {
@@ -94,6 +95,8 @@ function normalizeToolRegistryEntry(name, entryValue) {
         tags: asStringArray(entry['tags']),
         readOnly: entry['readOnly'] === true,
         skipPermission: tool['skipPermission'] === true,
+        hasParameters:
+            tool['parameters'] !== undefined && tool['parameters'] !== null && typeof tool['parameters'] === 'object',
     };
 }
 
@@ -1544,6 +1547,7 @@ export class AgentContext {
      *     tags: string[];
      *     readOnly: boolean;
      *     skipPermission: boolean;
+     *     hasParameters: boolean;
      * }[]}
      */
     getToolRegistryEntriesSnapshot() {
@@ -1635,7 +1639,7 @@ export class AgentContext {
      *
      * @param {{
      *     authorized?: boolean;
-     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
      *     shutdownTimeoutMs?: number;
      * }} [opts]
      * @returns {Promise<void>}

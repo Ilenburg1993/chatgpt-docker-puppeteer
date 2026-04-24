@@ -83,8 +83,9 @@ const permissionModeGetTool = buildTool({
 /**
  * Tool: permission_mode_set — altera o modo de aprovação de tools em runtime.
  *
- * A mudança é aplicada imediatamente para qualquer nova inicialização de sessão SDK. A sessão corrente (já ativa)
- * utilizará o novo handler na próxima reconexão ou reinício.
+ * A mudança é aplicada imediatamente e passa a valer para próximas requisições de permissão também na sessão corrente
+ * (sem necessidade de reconexão/reinício), pois o handler SDK permanece estável e a policy delegada é trocada em
+ * runtime.
  *
  * DL-PERM: o dialog loop não passa por este handler — não é possível bloqueá-lo aqui.
  */
@@ -122,7 +123,7 @@ const permissionModeSetTool = buildTool({
                     'run_shell_command, run_npm_script, run_node_script.',
             ),
     }),
-    requiresApproval: false,
+    requiresApproval: true,
     handler: async (
         /**
          * @type {{

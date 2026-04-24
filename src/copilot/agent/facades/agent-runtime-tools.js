@@ -15,6 +15,7 @@
  *     tags: string[];
  *     readOnly: boolean;
  *     skipPermission: boolean;
+ *     hasParameters: boolean;
  * }} AgentRuntimeToolProjection
  *
  *
@@ -56,6 +57,8 @@ function normalizeStaticTool(toolValue) {
         tags: [],
         readOnly: false,
         skipPermission: tool['skipPermission'] === true,
+        hasParameters:
+            tool['parameters'] !== undefined && tool['parameters'] !== null && typeof tool['parameters'] === 'object',
     };
 }
 
@@ -72,6 +75,9 @@ function normalizeRegistryProjection(itemValue) {
         tags: asStringArray(item['tags']),
         readOnly: item['readOnly'] === true,
         skipPermission: item['skipPermission'] === true,
+        hasParameters:
+            item['hasParameters'] === true ||
+            (item['parameters'] !== undefined && item['parameters'] !== null && typeof item['parameters'] === 'object'),
     };
 }
 
@@ -98,6 +104,10 @@ function readLegacyRegistryEntries(registryValue) {
             tags: asStringArray(entry['tags']),
             readOnly: entry['readOnly'] === true,
             skipPermission: tool['skipPermission'] === true,
+            hasParameters:
+                tool['parameters'] !== undefined &&
+                tool['parameters'] !== null &&
+                typeof tool['parameters'] === 'object',
         };
     });
 }

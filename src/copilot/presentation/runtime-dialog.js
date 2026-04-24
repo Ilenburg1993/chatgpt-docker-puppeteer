@@ -7,7 +7,12 @@
  *   turnos, ler contexto de arquivos e montar embeddings de attachments.
  */
 
-import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
+import {
+    recoverAgentDialogInputChannel,
+    sendAgentDialogTurn,
+    startAgentDialogLoop,
+    stopAgentDialogLoopAuthorized,
+} from '#copilot/agent';
 import { log } from '#copilot/observability';
 import { readRuntimeControlState, readRuntimeInteractionState } from '../agent/facades/agent-runtime-controls.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
@@ -23,9 +28,16 @@ export { MAX_EMBED_BYTES };
  *     sendDialogTurn: (message: string, options?: { timeout?: number; traceId?: string }) => Promise<string | null>;
  *     stopDialogLoop: (opts?: {
  *         authorized?: boolean;
- *         reason?: 'watchdog_restart' | 'authorized_stop';
+ *         reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
  *         shutdownTimeoutMs?: number;
  *     }) => Promise<void>;
+ *     recoverDialogInputChannel?: (opts?: { reason?: string; traceId?: string }) => Promise<{
+ *         recovered: boolean;
+ *         reason: string;
+ *         strategy: string;
+ *         prConsumed: boolean;
+ *         durationMs: number;
+ *     }>;
  * }} RuntimeDialogTarget
  */
 
@@ -106,10 +118,12 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
         if (interaction.pendingQuestion === null) {
             log(
                 'WARN',
-                `[runtime-dialog] active loop sem pending READY antes do turno; reiniciando loop uma vez (${traceLabel(traceId)}, from=${from})`,
+                `[runtime-dialog] active loop sem pending READY antes do turno; solicitando recovery ao Agent (${traceLabel(traceId)}, from=${from})`,
             );
-            await stopRuntimeDialogLoopAuthorized(agent);
-            await startRuntimeDialogLoop(undefined, agent);
+            await recoverAgentDialogInputChannel(agent, {
+                reason: 'input_channel_missing',
+                ...(traceId ? { traceId } : {}),
+            });
         }
     }
 

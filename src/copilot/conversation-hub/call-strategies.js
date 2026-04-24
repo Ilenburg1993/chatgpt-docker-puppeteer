@@ -24,7 +24,7 @@ import { log } from '#copilot/observability';
  * @typedef {Object} CallStrategyContext
  * @property {string} hubSessionId
  * @property {number} turnNumber
- * @property {number} timeoutMs
+ * @property {number | null} timeoutMs - Timeout por inatividade em ms. `null` desabilita o inactivity guard.
  * @property {(event: string, data: object) => boolean} emit - EventEmitter.emit
  */
 
@@ -55,7 +55,11 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     };
     agent.on?.('task.delta', onDelta);
     try {
-        const reply = await sendAgentDialogTurn(dialogAgent, content, { timeout: ctx.timeoutMs });
+        const reply = await sendAgentDialogTurn(
+            dialogAgent,
+            content,
+            ctx.timeoutMs !== null ? { timeout: ctx.timeoutMs } : undefined,
+        );
         if (reply === null) {
             throw new SessionError('[HubOrchestrator] sendDialogTurn retornou null', 'ORCH_DIALOG_NULL_REPLY');
         }
@@ -86,7 +90,7 @@ export async function callViaStructured(bridge, message, ctx) {
                     turnNumber: ctx.turnNumber + 1,
                 });
             },
-            timeoutMs: ctx.timeoutMs,
+            ...(ctx.timeoutMs !== null ? { timeoutMs: ctx.timeoutMs } : {}),
         },
     );
     return {
@@ -118,7 +122,7 @@ export async function callViaSimpleChat(bridge, messageContent, ctx) {
                 turnNumber: ctx.turnNumber + 1,
             });
         },
-        timeoutMs: ctx.timeoutMs,
+        ...(ctx.timeoutMs !== null ? { timeoutMs: ctx.timeoutMs } : {}),
     });
     return result.response;
 }

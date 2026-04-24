@@ -33,6 +33,7 @@ describe('event-name-map › EMITTER_TO_BUS_TYPE (FAIXA-L14)', () => {
         const expected = [
             'dialog.turn_start',
             'dialog.turn_end',
+            'dialog.recovery',
             'dialog.ready',
             'task.started',
             'task.completed',

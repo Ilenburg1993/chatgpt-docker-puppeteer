@@ -11,7 +11,8 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { toError } from '#copilot/core';
+import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
+import { runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
@@ -45,7 +46,6 @@ import {
     cmdModel as _cmdModel,
     cmdPlan as _cmdPlan,
     cmdReasoning as _cmdReasoning,
-    cmdRecall as _cmdRecall,
     cmdRemember as _cmdRemember,
     cmdResume as _cmdResume,
     cmdSearch as _cmdSearch,
@@ -67,7 +67,6 @@ import {
     readTerminalHandoffHistory,
     readTerminalRuntimeControlState,
     resumeTerminalDialogLoop,
-    stopTerminalAgentRuntime,
     stopTerminalDialogMode,
 } from './frontend/llm-b-runtime.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
@@ -94,6 +93,8 @@ const BANNER = `
   \x1b[90mGET :${INJECT_PORT}/gh/issues  ·  GET :${INJECT_PORT}/gh/prs  ·  GET :${INJECT_PORT}/gh/ci  ·  GET :${INJECT_PORT}/git/status  ·  GET :${INJECT_PORT}/git/log\x1b[0m
   \x1b[90mGET :${INJECT_PORT}/config  ·  GET :${INJECT_PORT}/health  |  @caminho/arquivo → embed automático\x1b[0m
 `;
+
+const RESTART_WAIT_TIMEOUT_MS = Math.max(15_000, Math.min(120_000, Math.round(LLM_B_BOOT_TIMEOUT_MS * 0.5)));
 
 /**
  * @typedef {{ hubSessionId: string | null; injectPort: number }} CmdCtx
@@ -130,7 +131,6 @@ const CMD_ROUTES = [
     ],
     [['db-sessions'], (ctx, arg) => _cmdDbSessions({ hubSessionId: ctx.hubSessionId, println }, Number(arg) || 10)],
     [['remember'], (ctx, arg) => _cmdRemember({ hubSessionId: ctx.hubSessionId, println }, arg)],
-    [['recall'], (ctx, arg) => _cmdRecall({ hubSessionId: ctx.hubSessionId, println }, arg)],
     [['forget'], (ctx, arg) => _cmdForget({ hubSessionId: ctx.hubSessionId, println }, arg)],
     [['who'], (ctx) => _cmdWho({ injectPort: ctx.injectPort, println })],
     [['clear'], () => _cmdClear({ println })],
@@ -250,7 +250,10 @@ async function _cmdRestart() {
             resolveReady = resolve;
             rejectReady = reject;
         });
-        const timeout = setTimeout(() => rejectReady(new Error('Timeout aguardando restart')), 30_000);
+        const timeout = setTimeout(
+            () => rejectReady(new Error(`Timeout aguardando restart (${RESTART_WAIT_TIMEOUT_MS}ms)`)),
+            RESTART_WAIT_TIMEOUT_MS,
+        );
         /** @type {() => void} */
         const onReady = () => {
             clearTimeout(timeout);
@@ -314,16 +317,17 @@ function _cmdHandoff() {
  * @param {() => void} cleanup
  */
 async function _cmdQuit(rl, injectServer, cleanup) {
+    void injectServer;
     println('[terminal] Encerrando sessão…');
     cleanup();
     try {
-        await stopTerminalAgentRuntime();
+        await runShutdown('terminal.quit');
     } catch (e) {
         logSwallowed(e, 'terminal.repl.stopLoop');
     }
     rl.close();
-    injectServer.close();
     setRl(null);
+    setImmediate(() => process.exit(0));
 }
 
 export { setupAgentListeners } from './repl-listeners.js';

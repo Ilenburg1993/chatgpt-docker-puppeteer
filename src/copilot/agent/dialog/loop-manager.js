@@ -11,7 +11,7 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { getCopilotFallbackModel } from '#copilot/config';
+import { getCopilotFallbackModel, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { SessionError } from '#copilot/core';
 import {
     EMITTER_LOOP_CHANGED,
@@ -46,6 +46,10 @@ import { selectDialogResumeStrategy } from './resume-policy.js';
 import { DialogLoopStateMachine } from './state-machine.js';
 import { executeTurnImpl } from './turn-executor.js';
 import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
+
+const BOOT_FAILURE_CIRCUIT_WINDOW_MS = 120_000;
+const BOOT_FAILURE_CIRCUIT_COOLDOWN_MS = 60_000;
+const BOOT_FAILURE_CIRCUIT_MAX_FAILURES = 3;
 
 /**
  * @typedef {Object} DialogLoopManagerOptions
@@ -104,6 +108,12 @@ export class DialogLoopManager extends EventEmitter {
 
     /** @type {DialogCostLedger} F5: ledger de PR consumido por boot/resume */
     #costLedger;
+
+    /** @type {number[]} */
+    #bootFailureTimestamps = [];
+
+    /** @type {number} */
+    #bootCircuitOpenUntil = 0;
 
     /**
      * @param {DialogLoopManagerOptions} [options]
@@ -233,6 +243,7 @@ export class DialogLoopManager extends EventEmitter {
                 'NOT_ATTACHED',
             );
         }
+        this.#assertBootCircuitClosed();
 
         // F42.6: permitir start() durante resume (Estratégia B) mas bloquear duplicatas externas
         if (this.#state.active) {
@@ -279,14 +290,20 @@ export class DialogLoopManager extends EventEmitter {
                 : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
                       host.sendMessage(msg, { ...opts, timeoutMs: LONG_TASK_TIMEOUT_MS });
 
-        Promise.resolve(bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS })).catch((/** @type {Error} */ e) => {
-            if (this.#state.active) {
-                log('WARN', `[DialogLoopManager] Dialog loop encerrado: ${e.message}`);
-                this.#state.deactivate();
-                this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
-                this.emit('stopped', { reason: e.message });
-            }
-        });
+        let bootFailureHandled = false;
+        /** @type {Error | null} */
+        let bootSendError = null;
+        const bootSendFailure = Promise.resolve(bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS })).then(
+            () => new Promise(() => {}),
+            (/** @type {Error} */ e) => {
+                if (this.#state.active) {
+                    bootFailureHandled = true;
+                    bootSendError = e;
+                    this.#markBootFailed(e);
+                }
+                throw e;
+            },
+        );
 
         // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
         bootPromise.catch((e) => {
@@ -300,8 +317,11 @@ export class DialogLoopManager extends EventEmitter {
         });
 
         try {
-            await bootPromise;
+            await Promise.race([bootPromise, bootSendFailure]);
         } catch (bootErr) {
+            if (bootFailureHandled) {
+                throw bootSendError ?? bootErr;
+            }
             if (isBootTimeoutError(bootErr) && (await this.#waitForLateBootReady())) {
                 log(
                     'WARN',
@@ -312,6 +332,7 @@ export class DialogLoopManager extends EventEmitter {
             }
         }
         // F41B.8: contabilizar boot como 1 PR consumido
+        this.#recordBootSuccess();
         this.#costLedger.recordBoot();
         // F42.4: persistir prMetrics após boot bem-sucedido
         void this.#persistPrMetrics('dialog.prMetrics.boot', 'Persist dialog loop PR metrics after boot');
@@ -322,10 +343,11 @@ export class DialogLoopManager extends EventEmitter {
      * Envia um turno de diálogo. Chamadas concorrentes são serializadas via mutex.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
+     * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts] `timeout: null` desabilita o
+     *   inactivity guard — use somente quando o watchdog de loop for o guardião de stall.
      * @returns {Promise<string>}
      */
-    sendTurn(message, { timeout = 60_000, signal, traceId } = {}) {
+    sendTurn(message, { timeout = LLM_B_TURN_TIMEOUT_MS, signal, traceId } = {}) {
         if (!this.#state.canSendTurn) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
@@ -339,7 +361,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#watchdogSupervisor.ping();
         log(
             'INFO',
-            `[DialogLoopManager] sendTurn enqueued (trace=${traceId ?? 'none'}, timeout=${timeout}ms, queueDepth=${this.#turnQueue.depth})`,
+            `[DialogLoopManager] sendTurn enqueued (trace=${traceId ?? 'none'}, timeout=${timeout === null ? 'none(watchdog-only)' : `${timeout}ms`}, queueDepth=${this.#turnQueue.depth})`,
         );
 
         return this.#turnQueue.enqueue(() =>
@@ -359,7 +381,7 @@ export class DialogLoopManager extends EventEmitter {
      *
      * @param {{
      *     authorized?: boolean;
-     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
      *     shutdownTimeoutMs?: number;
      * }} [opts]
      * @returns {Promise<void>}
@@ -507,6 +529,14 @@ export class DialogLoopManager extends EventEmitter {
             this.#recoverFromLateProtocol(kind);
         }
 
+        if (this.#state.stopping && kind !== 'stopped') {
+            log(
+                'DEBUG',
+                `[DialogLoopManager] Ignorando protocolo ${kind.toUpperCase()} recebido enquanto o loop está parando.`,
+            );
+            return;
+        }
+
         if (kind === 'ready') {
             this.#watchdogSupervisor.ping();
             this.emit(EMITTER_LOOP_READY, {});
@@ -577,9 +607,10 @@ export class DialogLoopManager extends EventEmitter {
 
     /**
      * @param {unknown} bootErr
-     * @throws {unknown}
+     * @returns {void}
      */
-    #failBoot(bootErr) {
+    #markBootFailed(bootErr) {
+        this.#recordBootFailure();
         const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
         this.#state.deactivate();
         this.#watchdogSupervisor.clear();
@@ -593,6 +624,56 @@ export class DialogLoopManager extends EventEmitter {
                 description: 'Persist dialogLoopActive=false after boot failure',
             },
         );
+    }
+
+    /**
+     * @returns {void}
+     */
+    #assertBootCircuitClosed() {
+        const now = Date.now();
+        if (this.#bootCircuitOpenUntil > now) {
+            const waitMs = this.#bootCircuitOpenUntil - now;
+            throw new SessionError(
+                `[DialogLoopManager] Circuit breaker de boot aberto por ${waitMs}ms após ${BOOT_FAILURE_CIRCUIT_MAX_FAILURES} falhas recentes.`,
+                'DIALOG_BOOT_CIRCUIT_OPEN',
+            );
+        }
+        if (this.#bootCircuitOpenUntil > 0) {
+            this.#bootCircuitOpenUntil = 0;
+            this.#bootFailureTimestamps = [];
+        }
+    }
+
+    /**
+     * @returns {void}
+     */
+    #recordBootFailure() {
+        const now = Date.now();
+        const windowStart = now - BOOT_FAILURE_CIRCUIT_WINDOW_MS;
+        this.#bootFailureTimestamps = [...this.#bootFailureTimestamps.filter((ts) => ts >= windowStart), now];
+        if (this.#bootFailureTimestamps.length >= BOOT_FAILURE_CIRCUIT_MAX_FAILURES) {
+            this.#bootCircuitOpenUntil = now + BOOT_FAILURE_CIRCUIT_COOLDOWN_MS;
+            log(
+                'WARN',
+                `[DialogLoopManager] Circuit breaker de boot aberto por ${BOOT_FAILURE_CIRCUIT_COOLDOWN_MS}ms após ${this.#bootFailureTimestamps.length} falhas.`,
+            );
+        }
+    }
+
+    /**
+     * @returns {void}
+     */
+    #recordBootSuccess() {
+        this.#bootFailureTimestamps = [];
+        this.#bootCircuitOpenUntil = 0;
+    }
+
+    /**
+     * @param {unknown} bootErr
+     * @throws {unknown}
+     */
+    #failBoot(bootErr) {
+        this.#markBootFailed(bootErr);
         throw bootErr;
     }
 
@@ -657,7 +738,7 @@ export class DialogLoopManager extends EventEmitter {
      * Executa um turno serializado.
      *
      * @param {string} message
-     * @param {{ timeout: number; signal?: AbortSignal; traceId?: string }} opts
+     * @param {{ timeout: number | null; signal?: AbortSignal; traceId?: string }} opts
      * @returns {Promise<string>}
      */
     #executeTurn(message, { timeout, signal, traceId }) {

@@ -11,7 +11,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { LLM_B_BOOT_TIMEOUT_MS, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, toError } from '#copilot/core';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
@@ -30,6 +30,15 @@ const DEFAULT_PORT = (() => {
 
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
+const DEFAULT_BOOT_WAIT_MS = LLM_B_BOOT_TIMEOUT_MS;
+const MAX_TURN_TIMEOUT_MS = 15 * 60_000;
+const MIN_TURN_TIMEOUT_MS = 10_000;
+const MAX_TRANSPORT_TIMEOUT_MS = 30 * 60_000;
+const MIN_TRANSPORT_TIMEOUT_MS = 15_000;
+const INJECT_LATENCY_HISTORY_SIZE = 120;
+
+/** @type {number[]} */
+const _injectLatencyHistory = [];
 
 /**
  * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC. Default: 30 req/s. Protege
@@ -50,6 +59,144 @@ const _injectTimestamps = [];
  * @type {number}
  */
 let _injectWindowStartIndex = 0;
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+function _clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * @param {number} value
+ * @returns {number}
+ */
+function _roundToSecond(value) {
+    return Math.ceil(value / 1000) * 1000;
+}
+
+/**
+ * @param {number} durationMs
+ * @returns {void}
+ */
+function _recordInjectLatency(durationMs) {
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+    _injectLatencyHistory.push(durationMs);
+    if (_injectLatencyHistory.length > INJECT_LATENCY_HISTORY_SIZE) {
+        _injectLatencyHistory.splice(0, _injectLatencyHistory.length - INJECT_LATENCY_HISTORY_SIZE);
+    }
+}
+
+/**
+ * @returns {number}
+ */
+function _estimateInjectP95() {
+    if (_injectLatencyHistory.length === 0) return 0;
+    const sorted = [..._injectLatencyHistory].sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+    return sorted[idx] ?? 0;
+}
+
+/**
+ * @param {number | undefined} explicitTimeoutMs
+ * @param {string} message
+ * @returns {{ timeoutMs: number; strategy: 'explicit' | 'adaptive'; reasons: string[] }}
+ */
+function _resolveInjectTurnTimeout(explicitTimeoutMs, message) {
+    const explicit =
+        typeof explicitTimeoutMs === 'number' && Number.isFinite(explicitTimeoutMs) && explicitTimeoutMs > 0
+            ? _clamp(explicitTimeoutMs, MIN_TURN_TIMEOUT_MS, MAX_TURN_TIMEOUT_MS)
+            : null;
+    if (explicit !== null) {
+        return { timeoutMs: _roundToSecond(explicit), strategy: 'explicit', reasons: ['caller'] };
+    }
+
+    const reasons = ['baseline'];
+    const p95 = _estimateInjectP95();
+    let computedMs = DEFAULT_TIMEOUT_MS;
+
+    if (p95 > 0) {
+        const latencyMs = Math.round(p95 * 1.3);
+        if (latencyMs > computedMs) {
+            computedMs = latencyMs;
+            reasons.push('recent_latency');
+        }
+    }
+
+    const msgLen = message.length;
+    if (msgLen >= 12_000) {
+        computedMs *= 1.35;
+        reasons.push('payload_xlarge');
+    } else if (msgLen >= 6_000) {
+        computedMs *= 1.2;
+        reasons.push('payload_large');
+    } else if (msgLen >= 2_000) {
+        computedMs *= 1.1;
+        reasons.push('payload_medium');
+    }
+
+    return {
+        timeoutMs: _roundToSecond(_clamp(computedMs, MIN_TURN_TIMEOUT_MS, MAX_TURN_TIMEOUT_MS)),
+        strategy: 'adaptive',
+        reasons,
+    };
+}
+
+/**
+ * @param {number} turnTimeoutMs
+ * @param {number | undefined} explicitTransportTimeoutMs
+ * @param {'inject' | 'pipeline'} phase
+ * @returns {{ timeoutMs: number | null; strategy: 'explicit' | 'adaptive' | 'disabled'; reasons: string[] }}
+ */
+function _resolveTransportTimeout(turnTimeoutMs, explicitTransportTimeoutMs, phase) {
+    if (explicitTransportTimeoutMs === 0) {
+        return { timeoutMs: null, strategy: 'disabled', reasons: ['caller_disabled'] };
+    }
+
+    const explicit =
+        typeof explicitTransportTimeoutMs === 'number' &&
+        Number.isFinite(explicitTransportTimeoutMs) &&
+        explicitTransportTimeoutMs > 0
+            ? _clamp(explicitTransportTimeoutMs, MIN_TRANSPORT_TIMEOUT_MS, MAX_TRANSPORT_TIMEOUT_MS)
+            : null;
+    if (explicit !== null) {
+        return { timeoutMs: _roundToSecond(explicit), strategy: 'explicit', reasons: ['caller'] };
+    }
+
+    // Para operações de longa duração guiadas por progresso semântico do servidor,
+    // o timeout de transporte absoluto gera falsos positivos. Nesses casos, o watchdog
+    // e o timeout semântico do runtime são fontes melhores de verdade.
+    if (phase === 'inject' || phase === 'pipeline') {
+        return {
+            timeoutMs: null,
+            strategy: 'disabled',
+            reasons: ['server_semantic_timeout', `phase:${phase}`],
+        };
+    }
+
+    const reasons = ['baseline', `phase:${phase}`];
+    const p95 = _estimateInjectP95();
+    let computedMs = Math.max(turnTimeoutMs + 20_000, Math.round(turnTimeoutMs * 1.2));
+    if (p95 > 0) {
+        const latencyMs = Math.round(p95 * 1.35 + 15_000);
+        if (latencyMs > computedMs) {
+            computedMs = latencyMs;
+            reasons.push('recent_latency');
+        }
+    }
+    if (phase === 'pipeline') {
+        computedMs *= 1.2;
+        reasons.push('pipeline_overhead');
+    }
+    return {
+        timeoutMs: _roundToSecond(_clamp(computedMs, MIN_TRANSPORT_TIMEOUT_MS, MAX_TRANSPORT_TIMEOUT_MS)),
+        strategy: 'adaptive',
+        reasons,
+    };
+}
 
 /**
  * Verifica se a próxima injeção é permitida pelo rate limiter client-side. Usa sliding window de 1s.
@@ -83,7 +230,8 @@ function _checkClientRateLimit() {
 /**
  * @typedef {Object} InjectOpts
  * @property {string} [from] - ator remetente (default: 'llm-a')
- * @property {number} [timeoutMs] - timeout em ms (default: 130000)
+ * @property {number} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo)
+ * @property {number} [transportTimeoutMs] - timeout de transporte HTTP (padrão adaptativo, maior que `timeoutMs`)
  * @property {number} [port] - porta do terminal (default: porta canônica do boot)
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
@@ -114,7 +262,7 @@ function _checkClientRateLimit() {
  * @param {string} path
  * @param {object | null} body
  * @param {number} port
- * @param {number} timeoutMs
+ * @param {number | null | undefined} timeoutMs
  * @returns {Promise<{ statusCode: number; body: string }>}
  */
 function httpRequest(method, path, body, port, timeoutMs) {
@@ -152,9 +300,11 @@ function httpRequest(method, path, body, port, timeoutMs) {
             },
         );
 
-        req.setTimeout(timeoutMs, () => {
-            req.destroy(new BridgeError(`Timeout após ${timeoutMs}ms aguardando LLM-B`, 'LLM_B_TIMEOUT'));
-        });
+        if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+            req.setTimeout(timeoutMs, () => {
+                req.destroy(new BridgeError(`Timeout após ${timeoutMs}ms aguardando LLM-B`, 'LLM_B_TIMEOUT'));
+            });
+        }
 
         req.on('error', reject);
 
@@ -249,16 +399,19 @@ export async function injectToLlmB(message, opts = {}) {
  */
 async function _doInjectToLlmB(message, opts) {
     const port = opts.port ?? DEFAULT_PORT;
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutDecision = _resolveInjectTurnTimeout(opts.timeoutMs, message);
+    const timeoutMs = timeoutDecision.timeoutMs;
+    const transportDecision = _resolveTransportTimeout(timeoutMs, opts.transportTimeoutMs, 'inject');
+    const transportTimeoutMs = transportDecision.timeoutMs;
     const from = opts.from ?? 'llm-a';
     const attachments = opts.attachments;
     const _startMs = Date.now();
 
-    const payload = { message, from, ...(attachments !== undefined ? { attachments } : {}) };
+    const payload = { message, from, timeout: timeoutMs, ...(attachments !== undefined ? { attachments } : {}) };
     let statusCode;
     let body;
     try {
-        ({ statusCode, body } = await httpRequest('POST', '/inject', payload, port, timeoutMs));
+        ({ statusCode, body } = await httpRequest('POST', '/inject', payload, port, transportTimeoutMs));
     } catch (e) {
         // F11.3: registrar erro de transporte no tool-stats
         recordToolCall('channel.inject', Date.now() - _startMs, false);
@@ -299,12 +452,20 @@ async function _doInjectToLlmB(message, opts) {
     }
 
     // F11.3: registrar latência por chamada bem-sucedida
-    recordToolCall('channel.inject', Date.now() - _startMs);
+    const durationMs = Date.now() - _startMs;
+    _recordInjectLatency(durationMs);
+    recordToolCall('channel.inject', durationMs);
+
+    log(
+        'INFO',
+        `[inject-llmb] timeout(turn=${timeoutMs}ms/${timeoutDecision.strategy}, transport=${transportTimeoutMs ?? 'disabled'}/${transportDecision.strategy})` +
+            ` reasons(turn=${timeoutDecision.reasons.join('+')}; transport=${transportDecision.reasons.join('+')})`,
+    );
 
     return {
         ok: true,
         reply: /** @type {string} */ (parsed['reply'] ?? ''),
-        durationMs: /** @type {number} */ (parsed['durationMs'] ?? 0),
+        durationMs: /** @type {number} */ (parsed['durationMs'] ?? durationMs),
         from: /** @type {string} */ (parsed['from'] ?? from),
     };
 }
@@ -316,7 +477,7 @@ async function _doInjectToLlmB(message, opts) {
  * @throws {BridgeError} Se o terminal não ficar pronto dentro do tempo máximo
  */
 export async function waitForLlmBReady(opts = {}) {
-    const maxWaitMs = opts.maxWaitMs ?? 30_000;
+    const maxWaitMs = opts.maxWaitMs ?? Math.max(30_000, Math.min(DEFAULT_BOOT_WAIT_MS, 120_000));
     const pollIntervalMs = opts.pollIntervalMs ?? 2_000;
     const port = opts.port ?? DEFAULT_PORT;
     const deadline = Date.now() + maxWaitMs;
@@ -400,7 +561,14 @@ export function subscribeLlmBCritical(onEvent, opts = {}) {
  */
 export async function injectPipeline(steps, opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS * steps.length;
+    const stepCount = Math.max(1, steps.length);
+    const estimatedTurnMs = _clamp(
+        DEFAULT_TIMEOUT_MS * Math.min(stepCount, 6),
+        MIN_TURN_TIMEOUT_MS,
+        MAX_TURN_TIMEOUT_MS,
+    );
+    const transportDecision = _resolveTransportTimeout(estimatedTurnMs, opts.timeoutMs, 'pipeline');
+    const timeoutMs = transportDecision.timeoutMs;
     const from = opts.from ?? 'llm-a';
 
     const { statusCode, body } = await httpRequest('POST', '/pipeline', { steps, from }, port, timeoutMs);

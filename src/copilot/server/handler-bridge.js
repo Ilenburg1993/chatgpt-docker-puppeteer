@@ -15,6 +15,7 @@
 import { log } from '#copilot/observability';
 import { resolveRequestedRuntimeId } from '../presentation/runtime-request.js';
 import { normalizeRuntimeId } from '../presentation/runtime-targeting.js';
+import { sanitizeHttpErrorMessage } from './middleware/error-handler.js';
 
 /**
  * @typedef {{ status: number; body: unknown; cors?: boolean; contentType?: string }} HandlerResult
@@ -65,11 +66,24 @@ function resolveHandlerParams(req, paramsExtractor) {
  * @returns {void}
  */
 function sendHandlerResult(res, result) {
+    const body =
+        result.status >= 500 &&
+        result.body &&
+        typeof result.body === 'object' &&
+        typeof /** @type {Record<string, unknown>} */ (result.body)['error'] === 'string'
+            ? {
+                  .../** @type {Record<string, unknown>} */ (result.body),
+                  error: sanitizeHttpErrorMessage(
+                      /** @type {string} */ (/** @type {Record<string, unknown>} */ (result.body)['error']),
+                      result.status,
+                  ),
+              }
+            : result.body;
     if (result.contentType) {
-        res.status(result.status).type(result.contentType).send(result.body);
+        res.status(result.status).type(result.contentType).send(body);
         return;
     }
-    res.status(result.status).json(result.body);
+    res.status(result.status).json(body);
 }
 
 /**

@@ -21,6 +21,7 @@ import { METRICS_STORE } from './ports/observability-port.js';
 import { MAX_LISTENERS } from '../config/agent.js';
 import {
     ensureDialogLoopAttached as dialogEnsureAttached,
+    dialogRecoverInputChannel,
     dialogResume,
     dialogStart,
     dialogStop,
@@ -432,7 +433,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Para o agente graciosamente.
      *
-     * @param {{ shutdownTimeoutMs?: number }} [opts]
+     * @param {{ shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }} [opts]
      * @returns {Promise<void>}
      */
     async stop(opts) {
@@ -776,13 +777,23 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @param {{
      *     authorized?: boolean;
-     *     reason?: 'watchdog_restart' | 'authorized_stop';
+     *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
      *     shutdownTimeoutMs?: number;
      * }} [opts]
      * @returns {Promise<void>}
      */
     async stopDialogLoop(opts) {
         await dialogStop(this.ctx, this, opts);
+    }
+
+    /**
+     * Recupera o canal de input do dialog loop por operação semântica do Agent.
+     *
+     * @param {{ reason?: string; traceId?: string }} [opts]
+     * @returns {Promise<import('./dialog/agent-dialog-controller.js').DialogInputRecoveryResult>}
+     */
+    async recoverDialogInputChannel(opts) {
+        return dialogRecoverInputChannel(this.ctx, this, opts);
     }
 
     /**

@@ -59,6 +59,60 @@ export function getDisabledTools() {
     return [..._disabledTools];
 }
 
+// ─── H2-FIX: Dynamic Category Derivation ─────────────────────────────────────
+
+/**
+ * Mapa de categorias derivado dinamicamente do array de tools registradas. Inicialmente vazio; preenchido por
+ * _deriveCategoriesFromTools() quando registerForIntrospection() é chamado.
+ *
+ * Formato: { category: [tool_names] }
+ *
+ * @type {Record<string, string[]>}
+ */
+let _CATEGORY_TOOL_MAP_DYNAMIC = {};
+
+/**
+ * Registro auxiliar: tool name → category. Preenchido durante registerTools() em bootstrap.js.
+ * Necessário porque o SDK Tool type não armazena metadados de categoria.
+ *
+ * @type {Map<string, string>}
+ */
+export const _toolNameToCategoryMap = new Map();
+
+/**
+ * Registra a associação entre uma tool e sua categoria. Chamado durante bootstrap.js registerTools().
+ *
+ * @param {string} toolName
+ * @param {string} category
+ * @returns {void}
+ */
+export function recordToolCategory(toolName, category) {
+    _toolNameToCategoryMap.set(toolName.toLowerCase(), category);
+}
+
+/**
+ * Deriva as categorias das tools a partir do array _registeredTools e constrói _CATEGORY_TOOL_MAP_DYNAMIC.
+ * Esta função substitui a necessidade de CATEGORY_TOOL_MAP hardcoded (TODO RF-026).
+ *
+ * @returns {void}
+ */
+function _deriveCategoriesFromTools() {
+    _CATEGORY_TOOL_MAP_DYNAMIC = {};
+    
+    for (const tool of _registeredTools) {
+        // Procura a categoria no registro auxiliar _toolNameToCategoryMap (preenchido durante bootstrap)
+        const category = _toolNameToCategoryMap.get(tool.name.toLowerCase()) ?? 'unknown';
+        
+        if (!_CATEGORY_TOOL_MAP_DYNAMIC[category]) {
+            _CATEGORY_TOOL_MAP_DYNAMIC[category] = [];
+        }
+        
+        _CATEGORY_TOOL_MAP_DYNAMIC[category].push(tool.name);
+    }
+    
+    log('DEBUG', `[introspection] Categories derivadas dinamicamente: ${Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).join(', ')}`);
+}
+
 /**
  * Informa ao módulo quais ferramentas estão registradas na sessão atual. Deve ser chamado pelo AlwaysAliveAgent após
  * montar o array de tools.
@@ -67,7 +121,22 @@ export function getDisabledTools() {
  * @returns {void}
  */
 export function registerForIntrospection(tools) {
+    // M1-FIX: Validação de tipo + schema antes de atribuir
+    if (!Array.isArray(tools)) {
+        log('ERROR', `[introspection] registerForIntrospection recebeu tipo inválido: ${typeof tools}. Esperado: Tool[].`);
+        _registeredTools = [];
+        return;
+    }
+    
+    if (tools.length === 0) {
+        log('WARN', '[introspection] registerForIntrospection chamado com array vazio.');
+    }
+    
     _registeredTools = tools;
+    
+    // H2-FIX: Derivar categorias dinamicamente do array de tools e construir CATEGORY_TOOL_MAP_DYNAMIC
+    _deriveCategoriesFromTools();
+    
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
 }
 // TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.
@@ -239,16 +308,18 @@ const getTelemetryTool = createTool({
 });
 
 /**
- * Tool: report_intent — registra em log a intenção da LLM antes de executar uma ação sensível. Análogo ao
- * `report_intent` built-in do GitHub Copilot CLI. Garante auditabilidade e rastreabilidade.
+ * Tool: legacy_report_intent — compat legado para logging local de intenção.
+ *
+ * A built-in do CLI (`report_intent`) deve prevalecer quando disponível. Este fallback é mantido apenas por
+ * retrocompatibilidade em runtimes sem a built-in.
  */
 const reportIntentTool = createTool({
-    name: 'report_intent',
+    name: 'legacy_report_intent',
     description:
+        '[DEPRECATED] Compat legado para intent logging local. Prefira a built-in do CLI: "report_intent". ' +
         'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
         'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
         'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
-    overridesBuiltInTool: true,
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
@@ -276,7 +347,13 @@ const reportIntentTool = createTool({
  * bloqueadas pelo tool-interceptor e não aparecem em list_tools. Tools de introspecção (list_tools, get_agent_info,
  * toggle_tool) não podem ser desabilitadas.
  */
-const PROTECTED_TOOLS = new Set(['list_tools', 'get_agent_info', 'get_telemetry', 'report_intent', 'toggle_tool']);
+const PROTECTED_TOOLS = new Set([
+    'list_tools',
+    'get_agent_info',
+    'get_telemetry',
+    'legacy_report_intent',
+    'toggle_tool',
+]);
 
 const toggleToolTool = createTool({
     name: 'toggle_tool',

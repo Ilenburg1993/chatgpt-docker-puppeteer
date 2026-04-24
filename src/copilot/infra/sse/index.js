@@ -11,6 +11,7 @@
 export { EventFanout, eventFanout } from './fanout.js';
 export { SseReplayBuffer } from './replay-buffer.js';
 export { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
+export { SseClientPool } from './stream-hub.js';
 export {
     SseConnectionTracker,
     createEventFilter,

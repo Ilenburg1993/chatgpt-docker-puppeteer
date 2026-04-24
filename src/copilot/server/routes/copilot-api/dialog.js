@@ -11,8 +11,10 @@
  * @module copilot/server/routes/copilot-api/dialog
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import {
     sendRuntimeDialogTurnOnActiveLoop,
     startRuntimeDialogLoop,
@@ -83,8 +85,8 @@ export function registerDialogRoutes(bridge, binding) {
      *
      * Body: { message: string, timeout?: number } Returns: { ok: true, reply: string }
      *
-     * A LLM-B está suspensa em ask_user aguardando input; esta rota fornece o input, aguarda a resposta REPLY: e a
-     * retorna.
+     * `timeout=0` desabilita o timeout explícito da borda HTTP; o runtime interno continua responsável por detectar
+     * inatividade/stall. Quando omitido, o timeout é adaptativo.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const { agent } = resolveCopilotApiRouteBinding(binding, req);
@@ -96,24 +98,53 @@ export function registerDialogRoutes(bridge, binding) {
             });
         }
 
-        const MIN_DIALOG_TIMEOUT_MS = 1_000;
         const MAX_DIALOG_TIMEOUT_MS = 300_000;
-        const { message, timeout = 60_000 } = req.body ?? {};
+        const { message, timeout: rawTimeout } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
             return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
         }
-        if (typeof timeout !== 'number' || timeout < MIN_DIALOG_TIMEOUT_MS || timeout > MAX_DIALOG_TIMEOUT_MS) {
+        if (
+            rawTimeout !== undefined &&
+            (typeof rawTimeout !== 'number' ||
+                !Number.isFinite(rawTimeout) ||
+                rawTimeout < 0 ||
+                rawTimeout > MAX_DIALOG_TIMEOUT_MS)
+        ) {
             return res.status(400).json({
                 ok: false,
-                error: `"timeout" deve ser número entre ${MIN_DIALOG_TIMEOUT_MS} e ${MAX_DIALOG_TIMEOUT_MS}.`,
+                error: `"timeout" deve ser número finito entre 0 e ${MAX_DIALOG_TIMEOUT_MS}.`,
             });
         }
 
+        const timeoutDecision = resolveOptionalDialogTimeout({
+            explicitTimeoutMs: rawTimeout,
+            defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+            payloadChars: message.length,
+            phase: 'dialog',
+            allowDisabled: true,
+        });
+
         _turnInFlight = true;
         try {
-            const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
-            return res.json({ ok: true, reply });
+            const reply = await sendRuntimeDialogTurnOnActiveLoop(
+                message,
+                timeoutDecision.timeoutMs !== null ? { timeout: timeoutDecision.timeoutMs } : {},
+                agent,
+            );
+            log(
+                'INFO',
+                `[copilot-api/dialog/turn] timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')}`,
+            );
+            return res.json({
+                ok: true,
+                reply,
+                timeoutPolicy: {
+                    timeoutMs: timeoutDecision.timeoutMs,
+                    strategy: timeoutDecision.strategy,
+                    reasons: timeoutDecision.reasons,
+                },
+            });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             const projection = projectAgentHttpError(err, { timeoutStatus: 504 });

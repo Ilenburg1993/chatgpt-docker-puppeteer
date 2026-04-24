@@ -32,6 +32,26 @@ describe('pending-question-shadow helpers', () => {
         assert.equal(getPendingQuestionShadowExpiresAt(shadow), 61_000);
     });
 
+    it('normaliza askedAt/expiresAt inválidos restaurados de estado antigo', () => {
+        const shadow = createPendingQuestionShadow(
+            'READY: aguardando próxima mensagem',
+            {
+                kind: 'ready',
+                askedAt: 0,
+                allowFreeform: true,
+                protocolControlled: true,
+            },
+            { now: 5_000, ttlMs: 60_000 },
+        );
+
+        assert.equal(shadow.meta.askedAt, 5_000);
+        assert.equal(shadow.expiresAt, 65_000);
+        assert.equal(
+            getPendingQuestionShadowExpiresAt({ ...shadow, expiresAt: 0 }),
+            5_000 + getPendingQuestionShadowTtlMs('ready'),
+        );
+    });
+
     it('calcula idade e expiração corretamente', () => {
         const shadow = createPendingQuestionShadow(
             'READY: aguardando próxima mensagem',

@@ -56,6 +56,8 @@ export function clearToolsMetrics() {
 /**
  * Retorna summary de métricas da sessão. Retorna objeto vazio se não injetado.
  *
+ * M3-FIXED: Validação de fallback — se métricas não injetadas, retorna {} em vez de falhar.
+ *
  * @returns {MetricsSummary}
  */
 export function getSummary() {
@@ -65,6 +67,8 @@ export function getSummary() {
 /**
  * Retorna stats por tool. Retorna objeto vazio se não injetado.
  *
+ * M3-FIXED: Fallback seguro se _impl for null.
+ *
  * @returns {Record<string, ToolStatsEntry>}
  */
 export function getToolStats() {
@@ -73,6 +77,8 @@ export function getToolStats() {
 
 /**
  * Registra chamada de tool. No-op se não injetado.
+ *
+ * M3-FIXED: Se não injetado, a chamada é ignorada silenciosamente (não falha).
  *
  * @param {string} name
  * @param {number} durationMs

@@ -16,6 +16,8 @@ import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
 import { conversationStore } from './conversation-hub/store.js';
 import { container, wireLegacySetters } from './core/di-container.js';
+import { registerShutdownHandler } from './core/shutdown.js';
+import { log } from './observability/logger.js';
 
 /** @type {boolean} */
 let _runtimeDiWired = false;
@@ -55,6 +57,18 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
         BRIDGE_AGENT,
         NERV_BRIDGE_AGENT,
     ]);
+
+    registerShutdownHandler(
+        'copilot.agent.stop',
+        async () => {
+            const agent = getAgent();
+            if (agent.status === 'stopped') return;
+            await agent.stop({ preserveDialogLoopIntent: true });
+            log('INFO', '[runtime-wiring] AlwaysAliveAgent parado com intenção de dialog loop preservada.');
+        },
+        10,
+        { timeoutMs: 30_000 },
+    );
 
     _runtimeDiWired = true;
 }

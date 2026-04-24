@@ -1,0 +1,88 @@
+{
+    "snapshotId": "snap-1777036508078-ca52fe93",
+    "createdAt": 1777036508079,
+    "sessionId": "3ae12b1f-76dc-4a01-8abc-eb74b65ac6e3",
+    "model": "gpt-5-mini",
+    "status": "waiting_for_input",
+    "sendCount": 15,
+    "dialogLoopActive": true,
+    "dialogPaused": false,
+    "pendingQuestion": "READY: aguardando próxima mensagem",
+    "pendingQuestionMeta": {
+        "kind": "ready",
+        "askedAt": 1777036426865,
+        "allowFreeform": true,
+        "protocolControlled": true
+    },
+    "pendingQuestionShadow": null,
+    "stateSnapshot": {
+        "sessionId": "3ae12b1f-76dc-4a01-8abc-eb74b65ac6e3",
+        "startedAt": 1777028298756,
+        "resumedAt": 1777036233508,
+        "resumeCount": 11,
+        "sendCount": 14,
+        "model": "gpt-5-mini",
+        "pendingQuestion": "READY: aguardando próxima mensagem",
+        "pendingQuestionMeta": {
+            "kind": "ready",
+            "askedAt": 1777036426865,
+            "allowFreeform": true,
+            "protocolControlled": true
+        },
+        "gracefulShutdown": false,
+        "dialogLoopActive": true,
+        "dialogPaused": false,
+        "pendingTurnMessage": "Quero que avalie como podemos fazer você ter acesso direto a todo o log deste terminal, ao vivo",
+        "pendingTurnTs": 1777033130651,
+        "pendingTurnConsumedPR": true,
+        "lastPrConsumedAt": 1777036426858,
+        "lastPrModel": "gpt-5-mini",
+        "lastPrCost": 0,
+        "lastQuotaSnapshots": {
+            "chat": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            },
+            "completions": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            },
+            "premium_interactions": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 300,
+                "usedRequests": 142,
+                "usageAllowedWithExhaustedQuota": true,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": true,
+                "remainingPercentage": 52.7,
+                "resetDate": "2026-05-01T00:00:00.000Z"
+            }
+        },
+        "lastAskUserAt": 1777036426865,
+        "prMetrics": {
+            "boots": 1,
+            "resumesWithPR": 0,
+            "resumesZeroPR": 0,
+            "totalPR": 1
+        }
+    },
+    "prMetrics": {
+        "boots": 0,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 0
+    },
+    "reason": "auto-shutdown"
+}

@@ -83,6 +83,7 @@ export {
     readRuntimePrBudgetSnapshot,
     readSdkModelMetadata,
     readSdkModelStats,
+    recoverAgentDialogInputChannel,
     registerAgentRuntimeWebhook,
     resumeRuntimeDialogLoop,
     saveRuntimeSnapshot,

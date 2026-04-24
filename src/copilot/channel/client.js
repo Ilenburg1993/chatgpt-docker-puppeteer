@@ -8,8 +8,16 @@
  * @see module:copilot/channel/inject
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError } from '#copilot/core';
-import { EMITTER_QUESTION_PENDING, EMITTER_TASK_DELTA, EMITTER_TASK_QUEUED } from '#copilot/events';
+import {
+    EMITTER_QUESTION_PENDING,
+    EMITTER_TASK_DELTA,
+    EMITTER_TASK_QUEUED,
+    EMITTER_TASK_REASONING,
+    EMITTER_TASK_STARTED,
+    EMITTER_TOOL_EXECUTION_PROGRESS,
+} from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../core/error-handlers.js';
 import {
@@ -35,7 +43,7 @@ import { chatStructured as _chatStructured } from './client-structured.js';
  * @property {(message: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn
  * @property {(opts?: {
  *     authorized?: boolean;
- *     reason?: 'watchdog_restart' | 'authorized_stop';
+ *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
  *     shutdownTimeoutMs?: number;
  * }) => Promise<void>} stopDialogLoop
  * @property {(answer: string) => boolean} answerPendingQuestion
@@ -72,6 +80,43 @@ function requireAgent() {
         );
     return _agent;
 }
+
+/**
+ * @param {number | null} timeoutMs
+ * @param {() => void} onTimeout Se `timeoutMs` for `null`, nenhum timer é criado e `ping()` é no-op — para turnos sem
+ *   timeout explícito.
+ * @returns {{ ping: () => void; clear: () => void }}
+ */
+function createInactivityGuard(timeoutMs, onTimeout) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let handle = null;
+    let disposed = false;
+
+    const arm = () => {
+        if (timeoutMs === null) return;
+        if (disposed) return;
+        if (handle) clearTimeout(handle);
+        handle = setTimeout(() => {
+            if (disposed) return;
+            disposed = true;
+            handle = null;
+            onTimeout();
+        }, timeoutMs);
+    };
+
+    arm();
+
+    return {
+        ping: () => {
+            arm();
+        },
+        clear: () => {
+            disposed = true;
+            if (handle) clearTimeout(handle);
+            handle = null;
+        },
+    };
+}
 /**
  * Uma entrada no histórico de conversa.
  *
@@ -92,7 +137,8 @@ function requireAgent() {
  * @typedef {Object} ChatOptions
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
- * @property {number} [timeoutMs] - Timeout em ms (default: 60000)
+ * @property {number | null} [timeoutMs] - Timeout em ms. `null` = sem timeout por inatividade (default:
+ *   `LLM_B_TURN_TIMEOUT_MS`). Use `null` somente quando o watchdog for o único guardião de stall.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
@@ -139,7 +185,14 @@ export class LlmBridgeClient {
      * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
      */
     async chat(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = 60_000, attachments, retries = 0, retryDelayMs = 1_500 } = opts;
+        const {
+            onDelta,
+            onQuestion,
+            timeoutMs = LLM_B_TURN_TIMEOUT_MS,
+            attachments,
+            retries = 0,
+            retryDelayMs = 1_500,
+        } = opts;
 
         // F11.4: wrapper de retry — tenta no máximo `retries+1` vezes em erros de timeout ou busy
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -168,13 +221,13 @@ export class LlmBridgeClient {
      * @param {{
      *     onDelta?: ChatOptions['onDelta'];
      *     onQuestion?: ChatOptions['onQuestion'];
-     *     timeoutMs?: number;
+     *     timeoutMs?: number | null;
      *     attachments?: ChatOptions['attachments'];
      * }} opts
      * @returns {Promise<ChatResult>}
      */
     async #chatOnce(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = 60_000, attachments } = opts;
+        const { onDelta, onQuestion, timeoutMs = LLM_B_TURN_TIMEOUT_MS, attachments } = opts;
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
@@ -200,6 +253,7 @@ export class LlmBridgeClient {
         // Listener de streaming para este turno
         const onTaskQueued = (/** @type {{ taskId?: string }} */ evt) => {
             activeTaskId = evt.taskId ?? null;
+            inactivityGuard.ping();
         };
 
         const onDeltaEvt = (/** @type {{ taskId?: string; chunk?: string }} */ evt) => {
@@ -234,19 +288,34 @@ export class LlmBridgeClient {
             requireAgent().once(EMITTER_QUESTION_PENDING, onQuestionEvt);
         }
 
-        /** @type {ReturnType<typeof setTimeout> | undefined} */
-        let timeoutHandle;
+        /** @type {(evt?: unknown) => void} */
+        const onProgress = () => {
+            inactivityGuard.ping();
+        };
+
+        const inactivityGuard = createInactivityGuard(timeoutMs, () => {
+            rejectChat(new Error(`[LlmBridgeClient] Timeout por inatividade após ${timeoutMs ?? 0}ms`));
+        });
+
+        /** @type {(error: Error) => void} */
+        let rejectChat = (error) => {
+            log('WARN', `[LlmBridgeClient] Reject before promise wiring: ${error.message}`);
+        };
 
         try {
             log('INFO', `[LlmBridgeClient] Turno #${this.#turnCount}: enviando mensagem.`);
 
-            /** @type {Promise<string>} */
             const timeoutPromise = new Promise((_, reject) => {
-                timeoutHandle = setTimeout(
-                    () => reject(new Error(`[LlmBridgeClient] Timeout após ${timeoutMs}ms`)),
-                    timeoutMs,
-                );
+                rejectChat = (error) => {
+                    reject(error);
+                };
             });
+
+            requireAgent().on(EMITTER_TASK_STARTED, onProgress);
+            requireAgent().on(EMITTER_TASK_REASONING, onProgress);
+            requireAgent().on(EMITTER_TOOL_EXECUTION_PROGRESS, onProgress);
+            requireAgent().on(EMITTER_TASK_DELTA, onProgress);
+            requireAgent().on(EMITTER_QUESTION_PENDING, onProgress);
 
             const response = await Promise.race([requireAgent().sendMessage(message, { attachments }), timeoutPromise]);
 
@@ -275,9 +344,13 @@ export class LlmBridgeClient {
                 durationMs,
             };
         } finally {
-            if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+            inactivityGuard.clear();
             requireAgent().off('task.queued', onTaskQueued);
             requireAgent().off('task.delta', onDeltaEvt);
+            requireAgent().off(EMITTER_TASK_STARTED, onProgress);
+            requireAgent().off(EMITTER_TASK_REASONING, onProgress);
+            requireAgent().off(EMITTER_TOOL_EXECUTION_PROGRESS, onProgress);
+            requireAgent().off(EMITTER_QUESTION_PENDING, onProgress);
             if (onQuestion) {
                 requireAgent().off('question.pending', onQuestionEvt);
             }
@@ -392,7 +465,8 @@ export class LlmBridgeClient {
     /**
      * Encerra o modo de diálogo direto.
      *
-     * @param {'watchdog_restart' | 'authorized_stop'} [reason='watchdog_restart'] Default is `'watchdog_restart'`
+     * @param {'watchdog_restart' | 'authorized_stop' | 'recovery_restart'} [reason='watchdog_restart'] Default is
+     *   `'watchdog_restart'`
      * @returns {Promise<void>}
      */
     async stopDialogMode(reason = 'watchdog_restart') {

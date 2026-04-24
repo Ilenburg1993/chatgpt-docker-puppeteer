@@ -59,6 +59,7 @@ export const EMITTER_DIALOG_REPLY = 'dialog.reply';
 export const EMITTER_DIALOG_STALLED = 'dialog.stalled';
 export const EMITTER_DIALOG_STOPPED = 'dialog.stopped';
 export const EMITTER_DIALOG_BOOT_RECOVERY = 'dialog.boot_recovery';
+export const EMITTER_DIALOG_RECOVERY = 'dialog.recovery';
 
 // ── Dialog Loop Internal ─────────────────────────────────────
 export const EMITTER_LOOP_CHANGED = 'changed';
@@ -67,6 +68,7 @@ export const EMITTER_LOOP_PRE_STALL_WARNING = 'pre_stall_warning';
 export const EMITTER_LOOP_TURN_TIMEOUT = 'turn_timeout';
 export const EMITTER_LOOP_PAUSED = 'paused';
 export const EMITTER_LOOP_RESUMED = 'resumed';
+export const EMITTER_LOOP_RECOVERY = 'recovery';
 export const EMITTER_LOOP_REPLY = 'reply';
 export const EMITTER_LOOP_READY = 'ready';
 export const EMITTER_LOOP_STOPPED = 'stopped';

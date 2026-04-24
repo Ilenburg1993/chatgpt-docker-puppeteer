@@ -17,4 +17,13 @@ describe('terminal/terminal-agent-wiring.js — contrato', () => {
         const mod = await import('../../../src/copilot/terminal/terminal-agent-wiring.js');
         expect(typeof mod.registerAgentEventListeners).toBe('function');
     });
+
+    it('restringe restart automático a razões operacionais excepcionais', async () => {
+        const mod = await import('../../../src/copilot/terminal/terminal-agent-wiring.js');
+
+        expect(mod.shouldAutoRestartStoppedDialog('watchdog_restart')).toBe(true);
+        expect(mod.shouldAutoRestartStoppedDialog('model_stopped')).toBe(true);
+        expect(mod.shouldAutoRestartStoppedDialog('recovery_restart')).toBe(false);
+        expect(mod.shouldAutoRestartStoppedDialog('unknown')).toBe(false);
+    });
 });

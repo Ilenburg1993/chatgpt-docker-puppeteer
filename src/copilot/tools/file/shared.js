@@ -9,6 +9,7 @@
  */
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
+import { isAscii, isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -28,6 +29,9 @@ export const MAX_SEARCH_OUTPUT = 20_000;
 
 /** Limite máximo de entradas retornadas por list_directory */
 export const MAX_LIST_ENTRIES = 500;
+
+/** Limite máximo de bytes para diffs retornados por diff_files. */
+export const MAX_DIFF_OUTPUT = 64_000;
 
 // MELHORIA-10 (fix): verificação lazy da disponibilidade de ripgrep (cache single-check)
 /** @type {boolean | null} */
@@ -103,8 +107,18 @@ const BLOCKED_PATTERNS = [...BLOCKED_PATTERNS_SECRETS, ...BLOCKED_PATTERNS_WRITE
  * @returns {Promise<{ ok: boolean; reason?: string; resolved: string }>}
  */
 export async function validatePath(filePath, opts) {
+    if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+        return { ok: false, reason: 'Caminho inválido: path vazio.', resolved: '' };
+    }
+    if (filePath.includes('\u0000')) {
+        return { ok: false, reason: 'Caminho inválido: contém byte nulo.', resolved: '' };
+    }
+
     const mode = opts?.mode ?? 'write';
-    const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
+    const normalizedWorkspaceRoot = path.resolve(WORKSPACE_ROOT);
+    const resolved = path.isAbsolute(filePath)
+        ? path.resolve(filePath)
+        : path.resolve(normalizedWorkspaceRoot, filePath);
 
     // SEC-04 / BUG-H06 (fix): resolver symlinks antes de verificar containment.
     // F3.4 (BUG-MOD-08): usar realpath assíncrono para não bloquear o event loop.
@@ -120,10 +134,10 @@ export async function validatePath(filePath, opts) {
         }
     }
 
-    const relativeToWorkspace = path.relative(WORKSPACE_ROOT, realResolved);
+    const relativeToWorkspace = path.relative(normalizedWorkspaceRoot, realResolved);
 
     // Impede traversal fora do workspace
-    if (relativeToWorkspace.startsWith('..')) {
+    if (relativeToWorkspace.startsWith('..') || path.isAbsolute(relativeToWorkspace)) {
         return { ok: false, reason: `Acesso negado: caminho fora do workspace (${realResolved})`, resolved };
     }
 
@@ -137,4 +151,44 @@ export async function validatePath(filePath, opts) {
     }
 
     return { ok: true, resolved };
+}
+
+// ---------------------------------------------------------------------------
+// Utilitários de Buffer (Node.js >= 19.4 — disponíveis em Node 24+)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reexportação de `isUtf8` do `node:buffer` para uso centralizado nas file-tools. Valida eficientemente se um
+ * Buffer/Uint8Array é UTF-8 válido sem conversão. Disponível desde Node.js 19.4.0.
+ *
+ * @type {(input: Buffer | NodeJS.TypedArray | DataView) => boolean}
+ * @see https://nodejs.org/docs/latest/api/buffer.html#bufferisutf8input
+ */
+export { isAscii as bufferIsAscii, isUtf8 as bufferIsUtf8 };
+
+/**
+ * Concatena um array de chunks (Buffers) com otimização: fornece `totalLength` ao `Buffer.concat` para evitar a segunda
+ * passagem interna de cálculo de tamanho.
+ *
+ * @param {Buffer[]} chunks - Array de Buffers a concatenar
+ * @returns {Buffer} Buffer concatenado
+ */
+export function concatChunks(chunks) {
+    if (chunks.length === 0) return Buffer.alloc(0);
+    if (chunks.length === 1) return chunks[0] ?? Buffer.alloc(0);
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    return Buffer.concat(chunks, totalLength);
+}
+
+/**
+ * Trunca um Buffer para `maxBytes` bytes usando `subarray` (zero-copy view). Nota: `.toString('utf8')` sobre um
+ * subarray que termina no meio de uma sequência multibyte emitirá U+FFFD; aceitável para mensagens de truncamento.
+ *
+ * @param {Buffer} buf - Buffer a truncar
+ * @param {number} maxBytes - Tamanho máximo em bytes
+ * @returns {Buffer} Subarray (view) do buffer original
+ */
+export function truncateBuffer(buf, maxBytes) {
+    if (buf.length <= maxBytes) return buf;
+    return buf.subarray(0, maxBytes);
 }

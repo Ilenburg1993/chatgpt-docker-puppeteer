@@ -33,6 +33,7 @@ export const DEFAULT_AGENT_HTTP_STATUS_BY_CODE = Object.freeze({
     AGENT_STOPPED: 503,
     BRIDGE_AGENT_STOPPED: 503,
     DIALOG_ENDED: 409,
+    DIALOG_BOOT_CIRCUIT_OPEN: 503,
     DIALOG_NOT_ACTIVE: 409,
     DIALOG_QUEUE_FULL: 429,
     DIALOG_TIMEOUT: 504,
@@ -78,10 +79,24 @@ export function projectAgentHttpError(error, options = {}) {
         status,
         body: {
             ok: false,
-            error: message,
+            error: sanitizeAgentHttpErrorMessage(message, status),
             ...(code ? { code } : {}),
             disposition,
             retryable: disposition === 'retry',
         },
     };
+}
+
+/**
+ * @param {string} message
+ * @param {number} status
+ * @returns {string}
+ */
+export function sanitizeAgentHttpErrorMessage(message, status) {
+    if (status >= 500 && process.env['NODE_ENV'] === 'production') {
+        return 'Internal server error';
+    }
+    return (String(message).split('\n')[0] ?? 'Internal server error')
+        .replace(/\/workspaces\/[^\s)]+/g, '<workspace>')
+        .replace(/\/home\/[^\s)]+/g, '<home>');
 }

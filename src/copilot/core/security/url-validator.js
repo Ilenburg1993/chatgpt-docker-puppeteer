@@ -61,6 +61,21 @@ const BLOCKED_SCHEMES = new Set(['file:', 'ftp:', 'data:', 'javascript:']);
  */
 export function isPrivateIp(address) {
     if (address === '127.0.0.1' || address === '0.0.0.0') return true;
+    const normalized = address.toLowerCase().replace(/^\[|\]$/g, '');
+    const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(normalized);
+    if (mapped) {
+        const first = Number.parseInt(mapped[1] ?? '0', 16);
+        const a = (first >> 8) & 0xff;
+        const b = first & 0xff;
+        return (
+            a === 0 ||
+            a === 10 ||
+            a === 127 ||
+            (a === 169 && b === 254) ||
+            (a === 172 && b >= 16 && b <= 31) ||
+            (a === 192 && b === 168)
+        );
+    }
     return PRIVATE_IP_PATTERNS.some((re) => re.test(address));
 }
 
@@ -105,6 +120,7 @@ export function validateUrl(url) {
         h.startsWith('fd') ||
         h.startsWith('fc') ||
         h.startsWith('fe80:') ||
+        isPrivateIp(h) ||
         h.startsWith('::ffff:10.') ||
         /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(h) ||
         h.startsWith('::ffff:192.168.') ||
@@ -184,21 +200,17 @@ export async function checkResolvedIp(hostname, opts) {
     const allowPrivate = opts?.allowPrivate ?? WEBHOOK_ALLOW_PRIVATE_HOSTS;
     if (allowPrivate) return;
 
-    let address;
+    /** @type {{ address: string; family: number }[]} */
+    let records = [];
     try {
-        const result = await dns.lookup(hostname, { family: 4 });
-        address = result.address;
+        records = await dns.lookup(hostname, { all: true });
     } catch {
-        try {
-            const result = await dns.lookup(hostname, { family: 6 });
-            address = result.address;
-        } catch {
-            return; // Não conseguiu resolver — deixa o fetch falhar naturalmente
-        }
+        return; // Não conseguiu resolver — deixa o fetch falhar naturalmente
     }
-    if (isPrivateIp(address)) {
+    const privateRecord = records.find((record) => isPrivateIp(record.address));
+    if (privateRecord) {
         throw new ConfigError(
-            `[URLValidator] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${address}.`,
+            `[URLValidator] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${privateRecord.address}.`,
         );
     }
 }

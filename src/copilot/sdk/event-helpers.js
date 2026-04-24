@@ -31,7 +31,9 @@
  * @template T
  * @param {import('node:events').EventEmitter} emitter - EventEmitter fonte do evento
  * @param {string} event - Nome do evento a aguardar
- * @param {{ timeoutMs?: number; timeoutError?: string; signal?: AbortSignal }} [opts]
+ * @param {{ timeoutMs?: number | null; timeoutError?: string; signal?: AbortSignal }} [opts] Passe `timeoutMs: null`
+ *   para aguardar indefinidamente (sem timeout). Útil quando operações LLM longas precisam aguardar eventos sem risco
+ *   de falso-positivo por clock absoluto.
  * @returns {Promise<T>} Primeiro argumento emitido pelo evento
  */
 export function waitForEvent(emitter, event, opts = {}) {
@@ -69,7 +71,9 @@ export function waitForEvent(emitter, event, opts = {}) {
         };
 
         emitter.once(event, onEvent);
-        timer = setTimeout(onTimeout, timeoutMs);
+        if (timeoutMs !== null) {
+            timer = setTimeout(onTimeout, timeoutMs);
+        }
         signal?.addEventListener('abort', onAbort, { once: true });
     });
 }
@@ -92,7 +96,8 @@ export function waitForEvent(emitter, event, opts = {}) {
  *
  * @param {import('node:events').EventEmitter} emitter
  * @param {string[]} events - Nomes dos eventos a monitorar
- * @param {{ timeoutMs?: number; timeoutError?: string; signal?: AbortSignal }} [opts]
+ * @param {{ timeoutMs?: number | null; timeoutError?: string; signal?: AbortSignal }} [opts] Passe `timeoutMs: null`
+ *   para aguardar indefinidamente (sem timeout).
  * @returns {Promise<{ event: string; data: unknown }>}
  */
 export function raceEvents(emitter, events, opts = {}) {
@@ -131,10 +136,12 @@ export function raceEvents(emitter, events, opts = {}) {
             emitter.once(evt, handler);
         }
 
-        timer = setTimeout(() => {
-            cleanup();
-            reject(new Error(timeoutError ?? `raceEvents([${events.join(', ')}]) timeout após ${timeoutMs}ms`));
-        }, timeoutMs);
+        if (timeoutMs !== null) {
+            timer = setTimeout(() => {
+                cleanup();
+                reject(new Error(timeoutError ?? `raceEvents([${events.join(', ')}]) timeout após ${timeoutMs}ms`));
+            }, timeoutMs);
+        }
 
         signal?.addEventListener('abort', onAbort, { once: true });
     });

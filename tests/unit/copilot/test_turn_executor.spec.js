@@ -226,6 +226,33 @@ describe('turn-executor', () => {
             expect(err.code).toBe('DIALOG_TIMEOUT');
         });
 
+        it('timeout é de inatividade e reinicia com progresso observável', async () => {
+            const resolve = vi.fn();
+            const reject = vi.fn();
+
+            buildTurnResolutionListeners(emitter, {
+                host: makeTurnHost(),
+                turnStart: Date.now(),
+                timeout: 3000,
+                message: 'hi',
+                pendingListenerRef: { current: null },
+                resolve,
+                reject,
+                waitForRestartAndReplyFn: vi.fn(),
+            });
+
+            await vi.advanceTimersByTimeAsync(2500);
+            emitter.emit('task.delta', { chunk: 'still working' });
+            await vi.advanceTimersByTimeAsync(2500);
+
+            expect(resolve).not.toHaveBeenCalled();
+            expect(reject).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(600);
+            expect(reject).toHaveBeenCalledTimes(1);
+            expect(reject.mock.calls[0]?.[0]?.code).toBe('DIALOG_TIMEOUT');
+        });
+
         it('onReadyOuter usa fallback semântico antes do timeout quando houver reply candidato', () => {
             const resolve = vi.fn();
             const reject = vi.fn();

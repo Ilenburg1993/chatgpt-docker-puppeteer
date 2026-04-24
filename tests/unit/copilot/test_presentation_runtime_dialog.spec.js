@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => {
         startDialogLoop: vi.fn(async () => {}),
         sendDialogTurn: vi.fn(async (message) => `reply:${message}`),
         stopDialogLoop: vi.fn(async () => {}),
+        recoverDialogInputChannel: vi.fn(async () => ({
+            recovered: true,
+            reason: 'input_channel_missing',
+            strategy: 'restart_with_pr',
+            prConsumed: true,
+            durationMs: 1,
+        })),
     };
     return { agent };
 });
@@ -28,6 +35,7 @@ describe('presentation/runtime-dialog.js', () => {
         mocks.agent.startDialogLoop.mockClear();
         mocks.agent.sendDialogTurn.mockClear();
         mocks.agent.stopDialogLoop.mockClear();
+        mocks.agent.recoverDialogInputChannel.mockClear();
     });
 
     it('inicia o dialog loop quando inativo e não pausado', async () => {
@@ -58,7 +66,7 @@ describe('presentation/runtime-dialog.js', () => {
         expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi');
     });
 
-    it('reinicia uma vez quando o loop está ativo, idle e sem pending READY', async () => {
+    it('pede recovery semântico ao Agent quando o loop está ativo, idle e sem pending READY', async () => {
         mocks.agent.dialogLoopActive = true;
         mocks.agent.status = 'idle';
         mocks.agent.pendingQuestion = null;
@@ -66,8 +74,12 @@ describe('presentation/runtime-dialog.js', () => {
 
         await mod.sendRuntimeDialogTurn('oi', 'llm-a', { traceId: 't1' });
 
-        expect(mocks.agent.stopDialogLoop).toHaveBeenCalledWith({ authorized: true });
-        expect(mocks.agent.startDialogLoop).toHaveBeenCalledTimes(1);
+        expect(mocks.agent.recoverDialogInputChannel).toHaveBeenCalledWith({
+            reason: 'input_channel_missing',
+            traceId: 't1',
+        });
+        expect(mocks.agent.stopDialogLoop).not.toHaveBeenCalled();
+        expect(mocks.agent.startDialogLoop).not.toHaveBeenCalled();
         expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi', { traceId: 't1' });
     });
 

@@ -228,8 +228,8 @@ function createSdkToolFromMcp(mcpTool) {
         name: toolName,
         description: `[MCP] ${mcpTool.description ?? mcpTool.name}`,
         parameters: schema,
-        // GAP-SDK-07 (fix): MCP tools devem override built-ins com o mesmo nome
-        overridesBuiltInTool: true,
+        // CLI built-ins devem prevalecer em colisões de nome. MCP tools são prefixadas com `mcp_` e não devem
+        // sobrescrever built-ins.
         handler: async (/** @type {Record<string, unknown>} */ params) => {
             try {
                 const result = await rpcCall('tools/call', {

@@ -191,6 +191,7 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
         await tick();
         dlm.emit('ready', { ts: Date.now() });
         await startPromise;
+        host.hasPendingQuestion.mockReturnValue(true);
     }
 
     /* ── F67.2: boot completo ── */

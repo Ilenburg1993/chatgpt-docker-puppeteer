@@ -8,14 +8,17 @@
  * @see EventBus
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
+import { SseClientPool } from '../../../infra/sse/stream-hub.js';
 import {
     createEventFilter,
     createSseWriter,
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import {
     LogMessageBodySchema,
@@ -31,6 +34,8 @@ import {
  * @typedef {import('express').Request} Req
  *
  * @typedef {import('express').Response} Res
+ *
+ * @typedef {ReturnType<typeof resolveSdkRouteSharedDeps>} SdkRouteDeps
  */
 
 const router = Router();
@@ -38,12 +43,107 @@ const router = Router();
 // C14-03: limite de SSE streams simultâneos por /sessions/:id/stream
 const _sessionsTracker = new SseConnectionTracker('sessions/stream');
 
-// UPG-SE-004: buffers de replay SSE por sessão
-/** @type {Map<string, SseReplayBuffer>} */
-const _sessionReplayBuffers = new Map();
+/**
+ * @typedef {{
+ *     sessionId: string;
+ *     sessionRef: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'];
+ *     pool: SseClientPool;
+ *     unsubscribe: () => void;
+ * }} SessionStreamState
+ */
+
+/** @type {Map<string, SessionStreamState>} */
+const _sessionStreamStates = new Map();
 
 // C14-04: limite máximo de bytes aceitos em prompt para evitar uso excessivo de tokens
 const MAX_PROMPT_BYTES = 512_000;
+
+/**
+ * @param {SdkRouteDeps} routeDeps
+ * @param {string} id
+ * @param {ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>} entry
+ * @returns {SessionStreamState}
+ */
+function ensureSessionStreamState(routeDeps, id, entry) {
+    if (!entry) {
+        throw new Error(`Sessão \"${id}\" não está ativa para stream SSE.`);
+    }
+    const existing = _sessionStreamStates.get(id);
+    if (existing && existing.sessionRef === entry.session) return existing;
+
+    if (existing) {
+        existing.pool.closeAll();
+        existing.unsubscribe();
+        _sessionStreamStates.delete(id);
+    }
+
+    const pool = new SseClientPool(new SseReplayBuffer(), {
+        name: `sdk.session.stream.${id}`,
+        metrics: routeDeps.metrics,
+    });
+
+    const unsubscribe = entry.session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        const type = /** @type {string} */ (event?.type ?? 'message');
+        const payload = standardizeSsePayload(event);
+        pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
+    });
+
+    const state = { sessionId: id, sessionRef: entry.session, pool, unsubscribe };
+    _sessionStreamStates.set(id, state);
+    return state;
+}
+
+/**
+ * @param {SdkRouteDeps} routeDeps
+ * @param {SessionStreamState} state
+ * @returns {void}
+ */
+function maybeDisposeSessionStreamState(routeDeps, state) {
+    if (state.pool.size > 0) return;
+    state.unsubscribe();
+    _sessionStreamStates.delete(state.sessionId);
+    routeDeps.sdkObservability.log('INFO', `[sdk-api] SSE stream encerrado: sessão ${state.sessionId}`);
+}
+
+/**
+ * @param {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session']} session
+ * @param {import('#copilot/sdk/types').MessageOptions} messageOptions
+ * @returns {Promise<import('@github/copilot-sdk').AssistantMessageEvent | undefined>}
+ */
+async function sendAndWaitWithoutTimeout(session, messageOptions) {
+    /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */
+    let lastAssistantMessage;
+
+    /** @type {() => void} */
+    let resolveIdle = () => {};
+    /** @type {(error: Error) => void} */
+    let rejectIdle = () => {};
+
+    const idlePromise = new Promise((resolve, reject) => {
+        resolveIdle = () => resolve(undefined);
+        rejectIdle = (error) => reject(error);
+    });
+
+    const unsubscribe = session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        if (event.type === 'assistant.message') {
+            lastAssistantMessage = event;
+        } else if (event.type === 'session.idle') {
+            resolveIdle();
+        } else if (event.type === 'session.error') {
+            const error = new Error(event.data.message);
+            error.stack = event.data.stack;
+            rejectIdle(error);
+        }
+    });
+
+    try {
+        await session.send(messageOptions);
+        await idlePromise;
+        return lastAssistantMessage;
+    } finally {
+        unsubscribe();
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /sessions/:id/send
@@ -58,7 +158,7 @@ const MAX_PROMPT_BYTES = 512_000;
  * {
  *     "prompt": "Olá, qual é o status do projeto?", // OBRIGATÓRIO
  *     "waitForResponse": true, // padrão: true
- *     "timeoutMs": 60000, // padrão: 60s
+ *     "timeoutMs": 0, // 0 = sem timeout; omitido = adaptativo
  *     "attachments": [{ "type": "file", "path": "..." }] // opcional
  * }
  * ```
@@ -80,16 +180,15 @@ router.post(
             const rawMode = (req.body ?? {}).mode;
             /** @type {'immediate' | 'enqueue' | undefined} */
             const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
-            // NEW-03 (fix): validar timeoutMs para evitar NaN / Infinity / negativo no setTimeout
-            const timeoutMs =
-                rawTimeoutMs === undefined
-                    ? 60_000
-                    : typeof rawTimeoutMs === 'number' && isFinite(rawTimeoutMs) && rawTimeoutMs > 0
-                      ? rawTimeoutMs
-                      : null;
 
-            if (timeoutMs === null) {
-                res.status(400).json({ ok: false, error: 'Campo "timeoutMs" deve ser um número positivo finito.' });
+            if (
+                rawTimeoutMs !== undefined &&
+                (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
+            ) {
+                res.status(400).json({
+                    ok: false,
+                    error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
+                });
                 return;
             }
 
@@ -103,6 +202,14 @@ router.post(
                 res.status(400).json({ ok: false, error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.` });
                 return;
             }
+
+            const timeoutDecision = resolveOptionalDialogTimeout({
+                explicitTimeoutMs: rawTimeoutMs,
+                defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+                payloadChars: prompt.length,
+                phase: 'dialog',
+                allowDisabled: true,
+            });
 
             const entry = routeDeps.sdkSession.getClientSession(id);
             if (!entry) {
@@ -123,12 +230,14 @@ router.post(
             };
 
             if (waitForResponse) {
-                const event = await Promise.race([
-                    entry.session.sendAndWait(messageOptions, timeoutMs),
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs + 5000),
-                    ),
-                ]);
+                const event =
+                    timeoutDecision.timeoutMs !== null
+                        ? await entry.session.sendAndWait(messageOptions, timeoutDecision.timeoutMs)
+                        : await sendAndWaitWithoutTimeout(entry.session, messageOptions);
+                routeDeps.sdkObservability.log(
+                    'INFO',
+                    `[sdk-api] session.send timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')} session=${id}`,
+                );
                 const assistantEvent = /** @type {{ data?: { content?: string; messageId?: string } } | undefined} */ (
                     event
                 );
@@ -139,6 +248,11 @@ router.post(
                             sessionId: id,
                             content: assistantEvent?.data?.content ?? null,
                             messageId: assistantEvent?.data?.messageId ?? null,
+                            timeoutPolicy: {
+                                timeoutMs: timeoutDecision.timeoutMs,
+                                strategy: timeoutDecision.strategy,
+                                reasons: timeoutDecision.reasons,
+                            },
                         },
                         id,
                     ),
@@ -194,17 +308,13 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    // UPG-SE-004: buffer de replay por sessão
-    if (!_sessionReplayBuffers.has(id)) {
-        _sessionReplayBuffers.set(id, new SseReplayBuffer());
-    }
-    const replayBuffer = /** @type {SseReplayBuffer} */ (_sessionReplayBuffers.get(id));
+    const state = ensureSessionStreamState(routeDeps, id, entry);
 
     // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
     // FASE-11.4: max lifetime para evitar conexões órfãs
     const sse = createSseWriter(req, res, {
         heartbeatMs: 15_000,
-        replayBuffer,
+        replayBuffer: state.pool.replayBuffer,
         tracker: _sessionsTracker,
         maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
@@ -212,21 +322,18 @@ router.get('/sessions/:id/stream', (req, res) => {
     sse.send(
         'connected',
         routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ sessionId: id, timestamp: Date.now() }, id),
+        { skipBuffer: true },
     );
 
     // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
 
-    // Registra handler no SDK para encaminhar eventos
-    const unsubscribe = entry.session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
-        const type = /** @type {string} */ (event?.type ?? '');
-        if (!eventFilter || eventFilter(type)) sse.send('message', standardizeSsePayload(event));
-    });
+    const sseClient = state.pool.addClient(sse, { filter: eventFilter });
 
     // Limpeza quando cliente desconecta
     req.on('close', () => {
-        unsubscribe();
-        routeDeps.sdkObservability.log('INFO', `[sdk-api] SSE stream encerrado: sessão ${id}`);
+        state.pool.removeClient(sseClient);
+        maybeDisposeSessionStreamState(routeDeps, state);
     });
 });
 

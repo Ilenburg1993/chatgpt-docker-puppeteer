@@ -28,6 +28,7 @@ import {
     hubTools,
     introspectionTools,
     permissionTools,
+    recordToolCategory,
     registerForIntrospection,
     sessionRpcTools,
     sessionTools,
@@ -87,18 +88,49 @@ export function bootstrapTools(registry, mcpTools) {
     ];
 
     // G1-ARCH-07: itera sobre TOOL_GROUPS uma única vez — evita duplicação entre registerTools e allTools
+    // C1-FIX: Granular error handling em cada categoria de tools (bootstrap robusto)
     for (const [tools, opts] of TOOL_GROUPS) {
-        registerTools(registry, tools, opts);
+        try {
+            registerTools(registry, tools, opts);
+            // H2-FIX: Registrar categoria de cada tool para derivação dinâmica posterior
+            const category = /** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown';
+            for (const tool of tools) {
+                recordToolCategory(tool.name, String(category));
+            }
+        } catch (err) {
+            const category = /** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown';
+            const error = /** @type {Error} */ (err);
+            log('ERROR', `[tools-bootstrap] Erro ao registrar categoria '${category}': ${error.message}`);
+            // Não relançar — permitir que outras categorias sejam registradas
+        }
     }
 
     if (mcpTools.length > 0) {
-        registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
+        try {
+            registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
+            // H2-FIX: Registrar categoria para mcpTools
+            for (const tool of mcpTools) {
+                recordToolCategory(tool.name, 'mcp');
+            }
+        } catch (err) {
+            const error = /** @type {Error} */ (err);
+            log('ERROR', `[tools-bootstrap] Erro ao registrar MCP tools: ${error.message}`);
+        }
     }
 
     // Tools declarativas customizadas registradas via /config/tools/custom.
     const customTools = buildCustomTools();
     if (customTools.length > 0) {
-        registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
+        try {
+            registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
+            // H2-FIX: Registrar categoria para custom tools
+            for (const tool of customTools) {
+                recordToolCategory(tool.name, 'custom');
+            }
+        } catch (err) {
+            const error = /** @type {Error} */ (err);
+            log('ERROR', `[tools-bootstrap] Erro ao registrar custom tools: ${error.message}`);
+        }
     }
 
     const allTools = [...TOOL_GROUPS.flatMap(([t]) => t), ...mcpTools, ...customTools];

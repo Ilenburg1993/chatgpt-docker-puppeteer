@@ -9,10 +9,12 @@
  * @module copilot/server/routes/copilot-api/tasks
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 
 /**
@@ -29,7 +31,7 @@ import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-req
  * @typedef {Object} SendRequestBody
  * @property {string} message - Texto da mensagem a enviar ao agente
  * @property {boolean} [waitForResponse] - Aguardar resposta síncrona (default: false)
- * @property {number} [timeoutMs] - Timeout em ms ao aguardar resposta (default: 30000)
+ * @property {number} [timeoutMs] - Timeout em ms ao aguardar resposta (`0` desabilita; omitido = adaptativo)
  * @property {unknown[]} [attachments] - Arquivos/contexto extras já validados pela borda chamadora
  */
 
@@ -50,11 +52,29 @@ export function registerTaskRoutes(bridge, binding) {
      */
     bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const { agent } = resolveCopilotApiRouteBinding(binding, req);
-        const { message, waitForResponse = false, timeoutMs = 30000, attachments } = req.body ?? {};
+        const { message, waitForResponse = false, timeoutMs: rawTimeoutMs, attachments } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
             return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
         }
+
+        if (
+            rawTimeoutMs !== undefined &&
+            (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
+        ) {
+            return res.status(400).json({
+                ok: false,
+                error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
+            });
+        }
+
+        const timeoutDecision = resolveOptionalDialogTimeout({
+            explicitTimeoutMs: rawTimeoutMs,
+            defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+            payloadChars: message.length,
+            phase: 'dialog',
+            allowDisabled: true,
+        });
 
         if (agent.status === 'stopped') {
             return res
@@ -64,22 +84,39 @@ export function registerTaskRoutes(bridge, binding) {
 
         try {
             if (waitForResponse) {
-                // G2-API-06: usar AbortController para cancelar a tarefa quando timeout vencer
-                const controller = new AbortController();
-                const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+                // Para turnos longos, o caller pode desabilitar o timeout explícito (timeoutMs=0).
+                // Caso contrário, usamos timeout adaptativo alinhado ao runtime do dialog loop.
+                const controller = timeoutDecision.timeoutMs !== null ? new AbortController() : null;
+                const timeoutHandle =
+                    controller !== null ? setTimeout(() => controller.abort(), timeoutDecision.timeoutMs) : null;
                 try {
                     const raceResult = await agent.sendMessage(message, {
                         ...(attachments !== undefined ? { attachments } : {}),
-                        signal: controller.signal,
+                        ...(controller !== null ? { signal: controller.signal } : {}),
                     });
-                    clearTimeout(timeoutHandle);
-                    return res.json({ ok: true, response: raceResult });
+                    if (timeoutHandle) clearTimeout(timeoutHandle);
+                    log(
+                        'INFO',
+                        `[copilot-api/tasks/send] waitForResponse timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')}`,
+                    );
+                    return res.json({
+                        ok: true,
+                        response: raceResult,
+                        timeoutPolicy: {
+                            timeoutMs: timeoutDecision.timeoutMs,
+                            strategy: timeoutDecision.strategy,
+                            reasons: timeoutDecision.reasons,
+                        },
+                    });
                 } catch (e) {
-                    clearTimeout(timeoutHandle);
+                    if (timeoutHandle) clearTimeout(timeoutHandle);
                     const projection = projectAgentHttpError(e, {
                         fallbackStatus: 500,
                         timeoutStatus: 504,
-                        timeoutMessage: `Timeout após ${timeoutMs}ms`,
+                        timeoutMessage:
+                            timeoutDecision.timeoutMs !== null
+                                ? `Timeout após ${timeoutDecision.timeoutMs}ms`
+                                : 'Operação abortada aguardando resposta do agente',
                     });
                     return res.status(projection.status).json(projection.body);
                 }

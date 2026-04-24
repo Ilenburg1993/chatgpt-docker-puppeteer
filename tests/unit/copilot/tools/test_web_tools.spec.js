@@ -6,8 +6,8 @@
  *
  * Valida:
  *
- * - webTools exporta array com web_fetch (sempre) + web_search (quando habilitado)
- * - web_fetch: URL válida, URL inválida, SSRF blocked, content-type blocked, timeout, rate limit
+ * - webTools exporta array com legacy_web_fetch (sempre) + web_search (quando habilitado)
+ * - legacy_web_fetch: URL válida, URL inválida, SSRF blocked, content-type blocked, timeout, rate limit
  * - web_search: resultados DDG JSON API, fallback HTML scraping, SSRF filter nos resultados
  * - Rate limiting compartilhado entre web_fetch e web_search
  */
@@ -130,8 +130,8 @@ describe('web-tools', () => {
             expect(mod.webTools.length).toBeGreaterThanOrEqual(1);
         });
 
-        it('inclui web_fetch', () => {
-            expect(mod.webTools.some((t) => t.name === 'web_fetch')).toBe(true);
+        it('inclui legacy_web_fetch', () => {
+            expect(mod.webTools.some((t) => t.name === 'legacy_web_fetch')).toBe(true);
         });
 
         it('inclui web_search quando WEB_SEARCH_DISABLED=false', () => {
@@ -139,11 +139,11 @@ describe('web-tools', () => {
         });
     });
 
-    // ── web_fetch ─────────────────────────────────────────────────────────
+    // ── legacy_web_fetch ─────────────────────────────────────────────────
 
-    describe('web_fetch', () => {
+    describe('legacy_web_fetch', () => {
         /** @returns {any} */
-        const findFetch = () => mod.webTools.find((t) => t.name === 'web_fetch');
+        const findFetch = () => mod.webTools.find((t) => t.name === 'legacy_web_fetch');
 
         it('retorna conteúdo para URL pública válida', async () => {
             fetchSpy.mockResolvedValueOnce(mockResponse('<h1>Hello</h1>', { url: 'https://example.com' }));

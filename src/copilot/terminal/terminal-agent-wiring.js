@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import {
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -39,6 +40,21 @@ import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 /** @type {boolean} */
 let _agentListenersRegistered = false;
 
+const WATCHDOG_RECOVERY_WAIT_MS = Math.max(5_000, Math.min(30_000, Math.round(LLM_B_TURN_TIMEOUT_MS * 0.2)));
+
+const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_stopped']);
+
+/**
+ * Política local de UX: restart automático é exceção. O Agent continua sendo dono do lifecycle, mas o terminal só
+ * reabre o loop sozinho quando a razão representa falha operacional clara.
+ *
+ * @param {string} reason
+ * @returns {boolean}
+ */
+export function shouldAutoRestartStoppedDialog(reason) {
+    return AUTO_RESTART_DIALOG_STOP_REASONS.has(reason);
+}
+
 /**
  * Registra todos os event listeners do AlwaysAliveAgent no terminal server.
  *
@@ -63,9 +79,9 @@ export function registerAgentEventListeners(printBanner) {
         // 1. Abortar mensagem travada (session.abort — 0 PR)
         await abortTerminalCurrentMessage();
 
-        // 2. Aguardar até 5s para o ask_user reaparecer (0 PR se reaparecer)
+        // 2. Aguardar janela adaptativa para o ask_user reaparecer (0 PR se reaparecer)
         const recovered = await new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(false), 5_000);
+            const timeout = setTimeout(() => resolve(false), WATCHDOG_RECOVERY_WAIT_MS);
             const check = () => {
                 if (readTerminalRuntimeState().pendingQuestionKind === 'ready') {
                     clearTimeout(timeout);
@@ -78,7 +94,7 @@ export function registerAgentEventListeners(printBanner) {
                 check();
                 if (readTerminalRuntimeState().pendingQuestionKind === 'ready') clearInterval(interval);
             }, 500);
-            setTimeout(() => clearInterval(interval), 5_100);
+            setTimeout(() => clearInterval(interval), WATCHDOG_RECOVERY_WAIT_MS + 100);
         });
 
         if (recovered) {
@@ -157,6 +173,16 @@ export function registerAgentEventListeners(printBanner) {
     agentEvents.on(EMITTER_DIALOG_STOPPED, (/** @type {{ reason: string; authorized?: boolean }} */ evt) => {
         const reason = evt.reason ?? 'desconhecido';
 
+        if (reason === 'recovery_restart') {
+            recordTerminalActivity('system', 'Dialog loop em recuperação', {
+                detail: 'Reinício semântico coordenado pelo Agent',
+                source: 'dialog',
+            });
+            log('INFO', '[TerminalServer] Dialog loop encerrado para recovery semântico coordenado pelo Agent.');
+            broadcastSse('dialog.stopped', { authorized: true, reason, recovery: true });
+            return;
+        }
+
         if (reason === 'authorized_stop') {
             recordTerminalActivity('system', 'Dialog loop encerrado', {
                 detail: 'Parado por autorização explícita do usuário',
@@ -182,6 +208,22 @@ export function registerAgentEventListeners(printBanner) {
 
         const isWatchdog = reason === 'watchdog_restart';
         const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+        if (!shouldAutoRestartStoppedDialog(reason)) {
+            recordTerminalActivity('system', 'Dialog loop encerrado sem restart automático', {
+                detail: label,
+                severity: 'warn',
+                source: 'dialog',
+            });
+            println(
+                `\n\x1b[33m  [dialog] Loop encerrado (${label}). Restart automático bloqueado; use /dialog-resume se precisar.\x1b[0m`,
+            );
+            log(
+                'WARN',
+                `[TerminalServer] Dialog loop encerrado (${label}). Restart automático bloqueado por política.`,
+            );
+            broadcastSse('dialog.stopped', { reason, restarting: false });
+            return;
+        }
         recordTerminalActivity('system', 'Reiniciando dialog loop', {
             detail: label,
             severity: 'warn',

@@ -16,6 +16,7 @@ import { getAgentHealthHttpStatus, resolveAgentHealthSelection } from '../../pre
 import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import { handleHealth } from '../../presentation/system-config.js';
 import { callHandler } from '../handler-bridge.js';
+import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 import { getCopilotNamespace } from '../socket/hub-ns.js';
 
 /**
@@ -47,7 +48,7 @@ export function createHealthRouter() {
                 ok: false,
                 healthy: false,
                 status: 'unhealthy',
-                error: toError(error).message,
+                error: sanitizeHttpErrorMessage(toError(error).message, 503),
                 ts: Date.now(),
             });
         }

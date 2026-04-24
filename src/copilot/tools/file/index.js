@@ -14,6 +14,8 @@ export {
     listDirectoryTool,
     readFileContentTool,
     searchInFilesTool,
+    symbolSearchTools,
+    workspaceSymbolSearchTool,
 } from './read-tools.js';
 
 export {
@@ -28,11 +30,16 @@ export {
 
 export {
     BLOCKED_PATTERNS_SECRETS,
+    bufferIsAscii,
+    bufferIsUtf8,
+    concatChunks,
     execFileAsync,
     isRgAvailable,
     MAX_CONTENT_BYTES,
+    MAX_DIFF_OUTPUT,
     MAX_LIST_ENTRIES,
     MAX_SEARCH_OUTPUT,
+    truncateBuffer,
     validatePath,
     WORKSPACE_ROOT,
 } from './shared.js';

@@ -62,7 +62,8 @@ export function tokenizeShell(command) {
  */
 export function truncateOutput(text) {
     if (Buffer.byteLength(text, 'utf8') <= MAX_OUTPUT_BYTES) return text;
-    const truncated = Buffer.from(text, 'utf8').slice(0, MAX_OUTPUT_BYTES).toString('utf8');
+    // Usar subarray (zero-copy view) em vez do deprecated buf.slice()
+    const truncated = Buffer.from(text, 'utf8').subarray(0, MAX_OUTPUT_BYTES).toString('utf8');
     return truncated + `\n\n[OUTPUT TRUNCADO — limite de ${MAX_OUTPUT_BYTES} bytes atingido]`;
 }
 

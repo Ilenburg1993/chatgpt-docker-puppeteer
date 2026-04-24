@@ -19,10 +19,12 @@
  */
 
 import { MAX_SSE_CLIENTS, MAX_SSE_CONTENT_CHARS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
+import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
 import { eventFanout } from '../../infra/sse/fanout.js';
 import { SseReplayBuffer } from '../../infra/sse/replay-buffer.js';
 import { getTerminalReplayBuffer } from '../../infra/sse/state.js';
+import { SseClientPool } from '../../infra/sse/stream-hub.js';
 import {
     createEventFilter,
     createSseWriter,
@@ -52,19 +54,19 @@ const _criticalTracker = new SseConnectionTracker('server-sse-critical', MAX_SSE
 /** Buffer dedicado para replay do stream crítico (menor, eventos de alta relevância). */
 const _criticalReplayBuffer = new SseReplayBuffer(64);
 
+/** Pool de clientes para stream global `/events`. */
+const _globalPool = new SseClientPool(_sharedReplayBuffer, {
+    name: 'server.events.global',
+    metrics: defaultMetrics,
+});
+
+/** Pool de clientes para stream `/events/critical`. */
+const _criticalPool = new SseClientPool(_criticalReplayBuffer, {
+    name: 'server.events.critical',
+    metrics: defaultMetrics,
+});
+
 // ─── Listener central no fanout ──────────────────────────────────────────────
-
-/**
- * @typedef {{
- *     res: Res;
- *     sse: import('../../infra/sse/utils.js').SseWriter;
- *     level: 'all' | 'critical';
- *     filter: ((evt: string) => boolean) | null;
- * }} ClientEntry
- */
-
-/** @type {Set<ClientEntry>} */
-const _clients = new Set();
 
 /**
  * Listener registrado uma única vez no eventFanout. Roteia eventos SSE formatados para todos os clientes conectados.
@@ -73,8 +75,6 @@ const _clients = new Set();
  * @returns {void}
  */
 function _onFanoutEvent(fEvt) {
-    if (_clients.size === 0) return;
-
     const { event, data } = fEvt;
     const safeEvent = sanitizeSseEvent(event);
     const isCritical = CRITICAL_EVENTS.has(safeEvent);
@@ -91,13 +91,9 @@ function _onFanoutEvent(fEvt) {
         }
     }
 
-    for (const entry of _clients) {
-        // Clientes /events recebem tudo (com filtro configurável via ?events=...)
-        // Clientes /events/critical recebem somente eventos CRITICAL_EVENTS
-        if (entry.level === 'critical' && !isCritical) continue;
-        if (entry.filter && !entry.filter(safeEvent)) continue;
-
-        entry.sse.send(safeEvent, payload);
+    _globalPool.broadcast(safeEvent, payload, { filterEvent: safeEvent });
+    if (isCritical) {
+        _criticalPool.broadcast(safeEvent, payload, { filterEvent: safeEvent });
     }
 }
 
@@ -153,14 +149,12 @@ export function createSseRouter() {
         });
 
         // Snapshot inicial — conectado com sucesso
-        sse.send('connected', { timestamp: Date.now(), channel: 'terminal' });
+        sse.send('connected', { timestamp: Date.now(), channel: 'terminal' }, { skipBuffer: true });
 
-        /** @type {ClientEntry} */
-        const entry = { res, sse, level: 'all', filter };
-        _clients.add(entry);
+        const entry = _globalPool.addClient(sse, { filter });
 
         req.on('close', () => {
-            _clients.delete(entry);
+            _globalPool.removeClient(entry);
         });
     });
 
@@ -199,13 +193,11 @@ function _serveCriticalStream(req, res) {
         maxContentChars: MAX_SSE_CONTENT_CHARS,
     });
 
-    sse.send('connected', { timestamp: Date.now(), channel: 'critical' });
+    sse.send('connected', { timestamp: Date.now(), channel: 'critical' }, { skipBuffer: true });
 
-    /** @type {ClientEntry} */
-    const entry = { res, sse, level: 'critical', filter: null };
-    _clients.add(entry);
+    const entry = _criticalPool.addClient(sse);
 
     req.on('close', () => {
-        _clients.delete(entry);
+        _criticalPool.removeClient(entry);
     });
 }

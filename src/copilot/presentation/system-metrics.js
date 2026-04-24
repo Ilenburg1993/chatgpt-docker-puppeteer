@@ -139,6 +139,26 @@ export function handleMetrics(params = {}) {
         '# TYPE llmb_dialog_stalls_total counter',
         `llmb_dialog_stalls_total ${summary.dialog.stallsTotal}`,
         '',
+        '# HELP llmb_dialog_recovery_total Total de recuperações semânticas do dialog loop',
+        '# TYPE llmb_dialog_recovery_total counter',
+        `llmb_dialog_recovery_total ${summary.dialogRecovery.total}`,
+        '',
+        '# HELP llmb_dialog_recovery_success_total Recuperações semânticas concluídas',
+        '# TYPE llmb_dialog_recovery_success_total counter',
+        `llmb_dialog_recovery_success_total ${summary.dialogRecovery.success}`,
+        '',
+        '# HELP llmb_dialog_recovery_failed_total Recuperações semânticas com falha',
+        '# TYPE llmb_dialog_recovery_failed_total counter',
+        `llmb_dialog_recovery_failed_total ${summary.dialogRecovery.failed}`,
+        '',
+        '# HELP llmb_dialog_recovery_zero_pr_total Recuperações sem consumir Premium Request',
+        '# TYPE llmb_dialog_recovery_zero_pr_total counter',
+        `llmb_dialog_recovery_zero_pr_total ${summary.dialogRecovery.zeroPr}`,
+        '',
+        '# HELP llmb_dialog_recovery_pr_total Recuperações que consumiram Premium Request',
+        '# TYPE llmb_dialog_recovery_pr_total counter',
+        `llmb_dialog_recovery_pr_total ${summary.dialogRecovery.pr}`,
+        '',
         '# HELP llmb_sessions_started_total Total de sessões SDK iniciadas',
         '# TYPE llmb_sessions_started_total counter',
         `llmb_sessions_started_total ${summary.sessions.started}`,
@@ -193,6 +213,16 @@ export function handleMetrics(params = {}) {
             '# HELP llmb_inject_duration_p95_ms Percentil 95 de duração do endpoint /inject (ms)',
             '# TYPE llmb_inject_duration_p95_ms gauge',
             `llmb_inject_duration_p95_ms ${injectLatency.p95}`,
+            '',
+        );
+    }
+
+    if (summary.dialogRecovery.total > 0) {
+        const recoveryLatency = summary.dialogRecovery.latency;
+        lines.push(
+            '# HELP llmb_dialog_recovery_duration_p95_ms Percentil 95 de duração da recuperação do dialog (ms)',
+            '# TYPE llmb_dialog_recovery_duration_p95_ms gauge',
+            `llmb_dialog_recovery_duration_p95_ms ${recoveryLatency.p95}`,
             '',
         );
     }

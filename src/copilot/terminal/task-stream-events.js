@@ -13,7 +13,11 @@ import {
     EMITTER_TASK_ERROR,
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
-import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../presentation/runtime-ui-state-store.js';
+import {
+    appendThinkingHistoryChunk,
+    finalizeThinkingHistoryEntry,
+    getShowThinking,
+} from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { println } from './dialog/index.js';
 
@@ -29,12 +33,15 @@ import { println } from './dialog/index.js';
  * @returns {() => void}
  */
 export function setupTerminalTaskStreamListeners({ agent }) {
+    const TASK_DELTA_ACTIVITY_THROTTLE_MS = 300;
     /** @type {Map<string, number>} */
     const taskThinkingStarts = new Map();
     /** @type {Set<string>} */
     const openThinkingIds = new Set();
     /** @type {Map<string, { chunks: number; chars: number }>} */
     const taskDeltaStats = new Map();
+    /** @type {Map<string, number>} */
+    const taskLastDeltaActivityAt = new Map();
 
     /**
      * @param {string | null | undefined} taskId
@@ -65,7 +72,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
                 durationMs: thinkingStartedAt ? Date.now() - thinkingStartedAt : null,
                 status,
             });
-            if (thinkingEntry) {
+            if (thinkingEntry && getShowThinking()) {
                 const color = status === 'error' ? '\x1b[31m' : '\x1b[90m';
                 const label = status === 'error' ? 'falhou' : 'concluído';
                 println(
@@ -106,8 +113,16 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
         recordTaskDelta(evt.taskId, chunk);
+        const taskKey = getTaskKey(evt.taskId);
+        const now = Date.now();
+        const lastAt = taskLastDeltaActivityAt.get(taskKey) ?? 0;
+        if (now - lastAt < TASK_DELTA_ACTIVITY_THROTTLE_MS) {
+            return;
+        }
+        taskLastDeltaActivityAt.set(taskKey, now);
+        const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         recordTerminalActivity('task', 'Executando tarefa interna', {
-            detail: `delta${evt.taskId ? ` (${evt.taskId})` : ''}`,
+            detail: `delta${evt.taskId ? ` (${evt.taskId})` : ''} · ${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
             recordHistory: false,
         });
@@ -133,26 +148,36 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         if (!taskThinkingStarts.has(thinkingId)) {
             taskThinkingStarts.set(thinkingId, Date.now());
             openThinkingIds.add(thinkingId);
-            println(`  \x1b[33m↳ task thinking capturado\x1b[0m \x1b[90m(${taskId ?? 'task interna'})\x1b[0m`);
-            println(`  \x1b[90m    /thinking show ${thinkingId.slice(-12)}  ·  /thinking latest\x1b[0m`);
+            if (getShowThinking()) {
+                println(`  \x1b[33m↳ task thinking capturado\x1b[0m \x1b[90m(${taskId ?? 'task interna'})\x1b[0m`);
+                println(`  \x1b[90m    /thinking show ${thinkingId.slice(-12)}  ·  /thinking latest\x1b[0m`);
+            }
         }
     };
 
     const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
+        const taskKey = getTaskKey(evt.taskId);
+        const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         recordTerminalActivity('task', 'Tarefa interna concluída', {
+            detail: `${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'completed');
-        taskDeltaStats.delete(getTaskKey(evt.taskId));
+        taskDeltaStats.delete(taskKey);
+        taskLastDeltaActivityAt.delete(taskKey);
     };
 
     const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
+        const taskKey = getTaskKey(evt.taskId);
+        const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         recordTerminalActivity('error', 'Tarefa interna falhou', {
+            detail: `${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
             severity: 'error',
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'error');
-        taskDeltaStats.delete(getTaskKey(evt.taskId));
+        taskDeltaStats.delete(taskKey);
+        taskLastDeltaActivityAt.delete(taskKey);
     };
 
     agent.on(EMITTER_TASK_DELTA, onTaskDelta);
