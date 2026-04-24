@@ -87,6 +87,11 @@ function startKeepaliveIfPossible(ctx, host) {
  * @returns {Promise<void>}
  */
 export async function dialogStart(ctx, host, bootPrompt) {
+    if (ctx.isWaitingForInput() && ctx.getPendingQuestionKind() === 'ready' && ctx.isDialogLoopActive()) {
+        log('WARN', '[AlwaysAlive] startDialogLoop() idempotente: READY pendente já mantém o loop ativo.');
+        host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: true, ts: Date.now(), reason: 'ready_already_waiting' });
+        return;
+    }
     if (!ctx.isIdle()) {
         throw new SessionError(
             `[AlwaysAlive] startDialogLoop() requer status 'idle'. Status atual: '${ctx.getRuntimeStatus()}'`,

@@ -69,6 +69,8 @@ export const WATCHDOG_THRESHOLDS = Object.freeze({
 export const DIALOG_QUEUE_MAX = LLM_B_DIALOG_QUEUE_MAX;
 /** Timeout de boot do loop (ms) */
 export const BOOT_TIMEOUT_MS = LLM_B_BOOT_TIMEOUT_MS;
+/** Janela zero-PR para aceitar READY/REPLY tardio depois do timeout nominal de boot. */
+export const BOOT_LATE_PROTOCOL_GRACE_MS = Math.min(30_000, Math.max(5_000, Math.round(BOOT_TIMEOUT_MS * 0.25)));
 /** Intervalo do watchdog do loop (ms) */
 export const WATCHDOG_INTERVAL_MS = LLM_B_WATCHDOG_MS;
 /** Stall timeout do watchdog (ms) */

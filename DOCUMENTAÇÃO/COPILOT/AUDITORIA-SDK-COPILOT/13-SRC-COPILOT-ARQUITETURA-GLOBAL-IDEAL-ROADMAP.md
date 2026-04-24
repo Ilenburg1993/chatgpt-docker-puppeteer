@@ -1544,6 +1544,23 @@ Refinamento fechado na rodada seguinte:
   para callers do dialog loop, removendo o import `terminal -> agent` que ainda restava no engine;
 - consumers fora de `sdk/` voltam a passar pelo barrel `#copilot/sdk` para helpers/modelos/config de
   tools, preservando a diretriz SDK-first sem bypasses de submódulos.
+- validação live em `2026-04-24` encontrou e corrigiu dois problemas de borda:
+  - `GET /metrics` retornava texto serializado como JSON; `server/handler-bridge.js` agora preserva
+    `HandlerResult.contentType` e usa `res.type(...).send(...)` quando a resposta é textual;
+  - `task.delta` ainda imprimia streaming bruto no TTY, duplicando a resposta e misturando logs com
+    prompt; `terminal/task-stream-events.js` agora trata delta como atividade/telemetria, deixando
+    resposta final no caminho de diálogo e thinking no histórico colapsado.
+- validação live também revelou boot timeout nominal muito agressivo para `gpt-5-mini/high`:
+  - `LLM_B_BOOT_TIMEOUT_MS` passa a ter default `90000`;
+  - `DialogLoopManager` adiciona janela zero-PR para READY tardio antes de declarar boot falho;
+  - `startDialogLoop()` passa a ser idempotente quando o Agent já está em `waiting_for_input` com
+    `READY` pendente e loop ativo;
+  - o terminal reconhece `waiting_for_input + pendingQuestionKind=ready` como loop semanticamente
+    vivo, evitando retry cego que consumiria novo boot.
+- o mesmo teste live expôs outro drift: `dialogLoopActive=true` com Agent `idle` e sem
+  `pendingQuestion` após `SessionEnd` do SDK. A borda canônica `presentation/runtime-dialog.js`
+  agora detecta esse estado como canal de entrada ausente, faz stop autorizado e reinicia o loop uma
+  vez antes do turno, em vez de deixar o `/inject` preso até timeout.
 
 vitest tests/unit/copilot:
   268 arquivos passados

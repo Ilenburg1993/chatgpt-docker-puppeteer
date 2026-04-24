@@ -68,6 +68,17 @@ let _sendTurnMutex = Promise.resolve(null);
 let _ensureDialogLoopInFlight = null;
 
 /**
+ * READY pendente significa que o SDK já entregou o `ask_user` controlado pelo protocolo e o loop está semanticamente
+ * vivo, mesmo que um snapshot operacional ainda esteja se atualizando após timeout/recovery.
+ *
+ * @returns {boolean}
+ */
+function hasReadyProtocolQuestion() {
+    const state = readTerminalRuntimeState();
+    return state.status === 'waiting_for_input' && state.pendingQuestionKind === 'ready';
+}
+
+/**
  * Garante que o dialog loop está ativo. Se não estiver, inicia-o.
  *
  * @returns {Promise<void>}
@@ -75,6 +86,10 @@ let _ensureDialogLoopInFlight = null;
 export function ensureDialogLoop() {
     const runtimeState = readTerminalRuntimeControlState();
     if (runtimeState.dialogLoopActive) {
+        return Promise.resolve();
+    }
+    if (hasReadyProtocolQuestion()) {
+        log('WARN', '[dialog] ensureDialogLoop() tratou READY pendente como loop ativo recuperado.');
         return Promise.resolve();
     }
     if (runtimeState.dialogPaused) {
@@ -180,6 +195,12 @@ async function _tryStartDialogLoop() {
             };
             check();
         });
+    }
+
+    if (hasReadyProtocolQuestion()) {
+        markTerminalActivityIdle('Aguardando próxima mensagem');
+        log('WARN', '[dialog] startDialogLoop() pulado — READY pendente já está aguardando input.');
+        return;
     }
 
     recordTerminalActivity('boot', 'Conectando ao dialog loop', {

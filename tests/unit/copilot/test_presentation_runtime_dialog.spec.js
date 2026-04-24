@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
     const agent = {
+        status: 'idle',
         dialogLoopActive: false,
         dialogPaused: false,
+        pendingQuestion: null,
         startDialogLoop: vi.fn(async () => {}),
         sendDialogTurn: vi.fn(async (message) => `reply:${message}`),
         stopDialogLoop: vi.fn(async () => {}),
@@ -21,6 +23,8 @@ describe('presentation/runtime-dialog.js', () => {
     beforeEach(() => {
         mocks.agent.dialogLoopActive = false;
         mocks.agent.dialogPaused = false;
+        mocks.agent.status = 'idle';
+        mocks.agent.pendingQuestion = null;
         mocks.agent.startDialogLoop.mockClear();
         mocks.agent.sendDialogTurn.mockClear();
         mocks.agent.stopDialogLoop.mockClear();
@@ -52,6 +56,19 @@ describe('presentation/runtime-dialog.js', () => {
 
         expect(mocks.agent.startDialogLoop).not.toHaveBeenCalled();
         expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi');
+    });
+
+    it('reinicia uma vez quando o loop está ativo, idle e sem pending READY', async () => {
+        mocks.agent.dialogLoopActive = true;
+        mocks.agent.status = 'idle';
+        mocks.agent.pendingQuestion = null;
+        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+
+        await mod.sendRuntimeDialogTurn('oi', 'llm-a', { traceId: 't1' });
+
+        expect(mocks.agent.stopDialogLoop).toHaveBeenCalledWith({ authorized: true });
+        expect(mocks.agent.startDialogLoop).toHaveBeenCalledTimes(1);
+        expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi', { traceId: 't1' });
     });
 
     it('encerra o dialog loop com autorização explícita', async () => {

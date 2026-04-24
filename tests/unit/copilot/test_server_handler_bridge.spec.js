@@ -11,11 +11,15 @@ import { bridgeHandler, callHandler } from '../../../src/copilot/server/handler-
  *     next: import('express').NextFunction;
  *     status: ReturnType<typeof vi.fn>;
  *     json: ReturnType<typeof vi.fn>;
+ *     type: ReturnType<typeof vi.fn>;
+ *     send: ReturnType<typeof vi.fn>;
  * }}
  */
 function createHttpHarness() {
     const json = vi.fn();
+    const send = vi.fn();
     const status = vi.fn(() => res);
+    const type = vi.fn(() => res);
     const req = /** @type {import('express').Request} */ ({
         query: {},
         params: {},
@@ -26,10 +30,12 @@ function createHttpHarness() {
         /** @type {unknown} */ ({
             status,
             json,
+            send,
+            type,
         })
     );
     const next = /** @type {import('express').NextFunction} */ (vi.fn());
-    return { req, res, next, status, json };
+    return { req, res, next, status, json, type, send };
 }
 
 describe('server/handler-bridge runtimeId propagation', () => {
@@ -86,5 +92,21 @@ describe('server/handler-bridge runtimeId propagation', () => {
 
         expect(status).toHaveBeenCalledWith(200);
         expect(json).toHaveBeenCalledWith(expect.objectContaining({ runtimeId: 'forced-alt' }));
+    });
+
+    it('envia HandlerResult textual sem serializar como JSON', () => {
+        const { req, res, next, status, json, type, send } = createHttpHarness();
+        const handler = bridgeHandler(() => ({
+            status: 200,
+            contentType: 'text/plain; version=0.0.4; charset=utf-8',
+            body: '# HELP metric\nmetric 1\n',
+        }));
+
+        handler(req, res, next);
+
+        expect(status).toHaveBeenCalledWith(200);
+        expect(type).toHaveBeenCalledWith('text/plain; version=0.0.4; charset=utf-8');
+        expect(send).toHaveBeenCalledWith('# HELP metric\nmetric 1\n');
+        expect(json).not.toHaveBeenCalled();
     });
 });

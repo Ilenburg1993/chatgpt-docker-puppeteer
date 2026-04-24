@@ -9,7 +9,7 @@
 
 import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
 import { log } from '#copilot/observability';
-import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
+import { readRuntimeControlState, readRuntimeInteractionState } from '../agent/facades/agent-runtime-controls.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './runtime-file-context.js';
 
@@ -99,6 +99,18 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
     if (!state.dialogLoopActive && !state.dialogPaused) {
         log('INFO', `[runtime-dialog] auto-starting dialog loop before turn (${traceLabel(traceId)}, from=${from})`);
         await startRuntimeDialogLoop(undefined, agent);
+    } else if (state.dialogLoopActive && !state.dialogPaused && state.status === 'idle') {
+        const interaction = readRuntimeInteractionState(
+            /** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent),
+        );
+        if (interaction.pendingQuestion === null) {
+            log(
+                'WARN',
+                `[runtime-dialog] active loop sem pending READY antes do turno; reiniciando loop uma vez (${traceLabel(traceId)}, from=${from})`,
+            );
+            await stopRuntimeDialogLoopAuthorized(agent);
+            await startRuntimeDialogLoop(undefined, agent);
+        }
     }
 
     void from;

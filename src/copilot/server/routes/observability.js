@@ -82,9 +82,7 @@ export function createObservabilityRouter() {
     // POST /system/reset — emergency reset (limpa rate limiters e error tracker)
     router.post('/system/reset', bridgeHandler(handleSystemReset));
 
-    // GET /metrics — skipAuth, retorna texto (custom: prometheus ou plain)
-    // Nota: handleMetrics pode retornar text/plain; a bridge usa res.json() que pode não ser ideal.
-    // A rota fica aqui como placeholder — infra/sse/ trata o caso custom completo.
+    // GET /metrics — retorna texto (Prometheus/plain) preservando contentType do HandlerResult.
     router.get('/metrics', bridgeHandler(handleMetrics));
 
     return router;

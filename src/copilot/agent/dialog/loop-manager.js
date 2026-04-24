@@ -27,6 +27,7 @@ import {
 import { waitForEvent } from '#copilot/sdk';
 import { EventEmitter } from 'node:events';
 import {
+    BOOT_LATE_PROTOCOL_GRACE_MS,
     BOOT_TIMEOUT_MS,
     DIALOG_QUEUE_MAX,
     LONG_TASK_TIMEOUT_MS,
@@ -57,6 +58,16 @@ import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
  *
  * @typedef {import('../types.js').DialogLoopHost} DialogLoopHost
  */
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isBootTimeoutError(error) {
+    const candidate = /** @type {{ code?: unknown; message?: unknown }} */ (error);
+    const message = typeof candidate?.message === 'string' ? candidate.message : String(error);
+    return candidate?.code === 'DIALOG_TIMEOUT' || message.includes('Boot timeout');
+}
 
 /**
  * Gerenciador do dialog loop — encapsula mutex, watchdog, backpressure, pause/resume e protocolo READY/REPLY.
@@ -279,7 +290,7 @@ export class DialogLoopManager extends EventEmitter {
 
         // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
         bootPromise.catch((e) => {
-            if (e?.message?.includes('Boot timeout') || e?.code === 'DIALOG_TIMEOUT') {
+            if (isBootTimeoutError(e)) {
                 this.emit(EMITTER_LOOP_TURN_TIMEOUT, { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
                 log(
                     'WARN',
@@ -291,20 +302,14 @@ export class DialogLoopManager extends EventEmitter {
         try {
             await bootPromise;
         } catch (bootErr) {
-            const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
-            this.#state.deactivate();
-            this.#watchdogSupervisor.clear();
-            this.#endLoopSpan(false);
-            this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
-            this.emit('stopped', { reason });
-            void this.#trackPersistedState(
-                { dialogLoopActive: false },
-                {
-                    label: 'dialog.state.boot_failed',
-                    description: 'Persist dialogLoopActive=false after boot failure',
-                },
-            );
-            throw bootErr;
+            if (isBootTimeoutError(bootErr) && (await this.#waitForLateBootReady())) {
+                log(
+                    'WARN',
+                    `[DialogLoopManager] Boot READY recuperado dentro da janela zero-PR (${BOOT_LATE_PROTOCOL_GRACE_MS}ms).`,
+                );
+            } else {
+                this.#failBoot(bootErr);
+            }
         }
         // F41B.8: contabilizar boot como 1 PR consumido
         this.#costLedger.recordBoot();
@@ -541,6 +546,54 @@ export class DialogLoopManager extends EventEmitter {
             },
         );
         log('WARN', `[DialogLoopManager] Recuperando estado ativo após protocolo tardio (${kind.toUpperCase()}).`);
+    }
+
+    /**
+     * Aguarda um READY tardio sem consumir novo PR. Alguns boots do SDK chegam poucos segundos após o timeout nominal;
+     * em vez de derrubar o loop e disparar um segundo boot, tratamos esse timeout como aviso e damos uma janela curta
+     * de estabilização.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async #waitForLateBootReady() {
+        log(
+            'WARN',
+            `[DialogLoopManager] Boot timeout atingido; aguardando READY tardio por ${BOOT_LATE_PROTOCOL_GRACE_MS}ms antes de falhar.`,
+        );
+        try {
+            await waitForEvent(this, EMITTER_LOOP_READY, {
+                timeoutMs: BOOT_LATE_PROTOCOL_GRACE_MS,
+                timeoutError: `[DialogLoopManager] READY tardio não chegou após ${BOOT_LATE_PROTOCOL_GRACE_MS}ms`,
+            });
+            return true;
+        } catch (lateErr) {
+            log(
+                'WARN',
+                `[DialogLoopManager] READY tardio ausente: ${lateErr instanceof Error ? lateErr.message : lateErr}`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * @param {unknown} bootErr
+     * @throws {unknown}
+     */
+    #failBoot(bootErr) {
+        const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
+        this.#state.deactivate();
+        this.#watchdogSupervisor.clear();
+        this.#endLoopSpan(false);
+        this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
+        this.emit('stopped', { reason });
+        void this.#trackPersistedState(
+            { dialogLoopActive: false },
+            {
+                label: 'dialog.state.boot_failed',
+                description: 'Persist dialogLoopActive=false after boot failure',
+            },
+        );
+        throw bootErr;
     }
 
     /**

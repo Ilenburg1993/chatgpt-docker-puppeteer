@@ -40,6 +40,30 @@ describe('agent-dialog-controller › dialogStart', () => {
         );
     });
 
+    it('trata READY pendente como start idempotente sem consumir novo boot', async () => {
+        const { ctx, host } = setup();
+        ctx.isWaitingForInput = () => true;
+        ctx.getPendingQuestionKind = () => 'ready';
+        ctx.isDialogLoopActive = () => true;
+        ctx.isIdle = () => false;
+
+        let emitted = null;
+        host.emit = (event, payload) => {
+            emitted = { event, payload };
+            return true;
+        };
+        let started = false;
+        ctx.dialogLoop.start = async () => {
+            started = true;
+        };
+
+        await dialogStart(ctx, /** @type {any} */ (host));
+
+        assert.equal(started, false);
+        assert.equal(emitted?.event, 'dialog.loop.changed');
+        assert.equal(emitted?.payload?.reason, 'ready_already_waiting');
+    });
+
     it('rejeita quando utilização de contexto ≥ 95%', async () => {
         const { ctx, host } = setup();
         ctx.status = 'idle';

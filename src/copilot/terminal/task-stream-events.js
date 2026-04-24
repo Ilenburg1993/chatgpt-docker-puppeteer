@@ -13,11 +13,7 @@ import {
     EMITTER_TASK_ERROR,
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
-import {
-    appendThinkingHistoryChunk,
-    finalizeThinkingHistoryEntry,
-    getShowStreaming,
-} from '../presentation/runtime-ui-state-store.js';
+import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { println } from './dialog/index.js';
 
@@ -33,12 +29,12 @@ import { println } from './dialog/index.js';
  * @returns {() => void}
  */
 export function setupTerminalTaskStreamListeners({ agent }) {
-    /** @type {string | null} */
-    let activeTaskId = null;
     /** @type {Map<string, number>} */
     const taskThinkingStarts = new Map();
     /** @type {Set<string>} */
     const openThinkingIds = new Set();
+    /** @type {Map<string, { chunks: number; chars: number }>} */
+    const taskDeltaStats = new Map();
 
     /**
      * @param {string | null | undefined} taskId
@@ -51,10 +47,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
      * @returns {string[]}
      */
     const resolveOpenThinkingIds = (taskId) => {
-        const candidates = [
-            taskId !== undefined ? getThinkingId(taskId) : null,
-            activeTaskId !== null ? getThinkingId(activeTaskId) : null,
-        ].filter(Boolean);
+        const candidates = [taskId !== undefined ? getThinkingId(taskId) : null].filter(Boolean);
         const matched = /** @type {string[]} */ (candidates).filter((id) => openThinkingIds.has(id));
         return matched.length > 0 ? [...new Set(matched)] : [...openThinkingIds];
     };
@@ -86,39 +79,38 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     };
 
     /**
-     * @param {string | null} taskId
+     * @param {string | null | undefined} taskId
+     * @returns {string}
      */
-    const startTaskBlock = (taskId) => {
-        if (activeTaskId) return;
-        activeTaskId = taskId ?? '__anonymous__';
-        if (!getShowStreaming()) return;
-        println('');
-        println(`  \x1b[90m┌── task streaming${taskId ? ` (${taskId})` : ''} ──┐\x1b[0m`);
-        process.stdout.write('  \x1b[90m│\x1b[0m  ');
-    };
+    const getTaskKey = (taskId) => taskId ?? '__anonymous__';
 
     /**
-     * @param {string} text
+     * Task deltas representam saída incremental de uma tarefa interna do Agent. No terminal, eles não são renderizados
+     * como streaming bruto: isso evita duplicar a resposta final e preserva o prompt legível. O payload continua
+     * observável por histórico/SSE/telemetria quando esses canais estiverem habilitados.
+     *
+     * @param {string | null | undefined} taskId
+     * @param {string} chunk
+     * @returns {void}
      */
-    const writeTaskChunk = (text) => {
-        if (!getShowStreaming()) return;
-        const lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (i > 0) process.stdout.write('\n  \x1b[90m│\x1b[0m  ');
-            process.stdout.write(/** @type {string} */ (lines[i]));
-        }
+    const recordTaskDelta = (taskId, chunk) => {
+        const taskKey = getTaskKey(taskId);
+        const current = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
+        taskDeltaStats.set(taskKey, {
+            chunks: current.chunks + 1,
+            chars: current.chars + chunk.length,
+        });
     };
 
     const onTaskDelta = (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
+        recordTaskDelta(evt.taskId, chunk);
         recordTerminalActivity('task', 'Executando tarefa interna', {
             detail: `delta${evt.taskId ? ` (${evt.taskId})` : ''}`,
             source: 'agent',
             recordHistory: false,
         });
-        startTaskBlock(evt.taskId ?? null);
-        writeTaskChunk(chunk);
     };
 
     const onTaskReasoning = (/** @type {{ taskId?: string | null; text?: string; chunk?: string }} */ evt) => {
@@ -150,12 +142,8 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         recordTerminalActivity('task', 'Tarefa interna concluída', {
             source: 'agent',
         });
-        finalizeTaskThinkings(evt.taskId ?? activeTaskId ?? undefined, 'completed');
-        if (activeTaskId) {
-            process.stdout.write('\n');
-            if (getShowStreaming()) println('  \x1b[90m└── task complete ───┘\x1b[0m');
-            activeTaskId = null;
-        }
+        finalizeTaskThinkings(evt.taskId ?? undefined, 'completed');
+        taskDeltaStats.delete(getTaskKey(evt.taskId));
     };
 
     const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
@@ -163,12 +151,8 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             source: 'agent',
             severity: 'error',
         });
-        finalizeTaskThinkings(evt.taskId ?? activeTaskId ?? undefined, 'error');
-        if (activeTaskId) {
-            process.stdout.write('\n');
-            if (getShowStreaming()) println('  \x1b[31m└── task error ──────┘\x1b[0m');
-            activeTaskId = null;
-        }
+        finalizeTaskThinkings(evt.taskId ?? undefined, 'error');
+        taskDeltaStats.delete(getTaskKey(evt.taskId));
     };
 
     agent.on(EMITTER_TASK_DELTA, onTaskDelta);

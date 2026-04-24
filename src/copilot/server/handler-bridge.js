@@ -17,7 +17,7 @@ import { resolveRequestedRuntimeId } from '../presentation/runtime-request.js';
 import { normalizeRuntimeId } from '../presentation/runtime-targeting.js';
 
 /**
- * @typedef {{ status: number; body: unknown; cors?: boolean }} HandlerResult
+ * @typedef {{ status: number; body: unknown; cors?: boolean; contentType?: string }} HandlerResult
  *
  * @typedef {(params: Record<string, unknown>) => HandlerResult | Promise<HandlerResult>} CopilotHandler
  */
@@ -60,6 +60,19 @@ function resolveHandlerParams(req, paramsExtractor) {
  *
  * Erros são propagados via `next(err)` para o `copilotErrorHandler`.
  *
+ * @param {import('express').Response} res
+ * @param {HandlerResult} result
+ * @returns {void}
+ */
+function sendHandlerResult(res, result) {
+    if (result.contentType) {
+        res.status(result.status).type(result.contentType).send(result.body);
+        return;
+    }
+    res.status(result.status).json(result.body);
+}
+
+/**
  * @param {CopilotHandler} handler - Handler copilot original
  * @param {import('express').Request} req
  * @param {import('express').Response} res
@@ -80,7 +93,7 @@ export function callHandler(handler, req, res, next) {
     if (!result || typeof (/** @type {{ then?: unknown }} */ (result).then) !== 'function') {
         const r = /** @type {HandlerResult} */ (result);
         try {
-            res.status(r.status).json(r.body);
+            sendHandlerResult(res, r);
         } catch (e) {
             log('ERROR', `[HandlerBridge] Erro ao enviar resposta: ${e}`);
         }
@@ -90,7 +103,7 @@ export function callHandler(handler, req, res, next) {
     // Handler assíncrono
     /** @type {Promise<HandlerResult>} */ (result)
         .then((r) => {
-            res.status(r.status).json(r.body);
+            sendHandlerResult(res, r);
         })
         .catch(next);
 }
@@ -117,10 +130,10 @@ export function bridgeHandler(handler, paramsExtractor) {
 
         if (!result || typeof (/** @type {{ then?: unknown }} */ (result).then) !== 'function') {
             const r = /** @type {HandlerResult} */ (result);
-            res.status(r.status).json(r.body);
+            sendHandlerResult(res, r);
             return;
         }
 
-        /** @type {Promise<HandlerResult>} */ (result).then((r) => res.status(r.status).json(r.body)).catch(next);
+        /** @type {Promise<HandlerResult>} */ (result).then((r) => sendHandlerResult(res, r)).catch(next);
     };
 }

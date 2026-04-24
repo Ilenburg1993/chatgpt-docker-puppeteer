@@ -204,8 +204,21 @@ describe('DialogLoopManager', () => {
             await expect(dlm.start('Hello')).rejects.toThrow(/DIALOG_ALREADY_ACTIVE|já está ativo/);
         });
 
-        it('start() limpa active/watchdog quando boot timeout rejeita', async () => {
-            mockWaitForEvent.mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+        it('start() aceita READY tardio após timeout nominal de boot sem derrubar o loop', async () => {
+            mockWaitForEvent
+                .mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'))
+                .mockResolvedValueOnce({});
+
+            await dlm.start('Hello');
+
+            expect(dlm.active).toBe(true);
+            expect(mockWaitForEvent).toHaveBeenCalledTimes(2);
+        });
+
+        it('start() limpa active/watchdog quando timeout e READY tardio falham', async () => {
+            mockWaitForEvent
+                .mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'))
+                .mockRejectedValueOnce(new Error('[DialogLoopManager] READY tardio não chegou'));
 
             await expect(dlm.start('Hello')).rejects.toThrow(/Boot timeout/);
 

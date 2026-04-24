@@ -77,6 +77,31 @@ describe('terminal/task-stream-events.js — contrato', () => {
         stdoutSpy.mockRestore();
     });
 
+    it('registra task.delta sem imprimir streaming bruto no terminal', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', { taskId: 'task-1', chunk: 'OK-LIVE-1' });
+        agent.emit('task.completed', { taskId: 'task-1' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Executando tarefa interna',
+            expect.objectContaining({
+                detail: 'delta (task-1)',
+                source: 'agent',
+                recordHistory: false,
+            }),
+        );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task streaming'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task complete'));
+        expect(stdoutSpy).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
     it('não imprime reasoning cru de tarefa quando /thinking está desligado', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         mocks.getShowThinking.mockReturnValue(false);
