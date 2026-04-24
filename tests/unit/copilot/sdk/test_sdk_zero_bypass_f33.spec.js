@@ -222,8 +222,8 @@ describe('F171 — terminal/ sem bypass direto de SDK', () => {
 // ─── F172: hooks/ e config/ sem bypass (exceto re-export intencional) ──────
 
 describe('F172 — hooks/ e config/ sem bypass não-intencional de SDK', () => {
-    // hooks/session-lifecycle.js removido (L40 shim cleanup)
-    // config/session-config.js removido (L40 shim cleanup)
+    // hooks/session-lifecycle.js removido (L40 cleanup)
+    // config/session-config.js removido (L40 cleanup)
 
     it('config/index.js re-export de tools-state está documentado como intencional', () => {
         // Garantir que o comentário de intencionalidade existe, ou pelo menos o import está isolado a tools-state

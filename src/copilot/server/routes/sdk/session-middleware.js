@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * src/copilot/api/express/session-middleware.js
+ * src/copilot/server/routes/sdk/session-middleware.js
  *
  * Middlewares e helpers compartilhados pelas rotas de sessão SDK.
  *
- * @module copilot/api/express/session-middleware
+ * @module copilot/server/routes/sdk/session-middleware
  * @see EventBus
  */
 
@@ -125,18 +125,23 @@ export function validateBody(schema) {
 
 /** Schema para POST /sessions body */
 export const CreateSessionBodySchema = z.object({
-    model: z.string(),
+    model: z.string().optional(),
     sessionId: z.string().optional(),
-    systemMessage: z.unknown().optional(),
-    infiniteSessions: z.unknown().optional(),
-    workingDirectory: z.string().optional(),
-    streaming: z.boolean().optional(),
-    provider: z.unknown().optional(),
+    clientName: z.string().optional(),
     reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    configDir: z.string().optional(),
+    systemMessage: z.unknown().optional(),
     availableTools: z.array(z.string()).optional(),
     excludedTools: z.array(z.string()).optional(),
+    provider: z.unknown().optional(),
+    workingDirectory: z.string().optional(),
+    streaming: z.boolean().optional(),
+    mcpServers: z.record(z.string(), z.unknown()).optional(),
     customAgents: z.array(z.unknown()).optional(),
-    clientName: z.string().optional(),
+    agent: z.string().optional(),
+    skillDirectories: z.array(z.string()).optional(),
+    disabledSkills: z.array(z.string()).optional(),
+    infiniteSessions: z.unknown().optional(),
 });
 
 /** Schema para POST /sessions/:id/send body */
@@ -151,11 +156,35 @@ export const SendMessageBodySchema = z.object({
 /** Schema para POST /sessions/:id/model body */
 export const SetModelBodySchema = z.object({
     model: z.string(),
+    reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
 });
 
 /** Schema para POST /sessions/:id/resume body */
 export const ResumeSessionBodySchema = z
     .object({
+        clientName: z.string().optional(),
         model: z.string().optional(),
+        reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+        configDir: z.string().optional(),
+        systemMessage: z.unknown().optional(),
+        availableTools: z.array(z.string()).optional(),
+        excludedTools: z.array(z.string()).optional(),
+        provider: z.unknown().optional(),
+        workingDirectory: z.string().optional(),
+        streaming: z.boolean().optional(),
+        mcpServers: z.record(z.string(), z.unknown()).optional(),
+        customAgents: z.array(z.unknown()).optional(),
+        agent: z.string().optional(),
+        skillDirectories: z.array(z.string()).optional(),
+        disabledSkills: z.array(z.string()).optional(),
+        infiniteSessions: z.unknown().optional(),
+        disableResume: z.boolean().optional(),
     })
     .optional();
+
+/** Schema para POST /sessions/:id/log body */
+export const LogMessageBodySchema = z.object({
+    message: z.string().min(1),
+    level: z.enum(['info', 'warning', 'error']).optional(),
+    ephemeral: z.boolean().optional(),
+});

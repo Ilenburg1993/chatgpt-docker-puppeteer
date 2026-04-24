@@ -43,7 +43,7 @@ vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
     readTerminalActivitySnapshot,
 }));
 
-vi.mock('../../../../src/copilot/terminal/state.js', () => ({
+vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getSdkSessionMode,
 }));
 

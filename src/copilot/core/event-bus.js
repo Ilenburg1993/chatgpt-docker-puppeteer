@@ -17,7 +17,7 @@
  */
 
 /**
- * @typedef {import('../events/legacy-events.js').BaseEvent} BaseEvent
+ * @typedef {import('../events/base-events.js').BaseEvent} BaseEvent
  */
 
 /**

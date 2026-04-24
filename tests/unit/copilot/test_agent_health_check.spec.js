@@ -244,6 +244,20 @@ describe('agent/health-check', () => {
         assert.equal(health.recommendedAction, 'reattach_dialog');
     });
 
+    it('nao degrada keepalive parado quando o dialog loop esta ativo', () => {
+        const health = getAgentHealthSnapshot(
+            createContext({ dialogActive: true, keepaliveRunning: false, quotaMonitorRunning: true }),
+            createHost({ status: 'waiting_for_input' }),
+        );
+
+        assert.equal(health.ok, true);
+        assert.equal(health.dialogLoopActive, true);
+        assert.equal(health.checks.io.keepaliveRunning, false);
+        assert.equal(health.checks.io.ok, true);
+        assert.equal(health.issues.includes('io.keepalive_stopped'), false);
+        assert.notEqual(health.recommendedAction, 'restart_keepalive');
+    });
+
     it('marca shadow expiring_soon sem tratá-la como expirada', () => {
         const health = getAgentHealthSnapshot(
             /** @type {any} */ ({

@@ -19,11 +19,14 @@
  * @see EventBus
  */
 
-import { SessionConfigBuilder } from '#copilot/config';
+import { readCopilotBootConfig } from '#copilot/boot';
+import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { createRegistry, modelRegistry } from '#copilot/sdk';
+import { composePreToolUseHandlers, createRuntimeDisableHook } from '#copilot/hooks';
+import { createRegistry, getToolsConfig, modelRegistry } from '#copilot/sdk';
 import { log, METRICS_STORE } from '../ports/observability-port.js';
 
+import { DialogProtocol } from '../../dialog/protocol.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
 import { buildAgentBusHooks } from '../ports/hook-port.js';
 import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
@@ -59,6 +62,8 @@ import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.j
  * @property {(value: import('#copilot/sdk/types').ReasoningEffort | undefined) => void} setReasoningEffort - Atualiza a
  *   opção de reasoning quando ela precisa ser omitida para um modelo sem suporte explícito.
  * @property {() => boolean} isDialogLoopActive - Distingue `ask_user` controlado pelo protocolo de input manual.
+ * @property {() => boolean} [getDialogLoopAttachedSnapshot] - Indica se o wiring do DLM ainda está anexado ao host,
+ *   mesmo quando `dialogLoopActive` ficou temporariamente defasado após timeout/recovery.
  * @property {(status: import('../types.js').AgentStatus, host: LifecycleHost) => void} setStatus - Atualiza status via
  *   host para preservar eventos/observabilidade do runtime.
  * @property {(question: import('../types.js').PendingQuestion | null) => void} setPendingQuestion - Registra ou limpa a
@@ -208,7 +213,33 @@ export function buildSessionHooks(ctx, host) {
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
     });
-    return { busHooks };
+
+    const toolsConfig = getToolsConfig();
+    const defaultRuntimeDenylist = [...DEFAULT_EXCLUDED_TOOLS, ...toolsConfig.denylist];
+    const hasRuntimeToolPolicy = defaultRuntimeDenylist.length > 0 || toolsConfig.allowlist !== null;
+
+    if (!hasRuntimeToolPolicy) {
+        return { busHooks };
+    }
+
+    const runtimeDisableHook = createRuntimeDisableHook((/** @type {string} */ toolName) => {
+        if (defaultRuntimeDenylist.includes(toolName)) {
+            return true;
+        }
+        if (toolsConfig.allowlist !== null) {
+            return !toolsConfig.allowlist.includes(toolName);
+        }
+        return false;
+    });
+
+    return {
+        busHooks: {
+            ...busHooks,
+            onPreToolUse: busHooks.onPreToolUse
+                ? composePreToolUseHandlers(runtimeDisableHook, busHooks.onPreToolUse)
+                : runtimeDisableHook,
+        },
+    };
 }
 
 /**
@@ -224,10 +255,12 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
         mcpBridge ? mcpBridge.buildConfig() : buildDefaultMcpConfig()
     );
+    const bootConfig = readCopilotBootConfig();
     const builder = new SessionConfigBuilder()
         .model(ctx.getModelSnapshot())
         .clientName('chatgpt-docker-puppeteer')
-        .workingDirectory(process.cwd())
+        .workingDirectory(bootConfig.workspace.root)
+        .skillDirectories(bootConfig.skills.skillDirectories)
         .onPermissionRequest(getPermissionHandler(ctx))
         .tools(tools);
 
@@ -259,6 +292,16 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             },
             {
                 isDialogLoopActive: () => ctx.isDialogLoopActive(),
+                shouldHandleProtocolInput: (question) => {
+                    if (ctx.isDialogLoopActive()) {
+                        return true;
+                    }
+                    const dialogLoopAttached =
+                        typeof ctx.getDialogLoopAttachedSnapshot === 'function'
+                            ? ctx.getDialogLoopAttachedSnapshot()
+                            : Boolean(/** @type {{ dialogLoop?: { host?: unknown } }} */ (ctx).dialogLoop?.host);
+                    return dialogLoopAttached && inputLooksLikeDialogProtocol(question);
+                },
                 handleProtocolInput: (q) => handleDialogProtocolInput(ctx, q),
                 setStatus: (s) => ctx.setStatus(s, host),
                 setPendingQuestion: (pq) => ctx.setPendingQuestion(pq),
@@ -275,6 +318,19 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         ...config,
         injectHookContext: true,
     };
+}
+
+/**
+ * Detecta se a pergunta recebida pertence ao protocolo do dialog loop.
+ *
+ * O critério aqui precisa ser semântico e independente do estado `active`, porque o SDK pode entregar um `READY:` já
+ * válido após um timeout transitório de boot.
+ *
+ * @param {string} question
+ * @returns {boolean}
+ */
+function inputLooksLikeDialogProtocol(question) {
+    return DialogProtocol.isProtocolMessage(question);
 }
 
 /**

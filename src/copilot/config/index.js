@@ -14,6 +14,9 @@
 /**
  * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
  *
+ * Mantido localmente neste barrel porque há contratos estruturais que validam a superfície pública de
+ * `#copilot/config`.
+ *
  * @type {readonly string[]}
  */
 export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
@@ -38,7 +41,7 @@ export {
     buildAppendSystemMessage,
     buildHookContextAppendMessage,
     buildReplaceSystemMessage,
-} from './system-prompt.js';
+} from './system-prompt/index.js';
 
 // ─── Novo módulo modular de system prompt (Faixa I) ──────────────────────────
 export {

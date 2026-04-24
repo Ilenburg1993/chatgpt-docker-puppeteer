@@ -2,31 +2,25 @@
 /**
  * src/copilot/agent/lifecycle/entry.js
  *
- * Agent lifecycle para o processo PM2 "copilot-sdk-agent".
+ * Agent lifecycle mantido para compat interna.
  *
  * Inicializa o AlwaysAliveAgent e mantém o processo ativo, aguardando mensagens via sinais ou via HTTP bridge (montado
  * no dashboard-web :3008).
  *
- * **Boot sequence**: A inicialização de DI (bootstrapObservability, bootstrapLateDeps, AUDIT_BUS) é feita pelo
- * `copilot/bootstrap.js`. Este módulo faz apenas o lifecycle do agent: plugin discovery, event wiring, retry loop,
- * shutdown handlers, IPC.
+ * **Boot sequence**: `terminal/bootstrap.js` e `copilot/bootstrap.js` são o boot canônico. Este módulo não é entrypoint
+ * operacional principal.
+ *
+ * O "host" citado pelos helpers deste arquivo é o host de processo compatível. Ele não se confunde com os
+ * `DialogHost`/`DialogLoopHost` de `agent/types.js`.
  *
  * @module copilot/agent/lifecycle/entry
  * @see EventBus
  */
 
-import {
-    EVENT_BUS,
-    TimeoutError,
-    bridgeEmitter,
-    container,
-    registerShutdownHandler,
-    runShutdown,
-    toError,
-    withRetry,
-} from '#copilot/core';
+import { readCopilotBootConfig } from '#copilot/boot';
+import { EVENT_BUS, bridgeEmitter, container, toError, withRetry } from '#copilot/core';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
-import { CopilotClient } from '#copilot/sdk';
+import { CopilotClient, checkAuthStatus } from '#copilot/sdk';
 import {
     BOOT_MAX_RETRIES,
     COPILOT_MODEL,
@@ -49,28 +43,36 @@ import {
 import { getAgent } from '../always-alive.js';
 import { getDefaultHookBus } from '../ports/hook-port.js';
 import { ERROR_TRACKER, log } from '../ports/observability-port.js';
+import {
+    discoverRuntimePlugins,
+    registerRuntimeAgentEventHost,
+    registerRuntimeIpcHost,
+    registerRuntimeProcessSignals,
+    registerRuntimeShutdownHost,
+    runCopilotSdkBootPreflight,
+} from './runtime-host.js';
 import { drainStateWrites } from './state-io.js';
-
-let processSignalHandlersRegistered = false;
 
 /**
  * Inicializa o agent lifecycle: plugin discovery, event wiring, retries, shutdown, IPC.
  *
- * Chamado por `copilot/bootstrap.js` com `mode='agent'` — NÃO executa boot de DI (já feito).
+ * Compat interno do lifecycle. O boot canônico chama `bootCopilot()` e compõe o runtime via `runtime-wiring.js`.
  *
  * @returns {Promise<void>}
  */
 export async function startAgentLoop() {
     const agent = getAgent();
+    const bootConfig = readCopilotBootConfig();
 
     // FAIXA-5A: descobrir e instalar plugins ao iniciar o processo
-    {
-        const _pluginRegistry = new PluginRegistry();
-        const _pluginsDir = new URL('../../plugins', import.meta.url).pathname;
-        discoverPlugins(_pluginsDir, _pluginRegistry).catch((e) => {
-            log('WARN', `[copilot/agent] Plugin discovery falhou (não crítico): ${e?.message ?? e}`);
-        });
-    }
+    discoverRuntimePlugins({
+        pluginsDir: bootConfig.paths.pluginsDir,
+        registry: {
+            discoverPlugins: /** @type {(dir: string, registry: unknown) => Promise<unknown>} */ (discoverPlugins),
+            pluginRegistry: new PluginRegistry(),
+        },
+        log,
+    });
 
     // FAIXA-2A: bridge HookBus → EventBus central para observabilidade cross-module
     const _bus = container.resolve(EVENT_BUS);
@@ -116,42 +118,13 @@ export async function startAgentLoop() {
         }
     }
 
-    // ─── Tratamento de sinais ─────────────────────────────────────────────────────
-
-    /** @param {string} signal */
-    async function shutdown(signal = 'SIGTERM') {
-        log('INFO', `[copilot/agent] Sinal ${signal} recebido — encerrando graciosamente...`);
-        await runShutdown(signal);
-        process.exit(0);
-    }
-
-    // Registrar handlers centralizados por prioridade
-    registerShutdownHandler(
-        'agent.stop',
-        async () => {
-            try {
-                await agent.stop();
-                log('INFO', '[copilot/agent] Agente parado.');
-            } catch (e) {
-                log('WARN', `[copilot/agent] Erro no shutdown: ${toError(e).message}`);
-            }
-        },
-        0,
-    );
-
-    registerShutdownHandler(
-        'state.drain',
-        async () => {
-            await drainStateWrites(DRAIN_WRITES_TIMEOUT_MS);
-        },
-        5,
-    );
-
-    if (!processSignalHandlersRegistered) {
-        process.on('SIGTERM', () => shutdown('SIGTERM'));
-        process.on('SIGINT', () => shutdown('SIGINT'));
-        processSignalHandlersRegistered = true;
-    }
+    const shutdown = registerRuntimeShutdownHost({
+        agent,
+        drainStateWrites,
+        drainTimeoutMs: DRAIN_WRITES_TIMEOUT_MS,
+        log,
+    });
+    registerRuntimeProcessSignals({ shutdown });
 
     // ─── Handlers de erros não tratados ──────────────────────────────────────────
     // Delegado ao error-tracker singleton que já implementa trackError + log.
@@ -159,98 +132,36 @@ export async function startAgentLoop() {
     container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
     // ─── IPC básico (G1-API-03) ───────────────────────────────────────────────────
-    // Permite que o processo pai (PM2 / scripts de controle) envie comandos via IPC.
-    // Comandos suportados: { cmd: 'ping' }, { cmd: 'status' }, { cmd: 'stop' }.
-    if (process.send) {
-        process.on('message', (/** @type {Record<string, unknown>} */ msg) => {
-            const cmd = msg?.['cmd'];
-            if (cmd === 'ping') {
-                process.send?.({ ok: true, pong: true });
-            } else if (cmd === 'status') {
-                process.send?.({ ok: true, status: agent.status });
-            } else if (cmd === 'stop') {
-                log('INFO', '[copilot/agent] IPC stop recebido — encerrando...');
-                shutdown('IPC:stop').catch((e) => logSwallowed(e, 'agent.entry.ipcShutdown'));
-            } else {
-                process.send?.({ ok: false, error: `Comando desconhecido: ${cmd}` });
-            }
-        });
-    }
-
-    // Logar status periódico (evita PM2 matar o processo por inatividade)
-    agent.on(EMITTER_STATUS, (status) => {
-        log('INFO', `[copilot/agent] Status: ${status}`);
+    registerRuntimeIpcHost({
+        agent,
+        shutdown: (signal) => shutdown(signal).catch((e) => logSwallowed(e, 'agent.entry.ipcShutdown')),
+        log,
     });
 
-    agent.on(EMITTER_ERROR, (err) => {
-        log('ERROR', `[copilot/agent] Erro do agente: ${err.message}`);
+    registerRuntimeAgentEventHost({
+        agent,
+        events: {
+            status: EMITTER_STATUS,
+            error: EMITTER_ERROR,
+            sessionFatal: EMITTER_SESSION_FATAL,
+        },
+        log,
     });
 
-    // `session.fatal` indica que a sessão está irrecuperável. Encerrar o processo permite ao PM2 reiniciar imediatamente.
-    agent.on(EMITTER_SESSION_FATAL, (/** @type {Record<string, unknown>} */ evt) => {
-        const reason = evt?.['reason'] ?? evt?.['message'] ?? 'desconhecido';
-        log('ERROR', `[copilot/agent] session.fatal recebido — encerrando processo: ${reason}`);
-        void runShutdown('session.fatal').finally(() => {
-            process.exitCode = 1;
-            process.exit(1);
-        });
+    const preflightReport = await runCopilotSdkBootPreflight({
+        createClient: () => new CopilotClient(),
+        checkAuthStatus,
+        configuredModel: COPILOT_MODEL,
+        pingTimeoutMs: PING_TIMEOUT_MS,
+        log,
     });
-
-    // ─── Bootstrap ───────────────────────────────────────────────────────────────
-
-    // Verifica conectividade do CLI antes do primeiro start para falhar rápido em caso de indisponibilidade.
-    let pingClient = null;
-    try {
-        pingClient = new CopilotClient();
-        await pingClient.start();
-        await Promise.race([
-            pingClient.ping(),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new TimeoutError('Ping timeout (5s)')), PING_TIMEOUT_MS),
-            ),
-        ]);
-        log('INFO', '[copilot/agent] CLI conectado — ping OK.');
-
-        // F113 (Faixa 24): Verificar autenticação no boot para falhar rápido antes de criar sessão.
-        try {
-            const { checkAuthStatus } = await import('#copilot/sdk');
-            const authStatus = await checkAuthStatus(pingClient);
-            if (!authStatus.authenticated) {
-                log(
-                    'WARN',
-                    '[copilot/agent] Usuário não autenticado no Copilot — sessão pode falhar. Verifique suas credenciais.',
-                );
-            } else {
-                log('INFO', '[copilot/agent] Autenticação Copilot OK.');
-            }
-        } catch (authErr) {
-            log('DEBUG', `[copilot/agent] Verificação de auth ignorada: ${toError(authErr).message ?? authErr}`);
-        }
-    } catch (e) {
-        log('WARN', `[copilot/agent] CLI não respondeu ao ping no boot: ${toError(e).message}`);
-        // Continuar de qualquer forma — startWithRetry() tratará a falha
-    } finally {
-        // Para o cliente de ping após uso para evitar conexão TCP persistente desnecessaria.
-        pingClient?.stop().catch((e) => logSwallowed(e, 'agent.entry.pingStop'));
-    }
-
-    // Valida COPILOT_MODEL proativamente — falha rápida em modelo inválido antes do start.
-    if (COPILOT_MODEL && COPILOT_MODEL !== 'gpt-5-mini') {
-        try {
-            const { listModels } = await import('../../sdk/models/helpers.js');
-            const models = await listModels();
-            const valid = models.some((/** @type {{ id: string }} */ m) => m.id === COPILOT_MODEL);
-            if (!valid) {
-                log(
-                    'WARN',
-                    `[copilot/agent] Modelo '${COPILOT_MODEL}' não encontrado na lista de modelos disponíveis. Verifique COPILOT_MODEL.`,
-                );
-            } else {
-                log('INFO', `[copilot/agent] Modelo '${COPILOT_MODEL}' validado na lista de modelos.`);
-            }
-        } catch (e) {
-            log('DEBUG', `[copilot/agent] Validação de modelo ignorada: ${toError(e).message ?? e}`);
-        }
+    if (!preflightReport.ok) {
+        log(
+            'WARN',
+            `[copilot/agent] Preflight degradado no host compatível: ${preflightReport.warnings.join(' | ') || 'sem detalhes'}`,
+        );
+    } else {
+        log('INFO', '[copilot/agent] Preflight SDK concluído com sucesso no host compatível.');
     }
 
     // Captura Promise para garantir que rejeições assíncronas não fiquem silenciosas.

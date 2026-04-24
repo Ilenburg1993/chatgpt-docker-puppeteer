@@ -72,6 +72,7 @@ export {
     createArgSanitizerHook,
     createBlocklistHook,
     createPostToolEnricher,
+    createRuntimeDisableHook,
     createTimingEnricherHook,
 } from './tool-interceptor.js';
 

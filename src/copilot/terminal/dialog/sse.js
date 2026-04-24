@@ -13,7 +13,7 @@ import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
 import { eventFanout } from '../../infra/sse/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { CRITICAL_EVENTS } from '../../presentation/realtime.js';
-import { getHubSessionId } from '../state.js';
+import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
 
 export { CRITICAL_EVENTS } from '../../presentation/realtime.js';
 

@@ -8,6 +8,14 @@
 
 export { tryReconnect } from './reconnect-policy.js';
 export {
+    discoverRuntimePlugins,
+    registerRuntimeAgentEventHost,
+    registerRuntimeIpcHost,
+    registerRuntimeProcessSignals,
+    registerRuntimeShutdownHost,
+    runCopilotSdkBootPreflight,
+} from './runtime-host.js';
+export {
     clearState,
     clearStateAsync,
     drainStateWrites,

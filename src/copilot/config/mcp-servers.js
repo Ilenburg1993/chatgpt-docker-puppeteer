@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { WORKSPACE_ROOT } from '#copilot/boot';
 import {
     COPILOT_MCP_HTTP_TIMEOUT_MS,
     COPILOT_MCP_SERVERS,
@@ -64,7 +65,7 @@ export const MCP_SERVERS = {
     filesystem: {
         type: 'stdio',
         command: 'npx',
-        args: ['@modelcontextprotocol/server-filesystem', '/workspaces/chatgpt-docker-puppeteer'],
+        args: ['@modelcontextprotocol/server-filesystem', WORKSPACE_ROOT],
         timeout: MCP_STDIO_TIMEOUT_MS,
     },
 

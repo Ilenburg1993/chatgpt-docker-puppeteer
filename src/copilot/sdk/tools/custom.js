@@ -16,8 +16,9 @@
  * @see EventBus
  */
 
+import { resolvePersistentConfigFile } from '#copilot/boot';
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
@@ -44,14 +45,13 @@ export function setCustomToolsBuilder(fn) {
     if (typeof fn === 'function') _buildTool = fn;
 }
 
-const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../../..');
 const LEGACY_COPILOT_ROOT = resolve(import.meta.dirname, '../..');
 
 /** Caminho canônico do arquivo de persistência. @type {string} */
-const CUSTOM_TOOLS_PATH = join(WORKSPACE_ROOT, 'custom-tools.json');
+const CUSTOM_TOOLS_PATH = resolvePersistentConfigFile('custom-tools.json');
 
 /** Caminho legado mantido apenas para compatibilidade de leitura. @type {string} */
-const LEGACY_CUSTOM_TOOLS_PATH = join(LEGACY_COPILOT_ROOT, 'custom-tools.json');
+const LEGACY_CUSTOM_TOOLS_PATH = resolve(LEGACY_COPILOT_ROOT, 'custom-tools.json');
 
 /** @type {boolean} */
 let _legacyPathWarned = false;

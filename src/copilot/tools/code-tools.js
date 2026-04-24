@@ -10,18 +10,20 @@
  * @see module:copilot/tools/tool-factory
  */
 
+import { COPILOT_PACKAGE_ROOT, WORKSPACE_ROOT } from '#copilot/boot';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { toExecError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 
-const ROOT = new URL('../../..', import.meta.url).pathname;
+const ROOT = WORKSPACE_ROOT;
 // BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes
 // onde o cwd não coincide com o ROOT do projeto
-const _resolvedEslint = new URL('../../../node_modules/.bin/eslint', import.meta.url).pathname;
+const _resolvedEslint = resolve(COPILOT_PACKAGE_ROOT, 'node_modules', '.bin', 'eslint');
 // BUG-P2-18: fallback para `which eslint` se o caminho resolvido não existir
 const ESLINT_BIN = existsSync(_resolvedEslint)
     ? _resolvedEslint

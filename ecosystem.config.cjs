@@ -400,10 +400,10 @@ module.exports = {
               ]
             : []),
 
-        // ── Always-Alive Copilot SDK Agent ──────────────────────────────────
-        // Habilitado quando COPILOT_SDK_ENABLED=true no environment.
-        // Este processo NÃO inicia automaticamente com pm2 start — é opcional.
-        ...(process.env.COPILOT_SDK_ENABLED === 'true'
+        // ── Compat Copilot SDK Agent ────────────────────────────────────────
+        // Entry point histórico. Não é um segundo runtime; delega para o mesmo boot do terminal.
+        // Use apenas como compat opt-in e nunca junto com llm-b-terminal.
+        ...(process.env.COPILOT_SDK_AGENT_COMPAT_ENABLED === 'true' && process.env.COPILOT_TERMINAL_ENABLED !== 'true'
             ? [
                   {
                       name: 'copilot-sdk-agent',

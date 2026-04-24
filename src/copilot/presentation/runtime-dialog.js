@@ -8,6 +8,7 @@
  */
 
 import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
+import { log } from '#copilot/observability';
 import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './runtime-file-context.js';
@@ -19,7 +20,7 @@ export { MAX_EMBED_BYTES };
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
  *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
- *     sendDialogTurn: (message: string, options?: { timeout?: number }) => Promise<string | null>;
+ *     sendDialogTurn: (message: string, options?: { timeout?: number; traceId?: string }) => Promise<string | null>;
  *     stopDialogLoop: (opts?: {
  *         authorized?: boolean;
  *         reason?: 'watchdog_restart' | 'authorized_stop';
@@ -37,6 +38,14 @@ function resolveRuntimeDialogTarget(runtime) {
 }
 
 /**
+ * @param {string | undefined} [traceId]
+ * @returns {string}
+ */
+function traceLabel(traceId) {
+    return traceId ? `trace=${traceId}` : 'trace=none';
+}
+
+/**
  * @param {string | undefined} [bootPrompt]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
  * @returns {Promise<void>}
@@ -49,27 +58,46 @@ export async function startRuntimeDialogLoop(bootPrompt, runtime) {
  * Envia um turno para um dialog loop já ativo/pausado, sem tentar iniciar automaticamente o loop.
  *
  * @param {string} message
- * @param {{ timeout?: number }} [options]
+ * @param {{ timeout?: number; traceId?: string }} [options]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
  * @returns {Promise<string | null>}
  */
 export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
-    return sendAgentDialogTurn(agent, message, options);
+    const startedAt = Date.now();
+    const { traceId, timeout } = options ?? {};
+    log('INFO', `[runtime-dialog] send turn on active loop (${traceLabel(traceId)}, timeout=${timeout ?? 'default'})`);
+    try {
+        const reply = await sendAgentDialogTurn(agent, message, options);
+        log(
+            'INFO',
+            `[runtime-dialog] turn resolved (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, reply=${reply === null ? 'null' : 'ok'})`,
+        );
+        return reply;
+    } catch (error) {
+        const reason = error instanceof Error ? `${error.name}:${error.message}` : String(error);
+        log(
+            'WARN',
+            `[runtime-dialog] turn failed (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, error=${reason})`,
+        );
+        throw error;
+    }
 }
 
 /**
  * @param {string} message
  * @param {string} from
- * @param {{ timeout?: number }} [options]
+ * @param {{ timeout?: number; traceId?: string }} [options]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
  * @returns {Promise<string | null>}
  */
 export async function sendRuntimeDialogTurn(message, from, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
     const state = readRuntimeControlState(/** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent));
+    const { traceId } = options ?? {};
 
     if (!state.dialogLoopActive && !state.dialogPaused) {
+        log('INFO', `[runtime-dialog] auto-starting dialog loop before turn (${traceLabel(traceId)}, from=${from})`);
         await startRuntimeDialogLoop(undefined, agent);
     }
 
@@ -80,7 +108,7 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
 /**
  * @param {string} message
  * @param {string} from
- * @param {{ timeout?: number }} [options]
+ * @param {{ timeout?: number; traceId?: string }} [options]
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<string | null>}
  */

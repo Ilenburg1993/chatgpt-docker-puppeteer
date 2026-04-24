@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { WORKSPACE_ROOT } from '#copilot/boot';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
@@ -34,7 +35,7 @@ export async function cmdExport({ println }, arg) {
 
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const defaultName = `conversa-${ts}.md`;
-    const filePath = arg?.trim() ? resolve(arg.trim()) : join(process.cwd(), defaultName);
+    const filePath = arg?.trim() ? resolve(WORKSPACE_ROOT, arg.trim()) : join(WORKSPACE_ROOT, defaultName);
 
     const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
     lines.push(`> ${hist.length} mensagens · exportado em ${new Date().toISOString()}`, '');

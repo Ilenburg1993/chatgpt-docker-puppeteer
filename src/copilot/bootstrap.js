@@ -2,22 +2,29 @@
 /**
  * src/copilot/bootstrap.js — Entry point canônico do módulo copilot.
  *
- * Modo único: **terminal** (ferramenta de desenvolvimento).
+ * Modo único: **terminal-runtime** (ferramenta de desenvolvimento).
  *
  * O copilot é a LLM-B — uma ferramenta de desenvolvimento equivalente ao DevTools. Não é um addon de produção. Sempre
  * boot via terminal com inject server (:3009).
  *
  * Boot sequence: Phase 0 — Kernel: container + L0 tokens (already at module load) Phase 1 — Observability: loggers,
- * error tracker, EventBus Phase 2 — Late deps: tools builder, audit bus Phase 3 — Terminal: startTerminalServer()
+ * error tracker, EventBus Phase 2 — Late deps: tools builder, audit bus Phase 3 — Runtime wiring Phase 4 — Terminal
+ * host
+ *
+ * - Copilot HTTP server Phase 5 — REPL
  *
  * @module copilot/bootstrap
  */
 
 import { AUDIT_BUS } from '#copilot/audit';
+import { createCopilotBootPlan, readCopilotBootConfig } from '#copilot/boot';
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { HOOKS_LOGGER } from '#copilot/hooks';
-import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
+import { ERROR_TRACKER } from '#copilot/observability';
+import { CopilotClient, SDK_LOGGER, TOOLS_BUILDER, checkAuthStatus } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
+import { runCopilotSdkBootPreflight } from './agent/lifecycle/runtime-host.js';
+import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
 import { container } from './core/di-container.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
@@ -40,46 +47,68 @@ export async function bootCopilot() {
     }
     _booted = true;
 
-    log('INFO', '[bootstrap] Iniciando copilot (modo terminal)…');
+    try {
+        const bootConfig = readCopilotBootConfig();
+        const bootPlan = createCopilotBootPlan(bootConfig);
 
-    // ── Phase 1: Observability ──────────────────────────────────────────
-    bootstrapObservability();
+        log(
+            'INFO',
+            `[bootstrap] Iniciando copilot (modo ${bootConfig.mode}) em ${bootConfig.workspace.root} -> ${bootConfig.server.url}.`,
+        );
 
-    // ── Phase 2: Late deps ──────────────────────────────────────────────
-    const { buildTool } = await import('./tools/index.js');
-    bootstrapLateDeps({ buildTool });
+        // ── Phase 1: Observability ──────────────────────────────────────────
+        bootstrapObservability();
+        container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
-    const { defaultBus } = await import('./hooks/bus.js');
-    container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+        // ── Phase 2: Late deps ──────────────────────────────────────────────
+        const { buildTool } = await import('./tools/index.js');
+        bootstrapLateDeps({ buildTool });
 
-    const { setAuditBus } = await import('./audit/pipeline-permission.js');
-    setAuditBus(defaultBus);
+        const { defaultBus } = await import('./hooks/bus.js');
+        container.register(AUDIT_BUS, () => defaultBus, 'singleton');
 
-    // ── Validation: verify all critical DI tokens are registered ────────
-    container.validateRequired([
-        SHUTDOWN_LOGGER,
-        EVENT_BUS,
-        SDK_LOGGER,
-        TOOLS_BUILDER,
-        AUDIT_BUS,
-        HOOKS_LOGGER,
-        TOOLS_LOGGER,
-        TOOLS_METRICS,
-    ]);
+        const { setAuditBus } = await import('./audit/pipeline-permission.js');
+        setAuditBus(defaultBus);
 
-    // ── Phase 3: Terminal (único modo) ──────────────────────────────────
-    const [{ wireCopilotRuntimeDI }, { startTerminalServer }, { startTodoCleanupJob }] = await Promise.all([
-        import('./runtime-wiring.js'),
-        import('./terminal/index.js'),
-        import('./tools/todo/store.js'),
-    ]);
+        // ── Validation: verify all critical DI tokens are registered ────────
+        container.validateRequired([
+            SHUTDOWN_LOGGER,
+            EVENT_BUS,
+            SDK_LOGGER,
+            TOOLS_BUILDER,
+            AUDIT_BUS,
+            HOOKS_LOGGER,
+            TOOLS_LOGGER,
+            TOOLS_METRICS,
+        ]);
 
-    // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
-    // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
-    const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
-    wireRuntime();
+        const bootPreflight = await runCopilotSdkBootPreflight({
+            createClient: () => new CopilotClient(),
+            checkAuthStatus,
+            configuredModel: COPILOT_MODEL,
+            pingTimeoutMs: PING_TIMEOUT_MS,
+            log,
+        });
 
-    await startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob });
+        // ── Phase 3: Terminal (único modo) ──────────────────────────────────
+        const [{ wireCopilotRuntimeDI }, { startTerminalServer }, { startTodoCleanupJob }] = await Promise.all([
+            import('./runtime-wiring.js'),
+            import('./terminal/index.js'),
+            import('./tools/todo/store.js'),
+        ]);
+
+        // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
+        // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
+        const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
+        wireRuntime();
+
+        log('DEBUG', `[bootstrap] Plano de boot: ${bootPlan.phases.map((phase) => phase.id).join(' -> ')}`);
+
+        await startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob, bootConfig, bootPreflight });
+    } catch (error) {
+        _booted = false;
+        throw error;
+    }
 }
 
 /**
@@ -91,5 +120,5 @@ export async function bootCopilot() {
  */
 function startTerminalServerBroadcast(event, payload) {
     const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
-    void import('./terminal/dialog.js').then(({ broadcastSse }) => broadcastSse(event, data));
+    void import('./terminal/dialog/index.js').then(({ broadcastSse }) => broadcastSse(event, data));
 }

@@ -2,7 +2,7 @@
 /**
  * src/copilot/observability/event-bus-observers.js
  *
- * FAIXA-2D — compat shim para subscribers cross-module do EventBus.
+ * Adapter público para subscribers cross-module do EventBus.
  *
  * Este arquivo era a implementação ad hoc de subscribers no EventBus. A arquitetura atual promoveu
  * `event-bus-runtime.js` a owner canônico dessa composição.
@@ -36,11 +36,11 @@ export function attachEventBusObservers() {
     const bus = container.resolve(EVENT_BUS);
     const metrics = container.resolve(METRICS_STORE);
     if (!bus || !metrics) {
-        log('WARN', '[event-bus-observers] EventBus ou MetricsStore indisponível — compat shim não registrado');
+        log('WARN', '[event-bus-observers] EventBus ou MetricsStore indisponível — runtime não registrado');
         return;
     }
     attachObservabilityBusRuntime({ bus, metrics });
-    log('INFO', '[event-bus-observers] compat shim delegou para event-bus-runtime');
+    log('INFO', '[event-bus-observers] adapter delegou para event-bus-runtime');
 }
 
 /**
@@ -50,5 +50,5 @@ export function attachEventBusObservers() {
  */
 export function detachEventBusObservers() {
     detachObservabilityBusRuntime();
-    log('INFO', '[event-bus-observers] compat shim removeu event-bus-runtime');
+    log('INFO', '[event-bus-observers] adapter removeu event-bus-runtime');
 }

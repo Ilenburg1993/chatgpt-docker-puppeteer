@@ -1,0 +1,14 @@
+// @ts-check
+/**
+ * src/copilot/boot/index.js
+ *
+ * Barrel canonico do boot Copilot.
+ *
+ * @module copilot/boot
+ */
+
+export * from './config.js';
+export * from './contract.js';
+export * from './plan.js';
+export * from './skills.js';
+export * from './workspace.js';

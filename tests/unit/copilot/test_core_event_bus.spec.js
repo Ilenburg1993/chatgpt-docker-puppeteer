@@ -9,7 +9,7 @@ import { EventBus, createEventBus } from '../../../src/copilot/core/event-bus.js
  *
  * @param {string} type
  * @param {Record<string, unknown>} [extra]
- * @returns {import('../../../src/copilot/events/legacy-events.js').BaseEvent}
+ * @returns {import('../../../src/copilot/events/base-events.js').BaseEvent}
  */
 function evt(type, extra = {}) {
     return { type, timestamp: Date.now(), ...extra };

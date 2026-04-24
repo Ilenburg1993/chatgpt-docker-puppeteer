@@ -16,10 +16,10 @@ describe('observability runtime contract', () => {
         assert.match(src, /attachObservabilityBusRuntime/);
     });
 
-    it('event-bus-observers foi reduzido a compat shim', () => {
+    it('event-bus-observers é adapter público para event-bus-runtime', () => {
         const src = read('observability/event-bus-observers.js');
         assert.match(src, /attachObservabilityBusRuntime/);
-        assert.match(src, /compat shim/i);
+        assert.match(src, /adapter/i);
     });
 
     it('health-registry registra health do módulo observability', () => {

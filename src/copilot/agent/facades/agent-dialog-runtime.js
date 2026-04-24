@@ -15,7 +15,7 @@
 
 /**
  * @typedef {{
- *     sendDialogTurn: (message: string, options?: { timeout?: number }) => Promise<string | null>;
+ *     sendDialogTurn: (message: string, options?: { timeout?: number; traceId?: string }) => Promise<string | null>;
  * }} AgentDialogTurnTarget
  */
 
@@ -41,7 +41,7 @@ export async function startAgentDialogLoop(runtime, bootPrompt) {
 /**
  * @param {AgentDialogTurnTarget} runtime
  * @param {string} message
- * @param {{ timeout?: number }} [options]
+ * @param {{ timeout?: number; traceId?: string }} [options]
  * @returns {Promise<string | null>}
  */
 export async function sendAgentDialogTurn(runtime, message, options) {

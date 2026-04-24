@@ -72,12 +72,14 @@ export class TurnQueue {
         const next = prev.then(fn);
         this.#mutex = next.then(() => {}).catch((e) => logSwallowed(e, 'agent.backpressure.mutex'));
         const myGen = ++this.#gen;
-        void next.finally(() => {
+        const finalizeTurn = () => {
             this.#depth--;
             if (this.#depth === 0 && this.#gen === myGen) {
                 this.#mutex = Promise.resolve();
             }
-        });
+        };
+        // Evita gerar uma Promise rejeitada órfã via `finally()` quando `next` falha.
+        void next.then(finalizeTurn, finalizeTurn);
         return next;
     }
 

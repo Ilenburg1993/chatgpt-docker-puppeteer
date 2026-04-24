@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/test_system_prompt.spec.js
  *
- * Testes unitários para src/copilot/config/system-prompt.js (Sprint 22). Cobre: constantes exportadas,
+ * Testes unitários para src/copilot/config/system-prompt/index.js (Sprint 22). Cobre: constantes exportadas,
  * buildAppendSystemMessage, buildReplaceSystemMessage, buildAlwaysAliveSystemMessage, buildHookContextAppendMessage.
  */
 

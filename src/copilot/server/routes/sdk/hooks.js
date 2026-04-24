@@ -15,11 +15,10 @@
  * @see EventBus
  */
 
-import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
-import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../../../infra/sse/utils.js';
+import { resolveSdkRouteSharedDeps } from './deps.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */
@@ -62,7 +61,7 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/hooks');
  *         .then(({ hooks }) => hooks.forEach((h) => console.log(h.name)));
  */
 router.get('/hooks/registry', (_req, res) => {
-    const hooks = SDK_HOOKS.list();
+    const hooks = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req)).sdkHooks.registry.list();
     res.json({ ok: true, count: hooks.length, hooks });
 });
 
@@ -90,6 +89,7 @@ router.get('/hooks/events', (req, res) => {
             res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
             return;
         }
+        const routeDeps = resolveSdkRouteSharedDeps(req);
 
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
         // FASE-11.1/11.4: replay buffer + max lifetime
@@ -108,11 +108,11 @@ router.get('/hooks/events', (req, res) => {
         };
 
         // Observar todos os eventos via wildcard '*'
-        defaultBus.on('*', onAnyHook);
+        routeDeps.sdkHooks.bus.on('*', onAnyHook);
 
         req.on('close', () => {
-            defaultBus.off('*', onAnyHook);
-            log('INFO', '[sdk-api] SSE hooks/events encerrado');
+            routeDeps.sdkHooks.bus.off('*', onAnyHook);
+            routeDeps.sdkHooks.log('INFO', '[sdk-api] SSE hooks/events encerrado');
         });
     });
 });

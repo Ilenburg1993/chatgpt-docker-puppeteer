@@ -9,11 +9,11 @@
  * @see EventBus
  */
 
+import { getBusy } from '../presentation/runtime-ui-state-store.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
-import { buildUserPrompt } from './dialog.js';
+import { buildUserPrompt } from './dialog/index.js';
 import { readTerminalAgentRuntimeEventHost } from './frontend/llm-b-runtime.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
-import { getBusy } from './state.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.

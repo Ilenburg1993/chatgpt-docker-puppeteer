@@ -1,34 +1,13 @@
 // @ts-check
 /**
- * src/copilot/api/express/session-crud.js
+ * src/copilot/server/routes/sdk/session-crud.js
  *
- * @module copilot/api/express/session-crud
+ * @module copilot/server/routes/sdk/session-crud
  * @see EventBus
  */
 
-import { BRIDGE_ADMIN_TOKEN as _BRIDGE_ADMIN_TOKEN } from '#copilot/config';
-import { getCompactionHistory, log } from '#copilot/observability';
-import {
-    approveAll,
-    createClientSession,
-    disconnectClientSession,
-    getClient,
-    getClientSession,
-    getForegroundClientSessionId,
-    getLastClientSessionId,
-    listActiveClientSessions,
-    listAllClientSessions,
-    pickDefined,
-    resumeClientSession,
-    setForegroundClientSessionId,
-} from '#copilot/sdk';
 import { Router } from 'express';
-import {
-    attachSdkSessionOwnership,
-    forgetSdkSessionOwnership,
-    rememberSdkSessionOwnership,
-    resolveSdkSessionRouteMeta,
-} from '../../../presentation/sdk-sessions.js';
+import { resolveSdkRouteSharedDeps } from './deps.js';
 import {
     CreateSessionBodySchema,
     rateLimitMiddleware,
@@ -44,6 +23,8 @@ import {
  * @typedef {import('express').Response} Res
  *
  * @typedef {import('#copilot/sdk/types').SessionListFilter} SessionListFilter
+ *
+ * @typedef {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>} SdkRouteDeps
  */
 
 const router = Router();
@@ -51,11 +32,12 @@ const router = Router();
 /**
  * Lista sessões ativas do registry em memória com metadados derivados.
  *
+ * @param {SdkRouteDeps} routeDeps
  * @returns {{ sessionId: string; model: string; createdAt: number; messagesCount: number; activeMs: number }[]}
  */
-function listActiveSessions() {
-    return listActiveClientSessions().map(({ sessionId, model, createdAt, messagesCount }) =>
-        attachSdkSessionOwnership(
+function listActiveSessions(routeDeps) {
+    return routeDeps.sdkSession.listActiveClientSessions().map(({ sessionId, model, createdAt, messagesCount }) =>
+        routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
             {
                 sessionId,
                 model,
@@ -76,7 +58,8 @@ function listActiveSessions() {
  * Lista sessões ativas no registry em memória (sessões com conexão aberta neste processo).
  */
 router.get('/sessions/active', (_req, res) => {
-    const active = listActiveSessions();
+    const routeDeps = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req));
+    const active = listActiveSessions(routeDeps);
     res.json({ ok: true, count: active.length, sessions: active });
 });
 
@@ -85,9 +68,10 @@ router.get('/sessions/active', (_req, res) => {
  */
 router.get('/sessions/last', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const meta = await resolveSdkSessionRouteMeta({
-            getForegroundSessionId: getForegroundClientSessionId,
-            getLastSessionId: getLastClientSessionId,
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const meta = await routeDeps.sdkSessionOwnership.resolveSdkSessionRouteMeta({
+            getForegroundSessionId: routeDeps.sdkSession.getForegroundClientSessionId,
+            getLastSessionId: routeDeps.sdkSession.getLastClientSessionId,
         });
         res.json({
             ok: true,
@@ -103,9 +87,10 @@ router.get('/sessions/last', (req, res) => {
  */
 router.get('/sessions/binding', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const meta = await resolveSdkSessionRouteMeta({
-            getForegroundSessionId: getForegroundClientSessionId,
-            getLastSessionId: getLastClientSessionId,
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const meta = await routeDeps.sdkSessionOwnership.resolveSdkSessionRouteMeta({
+            getForegroundSessionId: routeDeps.sdkSession.getForegroundClientSessionId,
+            getLastSessionId: routeDeps.sdkSession.getLastClientSessionId,
         });
         res.json({ ok: true, ...meta });
     });
@@ -120,9 +105,10 @@ router.get('/sessions/binding', (req, res) => {
  */
 router.get('/sessions/foreground', (req, res) => {
     void withErrorHandler(req, res, async () => {
-        const meta = await resolveSdkSessionRouteMeta({
-            getForegroundSessionId: getForegroundClientSessionId,
-            getLastSessionId: getLastClientSessionId,
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const meta = await routeDeps.sdkSessionOwnership.resolveSdkSessionRouteMeta({
+            getForegroundSessionId: routeDeps.sdkSession.getForegroundClientSessionId,
+            getLastSessionId: routeDeps.sdkSession.getLastClientSessionId,
         });
         res.json({
             ok: true,
@@ -138,10 +124,11 @@ router.get('/sessions/foreground', (req, res) => {
  */
 router.put('/sessions/foreground/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        await setForegroundClientSessionId(id);
-        rememberSdkSessionOwnership(id);
-        res.json(attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id));
+        await routeDeps.sdkSession.setForegroundClientSessionId(id);
+        routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(id);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id));
     });
 });
 
@@ -157,17 +144,20 @@ router.put('/sessions/foreground/:id', (req, res) => {
  */
 router.get('/sessions', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         /** @type {SessionListFilter} */
         const filter = {};
         if (req.query['repository']) filter.repository = String(req.query['repository']);
         if (req.query['branch']) filter.branch = String(req.query['branch']);
         if (req.query['cwd']) filter.cwd = String(req.query['cwd']);
 
-        const sessions = await listAllClientSessions(Object.keys(filter).length ? filter : undefined);
-        const active = new Set(listActiveSessions().map((s) => s.sessionId));
+        const sessions = await routeDeps.sdkSession.listAllClientSessions(
+            Object.keys(filter).length ? filter : undefined,
+        );
+        const active = new Set(listActiveSessions(routeDeps).map((s) => s.sessionId));
 
         const enriched = sessions.map((s) => ({
-            ...attachSdkSessionOwnership(s, s.sessionId),
+            ...routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(s, s.sessionId),
             isActive: active.has(s.sessionId),
         }));
         res.json({ ok: true, count: enriched.length, sessions: enriched });
@@ -185,8 +175,9 @@ router.get('/sessions', (req, res) => {
  *
  * ```json
  * {
- *     "model": "claude-sonnet-4-5", // OBRIGATÓRIO — nome do modelo
+ *     "model": "claude-sonnet-4-5", // opcional, exceto quando provider custom exige modelo
  *     "sessionId": "my-id", // opcional — ID customizado
+ *     "configDir": "/tmp/copilot-config", // opcional
  *     "systemMessage": { "content": "..." }, // opcional
  *     "infiniteSessions": { "enabled": true }, // opcional (padrão: habilitado)
  *     "workingDirectory": "/caminho/do/projeto", // opcional
@@ -194,7 +185,11 @@ router.get('/sessions', (req, res) => {
  *     "reasoningEffort": "high", // opcional — "low" | "medium" | "high" | "xhigh"
  *     "availableTools": ["read_file"], // opcional — whitelist de tools
  *     "excludedTools": ["run_in_terminal"], // opcional — blacklist de tools
+ *     "mcpServers": {}, // opcional — MCP servers locais/remotos do SDK
  *     "customAgents": [], // opcional — agentes customizados
+ *     "agent": "reviewer", // opcional — custom agent inicial
+ *     "skillDirectories": [".github/skills"], // opcional
+ *     "disabledSkills": ["legacy-skill"], // opcional
  *     "clientName": "my-app", // opcional — identificador no User-Agent
  *     "provider": { "type": "openai", "baseUrl": "..." } // opcional — BYOK
  * }
@@ -206,6 +201,7 @@ router.post(
     validateBody(CreateSessionBodySchema),
     (req, res) => {
         void withErrorHandler(req, res, async () => {
+            const routeDeps = resolveSdkRouteSharedDeps(req);
             const {
                 model,
                 sessionId,
@@ -215,45 +211,71 @@ router.post(
                 streaming,
                 provider,
                 reasoningEffort,
+                configDir,
                 availableTools,
                 excludedTools,
+                mcpServers,
                 customAgents,
+                agent,
+                skillDirectories,
+                disabledSkills,
                 clientName,
             } = req.body ?? {};
 
-            const modelResult = validateModel(model);
-            if (!modelResult.ok) {
-                res.status(400).json({ ok: false, error: modelResult.error });
+            /** @type {string | undefined} */
+            let safeModel;
+            if (model !== undefined) {
+                const modelResult = validateModel(model);
+                if (!modelResult.ok) {
+                    res.status(400).json({ ok: false, error: modelResult.error });
+                    return;
+                }
+                safeModel = modelResult.model;
+            }
+            if (provider !== undefined && safeModel === undefined) {
+                res.status(400).json({
+                    ok: false,
+                    error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
+                });
                 return;
             }
-            const safeModel = modelResult.model;
 
-            const session = await createClientSession({
-                onPermissionRequest: approveAll,
-                model: safeModel,
-                ...pickDefined({
-                    sessionId,
-                    systemMessage,
-                    infiniteSessions,
-                    workingDirectory,
-                    streaming,
-                    provider,
-                    reasoningEffort,
-                    availableTools,
-                    excludedTools,
-                    customAgents,
-                    clientName,
-                }),
+            /** @type {Partial<import('#copilot/sdk/types').SessionConfig>} */
+            const sessionOptions = routeDeps.sdkSession.pickDefined({
+                sessionId,
+                clientName,
+                reasoningEffort,
+                configDir,
+                systemMessage,
+                availableTools,
+                excludedTools,
+                provider,
+                workingDirectory,
+                streaming,
+                mcpServers,
+                customAgents,
+                agent,
+                skillDirectories,
+                disabledSkills,
+                infiniteSessions,
             });
+            if (safeModel !== undefined) sessionOptions.model = safeModel;
 
-            rememberSdkSessionOwnership(session.sessionId);
+            const session = await routeDeps.sdkSession.createClientSession(
+                /** @type {import('#copilot/sdk/types').SessionConfig} */ ({
+                    onPermissionRequest: routeDeps.sdkSession.approveAll,
+                    ...sessionOptions,
+                }),
+            );
+
+            routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(session.sessionId);
 
             res.status(201).json(
-                attachSdkSessionOwnership(
+                routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                     {
                         ok: true,
                         sessionId: session.sessionId,
-                        model: safeModel,
+                        model: safeModel ?? null,
                         workspacePath: session.workspacePath ?? null,
                     },
                     session.sessionId,
@@ -272,13 +294,14 @@ router.post(
  */
 router.get('/sessions/:id', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
 
         // Busca todas as sessões no disco e filtra pela ID solicitada
-        const all = await listAllClientSessions();
+        const all = await routeDeps.sdkSession.listAllClientSessions();
         const meta = all.find((s) => s.sessionId === id);
 
-        const entry = getClientSession(id);
+        const entry = routeDeps.sdkSession.getClientSession(id);
 
         if (!meta && !entry) {
             res.status(404).json({ ok: false, error: `Sessão "${id}" não encontrada.` });
@@ -286,7 +309,7 @@ router.get('/sessions/:id', (req, res) => {
         }
 
         res.json(
-            attachSdkSessionOwnership(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                 {
                     ok: true,
                     sessionId: id,
@@ -314,7 +337,7 @@ router.get('/sessions/:id', (req, res) => {
  * @type {import('express').RequestHandler}
  */
 function _requireAdminForDestructive(req, res, next) {
-    const adminToken = _BRIDGE_ADMIN_TOKEN;
+    const adminToken = resolveSdkRouteSharedDeps(req).bridgeAdminToken;
     if (!adminToken) return next(); // token não configurado — comportamento legado (dev)
     const authHeader = req.headers['x-admin-token'] ?? req.headers['authorization'] ?? '';
     const provided = String(authHeader).replace(/^Bearer\s+/i, '');
@@ -331,6 +354,7 @@ function _requireAdminForDestructive(req, res, next) {
  */
 router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const id = /** @type {string} */ (req.params['id']);
 
         // SEC-N10 (fix): exigir confirmação explícita para operação irreversível
@@ -344,12 +368,12 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
         }
 
         // Desconectar do registry se ativo
-        await disconnectClientSession(id);
-        const sharedBinding = forgetSdkSessionOwnership(id);
+        await routeDeps.sdkSession.disconnectClientSession(id);
+        const sharedBinding = routeDeps.sdkSessionOwnership.forgetSdkSessionOwnership(id);
 
-        const client = await getClient();
+        const client = await routeDeps.sdkSession.getClient();
         await client.deleteSession(id);
-        log('INFO', `[sdk-api] Sessão deletada: ${id}`);
+        routeDeps.sdkObservability.log('INFO', `[sdk-api] Sessão deletada: ${id}`);
         res.json({ ok: true, message: `Sessão "${id}" deletada permanentemente.`, sharedBinding });
     });
 });
@@ -363,9 +387,10 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
  */
 router.post('/sessions/:id/disconnect', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
 
-        const entry = getClientSession(id);
+        const entry = routeDeps.sdkSession.getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -374,9 +399,9 @@ router.post('/sessions/:id/disconnect', (req, res) => {
             return;
         }
 
-        await disconnectClientSession(id);
-        const sharedBinding = forgetSdkSessionOwnership(id);
-        log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
+        await routeDeps.sdkSession.disconnectClientSession(id);
+        const sharedBinding = routeDeps.sdkSessionOwnership.forgetSdkSessionOwnership(id);
+        routeDeps.sdkObservability.log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
         res.json({
             ok: true,
             message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.`,
@@ -396,22 +421,94 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  *
  * ```json
  * {
- *     "model": "gpt-4.1" // opcional — modelo para retomada
+ *     "model": "gpt-4.1", // opcional — modelo para retomada
+ *     "reasoningEffort": "high", // opcional
+ *     "streaming": true, // opcional
+ *     "availableTools": ["read_file"], // opcional
+ *     "excludedTools": ["run_in_terminal"], // opcional
+ *     "provider": { "type": "openai", "baseUrl": "..." }, // opcional
+ *     "mcpServers": {}, // opcional
+ *     "customAgents": [], // opcional
+ *     "agent": "reviewer", // opcional
+ *     "skillDirectories": [".github/skills"], // opcional
+ *     "disabledSkills": ["legacy-skill"], // opcional
+ *     "disableResume": true // opcional — reconexão silenciosa
  * }
  * ```
  */
 router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const id = /** @type {string} */ (req.params['id']);
-        const { model } = req.body ?? {};
+        const {
+            clientName,
+            model,
+            reasoningEffort,
+            configDir,
+            systemMessage,
+            availableTools,
+            excludedTools,
+            provider,
+            workingDirectory,
+            streaming,
+            mcpServers,
+            customAgents,
+            agent,
+            skillDirectories,
+            disabledSkills,
+            infiniteSessions,
+            disableResume,
+        } = req.body ?? {};
 
-        const session = await resumeClientSession(
+        /** @type {string | undefined} */
+        let safeModel;
+        if (model !== undefined) {
+            const modelResult = validateModel(model);
+            if (!modelResult.ok) {
+                res.status(400).json({ ok: false, error: modelResult.error });
+                return;
+            }
+            safeModel = modelResult.model;
+        }
+        if (provider !== undefined && safeModel === undefined) {
+            res.status(400).json({
+                ok: false,
+                error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
+            });
+            return;
+        }
+
+        /** @type {Partial<import('#copilot/sdk/types').ResumeSessionConfig>} */
+        const resumeOptions = routeDeps.sdkSession.pickDefined({
+            clientName,
+            reasoningEffort,
+            configDir,
+            systemMessage,
+            availableTools,
+            excludedTools,
+            provider,
+            workingDirectory,
+            streaming,
+            mcpServers,
+            customAgents,
+            agent,
+            skillDirectories,
+            disabledSkills,
+            infiniteSessions,
+            disableResume,
+        });
+        if (safeModel !== undefined) resumeOptions.model = safeModel;
+
+        const session = await routeDeps.sdkSession.resumeClientSession(
             id,
-            model ? { onPermissionRequest: approveAll, model } : { onPermissionRequest: approveAll },
+            /** @type {import('#copilot/sdk/types').ResumeSessionConfig} */ ({
+                onPermissionRequest: routeDeps.sdkSession.approveAll,
+                ...resumeOptions,
+            }),
         );
-        rememberSdkSessionOwnership(session.sessionId);
+        routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(session.sessionId);
         res.json(
-            attachSdkSessionOwnership(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                 {
                     ok: true,
                     sessionId: session.sessionId,
@@ -432,8 +529,9 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
  */
 router.get('/sessions/:id/compaction-history', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        const history = getCompactionHistory(String(id));
+        const history = routeDeps.sdkObservability.getCompactionHistory(String(id));
         res.json({ ok: true, sessionId: id, entries: history, count: history.length });
     });
 });

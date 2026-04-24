@@ -7,7 +7,7 @@
  *   src/copilot/agent/dialog/loop-manager.js
  * @see EventBus
  * @see module:copilot/always-alive
- * @see module:copilot/agent/dialog/protocol
+ * @see module:copilot/dialog/protocol
  * @see module:copilot/agent/dialog/watchdog
  */
 
@@ -34,13 +34,13 @@ import {
     WATCHDOG_STALL_MS,
 } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
+import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 import { log, startSpanImmediate } from '../ports/observability-port.js';
 import { TurnQueue } from './backpressure.js';
 import { DialogCompactionPolicy } from './compaction-policy.js';
 import { DialogCostLedger } from './cost-ledger.js';
 import { ModelFallbackState } from './model-fallback.js';
-import { DialogProtocol } from './protocol.js';
 import { selectDialogResumeStrategy } from './resume-policy.js';
 import { DialogLoopStateMachine } from './state-machine.js';
 import { executeTurnImpl } from './turn-executor.js';
@@ -55,21 +55,7 @@ import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
  * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por
  *   `scheduleFallback()`) Interface esperada do agente host (AlwaysAliveAgent) para interação bidirecional.
  *
- * @typedef {Object} AgentHost
- * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage - Envia mensagem ao SDK
- * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
- *   prompt sem passar pelo guard do dialog loop — uso exclusivo do DialogLoopManager
- * @property {(answer: string) => boolean} answerPendingQuestion - Responde à pergunta pendente
- * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [on] - Interface mínima de
- *   EventEmitter para aguardar `question.pending` no host real.
- * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [once]
- * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} [off]
- * @property {() => string | null} getSessionId - Retorna o sessionId ativo
- * @property {() => string} getModel - Retorna o modelo ativo
- * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo (F41B.2)
- * @property {() => boolean} hasPendingQuestion - Indica se há pergunta pendente ativa
- * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
- *   - Tracker de tarefas fire-and-forget do host
+ * @typedef {import('../types.js').DialogLoopHost} DialogLoopHost
  */
 
 /**
@@ -99,7 +85,7 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {number} */
     #bootTimeoutMs;
 
-    /** @type {AgentHost | null} */
+    /** @type {DialogLoopHost | null} */
     #host = null;
 
     /** @type {{ sendCount: number }} Ref mutável para o contador de sends — usado pelo dialog-turn-executor. */
@@ -134,9 +120,18 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Vincula o manager ao agente host. Deve ser chamado antes de startDialogLoop().
+     * Vincula o manager ao host interno do dialog loop.
      *
-     * @param {AgentHost} host - Referência ao AlwaysAliveAgent
+     * O `host` aqui é um adapter de capacidades montado pelo controller do dialog. Ele não representa o
+     * `AlwaysAliveAgent` inteiro; representa apenas o canal mínimo que preserva a política 0-PR do loop:
+     *
+     * - boot por `sendMessageDialogBoot()`;
+     * - reutilização de `ask_user` via `answerPendingQuestion()`;
+     * - observação de eventos auxiliares do runtime para fallback semântico.
+     *
+     * Deve ser chamado antes de `start()` e pode ser chamado novamente após reconexão para atualizar a capability viva.
+     *
+     * @param {DialogLoopHost} host
      */
     attach(host) {
         this.#host = host;
@@ -322,10 +317,10 @@ export class DialogLoopManager extends EventEmitter {
      * Envia um turno de diálogo. Chamadas concorrentes são serializadas via mutex.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
+     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
      * @returns {Promise<string>}
      */
-    sendTurn(message, { timeout = 60_000, signal } = {}) {
+    sendTurn(message, { timeout = 60_000, signal, traceId } = {}) {
         if (!this.#state.canSendTurn) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
@@ -337,9 +332,17 @@ export class DialogLoopManager extends EventEmitter {
         }
 
         this.#watchdogSupervisor.ping();
+        log(
+            'INFO',
+            `[DialogLoopManager] sendTurn enqueued (trace=${traceId ?? 'none'}, timeout=${timeout}ms, queueDepth=${this.#turnQueue.depth})`,
+        );
 
         return this.#turnQueue.enqueue(() =>
-            this.#executeTurn(message, { timeout, ...(signal !== undefined && { signal }) }),
+            this.#executeTurn(message, {
+                timeout,
+                ...(signal !== undefined && { signal }),
+                ...(traceId ? { traceId } : {}),
+            }),
         );
     }
 
@@ -495,6 +498,10 @@ export class DialogLoopManager extends EventEmitter {
     handleProtocolInput({ question }) {
         const kind = DialogProtocol.classify(question);
 
+        if ((kind === 'ready' || kind === 'reply') && !this.#state.active && !this.#state.stopping) {
+            this.#recoverFromLateProtocol(kind);
+        }
+
         if (kind === 'ready') {
             this.#watchdogSupervisor.ping();
             this.emit(EMITTER_LOOP_READY, {});
@@ -506,6 +513,34 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', '[DialogLoopManager] Modelo emitiu STOPPED — emitindo stopped para restart automático.');
             this.emit('stopped', { reason: 'model_stopped', authorized: false });
         }
+    }
+
+    /**
+     * Reativa o estado interno quando um READY/REPLY chega após timeout de boot ou outro drift transitório.
+     *
+     * Isso evita que o runtime fique preso em `waiting_for_input` com `dialogLoopActive=false` quando o protocolo do
+     * modelo já voltou a responder.
+     *
+     * @param {'ready' | 'reply'} kind
+     * @returns {void}
+     */
+    #recoverFromLateProtocol(kind) {
+        this.#state.activate();
+        this.#watchdogSupervisor.start();
+        this.emit(EMITTER_LOOP_CHANGED, {
+            active: true,
+            ts: Date.now(),
+            reason: 'late_protocol_recovery',
+            trigger: kind,
+        });
+        void this.#trackPersistedState(
+            { dialogLoopActive: true, dialogPaused: false },
+            {
+                label: 'dialog.state.late_protocol_recovery',
+                description: 'Persist dialogLoopActive=true after late READY/REPLY recovery',
+            },
+        );
+        log('WARN', `[DialogLoopManager] Recuperando estado ativo após protocolo tardio (${kind.toUpperCase()}).`);
     }
 
     /**
@@ -569,10 +604,10 @@ export class DialogLoopManager extends EventEmitter {
      * Executa um turno serializado.
      *
      * @param {string} message
-     * @param {{ timeout: number; signal?: AbortSignal }} opts
+     * @param {{ timeout: number; signal?: AbortSignal; traceId?: string }} opts
      * @returns {Promise<string>}
      */
-    #executeTurn(message, { timeout, signal }) {
+    #executeTurn(message, { timeout, signal, traceId }) {
         const host = this.#host;
         if (!host) {
             return Promise.reject(new SessionError('[DialogLoopManager] Host não vinculado.', 'NOT_ATTACHED'));
@@ -580,7 +615,7 @@ export class DialogLoopManager extends EventEmitter {
         return executeTurnImpl(
             this,
             message,
-            { timeout, ...(signal !== undefined && { signal }) },
+            { timeout, ...(signal !== undefined && { signal }), ...(traceId ? { traceId } : {}) },
             {
                 host,
                 sendCountRef: this.#sendCountRef,

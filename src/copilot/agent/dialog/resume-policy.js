@@ -12,7 +12,7 @@ import { EventEmitter } from 'node:events';
 import { RESUME_QUESTION_WAIT_MS } from '../../config/agent.js';
 
 /**
- * @typedef {import('./loop-manager.js').AgentHost} AgentHost
+ * @typedef {import('../types.js').DialogLoopHost} AgentHost
  *
  * @typedef {'zero-pr-immediate' | 'zero-pr-preserved' | 'restart-with-pr'} DialogResumeStrategyKind
  *

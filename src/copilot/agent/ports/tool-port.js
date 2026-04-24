@@ -13,7 +13,7 @@
  * - montar o registry de tools do agent;
  * - vincular/desvincular a sessão SDK ativa aos helpers legados de tools;
  * - resolver respostas de `ask_user` que vieram por tools/hook-tools;
- * - preservar shims temporários até `tools/` também falar em capabilities explícitas.
+ * - concentrar compatibilidade de tools até `tools/` também falar em capabilities explícitas.
  *
  * @module copilot/agent/ports/tool-port
  * @internal
@@ -47,8 +47,8 @@ export function bootstrapAgentTools(registry, mcpTools) {
 /**
  * Propaga a sessão SDK ativa para helpers de tools que ainda dependem de estado global legado.
  *
- * Quando essa compatibilidade desaparecer, este método deve virar no-op ou ser removido junto com os shims
- * correspondentes em `tools/`.
+ * Quando essa compatibilidade desaparecer, este método deve virar no-op ou ser removido junto com o estado global
+ * correspondente em `tools/`.
  *
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @returns {void}

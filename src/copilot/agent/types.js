@@ -389,6 +389,79 @@
 // ─── Host Interfaces (contratos internos para módulos extraídos) ──────────────
 
 /**
+ * Canal mínimo de eventos que o runtime do agent expõe para submódulos internos.
+ *
+ * Aqui o termo "host" significa "adapter de capacidades" e não "o AlwaysAliveAgent inteiro". Cada subsistema recebe
+ * apenas o pedaço do runtime de que realmente precisa.
+ *
+ * @typedef {Object} AgentEventChannel
+ * @property {(event: string | symbol, payload?: unknown) => boolean} emit
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} on
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} once
+ * @property {(event: string | symbol, listener: (...args: any[]) => void) => void} off
+ */
+
+/**
+ * Host mínimo consumido pelo executor de turno do dialog loop.
+ *
+ * Responsabilidade:
+ *
+ * - observar se existe um `ask_user` vivo;
+ * - responder esse `ask_user` sem abrir novo PR;
+ * - expor eventos auxiliares (`assistant.message`, `assistant.turn_end`) usados apenas como fallback semântico quando o
+ *   modelo deriva do protocolo `REPLY:`.
+ *
+ * Não é o agent inteiro; é a menor capability suficiente para o caminho quente de `sendDialogTurn()`.
+ *
+ * @typedef {Object} DialogTurnHost
+ * @property {() => boolean} hasPendingQuestion
+ * @property {(message: string) => boolean} answerPendingQuestion
+ * @property {(() => {
+ *           question: string;
+ *           allowFreeform: boolean;
+ *           askedAt: number;
+ *           kind: PendingQuestionKind;
+ *           protocolControlled: boolean;
+ *           choices?: string[];
+ *       } | null)
+ *     | undefined} [getPendingQuestionSnapshot]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [on]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [once]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [off]
+ * @property {(() => string | null) | undefined} [getSessionId]
+ * @property {(() => string) | undefined} [getModel]
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
+ */
+
+/**
+ * Host interno consumido pelo `DialogLoopManager`.
+ *
+ * Ele estende `DialogTurnHost` com capacidades de boot (`sendMessageDialogBoot`) e governança de modelo (`setModel`).
+ * Esse adapter é construído por `agent-dialog-controller` a partir do host público do agent.
+ *
+ * @typedef {Object} DialogLoopHost
+ * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage
+ * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot
+ * @property {() => boolean} hasPendingQuestion
+ * @property {(message: string) => boolean} answerPendingQuestion
+ * @property {() => {
+ *     question: string;
+ *     allowFreeform: boolean;
+ *     askedAt: number;
+ *     kind: PendingQuestionKind;
+ *     protocolControlled: boolean;
+ *     choices?: string[];
+ * } | null} getPendingQuestionSnapshot
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [on]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [once]
+ * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [off]
+ * @property {() => string | null} getSessionId
+ * @property {() => string} getModel
+ * @property {(modelId: string) => void} [setModel]
+ * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
+ */
+
+/**
  * Contrato do host exigido pelo módulo lifecycle (agentStart, agentStop, initSession).
  *
  * @typedef {Object} LifecycleHost
@@ -408,7 +481,10 @@
  */
 
 /**
- * Contrato do host exigido pelo módulo dialog (dialogStart, dialogStop, etc.).
+ * Host público consumido pelo controller do dialog (`dialogStart`, `dialogStop`, `dialogResume`).
+ *
+ * Este é o host "externo" do subsistema: representa o agent/live runtime e é o ponto a partir do qual o controller
+ * constrói um `DialogLoopHost` menor para o manager.
  *
  * @typedef {Object} DialogHost
  * @property {(event: string | symbol, payload?: unknown) => boolean} emit

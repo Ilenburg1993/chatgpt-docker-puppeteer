@@ -21,7 +21,7 @@ import {
     setShowThinking,
     setShowToolActivity,
     setShowUsage,
-} from '../state.js';
+} from '../../presentation/runtime-ui-state-store.js';
 
 /**
  * @typedef {object} DisplayContext

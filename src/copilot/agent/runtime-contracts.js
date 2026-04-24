@@ -4,8 +4,8 @@
  *
  * Helpers de fronteira runtime para o subsistema agent.
  *
- * Objetivo: concentrar validações leves de capabilities e compat shims inevitáveis (ex.: APIs opcionais do SDK) fora
- * dos módulos quentes, reduzindo casts `unknown` espalhados e tornando as exceções de contrato explícitas.
+ * Objetivo: concentrar validações leves de capabilities e APIs opcionais do SDK fora dos módulos quentes, reduzindo
+ * casts `unknown` espalhados e tornando as exceções de contrato explícitas.
  *
  * @module copilot/agent/runtime-contracts
  */

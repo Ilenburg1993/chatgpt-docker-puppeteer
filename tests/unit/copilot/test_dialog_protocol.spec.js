@@ -6,7 +6,7 @@ import {
     DIALOG_PROTO_STOPPED,
     DialogProtocol,
     MESSAGE_KIND,
-} from '../../../src/copilot/agent/dialog/protocol.js';
+} from '../../../src/copilot/dialog/protocol.js';
 
 describe('DialogProtocol', () => {
     describe('classify()', () => {
@@ -36,6 +36,14 @@ describe('DialogProtocol', () => {
 
         it('retorna "stopped" para STOP_DIALOG', () => {
             expect(DialogProtocol.classify('STOP_DIALOG')).toBe('stopped');
+        });
+
+        it('não trata texto comum começando com STOPPED como comando de parada', () => {
+            expect(DialogProtocol.classify('STOPPED nao deveria ser reinterpretado aqui')).toBe('question');
+        });
+
+        it('não trata texto comum começando com STOP_DIALOG como comando de parada', () => {
+            expect(DialogProtocol.classify('STOP_DIALOG e apenas texto nesta frase')).toBe('question');
         });
 
         it('retorna "question" para texto sem prefixo protocolo', () => {
@@ -81,6 +89,19 @@ describe('DialogProtocol', () => {
         it('não inclui firstMessage quando omitida', () => {
             const prompt = DialogProtocol.buildBootPrompt();
             expect(prompt).not.toContain('Primeira mensagem a processar');
+        });
+    });
+
+    describe('isProtocolMessage()', () => {
+        it('retorna true para sinais canônicos do protocolo', () => {
+            expect(DialogProtocol.isProtocolMessage('READY: aguardando')).toBe(true);
+            expect(DialogProtocol.isProtocolMessage('REPLY: ok')).toBe(true);
+            expect(DialogProtocol.isProtocolMessage('STOP_DIALOG')).toBe(true);
+        });
+
+        it('retorna false para texto comum contendo tokens reservados', () => {
+            expect(DialogProtocol.isProtocolMessage('STOP_DIALOG e apenas texto')).toBe(false);
+            expect(DialogProtocol.isProtocolMessage('responda com READY: literal')).toBe(false);
         });
     });
 

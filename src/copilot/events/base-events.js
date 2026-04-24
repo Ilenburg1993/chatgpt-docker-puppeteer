@@ -1,14 +1,14 @@
 // @ts-check
 /**
- * src/copilot/events/legacy-events.js
+ * src/copilot/events/base-events.js
  *
- * @module copilot/events/legacy-events
+ * Catálogo base de nomes de eventos cross-module do sistema Copilot.
  *
- *   Catálogo de nomes de eventos cross-module do sistema Copilot (legado).
+ * Define namespaces e nomes de eventos usados pelo HookBus, EventBus e subsistemas de observabilidade.
  *
- *   Define namespaces e nomes de eventos usados pelo HookBus, EventBus futuro, e subsistemas de observabilidade.
+ * **Puro** — apenas constantes e tipagem, zero lógica.
  *
- *   **Puro** — apenas constantes e tipagem, zero lógica.
+ * @module copilot/events/base-events
  */
 
 // ─── Namespaces ──────────────────────────────────────────────────────────────
@@ -40,7 +40,6 @@ export const EVENT_NAMESPACES = /** @type {const} */ ({
  * @readonly
  */
 export const EVENT_NAMES = /** @type {const} */ ({
-    // ── Hook events (emitidos pelo HookBus) ──────────────────────────────
     hook: {
         PRE_TOOL_USE: 'hook:pre_tool_use',
         POST_TOOL_USE: 'hook:post_tool_use',
@@ -49,8 +48,6 @@ export const EVENT_NAMES = /** @type {const} */ ({
         SESSION_END: 'hook:session_end',
         ERROR_OCCURRED: 'hook:error_occurred',
     },
-
-    // ── Session lifecycle ────────────────────────────────────────────────
     session: {
         START: 'session:start',
         END: 'session:end',
@@ -59,16 +56,12 @@ export const EVENT_NAMES = /** @type {const} */ ({
         TURN_START: 'session:turn_start',
         TURN_END: 'session:turn_end',
     },
-
-    // ── Tool events ──────────────────────────────────────────────────────
     tool: {
         PRE_INVOKE: 'tool:pre_invoke',
         POST_INVOKE: 'tool:post_invoke',
         ERROR: 'tool:error',
         REGISTERED: 'tool:registered',
     },
-
-    // ── SDK events ───────────────────────────────────────────────────────
     sdk: {
         REQUEST: 'sdk:request',
         RESPONSE: 'sdk:response',
@@ -76,28 +69,20 @@ export const EVENT_NAMES = /** @type {const} */ ({
         CONNECTED: 'sdk:connected',
         DISCONNECTED: 'sdk:disconnected',
     },
-
-    // ── Agent events ─────────────────────────────────────────────────────
     agent: {
         READY: 'agent:ready',
         SHUTDOWN: 'agent:shutdown',
         ERROR: 'agent:error',
     },
-
-    // ── API events ───────────────────────────────────────────────────────
     api: {
         REQUEST: 'api:request',
         ERROR: 'api:error',
     },
-
-    // ── Terminal events ──────────────────────────────────────────────────
     terminal: {
         STARTED: 'terminal:started',
         STOPPED: 'terminal:stopped',
         COMMAND: 'terminal:command',
     },
-
-    // ── Audit events ─────────────────────────────────────────────────────
     audit: {
         ENTRY: 'audit:entry',
         FLUSH: 'audit:flush',
@@ -118,11 +103,11 @@ export const EVENT_NAMES = /** @type {const} */ ({
  * @typedef {object} BaseEvent
  * @property {string} type - Nome canônico do evento (ex: `session:start`).
  * @property {number} timestamp - Unix epoch ms.
- * @property {string} [correlationId] - UUID de correlação para rastreamento ponta-a-ponta (FAIXA-L16).
- * @property {string} [eventId] - UUID único deste evento (FAIXA-L35).
- * @property {string} [causationId] - eventId do evento causador para rastreio de causalidade (FAIXA-L35).
+ * @property {string} [correlationId] - UUID de correlação para rastreamento ponta-a-ponta.
+ * @property {string} [eventId] - UUID único deste evento.
+ * @property {string} [causationId] - eventId do evento causador para rastreio de causalidade.
  * @property {string} [source] - Módulo/subsistema de origem.
- * @property {string} [_source] - Identificador host:pid injetado pelo timestampEnricher (FAIXA-L27).
+ * @property {string} [_source] - Identificador host:pid injetado pelo timestampEnricher.
  * @property {Record<string, unknown>} [meta] - Metadata adicional.
  */
 

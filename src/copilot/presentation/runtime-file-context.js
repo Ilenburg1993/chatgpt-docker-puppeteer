@@ -3,8 +3,7 @@
  * @module copilot/presentation/runtime-file-context
  * @file Implementação compartilhada de contexto de arquivos/attachments consumida por bordas e pelo terminal.
  *
- *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos. O terminal
- *   continua podendo importar `terminal/file-context.js`, mas esse módulo passa a ser apenas shim compatível.
+ *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos.
  */
 
 import { readdir, readFile, stat } from 'node:fs/promises';

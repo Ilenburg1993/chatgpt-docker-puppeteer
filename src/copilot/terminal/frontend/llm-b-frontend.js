@@ -24,7 +24,6 @@ import {
     readAgentRuntimeOverviewProjection,
 } from '../../presentation/runtime-overview.js';
 import { listActiveRuntimeTodosProjection } from '../../presentation/runtime-todos.js';
-import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
@@ -34,7 +33,8 @@ import {
     getShowThinking,
     getShowToolActivity,
     getShowUsage,
-} from '../state.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 import { getWorkspaceContext } from '../workspace-context.js';
 import {
     answerTerminalPendingQuestion,

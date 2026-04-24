@@ -29,14 +29,44 @@ import { injectRateMiddleware, writeRateMiddleware } from '../middleware/rate-li
 import { validate } from '../middleware/validate.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
-const injectBodySchema = z.object({
-    content: z.string().min(1).max(64_000),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-});
+const injectBodyBaseSchema = z
+    .object({
+        message: z.string().trim().min(1).max(64_000).optional(),
+        content: z.string().trim().min(1).max(64_000).optional(),
+        from: z.string().optional(),
+        timeout: z.number().int().min(1).max(300_000).optional(),
+        context_files: z.array(z.string().min(1)).max(32).optional(),
+        attachments: z.array(z.object({}).passthrough()).max(32).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+    })
+    .passthrough();
 
-const pipelineBodySchema = z.object({
-    steps: z.array(z.object({ type: z.string(), config: z.record(z.string(), z.unknown()).optional() })).min(1),
-});
+const injectBodySchema = injectBodyBaseSchema.refine(
+    (/** @type {{ message?: unknown; content?: unknown }} */ body) =>
+        typeof body.message === 'string' || typeof body.content === 'string',
+    {
+        message: 'Campo "message" ou "content" é obrigatório.',
+        path: ['message'],
+    },
+);
+
+const pipelineBodySchema = z
+    .object({
+        from: z.string().optional(),
+        steps: z
+            .array(
+                z
+                    .object({
+                        prompt: z.string().trim().min(1).max(64_000),
+                        from: z.string().optional(),
+                        waitMs: z.number().int().min(0).max(30_000).optional(),
+                    })
+                    .passthrough(),
+            )
+            .min(1)
+            .max(20),
+    })
+    .passthrough();
 
 const handoffParamsSchema = z.object({
     handoffId: z.string().min(1),

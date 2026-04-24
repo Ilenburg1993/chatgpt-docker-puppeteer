@@ -4,8 +4,7 @@
  *
  * Testes unitários comportamentais para a execução por tarefa do agente.
  *
- * O caminho legado `infra/task-executor.js` é preservado como shim de compatibilidade; a implementação canônica mora em
- * `agent/messaging/agent-messaging.js`.
+ * A implementação canônica mora em `agent/messaging/agent-messaging.js`.
  *
  * Cobre (G1-DX-01):
  *
@@ -19,8 +18,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { executeTask } from '../../../src/copilot/agent/infra/task-executor.js';
-import { executeTask as executeTaskCanonical } from '../../../src/copilot/agent/messaging/agent-messaging.js';
+import { executeTask } from '../../../src/copilot/agent/messaging/agent-messaging.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -131,9 +129,9 @@ function makeCallbacks(overrides = {}) {
 
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
-describe('task-executor › compat shim', () => {
-    it('mantém o mesmo símbolo exportado pelo caminho canônico de messaging', () => {
-        assert.strictEqual(executeTask, executeTaskCanonical);
+describe('task-executor › módulo canônico', () => {
+    it('exporta executeTask pelo caminho de messaging', () => {
+        assert.strictEqual(typeof executeTask, 'function');
     });
 });
 

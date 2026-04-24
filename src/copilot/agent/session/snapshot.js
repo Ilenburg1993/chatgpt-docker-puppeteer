@@ -11,6 +11,7 @@
  * @see EventBus
  */
 
+import { resolveHooksStateDir } from '#copilot/boot';
 import { logSwallowed } from '#copilot/core';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -20,10 +21,7 @@ import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/sc
 import { readState } from '../lifecycle/state-io.js';
 import { log, startSpan } from '../ports/observability-port.js';
 
-const ROOT = resolve(import.meta.dirname, '../../');
-const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV
-    ? resolve(_SNAPSHOT_DIR_ENV)
-    : join(ROOT, '.github', 'hooks', 'state', 'snapshots');
+const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
 
 /**
  * @typedef {Object} SessionSnapshotData

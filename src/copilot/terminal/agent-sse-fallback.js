@@ -8,7 +8,7 @@
  */
 
 import { AGENT_EVENTS } from '#copilot/events';
-import { broadcastSse } from './dialog.js';
+import { broadcastSse } from './dialog/index.js';
 
 /**
  * @typedef {{

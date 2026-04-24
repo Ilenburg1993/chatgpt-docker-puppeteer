@@ -9,6 +9,7 @@ vi.mock('#copilot/observability/logger', () => ({
 }));
 vi.mock('#copilot/sdk/index', () => ({
     createRegistry: vi.fn(() => new Map()),
+    getToolsConfig: vi.fn(() => ({ allowlist: null, denylist: [] })),
     modelRegistry: {
         get: vi.fn((modelId) => {
             if (modelId === 'gpt-4.1') {
@@ -48,6 +49,7 @@ vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
+import { getToolsConfig } from '#copilot/sdk';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
 import {
     buildSessionHooks,
@@ -121,6 +123,15 @@ describe('session-setup (F63)', () => {
         it('deve retornar busHooks', () => {
             const result = buildSessionHooks(ctx, host);
             expect(result.busHooks).toBeDefined();
+        });
+
+        it('aplica a denylist local do runtime via onPreToolUse', async () => {
+            vi.mocked(getToolsConfig).mockReturnValue({ allowlist: null, denylist: ['custom-danger'] });
+
+            const result = buildSessionHooks(ctx, host);
+            const decision = await result.busHooks.onPreToolUse?.({ toolName: 'custom-danger' }, { sessionId: 's1' });
+
+            expect(decision).toEqual(expect.objectContaining({ permissionDecision: 'deny' }));
         });
     });
 

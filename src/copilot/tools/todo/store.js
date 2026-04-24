@@ -19,10 +19,10 @@
  * @see module:copilot/db/sqlite
  */
 
+import { resolveHooksStateFile } from '#copilot/boot';
 import { logSwallowed } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { log } from '../logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
 
@@ -38,11 +38,8 @@ export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPrio
  * @typedef {import('./todo-schema.js').TodoStore} TodoStore
  */
 
-/** Raiz do workspace */
-const WORKSPACE_ROOT = new URL('../../../..', import.meta.url).pathname;
-
 /** Arquivo JSON legado (mantido para migração one-shot) */
-const TODOS_FILE = path.join(WORKSPACE_ROOT, '.github', 'hooks', 'state', 'todos.json');
+const TODOS_FILE = resolveHooksStateFile('todos.json');
 
 // SQLite backend — persistência
 // ---------------------------------------------------------------------------

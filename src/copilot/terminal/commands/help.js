@@ -53,7 +53,9 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão
   \x1b[33m/compact\x1b[0m                             — compacta histórico em resumo técnico denso
   \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m — controla o mode/plan vanilla da sessão SDK
-  \x1b[33m/thinking [on|off]\x1b[0m                   — toggle exibição de thinking/reasoning da LLM-B
+  \x1b[33m/thinking [on|off]\x1b[0m                   — toggle da expansão ao vivo do thinking/reasoning
+  \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
+  \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
   \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)

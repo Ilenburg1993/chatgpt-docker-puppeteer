@@ -15,6 +15,7 @@ import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-i
 function createCtx(/** @type {boolean} */ dialogLoopActive) {
     return {
         isDialogLoopActive: () => dialogLoopActive,
+        shouldHandleProtocolInput: vi.fn((question) => dialogLoopActive || question.startsWith('READY:')),
         handleProtocolInput: vi.fn(),
         setStatus: vi.fn(),
         setPendingQuestion: vi.fn(),
@@ -55,16 +56,30 @@ describe('agent/dialog/user-input-handler', () => {
         await expect(promise).resolves.toEqual({ answer: 'ok', wasFreeform: true });
     });
 
-    it('não persiste REPLY transitório do dialog loop', async () => {
+    it('não persiste REPLY transitório do dialog loop e responde automaticamente ao SDK', async () => {
         const ctx = createCtx(true);
         const promise = handleUserInputRequest({ question: 'REPLY: resposta curta', allowFreeform: true }, ctx);
 
-        const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
-        expect(pending.kind).toBe('reply');
+        expect(ctx.setPendingQuestion).not.toHaveBeenCalled();
         expect(mocks.persistStateWithPolicy).not.toHaveBeenCalled();
+        await expect(promise).resolves.toEqual({ answer: '', wasFreeform: false });
+    });
 
-        pending.resolve('next');
-        await expect(promise).resolves.toEqual({ answer: 'next', wasFreeform: true });
+    it('trata READY tardio como protocolo quando shouldHandleProtocolInput autoriza recovery', async () => {
+        const ctx = createCtx(false);
+        const promise = handleUserInputRequest(
+            { question: 'READY: recuperado após timeout', allowFreeform: true },
+            ctx,
+        );
+
+        expect(ctx.shouldHandleProtocolInput).toHaveBeenCalledWith('READY: recuperado após timeout');
+        expect(ctx.handleProtocolInput).toHaveBeenCalledWith({ question: 'READY: recuperado após timeout' });
+
+        const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
+        expect(pending.kind).toBe('ready');
+
+        pending.resolve('ok');
+        await expect(promise).resolves.toEqual({ answer: 'ok', wasFreeform: true });
     });
 
     it('fora do dialog loop, trata ask_user como question e persiste metadados', async () => {

@@ -14,7 +14,7 @@
  * @module scripts/check-copilot-global-architecture
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import process from 'node:process';
 
@@ -22,6 +22,7 @@ const COPILOT_ROOT = 'src/copilot';
 
 /** @type {Record<string, number>} */
 const LAYER_MAP = {
+    boot: 0,
     core: 0,
     types: 0,
     db: 0,
@@ -47,6 +48,31 @@ const CROSS_CUTTING_MODULES = new Set(['observability', 'audit']);
 
 /** @type {Set<string>} */
 const RUNTIME_ARTIFACT_MODULES = new Set(['logs', '.github']);
+
+/** @type {Set<string>} */
+const SDK_ROUTE_COMPOSITION_MODULES = new Set([
+    'agent',
+    'audit',
+    'bridges',
+    'config',
+    'hooks',
+    'presentation',
+    'sdk',
+    'tools',
+]);
+
+/** @type {Set<string>} */
+const REMOVED_COMPAT_ENTRYPOINTS = new Set([
+    'agent/infra/task-executor.js',
+    'agent/queue-processor.js',
+    'boot-contract.js',
+    'config/system-prompt.js',
+    'events/create-emitter.js',
+    'events/legacy-events.js',
+    'terminal/dialog.js',
+    'terminal/file-context.js',
+    'terminal/state.js',
+]);
 
 /**
  * @typedef {{
@@ -82,6 +108,14 @@ const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
 /** @type {ContentRule[]} */
 const CONTENT_RULES = [
+    {
+        pattern:
+            /(?:import\(\s*|from\s+)['"][^'"]*(?:terminal\/(?:state|file-context|dialog)|agent\/(?:infra\/task-executor|queue-processor)|events\/(?:legacy-events|create-emitter))(?:\.js)?['"]/g,
+        severity: 'hard',
+        rule: 'internal-code-must-not-import-removed-entrypoints',
+        message:
+            'Código interno deve importar o módulo canônico; entrypoints antigos removidos não voltam como compatibilidade.',
+    },
     {
         fromModule: 'terminal',
         pattern: /import\(['"]#copilot\/(?:agent|sdk|tools)(?:\/[^'"]*)?['"]\)/g,
@@ -244,6 +278,19 @@ function classifyImport(from, to, relFile, spec) {
     if (from === to) return null;
     if (RUNTIME_ARTIFACT_MODULES.has(from) || RUNTIME_ARTIFACT_MODULES.has(to)) return null;
 
+    if (
+        relFile.startsWith('server/routes/sdk/') &&
+        relFile !== 'server/routes/sdk/deps.js' &&
+        SDK_ROUTE_COMPOSITION_MODULES.has(to)
+    ) {
+        return {
+            severity: 'hard',
+            rule: 'sdk-routes-must-compose-through-deps',
+            message:
+                '`server/routes/sdk/*` deve receber SDK/agent/presentation/domínios por `server/routes/sdk/deps.js`.',
+        };
+    }
+
     if (isDocumentedCompositionImport(relFile, to, spec)) {
         return {
             severity: 'info',
@@ -391,6 +438,20 @@ function classifyImport(from, to, relFile, spec) {
 export function checkGlobalArchitecture() {
     /** @type {Finding[]} */
     const findings = [];
+    for (const relFile of REMOVED_COMPAT_ENTRYPOINTS) {
+        if (existsSync(join(COPILOT_ROOT, relFile))) {
+            findings.push({
+                file: relFile,
+                line: 1,
+                from: extractModule(relFile) ?? 'unknown',
+                to: 'removed-entrypoint',
+                spec: relFile,
+                severity: 'hard',
+                rule: 'removed-compat-entrypoints-must-stay-deleted',
+                message: 'Entrypoints antigos removidos não podem ser reintroduzidos; use o módulo canônico.',
+            });
+        }
+    }
     const allFiles = walkJs(COPILOT_ROOT);
 
     for (const file of allFiles) {

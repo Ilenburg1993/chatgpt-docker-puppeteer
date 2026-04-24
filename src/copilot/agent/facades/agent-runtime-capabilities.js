@@ -30,7 +30,7 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  *
  * - `available=false` significa que a superfície não existe nesse runtime/adaptador;
  * - `available=true` com `state=degraded` significa que a superfície existe, mas o health atual indica risco;
- * - `state=unknown` é usado para compat/shims que existem, mas ainda não têm readiness própria.
+ * - `state=unknown` é usado para capacidades compatíveis que existem, mas ainda não têm readiness própria.
  *
  * @typedef {{
  *     id: string;

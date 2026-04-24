@@ -34,9 +34,9 @@ import {
     EMITTER_SESSION_WARNING,
     EMITTER_SESSION_WORKSPACE_FILE_CHANGED,
 } from '#copilot/events';
+import { setLastSdkPlanOperation, setSdkSessionMode } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, println } from './dialog.js';
-import { setLastSdkPlanOperation, setSdkSessionMode } from './state.js';
+import { broadcastSse, println } from './dialog/index.js';
 
 /**
  * @typedef {{

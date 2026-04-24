@@ -7,18 +7,10 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { toError } from '#copilot/core';
-import { log } from '#copilot/observability';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
-import { embedMultiple, readFileContext } from '../file-context.js';
-import {
-    readTerminalDialogStreamMeta,
-    readTerminalRuntimeControlState,
-    readTerminalRuntimeState,
-    runTerminalDialogTurn,
-    startTerminalAgentRuntime,
-    startTerminalDialogMode,
-} from '../frontend/llm-b-runtime.js';
+import { container, toError } from '#copilot/core';
+import { log, METRICS_STORE } from '#copilot/observability';
+import { computeAdaptiveDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
+import { embedMultiple, readFileContext } from '../../presentation/runtime-file-context.js';
 import {
     clearAttachments,
     getAttachmentQueue,
@@ -28,7 +20,16 @@ import {
     getShowThinking,
     getShowUsage,
     setBusy,
-} from '../state.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
+import {
+    readTerminalDialogStreamMeta,
+    readTerminalRuntimeControlState,
+    readTerminalRuntimeState,
+    runTerminalDialogTurn,
+    startTerminalAgentRuntime,
+    startTerminalDialogMode,
+} from '../frontend/llm-b-runtime.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -295,23 +296,41 @@ async function _executeTurn(message, actor) {
         const showThinking = getShowThinking();
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
+        const metricsSummary = (() => {
+            try {
+                return container.resolve(METRICS_STORE).getSummary();
+            } catch {
+                return null;
+            }
+        })();
+        const timeoutDecision = computeAdaptiveDialogTimeout({
+            defaultTimeoutMs: TURN_TIMEOUT_MS,
+            queueDepth: runtimeState.queueSize,
+            contextUtilization: runtimeState.contextWindow?.utilization,
+            recentP50Ms: Number(metricsSummary?.dialog?.turnLatency?.p50 ?? 0),
+            recentP95Ms: Number(metricsSummary?.dialog?.turnLatency?.p95 ?? 0),
+            recentP99Ms: Number(metricsSummary?.dialog?.turnLatency?.p99 ?? 0),
+        });
         const displayState = createDisplayState({
             model,
             effort,
             turnStartTime: t0,
             showStreaming: getShowStreaming(),
+            showThinking,
         });
+        displayState.timeoutMs = timeoutDecision.timeoutMs;
+        displayState.timeoutStrategy = timeoutDecision.strategy;
 
-        /** @type {((chunk: string, reasoningId: string | null) => void) | undefined} */
-        const onReasoning = showThinking ? createReasoningCallback(displayState) : undefined;
+        /** @type {(chunk: string, reasoningId: string | null) => void} */
+        const onReasoning = createReasoningCallback(displayState);
 
         /** @type {(chunk: string) => void} */
         const onDelta = createDeltaCallback(displayState);
 
         const reply = await runTerminalDialogTurn(enrichedMessage, {
-            timeout: TURN_TIMEOUT_MS,
+            timeout: timeoutDecision.timeoutMs,
             onDelta,
-            ...(onReasoning && { onReasoning }),
+            onReasoning,
         });
         const durationMs = Date.now() - t0;
 

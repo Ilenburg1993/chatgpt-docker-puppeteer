@@ -112,6 +112,7 @@ export const EMITTER_SUBAGENT_FAILED = 'subagent.failed';
 
 // ── Assistant ────────────────────────────────────────────────
 export const EMITTER_ASSISTANT_INTENT = 'assistant.intent';
+export const EMITTER_ASSISTANT_MESSAGE = 'assistant.message';
 export const EMITTER_ASSISTANT_TURN_START = 'assistant.turn_start';
 export const EMITTER_ASSISTANT_TURN_END = 'assistant.turn_end';
 export const EMITTER_ASSISTANT_STREAMING_DELTA = 'assistant.streaming_delta';

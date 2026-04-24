@@ -11,6 +11,7 @@
 import {
     AGENT_ABORT,
     AGENT_ASSISTANT_INTENT,
+    AGENT_ASSISTANT_MESSAGE,
     AGENT_ASSISTANT_REASONING_COMPLETE,
     AGENT_ASSISTANT_STREAMING_DELTA,
     AGENT_ASSISTANT_TURN_END,
@@ -138,6 +139,7 @@ export const AGENT_EVENT_BRIDGE_MAP = Object.freeze({
     'system.message': AGENT_SYSTEM_MESSAGE,
     'assistant.turn_start': AGENT_ASSISTANT_TURN_START,
     'assistant.turn_end': AGENT_ASSISTANT_TURN_END,
+    'assistant.message': AGENT_ASSISTANT_MESSAGE,
     'assistant.intent': AGENT_ASSISTANT_INTENT,
     'assistant.streaming_delta': AGENT_ASSISTANT_STREAMING_DELTA,
     'assistant.reasoning_complete': AGENT_ASSISTANT_REASONING_COMPLETE,

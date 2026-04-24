@@ -282,6 +282,7 @@ vi.mock('#copilot/core', async (importOriginal) => ({
 }));
 
 vi.mock('#copilot/observability', () => ({
+    log: vi.fn(),
     getToolStats: () => ({
         'tool.fast': { calls: 3, errors: 0, avgLatencyMs: 20 },
         'tool.slow': { calls: 5, errors: 2, avgLatencyMs: 150 },

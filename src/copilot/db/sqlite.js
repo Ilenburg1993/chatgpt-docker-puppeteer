@@ -10,7 +10,8 @@
  * 2. Isolar o schema copilot em seu próprio arquivo de migrations versionadas.
  * 3. Permitir que testes do módulo copilot usem `:memory:` sem interferir nos testes/fixtures do domínio principal.
  *
- * Variável de ambiente: `COPILOT_DB_PATH` sobrescreve o caminho padrão. Padrão: `<cwd>/data/copilot.sqlite`
+ * Variável de ambiente: `COPILOT_DB_PATH` sobrescreve o caminho padrão. Padrão:
+ * `<COPILOT_WORKING_DIRECTORY>/data/copilot.sqlite`
  *
  * L0 (db) — não importa camadas superiores. Logger injetável via `setDbLogger`.
  *
@@ -20,6 +21,7 @@
  * @see module:copilot/conversation-hub/store
  */
 
+import { resolveWorkspacePath } from '#copilot/boot';
 import { ConfigError, registerShutdownHandler, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -90,7 +92,7 @@ function getExitHandlerState() {
  */
 function resolveCopilotDbPath() {
     const fromEnv = ENV_DB_PATH;
-    const raw = fromEnv || path.join(process.cwd(), 'data', 'copilot.sqlite');
+    const raw = fromEnv || resolveWorkspacePath('data', 'copilot.sqlite');
 
     const looksLikeDir = raw.endsWith(path.sep) || raw.endsWith('/') || raw.endsWith('\\');
     const resolved = looksLikeDir ? path.join(raw, 'copilot.sqlite') : raw;

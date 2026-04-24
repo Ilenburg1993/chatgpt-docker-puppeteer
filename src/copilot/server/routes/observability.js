@@ -18,6 +18,8 @@ import {
     handleGetAudit,
     handleGetErrors,
     handleGetHistory,
+    handleGetThinkingEntry,
+    handleGetThinkingHistory,
     handleGetToolStats,
     handleMetrics,
     handleSystemReset,
@@ -44,6 +46,22 @@ export function createObservabilityRouter() {
         '/history',
         bridgeHandler(handleGetHistory, (req) => ({
             limit: Number(req.query['limit'] ?? 50),
+        })),
+    );
+
+    // GET /thinking?limit= — lista thinkings capturados como artefatos colapsados.
+    router.get(
+        '/thinking',
+        bridgeHandler(handleGetThinkingHistory, (req) => ({
+            limit: Number(req.query['limit'] ?? 20),
+        })),
+    );
+
+    // GET /thinking/:thinkingId — abre um thinking completo (`latest` ou sufixo curto aceito).
+    router.get(
+        '/thinking/:thinkingId',
+        bridgeHandler(handleGetThinkingEntry, (req) => ({
+            id: String(req.params['thinkingId'] ?? 'latest'),
         })),
     );
 

@@ -1,15 +1,13 @@
 // @ts-check
 /**
- * src/copilot/api/express/session-messaging.js
+ * src/copilot/server/routes/sdk/session-messaging.js
  *
  * Rotas de messaging e streaming de sessões SDK: send, stream, model, abort, messages.
  *
- * @module copilot/api/express/session-messaging
+ * @module copilot/server/routes/sdk/session-messaging
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
-import { getClientSession, incrementSessionMessageCount } from '#copilot/sdk';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import {
@@ -18,8 +16,9 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { attachSdkSessionOwnership } from '../../../presentation/sdk-sessions.js';
+import { resolveSdkRouteSharedDeps } from './deps.js';
 import {
+    LogMessageBodySchema,
     rateLimitMiddleware,
     SendMessageBodySchema,
     SetModelBodySchema,
@@ -73,6 +72,7 @@ router.post(
     validateBody(SendMessageBodySchema),
     (req, res) => {
         void withErrorHandler(req, res, async () => {
+            const routeDeps = resolveSdkRouteSharedDeps(req);
             const id = /** @type {string} */ (req.params['id']);
             const { prompt, waitForResponse = true, attachments } = req.body ?? {};
             const rawTimeoutMs = (req.body ?? {}).timeoutMs;
@@ -104,7 +104,7 @@ router.post(
                 return;
             }
 
-            const entry = getClientSession(id);
+            const entry = routeDeps.sdkSession.getClientSession(id);
             if (!entry) {
                 res.status(404).json({
                     ok: false,
@@ -113,7 +113,7 @@ router.post(
                 return;
             }
 
-            incrementSessionMessageCount(id);
+            routeDeps.sdkSession.incrementSessionMessageCount(id);
 
             /** @type {import('#copilot/sdk/types').MessageOptions} */
             const messageOptions = {
@@ -129,11 +129,11 @@ router.post(
                         setTimeout(() => reject(new Error(`Timeout após ${timeoutMs}ms`)), timeoutMs + 5000),
                     ),
                 ]);
-                const assistantEvent = /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */ (
+                const assistantEvent = /** @type {{ data?: { content?: string; messageId?: string } } | undefined} */ (
                     event
                 );
                 res.json(
-                    attachSdkSessionOwnership(
+                    routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                         {
                             ok: true,
                             sessionId: id,
@@ -145,7 +145,12 @@ router.post(
                 );
             } else {
                 const messageId = await entry.session.send(messageOptions);
-                res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, messageId, enqueued: true }, id));
+                res.json(
+                    routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                        { ok: true, sessionId: id, messageId, enqueued: true },
+                        id,
+                    ),
+                );
             }
         });
     },
@@ -171,6 +176,7 @@ router.post(
  *     };
  */
 router.get('/sessions/:id/stream', (req, res) => {
+    const routeDeps = resolveSdkRouteSharedDeps(req);
     const { id } = req.params;
 
     // C14-03: limitar streams SSE simultâneos
@@ -179,7 +185,7 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    const entry = getClientSession(id);
+    const entry = routeDeps.sdkSession.getClientSession(id);
     if (!entry) {
         res.status(404).json({
             ok: false,
@@ -203,7 +209,10 @@ router.get('/sessions/:id/stream', (req, res) => {
         maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
 
-    sse.send('connected', attachSdkSessionOwnership({ sessionId: id, timestamp: Date.now() }, id));
+    sse.send(
+        'connected',
+        routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ sessionId: id, timestamp: Date.now() }, id),
+    );
 
     // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
@@ -217,7 +226,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     // Limpeza quando cliente desconecta
     req.on('close', () => {
         unsubscribe();
-        log('INFO', `[sdk-api] SSE stream encerrado: sessão ${id}`);
+        routeDeps.sdkObservability.log('INFO', `[sdk-api] SSE stream encerrado: sessão ${id}`);
     });
 });
 
@@ -228,19 +237,20 @@ router.get('/sessions/:id/stream', (req, res) => {
 /**
  * Muda o modelo de uma sessão ativa em tempo real via CopilotSession.setModel().
  *
- * Body: { "model": "claude-sonnet-4-5" }
+ * Body: { "model": "claude-sonnet-4-5", "reasoningEffort": "high" }
  */
 router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const id = /** @type {string} */ (req.params['id']);
-        const { model } = req.body ?? {};
+        const { model, reasoningEffort } = req.body ?? {};
         const modelValidation = validateModel(model);
         if (!modelValidation.ok) {
             res.status(400).json({ ok: false, error: modelValidation.error });
             return;
         }
         const safeModel = modelValidation.model;
-        const entry = getClientSession(id);
+        const entry = routeDeps.sdkSession.getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -248,9 +258,44 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
             });
             return;
         }
-        await entry.session.setModel(safeModel);
-        log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
-        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, model: safeModel }, id));
+        await entry.session.setModel(safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
+        routeDeps.sdkObservability.log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
+        res.json(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                { ok: true, sessionId: id, model: safeModel, reasoningEffort: reasoningEffort ?? null },
+                id,
+            ),
+        );
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/log
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Emite uma mensagem no timeline da sessão via CopilotSession.log().
+ */
+router.post('/sessions/:id/log', validateBody(LogMessageBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { message, level, ephemeral } = req.body ?? {};
+        const entry = routeDeps.sdkSession.getClientSession(id);
+        if (!entry) {
+            res.status(404).json({
+                ok: false,
+                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+            });
+            return;
+        }
+        await entry.session.log(message, routeDeps.sdkSession.pickDefined({ level, ephemeral }));
+        res.json(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                { ok: true, sessionId: id, message: 'Log emitido na timeline da sessão.' },
+                id,
+            ),
+        );
     });
 });
 
@@ -263,8 +308,9 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
  */
 router.post('/sessions/:id/abort', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        const entry = getClientSession(id);
+        const entry = routeDeps.sdkSession.getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -273,8 +319,13 @@ router.post('/sessions/:id/abort', (req, res) => {
             return;
         }
         await entry.session.abort();
-        log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
-        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, message: 'Processamento abortado.' }, id));
+        routeDeps.sdkObservability.log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
+        res.json(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                { ok: true, sessionId: id, message: 'Processamento abortado.' },
+                id,
+            ),
+        );
     });
 });
 
@@ -287,8 +338,9 @@ router.post('/sessions/:id/abort', (req, res) => {
  */
 router.get('/sessions/:id/messages', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        const entry = getClientSession(id);
+        const entry = routeDeps.sdkSession.getClientSession(id);
         if (!entry) {
             res.status(404).json({
                 ok: false,
@@ -297,7 +349,12 @@ router.get('/sessions/:id/messages', (req, res) => {
             return;
         }
         const messages = await entry.session.getMessages();
-        res.json(attachSdkSessionOwnership({ ok: true, sessionId: id, count: messages.length, messages }, id));
+        res.json(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                { ok: true, sessionId: id, count: messages.length, messages },
+                id,
+            ),
+        );
     });
 });
 

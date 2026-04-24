@@ -4,7 +4,7 @@
  *
  * Router canônico para gerenciamento de webhooks do agente Always-Alive.
  *
- * Onda 5.2 — migrado de `api/express/webhooks.js`. Endpoints:
+ * Onda 5.2 — router canônico de webhooks em `server/routes/`. Endpoints:
  *
  * - GET /webhooks — Lista webhooks registrados
  * - POST /webhooks — Registra nova URL de webhook

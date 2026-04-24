@@ -92,7 +92,8 @@ export function getAgentHealthSnapshot(ctx, host) {
     const waitingForInput = snap.status === 'waiting_for_input';
     const ioOk = !hasPendingQuestion || waitingForInput || dialogActive;
     const keepaliveRunning = ctx.isKeepaliveRunning();
-    const keepaliveOk = !sessionActive || keepaliveRunning;
+    const keepaliveSuppressedByDialog = sessionActive && dialogActive;
+    const keepaliveOk = !sessionActive || keepaliveRunning || keepaliveSuppressedByDialog;
     const backgroundPendingCount = ctx.getBackgroundPendingCount();
     const backgroundOk = backgroundPendingCount < BACKGROUND_PENDING_WARN_THRESHOLD;
     const failedBootSteps = bootReport?.failedCount ?? 0;

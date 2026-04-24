@@ -95,4 +95,19 @@ describe('TurnQueue', () => {
         await q.drain();
         expect(q.depth).toBe(0);
     });
+
+    it('mantém a fila utilizável após uma tarefa rejeitada', async () => {
+        const q = new TurnQueue({ maxSize: 3 });
+
+        await expect(
+            q.enqueue(async () => {
+                throw new Error('boom');
+            }),
+        ).rejects.toThrow('boom');
+
+        await q.drain();
+        expect(q.depth).toBe(0);
+
+        await expect(q.enqueue(async () => 'ok')).resolves.toBe('ok');
+    });
 });

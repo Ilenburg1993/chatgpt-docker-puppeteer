@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -16,8 +17,8 @@ import { log } from '../logger.js';
 
 export const execFileAsync = promisify(execFile);
 
-/** Raiz do workspace derivada do meta.url (resolve para /workspaces/...) */
-export const WORKSPACE_ROOT = new URL('../../../..', import.meta.url).pathname;
+/** Raiz canonica do workspace definida pelo boot. */
+export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
 
 /** Limite máximo de bytes retornados por read_file_content */
 export const MAX_CONTENT_BYTES = 80_000;

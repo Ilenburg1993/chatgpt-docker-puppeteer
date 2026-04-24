@@ -1602,7 +1602,7 @@ export class AgentContext {
     /**
      * Atualiza o host do dialog loop.
      *
-     * @param {import('./dialog/loop-manager.js').AgentHost} host
+     * @param {import('./types.js').DialogLoopHost} host
      * @returns {void}
      */
     attachDialogLoop(host) {
@@ -1623,7 +1623,7 @@ export class AgentContext {
      * Envia um turno ao dialog loop.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
+     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
      * @returns {Promise<string>}
      */
     sendDialogTurn(message, opts) {

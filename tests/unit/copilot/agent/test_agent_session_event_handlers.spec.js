@@ -81,11 +81,11 @@ vi.mock(
             },
         ),
 );
-// Mock conversationStore e terminal/state (deep deps from history-sync)
+// Mock conversationStore e runtime-ui-state-store (deep deps from history-sync)
 vi.mock('#copilot/conversation-hub/store', () => ({
     conversationStore: mocks.conversationStore,
 }));
-vi.mock('#copilot/terminal/state', () => ({
+vi.mock('#copilot/presentation/runtime-ui-state-store', () => ({
     getHubSessionId: mocks.getHubSessionId,
     default: {},
 }));
@@ -204,6 +204,18 @@ describe('F43 — event-handlers/sdk-responses', () => {
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         session._emit('assistant.intent', { intent: 'code_edit' });
         expect(emit).toHaveBeenCalledWith('assistant.intent', expect.objectContaining({ intent: 'code_edit' }));
+    });
+
+    it('emite assistant.message com content quando o SDK envia mensagem final', async () => {
+        const { wireSdkResponseEvents } = await import('#copilot/event-handlers/sdk-responses');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSdkResponseEvents(/** @type {any} */ (session), { emit });
+        session._emit('assistant.message', { messageId: 'm-1', content: 'fallback reply' });
+        expect(emit).toHaveBeenCalledWith(
+            'assistant.message',
+            expect.objectContaining({ messageId: 'm-1', content: 'fallback reply' }),
+        );
     });
 
     it('emite session.error com errorType e message', async () => {

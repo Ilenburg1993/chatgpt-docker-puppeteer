@@ -21,9 +21,10 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../core/error-handlers.js';
+import { getHubSessionId } from '../presentation/runtime-ui-state-store.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from './activity-state.js';
 import { registerUnhandledAgentSseFallback } from './agent-sse-fallback.js';
-import { broadcastSse, ensureDialogLoop, println } from './dialog.js';
+import { broadcastSse, ensureDialogLoop, println } from './dialog/index.js';
 import {
     abortTerminalCurrentMessage,
     pingTerminalDialogWatchdog,
@@ -33,7 +34,6 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from './frontend/llm-b-runtime.js';
-import { getHubSessionId } from './state.js';
 import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 
 /** @type {boolean} */

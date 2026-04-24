@@ -161,7 +161,7 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     } else {
                         log(
                             'INFO',
-                            '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando terminal/dialog.js retomar via ensureDialogLoop.',
+                            '[AlwaysAlive] Reconexão com dialog loop inativo. Aguardando dialog/index retomar via ensureDialogLoop.',
                         );
                     }
                     return true;

@@ -3,9 +3,8 @@
  * @module copilot/presentation/runtime-ui-state
  * @file Façade compartilhada de leitura do estado operacional/UI do runtime.
  *
- *   A implementação-base agora vive em `runtime-ui-state-store.js` e `runtime-file-context.js`, deixando
- *   `terminal/state.js` apenas como shim de compatibilidade. Esta camada mantém a surface de leitura/registro estável
- *   para consumers compartilhados.
+ *   A implementação-base agora vive em `runtime-ui-state-store.js` e `runtime-file-context.js`. Esta camada mantém a
+ *   surface de leitura/registro estável para consumers compartilhados.
  */
 
 import { getFileCacheStats } from './runtime-file-context.js';
@@ -14,7 +13,10 @@ import {
     getHubSessionId,
     getInjectHistory,
     getLastSdkPlanOperation,
+    getLatestThinkingHistoryEntry,
     getSdkSessionMode,
+    getThinkingHistory,
+    getThinkingHistoryEntry,
     recordInjectHistory,
 } from './runtime-ui-state-store.js';
 
@@ -52,6 +54,27 @@ export function readRuntimeInjectHistory(limit) {
  */
 export function recordRuntimeInjectHistory(entry) {
     recordInjectHistory(entry);
+}
+
+/**
+ * @param {number} [limit]
+ * @returns {ReturnType<typeof getThinkingHistory>}
+ */
+export function readRuntimeThinkingHistory(limit) {
+    return getThinkingHistory(limit);
+}
+
+/**
+ * @param {string} id
+ * @returns {ReturnType<typeof getThinkingHistoryEntry>}
+ */
+export function readRuntimeThinkingHistoryEntry(id) {
+    return getThinkingHistoryEntry(id);
+}
+
+/** @returns {ReturnType<typeof getLatestThinkingHistoryEntry>} */
+export function readRuntimeLatestThinkingHistoryEntry() {
+    return getLatestThinkingHistoryEntry();
 }
 
 /** @returns {{ hits: number; misses: number; size: number }} */

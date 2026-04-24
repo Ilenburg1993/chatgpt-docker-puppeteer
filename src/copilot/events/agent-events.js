@@ -143,6 +143,8 @@ export const AGENT_ASSISTANT_TURN_END = 'agent:assistant:turn_end';
 /** @readonly */
 export const AGENT_ASSISTANT_INTENT = 'agent:assistant:intent';
 /** @readonly */
+export const AGENT_ASSISTANT_MESSAGE = 'agent:assistant:message';
+/** @readonly */
 export const AGENT_ASSISTANT_STREAMING_DELTA = 'agent:assistant:streaming_delta';
 /** @readonly */
 export const AGENT_ASSISTANT_REASONING_COMPLETE = 'agent:assistant:reasoning_complete';
@@ -291,6 +293,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'exit_plan_mode.completed',
     'external_tool.completed',
     // ── streaming & SDK responses ────────────────────────────────────────
+    'assistant.message',
     'assistant.intent',
     'assistant.streaming_delta',
     'assistant.reasoning_complete',

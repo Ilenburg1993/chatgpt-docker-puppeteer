@@ -103,9 +103,10 @@ describe('F54 — config/index.js cleanup', () => {
         expect(src).not.toContain('patchToolsConfig');
     });
 
-    it('config/index.js preserva exports locais (não-sdk)', () => {
+    it('config/index.js preserva exports locais via módulo canônico', () => {
         const src = readSource('config/index.js');
-        expect(src).toContain("from './system-prompt.js'");
+        expect(src).toContain("from './system-prompt/index.js'");
+        expect(src).not.toContain("from './system-prompt.js'");
     });
 });
 

@@ -3,16 +3,132 @@
  * @module copilot/server/routes/sdk/deps
  * @file Wiring do adapter HTTP do SDK.
  *
- *   Rotas em `server/routes/sdk/*` adaptam o SDK para HTTP. Por isso, este é o ponto de composição autorizado para client
- *   SDK, estado do SDK e catálogo estático usado como fallback antes do boot do agent.
+ *   Rotas em `server/routes/sdk/*` adaptam capacidades de domínio para HTTP. Este arquivo é o composition root autorizado
+ *   desse adapter: SDK client/session, runtime agent, projections, hooks, observability e fallbacks estáticos entram
+ *   aqui e chegam aos handlers como capacidades explícitas.
  */
 
+import { defaultAuditLog, getAuditTail } from '#copilot/audit';
+import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
+import { BRIDGE_ADMIN_TOKEN, OTEL_EXPORTER_OTLP_ENDPOINT, SDK_API_TOKEN } from '#copilot/config';
 import { container } from '#copilot/core';
-import { METRICS_STORE } from '#copilot/observability';
-import { forceStopClient, getClient, getClientState, stopClient } from '#copilot/sdk';
+import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
+import {
+    DEFAULT_OTEL_FILE,
+    defaultErrorTracker,
+    defaultMetrics,
+    getCatalog,
+    getCompactionHistory,
+    getDeadLetters,
+    getLastQuotaSnapshots,
+    getRecentLogs,
+    isOtelEnabled,
+    log,
+    METRICS_STORE,
+} from '#copilot/observability';
+import {
+    approveAll,
+    createClientSession,
+    disconnectClientSession,
+    forceStopClient,
+    getClient,
+    getClientSession,
+    getClientState,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
+    incrementSessionMessageCount,
+    listActiveClientSessions,
+    listAllClientSessions,
+    pickDefined,
+    resumeClientSession,
+    setForegroundClientSessionId,
+    stopClient,
+} from '#copilot/sdk';
 import { getAllTools } from '#copilot/tools';
 import { resolveAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
+import { readAgentStatusSnapshot, readAgentStatusValue } from '../../../presentation/runtime-status.js';
+import {
+    paginateAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjection,
+} from '../../../presentation/runtime-tools.js';
+import {
+    attachSdkSessionOwnership,
+    clearSdkRuntimeBinding,
+    forgetSdkSessionOwnership,
+    rememberSdkSessionOwnership,
+    resolveSdkRuntimeProjection,
+    resolveSdkSessionRouteMeta,
+} from '../../../presentation/sdk-sessions.js';
+
+const sdkSessionOps = Object.freeze({
+    approveAll,
+    createClientSession,
+    disconnectClientSession,
+    getClient,
+    getClientSession,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
+    incrementSessionMessageCount,
+    listActiveClientSessions,
+    listAllClientSessions,
+    pickDefined,
+    resumeClientSession,
+    setForegroundClientSessionId,
+});
+
+const sdkSessionOwnershipOps = Object.freeze({
+    attachSdkSessionOwnership,
+    clearSdkRuntimeBinding,
+    forgetSdkSessionOwnership,
+    rememberSdkSessionOwnership,
+    resolveSdkRuntimeProjection,
+    resolveSdkSessionRouteMeta,
+});
+
+const sdkRuntimeProjectionOps = Object.freeze({
+    paginateAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjection,
+    readAgentStatusSnapshot,
+    readAgentStatusValue,
+});
+
+const sdkObservabilityOps = Object.freeze({
+    defaultAuditLog,
+    defaultErrorTracker,
+    defaultMetrics,
+    defaultOtelFile: DEFAULT_OTEL_FILE,
+    getAuditTail,
+    getCatalog,
+    getCompactionHistory,
+    getDeadLetters,
+    getLastQuotaSnapshots,
+    getMcpStatus,
+    getRecentLogs,
+    isOtelEnabled,
+    log,
+    nervEventBusAdapter,
+    otelExporterOtlpEndpoint: OTEL_EXPORTER_OTLP_ENDPOINT,
+});
+
+const sdkHookOps = Object.freeze({
+    bus: defaultBus,
+    registry: SDK_HOOKS,
+    log,
+});
+
+/**
+ * @returns {import('#copilot/observability/metrics.js').MetricsStore}
+ */
+function resolveMetricsStore() {
+    try {
+        return /** @type {import('#copilot/observability/metrics.js').MetricsStore} */ (
+            container.resolve(METRICS_STORE)
+        );
+    } catch {
+        return defaultMetrics;
+    }
+}
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -28,6 +144,13 @@ import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request
  *     stopClient: typeof stopClient;
  *     forceStopClient: typeof forceStopClient;
  *     allTools: ReturnType<typeof getAllTools>;
+ *     sdkSession: typeof sdkSessionOps;
+ *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
+ *     sdkRuntimeProjection: typeof sdkRuntimeProjectionOps;
+ *     sdkObservability: typeof sdkObservabilityOps;
+ *     sdkHooks: typeof sdkHookOps;
+ *     sdkApiToken: string | null;
+ *     bridgeAdminToken: string | undefined;
  * }}
  */
 export function buildDefaultSdkRouteSharedDeps(runtimeId) {
@@ -38,14 +161,19 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         requestedRuntimeId: selection.requestedRuntimeId,
         runtimeFound: selection.runtimeFound,
         usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
-        metrics: /** @type {import('#copilot/observability/metrics.js').MetricsStore} */ (
-            container.resolve(METRICS_STORE)
-        ),
+        metrics: resolveMetricsStore(),
         getClient,
         getClientState,
         stopClient,
         forceStopClient,
         allTools: getAllTools(),
+        sdkSession: sdkSessionOps,
+        sdkSessionOwnership: sdkSessionOwnershipOps,
+        sdkRuntimeProjection: sdkRuntimeProjectionOps,
+        sdkObservability: sdkObservabilityOps,
+        sdkHooks: sdkHookOps,
+        sdkApiToken: SDK_API_TOKEN,
+        bridgeAdminToken: BRIDGE_ADMIN_TOKEN,
     };
 }
 

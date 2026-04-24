@@ -13,9 +13,13 @@ import {
     EMITTER_TASK_ERROR,
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
+import {
+    appendThinkingHistoryChunk,
+    finalizeThinkingHistoryEntry,
+    getShowStreaming,
+} from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
-import { println } from './dialog.js';
-import { getShowStreaming } from './state.js';
+import { println } from './dialog/index.js';
 
 /**
  * @typedef {{
@@ -31,6 +35,55 @@ import { getShowStreaming } from './state.js';
 export function setupTerminalTaskStreamListeners({ agent }) {
     /** @type {string | null} */
     let activeTaskId = null;
+    /** @type {Map<string, number>} */
+    const taskThinkingStarts = new Map();
+    /** @type {Set<string>} */
+    const openThinkingIds = new Set();
+
+    /**
+     * @param {string | null | undefined} taskId
+     * @returns {string}
+     */
+    const getThinkingId = (taskId) => `task-${taskId ?? '__anonymous__'}`;
+
+    /**
+     * @param {string | null | undefined} taskId
+     * @returns {string[]}
+     */
+    const resolveOpenThinkingIds = (taskId) => {
+        const candidates = [
+            taskId !== undefined ? getThinkingId(taskId) : null,
+            activeTaskId !== null ? getThinkingId(activeTaskId) : null,
+        ].filter(Boolean);
+        const matched = /** @type {string[]} */ (candidates).filter((id) => openThinkingIds.has(id));
+        return matched.length > 0 ? [...new Set(matched)] : [...openThinkingIds];
+    };
+
+    /**
+     * @param {string | null | undefined} taskId
+     * @param {'completed' | 'error'} status
+     * @returns {void}
+     */
+    const finalizeTaskThinkings = (taskId, status) => {
+        const ids = resolveOpenThinkingIds(taskId);
+        for (const thinkingId of ids) {
+            const thinkingStartedAt = taskThinkingStarts.get(thinkingId);
+            const thinkingEntry = finalizeThinkingHistoryEntry(thinkingId, {
+                durationMs: thinkingStartedAt ? Date.now() - thinkingStartedAt : null,
+                status,
+            });
+            if (thinkingEntry) {
+                const color = status === 'error' ? '\x1b[31m' : '\x1b[90m';
+                const label = status === 'error' ? 'falhou' : 'concluído';
+                println(
+                    `  ${color}└── task thinking #${thinkingEntry.id.slice(-12)} ${label} · ${(Number(thinkingEntry.durationMs ?? 0) / 1000).toFixed(1)}s · ${thinkingEntry.chars} chars\x1b[0m`,
+                );
+                println(`  \x1b[90m    /thinking show ${thinkingEntry.id.slice(-12)}  ·  /thinking latest\x1b[0m`);
+            }
+            taskThinkingStarts.delete(thinkingId);
+            openThinkingIds.delete(thinkingId);
+        }
+    };
 
     /**
      * @param {string | null} taskId
@@ -68,22 +121,36 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         writeTaskChunk(chunk);
     };
 
-    const onTaskReasoning = (/** @type {{ taskId?: string | null; text?: string }} */ evt) => {
-        const text = evt?.text ?? '';
+    const onTaskReasoning = (/** @type {{ taskId?: string | null; text?: string; chunk?: string }} */ evt) => {
+        const text = evt?.chunk ?? evt?.text ?? '';
         if (!text) return;
+        const taskId = evt.taskId ?? null;
+        const thinkingId = getThinkingId(taskId);
         recordTerminalActivity('task', 'Raciocinando tarefa interna', {
-            detail: evt.taskId ? `task ${evt.taskId}` : 'task interna',
+            detail: taskId ? `task ${taskId}` : 'task interna',
             source: 'agent',
             recordHistory: false,
         });
-        startTaskBlock(evt.taskId ?? null);
-        writeTaskChunk(`\x1b[2m${text}\x1b[22m`);
+        appendThinkingHistoryChunk({
+            id: thinkingId,
+            source: 'task',
+            title: taskId ? `Task ${taskId}` : 'Task interna',
+            chunk: text,
+            taskId,
+        });
+        if (!taskThinkingStarts.has(thinkingId)) {
+            taskThinkingStarts.set(thinkingId, Date.now());
+            openThinkingIds.add(thinkingId);
+            println(`  \x1b[33m↳ task thinking capturado\x1b[0m \x1b[90m(${taskId ?? 'task interna'})\x1b[0m`);
+            println(`  \x1b[90m    /thinking show ${thinkingId.slice(-12)}  ·  /thinking latest\x1b[0m`);
+        }
     };
 
-    const onTaskCompleted = () => {
+    const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         recordTerminalActivity('task', 'Tarefa interna concluída', {
             source: 'agent',
         });
+        finalizeTaskThinkings(evt.taskId ?? activeTaskId ?? undefined, 'completed');
         if (activeTaskId) {
             process.stdout.write('\n');
             if (getShowStreaming()) println('  \x1b[90m└── task complete ───┘\x1b[0m');
@@ -91,11 +158,12 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         }
     };
 
-    const onTaskError = () => {
+    const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         recordTerminalActivity('error', 'Tarefa interna falhou', {
             source: 'agent',
             severity: 'error',
         });
+        finalizeTaskThinkings(evt.taskId ?? activeTaskId ?? undefined, 'error');
         if (activeTaskId) {
             process.stdout.write('\n');
             if (getShowStreaming()) println('  \x1b[31m└── task error ──────┘\x1b[0m');

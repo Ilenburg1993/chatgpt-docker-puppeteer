@@ -28,8 +28,6 @@ describe('P4 — superfícies compartilhadas de agent-control', () => {
 
         assert.ok(src.includes("'./runtime-dialog.js'"));
         assert.ok(src.includes("'./runtime-ui-state.js'"));
-        assert.ok(!src.includes("'../terminal/dialog.js'"));
-        assert.ok(!src.includes("'../terminal/file-context.js'"));
-        assert.ok(!src.includes("'../terminal/state.js'"));
+        assert.ok(!src.includes("'../terminal/"));
     });
 });

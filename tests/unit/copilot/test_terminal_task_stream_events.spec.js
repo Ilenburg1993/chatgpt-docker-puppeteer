@@ -5,9 +5,45 @@
  * Contrato: terminal/task-stream-events.js
  */
 
-import { describe, expect, it } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+    recordTerminalActivity: vi.fn(),
+    println: vi.fn(),
+    getShowStreaming: vi.fn(() => true),
+    getShowThinking: vi.fn(() => true),
+    appendThinkingHistoryChunk: vi.fn(),
+    finalizeThinkingHistoryEntry: vi.fn(),
+}));
+
+vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+    recordTerminalActivity: mocks.recordTerminalActivity,
+}));
+
+vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+    println: mocks.println,
+}));
+
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+    appendThinkingHistoryChunk: mocks.appendThinkingHistoryChunk,
+    finalizeThinkingHistoryEntry: mocks.finalizeThinkingHistoryEntry,
+    getShowStreaming: mocks.getShowStreaming,
+    getShowThinking: mocks.getShowThinking,
+}));
 
 describe('terminal/task-stream-events.js — contrato', () => {
+    beforeEach(() => {
+        mocks.recordTerminalActivity.mockClear();
+        mocks.println.mockClear();
+        mocks.getShowStreaming.mockReset();
+        mocks.getShowStreaming.mockReturnValue(true);
+        mocks.getShowThinking.mockReset();
+        mocks.getShowThinking.mockReturnValue(true);
+        mocks.appendThinkingHistoryChunk.mockClear();
+        mocks.finalizeThinkingHistoryEntry.mockClear();
+    });
+
     it('importa sem erros', async () => {
         const mod = await import('../../../src/copilot/terminal/task-stream-events.js');
         expect(mod).toBeTruthy();
@@ -16,5 +52,71 @@ describe('terminal/task-stream-events.js — contrato', () => {
     it('exporta setupTerminalTaskStreamListeners', async () => {
         const mod = await import('../../../src/copilot/terminal/task-stream-events.js');
         expect(typeof mod.setupTerminalTaskStreamListeners).toBe('function');
+    });
+
+    it('consome chunk em task.reasoning como thinking colapsado de tarefa interna', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.reasoning', { taskId: 'task-1', chunk: 'pensando...' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Raciocinando tarefa interna',
+            expect.objectContaining({ detail: 'task task-1', source: 'agent', recordHistory: false }),
+        );
+        expect(mocks.appendThinkingHistoryChunk).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'task-task-1', source: 'task', chunk: 'pensando...' }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking capturado'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show'));
+        expect(stdoutSpy).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('não imprime reasoning cru de tarefa quando /thinking está desligado', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        mocks.getShowThinking.mockReturnValue(false);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.reasoning', { taskId: 'task-1', chunk: 'pensando...' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalled();
+        expect(stdoutSpy).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('finaliza thinking aberto mesmo quando task.completed chega sem taskId', async () => {
+        mocks.finalizeThinkingHistoryEntry.mockReturnValue({
+            id: 'task-task-1',
+            ts: Date.now(),
+            source: 'task',
+            title: 'Task task-1',
+            content: 'pensando...',
+            chars: 11,
+            durationMs: 15,
+            reasoningId: null,
+            taskId: 'task-1',
+            status: 'completed',
+        });
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.reasoning', { taskId: 'task-1', chunk: 'pensando...' });
+        agent.emit('task.completed', {});
+
+        expect(mocks.finalizeThinkingHistoryEntry).toHaveBeenCalledWith(
+            'task-task-1',
+            expect.objectContaining({ status: 'completed' }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking #task-task-1 concluído'));
     });
 });

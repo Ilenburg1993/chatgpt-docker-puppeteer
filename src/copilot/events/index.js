@@ -27,6 +27,7 @@
 export {
     AGENT_ABORT,
     AGENT_ASSISTANT_INTENT,
+    AGENT_ASSISTANT_MESSAGE,
     AGENT_ASSISTANT_REASONING_COMPLETE,
     AGENT_ASSISTANT_STREAMING_DELTA,
     AGENT_ASSISTANT_TURN_END,
@@ -189,6 +190,7 @@ export {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_AGENT_METRICS,
     EMITTER_ASSISTANT_INTENT,
+    EMITTER_ASSISTANT_MESSAGE,
     EMITTER_ASSISTANT_REASONING_COMPLETE,
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_ASSISTANT_TURN_END,
@@ -265,8 +267,8 @@ export {
     EMITTER_TURN_START,
 } from './emitter-events.js';
 
-// ─── Re-exports de types/events.js para compatibilidade ──────────────────────
-export { EVENT_NAMES, EVENT_NAMESPACES } from './legacy-events.js';
+// ─── Catálogo base ───────────────────────────────────────────────────────────
+export { EVENT_NAMES, EVENT_NAMESPACES } from './base-events.js';
 
 // ─── Grupos consolidados (para uso em switch/Map) ─────────────────────────────
 
@@ -366,7 +368,7 @@ export const AUDIT_EVENTS = /** @type {const} */ ({
 
 // ─── Emitter Factory & Base Class ─────────────────────────────────────────────
 
-export { BaseEmitter, createEmitter } from './create-emitter.js';
+export { BaseEmitter, createEmitter } from './local-emitter.js';
 
 // ─── SDK Session Events (re-export para desacoplar observability/ de sdk/) ────
 export { ALL_EVENT_TYPES, onSessionEvent, onSessionEvents, SESSION_EVENTS } from './sdk-events.js';

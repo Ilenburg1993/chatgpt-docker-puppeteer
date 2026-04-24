@@ -4,11 +4,10 @@
  *
  * Estado SSE canônico (movido de server/sse/ para infra/sse/ — infraestrutura compartilhada).
  *
- * Onda 4.4 — L64.5: implementação própria sem re-export de `terminal/state.js`. Elimina a inversão de camada server →
- * terminal identificada na PARTE-25C.
+ * Onda 4.4 — L64.5: implementação própria de estado SSE. Elimina a inversão de camada server → terminal identificada na
+ * PARTE-25C.
  *
- * - `_serverSseClients` / `_serverSseCriticalClients`: Sets de clientes do servidor (distintos dos Sets raw do terminal
- *   em `terminal/state.js`)
+ * - `_serverSseClients` / `_serverSseCriticalClients`: Sets de clientes do servidor
  * - `_serverReplayBuffer`: buffer de replay dedicado ao endpoint /events do servidor (o `createSseWriter` escreve nele
  *   automaticamente via replayBuffer.push())
  *

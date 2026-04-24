@@ -226,6 +226,28 @@ describe('turn-executor', () => {
             expect(err.code).toBe('DIALOG_TIMEOUT');
         });
 
+        it('onReadyOuter usa fallback semântico antes do timeout quando houver reply candidato', () => {
+            const resolve = vi.fn();
+            const reject = vi.fn();
+            const tryUseReplyFallback = vi.fn(() => true);
+
+            const { onReadyOuter } = buildTurnResolutionListeners(emitter, {
+                host: makeTurnHost(),
+                turnStart: Date.now(),
+                timeout: 5000,
+                message: 'hi',
+                pendingListenerRef: { current: null },
+                resolve,
+                reject,
+                waitForRestartAndReplyFn: vi.fn(),
+                tryUseReplyFallback,
+            });
+
+            onReadyOuter({});
+            expect(tryUseReplyFallback).toHaveBeenCalled();
+            expect(reject).not.toHaveBeenCalled();
+        });
+
         it('onStopOuter authorized rejeita com DIALOG_ENDED', () => {
             const resolve = vi.fn();
             const reject = vi.fn();
@@ -317,6 +339,40 @@ describe('turn-executor', () => {
             emitter.emit('question.pending', {});
             await tick();
             expect(host.answerPendingQuestion).toHaveBeenCalledWith('delayed');
+        });
+
+        it('resolve via pendingQuestion protocolar quando QUESTION_PENDING chega com REPLY já materializado', async () => {
+            const host = {
+                hasPendingQuestion: vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true),
+                answerPendingQuestion: vi.fn(),
+                getPendingQuestionSnapshot: vi.fn(() => ({
+                    question: 'REPLY: OK',
+                    allowFreeform: true,
+                    askedAt: Date.now(),
+                    kind: 'reply',
+                    protocolControlled: true,
+                })),
+            };
+            const onReplyOuter = vi.fn();
+
+            dispatchTurnToHost(emitter, {
+                host,
+                message: 'delayed',
+                timeout: 5000,
+                timeoutHandle: setTimeout(() => {}, 5000),
+                pendingListenerRef: { current: null },
+                onReplyOuter,
+                onStopOuter: vi.fn(),
+                resolve: vi.fn(),
+                reject: vi.fn(),
+                waitForRestartAndReplyFn: vi.fn(),
+            });
+
+            emitter.emit('question.pending', {});
+            await tick();
+
+            expect(onReplyOuter).toHaveBeenCalledWith({ reply: 'OK' });
+            expect(host.answerPendingQuestion).not.toHaveBeenCalled();
         });
     });
 
@@ -483,6 +539,108 @@ describe('turn-executor', () => {
 
             await expect(p).resolves.toBe('answer!');
             expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+        });
+
+        it('usa assistant.message como fallback semântico quando o protocolo REPLY deriva', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+
+            const p = executeTurnImpl(
+                emitter,
+                'question?',
+                { timeout: 5000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            host.emit('assistant.message', { content: 'OK' });
+            await vi.advanceTimersByTimeAsync(5100);
+            await tick();
+
+            await expect(p).resolves.toBe('OK');
+        });
+
+        it('normaliza assistant.message contendo REPLY: como fallback do turno', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+
+            const p = executeTurnImpl(
+                emitter,
+                'question?',
+                { timeout: 5000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            host.emit('assistant.message', { content: 'REPLY: resposta por fallback' });
+            await vi.advanceTimersByTimeAsync(5100);
+            await tick();
+
+            await expect(p).resolves.toBe('resposta por fallback');
+        });
+
+        it('remove listeners externos após timeout para evitar reply tardio contabilizado', async () => {
+            const host = {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            };
+
+            const p = executeTurnImpl(
+                emitter,
+                'question?',
+                { timeout: 1000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+            const caught = p.catch((err) => err);
+
+            await vi.advanceTimersByTimeAsync(1100);
+            await tick();
+
+            expect(emitter.listenerCount('reply')).toBe(0);
+            expect(emitter.listenerCount('stopped')).toBe(0);
+
+            emitter.emit('reply', { reply: 'late reply' });
+            await tick();
+
+            const err = await caught;
+            expect(err.code).toBe('DIALOG_TIMEOUT');
+        });
+
+        it('resolve pelo snapshot protocolar pendente quando o evento de reply se perde', async () => {
+            const host = {
+                hasPendingQuestion: vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true),
+                answerPendingQuestion: vi.fn(),
+                getPendingQuestionSnapshot: vi.fn(() => ({
+                    question: 'REPLY: OK',
+                    allowFreeform: true,
+                    askedAt: Date.now(),
+                    kind: 'reply',
+                    protocolControlled: true,
+                })),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            };
+
+            const p = executeTurnImpl(
+                emitter,
+                'question?',
+                { timeout: 5000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            emitter.emit('question.pending', {});
+            await tick();
+
+            await expect(p).resolves.toBe('OK');
+            expect(host.answerPendingQuestion).not.toHaveBeenCalled();
         });
     });
 });

@@ -10,11 +10,8 @@
  * Regras:
  *
  * - Apenas estado inerte (getters/setters de primitivos)
- * - Sem EventEmitter sofisticado — use `terminal/state.js` para reatividade do terminal
- * - O módulo de nível superior (`terminal/state.js`) DELEGA para este módulo como SSOT
  * - Sem EventEmitter sofisticado — use `presentation/runtime-ui-state-store.js` para reatividade compartilhada
- * - Os shims compatíveis (`terminal/state.js`) delegam para `presentation/runtime-ui-state-store.js`, que por sua vez
- *   sincroniza este módulo como SSOT cross-layer mínimo
+ * - `presentation/runtime-ui-state-store.js` sincroniza este módulo como SSOT cross-layer mínimo
  *
  * @module copilot/core/shared-state
  * @see EventBus
@@ -38,8 +35,7 @@ export function getHubSessionId() {
 }
 
 /**
- * Define o ID da hub session permanente. Deve ser chamado por `terminal/state.js` ao mudar o hubSessionId. Define o ID
- * da hub session permanente. Deve ser chamado pela store compartilhada quando o hubSessionId mudar.
+ * Define o ID da hub session permanente. Deve ser chamado pela store compartilhada quando o hubSessionId mudar.
  *
  * @param {string | null} id
  * @returns {void}

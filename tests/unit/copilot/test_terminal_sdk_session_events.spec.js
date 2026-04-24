@@ -19,12 +19,12 @@ vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/dialog.js', () => ({
+vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
 }));
 
-vi.mock('../../../src/copilot/terminal/state.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
     setSdkSessionMode: mocks.setSdkSessionMode,
 }));

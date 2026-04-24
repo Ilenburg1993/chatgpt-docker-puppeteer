@@ -14,9 +14,9 @@
  * @see module:copilot/agent/session/initializer
  */
 
+import { readBootSkillConfig, resolveHooksStateFile } from '#copilot/boot';
 import { container, logSwallowed, toError } from '#copilot/core';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
@@ -25,9 +25,8 @@ import { readAgentTodoStore } from '../ports/tool-port.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 
-const PROJECT_ROOT = resolve(import.meta.dirname, '../../../../');
-export const BRIEFING_FILE = join(PROJECT_ROOT, '.github', 'hooks', 'state', 'session-briefing.md');
-export const SESSION_JSON_FILE = join(PROJECT_ROOT, '.github', 'hooks', 'state', 'session.json');
+export const BRIEFING_FILE = resolveHooksStateFile('session-briefing.md');
+export const SESSION_JSON_FILE = resolveHooksStateFile('session.json');
 
 /**
  * Envelope defensivo para conteudo local controlavel por ferramentas.
@@ -173,16 +172,25 @@ export async function buildHookSystemContext() {
         log('DEBUG', `[hook-context] session.json indisponível: ${toError(e).code ?? toError(e).message ?? 'unknown'}`);
     }
 
-    // F5.3: skills disponíveis no diretório .github/skills/
+    // F5.3: skills disponiveis nos diretorios canonicos de boot.
     try {
-        const skillsDir = join(resolve(import.meta.dirname, '../../'), '.github', 'skills');
-        const entries = await readdir(skillsDir, { withFileTypes: true });
-        const skillNames = entries
-            .filter((e) => e.isDirectory())
-            .map((e) => e.name)
-            .sort();
-        if (skillNames.length > 0) {
-            parts.push('\n## Skills Disponíveis\n\n' + skillNames.map((s) => `- \`${s}\``).join('\n'));
+        const bootSkills = readBootSkillConfig();
+        const disabled = new Set(bootSkills.disabledSkills);
+        /** @type {Set<string>} */
+        const skillNames = new Set();
+        for (const skillsDir of bootSkills.skillDirectories) {
+            try {
+                const entries = await readdir(skillsDir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory() && !disabled.has(entry.name)) skillNames.add(entry.name);
+                }
+            } catch (e) {
+                log('DEBUG', `[hook-context] skills indisponiveis em ${skillsDir}: ${toError(e).message}`);
+            }
+        }
+        const names = [...skillNames].sort();
+        if (names.length > 0) {
+            parts.push('\n## Skills Disponíveis\n\n' + names.map((s) => `- \`${s}\``).join('\n'));
         }
     } catch (e) {
         log('DEBUG', `[hook-context] skills indisponíveis: ${toError(e).code ?? toError(e).message ?? 'unknown'}`);
@@ -192,6 +200,9 @@ export async function buildHookSystemContext() {
     try {
         const summary = container.resolve(METRICS_STORE).getSummary();
         const uptimeSecs = Math.round(process.uptime());
+        const sdkTurnsTotal = Number(summary.sdkDialog?.turnsTotal ?? summary.dialog?.turnsTotal ?? 0);
+        const inputTokens = Number(summary.tokens?.inputTokens ?? 0);
+        const outputTokens = Number(summary.tokens?.outputTokens ?? 0);
         // Contagem de TODOs pendentes (best-effort — falha silenciosa)
         let pendingCount = 0;
         try {
@@ -206,8 +217,8 @@ export async function buildHookSystemContext() {
             [
                 '\n## Estado Runtime do Agente (LLM-B SDK)',
                 `- Uptime do processo: ${uptimeSecs}s`,
-                `- Turns SDK completados: ${summary.dialog.turnsTotal}`,
-                `- Tokens acumulados (entrada+saída): ${summary.tokens.inputTokens + summary.tokens.outputTokens}`,
+                `- Turns SDK completados: ${sdkTurnsTotal}`,
+                `- Tokens acumulados (entrada+saída): ${inputTokens + outputTokens}`,
                 `- TODOs ativos (todo/in_progress): ${pendingCount}`,
             ].join('\n'),
         );
@@ -234,6 +245,17 @@ const HOOK_CONTEXT_MAX_BYTES = _HOOK_CONTEXT_MAX_BYTES;
  */
 export async function buildHookSystemContextSafe() {
     const raw = await buildHookSystemContext();
+    const optionalSkillsStart = raw.indexOf('\n\n## Skills Disponíveis');
+    if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES && optionalSkillsStart !== -1) {
+        const optionalSkillsEnd = raw.indexOf('\n\n## Estado Runtime', optionalSkillsStart + 1);
+        const withoutSkills =
+            optionalSkillsEnd === -1
+                ? raw.slice(0, optionalSkillsStart)
+                : raw.slice(0, optionalSkillsStart) + raw.slice(optionalSkillsEnd);
+        if (Buffer.byteLength(withoutSkills, 'utf8') <= HOOK_CONTEXT_MAX_BYTES) {
+            return withoutSkills;
+        }
+    }
     if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
         // G1-BUG-08 (fix): usar TextDecoder com fatal=false para garantir que o truncamento em
         // limite de bytes não corta caracteres UTF-8 multibyte no meio, gerando strings inválidas.

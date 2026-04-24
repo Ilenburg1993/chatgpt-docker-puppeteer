@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/api/express/sessions.js
+ * src/copilot/server/routes/sdk/sessions.js
  *
  * Rotas de gerenciamento de sessões SDK — barrel de composição.
  *
@@ -23,15 +23,16 @@
  * - POST /sessions/:id/send — Envia mensagem (sync ou async)
  * - GET /sessions/:id/stream — SSE stream de eventos da sessão
  * - POST /sessions/:id/model — Altera modelo da sessão ativa
+ * - POST /sessions/:id/log — Emite mensagem no timeline da sessão SDK
  * - POST /sessions/:id/abort — Aborta processamento em andamento
  * - GET /sessions/:id/messages — Lista histórico de mensagens
  *
- * @module copilot/api/express/sessions
+ * @module copilot/server/routes/sdk/sessions
  * @see EventBus
  */
 
-import { SDK_API_TOKEN as _SDK_API_TOKEN } from '#copilot/config';
 import { Router } from 'express';
+import { resolveSdkRouteSharedDeps } from './deps.js';
 import crudRouter from './session-crud.js';
 import messagingRouter from './session-messaging.js';
 
@@ -39,17 +40,16 @@ const router = Router();
 
 // SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
 // Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
-const SDK_API_TOKEN = _SDK_API_TOKEN;
+router.use((req, res, next) => {
+    const sdkApiToken = resolveSdkRouteSharedDeps(req).sdkApiToken;
+    if (!sdkApiToken) return next();
 
-if (SDK_API_TOKEN) {
-    router.use((req, res, next) => {
-        const authHeader = req.headers['authorization'] ?? '';
-        if (authHeader !== `Bearer ${SDK_API_TOKEN}`) {
-            return res.status(401).json({ ok: false, error: 'Unauthorized' });
-        }
-        return next();
-    });
-}
+    const authHeader = req.headers['authorization'] ?? '';
+    if (authHeader !== `Bearer ${sdkApiToken}`) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+    return next();
+});
 
 // CRUD routes must come first (sessions/active, sessions/last, sessions/foreground
 // must appear before :id param routes)

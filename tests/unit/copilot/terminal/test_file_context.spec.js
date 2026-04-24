@@ -15,7 +15,7 @@ import {
     extractAtReferences,
     getFileCacheStats,
     readFileContext,
-} from '../../../../src/copilot/terminal/file-context.js';
+} from '../../../../src/copilot/presentation/runtime-file-context.js';
 
 describe('file-context detectLang', () => {
     it('mapeia .js para js', () => expect(detectLang('foo.js')).toBe('js'));
@@ -60,7 +60,7 @@ describe('file-context extractAtReferences', () => {
 
 describe('file-context embedContextBlock', () => {
     it('prepende bloco markdown à mensagem', () => {
-        /** @type {import('../../../../src/copilot/terminal/file-context.js').FileContext} */
+        /** @type {import('../../../../src/copilot/presentation/runtime-file-context.js').FileContext} */
         const ctx = { path: 'test.js', content: 'const x = 1;', size: 12, lang: 'js' };
         const result = embedContextBlock(ctx, 'analisar este código');
         expect(result).toContain('```js');

@@ -218,6 +218,22 @@ Leitura arquitetural:
 - `terminal/` permanece dono da UX/REPL, enquanto o composition root conhece `terminal/` e
   `server/`.
 
+## 2.7 Taxonomia dura de host
+
+Uma fonte recorrente de ambiguidade era a palavra `host`. A arquitetura ideal agora precisa tratá-la
+como termo técnico contextual, e não como sinônimo genérico de "coisa principal":
+
+- `boot host`: composição operacional que sobe o runtime local;
+- `process host`: borda Node/IPC/sinais do runtime compatível;
+- `HTTP host`: `server/`;
+- `UX host`: `terminal/`;
+- `runtime host`: `AlwaysAliveAgent` como runtime contínuo;
+- `DialogHost` / `DialogLoopHost` / `DialogTurnHost`: adapters progressivamente menores de
+  capability dentro de `agent/`.
+
+Regra estrutural: módulos internos do `agent/` não devem depender do runtime inteiro quando um host
+menor resolve o problema. "Host" no hot path significa capability adapter.
+
 Os `soft` iniciais confirmam a hipótese do documento 12: o grosso do trabalho não é `server` e
 `terminal`, que já usam bastante `presentation/`; o grosso está em fronteiras sensíveis do `agent/`
 com `observability/`, `tools/`, `hooks/`, `bridges/` e `conversation-hub/`.
@@ -1008,9 +1024,575 @@ Interpretação:
   começando pelos ports de observability/conversation-hub, sem quebrar a regra central: SDK
   primeiro, agent mestre do runtime e presentation apenas como projection.
 
+## 2.19 Baseline após endurecimento de `server/routes/sdk`
+
+Esta rodada fechou duas ambiguidades: o ruído de teste que ainda varria a pasta morta
+`src/copilot/api/`, e a fronteira de composição do adapter HTTP `/sdk`.
+
+Implementado:
+
+- `tests/unit/copilot/sdk/test_sdk_tools_registry_f28.spec.js` deixou de executar `grep` shell
+  contra `src/copilot/api/` e passou a usar varredura Node silenciosa em caminhos existentes.
+- `server/routes/sdk/deps.js` virou o composition root único do namespace `/sdk`:
+  - SDK client/session;
+  - seleção de runtime agent;
+  - projections de runtime/tools/sessão;
+  - hooks;
+  - audit/observability/bridges;
+  - tokens de política HTTP;
+  - fallback estático de tools.
+- `agent.js`, `client.js`, `hooks.js`, `observability.js`, `sessions.js`, `session-crud.js` e
+  `session-messaging.js` passaram a receber essas capacidades por `deps.js`, sem importar SDK,
+  agent, tools, hooks, audit, bridges, config ou presentation diretamente.
+- `buildDefaultSdkRouteSharedDeps()` passou a tolerar ausência do `METRICS_STORE` no container,
+  usando `defaultMetrics` como fallback para testes e boot parcial.
+- `scripts/check-copilot-global-architecture.mjs` ganhou a regra hard
+  `sdk-routes-must-compose-through-deps`: qualquer import de domínio/projection em
+  `server/routes/sdk/*`, exceto `deps.js`, falha o gate.
+
+Regra consolidada:
+
+```text
+server/routes/sdk/deps.js:
+  único ponto que compõe SDK, agent runtime, tools, hooks, audit, bridges, config e presentation
+
+server/routes/sdk/*.js:
+  HTTP adapter puro; pode validar request, aplicar rate limit, serializar resposta e abrir SSE
+  não pode compor domínio nem ler runtime vivo diretamente
+
+server/routes/sdk/*middleware.js:
+  middleware HTTP local; pode usar logging/error helpers transversais
+  não pode acessar SDK/agent/presentation/tools
+```
+
+Interpretação:
+
+- `/sdk` continua sendo adapter HTTP do SDK, mas já não contém pequenos composition roots
+  espalhados;
+- o SDK permanece mestre sobre client/session/model/tools do SDK;
+- o agent permanece mestre sobre runtime vivo;
+- `presentation/` permanece projection compartilhada, acessada por `deps.js`, não pelos handlers
+  HTTP diretamente.
+
+Gates executados:
+
+```text
+npx vitest run tests/unit/copilot:
+  264 arquivos passados
+  18 arquivos skipped
+  3988 testes passados
+  28 testes skipped
+  4016 testes totais
+  sem ruído de grep para src/copilot/api/
+
+typecheck:strict:src.copilot:
+  sem erros
+
+analyze:arch:global:strict:
+  hard=0
+  soft=0
+  info=105
+  total=105
+
+analyze:events:ssot:strict:
+  ssotCount=198
+  filesScanned=462
+  violationCount=0
+  findingCount=39
+
+analyze:arch:layers:
+  sem violações
+```
+
+## 2.20 Baseline após saneamento de resíduos `legacy/shim/deprecated`
+
+Baseline transitório: esta seção registra a quarentena inicial de compatibilidade pública. A seção
+2.21 substitui essa regra por uma postura mais dura: sem arquivos-shim físicos para os entrypoints
+legados removidos.
+
+Esta rodada separou compatibilidade pública de resíduo arquitetural. A regra adotada é dura:
+arquivos compatíveis podem continuar existindo como API de borda quando há contrato público, mas
+nenhum código interno novo pode depender deles. Implementação viva deve importar o módulo canônico.
+
+Implementado:
+
+- `events/base-events.js` virou o catálogo canônico de `EVENT_NAMES` e `EVENT_NAMESPACES`.
+  `events/legacy-events.js` ficou apenas como shim público que reexporta o catálogo canônico.
+- `events/local-emitter.js` virou o owner canônico de `createEmitter()` e `BaseEmitter`.
+  `events/create-emitter.js` ficou apenas como shim público.
+- `terminal/` deixou de consumir seus próprios shims `terminal/state.js` e
+  `terminal/file-context.js`; o terminal agora importa diretamente
+  `presentation/runtime-ui-state-store.js` e `presentation/runtime-file-context.js`.
+- `bootstrap.js` deixou de lazy-loadar `terminal/dialog.js` e passou a usar o barrel canônico
+  `terminal/dialog/index.js`.
+- `scripts/generate-openapi.mjs` passou a escanear `src/copilot/server/routes/` e a gerar
+  `src/copilot/server/routes/openapi.json` quando executado. `scripts/gen-openapi.mjs` virou wrapper
+  compatível.
+- `scripts/check-copilot-autonomy.mjs` deixou de exigir `src/copilot/api/`, `api/sse` e
+  `src/copilot/api/openapi.json`; agora valida que `server/routes/` é a única borda HTTP canônica.
+- `scripts/health-check-parte22.mjs` deixou de medir `api/` e `services/` como módulos críticos
+  vivos e passou a medir `presentation/` e `server/`.
+- `scripts/check-copilot-global-architecture.mjs` ganhou a regra hard
+  `internal-code-must-not-import-compat-shims`.
+
+Regra consolidada:
+
+```text
+Compatibilidade pública:
+  pode existir em arquivos explicitamente marcados como shim/facade
+  deve reexportar ou delegar para o módulo canônico
+  não pode conter lógica própria nova
+
+Implementação interna:
+  não importa terminal/state.js, terminal/file-context.js ou terminal/dialog.js
+  não importa agent/infra/task-executor.js ou agent/queue-processor.js
+  não importa events/legacy-events.js ou events/create-emitter.js
+  importa sempre presentation/, agent/messaging/ ou events/* canônico
+```
+
+Interpretação:
+
+- `legacy` não é mais uma direção de arquitetura; é apenas uma camada de compatibilidade pública
+  quarantinada;
+- `presentation/` permanece dona de estado de UI/file-context compartilhado entre bordas;
+- `events/` deixa de chamar seu catálogo base de “legacy” internamente;
+- scripts de governança agora reforçam a arquitetura atual, não uma topologia já removida.
+
+Gates executados nesta rodada:
+
+```text
+typecheck:strict:src.copilot:
+  sem erros
+
+analyze:arch:global:strict:
+  hard=0
+  soft=0
+  info=105
+
+analyze:arch:layers:
+  sem violações
+
+check-copilot-autonomy:
+  sucesso
+
+vitest terminal focado:
+  23 arquivos passados
+  208 testes passados
+
+vitest events/observability/task-executor focado:
+  6 arquivos passados
+  73 testes passados
+```
+
+## 2.21 Baseline após eliminação física dos shims
+
+Regra atual: shims físicos removidos não voltam. Compatibilidade pública só pode existir quando o
+entrypoint aponta diretamente para o módulo canônico por mecanismo de resolução explícito, sem novo
+arquivo intermediário com lógica, reexport ou delegação. O exemplo aceito é o import map
+`#copilot/config/system-prompt`, que agora resolve diretamente para
+`src/copilot/config/system-prompt/index.js`.
+
+Entry points removidos e substitutos canônicos:
+
+- `terminal/state.js` -> `presentation/runtime-ui-state-store.js`
+- `terminal/file-context.js` -> `presentation/runtime-file-context.js`
+- `terminal/dialog.js` -> `terminal/dialog/index.js`
+- `events/legacy-events.js` -> `events/base-events.js`
+- `events/create-emitter.js` -> `events/local-emitter.js`
+- `agent/infra/task-executor.js` -> `agent/messaging/agent-messaging.js`
+- `agent/queue-processor.js` -> `agent/messaging/agent-messaging.js`
+- `config/system-prompt.js` -> `config/system-prompt/index.js`
+
+Impacto arquitetural:
+
+- consumers de `src/copilot/` e `tests/unit/copilot/` foram migrados para módulos canônicos;
+- o catálogo público de system prompt preserva a API histórica pelo módulo canônico
+  `config/system-prompt/index.js`, sem fachada física legada;
+- `package.json` declara `#copilot/config/system-prompt` como alias exato para o índice canônico;
+- `scripts/check-copilot-global-architecture.mjs` ganhou gate hard
+  `removed-compat-entrypoints-must-stay-deleted`;
+- a regra de import interno foi renomeada para `internal-code-must-not-import-removed-entrypoints`,
+  deixando claro que o alvo antigo não é mais uma zona de compatibilidade aceita.
+
+Regra consolidada, sem exceções:
+
+```text
+Código novo e código interno:
+  importa sempre o módulo canônico
+  não importa entrypoints removidos
+  não recria arquivos-shim físicos para paths removidos
+
+Compatibilidade pública:
+  só é aceita por alias/resolution direto para módulo canônico
+  não adiciona arquivo intermediário
+  não contém lógica própria
+```
+
+Gates executados nesta rodada:
+
+```text
+typecheck:strict:src.copilot:
+  sem erros
+
+analyze:arch:global:strict:
+  hard=0
+  soft=0
+  info=105
+
+analyze:arch:layers:
+  sem violações
+
+analyze:events:ssot:strict:
+  sem violações
+
+check-copilot-autonomy:
+  sucesso
+
+vitest tests/unit/copilot:
+  264 arquivos passados
+  18 arquivos pulados
+  3988 testes passados
+  28 testes pulados
+```
+
+## 2.22 Baseline após hardening de boot e compat operacional
+
+Esta rodada atacou compatibilidade que não era shim físico: entrypoints PM2/deprecated, wrappers
+operacionais e lacunas de superfície SDK na borda HTTP.
+
+Leitura do SDK instalado:
+
+- `node_modules/README.md` não existe neste checkout;
+- o README real lido integralmente foi `node_modules/@github/copilot-sdk/README.md`, com 893 linhas;
+- a conferência também usou `dist/index.d.ts`, `dist/client.d.ts`, `dist/session.d.ts` e
+  `dist/types.d.ts` para cobrir APIs que o README resume.
+
+Situação ideal consolidada para boot:
+
+```text
+terminal:llm-b
+  -> src/copilot/terminal/bootstrap.js        entrypoint canônico
+    -> src/copilot/bootstrap.js               composition root de boot
+      -> observability/bootstrap.js           loggers, métricas, audit bus
+      -> runtime-wiring.js                    DI/runtime agent
+      -> terminal/index.js                    host da UX local
+        -> server/index.js                    HTTP/Socket.IO somente
+        -> terminal/repl.js                   interação humana
+```
+
+Regras sem ambiguidade:
+
+- `terminal/bootstrap.js` é o único boot real;
+- `src/copilot/agent.js` é compat operacional e só delega para `bootCopilot()`;
+- `copilot-sdk-agent` no PM2 não é segundo runtime e agora só entra com
+  `COPILOT_SDK_AGENT_COMPAT_ENABLED=true`;
+- `copilot-sdk-agent` não pode ser habilitado junto com `llm-b-terminal`;
+- `server/index.js` não inicia terminal, REPL ou agent; ele apenas publica HTTP/Socket.IO;
+- `terminal/index.js` é quem compõe o server local por injeção de `startCopilotServer`;
+- o contrato vivo de boot agora fica em `src/copilot/boot/`, com `contract.js`, `config.js`,
+  `workspace.js`, `skills.js` e `plan.js`.
+
+Compatibilidade SDK endurecida:
+
+- `/sdk/sessions` aceita os campos JSON-serializáveis da `SessionConfig`/`ResumeSessionConfig` do
+  SDK: `configDir`, `mcpServers`, `agent`, `skillDirectories`, `disabledSkills`, `infiniteSessions`,
+  `provider`, `reasoningEffort`, `availableTools`, `excludedTools`, `customAgents`, `systemMessage`,
+  `streaming`, `workingDirectory` e `clientName`;
+- `provider` custom continua SDK-first: exige `model`, como documentado pelo SDK;
+- `POST /sdk/sessions/:id/model` agora repassa `reasoningEffort` para `CopilotSession.setModel`;
+- `POST /sdk/sessions/:id/log` expõe `CopilotSession.log`;
+- capacidades SDK baseadas em função (`tools[].handler`, hooks, permission handler, user input,
+  `onEvent`, trace context) continuam process-local e entram por `deps.js`, ports, hooks e registry,
+  não por JSON.
+
+Governança adicionada:
+
+- `scripts/check-copilot-autonomy.mjs` agora valida o contrato PM2 de boot único;
+- o mesmo gate valida um baseline mínimo de capacidades vanilla do SDK em
+  `src/copilot/boot/contract.js`;
+- o gate exige que `/sdk/sessions` cubra a superfície JSON do SDK e `session.log`.
+
+Gates executados nesta rodada:
+
+```text
+node --check:
+  boot contract/config/workspace/skills/plan, session middleware/crud/messaging e autonomy gate sem erro de sintaxe
+
+typecheck:strict:src.copilot:
+  sem erros
+
+check-copilot-autonomy:
+  sucesso, incluindo checks de boot PM2 e baseline SDK
+
+analyze:arch:global:strict:
+  hard=0
+  soft=0
+  info=105
+
+analyze:arch:layers:
+  sem violações
+
+analyze:events:ssot:strict:
+  sem violações
+
+vitest tests/unit/copilot:
+  264 arquivos passados
+  18 arquivos pulados
+  3991 testes passados
+  28 testes pulados
+```
+
+## 2.23 Boot centralizado e configurável
+
+Esta rodada endurece a arquitetura de boot: `src/copilot/boot/` passa a ser o único lugar onde o
+ambiente operacional é descoberto e transformado em plano de execução.
+
+Situação ideal consolidada:
+
+- `boot/config.js` é o arquivo canônico para variáveis de boot;
+- `boot/workspace.js` resolve `COPILOT_WORKING_DIRECTORY`, raiz do pacote, raiz de `src/copilot`,
+  estado de hooks e arquivos persistentes como `skills.json`;
+- `boot/skills.js` resolve `COPILOT_SKILL_DIRECTORIES`, `COPILOT_PINNED_CONTEXT_DIRS` e
+  `COPILOT_DISABLED_SKILLS`;
+- `boot/plan.js` descreve fases, donos e responsabilidades de boot;
+- `terminal/`, `server/`, `agent/` e `config/` consomem o boot, sem redescobrir workspace, skills ou
+  porta local por conta própria.
+
+Transições implementadas:
+
+- `terminal/index.js` usa `bootConfig.skills.pinnedContextDirectories` para o `PinnedFilesLoader`;
+- `terminal/index.js` injeta `host`, `port` e `token` do boot em `startCopilotServer`;
+- `terminal/workspace-context.js` reexporta o contexto canônico de `#copilot/boot`;
+- `agent/session/initializer.js` e `agent/lifecycle/session-setup.js` usam workspace e
+  `skillDirectories` do boot para criar sessões SDK;
+- `agent/session/hook-context.js` lista skills a partir dos diretórios do boot, com suporte a
+  múltiplos diretórios e disabled skills;
+- `tools/session-tools.js` carrega skills e estado de hooks a partir do boot;
+- `config/mcp-servers.js` remove o path absoluto do filesystem MCP e usa `WORKSPACE_ROOT`;
+- `declarative-runtime-config.js` persiste `skills.json` via path canônico do boot.
+- `db/sqlite.js`, `sdk/tools/state.js`, `sdk/tools/custom.js`, `tools/file`, `tools/shell`,
+  `tools/git`, `tools/todo` e `tools/code-tools` passaram a usar paths do boot para artefatos
+  persistentes e raiz de execução.
+
+Regra nova sem exceção: qualquer variável operacional de boot deve entrar primeiro em
+`src/copilot/boot/config.js`. `config/env.js` pode reexportar variáveis para compat de domínio, mas
+não é mais a autoridade para descobrir workspace/skills/entrypoints.
+
+Validação da rodada 2.23:
+
+```text
+typecheck:strict:src.copilot:
+  sem erros
+
+check-copilot-autonomy:
+  sucesso, incluindo Check 19 para boot centralizado
+
+analyze:arch:global:strict:
+  hard=0
+  soft=0
+  info=105
+
+analyze:arch:layers:
+  sem violações
+
+analyze:events:ssot:strict:
+  sem violações
+
+## 2.23.1 Hardenings de boot, protocolo e visibilidade de tools
+
+Rodada complementar após validação com `npm run terminal:llm-b` em ambiente real.
+
+Decisões consolidadas:
+
+- `entry.js` e o host de runtime não devem reinventar boot; fazem apenas hosting, sinais, IPC,
+  preflight SDK e plugin discovery;
+- `READY/REPLY/STOPPED` pertencem ao protocolo do agent. Se chegarem tardiamente após timeout de
+  boot, continuam sendo protocolo, não input interativo comum;
+- `availableTools` e `excludedTools` do SDK são fronteiras do SDK, não da nossa superfície local de
+  tools; policy local do runtime deve ser aplicada em hooks/capabilities do agent;
+- keepalive parado durante `dialogLoopActive=true` é estado normal, não degradação de health.
+
+Transições implementadas:
+
+- `agent/dialog/user-input-handler.js` passa a usar uma decisão semântica
+  `shouldHandleProtocolInput(question)` em vez de depender apenas de `dialogLoopActive`;
+- `agent/dialog/loop-manager.js` recupera `dialogLoopActive=true` quando um `READY` ou `REPLY`
+  chega após drift transitório de boot, persistindo o estado corrigido;
+- `agent/lifecycle/session-setup.js` aplica denylist/allowlist local por `onPreToolUse`, mantendo a
+  política de tools do runtime dentro do agent;
+- `agent/session/initializer.js` deixa de enviar denylist local crua para `excludedTools` do SDK,
+  eliminando warnings de nomes desconhecidos e reforçando a regra "SDK first, agent as governor";
+- `agent/health-check.js` deixa de marcar `io.keepalive_stopped` quando o keepalive está
+  intencionalmente suprimido por dialog loop ativo;
+- `terminal/repl.js` ganhou guard para não chamar `prompt()` após `/quit` fechar o `readline`.
+
+Regra nova sem exceção:
+
+- filtro nativo do SDK governa apenas recursos do SDK;
+- filtro operacional do runtime governa tools locais, MCP exposto no runtime e políticas do agent;
+- protocolo do dialog loop é decidido semanticamente, nunca por heurística de UI/terminal.
+
+## 2.23.2 Hardenings finais de boot HTTP, inject e fila de turnos
+
+Rodada adicional após testes live concretos pelo `terminal:llm-b`.
+
+Decisões consolidadas:
+
+- o boot canônico (`bootstrap.js`) também é responsável por registrar os global handlers de erro;
+  isso não pode ficar escondido apenas no host compatível de `entry.js`;
+- a borda HTTP (`server/routes/agent.js`) deve validar o mesmo contrato semântico de
+  `presentation/agent-control.js`, aceitando `message` como campo canônico e `content` apenas como
+  alias compatível;
+- classificação de protocolo deve usar uma única fonte de verdade (`DialogProtocol`), e tokens de
+  parada não podem ser inferidos por prefixo frouxo dentro de texto comum;
+- infraestrutura de fila nunca pode gerar `Promise` rejeitada órfã como efeito colateral interno.
+
+Transições implementadas:
+
+- `bootstrap.js` passa a registrar `ERROR_TRACKER.registerGlobalHandlers()` no boot canônico;
+- `presentation/agent-control.js` passa a propagar `timeout` explícito em `/inject` para
+  `sendRuntimeDialogTurn`;
+- `server/routes/agent.js` alinha os schemas de `/inject` e `/pipeline` com a surface canônica;
+- `dialog/protocol.js` vira o contrato neutro do protocolo READY/REPLY; `agent/lifecycle/session-setup.js`,
+  `agent/dialog/*` e `terminal/agent-runtime-events.js` convergem para essa mesma semântica sem dependência
+  `terminal -> agent`;
+- `agent/dialog/backpressure.js` remove o `next.finally(...)` órfão e passa a finalizar via
+  `next.then(finalize, finalize)`, eliminando `unhandledRejection` espúrio da fila;
+- testes unitários cobrindo boot, route validation, timeout propagation, protocolo e backpressure
+  foram atualizados.
+
+Validação live desta rodada:
+
+- `/dialog/pause` e `/dialog/resume` passaram a refletir corretamente `dialogPaused` em `GET /health`
+  e `GET /config`;
+- `/inject` com `message` canônico deixou de falhar na validação legacy;
+- timeouts de dialog turn passaram a ser projetados na HTTP surface como `DIALOG_TIMEOUT`, sem
+  derrubar o processo;
+- permanece um ponto funcional a investigar: em alguns cenários o modelo consome o input e conclui o
+  `ask_user`, mas não emite `REPLY:` a tempo, fazendo `/inject` expirar. Isso deixou de ser falha
+  de crash/boot e passa a ser investigação semântica do protocolo/modelo na próxima rodada.
+
+## 2.23.3 Hardenings de métricas, timeout adaptativo e UX de thinking
+
+Rodada posterior com validação live em `2026-04-23`, focada em separar semânticas que ainda estavam
+misturadas e em organizar melhor a experiência do terminal.
+
+Decisões consolidadas:
+
+- `dialog` interno, `sdkDialog` e `inject` são métricas diferentes e não podem mais compartilhar o
+  mesmo contador operacional;
+- timeout explícito do caller continua soberano; timeout implícito passa por policy adaptativa comum,
+  baseada em baseline, latência recente, fila e pressão de contexto;
+- `thinking` precisa ter duas formas distintas:
+  - **captura integral** e persistida em memória operacional;
+  - **apresentação** colapsada por padrão, com expansão sob comando do usuário;
+- `REPLY:` e `STOPPED` não podem virar `pendingQuestion` interativa; são mensagens de protocolo e
+  devem ser respondidas automaticamente para não contaminar o próximo turno;
+- o fallback semântico do dialog loop não pode depender apenas de `assistant.message`; ele também
+  precisa aproveitar texto já emitido em streaming quando o modelo volta para `READY` sem `REPLY:`
+  explícito.
+
+Transições implementadas:
+
+- `observability/metrics.js` e `metrics-histogram.js` passam a expor:
+  - `dialog` (turnos do runtime/dialog loop),
+  - `sdkDialog` (turnos concluídos pelo SDK),
+  - `inject` (tentativas/sucesso/timeout/erro da borda HTTP);
+- `presentation/system-config.js` e `system-metrics.js` passam a projetar essas superfícies
+  separadamente em `/health` e `/metrics`;
+- `presentation/dialog-timeout-policy.js` centraliza a policy adaptativa consumida pelas bordas
+  `presentation/agent-control.js` e `terminal/dialog/engine.js`;
+- `presentation/agent-control.js` passa a registrar `timeoutMs`, `timeoutStrategy`, `timeoutReasons`
+  e outcome no histórico de `/inject`;
+- `presentation/runtime-ui-state-store.js` ganha histórico explícito de `thinking`, e
+  `terminal/commands/thinking.js` passa a suportar `list`, `show`, `latest` e `clear`;
+- `terminal/dialog/turn-display.js` deixa de depender da impressão bruta como única forma de
+  observação e passa a registrar o thinking completo com resumo colapsado;
+- `terminal/task-stream-events.js` passa a registrar reasoning de tarefas internas no mesmo
+  histórico e a tratá-lo como artefato colapsado, nunca como despejo bruto no stdout;
+- `agent/dialog/user-input-handler.js` deixa de transformar `REPLY:` em pergunta pendente;
+- `agent/dialog/turn-executor.js` endurece o fallback semântico em `READY` e em `task.delta`,
+  reduzindo timeouts fantasma quando o modelo não segue o protocolo perfeitamente.
+- `presentation/system-metrics.js` e `server/routes/observability.js` passam a expor
+  `GET /thinking` e `GET /thinking/:id`, permitindo attach/follow por HTTP sem depender de
+  acoplamento TTY.
+
+Validação live desta rodada:
+
+- `POST /inject` passou a responder com `traceId`, `timeoutMs`, `timeoutStrategy` e
+  `timeoutReasons`;
+- `GET /health` deixou de misturar “turno SDK concluído” com “inject HTTP bem-sucedido”;
+- `terminal:llm-b` passou a permitir inspeção de thinking via `/thinking list` e
+  `/thinking latest`;
+- o caso live em que o modelo respondia e voltava a `READY` sem `REPLY:` deixou de bloquear o
+  `/inject` para o cenário testado após o fallback ampliado;
+- attach/follow recomendado para LLM-A deixa de ser “grudar no TTY”: a borda estável é
+  `/events` + `/history` + `/thinking`, com o terminal permanecendo apenas como UI local.
+
+Refinamento fechado na rodada seguinte:
+
+- thinking de tarefa interna é sempre capturado integralmente, anunciado por resumo curto e
+  finalizado mesmo quando `task.completed` chega sem `taskId`;
+- o terminal não imprime mais reasoning bruto de tarefas internas, evitando poluição visual e
+  preservando a política de UX colapsada;
+- `/thinking show <id>` e `GET /thinking/:id` aceitam o sufixo curto exibido no terminal, mantendo
+  a mesma operação mental nas duas bordas.
+- `dialog/protocol.js` passa a ser o contrato puro de protocolo compartilhado por `agent/` e
+  `terminal/`, removendo a dependência direta `terminal -> agent` para classificação de `READY:`,
+  `REPLY:`, `DONE:` e `STOPPED`;
+- `presentation/dialog-timeout-policy.js` passa a ser a policy compartilhada de timeout adaptativo
+  para callers do dialog loop, removendo o import `terminal -> agent` que ainda restava no engine;
+- consumers fora de `sdk/` voltam a passar pelo barrel `#copilot/sdk` para helpers/modelos/config de
+  tools, preservando a diretriz SDK-first sem bypasses de submódulos.
+
+vitest tests/unit/copilot:
+  268 arquivos passados
+  18 arquivos pulados
+
+Gates finais da rodada:
+
+- `npm run typecheck:strict:src.copilot`: verde;
+- `npm run analyze:arch:global`: `hard=0`, `soft=1` conhecido (`agent/lifecycle/session-setup.js`
+  ainda importa `#copilot/hooks` por compatibilidade até a próxima extração de port);
+- `npx vitest run tests/unit/copilot`: 4030 testes passados, 28 pulados.
+  3994 testes passados
+  28 testes pulados
+```
+
 ---
 
 ## 3. Arquitetura global ideal
+
+## 3.0 Glossário operativo
+
+Estes termos passam a ser contratos de arquitetura:
+
+- **SDK**: wrapper vanilla e camada mestre para client, sessão SDK, modelos, tools SDK, permissões
+  SDK e eventos crus do SDK. O SDK não conhece runtime, agent, presentation, server ou terminal.
+- **SDK client**: conexão operacional com o Copilot SDK/CLI. É infraestrutura de comunicação, não é
+  uma conversa nem um agente.
+- **SDK session**: unidade conversacional persistível do SDK, identificada por `sessionId`. Pode ser
+  criada, retomada, listada, desconectada, ter modelo alterado e receber mensagens. Não é runtime.
+- **Agent**: autoridade de runtime depois do SDK. Governa ciclo de vida, dialog loop, permissões em
+  execução, registry vivo, handoff, cache, estado de pending question, health e ownership.
+- **Runtime**: instância executável de um agent em um processo, endereçável por `runtimeId`. O
+  runtime tem estado vivo e pode orquestrar uma ou mais sessões SDK ao longo do tempo. Hoje o
+  runtime padrão é o AlwaysAliveAgent.
+- **RuntimeId**: alvo operacional para selecionar uma instância de runtime. Não é `sessionId` do SDK
+  e não é nome de persona.
+- **Multi-runtime**: múltiplas instâncias de runtime coexistindo sob um registry/manager. Exemplo:
+  `default` e `reviewer` como duas instâncias vivas, possivelmente da mesma classe de agent, com
+  estados separados.
+- **Multi-agent**: múltiplas identidades/políticas/capability sets de agent. Pode ser implementado
+  com múltiplos runtimes, mas o conceito é diferente: multi-agent fala de papel/política;
+  multi-runtime fala de instância viva.
+- **Presentation**: camada de projections e comandos semânticos para bordas. Ela formata payloads e
+  chama façades, mas não possui estado vivo, não decide política do SDK e não substitui o agent.
+- **Server/Terminal**: bordas. Recebem entrada humana/HTTP/SSE/REPL e serializam saída. Não governam
+  SDK, agent, tools, skills, plan ou permissões.
+- **Composition root**: ponto autorizado a juntar domínios. Hoje os pontos explícitos são
+  `bootstrap.js`, `runtime-wiring.js`, `agent/ports/*`, `config/sdk-config-port.js` e
+  `server/routes/sdk/deps.js`.
 
 ## 3.1 Mapa de camadas
 

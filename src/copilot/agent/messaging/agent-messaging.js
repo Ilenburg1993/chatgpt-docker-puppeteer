@@ -161,9 +161,8 @@ export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
 /**
  * Executa uma única tarefa da fila do agente de forma assíncrona.
  *
- * Implementação canônica da execução por tarefa após a decomposição incremental da `L2.3`. O caminho legado
- * `agent/infra/task-executor.js` permanece temporariamente como compat shim, mas a lógica real vive aqui na camada de
- * `messaging`.
+ * Implementação canônica da execução por tarefa após a decomposição incremental da `L2.3`. A lógica real vive aqui na
+ * camada de `messaging`.
  *
  * @param {import('#copilot/sdk/types').CopilotSession} session - Sessão SDK ativa — deve expor `on` e `sendAndWait`.
  * @param {QueuedTask} task - Tarefa a executar.

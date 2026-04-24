@@ -19,7 +19,6 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import {
@@ -28,11 +27,6 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import {
-    paginateAgentRuntimeToolsProjection,
-    readAgentRuntimeToolsProjection,
-} from '../../../presentation/runtime-tools.js';
-import { resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
@@ -54,6 +48,9 @@ const _agentReplayBuffer = new SseReplayBuffer();
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('@github/copilot-sdk').CopilotClient>} getClient - Factory do SDK client.
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  */
 
@@ -96,9 +93,16 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/info', (_req, res) => {
         void (async () => {
-            const { agent, getClient, runtimeId } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+            const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveAgentRouterDeps(
+                deps,
+                /** @type {Req} */ (_req),
+            );
             const client = agent.status !== 'stopped' ? await getClient() : null;
-            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, client?.getState?.() ?? null);
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(
+                agent,
+                client,
+                client?.getState?.() ?? null,
+            );
             res.json({
                 ok: true,
                 ...(runtimeId ? { runtimeId } : {}),
@@ -124,15 +128,15 @@ export default function createAgentRouter(deps) {
      * ?category=hook&page=1&limit=20 para filtragem e paginação.
      */
     router.get('/agent/tools', (req, res) => {
-        const { agent } = resolveAgentRouterDeps(deps, req);
-        const projection = readAgentRuntimeToolsProjection(agent, { requireRegistry: true });
+        const { agent, sdkRuntimeProjection } = resolveAgentRouterDeps(deps, req);
+        const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { requireRegistry: true });
         if (!projection.ok) {
             res.status(503).json({ ok: false, error: projection.error });
             return;
         }
 
         res.json(
-            paginateAgentRuntimeToolsProjection(projection, {
+            sdkRuntimeProjection.paginateAgentRuntimeToolsProjection(projection, {
                 category: req.query['category'],
                 page: req.query['page'],
                 limit: req.query['limit'],
@@ -163,9 +167,9 @@ export default function createAgentRouter(deps) {
      * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
      */
     router.post('/agent/telemetry/clear', (_req, res) => {
-        const { metrics } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+        const { metrics, sdkObservability } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
         metrics.reset();
-        log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
+        sdkObservability.log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
         res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
     });
 
@@ -182,10 +186,10 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/state', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { agent, getClient, runtimeId } = resolveAgentRouterDeps(deps, req);
+            const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveAgentRouterDeps(deps, req);
             const client = await getClient();
             const state = client.getState();
-            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(agent, client, state);
             res.json({ ok: true, state, ...(runtimeId ? { runtimeId } : {}), ...runtimeProjection });
         });
     });
@@ -209,7 +213,7 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/stream', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { getClient, runtimeId } = resolveAgentRouterDeps(deps, req);
+            const { getClient, runtimeId, sdkObservability } = resolveAgentRouterDeps(deps, req);
             if (!_agentTracker.accept()) {
                 res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
                 return;
@@ -244,7 +248,7 @@ export default function createAgentRouter(deps) {
 
             req.on('close', () => {
                 unsubscribe();
-                log('INFO', '[sdk-api] SSE agent/stream encerrado');
+                sdkObservability.log('INFO', '[sdk-api] SSE agent/stream encerrado');
             });
         });
     });

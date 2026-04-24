@@ -6,10 +6,10 @@
  * @see EventBus
  */
 
+export { DialogProtocol } from '../../dialog/protocol.js';
 export { DialogCompactionPolicy } from './compaction-policy.js';
 export { DialogCostLedger } from './cost-ledger.js';
 export { DialogLoopManager, wireDialogLoopEvents } from './loop-manager.js';
-export { DialogProtocol } from './protocol.js';
 export { selectDialogResumeStrategy } from './resume-policy.js';
 export { DialogLoopStateMachine } from './state-machine.js';
 export {

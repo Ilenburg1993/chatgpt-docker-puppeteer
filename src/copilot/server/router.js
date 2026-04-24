@@ -9,7 +9,6 @@
  */
 
 import { COPILOT_SDK_ENABLED } from '#copilot/config';
-import { createAuthMiddleware } from './middleware/auth.js';
 import { createAgentRouter } from './routes/agent.js';
 import { createConfigRouter } from './routes/config.js';
 import { createCopilotApiRouter } from './routes/copilot-api/index.js';
@@ -63,24 +62,14 @@ import { webhooksRouter } from './routes/webhooks.js';
  * @returns {void}
  */
 export function mountCopilotRoutes(app, opts) {
-    const authMiddleware = createAuthMiddleware({ token: opts?.token });
+    void opts;
 
     // Rotas auth-exempt: health não precisa de token
-    // O createHealthRouter não usa authMiddleware global do app
     app.use(createHealthRouter());
 
     // Onda 5.9: health checks per-domain
     registerCopilotHealthChecks();
     app.use(createHealthModulesRouter());
-
-    // GET /metrics — skipAuth (prometheus scrapper)
-    // Montado como parte do observability router mas sem auth
-    // O createObservabilityRouter inclui /metrics — aqui criamos um router sem auth só para /metrics
-    // Para simplicidade, o auth global do app já está configurado com skipAuth=false,
-    // portanto precisamos montar /metrics antes do auth middleware global.
-    // A abordagem correta é configurar skipAuth no createCopilotApp — feito via opts.skipAuth.
-    // Em produção, o createAuthMiddleware no app.js já cuida do token check.
-    // Health e metrics são skip-auth pela convenção do route-table, então montamos sem auth.
 
     // Rotas com auth (o auth global já foi aplicado pelo createCopilotApp)
     app.use(createAgentRouter());
@@ -97,6 +86,4 @@ export function mountCopilotRoutes(app, opts) {
     if (COPILOT_SDK_ENABLED) {
         app.use(createSdkRouter());
     }
-
-    void authMiddleware; // usado implicitamente via createCopilotApp opts
 }

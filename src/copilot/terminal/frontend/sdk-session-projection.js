@@ -7,7 +7,7 @@
  * @module copilot/terminal/frontend/sdk-session-projection
  */
 
-import { getLastSdkPlanChangedAt, getLastSdkPlanOperation } from '../state.js';
+import { getLastSdkPlanChangedAt, getLastSdkPlanOperation } from '../../presentation/runtime-ui-state-store.js';
 import {
     deleteTerminalSdkPlan,
     getTerminalSdkSessionMode,

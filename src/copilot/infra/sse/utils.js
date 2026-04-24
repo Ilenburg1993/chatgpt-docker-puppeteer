@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/api/sse-utils
+ * @module copilot/infra/sse/utils
  * @file Utilitários compartilhados para endpoints SSE (Server-Sent Events).
  *
  *   GAP-EVARCH-01 (STREAMING-EVENTS-AUDIT §12): extrai lógica comum de headers, heartbeat, sanitização de eventos,
@@ -54,9 +54,10 @@ export function sanitizeSseEvent(event) {
  *
  * 1. **`src/copilot/channel/inject.js`** — cliente HTTP raw (`http.request`) que consome `/stream` para propagar eventos
  *    do bridge para o terminal inject server. NÃO suporta gzip (não envia `Accept-Encoding: gzip`).
- * 2. **`src/copilot/terminal/server.js`** — endpoint `/events` do terminal server (server-side interno).
- * 3. **Dashboard Vue** — consumers browser via `EventSource` nativo (quando implementado).
- * 4. **Ferramentas externas** — qualquer cliente HTTP que envie `Accept: text/event-stream`.
+ * 2. **`src/copilot/server/routes/sse.js`** — endpoints `/events` e `/events/critical` do servidor Copilot.
+ * 3. **`src/copilot/server/routes/sdk/session-messaging.js`** — stream SSE por sessão SDK ativa.
+ * 4. **Dashboard Vue** — consumers browser via `EventSource` nativo (quando implementado).
+ * 5. **Ferramentas externas** — qualquer cliente HTTP que envie `Accept: text/event-stream`.
  *
  * **Sobre compressão gzip (`compress: true`):** Só será ativada se o _cliente HTTP_ enviar o header `Accept-Encoding:
  * gzip` na requisição. O `EventSource` nativo de browsers geralmente envia esse header automaticamente. O cliente

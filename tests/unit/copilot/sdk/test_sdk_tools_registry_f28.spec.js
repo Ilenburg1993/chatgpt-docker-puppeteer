@@ -29,7 +29,7 @@ import {
     registerTool,
     registerTools,
 } from '#copilot/sdk';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -52,6 +52,29 @@ function makeTool(name) {
 }
 
 const ROOT = '/workspaces/chatgpt-docker-puppeteer';
+
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function listJsFiles(dir) {
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return listJsFiles(path);
+        if (entry.isFile() || statSync(path).isFile()) return path.endsWith('.js') ? [path] : [];
+        return [];
+    });
+}
+
+/**
+ * @param {string} dir
+ * @param {string} needle
+ * @returns {string[]}
+ */
+function findFilesContaining(dir, needle) {
+    return listJsFiles(dir).filter((file) => readFileSync(file, 'utf8').includes(needle));
+}
 
 // ─── F133: tools-bootstrap usa barrel ──────────────────────────────────────
 
@@ -249,37 +272,12 @@ describe('F137 — funções de composição', () => {
 
 describe('F138 — zero-bypass: nenhum consumidor direto de sdk/tools-registry fora de sdk/', () => {
     it('agent/ não importa #copilot/sdk/tools-registry diretamente', () => {
-        const { execSync } = /** @type {typeof import('node:child_process')} */ (
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            require('node:child_process')
-        );
-        let count = 0;
-        try {
-            execSync(
-                'grep -rl "from \'#copilot/sdk/tools-registry\'" ' + ROOT + "/src/copilot/agent/ --include='*.js'",
-                { encoding: 'utf8' },
-            );
-            count = 1; // grep encontrou algo
-        } catch {
-            count = 0; // grep exit 1 = nenhum resultado
-        }
-        expect(count).toBe(0);
+        expect(findFilesContaining(join(ROOT, 'src/copilot/agent'), "from '#copilot/sdk/tools-registry'")).toEqual([]);
     });
 
-    it('api/ não importa #copilot/sdk/tools-registry diretamente', () => {
-        const { execSync } = /** @type {typeof import('node:child_process')} */ (
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            require('node:child_process')
-        );
-        let count = 0;
-        try {
-            execSync('grep -rl "from \'#copilot/sdk/tools-registry\'" ' + ROOT + "/src/copilot/api/ --include='*.js'", {
-                encoding: 'utf8',
-            });
-            count = 1;
-        } catch {
-            count = 0;
-        }
-        expect(count).toBe(0);
+    it('server/routes/sdk/ não importa #copilot/sdk/tools-registry diretamente', () => {
+        expect(
+            findFilesContaining(join(ROOT, 'src/copilot/server/routes/sdk'), "from '#copilot/sdk/tools-registry'"),
+        ).toEqual([]);
     });
 });

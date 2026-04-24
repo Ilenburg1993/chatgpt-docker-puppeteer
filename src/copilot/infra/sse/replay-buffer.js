@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/api/sse-replay-buffer
+ * @module copilot/infra/sse/replay-buffer
  * @file Buffer circular para replay de eventos SSE após reconexão via Last-Event-ID.
  *
  *   UPG-SE-004 (STREAMING-EVENTS-AUDIT Fase 5): Quando clientes SSE reconectam (timeout de 24h, perda de conexão), o

@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { WORKSPACE_ROOT } from '#copilot/boot';
 import { createTool } from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -19,7 +20,7 @@ import { withSkipPermission } from '../tool-factory.js';
 
 const execAsync = promisify(execFile);
 
-const ROOT = new URL('../../../..', import.meta.url).pathname;
+const ROOT = WORKSPACE_ROOT;
 const GIT_CMD_TIMEOUT_MS = 15_000;
 const GIT_PUSH_TIMEOUT_MS = 30_000;
 

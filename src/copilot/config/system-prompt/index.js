@@ -14,6 +14,7 @@
  * @see module:copilot/config/system-prompt/mode
  */
 
+import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '../sdk-config-port.js';
 import { getMode, setMode } from './mode.js';
 
 import * as codeChangeRules from './sections/code-change-rules.js';
@@ -64,6 +65,21 @@ const SECTIONS = {
     custom_instructions: customInstructions,
     last_instructions: lastInstructions,
 };
+
+/**
+ * Metadados das seções do system prompt reexportados do SDK.
+ *
+ * @type {Record<string, { description: string }>}
+ */
+export const SYSTEM_PROMPT_SECTIONS = /** @type {Record<string, { description: string }>} */ (SDK_SECTIONS);
+
+export { CONTENT as CODE_CHANGE_RULES } from './sections/code-change-rules.js';
+export { CONTENT as ENVIRONMENT_CONTEXT } from './sections/environment-context.js';
+export { CONTENT as AGENT_GUIDELINES } from './sections/guidelines.js';
+export { CONTENT as AGENT_IDENTITY } from './sections/identity.js';
+export { CONTENT as LAST_INSTRUCTIONS } from './sections/last-instructions.js';
+export { CONTENT as AGENT_TONE } from './sections/tone.js';
+export { CONTENT as TOOL_EFFICIENCY } from './sections/tool-efficiency.js';
 
 /**
  * Monta o SystemMessageConfig completo no modo `replace`. Concatena todas as seções com headers Markdown e separadores.
@@ -152,6 +168,59 @@ export function buildHookContextMessage(hookContext) {
             },
         },
     });
+}
+
+/**
+ * Constrói um `SystemMessageConfig` no modo `"customize"` com appendment na seção `guidelines`.
+ *
+ * @param {string} content
+ * @returns {SystemMessageConfig}
+ */
+export function buildGuidelinesAppendMessage(content) {
+    return /** @type {SystemMessageConfig} */ ({
+        mode: 'customize',
+        sections: { guidelines: { action: 'append', content } },
+    });
+}
+
+/**
+ * Constrói um `SystemMessageConfig` no modo `"append"`.
+ *
+ * @param {string} content
+ * @returns {SystemMessageConfig}
+ */
+export function buildAppendSystemMessage(content) {
+    return /** @type {SystemMessageConfig} */ ({ mode: 'append', content });
+}
+
+/**
+ * Constrói um `SystemMessageConfig` no modo `"replace"`.
+ *
+ * @param {string} content
+ * @returns {SystemMessageConfig}
+ */
+export function buildReplaceSystemMessage(content) {
+    return /** @type {SystemMessageConfig} */ ({ mode: 'replace', content });
+}
+
+/**
+ * Constrói o system message completo do LLM-B.
+ *
+ * @param {{ extraContext?: string }} [opts]
+ * @returns {SystemMessageConfig}
+ */
+export function buildAlwaysAliveSystemMessage(opts = {}) {
+    return buildSystemMessage(opts);
+}
+
+/**
+ * Constrói um system message com o contexto operacional do hook system.
+ *
+ * @param {string} hookContext
+ * @returns {SystemMessageConfig}
+ */
+export function buildHookContextAppendMessage(hookContext) {
+    return buildHookContextMessage(hookContext);
 }
 
 // Re-exports para API pública

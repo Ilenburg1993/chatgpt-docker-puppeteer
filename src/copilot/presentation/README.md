@@ -184,11 +184,12 @@ participar do caminho multi-agent sem reinventar parsing local de `query/header/
 - `hubSessionId`
 
 `runtime-file-context.js` e `runtime-ui-state-store.js` agora carregam a implementação compartilhada
-que antes vivia em `terminal/file-context.js` e `terminal/state.js`.
+que antes vivia no terminal.
 
 Com isso:
 
-- `terminal/file-context.js` e `terminal/state.js` viraram apenas **shims de compatibilidade**;
+- `presentation/runtime-file-context.js` e `presentation/runtime-ui-state-store.js` são os owners
+  canônicos;
 - `presentation/` não importa mais `terminal/*` diretamente;
 - `runtime-ui-state.js` e `runtime-dialog.js` passaram a ser apenas fachadas sobre primitivas já
   centralizadas.

@@ -23,19 +23,19 @@ Ele consome:
 
 ## Estrutura recomendada
 
-| Área                        | Função                                                                     |
-| --------------------------- | -------------------------------------------------------------------------- |
-| `frontend/`                 | consumer layer canônica do runtime para o terminal                         |
-| `dialog/`                   | prompt dinâmico, output helpers, waiting UX, engine de diálogo             |
-| `commands/`                 | comandos REPL finos, orientados a operações do runtime                     |
-| `state.js`                  | estado exclusivamente do terminal (flags, emitter, projeções observadas)   |
-| `repl-listeners.js`         | tradução de eventos do agente/SDK para UX local                            |
-| `sdk-session-events.js`     | tradução dedicada dos sinais vanilla da sessão SDK para stdout/SSE         |
-| `agent-runtime-events.js`   | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE |
-| `task-stream-events.js`     | render e SSE do streaming de tarefas internas (`task.*`)                   |
-| `agent-sse-fallback.js`     | fallback SSE para eventos do agent ainda não tratados manualmente          |
-| `terminal-agent-wiring.js`  | SSE + wiring de alto nível entre terminal e agent                          |
-| `index.js` / `bootstrap.js` | boot do terminal                                                           |
+| Área                                     | Função                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------- |
+| `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
+| `dialog/`                                | prompt dinâmico, output helpers, waiting UX, engine de diálogo             |
+| `commands/`                              | comandos REPL finos, orientados a operações do runtime                     |
+| `presentation/runtime-ui-state-store.js` | estado de UI compartilhado usado pelo terminal e outras bordas             |
+| `repl-listeners.js`                      | tradução de eventos do agente/SDK para UX local                            |
+| `sdk-session-events.js`                  | tradução dedicada dos sinais vanilla da sessão SDK para stdout/SSE         |
+| `agent-runtime-events.js`                | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE |
+| `task-stream-events.js`                  | render e SSE do streaming de tarefas internas (`task.*`)                   |
+| `agent-sse-fallback.js`                  | fallback SSE para eventos do agent ainda não tratados manualmente          |
+| `terminal-agent-wiring.js`               | SSE + wiring de alto nível entre terminal e agent                          |
+| `index.js` / `bootstrap.js`              | boot do terminal                                                           |
 
 ## Regra de ouro
 
@@ -83,8 +83,8 @@ Deve sair do `terminal/` quando virar:
 
 - `/plan` usa somente `mode.get/set` e `plan.read/update/delete` do SDK;
 - o prompt dinâmico mostra `MODE:<SDK>` quando a sessão está fora de `interactive`;
-- `state.js` não guarda mais um “plan mode local” paralelo — apenas a última projeção observada do
-  SDK;
+- `presentation/runtime-ui-state-store.js` não guarda mais um “plan mode local” paralelo — apenas a
+  última projeção observada do SDK;
 - `sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
 - `agent-runtime-events.js` reflete sinais já normalizados pelo runtime/agent ao operador;
 - `task-stream-events.js` concentra a narrativa do streaming de tarefas internas do runtime;

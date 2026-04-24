@@ -7,9 +7,9 @@
  *   esses dados viram sessão viva, registry vivo ou capability, a autoridade passa para `agent/`.
  */
 
+import { resolvePersistentConfigFile } from '#copilot/boot';
 import { existsSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { safeJsonParse } from '../core/safe-json.js';
 import {
     BUILTIN_HANDLER_MAP,
@@ -20,7 +20,7 @@ import {
     removeCustomTool,
 } from './sdk-config-port.js';
 
-const SKILLS_PATH = join(resolve(import.meta.dirname, '../../..'), 'skills.json');
+const SKILLS_PATH = resolvePersistentConfigFile('skills.json');
 
 /**
  * @typedef {{ paths: string[] }} SkillsConfig

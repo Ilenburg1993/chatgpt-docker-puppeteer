@@ -14,19 +14,19 @@
  * @see module:copilot/agent/session/initializer
  */
 
+import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log } from '../ports/observability-port.js';
 
-const ROOT = resolve(import.meta.dirname, '../../');
-const STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
+const STATE_DIR = resolveHooksStateDir();
 // G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.
-const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : join(STATE_DIR, 'sdk-always-alive.json');
+const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : resolveHooksStateFile('sdk-always-alive.json');
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
@@ -122,12 +122,12 @@ export function readState() {
 }
 
 /**
- * Persiste o estado da sessão em disco (shim síncrono).
+ * Persiste o estado da sessão em disco com wrapper síncrono de conveniência.
  *
  * F52: Delega para writeStateAsync internamente. Atualiza _stateCache imediatamente para manter consistência síncrona,
  * mas a escrita real em disco é async.
  *
- * Shim síncrono — atualiza o cache imediatamente e dispara escrita async em background. Para controle de erro na
+ * Wrapper síncrono — atualiza o cache imediatamente e dispara escrita async em background. Para controle de erro na
  * escrita, prefira {@link writeStateAsync}.
  *
  * @param {Partial<AliveAgentState>} updates - Campos a atualizar
@@ -192,7 +192,7 @@ async function _doWriteState(updates) {
 /**
  * Remove o estado persistido e invalida o cache.
  *
- * Shim síncrono — invalida cache e dispara remoção async em background. Para controle de erro na remoção, prefira
+ * Wrapper síncrono — invalida cache e dispara remoção async em background. Para controle de erro na remoção, prefira
  * {@link clearStateAsync}.
  *
  * @returns {void}

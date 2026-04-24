@@ -8,7 +8,7 @@
  * 1. Nenhum arquivo em src/copilot/ importa de fora do módulo copilot
  * 2. Os entry points de boot existem e exportam corretamente
  * 3. PM2 entry points resolvem para arquivos existentes
- * 4. Arquivos de wiring e agent.js existem (mesmo que deprecated)
+ * 4. Arquivos de boot e entrada compatível existem
  * 5. bootstrap.js implementa modo único (sem parâmetro mode/context)
  *
  * Arquitetura Onda 2.7: copilot é ferramenta DEV-only. Boot canônico: terminal/bootstrap.js → bootCopilot() →
@@ -22,6 +22,17 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+    BOOT_CONFIG_ENV_KEYS,
+    COPILOT_BOOT_MODE,
+    COPILOT_CANONICAL_BOOT_ENTRYPOINT,
+    COPILOT_CANONICAL_PM2_PROCESS,
+    COPILOT_COMPAT_BOOT_ENTRYPOINT,
+    COPILOT_COMPAT_PM2_ENV_FLAG,
+    COPILOT_COMPAT_PM2_PROCESS,
+    COPILOT_TERMINAL_PM2_ENV_FLAG,
+    SDK_VANILLA_CAPABILITY_BASELINE,
+} from '../src/copilot/boot/index.js';
 
 let errors = 0;
 
@@ -54,11 +65,11 @@ if (output.trim()) {
 
 // terminal/bootstrap.js = canônico (único modo real)
 // bootstrap.js = delegante (chama bootCopilot sem args)
-// agent.js = deprecated (backwards compat com PM2)
+// agent.js = entrypoint compatível operacional (não é segundo runtime)
 const ENTRY_POINTS = [
     { path: 'src/copilot/bootstrap.js', note: 'delegante (modo único)' },
-    { path: 'src/copilot/agent.js', note: '@deprecated — backwards compat PM2' },
-    { path: 'src/copilot/terminal/bootstrap.js', note: 'CANÔNICO — boot via terminal:llm-b' },
+    { path: COPILOT_COMPAT_BOOT_ENTRYPOINT, note: 'compat operacional PM2/manual' },
+    { path: COPILOT_CANONICAL_BOOT_ENTRYPOINT, note: 'CANÔNICO — boot via terminal:llm-b' },
 ];
 
 for (const { path: entry, note } of ENTRY_POINTS) {
@@ -74,8 +85,8 @@ for (const { path: entry, note } of ENTRY_POINTS) {
 // ── Check 3: PM2 entry points resolvem ──────────────────────────────────────
 
 const PM2_ENTRIES = [
-    { name: 'copilot-sdk-agent', script: './src/copilot/agent.js' },
-    { name: 'llm-b-terminal', script: './src/copilot/terminal/bootstrap.js' },
+    { name: COPILOT_COMPAT_PM2_PROCESS, script: `./${COPILOT_COMPAT_BOOT_ENTRYPOINT}` },
+    { name: COPILOT_CANONICAL_PM2_PROCESS, script: `./${COPILOT_CANONICAL_BOOT_ENTRYPOINT}` },
 ];
 
 for (const { name, script } of PM2_ENTRIES) {
@@ -86,6 +97,24 @@ for (const { name, script } of PM2_ENTRIES) {
         console.error(`❌ Check 3 FALHOU — PM2 "${name}" → ${script} não encontrado.`);
         errors++;
     }
+}
+
+// ── Check 3b: PM2 compat não pode competir com boot canônico ────────────────
+
+const ecosystemSrc = readFileSync(resolve('ecosystem.config.cjs'), 'utf-8');
+const hasCompatFlag = ecosystemSrc.includes(`process.env.${COPILOT_COMPAT_PM2_ENV_FLAG} === 'true'`);
+const excludesTerminalProcess = ecosystemSrc.includes(`process.env.${COPILOT_TERMINAL_PM2_ENV_FLAG} !== 'true'`);
+const canonicalPm2UsesTerminalBootstrap = new RegExp(
+    `name:\\s*['"]${COPILOT_CANONICAL_PM2_PROCESS}['"][\\s\\S]*?script:\\s*['"]\\./${COPILOT_CANONICAL_BOOT_ENTRYPOINT}['"]`,
+).test(ecosystemSrc);
+
+if (hasCompatFlag && excludesTerminalProcess && canonicalPm2UsesTerminalBootstrap) {
+    console.log(
+        `✅ Check 3b: PM2 compat é opt-in por ${COPILOT_COMPAT_PM2_ENV_FLAG} e não compete com ${COPILOT_CANONICAL_PM2_PROCESS}.`,
+    );
+} else {
+    console.error('❌ Check 3b FALHOU — PM2 compat/canônico não seguem o contrato de boot único.');
+    errors++;
 }
 
 // ── Check 4: server/wiring.js removido ou @deprecated ───────────────────────
@@ -107,7 +136,8 @@ if (existsSync(resolve(SERVER_WIRING))) {
 // ── Check 5: bootstrap.js tem modo único (sem parâmetros mode/context) ──────
 
 const bootstrapSrc = readFileSync(resolve('src/copilot/bootstrap.js'), 'utf-8');
-const hasModeProp = /\bmode\s*[=:]\s*['"]/.test(bootstrapSrc) || /CopilotBootMode/.test(bootstrapSrc);
+const hasModeProp =
+    /\bmode\s*[=:]\s*['"]/.test(bootstrapSrc.replaceAll(COPILOT_BOOT_MODE, '')) || /CopilotBootMode/.test(bootstrapSrc);
 if (hasModeProp) {
     console.error('❌ Check 5 FALHOU — bootstrap.js ainda contém referência a "mode" ou "CopilotBootMode".');
     console.error('   Onda 2.7 exige modo único: bootCopilot() sem parâmetros.');
@@ -179,25 +209,14 @@ if (existsSync(resolve(SOCKET_NS))) {
     console.log(`✅ Check 9: ${SOCKET_NS} removido (Onda 3.9 aplicada).`);
 }
 
-// ── Check 10: api/sse/*.js são todos re-export stubs ────────────────────────
+// ── Check 10: src/copilot/api removido ──────────────────────────────────────
 
-const API_SSE_DIR = 'src/copilot/api/sse';
-if (existsSync(resolve(API_SSE_DIR))) {
-    const sseFiles = readdirSync(resolve(API_SSE_DIR)).filter((f) => f.endsWith('.js'));
-    let allStubs = true;
-    for (const f of sseFiles) {
-        const src = readFileSync(resolve(API_SSE_DIR, f), 'utf-8');
-        if (!/@deprecated/.test(src)) {
-            console.error(`❌ Check 10 FALHOU — ${API_SSE_DIR}/${f} não está @deprecated.`);
-            allStubs = false;
-            errors++;
-        }
-    }
-    if (allStubs) {
-        console.log(`✅ Check 10: api/sse/ — todos os ${sseFiles.length} arquivos são stubs @deprecated.`);
-    }
+const API_DIR = 'src/copilot/api';
+if (existsSync(resolve(API_DIR))) {
+    console.error(`❌ Check 10 FALHOU — ${API_DIR}/ ainda existe; rotas canônicas vivem em server/routes/.`);
+    errors++;
 } else {
-    console.log(`✅ Check 10: ${API_SSE_DIR}/ removido (Onda 4.5+ aplicada).`);
+    console.log(`✅ Check 10: ${API_DIR}/ removido; server/routes/ é a única borda HTTP canônica.`);
 }
 
 // ── Check 11: server/routes/ tem ≥ 8 routers ───────────────────────────────
@@ -248,21 +267,23 @@ if (realRequires.length > 0) {
 
 const EXPECTED_MODULES = [
     'agent',
-    'api',
     'audit',
+    'boot',
     'bridges',
     'channel',
     'config',
     'conversation-hub',
     'core',
     'db',
+    'event-handlers',
     'events',
     'hooks',
+    'infra',
     'observability',
     'plugins',
+    'presentation',
     'sdk',
     'server',
-    'services',
     'terminal',
     'tools',
     'types',
@@ -283,61 +304,203 @@ if (missingBarrels.length > 0) {
     console.log(`✅ Check 13: todos os ${EXPECTED_MODULES.length} módulos copilot têm index.js.`);
 }
 
-// ── Check 14: services/ tem importador em server/routes/ ────────────────────
+// ── Check 14: server/routes não importa bordas removidas ────────────────────
 
-let servicesInRoutes = '';
+let removedRouteImports = '';
 try {
-    servicesInRoutes = execSync('rg -l "#copilot/services" src/copilot/server/routes/ --type js --no-heading', {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    removedRouteImports = execSync(
+        `rg -n "^\\s*import .*src/copilot/api|^\\s*import .*#copilot/api|from ['"][^'"]*api/(express|sse)" src/copilot/server/routes/ --type js --no-heading`,
+        {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+        },
+    );
 } catch (/** @type {any} */ e) {
     if (e.status !== 1) throw e;
 }
 
-const routeImporters = servicesInRoutes.split('\n').filter((l) => l.trim());
-if (routeImporters.length >= 1) {
-    console.log(`✅ Check 14: services/ importado por ${routeImporters.length} arquivo(s) em server/routes/.`);
+if (removedRouteImports.trim()) {
+    console.error('❌ Check 14 FALHOU — server/routes ainda importa bordas removidas:');
+    console.error(removedRouteImports);
+    errors++;
 } else {
-    console.error('❌ Check 14 FALHOU — services/ não é importado por nenhum arquivo em server/routes/.');
+    console.log('✅ Check 14: server/routes não importa api/express nem api/sse.');
+}
+
+// ── Check 14b: SDK routes têm composition root explícito ───────────────────
+
+let sdkRouteDeps = '';
+try {
+    sdkRouteDeps = execSync(
+        'rg -l "composition root|server/routes/sdk/\\*" src/copilot/server/routes/sdk/deps.js --no-heading',
+        {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+        },
+    );
+} catch (/** @type {any} */ e) {
+    if (e.status !== 1) throw e;
+}
+
+if (sdkRouteDeps.trim()) {
+    console.log('✅ Check 14b: server/routes/sdk/deps.js é o composition root do SDK API.');
+} else {
+    console.error('❌ Check 14b FALHOU — server/routes/sdk/deps.js não documenta composição das rotas SDK.');
     errors++;
 }
 
-// ── Check 15: server/sse/state.js não re-exporta terminal/state.js ──────────
+// ── Check 15: infra/sse/state.js não importa estado de UI do terminal ───────
 
-const SSE_STATE = 'src/copilot/server/sse/state.js';
+const SSE_STATE = 'src/copilot/infra/sse/state.js';
 if (existsSync(resolve(SSE_STATE))) {
     const sseStateSrc = readFileSync(resolve(SSE_STATE), 'utf-8');
     if (/from.*terminal\/state/.test(sseStateSrc)) {
-        console.error(`❌ Check 15 FALHOU — ${SSE_STATE} ainda faz re-export de terminal/state.js.`);
+        console.error(`❌ Check 15 FALHOU — ${SSE_STATE} ainda importa estado de UI do terminal.`);
         errors++;
     } else {
-        console.log(`✅ Check 15: ${SSE_STATE} é implementação independente (sem re-export terminal/state).`);
+        console.log(`✅ Check 15: ${SSE_STATE} é implementação independente de estado de UI do terminal.`);
     }
 } else {
     console.error(`❌ Check 15 FALHOU — ${SSE_STATE} não encontrado.`);
     errors++;
 }
 
-// ── Check 16: openapi.json possui >= 80 paths (reflete server/routes/) ──────
+// ── Check 16: server/routes expõe superfície HTTP suficiente ───────────────
 
-const OPENAPI_PATH = 'src/copilot/api/openapi.json';
-if (existsSync(resolve(OPENAPI_PATH))) {
-    try {
-        const openapiSpec = JSON.parse(readFileSync(resolve(OPENAPI_PATH), 'utf-8'));
-        const pathCount = Object.keys(openapiSpec.paths || {}).length;
-        if (pathCount >= 80) {
-            console.log(`✅ Check 16: openapi.json tem ${pathCount} paths (>= 80 esperados).`);
-        } else {
-            console.error(`❌ Check 16 FALHOU — openapi.json tem apenas ${pathCount} paths (esperado >= 80).`);
-            errors++;
-        }
-    } catch (/** @type {any} */ e) {
-        console.error(`❌ Check 16 FALHOU — openapi.json parse error: ${e.message}`);
-        errors++;
-    }
+let routeCount = 0;
+try {
+    const routesOut = execSync(
+        'rg -n "router\\.(get|post|put|delete|patch)\\(" src/copilot/server/routes/ --type js --no-heading',
+        {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+        },
+    );
+    routeCount = routesOut.split('\n').filter((line) => line.trim()).length;
+} catch (/** @type {any} */ e) {
+    if (e.status !== 1) throw e;
+}
+
+if (routeCount >= 50) {
+    console.log(`✅ Check 16: server/routes tem ${routeCount} handlers HTTP declarados (>= 50 esperados).`);
 } else {
-    console.error(`❌ Check 16 FALHOU — ${OPENAPI_PATH} não encontrado.`);
+    console.error(`❌ Check 16 FALHOU — server/routes tem apenas ${routeCount} handlers HTTP declarados.`);
+    errors++;
+}
+
+// ── Check 17: contrato de boot documenta baseline SDK vanilla ──────────────
+
+const REQUIRED_SDK_BASELINE = [
+    'client.start',
+    'client.stop',
+    'client.forceStop',
+    'client.ping',
+    'client.listModels',
+    'client.listSessions',
+    'client.getLastSessionId',
+    'client.deleteSession',
+    'client.getForegroundSessionId',
+    'client.setForegroundSessionId',
+    'session.create',
+    'session.resume',
+    'session.send',
+    'session.sendAndWait',
+    'session.streamEvents',
+    'session.getMessages',
+    'session.abort',
+    'session.setModel',
+    'session.log',
+    'session.disconnect',
+    'session.rpc',
+    'session.permissions',
+    'session.userInput',
+    'session.hooks',
+    'session.customTools',
+    'session.systemMessage.customize',
+    'session.infiniteSessions',
+    'session.attachments.blob',
+    'session.customProvider',
+    'session.mcpServers',
+    'session.customAgents',
+    'session.skills',
+    'telemetry.otel',
+    'telemetry.traceContext',
+];
+const missingSdkBaseline = REQUIRED_SDK_BASELINE.filter(
+    (capability) => !SDK_VANILLA_CAPABILITY_BASELINE.includes(capability),
+);
+
+if (missingSdkBaseline.length === 0) {
+    console.log(`✅ Check 17: boot/contract cobre baseline SDK vanilla (${REQUIRED_SDK_BASELINE.length} capacidades).`);
+} else {
+    console.error(`❌ Check 17 FALHOU — boot/contract sem capacidades SDK: ${missingSdkBaseline.join(', ')}`);
+    errors++;
+}
+
+// ── Check 18: SDK HTTP adapter expõe campos JSON-serializáveis do SDK ──────
+
+const sdkSessionMiddlewareSrc = readFileSync(resolve('src/copilot/server/routes/sdk/session-middleware.js'), 'utf-8');
+const sdkSessionMessagingSrc = readFileSync(resolve('src/copilot/server/routes/sdk/session-messaging.js'), 'utf-8');
+const REQUIRED_SDK_ROUTE_FIELDS = [
+    'configDir',
+    'mcpServers',
+    'agent',
+    'skillDirectories',
+    'disabledSkills',
+    'infiniteSessions',
+    'provider',
+    'reasoningEffort',
+    'LogMessageBodySchema',
+];
+const missingRouteFields = REQUIRED_SDK_ROUTE_FIELDS.filter(
+    (field) => !sdkSessionMiddlewareSrc.includes(field) && !sdkSessionMessagingSrc.includes(field),
+);
+
+if (missingRouteFields.length === 0 && sdkSessionMessagingSrc.includes("router.post('/sessions/:id/log'")) {
+    console.log('✅ Check 18: /sdk/sessions cobre configuração SDK JSON e session.log().');
+} else {
+    console.error(
+        `❌ Check 18 FALHOU — /sdk/sessions sem campos/rotas SDK: ${missingRouteFields.join(', ') || 'session.log'}`,
+    );
+    errors++;
+}
+
+// ── Check 19: boot config centraliza variáveis operacionais ────────────────
+
+const bootFiles = [
+    'src/copilot/boot/index.js',
+    'src/copilot/boot/config.js',
+    'src/copilot/boot/workspace.js',
+    'src/copilot/boot/skills.js',
+    'src/copilot/boot/plan.js',
+];
+const missingBootFiles = bootFiles.filter((file) => !existsSync(resolve(file)));
+const requiredBootEnvKeys = [
+    'COPILOT_WORKING_DIRECTORY',
+    'COPILOT_SKILL_DIRECTORIES',
+    'COPILOT_PINNED_CONTEXT_DIRS',
+    'LLM_B_TERMINAL_HOST',
+    'LLM_B_TERMINAL_PORT',
+    'COPILOT_CLI_URL',
+];
+const missingBootEnvKeys = requiredBootEnvKeys.filter((key) => !BOOT_CONFIG_ENV_KEYS.includes(key));
+const terminalIndexSrc = readFileSync(resolve('src/copilot/terminal/index.js'), 'utf-8');
+const sessionSetupSrc = readFileSync(resolve('src/copilot/agent/lifecycle/session-setup.js'), 'utf-8');
+const terminalStillHardcodesPinnedContext =
+    terminalIndexSrc.includes("'.github', 'skills'") || terminalIndexSrc.includes("'.github', 'instructions'");
+const sessionSetupStillUsesProcessCwd = sessionSetupSrc.includes('.workingDirectory(process.cwd())');
+
+if (
+    missingBootFiles.length === 0 &&
+    missingBootEnvKeys.length === 0 &&
+    !terminalStillHardcodesPinnedContext &&
+    !sessionSetupStillUsesProcessCwd
+) {
+    console.log('✅ Check 19: boot/ centraliza workspace, skills, portas e contexto pinado.');
+} else {
+    console.error(
+        `❌ Check 19 FALHOU — boot incompleto: files=${missingBootFiles.join(', ') || 'ok'} env=${missingBootEnvKeys.join(', ') || 'ok'} terminalPinned=${terminalStillHardcodesPinnedContext} sessionCwd=${sessionSetupStillUsesProcessCwd}`,
+    );
     errors++;
 }
 

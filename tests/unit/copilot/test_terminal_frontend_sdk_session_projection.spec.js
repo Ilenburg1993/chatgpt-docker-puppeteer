@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
     updateTerminalSdkPlan: vi.fn(async () => undefined),
 }));
 
-vi.mock('../../../src/copilot/terminal/state.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getLastSdkPlanChangedAt: mocks.getLastSdkPlanChangedAt,
     getLastSdkPlanOperation: mocks.getLastSdkPlanOperation,
 }));

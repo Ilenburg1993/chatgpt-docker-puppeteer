@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/api/event-fanout.js
+ * src/copilot/infra/sse/fanout.js
  *
  * FASE-15.2: Abstração de fanout para propagação de eventos entre processos.
  *

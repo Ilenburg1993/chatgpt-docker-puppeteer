@@ -263,6 +263,27 @@ describe('DialogLoopManager', () => {
             expect(readySpy).toHaveBeenCalled();
         });
 
+        it('reativa o loop quando READY chega apos drift de boot', () => {
+            dlm.forceDeactivate();
+
+            const changedSpy = vi.fn();
+            const readySpy = vi.fn();
+            dlm.on('changed', changedSpy);
+            dlm.on('ready', readySpy);
+
+            dlm.handleProtocolInput({ question: 'READY: recover' });
+
+            expect(dlm.active).toBe(true);
+            expect(readySpy).toHaveBeenCalled();
+            expect(changedSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ active: true, reason: 'late_protocol_recovery', trigger: 'ready' }),
+            );
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                { dialogLoopActive: true, dialogPaused: false },
+                expect.objectContaining({ label: 'dialog.state.late_protocol_recovery' }),
+            );
+        });
+
         it('classifica REPLY: e emite reply com texto extraído', () => {
             const replySpy = vi.fn();
             dlm.on('reply', replySpy);
@@ -270,10 +291,10 @@ describe('DialogLoopManager', () => {
             expect(replySpy).toHaveBeenCalledWith(expect.objectContaining({ reply: expect.any(String) }));
         });
 
-        it('classifica STOPPED e emite stopped', () => {
+        it('classifica STOPPED exato e emite stopped', () => {
             const stoppedSpy = vi.fn();
             dlm.on('stopped', stoppedSpy);
-            dlm.handleProtocolInput({ question: 'STOPPED: dialog acabou' });
+            dlm.handleProtocolInput({ question: 'STOPPED' });
             expect(stoppedSpy).toHaveBeenCalledWith(
                 expect.objectContaining({ reason: 'model_stopped', authorized: false }),
             );

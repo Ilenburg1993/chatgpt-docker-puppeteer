@@ -10,6 +10,8 @@ export {
     handleGetHistory,
     handleGetPrBudget,
     handleGetQuota,
+    handleGetThinkingEntry,
+    handleGetThinkingHistory,
     handleGetToolStats,
     handleGhCi,
     handleGhIssues,

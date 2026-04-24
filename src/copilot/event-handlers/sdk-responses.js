@@ -20,6 +20,16 @@ export function wireSdkResponseEvents(session, { emit }) {
             const intent = /** @type {string | undefined} */ (data['intent']);
             emit('assistant.intent', { intent: intent ?? 'unknown', ts: Date.now() });
         }),
+        session.on(SESSION_EVENTS.ASSISTANT_MESSAGE, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const messageId = /** @type {string | undefined} */ (data['messageId']);
+            const content = /** @type {string | undefined} */ (data['content']);
+            emit('assistant.message', {
+                messageId: messageId ?? null,
+                content: content ?? '',
+                ts: Date.now(),
+            });
+        }),
         session.on(SESSION_EVENTS.ASSISTANT_REASONING, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const reasoningId = /** @type {string | undefined} */ (data['reasoningId']);

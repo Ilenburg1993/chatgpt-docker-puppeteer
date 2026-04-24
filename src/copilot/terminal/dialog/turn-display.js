@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from '../activity-state.js';
 import { SEPARATOR, println } from './output.js';
 import { broadcastSse } from './sse.js';
@@ -20,37 +21,95 @@ import { broadcastSse } from './sse.js';
  * @property {number} reasoningChars
  * @property {string} reasoningContent
  * @property {string | null} reasoningId
+ * @property {string | null} thinkingEntryId
  * @property {number} thinkingStartTime
+ * @property {boolean} reasoningSummaryRendered
  * @property {boolean} streamingStarted
  * @property {number} streamingChars
  * @property {number} firstChunkTime
  * @property {number} turnStartTime
  * @property {string} model
  * @property {string} effort
+ * @property {boolean} showThinking
  * @property {boolean} showStreaming
+ * @property {number | undefined} [timeoutMs]
+ * @property {'explicit' | 'adaptive' | undefined} [timeoutStrategy]
  */
 
 /**
  * Cria estado inicial para display de turno.
  *
- * @param {{ model: string; effort: string; turnStartTime: number; showStreaming: boolean }} opts
+ * @param {{ model: string; effort: string; turnStartTime: number; showStreaming: boolean; showThinking: boolean }} opts
  * @returns {TurnDisplayState}
  */
-export function createDisplayState({ model, effort, turnStartTime, showStreaming }) {
+export function createDisplayState({ model, effort, turnStartTime, showStreaming, showThinking }) {
     return {
         reasoningStarted: false,
         reasoningChars: 0,
         reasoningContent: '',
         reasoningId: null,
+        thinkingEntryId: null,
         thinkingStartTime: Date.now(),
+        reasoningSummaryRendered: false,
         streamingStarted: false,
         streamingChars: 0,
         firstChunkTime: 0,
         turnStartTime,
         model,
         effort,
+        showThinking,
         showStreaming,
     };
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @returns {string}
+ */
+function getThinkingEntryId(state) {
+    return state.thinkingEntryId ?? `dialog-${state.reasoningId ?? state.turnStartTime}`;
+}
+
+/**
+ * @param {string} value
+ * @param {number} [max=96] Default is `96`
+ * @returns {string}
+ */
+function compactPreview(value, max = 96) {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    return normalized.length <= max ? normalized : `${normalized.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @returns {void}
+ */
+function flushReasoningSummary(state) {
+    if (!state.reasoningStarted || state.reasoningSummaryRendered) return;
+    const durationMs = Date.now() - state.thinkingStartTime;
+    const entry = finalizeThinkingHistoryEntry(getThinkingEntryId(state), { durationMs, status: 'completed' });
+    const preview = compactPreview(entry?.content ?? state.reasoningContent);
+    const shortId = (entry?.id ?? getThinkingEntryId(state)).slice(-12);
+
+    if (state.showThinking) {
+        process.stdout.write('\x1b[0m\n');
+    }
+    println(
+        `  \x1b[35m└── thinking #${shortId}\x1b[0m  \x1b[90m${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}\x1b[0m`,
+    );
+    if (preview) {
+        println(`  \x1b[90m    ${preview}\x1b[0m`);
+    }
+    println(`  \x1b[90m    /thinking show ${shortId}  ·  /thinking latest\x1b[0m`);
+    println('');
+    broadcastSse('reasoning.complete', {
+        content: state.reasoningContent,
+        reasoningId: state.reasoningId,
+        durationMs,
+        chars: state.reasoningChars,
+    });
+    state.reasoningSummaryRendered = true;
 }
 
 /**
@@ -64,27 +123,42 @@ export function createReasoningCallback(state) {
         if (!state.reasoningStarted) {
             state.reasoningStarted = true;
             state.reasoningId = rId;
+            state.thinkingEntryId = `dialog-${rId ?? state.turnStartTime}`;
             recordTerminalActivity('thinking', 'Raciocinando', {
                 detail: `${state.model} · ${state.effort}`,
                 source: 'dialog',
             });
-            process.stdout.write('\r\x1b[K');
             const tsNow = new Date().toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
             });
             println(SEPARATOR);
-            println(`  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[2m\x1b[35mpensando…\x1b[0m`);
-            println('');
-            process.stdout.write('  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
+            println(
+                `  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[35mThinking capturado\x1b[0m  \x1b[90m· ${state.model} · ${state.effort}\x1b[0m`,
+            );
+            if (state.showThinking) {
+                println('');
+                process.stdout.write('  \x1b[35m│\x1b[0m  \x1b[2m\x1b[37m');
+            }
         }
         state.reasoningChars += chunk.length;
         state.reasoningContent += chunk;
-        const lines = chunk.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (i > 0) process.stdout.write('\n  \x1b[2m\x1b[90m│\x1b[0m  \x1b[2m\x1b[37m');
-            process.stdout.write(/** @type {string} */ (lines[i]));
+        appendThinkingHistoryChunk({
+            id: getThinkingEntryId(state),
+            source: 'dialog',
+            title: `LLM-B · ${state.model} · ${state.effort}`,
+            chunk,
+            reasoningId: rId,
+            model: state.model,
+            effort: state.effort,
+        });
+        if (state.showThinking) {
+            const lines = chunk.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (i > 0) process.stdout.write('\n  \x1b[35m│\x1b[0m  \x1b[2m\x1b[37m');
+                process.stdout.write(/** @type {string} */ (lines[i]));
+            }
         }
         broadcastSse('reasoning', { chunk, reasoningId: rId });
     };
@@ -121,16 +195,7 @@ export function createDeltaCallback(state) {
                 source: 'dialog',
             });
             if (state.reasoningStarted) {
-                process.stdout.write('\x1b[0m\n');
-                const thinkSecs = ((Date.now() - state.thinkingStartTime) / 1000).toFixed(1);
-                println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${state.reasoningChars} chars)\x1b[0m`);
-                println('');
-                broadcastSse('reasoning.complete', {
-                    content: state.reasoningContent,
-                    reasoningId: state.reasoningId,
-                    durationMs: Date.now() - state.thinkingStartTime,
-                    chars: state.reasoningChars,
-                });
+                flushReasoningSummary(state);
             } else {
                 process.stdout.write('\r\x1b[K');
             }
@@ -184,15 +249,6 @@ export function renderStreamingFooter(state, durationMs) {
     }
 
     if (state.reasoningStarted && !state.streamingStarted) {
-        process.stdout.write('\x1b[0m\n');
-        const thinkSecs = ((Date.now() - state.thinkingStartTime) / 1000).toFixed(1);
-        println(`  \x1b[90m└── pensamento completo (${thinkSecs}s · ${state.reasoningChars} chars)\x1b[0m`);
-        println('');
-        broadcastSse('reasoning.complete', {
-            content: state.reasoningContent,
-            reasoningId: state.reasoningId,
-            durationMs: Date.now() - state.thinkingStartTime,
-            chars: state.reasoningChars,
-        });
+        flushReasoningSummary(state);
     }
 }

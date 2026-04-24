@@ -7,12 +7,16 @@
  *   interface operacional da LLM-B, mas removendo a dependência direta de `server/` em `terminal/handlers/agent.js`.
  */
 
-import { toError } from '#copilot/core';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { container, toError } from '#copilot/core';
+import { log, METRICS_STORE } from '#copilot/observability';
 import { projectAgentHttpError } from './agent-http-errors.js';
+import { computeAdaptiveDialogTimeout } from './dialog-timeout-policy.js';
 import {
     getAgentHandoffManager,
     getAgentRuntimeControlsTarget,
     pauseAgentDialogLoop,
+    readAgentRuntimeControlState,
     resumeAgentDialogLoop,
 } from './runtime-controls.js';
 import {
@@ -36,6 +40,47 @@ import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
  * @type {ReadonlySet<string>}
  */
 const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
+
+/**
+ * @returns {string}
+ */
+function createInjectTraceId() {
+    return `inject-${Date.now().toString(36)}-${globalThis.crypto.randomUUID().slice(0, 8)}`;
+}
+
+/**
+ * @returns {import('#copilot/observability/metrics.js').MetricsStore | null}
+ */
+function resolveMetricsStoreSafe() {
+    try {
+        return container.resolve(METRICS_STORE);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @param {number | undefined} explicitTimeoutMs
+ * @returns {{ timeoutMs: number; strategy: 'explicit' | 'adaptive'; reasons: string[] }}
+ */
+function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
+    const metrics = resolveMetricsStoreSafe();
+    const summary = metrics?.getSummary?.();
+    const runtime = readAgentRuntimeOverview(runtimeId);
+    const injectAttempts = Number(summary?.inject?.attemptsTotal ?? 0);
+    const injectTimeouts = Number(summary?.inject?.timeoutsTotal ?? 0);
+    return computeAdaptiveDialogTimeout({
+        explicitTimeoutMs,
+        defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+        queueDepth: Number(runtime.snap?.['queueSize'] ?? 0),
+        contextUtilization: Number(runtime.contextWindow?.utilization ?? 0),
+        recentP50Ms: Number(summary?.inject?.latency?.p50 ?? summary?.dialog?.turnLatency?.p50 ?? 0),
+        recentP95Ms: Number(summary?.inject?.latency?.p95 ?? summary?.dialog?.turnLatency?.p95 ?? 0),
+        recentP99Ms: Number(summary?.inject?.latency?.p99 ?? summary?.dialog?.turnLatency?.p99 ?? 0),
+        recentTimeoutRate: injectAttempts > 0 ? injectTimeouts / injectAttempts : 0,
+    });
+}
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -237,6 +282,7 @@ export async function handlePipeline(params = {}) {
 export async function handleInject(params = {}) {
     const body = resolveAgentControlInput(params);
     const runtimeId = resolveRuntimeIdParam(params);
+    const traceId = createInjectTraceId();
     const rawMessage =
         typeof body['message'] === 'string'
             ? body['message']
@@ -250,6 +296,16 @@ export async function handleInject(params = {}) {
 
     const rawFrom = body['from'] ?? 'llm-a';
     const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
+    const explicitTimeoutMs =
+        typeof body['timeout'] === 'number' && Number.isFinite(body['timeout']) && body['timeout'] > 0
+            ? body['timeout']
+            : undefined;
+    const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
+    const timeout = timeoutDecision.timeoutMs;
+    log(
+        'INFO',
+        `[agent-control] /inject accepted (trace=${traceId}, runtime=${runtimeId ?? 'default'}, from=${from}, timeout=${timeout}ms, strategy=${timeoutDecision.strategy}, reasons=${timeoutDecision.reasons.join('+')})`,
+    );
 
     let enrichedMessage = message;
     const contextFiles = Array.isArray(body['context_files']) ? body['context_files'] : [];
@@ -293,31 +349,75 @@ export async function handleInject(params = {}) {
     }
 
     const t0 = Date.now();
+    const metrics = resolveMetricsStoreSafe();
     try {
-        const reply = await sendRuntimeDialogTurn(enrichedMessage, from, undefined, getAgent(runtimeId));
+        const reply = await sendRuntimeDialogTurn(enrichedMessage, from, { timeout, traceId }, getAgent(runtimeId));
         const durationMs = Date.now() - t0;
+        const outcome = reply !== null ? 'completed' : 'null_reply';
+        metrics?.recordInjectTurn?.(durationMs, reply !== null, reply !== null ? 'completed' : 'error');
         recordRuntimeInjectHistory({
             ts: t0,
+            traceId,
             from,
             message: message.slice(0, 200),
             replySnippet: reply ? reply.slice(0, 200) : null,
             durationMs,
+            timeoutMs: timeout,
+            timeoutStrategy: timeoutDecision.strategy,
+            outcome,
             ok: reply !== null,
         });
+        log(
+            'INFO',
+            `[agent-control] /inject resolved (trace=${traceId}, duration=${durationMs}ms, ok=${reply !== null})`,
+        );
         return {
             status: reply !== null ? 200 : 409,
-            body: { ok: reply !== null, reply: reply ?? null, durationMs, from },
+            body: {
+                ok: reply !== null,
+                reply: reply ?? null,
+                durationMs,
+                from,
+                traceId,
+                timeoutMs: timeout,
+                timeoutStrategy: timeoutDecision.strategy,
+                timeoutReasons: timeoutDecision.reasons,
+            },
         };
     } catch (e) {
+        const projection = projectAgentHttpError(e);
+        const durationMs = Date.now() - t0;
+        const isTimeout = String(projection.body?.code ?? '') === 'DIALOG_TIMEOUT' || projection.status === 504;
+        metrics?.recordInjectTurn?.(durationMs, false, isTimeout ? 'timeout' : 'error');
         recordRuntimeInjectHistory({
             ts: t0,
+            traceId,
             from,
             message: message.slice(0, 200),
             replySnippet: null,
-            durationMs: Date.now() - t0,
+            durationMs,
+            timeoutMs: timeout,
+            timeoutStrategy: timeoutDecision.strategy,
+            outcome: isTimeout ? 'timeout' : 'error',
             ok: false,
         });
-        return projectAgentHttpError(e);
+        log(
+            'WARN',
+            `[agent-control] /inject failed (trace=${traceId}, duration=${durationMs}ms, code=${String(projection.body?.code ?? 'unknown')})`,
+        );
+        return {
+            ...projection,
+            body:
+                projection.body && typeof projection.body === 'object'
+                    ? {
+                          ...projection.body,
+                          traceId,
+                          timeoutMs: timeout,
+                          timeoutStrategy: timeoutDecision.strategy,
+                          timeoutReasons: timeoutDecision.reasons,
+                      }
+                    : projection.body,
+        };
     }
 }
 
@@ -328,8 +428,12 @@ export async function handleInject(params = {}) {
  */
 export async function handleDialogPause(params = {}) {
     const runtimeId = resolveRuntimeIdParam(params);
-    if (!getAgent(runtimeId).dialogLoopActive) {
+    const controlState = readAgentRuntimeControlState(runtimeId);
+    if (!controlState.dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop não está ativo.' } };
+    }
+    if (controlState.dialogPaused) {
+        return { status: 409, body: { ok: false, error: 'Dialog loop já está pausado.' } };
     }
     try {
         await pauseAgentDialogLoop(runtimeId);
@@ -349,8 +453,12 @@ export async function handleDialogPause(params = {}) {
  */
 export async function handleDialogResume(params = {}) {
     const runtimeId = resolveRuntimeIdParam(params);
-    if (getAgent(runtimeId).dialogLoopActive) {
+    const controlState = readAgentRuntimeControlState(runtimeId);
+    if (!controlState.dialogPaused && controlState.dialogLoopActive) {
         return { status: 409, body: { ok: false, error: 'Dialog loop já está ativo.' } };
+    }
+    if (!controlState.dialogPaused && !controlState.dialogLoopActive) {
+        return { status: 409, body: { ok: false, error: 'Dialog loop não está pausado.' } };
     }
     try {
         await resumeAgentDialogLoop(runtimeId);

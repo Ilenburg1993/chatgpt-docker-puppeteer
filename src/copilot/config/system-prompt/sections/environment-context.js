@@ -5,10 +5,12 @@
  * @module copilot/config/system-prompt/sections/environment-context
  */
 
+import { WORKSPACE_ROOT } from '#copilot/boot';
+
 /** @type {string} Conteúdo da seção */
 export const CONTENT = `\
 Ambiente: DevContainer Debian 12, Node.js v24.x, VS Code Copilot Chat.
-Workspace: /workspaces/chatgpt-docker-puppeteer
+Workspace: ${WORKSPACE_ROOT}
 Estrutura: src/core/, src/nerv/, src/kernel/, src/orchestrator/, src/agent/, src/driver/, src/infra/, src/server/, src/missions/
 Ferramentas CLI disponíveis: rg, fd, bat, delta, gh, jq, yq, sd, dust, xh, shellcheck, hyperfine.
 Scripts npm: lint, format:check, test:unit, test:fast, typecheck:node, audit:quick, analyze:deps, diagnose, health:core.`;

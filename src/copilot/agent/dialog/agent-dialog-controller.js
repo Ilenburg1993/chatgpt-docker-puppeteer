@@ -166,11 +166,15 @@ export async function dialogResume(ctx) {
 export function ensureDialogLoopAttached(ctx, host) {
     const emitterHost = assertEmitterHost(host, 'DialogHost');
 
-    /** @type {import('./loop-manager.js').AgentHost} */
+    /** @type {import('../types.js').DialogLoopHost} */
     const agentHost = {
         sendMessage: (msg, opts) => host.sendMessage(msg, opts),
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),
         answerPendingQuestion: (answer) => host.answerPendingQuestion(answer),
+        getPendingQuestionSnapshot: () => ctx.getPendingQuestionSnapshot(),
+        on: (event, listener) => host.on(event, listener),
+        once: (event, listener) => host.once(event, listener),
+        off: (event, listener) => host.off(event, listener),
         getSessionId: () => host.sessionId,
         getModel: () => ctx.getModelSnapshot(),
         setModel: (modelId) => {

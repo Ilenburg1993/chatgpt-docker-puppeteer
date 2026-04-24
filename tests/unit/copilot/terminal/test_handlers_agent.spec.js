@@ -190,7 +190,26 @@ describe('handlers/agent — handleInject validação', () => {
         expect(result.status).toBe(200);
         expect(body.ok).toBe(true);
         expect(body.reply).toBe('resposta');
-        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(defaultRuntime, 'hello', undefined);
+        expect(body.traceId).toEqual(expect.any(String));
+        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
+            defaultRuntime,
+            'hello',
+            expect.objectContaining({ traceId: expect.any(String) }),
+        );
+    });
+
+    it('propaga timeout explícito para o runtime dialog', async () => {
+        mockSendAgentDialogTurn.mockResolvedValueOnce('com-timeout');
+        const result = await handleInject({ body: { message: 'hello', timeout: 2500 } });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(result.status).toBe(200);
+        expect(body.reply).toBe('com-timeout');
+        expect(body.traceId).toEqual(expect.any(String));
+        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
+            defaultRuntime,
+            'hello',
+            expect.objectContaining({ timeout: 2500, traceId: expect.any(String) }),
+        );
     });
 
     it('aceita payload bridgeado com alias content e runtimeId explícito', async () => {
@@ -199,7 +218,12 @@ describe('handlers/agent — handleInject validação', () => {
         const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
         expect(body.reply).toBe('alt-body');
-        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(altRuntime, 'hello from body', undefined);
+        expect(body.traceId).toEqual(expect.any(String));
+        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
+            altRuntime,
+            'hello from body',
+            expect.objectContaining({ traceId: expect.any(String) }),
+        );
     });
 
     it('projeta AbortError para 504', async () => {
@@ -209,6 +233,7 @@ describe('handlers/agent — handleInject validação', () => {
         expect(result.status).toBe(504);
         expect(body.disposition).toBe('ignore');
         expect(body.retryable).toBe(false);
+        expect(body.traceId).toEqual(expect.any(String));
     });
 });
 
@@ -216,6 +241,20 @@ describe('handlers/agent — dialog pause/resume', () => {
     it('handleDialogPause retorna 409 se loop inativo', async () => {
         const result = await handleDialogPause();
         expect(result.status).toBe(409);
+    });
+
+    it('handleDialogPause retorna 409 se loop já está pausado', async () => {
+        defaultRuntime.dialogLoopActive = true;
+        defaultRuntime.dialogPaused = true;
+
+        const result = await handleDialogPause();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+        defaultRuntime.dialogLoopActive = false;
+        defaultRuntime.dialogPaused = false;
+
+        expect(result.status).toBe(409);
+        expect(body.error).toMatch(/já está pausado/i);
     });
 
     it('handleDialogPause usa runtimeId explícito quando informado', async () => {
@@ -229,20 +268,48 @@ describe('handlers/agent — dialog pause/resume', () => {
     });
 
     it('handleDialogResume tenta retomar loop', async () => {
+        defaultRuntime.dialogPaused = true;
         const result = await handleDialogResume();
         const body = bodyOf(/** @type {{ body: any }} */ (result));
+        defaultRuntime.dialogPaused = false;
         expect(result.status).toBe(200);
         expect(body.ok).toBe(true);
         expect(defaultRuntime.resumeDialogLoop).toHaveBeenCalled();
     });
 
+    it('handleDialogResume retorna 409 se loop já está ativo e não pausado', async () => {
+        defaultRuntime.dialogLoopActive = true;
+        defaultRuntime.dialogPaused = false;
+
+        const result = await handleDialogResume();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+        defaultRuntime.dialogLoopActive = false;
+
+        expect(result.status).toBe(409);
+        expect(body.error).toMatch(/já está ativo/i);
+    });
+
+    it('handleDialogResume retorna 409 se loop não está pausado', async () => {
+        defaultRuntime.dialogLoopActive = false;
+        defaultRuntime.dialogPaused = false;
+
+        const result = await handleDialogResume();
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+        expect(result.status).toBe(409);
+        expect(body.error).toMatch(/não está pausado/i);
+    });
+
     it('handleDialogResume projeta erro de sessão para 503', async () => {
+        defaultRuntime.dialogPaused = true;
         defaultRuntime.resumeDialogLoop.mockRejectedValueOnce(
             Object.assign(new Error('agente parado'), { code: 'AGENT_STOPPED' }),
         );
 
         const result = await handleDialogResume();
         const body = bodyOf(/** @type {{ body: any }} */ (result));
+        defaultRuntime.dialogPaused = false;
 
         expect(result.status).toBe(503);
         expect(body.code).toBe('AGENT_STOPPED');

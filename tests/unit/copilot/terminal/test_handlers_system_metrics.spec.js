@@ -5,17 +5,28 @@
  * Testes para handlers/system-metrics.js — endpoints de history, git status/log. Foca nos handlers testáveis sem mocks
  * pesados de agent singletons.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+    appendThinkingHistoryChunk,
+    clearThinkingHistory,
+    finalizeThinkingHistoryEntry,
+    recordInjectHistory,
+} from '../../../../src/copilot/presentation/runtime-ui-state-store.js';
+import {
     handleGetHistory,
+    handleGetThinkingEntry,
+    handleGetThinkingHistory,
     handleGitLog,
     handleGitStatus,
 } from '../../../../src/copilot/terminal/handlers/system-metrics.js';
-import { recordInjectHistory } from '../../../../src/copilot/terminal/state.js';
 
 /** @template T @param {{ body: unknown }} result @returns {T} */
 const bodyOf = (result) => /** @type {T} */ (result.body);
+
+beforeEach(() => {
+    clearThinkingHistory();
+});
 
 describe('handlers/system-metrics — handleGetHistory', () => {
     it('retorna status 200 com array de entries', () => {
@@ -59,6 +70,66 @@ describe('handlers/system-metrics — handleGetHistory', () => {
         const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
         expect(body.ok).toBe(true);
+    });
+});
+
+describe('handlers/system-metrics — thinking history', () => {
+    it('lista thinkings capturados com conteúdo resumido', () => {
+        appendThinkingHistoryChunk({
+            id: 'dialog-r1',
+            source: 'dialog',
+            title: 'Thinking dialog',
+            chunk: 'um pensamento operacional '.repeat(20),
+            reasoningId: 'r1',
+        });
+        finalizeThinkingHistoryEntry('dialog-r1', { durationMs: 120, status: 'completed' });
+
+        const result = handleGetThinkingHistory({ limit: 10 });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+        expect(result.status).toBe(200);
+        expect(body.ok).toBe(true);
+        expect(body.count).toBe(1);
+        expect(body.entries[0]).toMatchObject({
+            id: 'dialog-r1',
+            source: 'dialog',
+            status: 'completed',
+            durationMs: 120,
+        });
+        expect(body.entries[0].contentSnippet.length).toBeLessThanOrEqual(243);
+        expect(body.entries[0].content).toBeUndefined();
+    });
+
+    it('abre thinking completo por latest, id completo e sufixo curto', () => {
+        appendThinkingHistoryChunk({
+            id: 'task-abc123456789',
+            source: 'task',
+            title: 'Task abc123456789',
+            chunk: 'thinking completo',
+            taskId: 'abc123456789',
+        });
+        finalizeThinkingHistoryEntry('task-abc123456789', { status: 'completed' });
+
+        for (const id of ['latest', 'task-abc123456789', '123456789']) {
+            const result = handleGetThinkingEntry({ id });
+            const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+            expect(result.status).toBe(200);
+            expect(body.ok).toBe(true);
+            expect(body.entry).toMatchObject({
+                id: 'task-abc123456789',
+                content: 'thinking completo',
+                status: 'completed',
+            });
+        }
+    });
+
+    it('retorna 404 para thinking inexistente', () => {
+        const result = handleGetThinkingEntry({ id: 'nao-existe' });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+
+        expect(result.status).toBe(404);
+        expect(body.ok).toBe(false);
     });
 });
 

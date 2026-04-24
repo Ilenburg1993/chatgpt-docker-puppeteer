@@ -14,6 +14,8 @@
  * @see EventBus
  */
 
+import { resolve } from 'node:path';
+
 // ── Helpers ──────────────────────────────────────────────────
 
 /** @param {string} key @param {number} fallback @returns {number} */
@@ -36,6 +38,8 @@ const envBool = (key, fallback) => {
     if (v === undefined) return fallback;
     return v === 'true' || v === '1';
 };
+
+const DEFAULT_WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 
 // ── Agent ────────────────────────────────────────────────────
 
@@ -71,8 +75,11 @@ export const COPILOT_REASONING_EFFORT = envOpt('COPILOT_REASONING_EFFORT');
 export const COPILOT_RESTART_DELAY_MS = envInt('COPILOT_RESTART_DELAY_MS', 5_000);
 export const COPILOT_RPC_TIMEOUT_MS = envInt('COPILOT_RPC_TIMEOUT_MS', 30_000);
 export const COPILOT_SDK_ENABLED = envBool('COPILOT_SDK_ENABLED', false);
+export const COPILOT_SKILL_DIRECTORIES = envStr('COPILOT_SKILL_DIRECTORIES', '.github/skills');
+export const COPILOT_PINNED_CONTEXT_DIRS = envStr('COPILOT_PINNED_CONTEXT_DIRS', '.github/skills,.github/instructions');
+export const COPILOT_DISABLED_SKILLS = envStr('COPILOT_DISABLED_SKILLS', '');
 export const COPILOT_TOOL_PERMISSIONS_LOG = envOpt('COPILOT_TOOL_PERMISSIONS_LOG');
-export const COPILOT_WORKING_DIRECTORY = envStr('COPILOT_WORKING_DIRECTORY', process.cwd());
+export const COPILOT_WORKING_DIRECTORY = envStr('COPILOT_WORKING_DIRECTORY', DEFAULT_WORKSPACE_ROOT);
 export const LLM_B_BOOT_TIMEOUT_MS = envInt('LLM_B_BOOT_TIMEOUT_MS', 30_000);
 export const LLM_B_DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
 export const LLM_B_WATCHDOG_MS = envInt('LLM_B_WATCHDOG_MS', 5 * 60 * 1_000);
@@ -157,6 +164,7 @@ export const SSE_REPLAY_BUFFER_SIZE = envInt('SSE_REPLAY_BUFFER_SIZE', 500);
 // ── Terminal LLM-B ───────────────────────────────────────────
 
 export const LLM_B_TERMINAL_PORT = envInt('LLM_B_TERMINAL_PORT', 3009);
+export const LLM_B_TERMINAL_HOST = envStr('LLM_B_TERMINAL_HOST', '127.0.0.1');
 export const LLM_B_TERMINAL_TOKEN = envOpt('LLM_B_TERMINAL_TOKEN') ?? null;
 export const LLM_B_TURN_TIMEOUT_MS = envInt('LLM_B_TURN_TIMEOUT_MS', envInt('LLM_B_TURN_TIMEOUT', 120_000));
 export const LLM_B_BOOT_PROMPT = envOpt('LLM_B_BOOT_PROMPT');

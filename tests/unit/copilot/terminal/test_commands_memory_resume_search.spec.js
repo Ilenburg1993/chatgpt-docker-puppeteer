@@ -37,7 +37,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/dialog.js', () => ({
+vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     sendTurn: vi.fn(async () => 'ok'),
 }));
 
@@ -79,7 +79,7 @@ describe('commands/memory + resume + search', () => {
 
     it('cmdResume com argumento envia summaryPrompt ao dialog engine', async () => {
         const ctx = mockCtx();
-        const { sendTurn } = await import('../../../../src/copilot/terminal/dialog.js');
+        const { sendTurn } = await import('../../../../src/copilot/terminal/dialog/index.js');
         await cmdResume({ println: ctx.println, hubSessionId: 'hub-1' }, 'hub-2');
         expect(sendTurn).toHaveBeenCalledWith('Resumo da sessão anterior', 'user');
     });

@@ -16,17 +16,11 @@
  */
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
-import { DEFAULT_EXCLUDED_TOOLS, buildCustomAgentsConfig } from '#copilot/config';
+import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
+import { buildCustomAgentsConfig } from '#copilot/config';
 import { toError } from '#copilot/core';
-import {
-    DEFAULT_MODEL,
-    createSession,
-    getToolsConfig,
-    loadToolsConfigAsync,
-    pickDefined,
-    resumeOrCreate,
-} from '#copilot/sdk';
-import { SESSION_MAX_AGE_MS, WORKING_DIRECTORY } from '../../config/agent.js';
+import { DEFAULT_MODEL, createSession, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
     persistStateWithPolicy as _persistStateWithPolicy,
@@ -154,6 +148,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     const state = await _readStateAsync();
     const model = sessionOptions.model ?? DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
+    const bootSkills = readBootSkillConfig();
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
     const systemMessage = injectContext
@@ -167,13 +162,9 @@ export async function initOrResumeSession(client, sessionOptions) {
         // Threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
-        workingDirectory: WORKING_DIRECTORY,
+        workingDirectory: WORKSPACE_ROOT,
         // Diretórios de skills para o SDK carregar.
-        skillDirectories: ['.github/skills'],
-        // AH.1: ferramentas excluídas por padrão + denylist configurável em runtime
-        excludedTools: [...DEFAULT_EXCLUDED_TOOLS, ...getToolsConfig().denylist],
-        // AH.2: allowlist em runtime — quando definida, tem precedência sobre excludedTools
-        ...(getToolsConfig().allowlist !== null ? { availableTools: getToolsConfig().allowlist } : {}),
+        skillDirectories: bootSkills.skillDirectories,
         ...pickDefined({
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,

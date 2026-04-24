@@ -144,8 +144,8 @@ check('C7', 'Test coverage ≥ 70% por módulo crítico', 15, () => {
         'observability',
         'hooks',
         'bridges',
-        'api',
-        'services',
+        'presentation',
+        'server',
     ];
     let covered = 0;
     for (const mod of criticalModules) {
@@ -201,26 +201,19 @@ check('C9', 'Singletons lazy-init ≤ 15', 5, () => {
     return { score, detail: `${refined} singletons refined (meta: ≤15)` };
 });
 
-// ─── C10: services/ fachada cobrindo api/ + terminal/ ────────────────────────
-check('C10', 'services/ facade — api/ e terminal/ não importam L4 direto', 7, () => {
-    const apiViolations =
-        parseInt(
-            sh(
-                "grep -rl \"from '#copilot/agent\\|from '#copilot/conversation-hub\\|from '#copilot/channel\" " +
-                    "src/copilot/api/ --include='*.js' 2>/dev/null | grep -v '\\.test\\.' | wc -l",
-            ),
-        ) || 0;
+// ─── C10: terminal usa presentation, não runtime cru ────────────────────────
+check('C10', 'terminal/ não importa agent/sdk/tools crus', 7, () => {
     const termViolations =
         parseInt(
             sh(
-                "grep -rl \"from '#copilot/agent\\|from '#copilot/conversation-hub\\|from '#copilot/channel\" " +
-                    "src/copilot/terminal/ --include='*.js' 2>/dev/null | grep -v '\\.test\\.' | wc -l",
+                'rg -l "from \'#copilot/(agent|sdk|tools)\'" src/copilot/terminal/ --type js --no-heading ' +
+                    '2>/dev/null | wc -l',
             ),
         ) || 0;
-    const total = apiViolations + termViolations;
+    const total = termViolations;
     return {
         score: total === 0 ? 7 : 0,
-        detail: `${total} bypass(es) direto(s) de L4 em api/(${apiViolations}) + terminal/(${termViolations})`,
+        detail: `${total} bypass(es) direto(s) de runtime cru em terminal/`,
     };
 });
 

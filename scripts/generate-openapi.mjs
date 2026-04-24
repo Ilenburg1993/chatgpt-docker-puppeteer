@@ -3,23 +3,66 @@
 /**
  * scripts/generate-openapi.mjs
  *
- * N-3c: Gera spec OpenAPI 3.0 a partir dos route files Express do copilot.
+ * Gera spec OpenAPI 3.0 a partir dos route files Express canônicos do copilot.
  *
- * Escaneia os arquivos em `src/copilot/api/express/` usando regex para capturar `router.<method>('<path>', ...)` e
- * gerar um skeleton OpenAPI básico.
+ * Escaneia `src/copilot/server/routes/` usando regex para capturar `router.<method>('<path>', ...)` e gerar um skeleton
+ * OpenAPI básico.
  *
  * Uso: node scripts/generate-openapi.mjs [--output <path>]
  *
  * O spec gerado é um skeleton — types de request/response devem ser refinados manualmente.
  */
 
-import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
 
-const API_DIR = resolve(import.meta.dirname, '../src/copilot/api/express');
-const DEFAULT_OUTPUT = resolve(import.meta.dirname, '../src/copilot/api/openapi.json');
+const ROUTES_DIR = resolve(import.meta.dirname, '../src/copilot/server/routes');
+const DEFAULT_OUTPUT = resolve(import.meta.dirname, '../src/copilot/server/routes/openapi.json');
 
 const ROUTE_RE = /router\.(get|post|put|delete|patch)\(\s*['"`]([^'"`]+)['"`]/g;
+
+/**
+ * @param {string} dir
+ * @returns {Promise<string[]>}
+ */
+async function walkJs(dir) {
+    /** @type {string[]} */
+    const out = [];
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+            out.push(...(await walkJs(full)));
+        } else if (entry.isFile() && entry.name.endsWith('.js')) {
+            out.push(full);
+        }
+    }
+    return out;
+}
+
+/**
+ * Retorna o prefixo HTTP real aplicado pelo composition root `server/router.js`.
+ *
+ * @param {string} relFile
+ * @returns {string}
+ */
+function routePrefixFor(relFile) {
+    if (relFile.startsWith('sdk/')) return '/sdk';
+    if (relFile === 'config.js') return '/config';
+    if (relFile === 'memory.js') return '/memory';
+    return '';
+}
+
+/**
+ * @param {string} prefix
+ * @param {string} path
+ * @returns {string}
+ */
+function joinHttpPath(prefix, path) {
+    const normalizedPrefix = prefix === '/' ? '' : prefix.replace(/\/+$/, '');
+    const normalizedPath = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
+    return `${normalizedPrefix}${normalizedPath}` || '/';
+}
 
 /**
  * Converte path Express (:param) para OpenAPI ({param}).
@@ -56,20 +99,23 @@ async function main() {
     const outputArg = process.argv.indexOf('--output');
     const outputPath = outputArg >= 0 ? /** @type {string} */ (process.argv[outputArg + 1]) : DEFAULT_OUTPUT;
 
-    const entries = await readdir(API_DIR, { withFileTypes: true });
-    const jsFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.js'));
+    const jsFiles = await walkJs(ROUTES_DIR);
 
     /** @type {Record<string, Record<string, object>>} */
     const paths = {};
 
     for (const file of jsFiles) {
-        const content = await readFile(join(API_DIR, file.name), 'utf8');
+        const relFile = relative(ROUTES_DIR, file);
+        if (relFile.endsWith('README.md') || relFile.endsWith('deps.js') || relFile.endsWith('middleware.js')) continue;
+
+        const content = await readFile(file, 'utf8');
+        const prefix = routePrefixFor(relFile);
         let match;
         ROUTE_RE.lastIndex = 0;
         while ((match = ROUTE_RE.exec(content)) !== null) {
             const method = /** @type {string} */ (match[1]).toLowerCase();
             const rawPath = /** @type {string} */ (match[2]);
-            const oaPath = '/api/copilot' + toOpenApiPath(rawPath);
+            const oaPath = toOpenApiPath(joinHttpPath(prefix, rawPath));
             const params = extractParams(oaPath);
 
             if (!paths[oaPath]) paths[oaPath] = {};
@@ -78,7 +124,7 @@ async function main() {
             const operation = {
                 summary: `${method.toUpperCase()} ${rawPath}`,
                 operationId: `${method}_${rawPath.replace(/[/:{}]/g, '_').replace(/^_+|_+$/g, '')}`,
-                tags: [file.name.replace('.js', '')],
+                tags: [relFile.replace(/\.js$/, '').replaceAll('/', ':')],
                 responses: {
                     200: { description: 'OK', content: { 'application/json': { schema: { type: 'object' } } } },
                 },
@@ -101,13 +147,14 @@ async function main() {
             title: 'Copilot SDK API',
             version: '1.0.0',
             description:
-                'API REST do módulo copilot — endpoints para sessões, agent, observabilidade, hooks e webhooks.',
+                'API REST do módulo copilot — endpoints canônicos em server/routes para sessões, agent, SDK, observabilidade, hooks e webhooks.',
         },
         servers: [{ url: 'http://localhost:3001', description: 'Dev server' }],
         paths,
     };
 
     const json = JSON.stringify(spec, null, 2);
+    await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, json + '\n', 'utf8');
 
     const pathCount = Object.keys(paths).length;

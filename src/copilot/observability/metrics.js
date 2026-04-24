@@ -12,6 +12,8 @@
 /** @typedef {import('./metrics-histogram.js').ToolMetrics} ToolMetrics */
 /** @typedef {import('./metrics-histogram.js').TokenUsageMetrics} TokenUsageMetrics */
 /** @typedef {import('./metrics-histogram.js').DialogMetrics} DialogMetrics */
+/** @typedef {import('./metrics-histogram.js').SdkDialogMetrics} SdkDialogMetrics */
+/** @typedef {import('./metrics-histogram.js').InjectMetrics} InjectMetrics */
 /** @typedef {import('./metrics-histogram.js').TaskMetrics} TaskMetrics */
 /** @typedef {import('./metrics-histogram.js').SessionMetrics} SessionMetrics */
 /** @typedef {import('./metrics-histogram.js').StreamingMetrics} StreamingMetrics */
@@ -30,6 +32,8 @@
  * @property {() => void} recordSessionCleanup
  * @property {() => void} recordHandoff
  * @property {(durationMs: number, success: boolean) => void} recordDialogTurn
+ * @property {(durationMs: number, success: boolean) => void} recordSdkDialogTurn
+ * @property {(durationMs: number, success: boolean, outcome?: 'completed' | 'timeout' | 'error') => void} recordInjectTurn
  * @property {(stalledMs: number) => void} recordDialogStall
  * @property {() => void} recordDialogTimeout
  * @property {(durationMs: number, success: boolean) => void} recordTaskCompletion
@@ -89,6 +93,30 @@ export function createMetricsStore() {
         stallsTotal: 0,
         timeoutsTotal: 0,
         stallSumMs: 0,
+        histogram: createHistogram(500),
+    };
+
+    /** @type {{ turnsTotal: number; turnsSuccess: number; histogram: ReturnType<typeof createHistogram> }} */
+    const _sdkDialog = {
+        turnsTotal: 0,
+        turnsSuccess: 0,
+        histogram: createHistogram(500),
+    };
+
+    /**
+     * @type {{
+     *     attemptsTotal: number;
+     *     successTotal: number;
+     *     timeoutsTotal: number;
+     *     errorsTotal: number;
+     *     histogram: ReturnType<typeof createHistogram>;
+     * }}
+     */
+    const _inject = {
+        attemptsTotal: 0,
+        successTotal: 0,
+        timeoutsTotal: 0,
+        errorsTotal: 0,
         histogram: createHistogram(500),
     };
 
@@ -171,6 +199,35 @@ export function createMetricsStore() {
         _dialog.turnsTotal++;
         if (success) _dialog.turnsSuccess++;
         _dialog.histogram.record(durationMs);
+    }
+
+    /**
+     * Registra um turno concluído pelo SDK/base model, separado da semântica HTTP do `/inject`.
+     *
+     * @param {number} durationMs
+     * @param {boolean} success
+     * @returns {void}
+     */
+    function recordSdkDialogTurn(durationMs, success) {
+        _sdkDialog.turnsTotal++;
+        if (success) _sdkDialog.turnsSuccess++;
+        _sdkDialog.histogram.record(durationMs);
+    }
+
+    /**
+     * Registra o resultado da borda `/inject`, incluindo timeouts HTTP.
+     *
+     * @param {number} durationMs
+     * @param {boolean} success
+     * @param {'completed' | 'timeout' | 'error'} [outcome='completed'] Default is `'completed'`
+     * @returns {void}
+     */
+    function recordInjectTurn(durationMs, success, outcome = 'completed') {
+        _inject.attemptsTotal++;
+        if (success) _inject.successTotal++;
+        else if (outcome === 'timeout') _inject.timeoutsTotal++;
+        else _inject.errorsTotal++;
+        _inject.histogram.record(durationMs);
     }
 
     /**
@@ -331,6 +388,18 @@ export function createMetricsStore() {
                 turnLatency: _dialog.histogram.snapshot(),
                 stallSumMs: _dialog.stallSumMs,
             },
+            sdkDialog: {
+                turnsTotal: _sdkDialog.turnsTotal,
+                turnsSuccess: _sdkDialog.turnsSuccess,
+                turnLatency: _sdkDialog.histogram.snapshot(),
+            },
+            inject: {
+                attemptsTotal: _inject.attemptsTotal,
+                successTotal: _inject.successTotal,
+                timeoutsTotal: _inject.timeoutsTotal,
+                errorsTotal: _inject.errorsTotal,
+                latency: _inject.histogram.snapshot(),
+            },
             tasks: {
                 completed: _tasks.completed,
                 failed: _tasks.failed,
@@ -370,6 +439,14 @@ export function createMetricsStore() {
         _dialog.timeoutsTotal = 0;
         _dialog.stallSumMs = 0;
         _dialog.histogram = createHistogram(500);
+        _sdkDialog.turnsTotal = 0;
+        _sdkDialog.turnsSuccess = 0;
+        _sdkDialog.histogram = createHistogram(500);
+        _inject.attemptsTotal = 0;
+        _inject.successTotal = 0;
+        _inject.timeoutsTotal = 0;
+        _inject.errorsTotal = 0;
+        _inject.histogram = createHistogram(500);
         _tasks.completed = 0;
         _tasks.failed = 0;
         _tasks.histogram = createHistogram(500);
@@ -392,6 +469,8 @@ export function createMetricsStore() {
         recordSessionCleanup,
         recordHandoff,
         recordDialogTurn,
+        recordSdkDialogTurn,
+        recordInjectTurn,
         recordDialogStall,
         recordDialogTimeout,
         recordTaskCompletion,

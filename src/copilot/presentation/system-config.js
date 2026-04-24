@@ -8,9 +8,9 @@
  *   terminal para health/config.
  */
 
+import { readCopilotBootConfig } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
 import {
-    LLM_B_TERMINAL_PORT,
     readDeclarativeCustomToolsConfig,
     readDeclarativeToolsConfig,
     readSkillsConfig,
@@ -60,6 +60,7 @@ export function handleHealth(params = {}) {
         status: agentStatus,
         model,
         reasoningEffort,
+        dialogPaused,
     } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     const healthRecord = health && typeof health === 'object' ? /** @type {Record<string, unknown>} */ (health) : null;
     const healthChecks =
@@ -82,6 +83,8 @@ export function handleHealth(params = {}) {
                 tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
                 tasks: { completed: 0, failed: 0 },
                 dialog: { turnsTotal: 0, turnsSuccess: 0 },
+                sdkDialog: { turnsTotal: 0, turnsSuccess: 0 },
+                inject: { attemptsTotal: 0, successTotal: 0, timeoutsTotal: 0, errorsTotal: 0 },
             };
         }
     })();
@@ -101,6 +104,7 @@ export function handleHealth(params = {}) {
             healthStatus: healthRecord?.['status'] ?? 'healthy',
             issues: healthRecord?.['issues'] ?? [],
             dialogLoopActive,
+            dialogPaused,
             agentStatus,
             runtimeId,
             requestedRuntimeId: requestedRuntime,
@@ -127,6 +131,16 @@ export function handleHealth(params = {}) {
                 },
                 tasks: { completed: metricsSummary.tasks.completed, failed: metricsSummary.tasks.failed },
                 dialog: { turns: metricsSummary.dialog.turnsTotal, success: metricsSummary.dialog.turnsSuccess },
+                sdkDialog: {
+                    turns: metricsSummary.sdkDialog.turnsTotal,
+                    success: metricsSummary.sdkDialog.turnsSuccess,
+                },
+                inject: {
+                    attempts: metricsSummary.inject.attemptsTotal,
+                    success: metricsSummary.inject.successTotal,
+                    timeouts: metricsSummary.inject.timeoutsTotal,
+                    errors: metricsSummary.inject.errorsTotal,
+                },
             },
             uptime: Math.round(process.uptime()),
             memoryMB: Math.round(process.memoryUsage.rss() / 1_048_576),
@@ -159,6 +173,7 @@ export function getSseClientSets() {
  * @returns {HandlerResult}
  */
 export function handleGetConfig(params = {}) {
+    const bootConfig = readCopilotBootConfig();
     const requestedRuntimeId = readRuntimeIdFromParams(params && typeof params === 'object' ? params : null);
     const {
         requestedRuntimeId: requestedRuntime,
@@ -170,6 +185,7 @@ export function handleGetConfig(params = {}) {
         model,
         reasoningEffort,
         dialogLoopActive,
+        dialogPaused,
     } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     return {
         status: 200,
@@ -186,9 +202,12 @@ export function handleGetConfig(params = {}) {
             sdkSessionMode: readRuntimeSdkSessionMode(),
             sdkPlanOperation: readRuntimeLastSdkPlanOperation(),
             dialogLoopActive,
+            dialogPaused,
             busy: readRuntimeBusyState(),
             hubSessionId: readRuntimeHubSessionId(),
-            port: LLM_B_TERMINAL_PORT,
+            port: bootConfig.server.port,
+            host: bootConfig.server.host,
+            serverUrl: bootConfig.server.url,
             contextWindow: snapshot['contextWindow'],
             lastCheckpointPath: snapshot['lastCheckpointPath'],
             infiniteSession: getInfiniteSessionConfig(),

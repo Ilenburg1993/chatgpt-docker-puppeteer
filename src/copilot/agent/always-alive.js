@@ -764,7 +764,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Envia um turno de diálogo. Delega ao DialogLoopManager.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal }} [opts]
+     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
      * @returns {Promise<string>}
      */
     sendDialogTurn(message, opts) {

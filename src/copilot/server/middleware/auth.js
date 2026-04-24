@@ -3,27 +3,27 @@
  * @module copilot/server/middleware/auth
  * @file Middleware de autenticação por token Bearer para o servidor copilot.
  *
- *   Extrai auth de `terminal/server.js` (L54.1 — Onda 3.0). Usa comparação timing-safe para evitar timing attacks.
+ *   Middleware canônico de auth do servidor Copilot. Substitui a auth que existia no antigo terminal server.
  *
  *   src/copilot/server/middleware/auth.js
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { LLM_B_TERMINAL_TOKEN } from '#copilot/config';
+import { readCopilotBootConfig } from '#copilot/boot';
 import { timingSafeEqual } from 'node:crypto';
 
 /**
  * Cria um middleware Express de autenticação Bearer timing-safe.
  *
- * Se `LLM_B_TERMINAL_TOKEN` não estiver definido, a rota é liberada sem auth. Rotas marcadas com `skipAuth=true` na
- * route-table são whitelistadas antes de chegar aqui.
+ * Se o token canônico do boot não estiver definido, a rota é liberada sem auth. Rotas explicitamente públicas continuam
+ * acessíveis pelo desenho do servidor local.
  *
  * @param {object} [opts]
- * @param {string} [opts.token] - Token override (para testes). Default: `LLM_B_TERMINAL_TOKEN`.
+ * @param {string} [opts.token] - Token override (para testes). Default: `readCopilotBootConfig().server.token`.
  * @returns {import('express').RequestHandler} Middleware Express
  */
 export function createAuthMiddleware(opts) {
-    const TERMINAL_TOKEN = opts?.token ?? LLM_B_TERMINAL_TOKEN;
+    const TERMINAL_TOKEN = opts?.token ?? readCopilotBootConfig().server.token;
 
     return function authMiddleware(req, res, next) {
         // Sem token configurado → acesso livre (dev mode)

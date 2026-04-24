@@ -21,10 +21,7 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { Router } from 'express';
-import { readAgentRuntimeToolsProjection } from '../../../presentation/runtime-tools.js';
-import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../presentation/sdk-sessions.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
@@ -43,6 +40,9 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @property {() => Promise<void | Error[]>} stopClient - Para o client.
  * @property {() => Promise<void>} forceStopClient - Para o client forçadamente.
  * @property {import('#copilot/sdk/types').Tool[]} allTools - Ferramentas estáticas.
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  */
 
@@ -103,16 +103,19 @@ export default function createClientRouter(deps) {
      */
     router.get('/status', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { agent, getClient, getClientState, runtimeId } = resolveClientRouterDeps(deps, req);
+            const { agent, getClient, getClientState, runtimeId, sdkSessionOwnership } = resolveClientRouterDeps(
+                deps,
+                req,
+            );
             const state = getClientState();
             if (state !== 'connected') {
-                const runtimeProjection = await resolveSdkRuntimeProjection(agent, null, state);
+                const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(agent, null, state);
                 res.json({ ok: true, status: null, ...(runtimeId ? { runtimeId } : {}), ...runtimeProjection });
                 return;
             }
             const client = await getClient();
             const status = await client.getStatus();
-            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(agent, client, state);
             res.json({ ok: true, ...(runtimeId ? { runtimeId } : {}), ...status, ...runtimeProjection });
         });
     });
@@ -162,10 +165,10 @@ export default function createClientRouter(deps) {
      */
     router.post('/client/start', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { agent, getClient, runtimeId } = resolveClientRouterDeps(deps, req);
+            const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveClientRouterDeps(deps, req);
             const client = await getClient();
             const state = client.getState();
-            const runtimeProjection = await resolveSdkRuntimeProjection(agent, client, state);
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(agent, client, state);
             res.json({
                 ok: true,
                 state,
@@ -183,9 +186,9 @@ export default function createClientRouter(deps) {
      */
     router.post('/client/stop', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { stopClient } = resolveClientRouterDeps(deps, req);
+            const { stopClient, sdkSessionOwnership } = resolveClientRouterDeps(deps, req);
             await stopClient();
-            const sharedBinding = clearSdkRuntimeBinding();
+            const sharedBinding = sdkSessionOwnership.clearSdkRuntimeBinding();
             res.json({ ok: true, message: 'CopilotClient parado e sessões limpas.', sharedBinding });
         });
     });
@@ -197,10 +200,10 @@ export default function createClientRouter(deps) {
      */
     router.post('/client/force-stop', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { forceStopClient } = resolveClientRouterDeps(deps, req);
+            const { forceStopClient, sdkSessionOwnership, sdkObservability } = resolveClientRouterDeps(deps, req);
             await forceStopClient();
-            const sharedBinding = clearSdkRuntimeBinding();
-            log('INFO', '[sdk-api] CopilotClient force-stop executado');
+            const sharedBinding = sdkSessionOwnership.clearSdkRuntimeBinding();
+            sdkObservability.log('INFO', '[sdk-api] CopilotClient force-stop executado');
             res.json({ ok: true, message: 'CopilotClient force-stop executado.', sharedBinding });
         });
     });
@@ -214,8 +217,8 @@ export default function createClientRouter(deps) {
      * readOnly, skipPermission). Caso contrário, usa allTools estático.
      */
     router.get('/tools', (_req, res) => {
-        const { agent, allTools } = resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
-        res.json(readAgentRuntimeToolsProjection(agent, { allTools }));
+        const { agent, allTools, sdkRuntimeProjection } = resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
+        res.json(sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { allTools }));
     });
 
     return router;

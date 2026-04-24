@@ -154,7 +154,7 @@ export function attachAssistantHandlers(ctx) {
             const startTs = turnId ? turnStart.get(turnId) : undefined;
             if (turnId) turnStart.delete(turnId);
             const durationMs = startTs ? Date.now() - startTs : 0;
-            metrics?.recordDialogTurn(durationMs, true);
+            metrics?.recordSdkDialogTurn?.(durationMs, true);
             if (persist && persistSet.has('assistant.turn_end')) {
                 persistEvent({ type: event.type, sessionId, ts: event.timestamp, turnId, durationMs });
             }

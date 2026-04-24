@@ -9,12 +9,13 @@
  * @see EventBus
  */
 
+import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';
 import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 
-/** Raiz do workspace — único diretório autorizado para execução */
-export const WORKSPACE_ROOT = new URL('../../../..', import.meta.url).pathname;
+/** Raiz canonica do workspace definida pelo boot. */
+export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
 
 /**
  * BUG-07 (fix): Detecta metacaracteres shell perigosos fora de aspas simples ou duplas. Evita falsos positivos em

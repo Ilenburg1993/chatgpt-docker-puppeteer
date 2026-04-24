@@ -71,7 +71,7 @@ export async function cmdResume({ println, hubSessionId }, arg) {
         );
 
         // Import dinâmico para evitar ciclo
-        const { sendTurn } = await import('../dialog.js');
+        const { sendTurn } = await import('../dialog/index.js');
         await sendTurn(projection.summaryPrompt ?? '', 'user');
     } catch (e) {
         println(`\x1b[31m  ✗ Erro ao retomar sessão: ${toError(e).message}\x1b[0m`);

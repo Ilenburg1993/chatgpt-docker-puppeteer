@@ -3,8 +3,8 @@
  * @module copilot/server/middleware/rate-limiter
  * @file Rate limiters em memória para o servidor copilot.
  *
- *   Extrai os 3 rate limiters de `terminal/server.js` (L54.2 — Onda 3.0). Disponibiliza middlewares Express prontos para
- *   montar por rota.
+ *   Rate limiters canônicos do servidor Copilot. Substituem os limiters que existiam no antigo terminal server e ficam
+ *   disponíveis como middlewares Express por rota.
  *
  *   src/copilot/server/middleware/rate-limiter.js
  */

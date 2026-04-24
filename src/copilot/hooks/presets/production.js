@@ -19,6 +19,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { WORKSPACE_ROOT } from '#copilot/boot';
 import { isToolDisabled as defaultIsToolDisabled } from '#copilot/tools';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
@@ -337,7 +338,7 @@ export function createProductionHooks(opts = {}) {
      */
     function onSessionStart(input, invocation) {
         const ctx = {
-            cwd: input.cwd ?? process.cwd(),
+            cwd: input.cwd ?? WORKSPACE_ROOT,
             nodeVersion: process.version,
             hostname: os.hostname(),
             platform: process.platform,

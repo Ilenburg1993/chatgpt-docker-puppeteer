@@ -40,6 +40,22 @@ O objetivo agora é:
 - reduzir também leituras cruas de `ctx.*State` nos módulos quentes de lifecycle/health/setup;
 - deixar `AlwaysAliveAgent` como fachada previsível.
 
+## Taxonomia de "host"
+
+No `src/copilot/` a palavra "host" passou a ter significado estrito por contexto:
+
+- `boot host`: a borda operacional que sobe o runtime local a partir de `terminal/bootstrap.js` e
+  `bootstrap.js`;
+- `process host`: a borda Node/IPC/sinais do runtime compatível em
+  `agent/lifecycle/runtime-host.js`;
+- `DialogHost`: o host externo do subsistema de dialog, isto é, o runtime do agent exposto ao
+  controller;
+- `DialogLoopHost`: o adapter estreito que o controller monta para o `DialogLoopManager`;
+- `DialogTurnHost`: a capability mínima do caminho quente de `sendDialogTurn()`.
+
+Regra: quando um módulo interno fala em `host`, ele deve receber uma capability explícita e tipada,
+não um objeto "grande" semi-implícito.
+
 ## Runtime default vs runtimes registrados
 
 O `agent/` agora opera com duas noções compatíveis:

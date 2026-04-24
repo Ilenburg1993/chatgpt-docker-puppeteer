@@ -10,12 +10,14 @@
  * @see module:copilot/terminal/dialog
  */
 
-import { LLM_B_TERMINAL_PORT } from '#copilot/config';
+import { readCopilotBootConfig } from '#copilot/boot';
 import { toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { logSwallowed } from '../core/error-handlers.js';
+import { extractAtReferences } from '../presentation/runtime-file-context.js';
+import { addAttachment, getHubSessionId, setRl } from '../presentation/runtime-ui-state-store.js';
 import { resolve } from './alias-store.js';
 import {
     cmdActivity as _cmdActivity,
@@ -57,8 +59,7 @@ import {
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
 } from './commands/index.js';
-import { buildUserPrompt, ensureDialogLoop, println, sendTurn } from './dialog.js';
-import { extractAtReferences } from './file-context.js';
+import { buildUserPrompt, ensureDialogLoop, println, sendTurn } from './dialog/index.js';
 import {
     offTerminalAgentRuntimeEvent,
     onceTerminalAgentRuntimeEvent,
@@ -71,9 +72,8 @@ import {
 } from './frontend/llm-b-runtime.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 import { setupAgentListeners } from './repl-listeners.js';
-import { addAttachment, getHubSessionId, setRl } from './state.js';
 
-const INJECT_PORT = LLM_B_TERMINAL_PORT;
+const INJECT_PORT = readCopilotBootConfig().server.port;
 
 const BANNER = `
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
@@ -226,6 +226,15 @@ async function _cmdEmergencyReset() {
     println('\x1b[33m  [emergency-reset] Reiniciando dialog loop…\x1b[0m');
     await _cmdRestart();
     println('\x1b[32m  [emergency-reset] OK — rate limiters limpos e loop reiniciado.\x1b[0m');
+}
+
+/**
+ * @param {readline.Interface | null | undefined} rl
+ * @returns {boolean}
+ */
+function isReadlineOpen(rl) {
+    const state = /** @type {{ closed?: boolean }} */ (rl ?? {});
+    return Boolean(rl) && state.closed !== true;
 }
 
 async function _cmdRestart() {
@@ -398,8 +407,10 @@ export async function startRepl(injectServer) {
 
         const trimmed = line.trim();
         if (!trimmed) {
-            rl.setPrompt(buildUserPrompt());
-            rl.prompt();
+            if (isReadlineOpen(rl)) {
+                rl.setPrompt(buildUserPrompt());
+                rl.prompt();
+            }
             return;
         }
 
@@ -408,8 +419,10 @@ export async function startRepl(injectServer) {
             const [cmd, ...rest] = resolved.slice(1).split(' ');
             const arg = rest.join(' ');
             await dispatchCmd(cmd ?? '', arg, rest, rl, injectServer, cleanup);
-            rl.setPrompt(buildUserPrompt());
-            rl.prompt();
+            if (isReadlineOpen(rl)) {
+                rl.setPrompt(buildUserPrompt());
+                rl.prompt();
+            }
             return;
         }
 

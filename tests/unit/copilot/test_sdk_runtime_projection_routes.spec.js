@@ -5,6 +5,11 @@ import { clearSharedSessionBinding, setSharedHubSessionId, setSharedSdkSessionId
 import express from 'express';
 import request from 'supertest';
 
+import {
+    paginateAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjection,
+} from '../../../src/copilot/presentation/runtime-tools.js';
+import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../src/copilot/presentation/sdk-sessions.js';
 import createAgentRouter from '../../../src/copilot/server/routes/sdk/agent.js';
 import createClientRouter from '../../../src/copilot/server/routes/sdk/client.js';
 
@@ -56,6 +61,27 @@ function createMockAgent() {
     };
 }
 
+/**
+ * @param {Record<string, unknown>} overrides
+ * @returns {any}
+ */
+function routeDeps(overrides = {}) {
+    return {
+        sdkSessionOwnership: {
+            clearSdkRuntimeBinding,
+            resolveSdkRuntimeProjection,
+        },
+        sdkRuntimeProjection: {
+            paginateAgentRuntimeToolsProjection,
+            readAgentRuntimeToolsProjection,
+        },
+        sdkObservability: {
+            log: () => {},
+        },
+        ...overrides,
+    };
+}
+
 describe('sdk runtime projection routes', () => {
     beforeEach(() => {
         clearSharedSessionBinding();
@@ -70,14 +96,16 @@ describe('sdk runtime projection routes', () => {
     it('GET /status retorna projection canônica de binding e canonical session', async () => {
         const app = express();
         app.use(
-            createClientRouter({
-                agent: createMockAgent(),
-                getClient: async () => createMockClient(),
-                getClientState: () => 'connected',
-                stopClient: async () => [],
-                forceStopClient: async () => {},
-                allTools: [],
-            }),
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => createMockClient(),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [],
+                }),
+            ),
         );
 
         const res = await request(app).get('/status').expect(200);
@@ -98,14 +126,16 @@ describe('sdk runtime projection routes', () => {
     it('POST /client/stop limpa o sdk binding preservando hubSessionId', async () => {
         const app = express();
         app.use(
-            createClientRouter({
-                agent: createMockAgent(),
-                getClient: async () => createMockClient(),
-                getClientState: () => 'connected',
-                stopClient: async () => [],
-                forceStopClient: async () => {},
-                allTools: [],
-            }),
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => createMockClient(),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [],
+                }),
+            ),
         );
 
         const res = await request(app).post('/client/stop').expect(200);
@@ -123,21 +153,23 @@ describe('sdk runtime projection routes', () => {
 
         const app = express();
         app.use(
-            createClientRouter({
-                agent: createMockAgent(),
-                getClient: async () => ({
-                    ...createMockClient(),
-                    forceStop: async () => {
-                        throw new Error('should-not-be-called');
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => ({
+                        ...createMockClient(),
+                        forceStop: async () => {
+                            throw new Error('should-not-be-called');
+                        },
+                    }),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {
+                        forceStop.called += 1;
                     },
+                    allTools: [],
                 }),
-                getClientState: () => 'connected',
-                stopClient: async () => [],
-                forceStopClient: async () => {
-                    forceStop.called += 1;
-                },
-                allTools: [],
-            }),
+            ),
         );
 
         const res = await request(app).post('/client/force-stop').expect(200);
@@ -153,11 +185,13 @@ describe('sdk runtime projection routes', () => {
     it('GET /agent/info expõe a mesma projection canônica de runtime', async () => {
         const app = express();
         app.use(
-            createAgentRouter({
-                agent: createMockAgent(),
-                metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
-                getClient: async () => createMockClient(),
-            }),
+            createAgentRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
+                    getClient: async () => createMockClient(),
+                }),
+            ),
         );
 
         const res = await request(app).get('/agent/info').expect(200);
@@ -175,11 +209,13 @@ describe('sdk runtime projection routes', () => {
     it('GET /agent/state expõe state + binding canônico na mesma resposta', async () => {
         const app = express();
         app.use(
-            createAgentRouter({
-                agent: createMockAgent(),
-                metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
-                getClient: async () => createMockClient(),
-            }),
+            createAgentRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
+                    getClient: async () => createMockClient(),
+                }),
+            ),
         );
 
         const res = await request(app).get('/agent/state').expect(200);
@@ -197,14 +233,16 @@ describe('sdk runtime projection routes', () => {
     it('GET /tools usa a projeção semântica de tools do agent', async () => {
         const app = express();
         app.use(
-            createClientRouter({
-                agent: createMockAgent(),
-                getClient: async () => createMockClient(),
-                getClientState: () => 'connected',
-                stopClient: async () => [],
-                forceStopClient: async () => {},
-                allTools: [{ name: 'static_tool' }],
-            }),
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => createMockClient(),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [{ name: 'static_tool' }],
+                }),
+            ),
         );
 
         const res = await request(app).get('/tools').expect(200);
@@ -220,14 +258,16 @@ describe('sdk runtime projection routes', () => {
     it('GET /tools usa fallback estático quando o registry runtime não está disponível', async () => {
         const app = express();
         app.use(
-            createClientRouter({
-                agent: { status: 'stopped', sessionId: null, toolsRegistry: null },
-                getClient: async () => createMockClient(),
-                getClientState: () => 'connected',
-                stopClient: async () => [],
-                forceStopClient: async () => {},
-                allTools: [{ name: 'static_tool', description: 'Static', skipPermission: true }],
-            }),
+            createClientRouter(
+                routeDeps({
+                    agent: { status: 'stopped', sessionId: null, toolsRegistry: null },
+                    getClient: async () => createMockClient(),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [{ name: 'static_tool', description: 'Static', skipPermission: true }],
+                }),
+            ),
         );
 
         const res = await request(app).get('/tools').expect(200);
@@ -241,11 +281,13 @@ describe('sdk runtime projection routes', () => {
     it('GET /agent/tools filtra e pagina a projeção semanticamente governada pelo agent', async () => {
         const app = express();
         app.use(
-            createAgentRouter({
-                agent: createMockAgent(),
-                metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
-                getClient: async () => createMockClient(),
-            }),
+            createAgentRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
+                    getClient: async () => createMockClient(),
+                }),
+            ),
         );
 
         const res = await request(app).get('/agent/tools?category=file&page=1&limit=1').expect(200);

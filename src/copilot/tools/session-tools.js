@@ -10,17 +10,17 @@
  * @see module:copilot/always-alive
  */
 
+import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
 
-const ROOT = resolve(new URL('../..', import.meta.url).pathname, '..');
-const HOOKS_STATE = join(ROOT, '.github', 'hooks', 'state');
+const HOOKS_STATE = resolveHooksStateDir();
 const GIT_CMD_TIMEOUT_MS = 5_000;
 
 /**
@@ -88,7 +88,7 @@ const getWorkspaceInfoTool = createTool({
         'Retorna informações do workspace atual: diretório de trabalho, branch git, Node version, status básico.',
     parameters: z.object({}),
     handler: async () => {
-        const cwd = ROOT;
+        const cwd = resolveWorkspacePath();
         const nodeVersion = process.version;
         const platform = process.platform;
 
@@ -174,23 +174,38 @@ const invokeSkillTool = createTool({
         )
     ),
     handler: async (/** @type {{ name?: string }} */ { name }) => {
-        const skillsDir = resolve(join(process.cwd(), '.github', 'skills'));
-        try {
-            await stat(skillsDir);
-        } catch {
+        const bootSkills = readBootSkillConfig();
+        const disabled = new Set(bootSkills.disabledSkills);
+        /** @type {Map<string, string>} */
+        const availableMap = new Map();
+        let readableSkillDirCount = 0;
+        for (const skillsDir of bootSkills.skillDirectories) {
+            try {
+                await stat(skillsDir);
+                readableSkillDirCount++;
+                const entries = await readdir(skillsDir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory() && !disabled.has(entry.name) && !availableMap.has(entry.name)) {
+                        availableMap.set(entry.name, skillsDir);
+                    }
+                }
+            } catch (e) {
+                logSwallowed(e, `invokeSkill.readDir:${skillsDir}`);
+            }
+        }
+        if (readableSkillDirCount === 0) {
             return { error: 'Diretório .github/skills/ não encontrado.' };
         }
-
-        const entries = await readdir(skillsDir, { withFileTypes: true });
-        const available = entries
-            .filter((d) => d.isDirectory())
-            .map((d) => d.name)
-            .sort();
+        const available = [...availableMap.keys()].sort();
 
         if (!name) {
             return { available };
         }
 
+        const skillsDir = availableMap.get(name);
+        if (!skillsDir) {
+            return { error: `Skill '${name}' não encontrada.`, available };
+        }
         const skillPath = join(skillsDir, name, 'SKILL.md');
         let content;
         try {

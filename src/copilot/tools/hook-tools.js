@@ -69,7 +69,7 @@ let _pendingInputSeq = 0;
 let _broadcastSse = () => {};
 
 /**
- * Injeta a função `broadcastSse` para evitar o import dinâmico circular de `terminal/dialog.js`. Deve ser chamado em
+ * Injeta a função `broadcastSse` para evitar import circular com a borda de diálogo do terminal. Deve ser chamado em
  * `startTerminalServer()` antes de iniciar o agente.
  *
  * @param {{ broadcastSse: (event: string, data: Record<string, unknown>) => void }} config

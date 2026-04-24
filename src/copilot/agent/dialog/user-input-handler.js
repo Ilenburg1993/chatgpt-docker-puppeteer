@@ -11,9 +11,9 @@
  */
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
+import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 import { log } from '../ports/observability-port.js';
-import { DialogProtocol } from './protocol.js';
 
 /**
  * @typedef {import('../types.js').PendingQuestion} PendingQuestion
@@ -25,10 +25,12 @@ import { DialogProtocol } from './protocol.js';
  * Callbacks injetados pelo AlwaysAliveAgent para operações que dependem de estado privado.
  *
  * @typedef {Object} UserInputContext
- * @property {() => boolean} isDialogLoopActive — true se dialog loop está ativo
- * @property {(input: { question: string }) => void} handleProtocolInput — DLM.handleProtocolInput
- * @property {(status: import('../types.js').AgentStatus) => void} setStatus — #setStatus
- * @property {(pq: PendingQuestion | null) => void} setPendingQuestion — #pendingQuestion setter
+ * @property {() => boolean} isDialogLoopActive - true se dialog loop está ativo
+ * @property {(question: string) => boolean} [shouldHandleProtocolInput] - permite tratar READY/REPLY/STOPPED como
+ *   protocolo mesmo durante recovery, quando o loop ainda esta anexado mas o flag `active` ficou defasado
+ * @property {(input: { question: string }) => void} handleProtocolInput - DLM.handleProtocolInput
+ * @property {(status: import('../types.js').AgentStatus) => void} setStatus - #setStatus
+ * @property {(pq: PendingQuestion | null) => void} setPendingQuestion - #pendingQuestion setter
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
  *   - Tracker opcional para writes fire-and-forget
  *
@@ -115,7 +117,12 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
 export async function handleUserInputRequest({ question, choices, allowFreeform }, ctx) {
     log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
 
-    if (ctx.isDialogLoopActive()) {
+    const shouldHandleProtocol =
+        typeof ctx.shouldHandleProtocolInput === 'function'
+            ? ctx.shouldHandleProtocolInput(question)
+            : ctx.isDialogLoopActive();
+
+    if (shouldHandleProtocol) {
         return handleDialogLoopInput({ question, allowFreeform }, ctx);
     }
     return handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform }, ctx);
@@ -137,6 +144,10 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
 function handleDialogLoopInput({ question, allowFreeform }, ctx) {
     const kind = DialogProtocol.classify(question);
     ctx.handleProtocolInput({ question });
+
+    if (kind === 'reply' || kind === 'stopped') {
+        return Promise.resolve({ answer: '', wasFreeform: false });
+    }
 
     return handleInteractiveQuestion({ question, allowFreeform, kind }, ctx);
 }

@@ -16,11 +16,7 @@
 
 import { log } from '../ports/observability-port.js';
 
-/**
- * @typedef {Object} AgentHostForFallback
- * @property {() => string} getModel - Retorna o modelo ativo
- * @property {(modelId: string) => void} [setModel] - Altera o modelo ativo
- */
+/** @typedef {Pick<import('../types.js').DialogLoopHost, 'getModel' | 'setModel'>} AgentHostForFallback */
 
 /**
  * Gerencia o estado de fallback de modelo para o dialog loop.

@@ -14,19 +14,25 @@ import {
 } from '../../../../src/copilot/core/index.js';
 import {
     addAttachment,
+    appendThinkingHistoryChunk,
     clearAttachments,
+    clearThinkingHistory,
+    finalizeThinkingHistoryEntry,
     getAttachmentQueue,
     getBusy,
     getHubSessionId,
     getInjectHistory,
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
+    getLatestThinkingHistoryEntry,
     getSdkSessionMode,
     getShowIntentActivity,
     getShowStreaming,
     getShowThinking,
     getShowToolActivity,
     getShowUsage,
+    getThinkingHistory,
+    getThinkingHistoryEntry,
     recordInjectHistory,
     setBusy,
     setHubSessionId,
@@ -38,7 +44,7 @@ import {
     setShowToolActivity,
     setShowUsage,
     stateEmitter,
-} from '../../../../src/copilot/terminal/state.js';
+} from '../../../../src/copilot/presentation/runtime-ui-state-store.js';
 
 describe('state getters/setters', () => {
     afterEach(() => {
@@ -200,7 +206,7 @@ describe('state attachment queue', () => {
 });
 
 describe('state inject history (circular buffer)', () => {
-    /** @returns {import('../../../../src/copilot/terminal/state.js').InjectHistoryEntry} */
+    /** @returns {import('../../../../src/copilot/presentation/runtime-ui-state-store.js').InjectHistoryEntry} */
     const mkEntry = (from = 'test') => ({
         ts: Date.now(),
         from,
@@ -221,5 +227,44 @@ describe('state inject history (circular buffer)', () => {
         for (let i = 0; i < 10; i++) recordInjectHistory(mkEntry(`src-${i}`));
         const hist = getInjectHistory(3);
         expect(hist.length).toBeLessThanOrEqual(3);
+    });
+});
+
+describe('state thinking history', () => {
+    beforeEach(() => clearThinkingHistory());
+    afterEach(() => clearThinkingHistory());
+
+    it('appendThinkingHistoryChunk e getThinkingHistory round-trip', () => {
+        appendThinkingHistoryChunk({
+            id: 'dialog-1',
+            source: 'dialog',
+            title: 'LLM-B',
+            chunk: 'pensando',
+        });
+        const latest = getLatestThinkingHistoryEntry();
+        expect(latest?.id).toBe('dialog-1');
+        expect(latest?.content).toBe('pensando');
+        expect(getThinkingHistory(5)).toHaveLength(1);
+    });
+
+    it('acumula chunks e finaliza entrada', () => {
+        appendThinkingHistoryChunk({
+            id: 'dialog-2',
+            source: 'dialog',
+            title: 'LLM-B',
+            chunk: 'abc',
+        });
+        appendThinkingHistoryChunk({
+            id: 'dialog-2',
+            source: 'dialog',
+            title: 'LLM-B',
+            chunk: 'def',
+        });
+        finalizeThinkingHistoryEntry('dialog-2', { durationMs: 250, status: 'completed' });
+        const entry = getThinkingHistoryEntry('dialog-2');
+        expect(entry?.content).toBe('abcdef');
+        expect(entry?.chars).toBe(6);
+        expect(entry?.durationMs).toBe(250);
+        expect(entry?.status).toBe('completed');
     });
 });

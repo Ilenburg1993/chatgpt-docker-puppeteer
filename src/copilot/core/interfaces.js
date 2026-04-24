@@ -24,7 +24,7 @@
 
 // ─── Re-imports de tipos dependentes ──────────────────────────────────────────
 
-/** @typedef {import('../events/legacy-events.js').BaseEvent} BaseEvent */
+/** @typedef {import('../events/base-events.js').BaseEvent} BaseEvent */
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AC-5-01 — IAgent (facade contract)
@@ -305,7 +305,11 @@
  * @property {() => void} recordSessionEnd - Encerramento de sessão SDK
  * @property {() => void} recordSessionError - Erro durante sessão
  * @property {() => void} recordHandoff - Transição de handoff
- * @property {(durationMs: number, success: boolean) => void} recordDialogTurn - Turn do dialog loop
+ * @property {(durationMs: number, success: boolean) => void} recordDialogTurn - Turn do dialog loop interno
+ * @property {(durationMs: number, success: boolean) => void} recordSdkDialogTurn - Turn concluído pelo SDK/base model
+ * @property {(durationMs: number, success: boolean, outcome?: 'completed' | 'timeout' | 'error') => void} recordInjectTurn
+ *   - Resultado da borda HTTP `/inject`
+ *
  * @property {(stalledMs: number) => void} recordDialogStall - Dialog loop parado
  * @property {(name: string, delta?: number) => void} recordCounter - Contador genérico
  * @property {(name: string, value: number) => void} recordGauge - Gauge genérico

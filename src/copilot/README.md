@@ -10,6 +10,14 @@ Este diretório tem uma regra simples:
 ## Fluxo canônico de ponta a ponta
 
 ```text
+terminal:llm-b
+  -> terminal/bootstrap.js
+    -> bootstrap.js
+      -> runtime-wiring.js
+        -> terminal/index.js
+          -> server/index.js
+          -> repl.js
+
 Copilot SDK session
   -> event-handlers/               (tradução do vanilla para sinais internos estáveis)
     -> agent/                      (AlwaysAliveAgent + lifecycle/dialog/session)
@@ -40,6 +48,32 @@ SDK/agent events
 | `tools/`            | custom tools registradas sobre a superfície do SDK                                       |
 | `config/`           | defaults, builders e configuração declarativa                                            |
 | `core/`             | erros, constantes, contratos centrais e utilitários base                                 |
+
+## Boot Canônico
+
+O boot local tem uma única autoridade executável:
+
+```text
+npm run terminal:llm-b
+  -> src/copilot/terminal/bootstrap.js
+    -> bootCopilot()
+      -> readCopilotBootConfig()
+      -> startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob, bootConfig })
+        -> startCopilotServer()
+        -> startRepl()
+```
+
+Regras:
+
+- `terminal/bootstrap.js` é o entrypoint canônico para execução local e PM2 `llm-b-terminal`;
+- `src/copilot/agent.js` é entrypoint operacional de compatibilidade, não um segundo runtime;
+- `server/index.js` é dono apenas de HTTP/Socket.IO e nunca inicia REPL ou agent sozinho;
+- `terminal/index.js` é o host da UX local e compõe o server por injeção;
+- `boot/` registra o contrato vivo de boot, resolve workspace/skills/porta/token e guarda o baseline
+  mínimo de capacidades vanilla do SDK que o projeto deve preservar.
+- `boot/config.js` é o arquivo canônico para variáveis operacionais de boot:
+  `COPILOT_WORKING_DIRECTORY`, `COPILOT_SKILL_DIRECTORIES`, `COPILOT_PINNED_CONTEXT_DIRS`,
+  `LLM_B_TERMINAL_HOST`, `LLM_B_TERMINAL_PORT`, `LLM_B_TERMINAL_TOKEN` e `COPILOT_CLI_URL`.
 
 ## Critério rápido de responsabilidade por camada
 

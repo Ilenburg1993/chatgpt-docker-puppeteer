@@ -245,12 +245,12 @@ describe('system-prompt-modular › buildHookContextMessage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Facade backward compat (system-prompt.js)
+// Public API do módulo system-prompt
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('system-prompt-modular › facade backward compat', () => {
-    it('deve re-exportar as 7 constantes legadas', async () => {
-        const m = await import('../../../../src/copilot/config/system-prompt.js');
+describe('system-prompt-modular › public API', () => {
+    it('deve exportar as 7 constantes históricas', async () => {
+        const m = await import('../../../../src/copilot/config/system-prompt/index.js');
         expect(typeof m.AGENT_IDENTITY).toBe('string');
         expect(typeof m.AGENT_TONE).toBe('string');
         expect(typeof m.TOOL_EFFICIENCY).toBe('string');
@@ -261,7 +261,7 @@ describe('system-prompt-modular › facade backward compat', () => {
     });
 
     it('constantes devem ser idênticas ao CONTENT das seções modulares', async () => {
-        const facade = await import('../../../../src/copilot/config/system-prompt.js');
+        const facade = await import('../../../../src/copilot/config/system-prompt/index.js');
         const { SECTIONS } = await import('../../../../src/copilot/config/system-prompt/index.js');
         expect(facade.AGENT_IDENTITY).toBe(SECTIONS.identity?.CONTENT);
         expect(facade.AGENT_TONE).toBe(SECTIONS.tone?.CONTENT);
@@ -273,7 +273,7 @@ describe('system-prompt-modular › facade backward compat', () => {
     });
 
     it('buildAlwaysAliveSystemMessage deve delegar ao buildSystemMessage', async () => {
-        const { buildAlwaysAliveSystemMessage } = await import('../../../../src/copilot/config/system-prompt.js');
+        const { buildAlwaysAliveSystemMessage } = await import('../../../../src/copilot/config/system-prompt/index.js');
         const msg = buildAlwaysAliveSystemMessage();
         expect(msg.mode).toBe('replace');
         expect(typeof (/** @type {any} */ (msg).content)).toBe('string');
@@ -281,7 +281,7 @@ describe('system-prompt-modular › facade backward compat', () => {
     });
 
     it('buildHookContextAppendMessage deve delegar ao buildHookContextMessage', async () => {
-        const { buildHookContextAppendMessage } = await import('../../../../src/copilot/config/system-prompt.js');
+        const { buildHookContextAppendMessage } = await import('../../../../src/copilot/config/system-prompt/index.js');
         const msg = buildHookContextAppendMessage('ctx-test');
         expect(msg.mode).toBe('customize');
         const content = /** @type {any} */ (msg).sections?.guidelines?.content;
@@ -289,7 +289,7 @@ describe('system-prompt-modular › facade backward compat', () => {
     });
 
     it('buildAppendSystemMessage e buildReplaceSystemMessage continuam funcionando', async () => {
-        const m = await import('../../../../src/copilot/config/system-prompt.js');
+        const m = await import('../../../../src/copilot/config/system-prompt/index.js');
         const append = m.buildAppendSystemMessage('test');
         expect(append.mode).toBe('append');
         const replace = m.buildReplaceSystemMessage('test');
@@ -297,7 +297,7 @@ describe('system-prompt-modular › facade backward compat', () => {
     });
 
     it('SYSTEM_PROMPT_SECTIONS deve existir com 10 chaves', async () => {
-        const { SYSTEM_PROMPT_SECTIONS } = await import('../../../../src/copilot/config/system-prompt.js');
+        const { SYSTEM_PROMPT_SECTIONS } = await import('../../../../src/copilot/config/system-prompt/index.js');
         expect(Object.keys(SYSTEM_PROMPT_SECTIONS)).toHaveLength(10);
     });
 });

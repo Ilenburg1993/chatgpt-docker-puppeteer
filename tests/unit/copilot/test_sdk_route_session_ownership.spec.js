@@ -27,6 +27,7 @@ function makeSession(sessionId) {
         disconnect: async () => {},
         setModel: async () => {},
         abort: async () => {},
+        log: async () => {},
         getMessages: async () => [],
         send: async () => `${sessionId}-msg`,
         sendAndWait: async () => ({ data: { content: 'ok', messageId: `${sessionId}-reply` } }),
@@ -59,6 +60,10 @@ describe('sdk routes session ownership SSOT', () => {
 
     /** @type {any[]} */
     let persistedBindings;
+    /** @type {any[]} */
+    let createdConfigs;
+    /** @type {any[]} */
+    let resumedConfigs;
 
     beforeEach(() => {
         hadConversationStore = container.has(CONVERSATION_STORE);
@@ -66,6 +71,8 @@ describe('sdk routes session ownership SSOT', () => {
         foregroundSessionId = null;
         lastSessionId = null;
         persistedBindings = [];
+        createdConfigs = [];
+        resumedConfigs = [];
         clearSharedSessionBinding();
 
         container.register(
@@ -94,11 +101,13 @@ describe('sdk routes session ownership SSOT', () => {
                 },
                 listSessions: async () => [],
                 createSession: async (/** @type {{ sessionId?: string }} */ config) => {
+                    createdConfigs.push(config);
                     const session = makeSession(config.sessionId ?? 'sdk-created');
                     lastSessionId = session.sessionId;
                     return session;
                 },
-                resumeSession: async (/** @type {string} */ id) => {
+                resumeSession: async (/** @type {string} */ id, /** @type {unknown} */ config) => {
+                    resumedConfigs.push(config);
                     const session = makeSession(id);
                     lastSessionId = session.sessionId;
                     return session;
@@ -155,6 +164,38 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-1', sdkSessionId: 'sdk-created' }]);
     });
 
+    it('POST /sessions repassa a superfície JSON-serializável do SDK', async () => {
+        const body = {
+            sessionId: 'sdk-rich',
+            model: 'gpt-4.1',
+            clientName: 'test-client',
+            reasoningEffort: 'high',
+            configDir: '/tmp/copilot-config',
+            systemMessage: { mode: 'customize', content: 'contexto' },
+            availableTools: ['read_file'],
+            excludedTools: ['shell'],
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+            workingDirectory: '/workspaces/project',
+            streaming: true,
+            mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
+            customAgents: [{ name: 'reviewer', prompt: 'revise' }],
+            agent: 'reviewer',
+            skillDirectories: ['.github/skills'],
+            disabledSkills: ['old-skill'],
+            infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.8 },
+        };
+
+        const res = await request(createApp()).post('/sessions').send(body).expect(201);
+
+        assert.equal(res.body.sessionId, 'sdk-rich');
+        assert.equal(createdConfigs.length, 1);
+        assert.deepEqual(createdConfigs[0], {
+            onPermissionRequest: createdConfigs[0].onPermissionRequest,
+            ...body,
+        });
+        assert.equal(typeof createdConfigs[0].onPermissionRequest, 'function');
+    });
+
     it('PUT /sessions/foreground/:id promove a sessão para a SSOT compartilhada', async () => {
         setSharedHubSessionId('hub-2');
 
@@ -177,6 +218,38 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-3', sdkSessionId: 'sdk-resume' }]);
     });
 
+    it('POST /sessions/:id/resume repassa opções SDK de retomada', async () => {
+        const body = {
+            clientName: 'resume-client',
+            model: 'gpt-4.1',
+            reasoningEffort: 'medium',
+            configDir: '/tmp/copilot-resume',
+            systemMessage: { mode: 'append', content: 'resume' },
+            availableTools: ['read_file'],
+            excludedTools: ['shell'],
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+            workingDirectory: '/workspaces/project',
+            streaming: false,
+            mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
+            customAgents: [{ name: 'reviewer', prompt: 'revise' }],
+            agent: 'reviewer',
+            skillDirectories: ['.github/skills'],
+            disabledSkills: ['old-skill'],
+            infiniteSessions: { enabled: false },
+            disableResume: true,
+        };
+
+        const res = await request(createApp()).post('/sessions/sdk-rich/resume').send(body).expect(200);
+
+        assert.equal(res.body.sessionId, 'sdk-rich');
+        assert.equal(resumedConfigs.length, 1);
+        assert.deepEqual(resumedConfigs[0], {
+            onPermissionRequest: resumedConfigs[0].onPermissionRequest,
+            ...body,
+        });
+        assert.equal(typeof resumedConfigs[0].onPermissionRequest, 'function');
+    });
+
     it('POST /sessions/:id/disconnect limpa somente o sdkSessionId compartilhado quando a sessão era a ativa', async () => {
         setSharedHubSessionId('hub-4');
         setSharedSdkSessionId('sdk-disc');
@@ -192,14 +265,25 @@ describe('sdk routes session ownership SSOT', () => {
         });
     });
 
-    it('POST /sessions/:id/model expõe projection de ownership nas respostas de messaging', async () => {
+    it('POST /sessions/:id/model expõe projection e repassa reasoningEffort', async () => {
         setSharedHubSessionId('hub-5');
         setSharedSdkSessionId('sdk-msg');
-        registerActiveSdkSession(makeSession('sdk-msg'), { model: 'gpt-4.1' });
+        /** @type {any[]} */
+        const modelCalls = [];
+        const session = makeSession('sdk-msg');
+        session.setModel = async (/** @type {string} */ model, /** @type {unknown} */ options) => {
+            modelCalls.push({ model, options });
+        };
+        registerActiveSdkSession(session, { model: 'gpt-4.1' });
 
-        const res = await request(createApp()).post('/sessions/sdk-msg/model').send({ model: 'gpt-4.1' }).expect(200);
+        const res = await request(createApp())
+            .post('/sessions/sdk-msg/model')
+            .send({ model: 'gpt-4.1', reasoningEffort: 'high' })
+            .expect(200);
 
         assert.equal(res.body.sessionId, 'sdk-msg');
+        assert.equal(res.body.reasoningEffort, 'high');
+        assert.deepEqual(modelCalls, [{ model: 'gpt-4.1', options: { reasoningEffort: 'high' } }]);
         assert.equal(res.body.isSharedSdkSession, true);
         assert.equal(res.body.boundHubSessionId, 'hub-5');
         assert.deepEqual(res.body.sharedBinding, {
@@ -207,5 +291,25 @@ describe('sdk routes session ownership SSOT', () => {
             sdkSessionId: 'sdk-msg',
             isBound: true,
         });
+    });
+
+    it('POST /sessions/:id/log expõe CopilotSession.log()', async () => {
+        setSharedHubSessionId('hub-6');
+        setSharedSdkSessionId('sdk-log');
+        /** @type {any[]} */
+        const logCalls = [];
+        const session = makeSession('sdk-log');
+        session.log = async (/** @type {string} */ message, /** @type {unknown} */ options) => {
+            logCalls.push({ message, options });
+        };
+        registerActiveSdkSession(session, { model: 'gpt-4.1' });
+
+        const res = await request(createApp())
+            .post('/sessions/sdk-log/log')
+            .send({ message: 'hello timeline', level: 'warning', ephemeral: true })
+            .expect(200);
+
+        assert.equal(res.body.sessionId, 'sdk-log');
+        assert.deepEqual(logCalls, [{ message: 'hello timeline', options: { level: 'warning', ephemeral: true } }]);
     });
 });

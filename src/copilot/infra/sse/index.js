@@ -2,8 +2,8 @@
 /**
  * Barrel — SSE (Server-Sent Events) — infraestrutura compartilhada.
  *
- * Movido de `server/sse/` para `infra/sse/` — este módulo é usado por api/express/, server/routes/ e terminal/,
- * portanto pertence à camada infra.
+ * Movido de `server/sse/` para `infra/sse/` — este módulo é usado por server/routes/ e terminal/, portanto pertence à
+ * camada infra.
  *
  * @module copilot/infra/sse
  */

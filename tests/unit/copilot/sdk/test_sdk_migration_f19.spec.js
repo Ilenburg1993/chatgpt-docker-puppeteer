@@ -52,7 +52,7 @@ const ALL_NON_SDK_JS = collectJsFiles(SRC_COPILOT).filter((f) => !f.startsWith('
 
 // Arquivos migrados na Faixa 19
 const F19_MIGRATED = [
-    'config/system-prompt.js',
+    'config/system-prompt/index.js',
     'server/routes/sdk/session-crud.js',
     'hooks/permission-controller.js',
     'hooks/permission-handler.js',
@@ -145,11 +145,11 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
         }
     });
 
-    it('config/system-prompt.js: SYSTEM_PROMPT_SECTIONS importado via sdk-config-port', () => {
-        const src = readSource('config/system-prompt.js');
+    it('config/system-prompt/index.js: SYSTEM_PROMPT_SECTIONS importado via sdk-config-port', () => {
+        const src = readSource('config/system-prompt/index.js');
         const hasCorrectImport = src
             .split('\n')
-            .some((line) => /import.*SYSTEM_PROMPT_SECTIONS.*from\s+['"].\/sdk-config-port\.js['"]/.test(line));
+            .some((line) => /import.*SYSTEM_PROMPT_SECTIONS.*from\s+['"]\.\.\/sdk-config-port\.js['"]/.test(line));
         expect(hasCorrectImport).toBe(true);
     });
 });

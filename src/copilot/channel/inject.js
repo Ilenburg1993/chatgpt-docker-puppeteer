@@ -10,18 +10,19 @@
  * @see module:copilot/conversation-hub/orchestrator
  */
 
-import { LLM_B_TERMINAL_PORT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { readCopilotBootConfig } from '#copilot/boot';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, toError } from '#copilot/core';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
 import { subscribeSse } from './sse-client.js';
 
-/** Porta padrão do terminal LLM-B. GAP-CHAN-002: validação de range. */
+/** Porta padrão do terminal LLM-B via boot config (`LLM_B_TERMINAL_PORT`). GAP-CHAN-002: validação de range. */
 const DEFAULT_PORT = (() => {
-    const raw = LLM_B_TERMINAL_PORT;
+    const raw = readCopilotBootConfig().server.port;
     if (!Number.isInteger(raw) || raw < 1 || raw > 65535) {
-        log('WARN', `[channel/inject] LLM_B_TERMINAL_PORT inválida (${raw}), usando 3009`);
+        log('WARN', `[channel/inject] Porta de boot inválida (${raw}), usando 3009`);
         return 3009;
     }
     return raw;
@@ -83,7 +84,7 @@ function _checkClientRateLimit() {
  * @typedef {Object} InjectOpts
  * @property {string} [from] - ator remetente (default: 'llm-a')
  * @property {number} [timeoutMs] - timeout em ms (default: 130000)
- * @property {number} [port] - porta do terminal (default: LLM_B_TERMINAL_PORT ?? 3009)
+ * @property {number} [port] - porta do terminal (default: porta canônica do boot)
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - Tentativas automáticas em caso de 409 LLM_B_BUSY (default: 3; 0 = sem retry)

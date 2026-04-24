@@ -7,7 +7,7 @@
  * Orquestra a inicialização sequencial de todos os subsistemas:
  *
  * 1. Carrega aliases customizados
- * 2. Cria o servidor HTTP de injeção (via `server.js`)
+ * 2. Cria o servidor HTTP/Socket canônico via `server/index.js`
  * 3. Cria hub_session no ConversationStore (best-effort)
  * 4. Registra watchdogs e listeners de eventos do AlwaysAliveAgent
  * 5. Ativa o reflection loop periódico (se configurado)
@@ -17,18 +17,19 @@
  * @see EventBus
  */
 
+import { readCopilotBootConfig } from '#copilot/boot';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
 import { bridgeEmitter, EVENT_BUS, getSharedSdkSessionId, toError } from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { resolve } from 'node:path';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { container } from '../core/di-container.js';
 import { registerTimer } from '../core/timer-registry.js';
+import { getHubSessionId, setHubSessionId } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity, terminalActivityEmitter } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
-import { broadcastSse, println, sendTurn } from './dialog.js';
+import { broadcastSse, println, sendTurn } from './dialog/index.js';
 import {
     attachTerminalHubSocketIO,
     createTerminalHubSession,
@@ -39,19 +40,28 @@ import {
     readTerminalRuntimeState,
 } from './frontend/llm-b-runtime.js';
 import { startRepl } from './repl.js';
-import { getHubSessionId, setHubSessionId } from './state.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 
 /**
- * F10.3: Imprime o banner de diagnóstico do modo de operação (standalone vs. conectado ao server).
+ * F10.3: Imprime o banner de diagnóstico do modo de operação do terminal host.
  *
- * Útil para o usuário do terminal saber quais recursos estão disponíveis.
+ * Útil para o usuário do terminal saber se o MCP externo está disponível. O servidor HTTP local continua sendo sempre
+ * `server/index.js`; não há mais `terminal/server.js`.
  *
  * @returns {void}
  */
-function printStandaloneBanner() {
+/**
+ * @param {{
+ *     serverUrl: string;
+ *     bootPreflight?: import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport | null;
+ * }} opts
+ * @returns {void}
+ */
+function printStandaloneBanner(opts) {
     const mcp = getMcpStatus();
     const isStandalone = !mcp.available;
+    const serverUrl = opts.serverUrl;
+    const bootPreflight = opts.bootPreflight ?? null;
     const lines = [
         '',
         '┌─────────────────────────────────────────────────────────────┐',
@@ -59,7 +69,7 @@ function printStandaloneBanner() {
         isStandalone
             ? '│  Modo: STANDALONE  (server 3008 não detectado)              │'
             : `│  Modo: CONECTADO   (MCP: ${String(mcp.toolCount).padEnd(2)} tools via :3008)              │`,
-        '│  Inject server: http://localhost:3009                       │',
+        `│  Inject server: ${serverUrl.padEnd(40).slice(0, 40)} │`,
         '│  Comandos: /help  /status  /skills  /ask                   │',
         '└─────────────────────────────────────────────────────────────┘',
         '',
@@ -67,6 +77,10 @@ function printStandaloneBanner() {
     for (const line of lines) println(line);
     if (isStandalone) {
         println('  ⚠  MCP tools indisponíveis — tools locais ativas. Inicie src/server para habilitar.');
+        println('');
+    }
+    if (bootPreflight && bootPreflight.warnings.length > 0) {
+        println(`  ⚠  Preflight SDK: ${bootPreflight.warnings[0]}`);
         println('');
     }
 }
@@ -90,6 +104,8 @@ let _sighupHandlerRegistered = false;
  * @property {TerminalServerStartDeps['startCopilotServer']} [startCopilotServer]
  * @property {() => void} [wireRuntime]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
+ * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
+ * @property {import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport} [bootPreflight]
  */
 
 /**
@@ -142,6 +158,8 @@ export async function startTerminalServer(options = {}) {
     if (typeof options.startTodoCleanupJob !== 'function') {
         throw new TypeError('[TerminalServer] startTodoCleanupJob dependency is required by the composition root.');
     }
+    const bootConfig = options.bootConfig ?? readCopilotBootConfig();
+    const bootPreflight = options.bootPreflight ?? null;
 
     recordTerminalActivity('boot', 'Inicializando terminal', {
         detail: 'Preparando aliases, DI, hub e servidor HTTP',
@@ -154,14 +172,18 @@ export async function startTerminalServer(options = {}) {
 
     recordTerminalActivity('boot', 'Configurando runtime Copilot', { source: 'terminal', recordHistory: false });
     options.wireRuntime();
+    if (bootPreflight) {
+        recordTerminalActivity('boot', 'Executando preflight SDK', {
+            detail: bootPreflight.pingOk ? 'CLI acessível' : 'CLI indisponível ou sem resposta',
+            severity: bootPreflight.ok ? 'info' : 'warn',
+            source: 'terminal',
+            recordHistory: false,
+        });
+    }
 
     // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
     // Isso habilita o comando /skills reload e o sistema de pinned context files
-    const _root = resolve(import.meta.dirname, '../../..');
-    const pinnedLoader = new PinnedFilesLoader([
-        resolve(_root, '.github', 'skills'),
-        resolve(_root, '.github', 'instructions'),
-    ]);
+    const pinnedLoader = new PinnedFilesLoader(bootConfig.skills.pinnedContextDirectories);
     recordTerminalActivity('boot', 'Carregando arquivos pinados', { source: 'terminal', recordHistory: false });
     await pinnedLoader.start().catch((e) => {
         recordTerminalActivity('system', 'Pinned files indisponíveis', {
@@ -236,7 +258,11 @@ export async function startTerminalServer(options = {}) {
     // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
     const _hubReady = isTerminalHubReady();
     /** @type {TerminalCopilotServerOptions} */
-    const _serverOpts = {};
+    const _serverOpts = {
+        host: bootConfig.server.host,
+        port: bootConfig.server.port,
+    };
+    if (bootConfig.server.token !== null) _serverOpts.token = bootConfig.server.token;
     if (_hubReady) {
         _serverOpts.orchestrator = readTerminalHubOrchestrator();
         _serverOpts.store = readTerminalHubStore();
@@ -244,7 +270,7 @@ export async function startTerminalServer(options = {}) {
     recordTerminalActivity('boot', 'Subindo servidor copilot', { source: 'terminal', recordHistory: false });
     const copilotServer = await options.startCopilotServer(_serverOpts);
 
-    registerAgentEventListeners(printStandaloneBanner);
+    registerAgentEventListeners(() => printStandaloneBanner({ serverUrl: bootConfig.server.url, bootPreflight }));
     startReflectionLoop();
 
     const onActivityChanged = (
@@ -339,12 +365,9 @@ export async function startTerminalServer(options = {}) {
         hubSessionId: getHubSessionId(),
         dialogLoopActive: readTerminalRuntimeState().dialogLoopActive,
         model: readTerminalRuntimeState().model,
+        bootPreflight,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
 
-    // Extrair httpServer compatível com startRepl (aceita http.Server)
-    // CopilotServer tem .httpServer; o fallback legacy retorna http.Server diretamente
-    const httpServerForRepl =
-        /** @type {{ httpServer?: import('node:http').Server }} */ (copilotServer).httpServer ?? copilotServer;
-    await startRepl(/** @type {import('node:http').Server} */ (httpServerForRepl));
+    await startRepl(copilotServer.httpServer);
 }

@@ -50,6 +50,22 @@
  */
 
 /**
+ * @typedef {object} SdkDialogMetrics
+ * @property {number} turnsTotal - Total de turns concluídos pelo SDK/base model.
+ * @property {number} turnsSuccess - Turns concluídos com sucesso no SDK.
+ * @property {LatencyHistogram} turnLatency - Histograma de latência observada no SDK.
+ */
+
+/**
+ * @typedef {object} InjectMetrics
+ * @property {number} attemptsTotal - Total de tentativas via `/inject`.
+ * @property {number} successTotal - Total de injeções concluídas dentro do SLA HTTP.
+ * @property {number} timeoutsTotal - Total de injeções que expiraram por timeout.
+ * @property {number} errorsTotal - Total de injeções que falharam por erro não-timeout.
+ * @property {LatencyHistogram} latency - Histograma de latência da borda `/inject`.
+ */
+
+/**
  * @typedef {object} TaskMetrics
  * @property {number} completed - Total de tasks concluídas com sucesso.
  * @property {number} failed - Total de tasks com falha.
@@ -85,6 +101,8 @@
  * @property {TokenUsageMetrics} tokens - Uso de tokens acumulado.
  * @property {SessionMetrics} sessions - Contadores de sessão.
  * @property {DialogMetrics} dialog - Métricas do dialog loop.
+ * @property {SdkDialogMetrics} sdkDialog - Métricas de turnos concluídos pelo SDK.
+ * @property {InjectMetrics} inject - Métricas do caminho HTTP `/inject`.
  * @property {TaskMetrics} tasks - Métricas de tasks.
  * @property {StreamingMetrics} streaming - Métricas de streaming chunks.
  * @property {QuestionMetrics} questions - Métricas de question lifecycle.

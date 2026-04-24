@@ -25,9 +25,14 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
+import { DialogProtocol } from '../dialog/protocol.js';
+import {
+    getShowIntentActivity,
+    getShowStreaming,
+    getShowToolActivity,
+} from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, buildUserPrompt, println } from './dialog.js';
-import { getShowIntentActivity, getShowStreaming, getShowToolActivity } from './state.js';
+import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
 
 /**
  * @typedef {{
@@ -56,7 +61,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
         const question = /** @type {string} */ (evt?.['question'] ?? '');
         const choices = /** @type {string[]} */ (evt?.['choices'] ?? []);
 
-        if (/^(READY[:\s]|REPLY[:\s]|DONE[:\s]|STOPPED|STOP_DIALOG)/i.test(question.trim())) {
+        if (DialogProtocol.isProtocolMessage(question)) {
             return;
         }
 

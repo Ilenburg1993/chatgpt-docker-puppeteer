@@ -16,7 +16,12 @@ import { getSseClients } from '../infra/sse/state.js';
 import { clearRateLimiters } from './realtime.js';
 import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from './runtime-overview.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
-import { readRuntimeInjectHistory } from './runtime-ui-state.js';
+import {
+    readRuntimeInjectHistory,
+    readRuntimeLatestThinkingHistoryEntry,
+    readRuntimeThinkingHistory,
+    readRuntimeThinkingHistoryEntry,
+} from './runtime-ui-state.js';
 
 /**
  * @typedef {import('./types.js').HandlerResult} HandlerResult
@@ -106,6 +111,30 @@ export function handleMetrics(params = {}) {
         '# TYPE llmb_dialog_turns_success counter',
         `llmb_dialog_turns_success ${summary.dialog.turnsSuccess}`,
         '',
+        '# HELP llmb_sdk_dialog_turns_total Total de turns concluídos pelo SDK/base model',
+        '# TYPE llmb_sdk_dialog_turns_total counter',
+        `llmb_sdk_dialog_turns_total ${summary.sdkDialog.turnsTotal}`,
+        '',
+        '# HELP llmb_sdk_dialog_turns_success Turns SDK concluídos com sucesso',
+        '# TYPE llmb_sdk_dialog_turns_success counter',
+        `llmb_sdk_dialog_turns_success ${summary.sdkDialog.turnsSuccess}`,
+        '',
+        '# HELP llmb_inject_attempts_total Total de chamadas HTTP ao endpoint /inject',
+        '# TYPE llmb_inject_attempts_total counter',
+        `llmb_inject_attempts_total ${summary.inject.attemptsTotal}`,
+        '',
+        '# HELP llmb_inject_success_total Total de chamadas /inject concluídas dentro do SLA HTTP',
+        '# TYPE llmb_inject_success_total counter',
+        `llmb_inject_success_total ${summary.inject.successTotal}`,
+        '',
+        '# HELP llmb_inject_timeouts_total Total de timeouts HTTP no endpoint /inject',
+        '# TYPE llmb_inject_timeouts_total counter',
+        `llmb_inject_timeouts_total ${summary.inject.timeoutsTotal}`,
+        '',
+        '# HELP llmb_inject_errors_total Total de erros não-timeout no endpoint /inject',
+        '# TYPE llmb_inject_errors_total counter',
+        `llmb_inject_errors_total ${summary.inject.errorsTotal}`,
+        '',
         '# HELP llmb_dialog_stalls_total Total de stalls detectados pelo watchdog',
         '# TYPE llmb_dialog_stalls_total counter',
         `llmb_dialog_stalls_total ${summary.dialog.stallsTotal}`,
@@ -150,6 +179,20 @@ export function handleMetrics(params = {}) {
             '# HELP llmb_dialog_turn_duration_p95_ms Percentil 95 de duração de turns (ms)',
             '# TYPE llmb_dialog_turn_duration_p95_ms gauge',
             `llmb_dialog_turn_duration_p95_ms ${lp.p95}`,
+            '',
+        );
+    }
+
+    if (summary.inject.attemptsTotal > 0) {
+        const injectLatency = summary.inject.latency;
+        lines.push(
+            '# HELP llmb_inject_duration_p50_ms Percentil 50 de duração do endpoint /inject (ms)',
+            '# TYPE llmb_inject_duration_p50_ms gauge',
+            `llmb_inject_duration_p50_ms ${injectLatency.p50}`,
+            '',
+            '# HELP llmb_inject_duration_p95_ms Percentil 95 de duração do endpoint /inject (ms)',
+            '# TYPE llmb_inject_duration_p95_ms gauge',
+            `llmb_inject_duration_p95_ms ${injectLatency.p95}`,
             '',
         );
     }
@@ -223,6 +266,70 @@ export function handleGetHistory({ limit = 50 } = {}) {
         status: 200,
         cors: true,
         body: { ok: true, count: entries.length, entries },
+    };
+}
+
+/**
+ * @param {import('./runtime-ui-state-store.js').ThinkingHistoryEntry} entry
+ * @returns {object}
+ */
+function projectThinkingSummary(entry) {
+    return {
+        id: entry.id,
+        ts: entry.ts,
+        source: entry.source,
+        title: entry.title,
+        chars: entry.chars,
+        durationMs: entry.durationMs,
+        reasoningId: entry.reasoningId,
+        taskId: entry.taskId ?? null,
+        model: entry.model ?? null,
+        effort: entry.effort ?? null,
+        status: entry.status,
+        contentSnippet: entry.content.length > 240 ? `${entry.content.slice(0, 240)}...` : entry.content,
+    };
+}
+
+/**
+ * GET /thinking — lista resumida dos thinkings capturados pelo runtime/terminal.
+ *
+ * @param {{ limit?: number }} [params]
+ * @returns {HandlerResult}
+ */
+export function handleGetThinkingHistory({ limit = 20 } = {}) {
+    const entries = readRuntimeThinkingHistory(limit).map(projectThinkingSummary);
+    return {
+        status: 200,
+        cors: true,
+        body: { ok: true, count: entries.length, entries },
+    };
+}
+
+/**
+ * GET /thinking/:id — abre um thinking completo, com suporte a `latest` e sufixos exibidos no terminal.
+ *
+ * @param {{ id?: string }} [params]
+ * @returns {HandlerResult}
+ */
+export function handleGetThinkingEntry({ id = 'latest' } = {}) {
+    const wanted = String(id || 'latest').trim();
+    const entry =
+        wanted === 'latest'
+            ? readRuntimeLatestThinkingHistoryEntry()
+            : (readRuntimeThinkingHistoryEntry(wanted) ??
+              readRuntimeThinkingHistory(100).find((item) => item.id.endsWith(wanted)) ??
+              null);
+    if (!entry) {
+        return {
+            status: 404,
+            cors: true,
+            body: { ok: false, error: `Thinking não encontrado: ${wanted}` },
+        };
+    }
+    return {
+        status: 200,
+        cors: true,
+        body: { ok: true, entry },
     };
 }
 

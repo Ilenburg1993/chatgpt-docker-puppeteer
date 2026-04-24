@@ -9,9 +9,9 @@
  */
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../activity-state.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/llm-b-runtime.js';
-import { getSdkSessionMode } from '../state.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 

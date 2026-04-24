@@ -33,11 +33,10 @@ import { securityHeadersMiddleware } from './middleware/security-headers.js';
  *
  * 1. requestId — gera/propaga X-Request-ID
  * 2. cors — headers CORS + preflight OPTIONS
- * 3. express.json — parse body JSON (2MB max, alinhado com terminal/server.js)
+ * 3. express.json — parse body JSON (2MB max, limite canônico do servidor Copilot)
  * 4. auth — verifica Bearer token (pula rotas skipAuth)
  *
- * O error handler é registrado por último (após rotas) em `app.js`. Chame `mountCopilotRoutes(app)` separadamente para
- * adicionar as rotas.
+ * O error handler é registrado por último por `registerErrorHandler(app)`, após `mountCopilotRoutes(app)`.
  *
  * @param {CopilotAppOptions} [opts]
  * @returns {import('express').Application}
@@ -54,7 +53,7 @@ export function createCopilotApp(opts) {
     // 3. CORS: default reflection para localhost em qualquer porta; caller pode override via corsOrigin
     app.use(createCorsMiddleware({ origin: opts?.corsOrigin ?? [] }));
 
-    // 3. Body parsing: JSON, limite 2MB (alinhado com terminal/server.js readBody MAX_BODY_BYTES)
+    // 3. Body parsing: JSON, limite 2MB do servidor Copilot.
     app.use(express.json({ limit: '2mb' }));
     app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 
@@ -63,7 +62,7 @@ export function createCopilotApp(opts) {
         app.use(createAuthMiddleware({ token: opts?.token }));
     }
 
-    // Error handler — DEVE ser registrado após todas as rotas (montado no final pelo createCopilotServer)
+    // Error handler — DEVE ser registrado após todas as rotas (via registerErrorHandler no owner do servidor)
     // Chamada: app.use(copilotErrorHandler) após mountCopilotRoutes(app)
     app.set('_copilotErrorHandler', copilotErrorHandler);
 

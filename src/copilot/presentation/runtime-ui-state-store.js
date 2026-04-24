@@ -3,8 +3,8 @@
  * @module copilot/presentation/runtime-ui-state-store
  * @file Store compartilhada do estado operacional/UI do terminal.
  *
- *   Esta store retira de `terminal/state.js` a propriedade arquitetural sobre busy state, fase, histórico de inject,
- *   attachment queue e toggles visuais. O módulo antigo do terminal passa a existir como shim de compatibilidade.
+ *   Esta store é dona arquitetural de busy state, fase, histórico de inject, histórico de thinking, attachment queue e
+ *   toggles visuais do terminal.
  */
 
 import {
@@ -28,6 +28,7 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
     BUSY_CHANGED: 'busy:changed',
     SDK_SESSION_MODE_CHANGED: 'sdkSessionMode:changed',
     SDK_PLAN_OPERATION_CHANGED: 'sdkPlanOperation:changed',
+    THINKING_HISTORY_CHANGED: 'thinkingHistory:changed',
     SHOW_THINKING_CHANGED: 'showThinking:changed',
     SHOW_USAGE_CHANGED: 'showUsage:changed',
     SHOW_STREAMING_CHANGED: 'showStreaming:changed',
@@ -213,10 +214,14 @@ const MAX_INJECT_HISTORY = TERMINAL_MAX_INJECT_HISTORY;
 /**
  * @typedef {{
  *     ts: number;
+ *     traceId?: string;
  *     from: string;
  *     message: string;
  *     replySnippet: string | null;
  *     durationMs: number;
+ *     timeoutMs?: number;
+ *     timeoutStrategy?: 'explicit' | 'adaptive';
+ *     outcome?: 'completed' | 'null_reply' | 'timeout' | 'error';
  *     ok: boolean;
  * }} InjectHistoryEntry
  */
@@ -241,6 +246,132 @@ export function recordInjectHistory(entry) {
 export function getInjectHistory(n = 50) {
     const limit = Math.min(Math.max(1, n), MAX_INJECT_HISTORY);
     return _injectHistory.slice(-limit);
+}
+
+const MAX_THINKING_HISTORY = 120;
+
+/**
+ * @typedef {'dialog' | 'task'} ThinkingSource
+ */
+
+/**
+ * @typedef {{
+ *     id: string;
+ *     ts: number;
+ *     source: ThinkingSource;
+ *     title: string;
+ *     content: string;
+ *     chars: number;
+ *     durationMs: number | null;
+ *     reasoningId: string | null;
+ *     taskId?: string | null;
+ *     model?: string;
+ *     effort?: string;
+ *     status: 'streaming' | 'completed' | 'error';
+ * }} ThinkingHistoryEntry
+ */
+
+/** @type {ThinkingHistoryEntry[]} */
+let _thinkingHistory = [];
+
+/**
+ * @param {ThinkingHistoryEntry} entry
+ * @returns {void}
+ */
+function upsertThinkingHistoryEntry(entry) {
+    const idx = _thinkingHistory.findIndex((item) => item.id === entry.id);
+    if (idx === -1) _thinkingHistory.push(entry);
+    else _thinkingHistory[idx] = entry;
+    if (_thinkingHistory.length > MAX_THINKING_HISTORY) {
+        _thinkingHistory = _thinkingHistory.slice(-MAX_THINKING_HISTORY);
+    }
+    stateEmitter.emit(TERMINAL_EVENTS.THINKING_HISTORY_CHANGED, entry);
+}
+
+/**
+ * @param {{
+ *     id: string;
+ *     source: ThinkingSource;
+ *     title: string;
+ *     chunk: string;
+ *     reasoningId?: string | null;
+ *     taskId?: string | null;
+ *     model?: string;
+ *     effort?: string;
+ *     ts?: number;
+ * }} input
+ * @returns {ThinkingHistoryEntry}
+ */
+export function appendThinkingHistoryChunk(input) {
+    const now = input.ts ?? Date.now();
+    const existing = _thinkingHistory.find((entry) => entry.id === input.id) ?? null;
+    const content = (existing?.content ?? '') + input.chunk;
+    const taskId = input.taskId ?? existing?.taskId;
+    const model = input.model ?? existing?.model;
+    const effort = input.effort ?? existing?.effort;
+    /** @type {ThinkingHistoryEntry} */
+    const nextEntry = {
+        id: input.id,
+        ts: existing?.ts ?? now,
+        source: input.source,
+        title: input.title,
+        content,
+        chars: content.length,
+        durationMs: existing?.durationMs ?? null,
+        reasoningId: input.reasoningId ?? existing?.reasoningId ?? null,
+        status: 'streaming',
+        ...(taskId !== undefined ? { taskId } : {}),
+        ...(model !== undefined ? { model } : {}),
+        ...(effort !== undefined ? { effort } : {}),
+    };
+    upsertThinkingHistoryEntry(nextEntry);
+    return nextEntry;
+}
+
+/**
+ * @param {string} id
+ * @param {{ durationMs?: number | null; status?: 'completed' | 'error' }} [opts]
+ * @returns {ThinkingHistoryEntry | null}
+ */
+export function finalizeThinkingHistoryEntry(id, opts = {}) {
+    const existing = _thinkingHistory.find((entry) => entry.id === id) ?? null;
+    if (!existing) return null;
+    /** @type {ThinkingHistoryEntry} */
+    const nextEntry = {
+        ...existing,
+        durationMs: opts.durationMs ?? existing.durationMs ?? null,
+        status: opts.status ?? 'completed',
+    };
+    upsertThinkingHistoryEntry(nextEntry);
+    return nextEntry;
+}
+
+/**
+ * @param {number} [n=20] Default is `20`
+ * @returns {ThinkingHistoryEntry[]}
+ */
+export function getThinkingHistory(n = 20) {
+    const limit = Math.min(Math.max(1, n), MAX_THINKING_HISTORY);
+    return _thinkingHistory.slice(-limit);
+}
+
+/**
+ * @param {string} id
+ * @returns {ThinkingHistoryEntry | null}
+ */
+export function getThinkingHistoryEntry(id) {
+    return _thinkingHistory.find((entry) => entry.id === id) ?? null;
+}
+
+/** @returns {ThinkingHistoryEntry | null} */
+export function getLatestThinkingHistoryEntry() {
+    return _thinkingHistory.at(-1) ?? null;
+}
+
+/** @returns {void} */
+export function clearThinkingHistory() {
+    _thinkingHistory = [];
+    stateEmitter.emit(TERMINAL_EVENTS.THINKING_HISTORY_CHANGED, null);
 }
 
 export const TerminalPhase = /** @type {const} */ ({
