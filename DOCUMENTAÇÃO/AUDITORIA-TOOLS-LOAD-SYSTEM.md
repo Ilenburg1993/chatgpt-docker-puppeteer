@@ -1,8 +1,8 @@
 # Auditoria: Tools Loading System
 
-**Data**: 24 de abril de 2026  
-**Scope**: `src/copilot/tools/` (34 arquivos, 388KB)  
-**Metodologia**: Manual semantic audit + code inspection (sem ferramentas automáticas)  
+**Data**: 24 de abril de 2026
+**Scope**: `src/copilot/tools/` (34 arquivos, 388KB)
+**Metodologia**: Manual semantic audit + code inspection (sem ferramentas automáticas)
 **Classificação**: PROFUNDA
 
 ---
@@ -11,8 +11,8 @@
 
 ### 🔴 CRÍTICO (C1) — Bootstrap sem Error Handling
 
-**Arquivo**: `src/copilot/tools/bootstrap.js` (linhas 59-135)  
-**Função**: `bootstrapTools(registry, mcpTools)`  
+**Arquivo**: `src/copilot/tools/bootstrap.js` (linhas 59-135)
+**Função**: `bootstrapTools(registry, mcpTools)`
 **Problema**: Nenhum try-catch envolvendo as chamadas para `registerTools()`. Se uma ferramenta falhar durante registro (ex: Zod schema inválido em `tool-factory.js`), a exceção não é tratada e deruba a inicialização de sessão.
 
 **Evidência**:
@@ -38,14 +38,14 @@ if (customTools.length > 0) {
 3. `bootstrapTools()` propaga a exceção sem contexto
 4. Sessão falha a iniciar — agente fica inoperável
 
-**Severidade**: CRÍTICO (resulta em falha de sessão)  
+**Severidade**: CRÍTICO (resulta em falha de sessão)
 **Correção**: Envolver cada `registerTools()` com try-catch granular, logging de erro e fallback (toolParcial ou skip com aviso).
 
 ---
 
 ### 🔴 CRÍTICO (C2) — Tool Interception NOT Implemented
 
-**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 25-37)  
+**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 25-37)
 **Código**:
 ```js
 /**
@@ -66,15 +66,15 @@ const _disabledTools = new Set();
 4. Nenhum bloqueio ocorre — tool é executada apesar de desabilitada
 5. Política de segurança violada
 
-**Severidade**: CRÍTICO (falha de segurança — bypass possível)  
+**Severidade**: CRÍTICO (falha de segurança — bypass possível)
 **Correção**: Implementar interceptor em `src/copilot/sdk/` ou wrapper em `bootstrap.js` que bloqueia tools desabilitadas antes da invocação.
 
 ---
 
 ### 🟡 ALTO (H1) — Schema Zod Conversion Fragile
 
-**Arquivo**: `src/copilot/tools/tool-factory.js` (linhas 103-115)  
-**Função**: `normalizeParameters(parameters, toolName)`  
+**Arquivo**: `src/copilot/tools/tool-factory.js` (linhas 103-115)
+**Função**: `normalizeParameters(parameters, toolName)`
 **Problema**: Detecção de instância Zod via `'_def' in parameters || '_zod' in parameters` é frágil. Se Zod muda internamente novamente (v5+), o detectador quebra.
 
 **Evidência**:
@@ -92,8 +92,8 @@ if ('_def' in parameters || '_zod' in parameters) {
 
 **Problema adicional**: A exceção é relançada, que deruba o `bootstrapTools()` (veja C1).
 
-**Severidade**: ALTO (fragilidade + cascata de falha)  
-**Correção**: 
+**Severidade**: ALTO (fragilidade + cascata de falha)
+**Correção**:
 1. Usar `instanceof ZodType` + `package.json` version check para Zod
 2. Não relançar exceção; logar e retornar schema vazio (permitindo tool sem parâmetros)
 3. Implementar fallback em `bootstrapTools()` (C1)
@@ -102,7 +102,7 @@ if ('_def' in parameters || '_zod' in parameters) {
 
 ### 🟡 ALTO (H2) — Categories Hardcoded in CATEGORY_TOOL_MAP
 
-**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 60-70)  
+**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 60-70)
 **Código**:
 ```js
 const CATEGORY_TOOL_MAP = Object.freeze({
@@ -127,14 +127,14 @@ const CATEGORY_TOOL_MAP = Object.freeze({
 4. Filtrar por categoria `file` em `list_tools` retorna lista incompleta ou vazia
 5. Agente não descobre a nova tool via `list_tools`
 
-**Severidade**: ALTO (manutenibilidade + runtime discovery fraco)  
+**Severidade**: ALTO (manutenibilidade + runtime discovery fraco)
 **Correção**: Derivar categorias dinamicamente do `ToolRegistry` passado via `registerForIntrospection()`. Manter `CATEGORY_TOOL_MAP` como fallback apenas.
 
 ---
 
 ### 🟡 ALTO (H3) — Lazy Initialization Race Condition
 
-**Arquivo**: `src/copilot/tools/index.js` (linhas 111-127)  
+**Arquivo**: `src/copilot/tools/index.js` (linhas 111-127)
 **Código**:
 ```js
 let _allToolsCache;
@@ -156,14 +156,14 @@ export function getAllTools() {
 
 **Agravante**: A importação de `taskTools`, `codeTools` etc. pode ter circular dependencies. O lazy cache tenta evitar isso, mas é um hack.
 
-**Severidade**: ALTO (design fragile, difícil de debugar)  
+**Severidade**: ALTO (design fragile, difícil de debugar)
 **Correção**: Usar inicialização estática com top-level `await` ou module-level function call. Evitar lazy patterns.
 
 ---
 
 ### 🟠 MÉDIO (M1) — Missing Validation in registerForIntrospection
 
-**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 52-56)  
+**Arquivo**: `src/copilot/tools/introspection-tools.js` (linhas 52-56)
 **Código**:
 ```js
 export function registerForIntrospection(tools) {
@@ -180,17 +180,17 @@ export function registerForIntrospection(tools) {
 3. `_registeredTools = null`
 4. `list_tools` falha com `null.filter is not a function`
 
-**Severidade**: MÉDIO (erro runtime obscuro)  
+**Severidade**: MÉDIO (erro runtime obscuro)
 **Correção**: Validar tipo + logar aviso se array vazio.
 
 ---
 
 ### 🟠 MÉDIO (M2) — Symbol Tools Registration Gap
 
-**Arquivo**: `src/copilot/tools/file/symbol-search-tool.js` (novo — Phase 4)  
+**Arquivo**: `src/copilot/tools/file/symbol-search-tool.js` (novo — Phase 4)
 **Problema**: A nova tool `workspace_symbol_search` foi adicionada e exportada de `file/index.js`, mas **não está registrada em `bootstrap.js`**. As tools de arquivo estão em `fileReadTools` + `fileWriteTools`, mas `symbolSearchTools` não está incluso no TOOL_GROUPS.
 
-**Evidência**: 
+**Evidência**:
 ```js
 // bootstrap.js — TOOL_GROUPS não inclui symbolSearchTools:
 [fileReadTools, { category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true }],
@@ -208,24 +208,24 @@ export const fileReadTools = [
 
 **Impacto**: A tool está registrada, mas não está listada em `list_tools` se filtrar por categoria='file' (devido ao M2 anterior).
 
-**Severidade**: MÉDIO (tool funciona mas discovery fraco)  
+**Severidade**: MÉDIO (tool funciona mas discovery fraco)
 **Correção**: Garantir que `symbolSearchTools` está em `fileReadTools` (já está), e/ou adicionar método explícito de registro em bootstrap.
 
 ---
 
 ### 🟠 MÉDIO (M3) — Metrics Injection Missing Validation
 
-**Arquivo**: `src/copilot/tools/metrics-proxy.js` (não lido, presumido)  
+**Arquivo**: `src/copilot/tools/metrics-proxy.js` (não lido, presumido)
 **Padrão**: Assim como `setToolsLogger()`, há setters para `setToolsMetrics()`. Se métricas não forem injetadas, `recordToolCall()` pode falhar silenciosamente.
 
-**Severidade**: MÉDIO (telemetria fraca)  
+**Severidade**: MÉDIO (telemetria fraca)
 **Correção**: Validar injeção + fallback.
 
 ---
 
 ### 🔵 BAIXO (L1) — Logger Fallback Too Silent
 
-**Arquivo**: `src/copilot/tools/logger.js` (linhas 38-64)  
+**Arquivo**: `src/copilot/tools/logger.js` (linhas 38-64)
 **Código**:
 ```js
 case 'DEBUG':
@@ -235,7 +235,7 @@ case 'DEBUG':
 
 **Problema**: DEBUG logs são completamente suprimidos se logger não está injetado. Dificulta debugging em desenvolvimento.
 
-**Severidade**: BAIXO (QoL)  
+**Severidade**: BAIXO (QoL)
 **Correção**: Logar DEBUG via `console.debug` mesmo sem logger injetado.
 
 ---
@@ -318,12 +318,11 @@ case 'DEBUG':
 
 ## PARTE 3 — Resumo Executivo
 
-| Severidade | Qtd | Descrição                                          |
-| ---------- | --- | -------------------------------------------------- |
-| 🔴 Crítico | 2   | C1: Bootstrap sem erro handling C2: Tool interception não implementado |
-| 🟡 Alto    | 3   | H1: Zod detection frágil H2: Categories hardcoded H3: Race condition |
-| 🟠 Médio   | 3   | M1: registerForIntrospection sem validação M2: Symbol tools gap M3: Metrics fallback fraco |
-| 🔵 Baixo   | 1   | L1: Logger DEBUG suppressed                        |
+| Severidade | Qtd | Descrição                                                                                  |
+| ---------- | --- | ------------------------------------------------------------------------------------------ |
+| 🔴 Crítico  | 2   | C1: Bootstrap sem erro handling C2: Tool interception não implementado                     |
+| 🟡 Alto     | 3   | H1: Zod detection frágil H2: Categories hardcoded H3: Race condition                       |
+| 🟠 Médio    | 3   | M1: registerForIntrospection sem validação M2: Symbol tools gap M3: Metrics fallback fraco |
+| 🔵 Baixo    | 1   | L1: Logger DEBUG suppressed                                                                |
 
 **Recomendação**: Executar C1 + C2 + H2 como prioridade; depois H1, H3, M1.
-
