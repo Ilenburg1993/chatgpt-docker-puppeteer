@@ -1380,7 +1380,7 @@ não é mais a autoridade para descobrir workspace/skills/entrypoints.
 
 Validação da rodada 2.23:
 
-```text
+````text
 typecheck:strict:src.copilot:
   sem erros
 
@@ -1708,7 +1708,7 @@ Cross-cutting
 Runtime artifacts
   logs/
   .github/hooks/state/
-```
+````
 
 ## 3.2 Regra de dependência
 
@@ -2424,9 +2424,9 @@ contratos:
   podem reduzir `depth` abaixo de zero nem afetar a fila nova.
 - Compaction crítica e proativa são deduplicadas por policy até `reset()` ou retorno a faixa segura,
   evitando tempestade de eventos de compaction.
-- Reconnect e boot inicial compartilham o mesmo pós-init canônico de sessão: ownership, session event
-  wiring, event collector, lifecycle handlers, agent observer, stale cleanup, dialog recovery, metrics,
-  MCP reconnect, keepalive, quota monitor, handoff e hook relay.
+- Reconnect e boot inicial compartilham o mesmo pós-init canônico de sessão: ownership, session
+  event wiring, event collector, lifecycle handlers, agent observer, stale cleanup, dialog recovery,
+  metrics, MCP reconnect, keepalive, quota monitor, handoff e hook relay.
 - Relays registrados no boot entram em `unsubs`; nenhum listener operacional deve ficar fora do
   cleanup governado do `AgentContext`.
 - `pendingQuestionShadow` normaliza estado antigo/incompleto antes de calcular TTL e expiração.
@@ -2439,3 +2439,235 @@ contratos:
 
 Achados não confirmados ou já cobertos pelo estado atual não viraram regra nova; devem voltar ao
 roadmap apenas com reprodução concreta.
+
+---
+
+## 11. Auditoria SDK local — README + `dist/generated/rpc.d.ts`
+
+Rodada em `2026-04-25`, baseada na leitura integral de:
+
+- `node_modules/@github/copilot-sdk/README.md`;
+- `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts`;
+- superfícies locais `src/copilot/sdk/*`, `server/routes/sdk/*`, `event-handlers/*` e tools RPC.
+
+### Contrato SDK confirmado
+
+O SDK local expõe três camadas distintas que devem continuar mestres sobre qualquer extensão nossa:
+
+- **Client/server-scoped RPC**: `ping`, `models.list`, `tools.list`, `account.getQuota`;
+- **Session vanilla**: `send`, `sendAndWait`, `abort`, `getMessages`, `disconnect`, `model`, `mode`,
+  `plan`, `workspace`, `log`;
+- **Session advanced/experimental**: `ui.elicitation`, pending `permissions/tools/commands`,
+  `shell.exec/kill`, `compaction.compact`, `fleet`, custom `agent`, `skills`, `mcp`, `plugins` e
+  `extensions`.
+
+Regra reforçada: quando o SDK gerado define nomes de parâmetros, resultados ou eventos, nossos
+wrappers não podem inventar aliases como contrato primário. Aliases de compatibilidade só podem
+existir na borda, documentados e convertidos antes de cruzar a camada `sdk/`.
+
+### Bugs/gaps validados e corrigidos
+
+- `sdk/rpc/experimental.js` estava divergente do `rpc.d.ts`:
+  - `agent.select` usa `{ name }`, não `{ agentId }`;
+  - `skills.enable/disable` usam `{ name }`, não `{ skillId }`;
+  - `mcp.enable/disable` usam `{ serverName }`, não `{ serverId }`;
+  - `extensions.enable/disable` usam `{ id }`, não `{ extensionId }`;
+  - `fleet.start` retorna `{ started }` e aceita `prompt`, não contrato local com `fleetId`,
+    `status`, `maxAgents` e `model`.
+- `tools/experimental-rpc-tools.js` agora expõe schemas alinhados ao SDK gerado, evitando que a
+  LLM-B aprenda nomes de campos legados.
+- `sdk/types.js` corrigiu `ElicitationResult.action`: o SDK retorna `accept | decline | cancel`, não
+  `accept | dismiss | cancel`.
+- `event-handlers/sdk-responses.js` agora projeta `elicitation.requested` com os campos reais do SDK
+  (`message`, `mode`, `requestedSchema`, `url`, `toolCallId`, `elicitationSource`) e também propaga
+  `elicitation.completed`.
+- `events/agent-events.js`, `agent/event-bridge-map.js`, `events/index.js` e `events/nerv-events.js`
+  ganharam bridge canônico para `agent:elicitation:completed`.
+- `server/routes/sdk/session-middleware.js` corrigiu `timeoutMs=0`: a documentação da rota já dizia
+  que zero desabilita timeout, mas o schema rejeitava zero.
+- `server/routes/sdk/session-messaging.js` expõe as operações SDK advanced que já existiam em
+  façade:
+  - `POST /sessions/:id/ui/elicitation`;
+  - `POST /sessions/:id/permissions/:requestId`;
+  - `POST /sessions/:id/tools/:requestId`;
+  - `POST /sessions/:id/commands/:requestId`;
+  - `POST /sessions/:id/compaction/compact`;
+  - `POST /sessions/:id/shell/exec`;
+  - `POST /sessions/:id/shell/:processId/kill`.
+
+### Gaps ainda abertos
+
+- **UX de elicitation**: existe RPC e evento, mas ainda falta experiência terminal/server rica para
+  renderizar formulário, aceitar/declinar/cancelar e correlacionar request lifecycle com pending UI.
+- **Pending command/tool/permission dashboards**: os endpoints existem; falta uma projection
+  unificada em `presentation/` para listar pendências ativas, expiração, origem e ação recomendada.
+- **UX terminal do Workspace RPC**: a borda HTTP já cobre `workspace.listFiles/readFile/createFile`;
+  ainda falta comando terminal ergonomicamente explícito para navegar o workspace virtual SDK.
+- **Quota/listModels/listTools como policy**: as superfícies existem e agora passam pelo Agent, mas
+  seleção de modelo, reasoning e política 0 PR ainda podem usar mais metadata real de `models.list`
+  e `account.getQuota` em vez de heurísticas locais.
+- **Protocol versioning READY/REPLY**: continua necessário; não é parte do SDK vanilla, então deve
+  ficar como protocolo Agent sobre `onUserInputRequest`, com versão e fallback próprios.
+
+### Gates executados
+
+- `npm run typecheck:strict:src.copilot`;
+- `npx vitest run tests/unit/copilot/sdk/test_sdk_experimental_f22.spec.js tests/unit/copilot/agent/test_agent_session_event_handlers.spec.js tests/unit/copilot/sdk/test_sdk_rpc_advanced.spec.js tests/unit/copilot/sdk/test_sdk_rpc_edge_cases.spec.js`.
+
+---
+
+## 12. Rodada SDK-first — Client boot + Agent como mestre operacional
+
+Rodada em `2026-04-25`, após nova revisão do `CopilotClient`, do boot e da integração Agent.
+
+### Decisão arquitetural
+
+O contrato duro passa a ser:
+
+```text
+SDK vanilla
+  -> src/copilot/sdk/ wrappers tipados e sem aliases primários
+    -> AlwaysAliveAgent via facades/agent-sdk-access.js
+      -> presentation/server/terminal como bordas consumidoras
+```
+
+O servidor HTTP pode manter rotas SDK session-scoped porque é uma borda explícita de API, mas a API
+pública operacional do runtime deve existir também no Agent. Assim, terminal, server interno e
+automação não precisam reabrir `client.rpc`, `session.rpc` ou `AgentContext` cru.
+
+### Correções e upgrades implementados
+
+- `config/client-options.js` agora é a fonte canônica para `CopilotClientOptions`:
+  - `COPILOT_CLI_URL` vence transporte e omite `cliPath`, `cliArgs`, `port` e `useStdio`;
+  - `COPILOT_CLI_PATH`, `COPILOT_CLI_ARGS`, `COPILOT_CLI_CWD`, `COPILOT_CLI_PORT`,
+    `COPILOT_USE_STDIO` e `COPILOT_AUTO_START` configuram spawn SDK quando não há `cliUrl`;
+  - `COPILOT_GITHUB_TOKEN`/`GITHUB_TOKEN` configuram auth e desativam `useLoggedInUser` por padrão;
+  - `COPILOT_CLI_LOG_LEVEL`, `COPILOT_LOG_LEVEL` e `LOG_LEVEL` são normalizados para logLevel SDK;
+  - telemetria cobre `otlpEndpoint`, `filePath`, `exporterType`, `sourceName` e `captureContent`.
+- `sdk/session/client.js` preserva `buildClientOptions()` como API pública, mas delega ao builder
+  canônico, evitando duas políticas concorrentes de boot.
+- `boot/config.js` agora lista e projeta as variáveis reais do client SDK (`COPILOT_CLI_*`, auth e
+  telemetria), para que o painel canônico de boot reflita o que o `CopilotClient` de fato consome.
+- `agent/facades/agent-sdk-access.js` expõe pelo Agent:
+  - server-scoped: `models.list`, `tools.list`, `account.getQuota`;
+  - session-scoped: workspace virtual, compaction, elicitation, pending permissions/tools/commands e
+    shell exec/kill;
+  - snapshot de recursos com flags explícitas para cada subsistema SDK disponível.
+- `AlwaysAliveAgent` ganhou métodos públicos correspondentes, mantendo o Agent como mestre depois do
+  SDK.
+- `server/routes/sdk/session-messaging.js` ganhou endpoints HTTP para o workspace virtual:
+  - `GET /sessions/:id/workspace/files`;
+  - `GET /sessions/:id/workspace/file?path=...`;
+  - `POST /sessions/:id/workspace/file`.
+- A validação HTTP de workspace aceita apenas caminhos relativos ao workspace SDK e rejeita
+  absoluto, barra invertida e `..`.
+- A fronteira `server/routes/sdk/` foi reendurecida: handlers não importam mais `#copilot/sdk`,
+  `#copilot/config` nem `presentation/` diretamente; capacidades SDK, policy de timeout e projeções
+  entram por `deps.js`, o composition root autorizado do adapter.
+
+### Gaps remanescentes
+
+- Comandos terminal para workspace virtual SDK ainda devem ser desenhados com UX limpa.
+- Elicitation ainda precisa virar experiência de formulário no terminal/web, não apenas evento e
+  RPC.
+- A política 0 PR deve consumir `account.getQuota`/`models.list` mais diretamente para decidir
+  downgrade, timeout sem abort e orientação de fila.
+
+### Gates executados
+
+- `npm run typecheck:strict:src.copilot`;
+- `npx vitest run tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js tests/unit/copilot/sdk/test_sdk_client.spec.js tests/unit/copilot/test_agent_sdk_access.spec.js tests/unit/copilot/sdk/test_sdk_rpc.spec.js tests/unit/copilot/sdk/test_sdk_rpc_advanced.spec.js tests/unit/copilot/test_sdk_runtime_projection_routes.spec.js tests/unit/copilot/test_boot_config.spec.js`.
+
+---
+
+## 13. Rodada SDK-first — UX terminal, elicitation e boot sem retry storm
+
+Rodada em `2026-04-25`, validada com boot live via `npm run terminal:llm-b`.
+
+### Decisão arquitetural
+
+O terminal deixa de ser apenas uma casca de chat e passa a ser uma borda SDK completa. A hierarquia
+continua rígida:
+
+```text
+SDK vanilla
+  -> wrappers SDK puros
+    -> AlwaysAliveAgent como runtime mestre
+      -> presentation como projeção
+        -> terminal/server como adaptadores de UX/API
+```
+
+`ask_user` e `elicitation` são conceitos relacionados, mas não equivalentes:
+
+- `ask_user` é o canal textual do dialog loop permanente (`READY:`/`REPLY:`) e pertence ao protocolo
+  Agent sobre o SDK;
+- `elicitation` é UI estruturada do SDK (`message`, `requestedSchema`, `url`, `toolCallId`,
+  `elicitationSource`) e deve ser tratada como lifecycle próprio, com store/commands/HTTP/SSE.
+
+### Correções e upgrades implementados
+
+- `terminal:llm-b` agora sobe com `COPILOT_SDK_ENABLED=true`, garantindo que o boot padrão exponha
+  também `/sdk/*`, e não apenas `/health`, `/inject` e rotas do hub.
+- `sdk/errors.js` criou classificação pura de erros SDK (`rate_limit`, `quota_exhausted`, `auth`,
+  `network`, `timeout`, `unknown`).
+- `agent/error-policy.js` passou a tratar `rate_limit`/quota do SDK como fatal operacional sem
+  retry: não há reconnect automático, não há requeue, não há consumo repetido de PR.
+- `agent/messaging/agent-messaging.js` preserva `errorType`/`code` vindos de `session.error`, para
+  que a política do Agent consiga distinguir quota real de falha transitória.
+- `terminal/dialog/engine.js` mostra bloqueio de quota de forma explícita e pausa o boot do dialog
+  loop sem cascade de tentativas.
+- `agent/dialog/loop-manager.js` deixa de emitir `dialog.turn_timeout` fantasma quando o boot já foi
+  encerrado por erro fatal antes do timer nominal.
+- `agent/lifecycle/agent-lifecycle.js` e `reconnect-policy.js` abortam reconnect quando o processo
+  está em shutdown, evitando corrida com DB/server fechando.
+- `agent/lifecycle/agent-lifecycle.js` usa `buildClientOptions()` também no reconnect, mantendo o
+  mesmo contrato de transporte/auth/telemetria do boot inicial.
+- `terminal/commands/sdk.js` adicionou:
+  - `/sdk status|models|tools|quota|compact`;
+  - `/workspace list|read|write`;
+  - `/elicitation list|show|clear|request|request-json`.
+- `terminal/sdk-interactions.js` mantém store leve para elicitations pendentes/concluídas e deixa a
+  distinção `ask_user` vs `elicitation` documentada no código.
+- `terminal/terminal-agent-wiring.js` captura `elicitation.pending` e `elicitation.completed`, grava
+  atividade terminal e propaga SSE.
+- `presentation/runtime-sdk-session.js` e `terminal/frontend/llm-b-runtime.js` expõem as operações
+  SDK via Agent, inclusive models/tools/quota/workspace/compaction/elicitation.
+- `server/routes/sdk/session-messaging.js` agora consegue resolver a sessão viva do Agent quando ela
+  é a sessão compartilhada, mesmo que ela não esteja no registry singleton do client HTTP.
+- `sdk/tools/core.js` removeu o ciclo ESM com top-level import assíncrono de `zod-to-json-schema`,
+  corrigindo boot failure por TDZ em `createTool()`.
+
+### Validação live
+
+- Boot real iniciou DB, preflight SDK, server `http://127.0.0.1:3009`, Hub, Socket.IO,
+  AlwaysAliveAgent e 92 tools.
+- Com a conta em `rate_limit` por cerca de 40h, o sistema parou limpo:
+  - sem `Reconexão tentativa ...` em cascata;
+  - sem reprocessar a mesma task até `MAX_TASK_RETRIES`;
+  - sem `Boot timeout` fantasma depois da falha de quota;
+  - keepalive voltou ativo e health permaneceu `healthy`.
+- Endpoints testados durante o boot:
+  - `GET /health`;
+  - `GET /sdk/status`;
+  - `GET /sdk/tools`;
+  - `GET /sdk/sessions/:id/workspace/files`.
+- Shutdown via `SIGTERM` executou o shutdown central completo, com snapshot salvo, Agent parado, DB
+  fechado, server fechado, EventBus/observability/audit flush concluídos.
+
+### Gaps remanescentes
+
+- O SDK local ainda não expõe, via tipos públicos atuais, uma função direta para responder a uma
+  elicitation inbound já emitida por evento; até aparecer contrato oficial, a UX terminal lista e
+  solicita elicitations via `session.rpc.ui.elicitation()`, mas não falsifica resposta.
+- `/sdk/status` ainda mostra `connectionState: not_started` para o singleton HTTP quando a sessão
+  viva pertence ao Agent; a projeção canônica já informa `runtimeSessionId`, `canonicalSessionId` e
+  binding correto, mas o texto pode ficar mais explícito para humanos.
+- Quota/rate-limit deve evoluir para painel de espera com ETA, modelo alternativo e política de
+  fallback segura quando `account.getQuota` trouxer dados suficientes.
+
+### Gates executados
+
+- `npm run typecheck:strict:src.copilot`;
+- `npx vitest run tests/unit/copilot/test_agent_error_policy.spec.js tests/unit/copilot/test_agent_messaging.spec.js tests/unit/copilot/test_always_alive_reconnect.spec.js`;
+- `npx vitest run tests/unit/copilot/test_loop_manager.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+- `npx vitest run tests/unit/copilot/sdk/test_sdk_rpc.spec.js tests/unit/copilot/test_sdk_runtime_projection_routes.spec.js tests/unit/copilot/test_sdk_route_session_ownership.spec.js`.

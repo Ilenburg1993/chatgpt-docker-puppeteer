@@ -250,7 +250,7 @@ describe('sdk runtime projection routes', () => {
         assert.equal(res.body.source, 'registry');
         assert.equal(res.body.count, 3);
         assert.deepEqual(
-            res.body.tools.map((tool) => tool.name),
+            res.body.tools.map((/** @type {{ name: string }} */ tool) => tool.name),
             ['read_file', 'write_file', 'shell_exec'],
         );
     });

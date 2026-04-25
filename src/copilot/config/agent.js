@@ -119,8 +119,8 @@ export const STATE_FILE = AGENT_STATE_FILE;
 
 /** Delay de restart (ms) */
 export const RESTART_DELAY_MS = COPILOT_RESTART_DELAY_MS;
-/** Modelo default canônico do runtime LLM-B. */
-export const DEFAULT_COPILOT_MODEL = 'gpt-5-mini';
+/** Modelo default canônico do runtime LLM-B. Set to 'auto' para seleção automática via ModelSelector (F40.2). */
+export const DEFAULT_COPILOT_MODEL = 'auto';
 /** Reasoning effort default canônico do runtime LLM-B. */
 export const DEFAULT_COPILOT_REASONING_EFFORT = 'high';
 /** Modelo Copilot */

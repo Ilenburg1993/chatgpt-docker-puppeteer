@@ -25,6 +25,15 @@ describe('agent/error-policy', () => {
         assert.equal(shouldRetryAgentError(err), false);
     });
 
+    it('classifica rate_limit do SDK como fatal operacional sem retry', () => {
+        const err = Object.assign(new Error('Sorry, you hit a rate limit'), {
+            code: 'rate_limit',
+            errorType: 'rate_limit',
+        });
+        assert.equal(classifyAgentError(err), 'fatal');
+        assert.equal(shouldRetryAgentError(err), false);
+    });
+
     it('classifica erro genérico como retry', () => {
         const err = new Error('network-ish unknown');
         assert.equal(classifyAgentError(err), 'retry');

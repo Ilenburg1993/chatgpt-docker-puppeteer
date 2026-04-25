@@ -2,18 +2,18 @@
 /**
  * src/copilot/tools/session-rpc-tools.js
  *
- * Tools que expõem os RPCs do SDK (@github/copilot-sdk session.rpc.*) diretamente para a LLM-B. Permitem ao agente
- * mudar de modo (interactive/plan/autopilot), ler/atualizar o plan.md da sessão infinita, listar/selecionar sub-agentes
- * e acionar compaction manual.
+ * Tools que expõem operações avançadas de RPC de sessão do SDK para a LLM-B. Permitem ao agente mudar de modo
+ * (interactive/plan/autopilot), ler/atualizar o plan.md da sessão infinita, listar/selecionar sub-agentes e acionar
+ * compaction manual.
  *
- * Ativação: chamar setSessionRpc(session.rpc) após a sessão ser criada no always-alive.js.
+ * Ativação: chamar setSessionRpc(createSessionRpcFacade(session)) após a sessão ser criada no always-alive.js.
  *
  * @module copilot/tools/session-rpc-tools
  * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
  *
- * **SDK-05 (F6.13)**: as APIs `session.rpc.*` são RPCs JSON-RPC internos do CLI sem tipagem pública garantida.
+ * **SDK-05 (F6.13)**: estas APIs são RPCs JSON-RPC internos do CLI sem tipagem pública garantida.
  * Todas as chamadas são encapsuladas em `wrapRpc()` com try/catch e fallback gracioso (retorna `{ error }` em falha).
  * Em versões futuras do SDK, verificar se novos métodos públicos estão disponíveis como substitutos.
  */
@@ -35,10 +35,10 @@ import { withSkipPermission } from './tool-factory.js';
 let _rpc = null;
 
 /**
- * Injeta o handle RPC de uma sessão SDK ativa. Deve ser chamado após `initOrResumeSession()` retornar, passando
- * `session.rpc`.
+ * Injeta o handle RPC de uma sessão SDK ativa. Deve ser chamado após `initOrResumeSession()` retornar, passando a
+ * façade criada por `createSessionRpcFacade(session)`.
  *
- * @param {unknown} rpc - session.rpc retornado pelo SDK (ver @github/copilot-sdk Session.rpc)
+ * @param {unknown} rpc - façade RPC retornada por `createSessionRpcFacade(session)`
  * @returns {void}
  */
 export function setSessionRpc(rpc) {

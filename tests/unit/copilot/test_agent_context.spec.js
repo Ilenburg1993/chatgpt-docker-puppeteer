@@ -95,7 +95,12 @@ describe('AgentContext', () => {
         assert.notEqual(nextRegistry, originalRegistry);
         assert.equal(ctx.getToolRegistrySnapshot(), nextRegistry);
         nextRegistry.entries.set('demo_tool', {
-            tool: { name: 'demo_tool', description: 'Demo tool', skipPermission: true },
+            tool: /** @type {any} */ ({
+                name: 'demo_tool',
+                description: 'Demo tool',
+                skipPermission: true,
+                handler: async () => 'ok',
+            }),
             category: 'demo',
             tags: ['test'],
             readOnly: true,
@@ -108,6 +113,7 @@ describe('AgentContext', () => {
                 tags: ['test'],
                 readOnly: true,
                 skipPermission: true,
+                hasParameters: false,
             },
         ]);
 
@@ -118,7 +124,7 @@ describe('AgentContext', () => {
         const emitter = new EventEmitter();
         /** @type {'approve_all' | 'audit_only' | 'selective'} */
         let mode = 'approve_all';
-        const injectedHandler = async () =>
+        const injectedHandler = async (/** @type {any} */ _request, /** @type {any} */ _invocation) =>
             /** @type {import('../../../src/copilot/sdk/types.js').PermissionRequestResult} */ ({
                 kind: mode === 'selective' ? 'denied-by-rules' : 'approved',
                 ...(mode === 'selective' ? { rules: [] } : {}),
@@ -128,7 +134,7 @@ describe('AgentContext', () => {
             factories: {
                 createPermissions: () => ({
                     getMode: () => mode,
-                    setMode: (nextMode) => {
+                    setMode: (nextMode, _opts) => {
                         mode = nextMode;
                     },
                     get handler() {

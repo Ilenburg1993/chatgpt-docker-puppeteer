@@ -18,7 +18,8 @@ Este documento define e registra, de forma auditável:
 
 ## Defaults de aprovação
 
-- O projeto mantém `approve_all` como default canônico para `onPermissionRequest` em `SessionConfig`.
+- O projeto mantém `approve_all` como default canônico para `onPermissionRequest` em
+  `SessionConfig`.
 - `AGENT_PERMISSION_MODE` default é `approve_all` em `src/copilot/config/env.js`.
 
 ## Ferramentas de observabilidade do catálogo

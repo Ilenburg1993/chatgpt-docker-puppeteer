@@ -5,8 +5,9 @@
  * F62.8: Handler dedicado para billing (assistant.usage).
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -14,7 +15,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  * @returns {() => void}
  */
 export function wireUsageEvent(session, { emit, onPrInfo }) {
-    return session.on(SESSION_EVENTS.ASSISTANT_USAGE, (evt) => {
+    return onSessionEvent(session, SESSION_EVENTS.ASSISTANT_USAGE, (evt) => {
         const data = evt?.data ?? {};
         const model = /** @type {string | undefined} */ (data['model']);
         const cost = /** @type {number | undefined} */ (data['cost']);

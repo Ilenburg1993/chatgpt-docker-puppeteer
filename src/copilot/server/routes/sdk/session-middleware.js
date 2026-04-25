@@ -149,7 +149,7 @@ export const CreateSessionBodySchema = z.object({
 export const SendMessageBodySchema = z.object({
     prompt: z.string().min(1),
     waitForResponse: z.boolean().optional(),
-    timeoutMs: z.number().positive().finite().optional(),
+    timeoutMs: z.number().nonnegative().finite().optional(),
     attachments: z.array(z.unknown()).optional(),
     mode: z.enum(['immediate', 'enqueue']).optional(),
 });
@@ -188,4 +188,66 @@ export const LogMessageBodySchema = z.object({
     message: z.string().min(1),
     level: z.enum(['info', 'warning', 'error']).optional(),
     ephemeral: z.boolean().optional(),
+});
+
+/** Schema para POST /sessions/:id/ui/elicitation body */
+export const ElicitationBodySchema = z.object({
+    message: z.string().min(1),
+    requestedSchema: z.record(z.string(), z.unknown()),
+});
+
+/** Schema para POST /sessions/:id/permissions/:requestId body */
+export const PermissionDecisionBodySchema = z.object({
+    result: z.union([
+        z.object({ kind: z.literal('approved') }),
+        z.object({ kind: z.literal('denied-by-rules'), rules: z.array(z.unknown()) }),
+        z.object({ kind: z.literal('denied-no-approval-rule-and-could-not-request-from-user') }),
+        z.object({ kind: z.literal('denied-interactively-by-user'), feedback: z.string().optional() }),
+        z.object({
+            kind: z.literal('denied-by-content-exclusion-policy'),
+            path: z.string(),
+            message: z.string(),
+        }),
+    ]),
+});
+
+/** Schema para POST /sessions/:id/tools/:requestId body */
+export const HandlePendingToolCallBodySchema = z.object({
+    result: z
+        .union([
+            z.string(),
+            z.object({
+                textResultForLlm: z.string(),
+                resultType: z.string().optional(),
+                error: z.string().optional(),
+                toolTelemetry: z.record(z.string(), z.unknown()).optional(),
+            }),
+        ])
+        .optional(),
+    error: z.string().optional(),
+});
+
+/** Schema para POST /sessions/:id/commands/:requestId body */
+export const HandlePendingCommandBodySchema = z.object({
+    error: z.string().optional(),
+});
+
+/** Schema para POST /sessions/:id/shell/exec body */
+export const ShellExecBodySchema = z.object({
+    command: z.string().min(1),
+    cwd: z.string().optional(),
+    timeout: z.number().positive().finite().optional(),
+});
+
+/** Schema para POST /sessions/:id/shell/:processId/kill body */
+export const ShellKillBodySchema = z
+    .object({
+        signal: z.enum(['SIGTERM', 'SIGKILL', 'SIGINT']).optional(),
+    })
+    .optional();
+
+/** Schema para POST /sessions/:id/workspace/file body */
+export const WorkspaceCreateFileBodySchema = z.object({
+    path: z.string().min(1),
+    content: z.string(),
 });

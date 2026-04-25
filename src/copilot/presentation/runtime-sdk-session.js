@@ -1,9 +1,9 @@
 // @ts-check
 /**
  * @module copilot/presentation/runtime-sdk-session
- * @file Façade compartilhada das operações vanilla de sessão SDK (`mode/plan`) por runtime.
+ * @file Façade compartilhada das operações vanilla/advanced de sessão SDK por runtime.
  *
- *   Esta camada resolve `runtimeId`; a semântica de `mode/plan` fica em `agent/facades/agent-sdk-session`.
+ *   Esta camada resolve `runtimeId`; a semântica operacional fica no Agent, depois do SDK.
  * @typedef {import('./types.js').RuntimeSdkModeResult} RuntimeSdkModeResult
  *
  * @typedef {import('./types.js').RuntimeSdkPlanReadResult} RuntimeSdkPlanReadResult
@@ -66,4 +66,74 @@ export async function updateAgentSdkPlan(content, runtimeId) {
  */
 export async function deleteAgentSdkPlan(runtimeId) {
     return deleteAgentSdkPlanOnAgent(getAgentSdkSessionTarget(runtimeId));
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listAgentSdkModels(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).listSdkModels();
+}
+
+/**
+ * @param {{ model?: string }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listAgentSdkTools(options, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).listSdkBuiltInTools(options);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function getAgentSdkQuota(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).getSdkQuota();
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listAgentSdkWorkspaceFiles(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).listSdkWorkspaceFiles();
+}
+
+/**
+ * @param {string} path
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function readAgentSdkWorkspaceFile(path, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).readSdkWorkspaceFile(path);
+}
+
+/**
+ * @param {string} path
+ * @param {string} content
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function createAgentSdkWorkspaceFile(path, content, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).createSdkWorkspaceFile(path, content);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function compactAgentSdkSession(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).compactSdkSession();
+}
+
+/**
+ * @param {string} message
+ * @param {object} requestedSchema
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function requestAgentSdkElicitation(message, requestedSchema, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).requestSdkElicitation(message, requestedSchema);
 }

@@ -22,6 +22,7 @@ describe('terminal/dialog/turn-display', () => {
             effort: 'high',
             turnStartTime: Date.now(),
             showStreaming: false,
+            showThinking: false,
         });
 
         const onDelta = createDeltaCallback(state);
@@ -38,6 +39,7 @@ describe('terminal/dialog/turn-display', () => {
             effort: 'high',
             turnStartTime: Date.now(),
             showStreaming: true,
+            showThinking: false,
         });
 
         const onDelta = createDeltaCallback(state);

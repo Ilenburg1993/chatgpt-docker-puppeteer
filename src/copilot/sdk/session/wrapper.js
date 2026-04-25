@@ -6,7 +6,6 @@
  * asyncDispose com validação de sessão, logging e tratamento de erros padronizados.
  *
  * @module copilot/sdk/session-lifecycle
- * @see EventBus
  * @see module:copilot/sdk/session
  */
 
@@ -17,6 +16,10 @@ import { log } from '../logger.js';
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
  * @typedef {import('@github/copilot-sdk').SessionEvent} SessionEvent
+ *
+ * @typedef {import('@github/copilot-sdk').AssistantMessageEvent} AssistantMessageEvent
+ *
+ * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  *
  * @typedef {'low' | 'medium' | 'high'} ReasoningEffort
  */
@@ -51,6 +54,70 @@ export async function abortSession(session) {
     log('INFO', `[session-lifecycle] Abortando mensagem: sessionId='${session.sessionId}'`);
     await session.abort();
     log('INFO', `[session-lifecycle] Abort concluído: sessionId='${session.sessionId}'`);
+}
+
+/**
+ * Desconecta uma sessão ativa de forma padronizada.
+ *
+ * @param {CopilotSession} session - Sessão ativa
+ * @returns {Promise<void>}
+ * @throws {TypeError} Se a sessão for inválida
+ * @throws {Error} Se o SDK falhar ao desconectar
+ */
+export async function disconnectSessionSafe(session) {
+    assertSession(session, 'disconnect');
+    log('INFO', `[session-lifecycle] Desconectando sessão: sessionId='${session.sessionId}'`);
+    await session.disconnect();
+    log('INFO', `[session-lifecycle] Sessão desconectada: sessionId='${session.sessionId}'`);
+}
+
+/**
+ * Envia uma mensagem para a sessão e aguarda resposta final do assistente.
+ *
+ * Wrapper canônico para `session.sendAndWait(...)`, centralizando validação e logging.
+ *
+ * @param {CopilotSession} session - Sessão ativa
+ * @param {MessageOptions} messageOptions - Payload de mensagem
+ * @param {number} [timeoutMs] - Timeout opcional (ms)
+ * @returns {Promise<AssistantMessageEvent | undefined>}
+ * @throws {TypeError} Se a sessão for inválida
+ * @throws {Error} Se a operação falhar
+ */
+export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
+    assertSession(session, 'sendAndWait');
+    const hasTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0;
+    log(
+        'DEBUG',
+        `[session-lifecycle] sendAndWait: sessionId='${session.sessionId}', timeout=${hasTimeout ? String(timeoutMs) : 'none'}`,
+    );
+    const event = hasTimeout
+        ? await session.sendAndWait(messageOptions, timeoutMs)
+        : await session.sendAndWait(messageOptions);
+    log('DEBUG', `[session-lifecycle] sendAndWait concluído: sessionId='${session.sessionId}'`);
+    return event;
+}
+
+/**
+ * Envia uma mensagem para a sessão sem aguardar resposta (modo streaming / fire-and-subscribe).
+ *
+ * Wrapper canônico para `session.send(...)`. Use quando o fluxo de resposta é consumido via inscrição de eventos
+ * separadamente.
+ *
+ * @param {CopilotSession} session - Sessão ativa
+ * @param {MessageOptions} messageOptions - Payload de mensagem
+ * @returns {Promise<string | undefined>} messageId retornado pelo SDK
+ * @throws {TypeError} Se a sessão for inválida
+ * @throws {Error} Se a operação falhar
+ */
+export async function sendSession(session, messageOptions) {
+    assertSession(session, 'send');
+    log('DEBUG', `[session-lifecycle] send: sessionId='${session.sessionId}'`);
+    const messageId = await session.send(messageOptions);
+    log(
+        'DEBUG',
+        `[session-lifecycle] send enfileirado: sessionId='${session.sessionId}', messageId=${messageId ?? 'n/a'}`,
+    );
+    return messageId;
 }
 
 /**
@@ -154,7 +221,7 @@ export async function runSessionLifecycle({ create, use, options }) {
             if (opts.forceDispose) {
                 await disposeSession(session);
             } else {
-                await session.disconnect();
+                await disconnectSessionSafe(session);
             }
         } catch (cleanupErr) {
             log('WARN', `[session-lifecycle] cleanup falhou: ${toError(cleanupErr).message}`);

@@ -29,7 +29,7 @@ import { DialogProtocol } from '../../dialog/protocol.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
 import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../ports/hook-port.js';
 import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
-import { bindAgentSessionTools, bootstrapAgentTools } from '../ports/tool-port.js';
+import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../ports/tool-port.js';
 
 /**
  * Contrato mínimo do `AgentContext` exigido pelo setup de sessão.
@@ -223,6 +223,9 @@ export function buildSessionHooks(ctx, host) {
 
     return {
         busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName) => {
+            if (isAgentToolDisabled(toolName)) {
+                return true;
+            }
             if (defaultRuntimeDenylist.includes(toolName)) {
                 return true;
             }

@@ -35,6 +35,7 @@ import {
     cmdDbSessions as _cmdDbSessions,
     cmdDiagnose as _cmdDiagnose,
     cmdDisplay as _cmdDisplay,
+    cmdElicitation as _cmdElicitation,
     cmdErrors as _cmdErrors,
     cmdExport as _cmdExport,
     cmdForget as _cmdForget,
@@ -48,6 +49,7 @@ import {
     cmdReasoning as _cmdReasoning,
     cmdRemember as _cmdRemember,
     cmdResume as _cmdResume,
+    cmdSdk as _cmdSdk,
     cmdSearch as _cmdSearch,
     cmdSessionList as _cmdSessionList,
     cmdSessionRestore as _cmdSessionRestore,
@@ -58,6 +60,7 @@ import {
     cmdTools as _cmdTools,
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
+    cmdWorkspace as _cmdWorkspace,
 } from './commands/index.js';
 import { buildUserPrompt, ensureDialogLoop, println, sendTurn } from './dialog/index.js';
 import {
@@ -85,6 +88,7 @@ const BANNER = `
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
   \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
+  \x1b[33m/sdk [status|models|tools|quota|compact]\x1b[0m · \x1b[33m/workspace [list|read|write]\x1b[0m · \x1b[33m/elicitation [list|show|request]\x1b[0m
   \x1b[33m/display [toggle] [on|off]\x1b[0m · \x1b[33m/metrics\x1b[0m · \x1b[33m/export [path]\x1b[0m \x1b[90m← F24: display, metrics, export\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
   \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
@@ -152,6 +156,9 @@ const CMD_ROUTES = [
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
     [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
     [['tools'], () => _cmdTools({ println })],
+    [['sdk'], (_, arg) => _cmdSdk({ println }, arg)],
+    [['workspace', 'ws'], (_, arg) => _cmdWorkspace({ println }, arg)],
+    [['elicitation', 'elicit'], (_, arg) => _cmdElicitation({ println }, arg)],
     [['usage'], (_, arg) => _cmdUsage({ println }, arg)],
     [['errors'], (_, arg) => _cmdErrors({ println }, arg)],
     [['audit'], (_, arg) => _cmdAudit({ println }, arg)],

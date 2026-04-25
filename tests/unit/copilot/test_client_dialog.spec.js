@@ -12,6 +12,7 @@
  * - stopDialogMode: delegação com authorized:true + reason
  */
 
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { describe, expect, it, vi } from 'vitest';
 import {
     dialogTurn,
@@ -159,10 +160,10 @@ describe('client-dialog › dialogTurn', () => {
         expect(reply).toBe('reply text');
     });
 
-    it('usa timeout padrão de 60s quando não especificado', async () => {
+    it('usa timeout padrão configurado quando não especificado', async () => {
         const agent = createMockAgent();
         await dialogTurn(agent, 'hello');
-        expect(agent.sendDialogTurn).toHaveBeenCalledWith('hello', { timeout: 60_000 });
+        expect(agent.sendDialogTurn).toHaveBeenCalledWith('hello', { timeout: LLM_B_TURN_TIMEOUT_MS });
     });
 
     it('registra e remove listener de onDelta', async () => {

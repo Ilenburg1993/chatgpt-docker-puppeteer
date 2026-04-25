@@ -19,7 +19,8 @@
  * @internal
  */
 
-import { readStore } from '#copilot/tools';
+import { isToolDisabled, readStore } from '#copilot/tools';
+import { createSessionRpcFacade } from '../../sdk/rpc.js';
 import {
     bootstrapTools,
     configureHookTools,
@@ -54,7 +55,7 @@ export function bootstrapAgentTools(registry, mcpTools) {
  * @returns {void}
  */
 export function bindAgentSessionTools(session) {
-    setSessionRpc(session.rpc);
+    setSessionRpc(createSessionRpcFacade(session));
     try {
         if (typeof setExperimentalSession === 'function') {
             setExperimentalSession(session);
@@ -97,6 +98,16 @@ export function unbindAgentSessionTools() {
  */
 export function readAgentTodoStore() {
     return readStore();
+}
+
+/**
+ * Verifica se uma tool foi desabilitada dinamicamente em runtime (ex.: via `toggle_tool`).
+ *
+ * @param {string} toolName
+ * @returns {boolean}
+ */
+export function isAgentToolDisabled(toolName) {
+    return isToolDisabled(toolName);
 }
 
 export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };

@@ -32,12 +32,15 @@
  * @see EventBus
  */
 
+import { createTool as createToolCore, createToolSync as createToolSyncCore } from './tools/core.js';
+
 export {
-    CopilotClient,
     _injectClientForTest,
     _resetClientState,
     buildClientOptions,
+    CopilotClient,
     createClientSession,
+    createCopilotClient,
     deleteClientSession,
     disconnectClientSession,
     forceStopClient,
@@ -74,7 +77,6 @@ export {
 } from './session/lifecycle.js';
 
 export {
-    READ_ONLY_TOOLS,
     buildAgentList,
     createAgent,
     createAnalystAgent,
@@ -85,18 +87,19 @@ export {
     getCurrentAgent,
     isValidAgentName,
     listAgents,
+    READ_ONLY_TOOLS,
     reloadAgents,
     selectAgent,
 } from './agent/agents.js';
 
 export {
     AutoDowngradeDetector,
-    ModelRegistry,
-    ModelSelector,
-    ModelStatsTracker,
     autoDowngradeDetector,
+    ModelRegistry,
     modelRegistry,
+    ModelSelector,
     modelSelector,
+    ModelStatsTracker,
     modelStatsTracker,
 } from './models/registry.js';
 
@@ -120,10 +123,12 @@ export {
     listModels,
     pickModel,
     resolveModelId,
+    resolveModelIdAuto,
     supportsReasoning,
 } from './models/helpers.js';
 
 export { validateUrl, validateUrlString } from '#copilot/core';
+export { classifySdkError, getSdkErrorFingerprint, isSdkQuotaOrRateLimitError } from './errors.js';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
 export { pickDefined } from './utils.js';
@@ -146,12 +151,35 @@ export {
 
 // ─── Faixa 2: Tools & Permissions (rev.4) ────────────────────────────────────
 export { approveAll, createAllowlistPermissionHandler } from './session/permissions.js';
-export { createTool, createToolSync, defineTool } from './tools/core.js';
+export { defineTool } from './tools/core.js';
+
+/**
+ * Hoist-safe facade para consumers que importam de `#copilot/sdk` durante ciclos ESM de tools.
+ *
+ * @template [T=unknown] Default is `unknown`
+ * @param {import('./tools/core.js').CreateToolOptions<T>} options
+ * @returns {import('@github/copilot-sdk').Tool<T>}
+ */
+export function createTool(options) {
+    return createToolCore(options);
+}
+
+/**
+ * Variante síncrona da factory de tools, exposta pelo barrel canônico.
+ *
+ * @template [T=unknown] Default is `unknown`
+ * @param {Omit<import('./tools/core.js').CreateToolOptions<T>, 'parameters'> & {
+ *     parameters?: Record<string, unknown>;
+ * }} options
+ * @returns {import('@github/copilot-sdk').Tool<T>}
+ */
+export function createToolSync(options) {
+    return createToolSyncCore(options);
+}
 // Nota: createPermissionHandler já exportado via #copilot/hooks/permission acima
 
 // ─── Faixa 3: SystemMessage Builder (rev.4) ──────────────────────────────────
 export {
-    SYSTEM_PROMPT_SECTIONS,
     appendSystemMessage,
     appendToGuidelines,
     customizeSystemMessage,
@@ -161,6 +189,7 @@ export {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
+    SYSTEM_PROMPT_SECTIONS,
 } from './session/system-message.js';
 
 // ─── Faixa 4: Unified Config Builder (rev.4) ─────────────────────────────────
@@ -168,10 +197,10 @@ export {
 // buildFullAccessConfig, buildReadOnlyConfig removidos — importar de '#copilot/config/session-config'.
 // Cf. PARTE-21C Faixa H: eliminação de violações L1→L2.
 export {
+    buildSessionConfig,
     DEFAULT_DIAGNOSTIC_MODEL,
     DEFAULT_INFINITE_SESSION,
     DEFAULT_MODEL,
-    buildSessionConfig,
     getProjectDefaults,
     mergeExcludedTools,
     mergeTools,
@@ -192,10 +221,13 @@ export {
 // ─── Faixa 6: Session Lifecycle Wrappers (rev.4) ─────────────────────────────
 export {
     abortSession,
+    disconnectSessionSafe,
     disposeSession,
     getSessionMessages,
     getSessionWorkspacePath,
     runSessionLifecycle,
+    sendSession,
+    sendSessionAndWait,
     setSessionModel,
 } from './session/wrapper.js';
 
@@ -206,9 +238,9 @@ export {
     compactionCompact,
     createSessionRpcFacade,
     modeGet,
-    modeSet,
     modelGetCurrent,
     modelSwitchTo,
+    modeSet,
     permissionsHandlePending,
     planDelete,
     planRead,
@@ -255,8 +287,8 @@ export {
 // ─── Faixa 11: Session Lifecycle Events ───────────────────────────────────────
 
 export {
-    LIFECYCLE_EVENTS,
     isLifecycleEventType,
+    LIFECYCLE_EVENTS,
     onAllLifecycleEvents,
     onLifecycleEvent,
     onLifecycleEvents,
@@ -290,9 +322,9 @@ export {
 // ─── Faixa 16: Barrel Completeness ───────────────────────────────────────────
 
 export {
-    BUILTIN_HANDLER_MAP,
     _resetRegistry as _resetCustomToolsRegistry,
     buildCustomTools,
+    BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
     loadCustomTools,
     loadCustomToolsAsync,

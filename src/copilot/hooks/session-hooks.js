@@ -24,6 +24,29 @@ import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
 
 /**
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizeHookErrorMessage(raw) {
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (raw);
+        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
+        const nestedError = rec['error'];
+        if (nestedError && typeof nestedError === 'object') {
+            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
+            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
+        }
+        try {
+            return JSON.stringify(raw);
+        } catch {
+            return String(raw);
+        }
+    }
+    return String(raw);
+}
+
+/**
  * @typedef {import('./types.js').SessionLifecycleContext} SessionLifecycleContext
  */
 
@@ -58,9 +81,10 @@ export function createSessionHooks(ctx) {
         strategy: (input) => (input.recoverable ? 'retry' : 'abort'),
         onError: (input, invocation) => {
             const sessionId = invocation?.sessionId ?? '';
+            const normalizedMessage = normalizeHookErrorMessage(input.error);
             log(
                 'WARN',
-                `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${input.error} (recuperável: ${input.recoverable})`,
+                `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${normalizedMessage} (recuperável: ${input.recoverable})`,
             );
 
             defaultAuditLog.record({
@@ -93,7 +117,7 @@ export function createSessionHooks(ctx) {
 
             emit('error', {
                 hookType: 'errorOccurred',
-                errorMessage: input.error,
+                errorMessage: normalizedMessage,
                 errorContext: input.errorContext,
                 recoverable: input.recoverable,
                 sessionId,

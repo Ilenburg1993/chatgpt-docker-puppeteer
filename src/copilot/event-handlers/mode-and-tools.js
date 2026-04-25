@@ -5,8 +5,9 @@
  * F62.5: Handler de eventos de mudança de modo e ferramentas.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -15,7 +16,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireModeAndToolEvents(session, { emit }) {
     return [
-        session.on(SESSION_EVENTS.SESSION_MODE_CHANGED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_MODE_CHANGED, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const previousMode = /** @type {string | undefined} */ (data['previousMode']);
             const newMode = /** @type {string | undefined} */ (data['newMode']);
@@ -26,7 +27,7 @@ export function wireModeAndToolEvents(session, { emit }) {
                 ts: evt?.timestamp ?? Date.now(),
             });
         }),
-        session.on(SESSION_EVENTS.SESSION_PLAN_CHANGED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_PLAN_CHANGED, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const operation = /** @type {'create' | 'update' | 'delete' | undefined} */ (data['operation']);
             log('INFO', `[AlwaysAlive] Plano da sessão mudou: ${operation ?? '?'}`);

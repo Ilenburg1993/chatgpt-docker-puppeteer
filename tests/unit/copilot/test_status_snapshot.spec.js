@@ -8,9 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
-
-/** @type {typeof import('#copilot/observability/snapshots').buildStatusSnapshot} */
-let buildStatusSnapshot;
+import { buildStatusSnapshot } from '../../../src/copilot/observability/snapshots.js';
 
 /** @returns {import('../../../src/copilot/agent/types.js').PendingQuestion} */
 function makePendingQuestion() {
@@ -39,10 +37,6 @@ function makeTask(id, enqueuedAt) {
         enqueuedAt,
     };
 }
-
-beforeAll(async () => {
-    ({ buildStatusSnapshot } = await import('#copilot/observability/snapshots'));
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite: campos obrigatórios (G2-TEST-06)

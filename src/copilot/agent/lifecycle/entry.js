@@ -20,7 +20,7 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { EVENT_BUS, bridgeEmitter, container, toError, withRetry } from '#copilot/core';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
-import { CopilotClient, checkAuthStatus } from '#copilot/sdk';
+import { checkAuthStatus, createCopilotClient } from '#copilot/sdk';
 import {
     BOOT_MAX_RETRIES,
     COPILOT_MODEL,
@@ -149,7 +149,7 @@ export async function startAgentLoop() {
     });
 
     const preflightReport = await runCopilotSdkBootPreflight({
-        createClient: () => new CopilotClient(),
+        createClient: () => createCopilotClient(),
         checkAuthStatus,
         configuredModel: COPILOT_MODEL,
         pingTimeoutMs: PING_TIMEOUT_MS,

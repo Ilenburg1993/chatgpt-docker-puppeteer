@@ -6,8 +6,9 @@
  */
 
 import { CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config';
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {{ currentTokens: number; tokenLimit: number }} usageData
@@ -41,7 +42,7 @@ function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed
 export function wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {
     let firstUsageChecked = false;
     return [
-        session.on(SESSION_EVENTS.SESSION_USAGE_INFO, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_USAGE_INFO, (evt) => {
             const data = evt?.data ?? {};
             emit('session.usage', data);
             const currentTokens = /** @type {number} */ (data['currentTokens'] ?? 0);

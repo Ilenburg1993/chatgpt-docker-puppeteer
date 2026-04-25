@@ -88,9 +88,9 @@ export function registerTaskRoutes(bridge, binding) {
                 // Caso contrário, usamos timeout adaptativo alinhado ao runtime do dialog loop.
                 const controller = timeoutDecision.timeoutMs !== null ? new AbortController() : null;
                 const timeoutHandle =
-                        controller !== null && typeof timeoutDecision.timeoutMs === 'number'
-                            ? setTimeout(() => controller.abort(), timeoutDecision.timeoutMs)
-                            : null;
+                    controller !== null && typeof timeoutDecision.timeoutMs === 'number'
+                        ? setTimeout(() => controller.abort(), timeoutDecision.timeoutMs)
+                        : null;
                 try {
                     const raceResult = await agent.sendMessage(message, {
                         ...(attachments !== undefined ? { attachments } : {}),

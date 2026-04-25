@@ -41,6 +41,10 @@ vi.mock('#copilot/hooks/session-hooks', () => ({
         onErrorOccurred: vi.fn(),
     })),
 }));
+vi.mock('#copilot/tools', () => ({
+    readStore: vi.fn(async () => ({ tasks: {} })),
+    isToolDisabled: vi.fn(() => false),
+}));
 vi.mock('../../../src/copilot/tools/bootstrap.js', () => ({
     bootstrapTools: vi.fn((_registry, mcpTools) => ['tool1', 'tool2', ...mcpTools]),
     setSessionRpc: vi.fn(),
@@ -50,6 +54,7 @@ vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
 }));
 
 import { getToolsConfig } from '#copilot/sdk';
+import { isToolDisabled } from '#copilot/tools';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
 import {
     buildSessionHooks,
@@ -72,11 +77,7 @@ describe('session-setup (F63)', () => {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
             model: 'gpt-4',
-            getModelSnapshot: vi.fn(
-                /** @this {{ model: any }} */
-                function () {
-                    return this.model;
-            }),
+            getModelSnapshot: vi.fn(() => ctx.model),
             permissions: { handler: vi.fn() },
             webhooks: { emit: vi.fn() },
             dialogLoop: {
@@ -85,19 +86,15 @@ describe('session-setup (F63)', () => {
                 handleProtocolInput: vi.fn(),
             },
             reasoningEffort: 'medium',
-            getReasoningEffortSnapshot: vi.fn(
-                /** @this {{ reasoningEffort: any }} */
-                function () {
-                    return this.reasoningEffort;
-            }),
+            getReasoningEffortSnapshot: vi.fn(() => ctx.reasoningEffort),
             pendingQuestion: null,
             session: null,
             isResumed: false,
-            setSession: vi.fn(function (session) {
-                this.session = session;
+            setSession: vi.fn((session) => {
+                ctx.session = session;
             }),
-            setIsResumed: vi.fn(function (isResumed) {
-                this.isResumed = isResumed;
+            setIsResumed: vi.fn((isResumed) => {
+                ctx.isResumed = isResumed;
             }),
             setReasoningEffort: vi.fn(),
             setStatus: vi.fn(),
@@ -136,7 +133,21 @@ describe('session-setup (F63)', () => {
             const decision = await result.busHooks.onPreToolUse?.(
                 /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
                 { toolName: 'custom-danger', toolArgs: {}, timestamp: 0, cwd: '/' },
-                { sessionId: 's1' }
+                { sessionId: 's1' },
+            );
+
+            expect(decision).toEqual(expect.objectContaining({ permissionDecision: 'deny' }));
+        });
+
+        it('nega tool desabilitada dinamicamente em runtime (toggle_tool)', async () => {
+            vi.mocked(getToolsConfig).mockReturnValue({ allowlist: null, denylist: [] });
+            vi.mocked(isToolDisabled).mockReturnValueOnce(true);
+
+            const result = buildSessionHooks(ctx, host);
+            const decision = await result.busHooks.onPreToolUse?.(
+                /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
+                { toolName: 'danger_tool', toolArgs: {}, timestamp: 0, cwd: '/' },
+                { sessionId: 's1' },
             );
 
             expect(decision).toEqual(expect.objectContaining({ permissionDecision: 'deny' }));
@@ -224,7 +235,32 @@ describe('session-setup (F63)', () => {
 
             expect(ctx.session).toBe(session);
             expect(ctx.isResumed).toBe(true);
-            expect(setSessionRpc).toHaveBeenCalledWith('mock-rpc');
+            expect(setSessionRpc).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    model: expect.objectContaining({
+                        getCurrent: expect.any(Function),
+                        switchTo: expect.any(Function),
+                    }),
+                    mode: expect.objectContaining({ get: expect.any(Function), set: expect.any(Function) }),
+                    plan: expect.objectContaining({
+                        read: expect.any(Function),
+                        update: expect.any(Function),
+                        delete: expect.any(Function),
+                    }),
+                    workspace: expect.objectContaining({
+                        listFiles: expect.any(Function),
+                        readFile: expect.any(Function),
+                        createFile: expect.any(Function),
+                    }),
+                    log: expect.any(Function),
+                    agent: expect.objectContaining({
+                        list: expect.any(Function),
+                        select: expect.any(Function),
+                        deselect: expect.any(Function),
+                    }),
+                    compaction: expect.objectContaining({ compact: expect.any(Function) }),
+                }),
+            );
         });
     });
 });

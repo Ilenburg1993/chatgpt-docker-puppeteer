@@ -5,8 +5,9 @@
  * F62.2: Handler de eventos de compaction da sessão SDK.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -18,11 +19,11 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireCompactionEvents(session, { emit, getStatusSnapshot, onCheckpointPath }) {
     return [
-        session.on(SESSION_EVENTS.SESSION_COMPACTION_START, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_COMPACTION_START, (evt) => {
             log('INFO', '[AlwaysAlive] Compaction iniciada (sessão infinita).');
             emit('session.compaction_start', evt?.data ?? {});
         }),
-        session.on(SESSION_EVENTS.SESSION_COMPACTION_COMPLETE, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_COMPACTION_COMPLETE, (evt) => {
             const data = /** @type {{ success?: boolean; checkpointPath?: string }} */ (evt?.data ?? {});
             if (data['success'] === false) {
                 log('ERROR', '[AlwaysAlive] Compaction falhou. Sessão pode estar instável.');

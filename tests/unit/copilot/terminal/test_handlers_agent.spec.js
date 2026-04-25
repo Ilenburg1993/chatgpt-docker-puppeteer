@@ -157,7 +157,11 @@ describe('handlers/agent — handlePipeline validação', () => {
         expect(result.status).toBe(200);
         expect(body.ok).toBe(true);
         expect(body.results.length).toBe(1);
-        expect(mockSendAgentDialogTurn).toHaveBeenCalledWith(defaultRuntime, 'test', undefined);
+        expect(mockSendAgentDialogTurn).toHaveBeenCalledWith(
+            defaultRuntime,
+            'test',
+            expect.objectContaining({ timeout: expect.any(Number), traceId: expect.any(String) }),
+        );
     });
 
     it('aceita payload bridgeado e runtimeId explícito', async () => {
@@ -166,7 +170,11 @@ describe('handlers/agent — handlePipeline validação', () => {
         const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(200);
         expect(body.results[0].reply).toBe('alt-reply');
-        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(altRuntime, 'alt-turn', undefined);
+        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
+            altRuntime,
+            'alt-turn',
+            expect.objectContaining({ timeout: expect.any(Number), traceId: expect.any(String) }),
+        );
     });
 });
 

@@ -227,10 +227,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 
-    it('sendTurn() tem timeout configurável (padrão 60000ms)', () => {
+    it('sendTurn() tem timeout configurável (padrão via LLM_B_TURN_TIMEOUT_MS)', () => {
         assert.ok(
-            dlmSourceCode.includes('timeout = 60_000') || dlmSourceCode.includes('timeout = 60000'),
-            'sendTurn deve ter timeout padrão de 60000ms',
+            dlmSourceCode.includes('timeout = LLM_B_TURN_TIMEOUT_MS'),
+            'sendTurn deve usar timeout padrão configurado por LLM_B_TURN_TIMEOUT_MS',
         );
     });
 

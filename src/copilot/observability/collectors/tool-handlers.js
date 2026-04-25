@@ -10,6 +10,7 @@
 
 import { globalAuditBuffer } from '#copilot/audit';
 import { SESSION_EVENTS as SE } from '#copilot/events';
+import { onSessionEvent } from '../../sdk/session/events.js';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -30,7 +31,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_start ──────────────────────────────────────────────
     unsubs.push(
-        session.on(SE.TOOL_EXECUTION_START, (event) => {
+        onSessionEvent(session, SE.TOOL_EXECUTION_START, (event) => {
             const { toolCallId, toolName, mcpServerName } = event.data;
             const _now = Date.now();
             for (const [id, entry] of pending) {
@@ -59,7 +60,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_complete ───────────────────────────────────────────
     unsubs.push(
-        session.on(SE.TOOL_EXECUTION_COMPLETE, (event) => {
+        onSessionEvent(session, SE.TOOL_EXECUTION_COMPLETE, (event) => {
             const { toolCallId, success } = event.data;
             const pendingEntry = pending.get(toolCallId);
             pending.delete(toolCallId);
@@ -105,7 +106,7 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_progress (ephemeral — não persistir) ──────────────
     unsubs.push(
-        session.on(SE.TOOL_EXECUTION_PROGRESS, (event) => {
+        onSessionEvent(session, SE.TOOL_EXECUTION_PROGRESS, (event) => {
             hookBus?.emitHook(
                 'post_tool_use',
                 sessionId,
@@ -121,14 +122,14 @@ export function attachToolHandlers(ctx) {
 
     // ── tool.execution_partial_result — contador apenas ──────────────────
     unsubs.push(
-        session.on(SE.TOOL_EXECUTION_PARTIAL_RESULT, () => {
+        onSessionEvent(session, SE.TOOL_EXECUTION_PARTIAL_RESULT, () => {
             metrics?.recordCounter('tool.execution_partial_result');
         }),
     );
 
     // ── tool.user_requested ──────────────────────────────────────────────
     unsubs.push(
-        session.on(SE.TOOL_USER_REQUESTED, (event) => {
+        onSessionEvent(session, SE.TOOL_USER_REQUESTED, (event) => {
             const { toolCallId, toolName } = event.data;
             metrics?.recordCounter('tool.user_requested');
             if (persist && persistSet.has('tool.user_requested')) {

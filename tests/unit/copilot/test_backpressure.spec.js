@@ -72,6 +72,7 @@ describe('TurnQueue', () => {
 
     it('reset() deve zerar depth e permitir novas enqueues', async () => {
         const q = new TurnQueue({ maxSize: 2 });
+        /** @type {((v: string) => void) | undefined} */
         let resolve1;
         const p1 = q.enqueue(
             () =>

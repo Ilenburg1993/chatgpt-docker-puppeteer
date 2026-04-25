@@ -21,6 +21,7 @@
  * @see EventBus
  */
 
+import { toolsList } from '#copilot/sdk';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -232,7 +233,7 @@ export default function createClientRouter(deps) {
             if (state === 'connected') {
                 try {
                     const client = await getClient();
-                    const builtins = await client.rpc.tools.list({});
+                    const builtins = await toolsList(client, {});
                     cliBuiltins = (builtins.tools ?? []).map((tool) => ({
                         name: tool.name,
                         ...(tool.description ? { description: tool.description } : {}),

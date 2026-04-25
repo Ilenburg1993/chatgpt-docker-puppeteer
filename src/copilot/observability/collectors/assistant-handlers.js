@@ -9,6 +9,7 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
+import { onSessionEvent } from '../../sdk/session/events.js';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */
@@ -47,7 +48,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── assistant.usage (tokens + quota + cost) ──────────────────────────
     unsubs.push(
-        session.on(SE.ASSISTANT_USAGE, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_USAGE, (event) => {
             const {
                 model,
                 inputTokens,
@@ -135,7 +136,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── assistant.turn_start / turn_end ──────────────────────────────────
     unsubs.push(
-        session.on(SE.ASSISTANT_TURN_START, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_TURN_START, (event) => {
             const { turnId } = event.data;
             if (turnId) {
                 const _nowTs = Date.now();
@@ -149,7 +150,7 @@ export function attachAssistantHandlers(ctx) {
     );
 
     unsubs.push(
-        session.on(SE.ASSISTANT_TURN_END, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_TURN_END, (event) => {
             const { turnId } = event.data;
             const startTs = turnId ? turnStart.get(turnId) : undefined;
             if (turnId) turnStart.delete(turnId);
@@ -164,7 +165,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── assistant.message / intent ───────────────────────────────────────
     unsubs.push(
-        session.on(SE.ASSISTANT_MESSAGE, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_MESSAGE, (event) => {
             const { messageId, content } = event.data;
             metrics?.recordCounter('assistant.message');
             if (persist && persistSet.has('assistant.message')) {
@@ -180,7 +181,7 @@ export function attachAssistantHandlers(ctx) {
     );
 
     unsubs.push(
-        session.on(SE.ASSISTANT_INTENT, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_INTENT, (event) => {
             const { intent } = event.data;
             metrics?.recordCounter(`assistant.intent.${intent ?? 'unknown'}`);
             if (persist && persistSet.has('assistant.intent')) {
@@ -191,7 +192,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── assistant.reasoning ──────────────────────────────────────────────
     unsubs.push(
-        session.on(SE.ASSISTANT_REASONING, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_REASONING, (event) => {
             const { reasoningId, content } = event.data;
             metrics?.recordCounter('assistant.reasoning');
             if (persist && persistSet.has('assistant.reasoning')) {
@@ -212,7 +213,7 @@ export function attachAssistantHandlers(ctx) {
         /** @type {number} */
         let _lastDeltaTs = 0;
         unsubs.push(
-            session.on(SE.ASSISTANT_MESSAGE_DELTA, () => {
+            onSessionEvent(session, SE.ASSISTANT_MESSAGE_DELTA, () => {
                 const now = performance.now();
                 if (_lastDeltaTs > 0) {
                     const gap = Math.round(now - _lastDeltaTs);
@@ -230,7 +231,7 @@ export function attachAssistantHandlers(ctx) {
             }),
         );
         unsubs.push(
-            session.on(SE.ASSISTANT_TURN_END, () => {
+            onSessionEvent(session, SE.ASSISTANT_TURN_END, () => {
                 _lastDeltaTs = 0;
             }),
         );
@@ -238,7 +239,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── assistant.streaming_delta (ephemeral) ────────────────────────────
     unsubs.push(
-        session.on(SE.ASSISTANT_STREAMING_DELTA, (event) => {
+        onSessionEvent(session, SE.ASSISTANT_STREAMING_DELTA, (event) => {
             metrics?.recordCounter('assistant.streaming_delta');
             const total = /** @type {number | undefined} */ (event.data?.totalResponseSizeBytes);
             if (typeof total === 'number') {
@@ -249,7 +250,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── user.message ─────────────────────────────────────────────────────
     unsubs.push(
-        session.on(SE.USER_MESSAGE, (event) => {
+        onSessionEvent(session, SE.USER_MESSAGE, (event) => {
             const { content, attachments } = event.data;
             metrics?.recordCounter('user.message');
             if ((attachments?.length ?? 0) > 0) {
@@ -271,7 +272,7 @@ export function attachAssistantHandlers(ctx) {
 
     // ── abort ─────────────────────────────────────────────────────────────
     unsubs.push(
-        session.on(SE.ABORT, (event) => {
+        onSessionEvent(session, SE.ABORT, (event) => {
             metrics?.recordCounter('turn.aborted');
             metrics?.recordSessionError();
             if (persist && persistSet.has('abort')) {

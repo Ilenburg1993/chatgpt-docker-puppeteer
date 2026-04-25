@@ -227,8 +227,12 @@ function log(level, msg, metaOrTaskId = '-') {
         }
     } else {
         // F110.4: human-readable para dev
+        // GAP-ERR-COLOR: Apply red ANSI for ERROR and FATAL messages
         const sidTag = sessionId ? ` [sid:${sessionId}]` : '';
-        const line = `[${ts}] ${level.padEnd(5)} [${taskId}]${sidTag} [copilot] ${content}`;
+        const isError = level.toUpperCase() === 'ERROR' || level.toUpperCase() === 'FATAL';
+        const colorCode = isError ? '\x1b[31m' : ''; // Red for errors
+        const resetCode = isError ? '\x1b[0m' : ''; // Reset after error
+        const line = `${colorCode}[${ts}] ${level.padEnd(5)} [${taskId}]${sidTag} [copilot] ${content}${resetCode}`;
         console.log(line);
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();

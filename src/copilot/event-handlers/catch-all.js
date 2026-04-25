@@ -6,6 +6,7 @@
  */
 
 import { log } from '#copilot/observability';
+import { onAllSessionEvents } from '../sdk/session/events.js';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação.
@@ -93,7 +94,7 @@ export const KNOWN_SDK_EVENTS = new Set([
  * @returns {() => void}
  */
 export function wireCatchAll(session) {
-    return session.on((evt) => {
+    return onAllSessionEvents(session, (evt) => {
         const e = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
         const kind = /** @type {string} */ (e['kind'] ?? e['type'] ?? 'unknown');
         if (KNOWN_SDK_EVENTS.has(kind)) return;

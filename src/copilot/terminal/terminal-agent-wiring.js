@@ -35,6 +35,7 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from './frontend/llm-b-runtime.js';
+import { recordTerminalElicitationCompleted, recordTerminalElicitationPending } from './sdk-interactions.js';
 import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 
 /** @type {boolean} */
@@ -250,6 +251,33 @@ export function registerAgentEventListeners(printBanner) {
         }
     });
 
+    agentEvents.on('elicitation.pending', (evt) => {
+        const entry = recordTerminalElicitationPending(evt);
+        recordTerminalActivity('system', 'Elicitation SDK pendente', {
+            detail: `${entry.mode}: ${entry.message.slice(0, 120)}`,
+            source: 'sdk',
+            severity: 'warn',
+        });
+        println(`\n\x1b[36m  [sdk elicitation]\x1b[0m \x1b[33m${entry.id}\x1b[0m — ${entry.message}`);
+        if (entry.url) println(`  \x1b[36m${entry.url}\x1b[0m`);
+        println('  \x1b[90m/elicitation show latest  ·  /elicitation list\x1b[0m');
+        broadcastSse('elicitation.pending', entry);
+    });
+
+    agentEvents.on('elicitation.completed', (evt) => {
+        const entry = recordTerminalElicitationCompleted(evt);
+        if (entry) {
+            recordTerminalActivity('system', 'Elicitation SDK concluída', {
+                detail: entry.id,
+                source: 'sdk',
+            });
+        }
+        broadcastSse('elicitation.completed', {
+            ...(evt && typeof evt === 'object' ? evt : {}),
+            timestamp: Date.now(),
+        });
+    });
+
     // AB.4: SSE 'cache.hit'
     agentEvents.on(
         'session.compaction_complete',
@@ -308,6 +336,8 @@ export function registerAgentEventListeners(printBanner) {
         'dialog.stopped',
         'session.usage',
         'session.compaction_complete',
+        'elicitation.pending',
+        'elicitation.completed',
         'question.pending',
         'stopped',
         'tool.execution_start',

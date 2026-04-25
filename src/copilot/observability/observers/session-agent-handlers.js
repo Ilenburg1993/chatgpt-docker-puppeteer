@@ -13,6 +13,29 @@ import { AGENT_EMITTER_ERROR, AGENT_SESSION_FATAL } from '#copilot/events';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 
+/**
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizeUnknownErrorMessage(raw) {
+    if (raw instanceof Error) return raw.message;
+    if (raw && typeof raw === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (raw);
+        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
+        const nestedError = rec['error'];
+        if (nestedError && typeof nestedError === 'object') {
+            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
+            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
+        }
+        try {
+            return JSON.stringify(raw);
+        } catch {
+            return String(raw);
+        }
+    }
+    return String(raw);
+}
+
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 
 /**
@@ -251,10 +274,10 @@ export function attachSessionAgentHandlers(ctx) {
         safe((/** @type {unknown} */ err) => {
             metrics.recordCounter('agent.emitter.error');
             if (errorTracker) {
-                const e = err instanceof Error ? err : new Error(String(err));
+                const e = err instanceof Error ? err : new Error(normalizeUnknownErrorMessage(err));
                 errorTracker.trackError(e, { source: AGENT_EMITTER_ERROR });
             }
-            log('WARN', `[agent-event-observer] agent error: ${err instanceof Error ? err.message : String(err)}`);
+            log('WARN', `[agent-event-observer] agent error: ${normalizeUnknownErrorMessage(err)}`);
         }, 'error'),
     );
 

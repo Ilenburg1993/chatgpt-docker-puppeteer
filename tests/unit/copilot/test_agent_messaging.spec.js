@@ -176,6 +176,7 @@ describe('agent-messaging › processQueue', () => {
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle';
         ctx.session = /** @type {any} */ ({
+            sessionId: 'test-session-id',
             on: () => () => {},
             sendAndWait: async () => ({ data: { content: 'pong' } }),
         });
@@ -201,10 +202,10 @@ describe('agent-messaging › processQueue', () => {
         const ctx = new AgentContext(emitter);
         ctx.status = 'processing';
         ctx.session = /** @type {any} */ ({
+            sessionId: 'test-session-idle',
             on: () => () => {},
             sendAndWait: async () => ({ data: { content: 'pong' } }),
         });
-
         const resultPromise = sendMessageDialogBoot(ctx, emitter, 'queued-but-not-processed');
         processQueue(ctx, emitter, { tryReconnect: async () => false });
 
@@ -213,5 +214,44 @@ describe('agent-messaging › processQueue', () => {
         const drained = ctx.messageQueue.drain(new Error('cleanup'));
         assert.equal(drained.length, 1);
         await assert.rejects(() => resultPromise);
+    });
+
+    it('não tenta reconectar quando session.error é rate_limit do SDK', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.status = 'idle';
+        let sessionHandler = /** @type {((event: any) => void) | null} */ (null);
+        ctx.session = /** @type {any} */ ({
+            sessionId: 'sess-rate-limit',
+            on: (/** @type {string | ((event: any) => void)} */ eventName, /** @type {unknown} */ handler) => {
+                if (typeof eventName === 'function') {
+                    sessionHandler = eventName;
+                    return () => {};
+                }
+                return () => {};
+            },
+            send: async () => {
+                sessionHandler?.({
+                    type: 'session.error',
+                    data: {
+                        errorType: 'rate_limit',
+                        message: 'Sorry, you hit a rate limit',
+                    },
+                });
+            },
+        });
+
+        let reconnectCalls = 0;
+        const resultPromise = sendMessageDialogBoot(ctx, emitter, 'boot');
+        processQueue(ctx, emitter, {
+            tryReconnect: async () => {
+                reconnectCalls++;
+                return true;
+            },
+        });
+
+        await assert.rejects(() => resultPromise, /rate limit/i);
+        assert.equal(reconnectCalls, 0);
+        assert.equal(ctx.status, 'idle');
     });
 });

@@ -59,6 +59,7 @@ function makeSession(opts = {}) {
     /** @type {Map<string, Function[]>} */
     const listeners = new Map();
     return {
+        sessionId: 'session-test-001',
         /** @param {string} event @param {Function} fn @returns {() => void} */
         on(event, fn) {
             if (!listeners.has(event)) listeners.set(event, []);

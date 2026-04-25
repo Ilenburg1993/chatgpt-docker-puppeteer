@@ -62,7 +62,7 @@ const DEFAULT_TRACES_FILE = path.join(LOGS_DIR, 'otel-traces.jsonl');
  * Retorna `undefined` se `COPILOT_OTEL_DISABLED=true`, desabilitando o OTEL completamente.
  *
  * @example
- *     const client = new CopilotClient({ telemetry: buildTelemetryConfig() });
+ *     const client = createCopilotClient({ telemetry: buildTelemetryConfig() });
  *
  * @returns {TelemetryConfig | undefined}
  */

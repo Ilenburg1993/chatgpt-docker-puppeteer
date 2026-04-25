@@ -112,7 +112,7 @@ export { isKnownEventType };
  *
  * @param {CopilotSession} session — sessão ativa do SDK
  * @param {string} eventType — tipo de evento (e.g., 'assistant.message')
- * @param {(event: SessionEvent) => void} handler — callback para o evento
+ * @param {(event: any) => void} handler — callback para o evento
  * @returns {() => void} função unsubscribe
  */
 export function onSessionEvent(session, eventType, handler) {
@@ -144,7 +144,7 @@ export function onSessionEvent(session, eventType, handler) {
  *     ```;
  *
  * @param {CopilotSession} session — sessão ativa do SDK
- * @param {Record<string, (event: SessionEvent) => void>} handlerMap — mapa de eventType → handler
+ * @param {Record<string, (event: any) => void>} handlerMap — mapa de eventType → handler
  * @returns {() => void} função que chama unsubscribe de todos os handlers
  */
 export function onSessionEvents(session, handlerMap) {
@@ -189,7 +189,7 @@ export function onSessionEvents(session, handlerMap) {
  *     ```
  *
  * @param {CopilotSession} session — sessão ativa do SDK
- * @param {SessionEventHandler} handler — callback para todos os eventos
+ * @param {(event: any) => void} handler — callback para todos os eventos
  * @returns {() => void} função unsubscribe
  */
 export function onAllSessionEvents(session, handler) {

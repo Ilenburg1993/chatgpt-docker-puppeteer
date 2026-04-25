@@ -62,6 +62,8 @@ vi.mock('../../../src/copilot/tools/todo/store.js', () => ({
 
 vi.mock('../../../src/copilot/tools/index.js', () => ({
     buildTool: mocks.buildTool,
+    TOOLS_LOGGER: Symbol.for('TOOLS_LOGGER'),
+    TOOLS_METRICS: Symbol.for('TOOLS_METRICS'),
 }));
 
 vi.mock('../../../src/copilot/hooks/bus.js', () => ({

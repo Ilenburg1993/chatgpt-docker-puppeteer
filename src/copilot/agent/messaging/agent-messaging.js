@@ -21,6 +21,8 @@ import {
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
+import { onAllSessionEvents, onSessionEvent } from '../../sdk/session/events.js';
+import { sendSession, sendSessionAndWait } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 import { log, startSpan, startSpanImmediate } from '../ports/observability-port.js';
@@ -90,11 +92,9 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  * @returns {Promise<import('@github/copilot-sdk').AssistantMessageEvent | undefined>}
  */
 async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
-    // Compatibilidade retroativa: alguns mocks/implementações antigas expõem apenas sendAndWait().
-    // Neste caso, usamos o fallback para preservar comportamento sem quebrar consumidores legados.
     if (typeof session.send !== 'function') {
         if (typeof session.sendAndWait === 'function') {
-            return session.sendAndWait(sendOpts, timeoutMs);
+            return sendSessionAndWait(session, sendOpts, timeoutMs);
         }
         throw new Error('session.send is not a function');
     }
@@ -116,32 +116,38 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
         rejectIdle(new Error(`[agent-messaging] Timeout por inatividade após ${timeoutMs}ms aguardando session.idle`));
     });
 
-    const unsubscribe = session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
-        if (event.type === 'assistant.message') {
-            lastAssistantMessage = event;
-            inactivityGuard.ping();
-            return;
-        }
-        if (event.type === 'session.idle') {
-            inactivityGuard.clear();
-            resolveIdle();
-            return;
-        }
-        if (event.type === 'session.error') {
-            inactivityGuard.clear();
-            const error = new Error(event.data.message);
-            if (typeof event.data.stack === 'string') {
-                error.stack = event.data.stack;
+    const unsubscribe = onAllSessionEvents(
+        session,
+        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+            if (event.type === 'assistant.message') {
+                lastAssistantMessage = event;
+                inactivityGuard.ping();
+                return;
             }
-            rejectIdle(error);
-            return;
-        }
-        inactivityGuard.ping();
-    });
+            if (event.type === 'session.idle') {
+                inactivityGuard.clear();
+                resolveIdle();
+                return;
+            }
+            if (event.type === 'session.error') {
+                inactivityGuard.clear();
+                const error = new Error(event.data.message);
+                const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (error));
+                raw['errorType'] = event.data.errorType;
+                raw['code'] = event.data.errorType;
+                if (typeof event.data.stack === 'string') {
+                    error.stack = event.data.stack;
+                }
+                rejectIdle(error);
+                return;
+            }
+            inactivityGuard.ping();
+        },
+    );
 
     try {
         inactivityGuard.ping();
-        await session.send(sendOpts);
+        await sendSession(session, sendOpts);
         await waitForIdle;
         return lastAssistantMessage;
     } finally {
@@ -279,7 +285,8 @@ export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
 export async function executeTask(session, task, callbacks) {
     const { onDelta, setStatus, emit, tryReconnect, scheduleNext, requeueTask } = callbacks;
 
-    const unsubDelta = session.on(
+    const unsubDelta = onSessionEvent(
+        session,
         'assistant.message_delta',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
             const chunk = /** @type {string} */ (event?.data?.['deltaContent'] ?? '');
@@ -292,7 +299,8 @@ export async function executeTask(session, task, callbacks) {
     /** @type {Map<string, import('../../observability/otel.js').OtelSpan>} */
     const toolSpans = new Map();
 
-    const unsubToolStart = session.on(
+    const unsubToolStart = onSessionEvent(
+        session,
         'tool.execution_start',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
             const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
@@ -309,7 +317,8 @@ export async function executeTask(session, task, callbacks) {
         },
     );
 
-    const unsubToolComplete = session.on(
+    const unsubToolComplete = onSessionEvent(
+        session,
         'tool.execution_complete',
         (/** @type {{ data?: Record<string, unknown> }} */ event) => {
             const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
@@ -330,7 +339,7 @@ export async function executeTask(session, task, callbacks) {
     const startTime = Date.now();
     /** @type {number | undefined} */
     let idleTime;
-    const unsubIdle = session.on('session.idle', () => {
+    const unsubIdle = onSessionEvent(session, 'session.idle', () => {
         idleTime = Date.now();
     });
 
@@ -468,10 +477,10 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
     return startSpan('copilot.agent.steer', { model: ctx.getModelSnapshot(), actor: 'agent' }, async () => {
-        const messageId = await session.send({ prompt, mode: 'immediate' });
+        const messageId = await sendSession(session, { prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
         host.emit(EMITTER_STEERING_SENT, { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
-        return messageId;
+        return messageId ?? '';
     });
 }
 

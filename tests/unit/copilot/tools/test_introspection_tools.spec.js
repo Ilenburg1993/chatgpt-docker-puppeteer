@@ -95,6 +95,11 @@ describe('introspection-tools', () => {
     beforeEach(async () => {
         vi.resetModules();
         mod = await import('../../../../src/copilot/tools/introspection-tools.js');
+        mod.recordToolCategory('legacy_web_fetch', 'web');
+        mod.recordToolCategory('git_status', 'git');
+        mod.recordToolCategory('list_tools', 'introspection');
+        mod.recordToolCategory('get_agent_info', 'introspection');
+        mod.recordToolCategory('shell_exec', 'shell');
         // Registrar fake tools
         mod.registerForIntrospection(/** @type {any} */ (fakeTools));
     });

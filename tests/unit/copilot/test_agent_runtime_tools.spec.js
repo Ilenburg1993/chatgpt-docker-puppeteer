@@ -33,6 +33,7 @@ describe('agent-runtime-tools facade', () => {
                 tags: ['read'],
                 readOnly: true,
                 skipPermission: true,
+                hasParameters: false,
             },
         ]);
     });
@@ -55,6 +56,7 @@ describe('agent-runtime-tools facade', () => {
                     tags: [],
                     readOnly: false,
                     skipPermission: true,
+                    hasParameters: false,
                 },
             ],
         });

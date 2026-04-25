@@ -48,6 +48,7 @@ describe('agent-dialog-controller › dialogStart', () => {
         ctx.isDialogLoopActive = () => true;
         ctx.isIdle = () => false;
 
+        /** @type {{ event: string | symbol; payload: any } | null} */
         let emitted = null;
         host.emit = (event, payload) => {
             emitted = { event, payload };
@@ -61,8 +62,9 @@ describe('agent-dialog-controller › dialogStart', () => {
         await dialogStart(ctx, /** @type {any} */ (host));
 
         assert.equal(started, false);
-        assert.equal(emitted?.event, 'dialog.loop.changed');
-        assert.equal(emitted?.payload?.reason, 'ready_already_waiting');
+        assert.ok(emitted);
+        assert.equal(/** @type {any} */ (emitted).event, 'dialog.loop.changed');
+        assert.equal(/** @type {any} */ (emitted).payload?.reason, 'ready_already_waiting');
     });
 
     it('rejeita quando utilização de contexto ≥ 95%', async () => {
@@ -194,6 +196,7 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
 
     it('usa READY pendente como recuperação 0 PR', async () => {
         const { ctx, host } = setupRecovery();
+        /** @type {{ strategy?: string; success?: boolean } | null} */
         let recoveryPayload = null;
         host.on('dialog.recovery', (payload) => {
             recoveryPayload = payload;
@@ -210,11 +213,13 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
         assert.equal(result.recovered, true);
         assert.equal(result.strategy, 'zero_pr_ready');
         assert.equal(result.prConsumed, false);
-        assert.equal(recoveryPayload?.strategy, 'zero_pr_ready');
+        assert.ok(recoveryPayload);
+        assert.equal(/** @type {any} */ (recoveryPayload).strategy, 'zero_pr_ready');
     });
 
     it('reinicia com reason recovery_restart quando active+idle fica sem canal de input', async () => {
         const { ctx, host } = setupRecovery();
+        /** @type {{ strategy?: string; success?: boolean } | null} */
         let recoveryPayload = null;
         host.on('dialog.recovery', (payload) => {
             recoveryPayload = payload;
@@ -247,6 +252,7 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
         assert.equal(result.prConsumed, true);
         assert.deepEqual(stopOpts, { authorized: true, reason: 'recovery_restart' });
         assert.equal(started, true);
-        assert.equal(recoveryPayload?.success, true);
+        assert.ok(recoveryPayload);
+        assert.equal(/** @type {any} */ (recoveryPayload).success, true);
     });
 });

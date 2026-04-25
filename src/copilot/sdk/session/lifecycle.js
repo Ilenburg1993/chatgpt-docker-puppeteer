@@ -21,6 +21,7 @@ import { toError } from '../../core/error-handlers.js';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { log } from '../logger.js';
 
+import { listModels, resolveModelIdAuto } from '../models/index.js';
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
@@ -225,8 +226,28 @@ function buildSessionConfig(opts, mode) {
  */
 export async function createSession(client, opts) {
     const options = opts ?? {};
-    const model = options.model ?? 'gpt-5-mini';
-    const config = buildSessionConfig({ ...options, model }, 'create');
+    let model = options.model ?? 'gpt-5-mini';
+    let reasoningEffort = options.reasoningEffort;
+
+    // Se modelo é 'auto', usar seleção automática via ModelSelector (F40.2)
+    if (model === 'auto') {
+        try {
+            log('INFO', '[session] Iniciando auto-seleção de modelo...');
+            const availableModels = await listModels();
+            model = await resolveModelIdAuto(availableModels, 'auto', 'gpt-5-mini');
+            log('INFO', `[session] Modelo auto-selecionado: ${model}`);
+        } catch (e) {
+            log('WARN', `[session] Auto-seleção de modelo falhou: ${toError(e).message}; usando fallback gpt-5-mini`);
+            model = 'gpt-5-mini';
+        }
+    }
+
+    // Regra canônica: fallback gpt-5-mini deve usar reasoning high quando não houver effort explícito.
+    if (!reasoningEffort && model === 'gpt-5-mini') {
+        reasoningEffort = REASONING_EFFORTS.HIGH;
+    }
+
+    const config = buildSessionConfig({ ...options, model, ...(reasoningEffort ? { reasoningEffort } : {}) }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
     const session = await client.createSession(config);

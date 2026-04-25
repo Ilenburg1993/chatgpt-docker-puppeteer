@@ -8,7 +8,6 @@
  * @see EventBus
  */
 
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { Router } from 'express';
 import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
 import { SseClientPool } from '../../../infra/sse/stream-hub.js';
@@ -18,16 +17,30 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { onAllSessionEvents } from '../../../sdk/session/events.js';
+import {
+    abortSession,
+    getSessionMessages,
+    sendSession,
+    sendSessionAndWait,
+    setSessionModel,
+} from '../../../sdk/session/wrapper.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import {
+    ElicitationBodySchema,
+    HandlePendingCommandBodySchema,
+    HandlePendingToolCallBodySchema,
     LogMessageBodySchema,
+    PermissionDecisionBodySchema,
     rateLimitMiddleware,
     SendMessageBodySchema,
     SetModelBodySchema,
+    ShellExecBodySchema,
+    ShellKillBodySchema,
     validateBody,
     validateModel,
     withErrorHandler,
+    WorkspaceCreateFileBodySchema,
 } from './session-middleware.js';
 
 /**
@@ -61,6 +74,64 @@ const MAX_PROMPT_BYTES = 512_000;
 /**
  * @param {SdkRouteDeps} routeDeps
  * @param {string} id
+ * @param {Res} res
+ * @returns {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>> | null}
+ */
+function getActiveSessionEntryOrReply(routeDeps, id, res) {
+    const entry = routeDeps.sdkSession.getClientSession(id);
+    if (entry) {
+        return entry;
+    }
+
+    const agentSessionId =
+        typeof routeDeps.agent?.sessionId === 'string'
+            ? routeDeps.agent.sessionId
+            : (routeDeps.agent?.sessionId ?? null);
+    const agentHandles =
+        typeof (/** @type {{ getSdkHandles?: unknown }} */ (routeDeps.agent).getSdkHandles) === 'function'
+            ? /** @type {{ session?: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'] | null }} */ (
+                  /** @type {{ getSdkHandles: () => unknown }} */ (routeDeps.agent).getSdkHandles()
+              )
+            : null;
+    if (agentSessionId === id && agentHandles?.session) {
+        const agentWithModel = /** @type {{ getModel?: () => string }} */ (/** @type {unknown} */ (routeDeps.agent));
+        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ ({
+            session: agentHandles.session,
+            model: typeof agentWithModel.getModel === 'function' ? agentWithModel.getModel() : 'unknown',
+            createdAt: Date.now(),
+            messagesCount: 0,
+        });
+    }
+
+    {
+        res.status(404).json({
+            ok: false,
+            error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+        });
+        return null;
+    }
+}
+
+/**
+ * Mantém o endpoint HTTP alinhado à semântica do SDK: o caminho é relativo ao workspace virtual da sessão.
+ *
+ * @param {unknown} value
+ * @returns {{ ok: true; path: string } | { ok: false; error: string }}
+ */
+function validateWorkspacePath(value) {
+    if (typeof value !== 'string' || value.trim() === '') {
+        return { ok: false, error: 'Campo "path" deve ser string relativa não-vazia.' };
+    }
+    const path = value.trim();
+    if (path.startsWith('/') || path.includes('\\') || path.split('/').includes('..')) {
+        return { ok: false, error: 'Campo "path" deve ser relativo ao workspace SDK e não pode conter "..".' };
+    }
+    return { ok: true, path };
+}
+
+/**
+ * @param {SdkRouteDeps} routeDeps
+ * @param {string} id
  * @param {ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>} entry
  * @returns {SessionStreamState}
  */
@@ -82,11 +153,14 @@ function ensureSessionStreamState(routeDeps, id, entry) {
         metrics: routeDeps.metrics,
     });
 
-    const unsubscribe = entry.session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
-        const type = /** @type {string} */ (event?.type ?? 'message');
-        const payload = standardizeSsePayload(event);
-        pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
-    });
+    const unsubscribe = onAllSessionEvents(
+        entry.session,
+        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+            const type = /** @type {string} */ (event?.type ?? 'message');
+            const payload = standardizeSsePayload(event);
+            pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
+        },
+    );
 
     const state = { sessionId: id, sessionRef: entry.session, pool, unsubscribe };
     _sessionStreamStates.set(id, state);
@@ -124,20 +198,23 @@ async function sendAndWaitWithoutTimeout(session, messageOptions) {
         rejectIdle = (error) => reject(error);
     });
 
-    const unsubscribe = session.on((/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
-        if (event.type === 'assistant.message') {
-            lastAssistantMessage = event;
-        } else if (event.type === 'session.idle') {
-            resolveIdle();
-        } else if (event.type === 'session.error') {
-            const error = new Error(event.data.message);
-            if (event.data.stack) error.stack = event.data.stack;
-            rejectIdle(error);
-        }
-    });
+    const unsubscribe = onAllSessionEvents(
+        session,
+        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+            if (event.type === 'assistant.message') {
+                lastAssistantMessage = event;
+            } else if (event.type === 'session.idle') {
+                resolveIdle();
+            } else if (event.type === 'session.error') {
+                const error = new Error(event.data.message);
+                if (event.data.stack) error.stack = event.data.stack;
+                rejectIdle(error);
+            }
+        },
+    );
 
     try {
-        await session.send(messageOptions);
+        await sendSession(session, messageOptions);
         await idlePromise;
         return lastAssistantMessage;
     } finally {
@@ -203,22 +280,16 @@ router.post(
                 return;
             }
 
-            const timeoutDecision = resolveOptionalDialogTimeout({
+            const timeoutDecision = routeDeps.sdkSessionPolicy.resolveOptionalDialogTimeout({
                 explicitTimeoutMs: rawTimeoutMs,
-                defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+                defaultTimeoutMs: routeDeps.sdkSessionPolicy.defaultDialogTimeoutMs,
                 payloadChars: prompt.length,
                 phase: 'dialog',
                 allowDisabled: true,
             });
 
-            const entry = routeDeps.sdkSession.getClientSession(id);
-            if (!entry) {
-                res.status(404).json({
-                    ok: false,
-                    error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-                });
-                return;
-            }
+            const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+            if (!entry) return;
 
             routeDeps.sdkSession.incrementSessionMessageCount(id);
 
@@ -232,7 +303,7 @@ router.post(
             if (waitForResponse) {
                 const event =
                     timeoutDecision.timeoutMs !== null
-                        ? await entry.session.sendAndWait(messageOptions, timeoutDecision.timeoutMs)
+                        ? await sendSessionAndWait(entry.session, messageOptions, timeoutDecision.timeoutMs)
                         : await sendAndWaitWithoutTimeout(entry.session, messageOptions);
                 routeDeps.sdkObservability.log(
                     'INFO',
@@ -258,7 +329,7 @@ router.post(
                     ),
                 );
             } else {
-                const messageId = await entry.session.send(messageOptions);
+                const messageId = await sendSession(entry.session, messageOptions);
                 res.json(
                     routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                         { ok: true, sessionId: id, messageId, enqueued: true },
@@ -299,14 +370,8 @@ router.get('/sessions/:id/stream', (req, res) => {
         return;
     }
 
-    const entry = routeDeps.sdkSession.getClientSession(id);
-    if (!entry) {
-        res.status(404).json({
-            ok: false,
-            error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-        });
-        return;
-    }
+    const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+    if (!entry) return;
 
     const state = ensureSessionStreamState(routeDeps, id, entry);
 
@@ -342,7 +407,7 @@ router.get('/sessions/:id/stream', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Muda o modelo de uma sessão ativa em tempo real via CopilotSession.setModel().
+ * Muda o modelo de uma sessão ativa em tempo real via wrapper canônico setSessionModel().
  *
  * Body: { "model": "claude-sonnet-4-5", "reasoningEffort": "high" }
  */
@@ -357,15 +422,9 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
             return;
         }
         const safeModel = modelValidation.model;
-        const entry = routeDeps.sdkSession.getClientSession(id);
-        if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-            });
-            return;
-        }
-        await entry.session.setModel(safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        await setSessionModel(entry.session, safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
         routeDeps.sdkObservability.log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
         res.json(
             routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
@@ -388,14 +447,8 @@ router.post('/sessions/:id/log', validateBody(LogMessageBodySchema), (req, res) 
         const routeDeps = resolveSdkRouteSharedDeps(req);
         const id = /** @type {string} */ (req.params['id']);
         const { message, level, ephemeral } = req.body ?? {};
-        const entry = routeDeps.sdkSession.getClientSession(id);
-        if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-            });
-            return;
-        }
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
         await entry.session.log(message, routeDeps.sdkSession.pickDefined({ level, ephemeral }));
         res.json(
             routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
@@ -417,15 +470,9 @@ router.post('/sessions/:id/abort', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        const entry = routeDeps.sdkSession.getClientSession(id);
-        if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-            });
-            return;
-        }
-        await entry.session.abort();
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        await abortSession(entry.session);
         routeDeps.sdkObservability.log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
         res.json(
             routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
@@ -447,21 +494,220 @@ router.get('/sessions/:id/messages', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
-        const entry = routeDeps.sdkSession.getClientSession(id);
-        if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-            });
-            return;
-        }
-        const messages = await entry.session.getMessages();
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const messages = await getSessionMessages(entry.session);
         res.json(
             routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                 { ok: true, sessionId: id, count: messages.length, messages },
                 id,
             ),
         );
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/workspace/files
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lista arquivos do workspace virtual da sessão SDK.
+ */
+router.get('/sessions/:id/workspace/files', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.workspaceListFiles(entry.session);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/workspace/file?path=...
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lê um arquivo do workspace virtual da sessão SDK.
+ */
+router.get('/sessions/:id/workspace/file', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const validation = validateWorkspacePath(req.query['path']);
+        if (!validation.ok) {
+            res.status(400).json({ ok: false, error: validation.error });
+            return;
+        }
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.workspaceReadFile(entry.session, validation.path);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/workspace/file
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Cria ou sobrescreve um arquivo no workspace virtual da sessão SDK.
+ */
+router.post('/sessions/:id/workspace/file', validateBody(WorkspaceCreateFileBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { path, content } = req.body ?? {};
+        const validation = validateWorkspacePath(path);
+        if (!validation.ok) {
+            res.status(400).json({ ok: false, error: validation.error });
+            return;
+        }
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.workspaceCreateFile(entry.session, validation.path, content);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/ui/elicitation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aciona a operação de UI elicitation via façade RPC de sessão para formulários estruturados.
+ */
+router.post('/sessions/:id/ui/elicitation', validateBody(ElicitationBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { message, requestedSchema } = req.body ?? {};
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.uiElicitation(entry.session, message, requestedSchema);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/permissions/:requestId
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve uma permissão pendente usando o contrato SDK `permissions.handlePendingPermissionRequest`.
+ */
+router.post('/sessions/:id/permissions/:requestId', validateBody(PermissionDecisionBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const requestId = /** @type {string} */ (req.params['requestId']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.permissionsHandlePending(
+            entry.session,
+            requestId,
+            req.body.result,
+        );
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/tools/:requestId
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve uma chamada externa de tool pendente.
+ */
+router.post('/sessions/:id/tools/:requestId', validateBody(HandlePendingToolCallBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const requestId = /** @type {string} */ (req.params['requestId']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.toolsHandlePendingCall(entry.session, requestId, req.body);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/commands/:requestId
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve um comando SDK pendente.
+ */
+router.post('/sessions/:id/commands/:requestId', validateBody(HandlePendingCommandBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const requestId = /** @type {string} */ (req.params['requestId']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.commandsHandlePending(entry.session, requestId, req.body);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/compaction/compact
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aciona compaction manual da sessão infinita via RPC SDK.
+ */
+router.post('/sessions/:id/compaction/compact', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.compactionCompact(entry.session);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/shell/exec
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Executa shell remoto pelo runtime SDK e retorna `processId`.
+ */
+router.post('/sessions/:id/shell/exec', validateBody(ShellExecBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { command, cwd, timeout } = req.body ?? {};
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.shellExec(
+            entry.session,
+            command,
+            routeDeps.sdkSession.pickDefined({ cwd, timeout }),
+        );
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/shell/:processId/kill
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Envia sinal para processo iniciado por `shell.exec`.
+ */
+router.post('/sessions/:id/shell/:processId/kill', validateBody(ShellKillBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const processId = /** @type {string} */ (req.params['processId']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionRpc.shellKill(entry.session, processId, req.body?.signal);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
     });
 });
 

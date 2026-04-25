@@ -292,8 +292,18 @@
  *     abortAvailable: boolean;
  *     sessionLogAvailable: boolean;
  *     historyAvailable: boolean;
+ *     serverModelsListAvailable: boolean;
+ *     serverToolsListAvailable: boolean;
+ *     quotaAvailable: boolean;
  *     lastSessionLookupAvailable: boolean;
  *     foregroundControlAvailable: boolean;
+ *     workspaceRpcAvailable: boolean;
+ *     compactionAvailable: boolean;
+ *     shellAvailable: boolean;
+ *     uiElicitationAvailable: boolean;
+ *     pendingCommandsAvailable: boolean;
+ *     pendingPermissionsAvailable: boolean;
+ *     pendingToolsAvailable: boolean;
  *     customAgentsAvailable: boolean;
  *     experimentalAgentsAvailable: boolean;
  *     skillsAvailable: boolean;
@@ -615,6 +625,11 @@
  *   do SDK/CLI atual
  * @property {(() => Promise<import('#copilot/sdk/types').GetAuthStatusResponse>) | undefined} getSdkAuthStatus -
  *   Retorna status de autenticação do SDK/CLI atual
+ * @property {(() => Promise<unknown>) | undefined} listSdkModels - Lista modelos pelo RPC server-scoped do SDK
+ * @property {((options?: { model?: string }) => Promise<unknown>) | undefined} listSdkBuiltInTools - Lista tools
+ *   builtin/MCP pelo RPC server-scoped do SDK
+ * @property {(() => Promise<unknown>) | undefined} getSdkQuota - Retorna snapshot de quota pelo RPC server-scoped do
+ *   SDK
  * @property {(() => Promise<string | undefined>) | undefined} getLastSdkSessionId - Retorna a última sessão conhecida
  *   pelo SDK atual
  * @property {(() => Promise<string | undefined>) | undefined} getForegroundSdkSessionId - Retorna a sessão em
@@ -635,6 +650,36 @@
  *   sessão atual
  * @property {(() => Promise<unknown>) | undefined} deselectSdkAgent - Remove a seleção do agente customizado atual
  * @property {(() => Promise<unknown>) | undefined} reloadSdkAgents - Recarrega agentes customizados na sessão atual
+ * @property {(() => Promise<unknown>) | undefined} listSdkWorkspaceFiles - Lista arquivos do workspace virtual SDK
+ * @property {((path: string) => Promise<unknown>) | undefined} readSdkWorkspaceFile - Lê arquivo do workspace virtual
+ *   SDK
+ * @property {((path: string, content: string) => Promise<unknown>) | undefined} createSdkWorkspaceFile - Cria arquivo
+ *   no workspace virtual SDK
+ * @property {(() => Promise<unknown>) | undefined} compactSdkSession - Executa compaction manual da sessão SDK
+ * @property {((message: string, requestedSchema: object) => Promise<unknown>) | undefined} requestSdkElicitation -
+ *   Solicita elicitation estruturada pela superfície SDK
+ * @property {((requestId: string, result: { kind: string } & Record<string, unknown>) => Promise<unknown>)
+ *     | undefined} handleSdkPendingPermission
+ *   - Resolve permissão pendente do SDK
+ *
+ * @property {((
+ *           requestId: string,
+ *           options?: {
+ *               result?: string | { textResultForLlm: string; resultType?: string; error?: string };
+ *               error?: string;
+ *           },
+ *       ) => Promise<unknown>)
+ *     | undefined} handleSdkPendingToolCall
+ *   - Resolve tool call pendente do SDK
+ *
+ * @property {((requestId: string, options?: { error?: string }) => Promise<unknown>) | undefined} handleSdkPendingCommand
+ *   - Resolve comando pendente do SDK
+ *
+ * @property {((command: string, options?: { cwd?: string; timeout?: number }) => Promise<unknown>) | undefined} execSdkShell
+ *   - Executa shell pela superfície SDK
+ *
+ * @property {((processId: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT') => Promise<unknown>) | undefined} killSdkShell
+ *   - Envia sinal para processo shell iniciado pelo SDK
  */
 
 export {};

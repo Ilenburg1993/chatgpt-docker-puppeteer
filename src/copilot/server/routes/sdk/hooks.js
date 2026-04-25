@@ -74,10 +74,7 @@ function ensureHookRuntimeState(routeDeps) {
  * @param {HookRuntimeState} state
  * @returns {void}
  */
-function maybeDisposeHookRuntimeState(
-    /** @type {ReturnType<typeof resolveSdkRouteSharedDeps>} */ routeDeps,
-    state
-) {
+function maybeDisposeHookRuntimeState(/** @type {ReturnType<typeof resolveSdkRouteSharedDeps>} */ routeDeps, state) {
     if (state.pool.size > 0) return;
     state.bus.off('*', state.listener);
     _hookRuntimeStates.delete(state.runtimeId);

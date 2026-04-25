@@ -30,6 +30,7 @@ vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed 
 
 const { registerDialogListeners, startDialogMode, dialogTurn, stopDialogMode } =
     await import('#copilot/channel/client-dialog');
+const { LLM_B_TURN_TIMEOUT_MS } = await import('#copilot/config');
 
 const { getLastNPairs } = await import('#copilot/channel/client-history');
 
@@ -149,7 +150,7 @@ describe('F40 — dialogTurn', () => {
         const result = await dialogTurn(agent, 'mensagem');
 
         expect(result).toBe('resposta');
-        expect(agent.sendDialogTurn).toHaveBeenCalledWith('mensagem', { timeout: 60_000 });
+        expect(agent.sendDialogTurn).toHaveBeenCalledWith('mensagem', { timeout: LLM_B_TURN_TIMEOUT_MS });
     });
 
     it('usa timeout customizado', async () => {

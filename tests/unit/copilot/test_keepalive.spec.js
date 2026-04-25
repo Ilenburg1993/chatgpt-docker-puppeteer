@@ -46,7 +46,7 @@ describe('SessionKeepalive', () => {
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 50 });
 
         ka.start({
-            getSession: () => ({ send: sendFn }),
+            getSession: () => ({ sessionId: 'session-test-keepalive', send: sendFn }),
             isIdle: () => true,
             isDialogLoopActive: () => true,
         });
@@ -62,7 +62,7 @@ describe('SessionKeepalive', () => {
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 50 });
 
         ka.start({
-            getSession: () => ({ send: sendFn }),
+            getSession: () => ({ sessionId: 'session-test-keepalive', send: sendFn }),
             isIdle: () => false,
             isDialogLoopActive: () => false,
         });
@@ -81,7 +81,7 @@ describe('SessionKeepalive', () => {
 
         // Força lastActivityAt no passado simulando idle
         ka.start({
-            getSession: () => ({ send: sendFn }),
+            getSession: () => ({ sessionId: 'session-test-keepalive-fallback', send: sendFn }),
             getClient: () => ({ ping: pingFn }),
             isIdle: () => true,
             isDialogLoopActive: () => false,
@@ -101,7 +101,7 @@ describe('SessionKeepalive', () => {
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 0 });
 
         ka.start({
-            getSession: () => ({ send: sendFn }),
+            getSession: () => ({ sessionId: 'session-test-keepalive-fallback', send: sendFn }),
             getClient: () => ({ ping: pingFn }),
             isIdle: () => true,
             isDialogLoopActive: () => false,

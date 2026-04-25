@@ -11,6 +11,7 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
+import { buildCopilotClientOptionsFromEnv } from '../../config/client-options.js';
 import { CircuitBreaker } from '../../core/circuit-breaker.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import {
@@ -84,40 +85,30 @@ let _startPromise = null;
 let _registryHasActiveSessions = false;
 
 /**
- * Constrói as opções do CopilotClient, respeitando a variável de ambiente `COPILOT_CLI_URL` para conectar a um CLI já
- * em execução (PM2 separado).
+ * Constrói as opções canônicas do CopilotClient.
  *
- * Quando `COPILOT_CLI_URL` está definida:
- *
- * - O SDK conecta ao processo CLI existente em vez de fazer spawn de um novo.
- * - Reinicializações do processo SDK não consomem PRs adicionais.
- * - O CLI mantém a sessão viva entre reinicializações do Node.js.
+ * A fonte de verdade mora em `config/client-options.js`: este wrapper existe para preservar a API pública histórica de
+ * `#copilot/sdk` enquanto garante que boot, server, terminal e agent usem as mesmas regras SDK-first.
  *
  * @param {Partial<CopilotClientOptions>} [overrides] - Opções adicionais para sobrescrever
  * @returns {Partial<CopilotClientOptions>}
  */
 export function buildClientOptions(overrides = {}) {
-    const cliUrl = process.env['COPILOT_CLI_URL'] || '';
-    /** @type {Partial<CopilotClientOptions>} */
-    const options = {};
+    return buildCopilotClientOptionsFromEnv(overrides);
+}
 
-    if (cliUrl) {
-        /** @type {Record<string, unknown>} */
-        const anyOptions = options;
-        anyOptions['cliUrl'] = cliUrl;
-        log('INFO', `[lib/sdk-client] Modo cliUrl ativo: conectando ao CLI em ${cliUrl}`);
-    }
-
-    // F4.8 (UPG-02): ativa telemetria OTLP via SDK quando OTEL_EXPORTER_OTLP_ENDPOINT está definida
-    const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || '';
-    if (otlpEndpoint) {
-        /** @type {Record<string, unknown>} */
-        const anyOptions = options;
-        anyOptions['telemetry'] = { otlpEndpoint };
-        log('INFO', `[lib/sdk-client] OTLP telemetria ativa: ${otlpEndpoint}`);
-    }
-
-    return { ...options, ...overrides };
+/**
+ * Cria uma instância NÃO-singleton de CopilotClient com as opções canônicas do projeto.
+ *
+ * Use esta factory para fluxos isolados (ex.: preflight/reconnect) em vez de `new CopilotClient(...)` direto em
+ * consumers. Isso centraliza policy/env no mesmo builder usado por `getClient()`.
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides] - Overrides opcionais (ex.: telemetry, cliUrl)
+ * @returns {CopilotClient}
+ */
+export function createCopilotClient(overrides = {}) {
+    const options = buildClientOptions(overrides);
+    return new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
 }
 /**
  * Retorna (ou cria) a instância singleton de CopilotClient já conectada.
@@ -139,9 +130,8 @@ export async function getClient(overrides = {}) {
 
     _startPromise = (async () => {
         try {
-            const options = buildClientOptions(overrides);
             log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
-            const client = new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
+            const client = createCopilotClient(overrides);
             await client.start();
             _client = client;
             log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);

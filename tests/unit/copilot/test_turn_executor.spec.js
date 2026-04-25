@@ -320,18 +320,19 @@ describe('turn-executor', () => {
     /* ── F65.3: dispatchTurnToHost ── */
     describe('dispatchTurnToHost', () => {
         it('responde pergunta pendente diretamente se hasPendingQuestion() truthy', () => {
-            const host = {
+            const host = /** @type {any} */ ({
                 hasPendingQuestion: vi.fn().mockReturnValue(true),
                 answerPendingQuestion: vi.fn(),
-            };
+            });
 
-            dispatchTurnToHost(emitter, {
+            /** @type {any} */ (dispatchTurnToHost)(emitter, {
                 host,
                 message: 'resp',
                 timeout: 5000,
                 timeoutHandle: setTimeout(() => {}, 5000),
                 pendingListenerRef: { current: null },
                 onReplyOuter: vi.fn(),
+                onReadyOuter: vi.fn(),
                 onStopOuter: vi.fn(),
                 resolve: vi.fn(),
                 reject: vi.fn(),
@@ -342,18 +343,19 @@ describe('turn-executor', () => {
         });
 
         it('aguarda question.pending quando não há pergunta pendente', async () => {
-            const host = {
+            const host = /** @type {any} */ ({
                 hasPendingQuestion: vi.fn().mockReturnValue(false),
                 answerPendingQuestion: vi.fn(),
-            };
+            });
 
-            dispatchTurnToHost(emitter, {
+            /** @type {any} */ (dispatchTurnToHost)(emitter, {
                 host,
                 message: 'delayed',
                 timeout: 5000,
                 timeoutHandle: setTimeout(() => {}, 5000),
                 pendingListenerRef: { current: null },
                 onReplyOuter: vi.fn(),
+                onReadyOuter: vi.fn(),
                 onStopOuter: vi.fn(),
                 resolve: vi.fn(),
                 reject: vi.fn(),
@@ -369,7 +371,7 @@ describe('turn-executor', () => {
         });
 
         it('resolve via pendingQuestion protocolar quando QUESTION_PENDING chega com REPLY já materializado', async () => {
-            const host = {
+            const host = /** @type {any} */ ({
                 hasPendingQuestion: vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true),
                 answerPendingQuestion: vi.fn(),
                 getPendingQuestionSnapshot: vi.fn(() => ({
@@ -379,16 +381,17 @@ describe('turn-executor', () => {
                     kind: 'reply',
                     protocolControlled: true,
                 })),
-            };
+            });
             const onReplyOuter = vi.fn();
 
-            dispatchTurnToHost(emitter, {
+            /** @type {any} */ (dispatchTurnToHost)(emitter, {
                 host,
                 message: 'delayed',
                 timeout: 5000,
                 timeoutHandle: setTimeout(() => {}, 5000),
                 pendingListenerRef: { current: null },
                 onReplyOuter,
+                onReadyOuter: vi.fn(),
                 onStopOuter: vi.fn(),
                 resolve: vi.fn(),
                 reject: vi.fn(),
@@ -580,7 +583,7 @@ describe('turn-executor', () => {
                 emitter,
                 'question?',
                 { timeout: 5000 },
-                { host, sendCountRef: { sendCount: 0 } },
+                /** @type {any} */ ({ host, sendCountRef: { sendCount: 0 } }),
             );
 
             host.emit('assistant.message', { content: 'OK' });
@@ -598,7 +601,7 @@ describe('turn-executor', () => {
                 getModel: vi.fn().mockReturnValue('gpt-5-mini'),
             });
 
-            const p = executeTurnImpl(
+            const p = /** @type {any} */ (executeTurnImpl)(
                 emitter,
                 'question?',
                 { timeout: 5000 },
@@ -642,7 +645,7 @@ describe('turn-executor', () => {
         });
 
         it('resolve pelo snapshot protocolar pendente quando o evento de reply se perde', async () => {
-            const host = {
+            const host = /** @type {any} */ ({
                 hasPendingQuestion: vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true),
                 answerPendingQuestion: vi.fn(),
                 getPendingQuestionSnapshot: vi.fn(() => ({
@@ -654,7 +657,7 @@ describe('turn-executor', () => {
                 })),
                 getSessionId: vi.fn().mockReturnValue('sess-1'),
                 getModel: vi.fn().mockReturnValue('gpt-5-mini'),
-            };
+            });
 
             const p = executeTurnImpl(
                 emitter,

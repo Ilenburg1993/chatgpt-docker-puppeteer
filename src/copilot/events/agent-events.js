@@ -194,6 +194,8 @@ export const AGENT_DIALOG_PRE_STALL_WARNING = 'agent:dialog:pre_stall_warning';
 export const AGENT_ABORT = 'agent:abort';
 /** @readonly */
 export const AGENT_ELICITATION_PENDING = 'agent:elicitation:pending';
+/** @readonly */
+export const AGENT_ELICITATION_COMPLETED = 'agent:elicitation:completed';
 
 // ─── FAIXA-L9: Background / Shell ────────────────────────────────────────────
 
@@ -303,7 +305,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'abort',
     'steering.sent',
     'elicitation.pending',
-    'elicitation.answered',
+    'elicitation.completed',
     'subagent.started',
     'subagent.completed',
     'subagent.failed',

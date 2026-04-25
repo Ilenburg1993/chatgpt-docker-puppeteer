@@ -32,6 +32,7 @@ vi.mock('#copilot/bridges', () => ({
 
 vi.mock('#copilot/config', () => ({
     BRIDGE_ADMIN_TOKEN: undefined,
+    LLM_B_TURN_TIMEOUT_MS: 120_000,
     OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
     SDK_API_TOKEN: null,
 }));
@@ -63,6 +64,8 @@ vi.mock('#copilot/observability', () => ({
 
 vi.mock('#copilot/sdk', () => ({
     approveAll: vi.fn(),
+    commandsHandlePending: vi.fn(),
+    compactionCompact: vi.fn(),
     createClientSession: vi.fn(),
     disconnectClientSession: vi.fn(),
     getClient: mocks.getClient,
@@ -73,12 +76,20 @@ vi.mock('#copilot/sdk', () => ({
     incrementSessionMessageCount: vi.fn(),
     listActiveClientSessions: vi.fn(() => []),
     listAllClientSessions: vi.fn(async () => []),
+    permissionsHandlePending: vi.fn(),
     pickDefined: (/** @type {Record<string, unknown>} */ value) =>
         Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)),
     resumeClientSession: vi.fn(),
     setForegroundClientSessionId: vi.fn(),
+    shellExec: vi.fn(),
+    shellKill: vi.fn(),
     stopClient: mocks.stopClient,
     forceStopClient: mocks.forceStopClient,
+    toolsHandlePendingCall: vi.fn(),
+    uiElicitation: vi.fn(),
+    workspaceCreateFile: vi.fn(),
+    workspaceListFiles: vi.fn(),
+    workspaceReadFile: vi.fn(),
 }));
 
 vi.mock('#copilot/tools', () => ({

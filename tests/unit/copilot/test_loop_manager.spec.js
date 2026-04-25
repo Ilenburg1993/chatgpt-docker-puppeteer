@@ -101,27 +101,37 @@ import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/li
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/** Cria um host mock mínimo */
+/** @returns {any} Cria um host mock mínimo */
 function createMockHost() {
     return {
         sendMessage: vi.fn(async () => 'ok'),
         sendMessageDialogBoot: vi.fn(async () => 'ok'),
         answerPendingQuestion: vi.fn(),
         hasPendingQuestion: vi.fn(() => false),
+        getPendingQuestionSnapshot: vi.fn(() => null),
         setModel: vi.fn(),
         emit: vi.fn(),
         on: vi.fn(() => () => {}),
+        once: vi.fn(() => {}),
         off: vi.fn(),
         getSessionId: vi.fn(() => 'test-session'),
         getModel: vi.fn(() => 'gpt-4o'),
+        trackBackgroundTask: vi.fn(async (task) => {
+            await task;
+        }),
     };
 }
 
 // ── Testes ───────────────────────────────────────────────────────────────
 
+/**
+ * @typedef {ReturnType<typeof createMockHost>} MockDialogLoopHost
+ */
+
 describe('DialogLoopManager', () => {
     /** @type {DialogLoopManager} */
     let dlm;
+    /** @type {any} */
     let host;
 
     beforeEach(() => {

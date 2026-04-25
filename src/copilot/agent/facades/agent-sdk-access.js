@@ -14,16 +14,29 @@
 
 import { SessionError } from '#copilot/core';
 import {
+    accountGetQuota,
+    commandsHandlePending,
+    compactionCompact,
     deselectAgent,
     getCurrentAgent,
     listAgents,
     modeGet,
+    modelsList,
     modeSet,
+    permissionsHandlePending,
     planDelete,
     planRead,
     planUpdate,
     reloadAgents,
     selectAgent,
+    shellExec,
+    shellKill,
+    toolsHandlePendingCall,
+    toolsList,
+    uiElicitation,
+    workspaceCreateFile,
+    workspaceListFiles,
+    workspaceReadFile,
 } from '#copilot/sdk';
 
 /**
@@ -168,10 +181,21 @@ export function getSdkResourceSnapshot(ctx) {
         abortAvailable: typeof handles.session?.abort === 'function',
         sessionLogAvailable: typeof handles.session?.log === 'function',
         historyAvailable: typeof handles.session?.getMessages === 'function',
+        serverModelsListAvailable:
+            typeof handles.serverRpc === 'object' && hasRpcNamespace(handles.serverRpc, 'models'),
+        serverToolsListAvailable: typeof handles.serverRpc === 'object' && hasRpcNamespace(handles.serverRpc, 'tools'),
+        quotaAvailable: typeof handles.serverRpc === 'object' && hasRpcNamespace(handles.serverRpc, 'account'),
         lastSessionLookupAvailable: typeof handles.client?.getLastSessionId === 'function',
         foregroundControlAvailable:
             typeof handles.client?.getForegroundSessionId === 'function' &&
             typeof handles.client?.setForegroundSessionId === 'function',
+        workspaceRpcAvailable: hasRpcNamespace(handles.sessionRpc, 'workspace'),
+        compactionAvailable: hasRpcNamespace(handles.sessionRpc, 'compaction'),
+        shellAvailable: hasRpcNamespace(handles.sessionRpc, 'shell'),
+        uiElicitationAvailable: hasRpcNamespace(handles.sessionRpc, 'ui'),
+        pendingCommandsAvailable: hasRpcNamespace(handles.sessionRpc, 'commands'),
+        pendingPermissionsAvailable: hasRpcNamespace(handles.sessionRpc, 'permissions'),
+        pendingToolsAvailable: hasRpcNamespace(handles.sessionRpc, 'tools'),
         customAgentsAvailable: hasRpcNamespace(handles.sessionRpc, 'agent'),
         experimentalAgentsAvailable: hasRpcNamespace(handles.sessionRpc, 'agent'),
         skillsAvailable: hasRpcNamespace(handles.sessionRpc, 'skills'),
@@ -218,6 +242,31 @@ export async function getSdkStatus(ctx) {
  */
 export async function getSdkAuthStatus(ctx) {
     return requireClient(ctx, 'getSdkAuthStatus').getAuthStatus();
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof modelsList>>>}
+ */
+export async function listSdkModels(ctx) {
+    return modelsList(requireClient(ctx, 'listSdkModels'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {{ model?: string }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof toolsList>>>}
+ */
+export async function listSdkBuiltInTools(ctx, options) {
+    return toolsList(requireClient(ctx, 'listSdkBuiltInTools'), options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof accountGetQuota>>>}
+ */
+export async function getSdkQuota(ctx) {
+    return accountGetQuota(requireClient(ctx, 'getSdkQuota'));
 }
 
 /**
@@ -291,6 +340,101 @@ export async function updateSdkPlan(ctx, content) {
  */
 export async function deleteSdkPlan(ctx) {
     return planDelete(requireSession(ctx, 'deleteSdkPlan'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof workspaceListFiles>>>}
+ */
+export async function listSdkWorkspaceFiles(ctx) {
+    return workspaceListFiles(requireSession(ctx, 'listSdkWorkspaceFiles'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} path
+ * @returns {Promise<Awaited<ReturnType<typeof workspaceReadFile>>>}
+ */
+export async function readSdkWorkspaceFile(ctx, path) {
+    return workspaceReadFile(requireSession(ctx, 'readSdkWorkspaceFile'), path);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} path
+ * @param {string} content
+ * @returns {Promise<Awaited<ReturnType<typeof workspaceCreateFile>>>}
+ */
+export async function createSdkWorkspaceFile(ctx, path, content) {
+    return workspaceCreateFile(requireSession(ctx, 'createSdkWorkspaceFile'), path, content);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof compactionCompact>>>}
+ */
+export async function compactSdkSession(ctx) {
+    return compactionCompact(requireSession(ctx, 'compactSdkSession'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} message
+ * @param {object} requestedSchema
+ * @returns {Promise<Awaited<ReturnType<typeof uiElicitation>>>}
+ */
+export async function requestSdkElicitation(ctx, message, requestedSchema) {
+    return uiElicitation(requireSession(ctx, 'requestSdkElicitation'), message, requestedSchema);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} requestId
+ * @param {{ kind: string } & Record<string, unknown>} result
+ * @returns {Promise<Awaited<ReturnType<typeof permissionsHandlePending>>>}
+ */
+export async function handleSdkPendingPermission(ctx, requestId, result) {
+    return permissionsHandlePending(requireSession(ctx, 'handleSdkPendingPermission'), requestId, result);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} requestId
+ * @param {{ result?: string | { textResultForLlm: string; resultType?: string; error?: string }; error?: string }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof toolsHandlePendingCall>>>}
+ */
+export async function handleSdkPendingToolCall(ctx, requestId, options) {
+    return toolsHandlePendingCall(requireSession(ctx, 'handleSdkPendingToolCall'), requestId, options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} requestId
+ * @param {{ error?: string }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof commandsHandlePending>>>}
+ */
+export async function handleSdkPendingCommand(ctx, requestId, options) {
+    return commandsHandlePending(requireSession(ctx, 'handleSdkPendingCommand'), requestId, options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} command
+ * @param {{ cwd?: string; timeout?: number }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof shellExec>>>}
+ */
+export async function execSdkShell(ctx, command, options) {
+    return shellExec(requireSession(ctx, 'execSdkShell'), command, options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} processId
+ * @param {'SIGTERM' | 'SIGKILL' | 'SIGINT'} [signal]
+ * @returns {Promise<Awaited<ReturnType<typeof shellKill>>>}
+ */
+export async function killSdkShell(ctx, processId, signal) {
+    return shellKill(requireSession(ctx, 'killSdkShell'), processId, signal);
 }
 
 /**

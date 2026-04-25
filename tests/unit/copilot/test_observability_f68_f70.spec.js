@@ -141,7 +141,7 @@ function makeSessionMetadata(sessionId, startTime) {
     };
 }
 
-/** @returns {import('../../../src/copilot/agent/dialog/loop-manager.js').AgentHost} */
+/** @returns {import('../../../src/copilot/agent/types.js').DialogLoopHost} */
 function makeDialogHost() {
     return /** @type {any} */ ({
         sendMessage: vi.fn(async () => ''),

@@ -54,7 +54,10 @@ vi.mock(
 
 // ─── Imports ────────────────────────────────────────────────────────────────
 
-import { ClientOptionsBuilder } from '../../../../src/copilot/config/client-options.js';
+import {
+    ClientOptionsBuilder,
+    buildCopilotClientOptionsFromEnv,
+} from '../../../../src/copilot/config/client-options.js';
 import { SessionConfigBuilder } from '../../../../src/copilot/config/session-config.js';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -384,5 +387,51 @@ describe('ClientOptionsBuilder', () => {
         expect(opts.cliUrl).toBe('localhost:9000');
         expect(opts.logLevel).toBe('info');
         expect(opts.autoStart).toBe(true);
+    });
+
+    it('buildCopilotClientOptionsFromEnv centraliza cliUrl e omite transporte conflitante', () => {
+        const original = { ...process.env };
+        try {
+            process.env.COPILOT_CLI_URL = 'http://127.0.0.1:9010';
+            process.env.COPILOT_CLI_PATH = '/bin/copilot';
+            process.env.COPILOT_USE_STDIO = 'false';
+            process.env.COPILOT_CLI_PORT = '9011';
+            process.env.COPILOT_LOG_LEVEL = 'DEBUG';
+            const opts = buildCopilotClientOptionsFromEnv();
+            expect(opts.cliUrl).toBe('http://127.0.0.1:9010');
+            expect(opts.cliPath).toBeUndefined();
+            expect(opts.useStdio).toBeUndefined();
+            expect(opts.port).toBeUndefined();
+            expect(opts.logLevel).toBe('debug');
+        } finally {
+            process.env = original;
+        }
+    });
+
+    it('buildCopilotClientOptionsFromEnv cobre spawn, auth e telemetria do SDK', () => {
+        const original = { ...process.env };
+        try {
+            delete process.env.COPILOT_CLI_URL;
+            process.env.COPILOT_CLI_PATH = '/opt/copilot';
+            process.env.COPILOT_CLI_ARGS = '["--stdio"]';
+            process.env.COPILOT_USE_STDIO = 'true';
+            process.env.COPILOT_AUTO_START = 'false';
+            process.env.COPILOT_GITHUB_TOKEN = 'ghp_env';
+            process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318';
+            process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = 'true';
+            const opts = buildCopilotClientOptionsFromEnv();
+            expect(opts.cliPath).toBe('/opt/copilot');
+            expect(opts.cliArgs).toEqual(['--stdio']);
+            expect(opts.useStdio).toBe(true);
+            expect(opts.autoStart).toBe(false);
+            expect(opts.githubToken).toBe('ghp_env');
+            expect(opts.useLoggedInUser).toBe(false);
+            expect(opts.telemetry).toMatchObject({
+                otlpEndpoint: 'http://localhost:4318',
+                captureContent: true,
+            });
+        } finally {
+            process.env = original;
+        }
     });
 });

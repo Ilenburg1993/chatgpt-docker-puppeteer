@@ -117,6 +117,19 @@ function _deriveCategoriesFromTools() {
 }
 
 /**
+ * Retorna o mapa de categorias derivado dinamicamente. Se ainda não houver bootstrap, usa o CATEGORY_TOOL_MAP
+ * heurístico como fallback.
+ *
+ * @returns {Record<string, string[]>}
+ */
+function getCategoryToolMap() {
+    if (Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).length > 0) {
+        return _CATEGORY_TOOL_MAP_DYNAMIC;
+    }
+    return /** @type {Record<string, string[]>} */ (CATEGORY_TOOL_MAP);
+}
+
+/**
  * Informa ao módulo quais ferramentas estão registradas na sessão atual. Deve ser chamado pelo AlwaysAliveAgent após
  * montar o array de tools.
  *
@@ -200,9 +213,9 @@ const listToolsTool = createTool({
             );
         }
 
-        // Categorias heurísticas por nome de tool (ver CATEGORY_TOOL_MAP)
+        // Categorias derivadas dinamicamente (fallback para map heurístico se não houver bootstrap)
         if (category) {
-            const allowed = CATEGORY_TOOL_MAP[category];
+            const allowed = getCategoryToolMap()[category];
             if (allowed) tools = tools.filter((t) => allowed.includes(t.name));
         }
 

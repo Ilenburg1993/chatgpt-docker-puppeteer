@@ -602,7 +602,7 @@
 /**
  * Resultado de ui.elicitation() — resposta do formulário pelo usuário.
  *
- * @typedef {{ action: 'accept' | 'dismiss' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} ElicitationResult
+ * @typedef {{ action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} ElicitationResult
  */
 
 /**

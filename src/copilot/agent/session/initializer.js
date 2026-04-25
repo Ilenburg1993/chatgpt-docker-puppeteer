@@ -19,7 +19,14 @@ import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { buildCustomAgentsConfig } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { DEFAULT_MODEL, createSession, loadToolsConfigAsync, pickDefined, resumeOrCreate } from '#copilot/sdk';
+import {
+    DEFAULT_MODEL,
+    createSession,
+    getSessionMessages,
+    loadToolsConfigAsync,
+    pickDefined,
+    resumeOrCreate,
+} from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
@@ -64,7 +71,7 @@ async function _validateResumedSession(session) {
     if (typeof session.getMessages !== 'function') return true;
     try {
         await Promise.race([
-            session.getMessages(),
+            getSessionMessages(session),
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('resume-health-timeout')), RESUMED_SESSION_HEALTH_TIMEOUT_MS),
             ),

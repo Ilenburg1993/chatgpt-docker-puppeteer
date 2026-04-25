@@ -70,7 +70,7 @@ function sendHandlerResult(res, result) {
         result.status >= 500 &&
         result.body &&
         typeof result.body === 'object' &&
-        typeof /** @type {Record<string, unknown>} */ (result.body)['error'] === 'string'
+        typeof (/** @type {Record<string, unknown>} */ (result.body)['error']) === 'string'
             ? {
                   .../** @type {Record<string, unknown>} */ (result.body),
                   error: sanitizeHttpErrorMessage(

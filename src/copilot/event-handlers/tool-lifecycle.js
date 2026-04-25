@@ -5,8 +5,9 @@
  * Faixa B3: Handlers dedicados para tool.execution_progress, tool.user_requested, tool.execution_start/complete.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -16,7 +17,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
 export function wireToolLifecycleEvents(session, { emit }) {
     return [
         // ── tool.execution_partial_result ───────────────────────────────
-        session.on(SESSION_EVENTS.TOOL_EXECUTION_PARTIAL_RESULT, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.TOOL_EXECUTION_PARTIAL_RESULT, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
@@ -31,7 +32,7 @@ export function wireToolLifecycleEvents(session, { emit }) {
         }),
 
         // ── tool.execution_progress ──────────────────────────────────────
-        session.on(SESSION_EVENTS.TOOL_EXECUTION_PROGRESS, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.TOOL_EXECUTION_PROGRESS, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
@@ -54,7 +55,7 @@ export function wireToolLifecycleEvents(session, { emit }) {
         }),
 
         // ── tool.user_requested ──────────────────────────────────────────
-        session.on(SESSION_EVENTS.TOOL_USER_REQUESTED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.TOOL_USER_REQUESTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const toolName = /** @type {string | undefined} */ (data['toolName']);

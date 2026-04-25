@@ -349,12 +349,7 @@ async function runBootStepWithPolicy(step, state) {
         return;
     }
 
-    const status =
-        result.disposition === 'ignore'
-            ? 'skipped'
-            : !step.required && result.disposition !== 'fatal'
-              ? 'degraded'
-              : 'failed';
+    const status = result.disposition === 'ignore' ? 'skipped' : !step.required ? 'degraded' : 'failed';
     const level = status === 'failed' ? 'ERROR' : status === 'degraded' ? 'WARN' : 'DEBUG';
 
     state.stepReports.push({

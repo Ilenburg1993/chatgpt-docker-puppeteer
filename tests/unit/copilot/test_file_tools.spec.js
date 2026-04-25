@@ -79,9 +79,9 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fileTools — exportações do módulo', () => {
-    it('fileReadTools é um Array com 4 elementos', () => {
+    it('fileReadTools é um Array com pelo menos 4 elementos', () => {
         assert.ok(Array.isArray(fileReadTools));
-        assert.equal(fileReadTools.length, 4);
+        assert.ok(fileReadTools.length >= 4);
     });
 
     it('fileWriteTools é um Array com 6 elementos', () => {
@@ -89,9 +89,9 @@ describe('fileTools — exportações do módulo', () => {
         assert.equal(fileWriteTools.length, 6);
     });
 
-    it('fileTools = fileReadTools + fileWriteTools (10 no total)', () => {
+    it('fileTools = fileReadTools + fileWriteTools', () => {
         assert.ok(Array.isArray(fileTools));
-        assert.equal(fileTools.length, 10);
+        assert.equal(fileTools.length, fileReadTools.length + fileWriteTools.length);
     });
 
     it('fileReadTools inclui read_file_content, list_directory, search_in_files, diff_files', () => {

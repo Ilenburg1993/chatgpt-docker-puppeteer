@@ -10,7 +10,7 @@
 
 import { defaultAuditLog, getAuditTail } from '#copilot/audit';
 import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
-import { BRIDGE_ADMIN_TOKEN, OTEL_EXPORTER_OTLP_ENDPOINT, SDK_API_TOKEN } from '#copilot/config';
+import { BRIDGE_ADMIN_TOKEN, LLM_B_TURN_TIMEOUT_MS, OTEL_EXPORTER_OTLP_ENDPOINT, SDK_API_TOKEN } from '#copilot/config';
 import { container } from '#copilot/core';
 import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
 import {
@@ -28,6 +28,8 @@ import {
 } from '#copilot/observability';
 import {
     approveAll,
+    commandsHandlePending,
+    compactionCompact,
     createClientSession,
     disconnectClientSession,
     forceStopClient,
@@ -39,13 +41,22 @@ import {
     incrementSessionMessageCount,
     listActiveClientSessions,
     listAllClientSessions,
+    permissionsHandlePending,
     pickDefined,
     resumeClientSession,
     setForegroundClientSessionId,
+    shellExec,
+    shellKill,
     stopClient,
+    toolsHandlePendingCall,
+    uiElicitation,
+    workspaceCreateFile,
+    workspaceListFiles,
+    workspaceReadFile,
 } from '#copilot/sdk';
 import { getAllTools } from '#copilot/tools';
 import { resolveAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
+import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
 import { readAgentStatusSnapshot, readAgentStatusValue } from '../../../presentation/runtime-status.js';
 import {
@@ -75,6 +86,19 @@ const sdkSessionOps = Object.freeze({
     pickDefined,
     resumeClientSession,
     setForegroundClientSessionId,
+});
+
+const sdkSessionRpcOps = Object.freeze({
+    commandsHandlePending,
+    compactionCompact,
+    permissionsHandlePending,
+    shellExec,
+    shellKill,
+    toolsHandlePendingCall,
+    uiElicitation,
+    workspaceCreateFile,
+    workspaceListFiles,
+    workspaceReadFile,
 });
 
 const sdkSessionOwnershipOps = Object.freeze({
@@ -117,6 +141,11 @@ const sdkHookOps = Object.freeze({
     log,
 });
 
+const sdkSessionPolicyOps = Object.freeze({
+    defaultDialogTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+    resolveOptionalDialogTimeout,
+});
+
 /**
  * @returns {import('#copilot/observability/metrics.js').MetricsStore}
  */
@@ -145,10 +174,12 @@ function resolveMetricsStore() {
  *     forceStopClient: typeof forceStopClient;
  *     allTools: ReturnType<typeof getAllTools>;
  *     sdkSession: typeof sdkSessionOps;
+ *     sdkSessionRpc: typeof sdkSessionRpcOps;
  *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
  *     sdkRuntimeProjection: typeof sdkRuntimeProjectionOps;
  *     sdkObservability: typeof sdkObservabilityOps;
  *     sdkHooks: typeof sdkHookOps;
+ *     sdkSessionPolicy: typeof sdkSessionPolicyOps;
  *     sdkApiToken: string | null;
  *     bridgeAdminToken: string | undefined;
  * }}
@@ -168,10 +199,12 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         forceStopClient,
         allTools: getAllTools(),
         sdkSession: sdkSessionOps,
+        sdkSessionRpc: sdkSessionRpcOps,
         sdkSessionOwnership: sdkSessionOwnershipOps,
         sdkRuntimeProjection: sdkRuntimeProjectionOps,
         sdkObservability: sdkObservabilityOps,
         sdkHooks: sdkHookOps,
+        sdkSessionPolicy: sdkSessionPolicyOps,
         sdkApiToken: SDK_API_TOKEN,
         bridgeAdminToken: BRIDGE_ADMIN_TOKEN,
     };

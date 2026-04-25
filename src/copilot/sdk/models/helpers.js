@@ -7,8 +7,11 @@
  */
 
 import { ConfigError } from '#copilot/core';
+import { log } from '../logger.js';
 import { getClient } from '../session/client.js';
+import { modelSelector } from './registry.js';
 
+import { toError } from '../../core/error-handlers.js';
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
  *
@@ -144,6 +147,67 @@ export function resolveModelId(models, preferred, fallback = 'gpt-5-mini') {
     return found ? found.id : fallback;
 }
 
+/**
+ * Seleciona automaticamente o melhor modelo disponível usando ModelSelector (F40.2). Se preferred é 'auto', usa
+ * heurística de seleção; caso contrário, usa resolveModelId.
+ *
+ * @example
+ *     const models = await listModels();
+ *     const model = await resolveModelIdAuto(models, 'auto');
+ *     // => 'gpt-4o-mini' (exemplo: rápido + barato)
+ *
+ * @param {ModelInfo[]} models - Lista de modelos disponíveis
+ * @param {string} [preferred='auto'] - ID do modelo preferido ou 'auto' para seleção automática. Default is `'auto'`
+ * @param {string} [fallback='gpt-5-mini'] - Modelo de fallback se auto-selection falhar. Default is `'gpt-5-mini'`
+ * @returns {Promise<string>} ID do modelo selecionado
+ * @throws {Error} Se não houver modelos disponíveis
+ */
+export async function resolveModelIdAuto(models, preferred = 'auto', fallback = 'gpt-5-mini') {
+    // Se preferred não é 'auto', usar resolveModelId original
+    if (preferred !== 'auto') {
+        return resolveModelId(models, preferred, fallback);
+    }
+
+    // Auto-selection: usar ModelSelector para escolher melhor modelo
+    const enabled = filterEnabledModels(models);
+    if (enabled.length === 0) {
+        log('WARN', '[models] Nenhum modelo habilitado encontrado; usando fallback');
+        return fallback;
+    }
+
+    try {
+        // Critério de seleção: rápido + barato (balanceado para terminal)
+        const selected = modelSelector.select(
+            {
+                preferFast: true,
+                preferLowCost: true,
+                // Nota: reasoningEffort exigiria requireReasoning: true
+                // Por enquanto, deixamos aberto para qualquer modelo
+            },
+            enabled.map((m) => m.id),
+        );
+
+        if (!selected) {
+            log('WARN', '[models] ModelSelector não selecionou modelo; usando primeiro habilitado');
+            const firstModel = enabled[0];
+            if (!firstModel) {
+                log('ERROR', '[models] enabled array vazio (condição inesperada); usando fallback');
+                return fallback;
+            }
+            return firstModel.id;
+        }
+
+        log(
+            'INFO',
+            `[models] Auto-selecionado: ${selected.id} (custo: ${selected.costTier}, velocidade: ${selected.speedTier})`,
+        );
+        return selected.id;
+    } catch (e) {
+        const err = toError(e);
+        log('ERROR', `[models] Auto-selection falhou: ${err.message}; usando fallback`);
+        return fallback;
+    }
+}
 // ─── Configuração de reasoningEffort ─────────────────────────────────────────
 
 /**

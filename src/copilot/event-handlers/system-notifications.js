@@ -5,8 +5,9 @@
  * F62.6: Handler de eventos system.notification da sessão SDK.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -15,7 +16,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireSystemNotificationEvents(session, { emit }) {
     return [
-        session.on(SESSION_EVENTS.SYSTEM_NOTIFICATION, (event) => {
+        onSessionEvent(session, SESSION_EVENTS.SYSTEM_NOTIFICATION, (event) => {
             const kind = /** @type {Record<string, unknown> & { type: string }} */ (event?.data?.['kind']);
             if (!kind?.type) return;
 

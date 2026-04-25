@@ -9,6 +9,7 @@
  */
 
 import { isFatalError, toError } from '#copilot/core';
+import { isSdkQuotaOrRateLimitError } from '../sdk/errors.js';
 
 /** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
 
@@ -61,6 +62,7 @@ function normalizeAgentError(error) {
  * Nesta fase incremental, a política preserva a semântica já praticada no runtime:
  *
  * - `AbortError` → `ignore`
+ * - quota/rate-limit do SDK → `fatal` operacional: nao reconectar nem retry transparente
  * - erros fatais já reconhecidos por `#copilot/core` → `fatal`
  * - todo o resto → `retry`
  *
@@ -71,6 +73,9 @@ export function classifyAgentError(error) {
     const normalized = normalizeAgentError(error);
     if (normalized instanceof DOMException && normalized.name === 'AbortError') {
         return 'ignore';
+    }
+    if (isSdkQuotaOrRateLimitError(normalized)) {
+        return 'fatal';
     }
     if (typeof isFatalError === 'function' && isFatalError(normalized)) {
         return 'fatal';

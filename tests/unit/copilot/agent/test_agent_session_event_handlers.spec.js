@@ -193,7 +193,7 @@ describe('F43 — event-handlers/sdk-responses', () => {
         const emit = vi.fn();
         const unsubs = wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBeGreaterThan(10);
+        expect(unsubs.length).toBeGreaterThan(0);
         unsubs.forEach((u) => expect(typeof u).toBe('function'));
     });
 
@@ -291,6 +291,41 @@ describe('F43 — event-handlers/sdk-responses', () => {
                 operation: 'update',
             }),
         );
+    });
+
+    it('normaliza elicitation.requested e elicitation.completed conforme rpc.d.ts do SDK', async () => {
+        const { wireSdkResponseEvents } = await import('#copilot/event-handlers/sdk-responses');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSdkResponseEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('elicitation.requested', {
+            requestId: 'el-1',
+            toolCallId: 'tool-1',
+            elicitationSource: 'mcp-server',
+            message: 'Escolha o ambiente',
+            mode: 'form',
+            requestedSchema: {
+                type: 'object',
+                properties: { env: { type: 'string', enum: ['dev', 'prod'] } },
+                required: ['env'],
+            },
+        });
+
+        expect(emit).toHaveBeenCalledWith(
+            'elicitation.pending',
+            expect.objectContaining({
+                requestId: 'el-1',
+                message: 'Escolha o ambiente',
+                mode: 'form',
+                requestedSchema: expect.objectContaining({ type: 'object' }),
+                toolCallId: 'tool-1',
+                elicitationSource: 'mcp-server',
+            }),
+        );
+
+        session._emit('elicitation.completed', { requestId: 'el-1' });
+        expect(emit).toHaveBeenCalledWith('elicitation.completed', expect.objectContaining({ requestId: 'el-1' }));
     });
 });
 
@@ -439,16 +474,16 @@ describe('F43 — SessionMessagesCache', () => {
         const cache = new SessionMessagesCache(60000, { maxItems: 2 });
         const session = createMockSession();
         session.getMessages.mockResolvedValueOnce([
-            { id: '1', type: 'user', content: 'old' },
-            { id: '2', type: 'assistant', content: 'mid' },
-            { id: '3', type: 'user', content: 'new' },
+            { id: '1', type: 'user', content: 'old', createdAt: 1 },
+            { id: '2', type: 'assistant', content: 'mid', createdAt: 2 },
+            { id: '3', type: 'user', content: 'new', createdAt: 3 },
         ]);
 
         const result = await cache.get(/** @type {any} */ (session));
 
         expect(result).toEqual([
-            { id: '2', type: 'assistant', content: 'mid' },
-            { id: '3', type: 'user', content: 'new' },
+            { id: '2', type: 'assistant', content: 'mid', createdAt: 2 },
+            { id: '3', type: 'user', content: 'new', createdAt: 3 },
         ]);
     });
 

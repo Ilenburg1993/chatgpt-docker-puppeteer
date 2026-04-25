@@ -33,7 +33,8 @@ import { log, startSpan } from '../ports/observability-port.js';
  *     client: import('#copilot/sdk/types').CopilotClient,
  *     session: import('@github/copilot-sdk').CopilotSession,
  *     isResumed: boolean,
- * ) => Promise<void>} [onSessionReady] - Reaplica o runtime governado pela sessão reconectada.
+ * ) => Promise<void>} [onSessionReady]
+ *   - Reaplica o runtime governado pela sessão reconectada.
  */
 
 /**
@@ -53,6 +54,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  *     baseDelayMs?: number;
  *     jitterFn?: () => number;
  *     sessionLog?: (msg: string) => Promise<void>;
+ *     shouldAbort?: () => boolean;
  * }} [opts]
  *   - Opções de tuning
  *
@@ -60,7 +62,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  */
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
     // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
-    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog } = opts;
+    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog, shouldAbort } = opts;
     const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient, onSessionReady } =
         callbacks;
 
@@ -77,6 +79,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
         { sessionId: '', model: '', extra: { maxAttempts, error: originalError.message } },
         async () => {
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                if (shouldAbort?.()) {
+                    log('INFO', '[AlwaysAlive] Reconexão abortada: host em shutdown.');
+                    return false;
+                }
                 // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
                 // G2-ARCH-09: cap no máximo de 30s para evitar esperas excessivas
                 const raw = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
@@ -85,6 +91,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                 emit('status', `reconnecting:${attempt}/${maxAttempts}`);
 
                 await new Promise((r) => setTimeout(r, delay));
+                if (shouldAbort?.()) {
+                    log('INFO', '[AlwaysAlive] Reconexão abortada após backoff: host em shutdown.');
+                    return false;
+                }
 
                 const attemptResult = await withAgentErrorPolicy(
                     async () => {

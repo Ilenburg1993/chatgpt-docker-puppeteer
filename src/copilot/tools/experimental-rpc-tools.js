@@ -106,17 +106,14 @@ async function wrapExp(toolName, fn) {
 const expFleetStartTool = createTool({
     name: 'exp_fleet_start',
     description: '[Experimental] Inicia um fleet de agentes paralelos. ' + 'Requer feature flag "fleet" habilitado.',
-    parameters:
-        /** @type {import('#copilot/sdk/types').ZodSchema<{ maxAgents?: number; model?: string; prompt?: string }>} */ (
-            /** @type {unknown} */ (
-                z.object({
-                    maxAgents: z.number().optional().describe('Número máximo de agentes no fleet'),
-                    model: z.string().optional().describe('Modelo a usar nos agentes do fleet'),
-                    prompt: z.string().optional().describe('Prompt usado para os agentes do fleet'),
-                })
-            )
-        ),
-    handler: async (/** @type {{ maxAgents?: number; model?: string; prompt?: string }} */ params) =>
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ prompt?: string }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                prompt: z.string().optional().describe('Prompt opcional combinado às instruções do fleet'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ prompt?: string }} */ params) =>
         wrapExp('exp_fleet_start', (s) => fleetStart(s, params)),
 });
 
@@ -144,16 +141,16 @@ const expAgentGetCurrentTool = createTool({
 
 const expAgentSelectTool = createTool({
     name: 'exp_agent_select',
-    description: '[Experimental] Seleciona um agente por ID. ' + 'Requer feature flag "agents" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ agentId: string }>} */ (
+    description: '[Experimental] Seleciona um agente por nome. ' + 'Requer feature flag "agents" habilitado.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                agentId: z.string().min(1).describe('ID do agente a selecionar'),
+                name: z.string().min(1).describe('Nome do agente a selecionar'),
             })
         )
     ),
-    handler: async (/** @type {{ agentId: string }} */ { agentId }) =>
-        wrapExp('exp_agent_select', (s) => agentSelect(s, agentId)),
+    handler: async (/** @type {{ name: string }} */ { name }) =>
+        wrapExp('exp_agent_select', (s) => agentSelect(s, name)),
 });
 
 const expAgentDeselectTool = createTool({
@@ -190,30 +187,30 @@ const expSkillsListTool = createTool({
 
 const expSkillsEnableTool = createTool({
     name: 'exp_skills_enable',
-    description: '[Experimental] Habilita uma skill por ID. ' + 'Requer feature flag "skills" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ skillId: string }>} */ (
+    description: '[Experimental] Habilita uma skill por nome. ' + 'Requer feature flag "skills" habilitado.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                skillId: z.string().min(1).describe('ID da skill a habilitar'),
+                name: z.string().min(1).describe('Nome da skill a habilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ skillId: string }} */ { skillId }) =>
-        wrapExp('exp_skills_enable', (s) => skillsEnable(s, skillId)),
+    handler: async (/** @type {{ name: string }} */ { name }) =>
+        wrapExp('exp_skills_enable', (s) => skillsEnable(s, name)),
 });
 
 const expSkillsDisableTool = createTool({
     name: 'exp_skills_disable',
-    description: '[Experimental] Desabilita uma skill por ID. ' + 'Requer feature flag "skills" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ skillId: string }>} */ (
+    description: '[Experimental] Desabilita uma skill por nome. ' + 'Requer feature flag "skills" habilitado.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                skillId: z.string().min(1).describe('ID da skill a desabilitar'),
+                name: z.string().min(1).describe('Nome da skill a desabilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ skillId: string }} */ { skillId }) =>
-        wrapExp('exp_skills_disable', (s) => skillsDisable(s, skillId)),
+    handler: async (/** @type {{ name: string }} */ { name }) =>
+        wrapExp('exp_skills_disable', (s) => skillsDisable(s, name)),
 });
 
 const expSkillsReloadTool = createTool({
@@ -240,30 +237,30 @@ const expMcpListTool = createTool({
 
 const expMcpEnableTool = createTool({
     name: 'exp_mcp_enable',
-    description: '[Experimental] Habilita um servidor MCP por ID. ' + 'Requer feature flag "mcp" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverId: string }>} */ (
+    description: '[Experimental] Habilita um servidor MCP por nome. ' + 'Requer feature flag "mcp" habilitado.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                serverId: z.string().min(1).describe('ID do servidor MCP a habilitar'),
+                serverName: z.string().min(1).describe('Nome do servidor MCP a habilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ serverId: string }} */ { serverId }) =>
-        wrapExp('exp_mcp_enable', (s) => mcpEnable(s, serverId)),
+    handler: async (/** @type {{ serverName: string }} */ { serverName }) =>
+        wrapExp('exp_mcp_enable', (s) => mcpEnable(s, serverName)),
 });
 
 const expMcpDisableTool = createTool({
     name: 'exp_mcp_disable',
-    description: '[Experimental] Desabilita um servidor MCP por ID. ' + 'Requer feature flag "mcp" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverId: string }>} */ (
+    description: '[Experimental] Desabilita um servidor MCP por nome. ' + 'Requer feature flag "mcp" habilitado.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                serverId: z.string().min(1).describe('ID do servidor MCP a desabilitar'),
+                serverName: z.string().min(1).describe('Nome do servidor MCP a desabilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ serverId: string }} */ { serverId }) =>
-        wrapExp('exp_mcp_disable', (s) => mcpDisable(s, serverId)),
+    handler: async (/** @type {{ serverName: string }} */ { serverName }) =>
+        wrapExp('exp_mcp_disable', (s) => mcpDisable(s, serverName)),
 });
 
 const expMcpReloadTool = createTool({
@@ -304,29 +301,29 @@ const expExtensionsListTool = createTool({
 const expExtensionsEnableTool = createTool({
     name: 'exp_extensions_enable',
     description: '[Experimental] Habilita uma extensão por ID. ' + 'Requer feature flag "extensions" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ extensionId: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                extensionId: z.string().min(1).describe('ID da extensão a habilitar'),
+                id: z.string().min(1).describe('ID source-qualified da extensão a habilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ extensionId: string }} */ { extensionId }) =>
-        wrapExp('exp_extensions_enable', (s) => extensionsEnable(s, extensionId)),
+    handler: async (/** @type {{ id: string }} */ { id }) =>
+        wrapExp('exp_extensions_enable', (s) => extensionsEnable(s, id)),
 });
 
 const expExtensionsDisableTool = createTool({
     name: 'exp_extensions_disable',
     description: '[Experimental] Desabilita uma extensão por ID. ' + 'Requer feature flag "extensions" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ extensionId: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                extensionId: z.string().min(1).describe('ID da extensão a desabilitar'),
+                id: z.string().min(1).describe('ID source-qualified da extensão a desabilitar'),
             })
         )
     ),
-    handler: async (/** @type {{ extensionId: string }} */ { extensionId }) =>
-        wrapExp('exp_extensions_disable', (s) => extensionsDisable(s, extensionId)),
+    handler: async (/** @type {{ id: string }} */ { id }) =>
+        wrapExp('exp_extensions_disable', (s) => extensionsDisable(s, id)),
 });
 
 const expExtensionsReloadTool = createTool({

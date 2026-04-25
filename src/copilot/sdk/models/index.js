@@ -30,6 +30,7 @@ export {
     listModels,
     pickModel,
     resolveModelId,
+    resolveModelIdAuto,
     supportsReasoning,
 } from './helpers.js';
 

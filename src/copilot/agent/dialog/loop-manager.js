@@ -307,6 +307,9 @@ export class DialogLoopManager extends EventEmitter {
 
         // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
         bootPromise.catch((e) => {
+            if (!this.#state.active) {
+                return;
+            }
             if (isBootTimeoutError(e)) {
                 this.emit(EMITTER_LOOP_TURN_TIMEOUT, { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
                 log(

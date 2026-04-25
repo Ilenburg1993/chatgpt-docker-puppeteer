@@ -12,6 +12,13 @@ const handlePipeline = vi.fn(async (params) => ({
     body: { ok: true, accepted: params?.body ?? null },
 }));
 
+/** @type {import('express').RequestHandler} */
+const passRateMiddleware = (
+    /** @type {import('express').Request} */ _req,
+    /** @type {import('express').Response} */ _res,
+    /** @type {import('express').NextFunction} */ next,
+) => next();
+
 vi.mock('../../../src/copilot/presentation/agent-control.js', () => ({
     handleAcceptHandoff: vi.fn(() => ({ status: 200, body: { ok: true } })),
     handleDialogPause: vi.fn(() => ({ status: 200, body: { ok: true } })),
@@ -29,16 +36,8 @@ vi.mock('../../../src/copilot/presentation/system-metrics.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/server/middleware/rate-limiter.js', () => ({
-    injectRateMiddleware: (
-        /** @type {any} */ _req,
-        /** @type {any} */ _res,
-        /** @type {Function} */ next
-    ) => next(),
-    writeRateMiddleware: (
-        /** @type {any} */ _req,
-        /** @type {any} */ _res,
-        /** @type {Function} */ next
-    ) => next(),
+    injectRateMiddleware: passRateMiddleware,
+    writeRateMiddleware: passRateMiddleware,
 }));
 
 describe('server/routes/agent validation', () => {

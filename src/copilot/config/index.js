@@ -72,7 +72,7 @@ export {
 export { SessionConfigBuilder } from './session-config.js';
 
 // ─── Client Options Builder (Faixa C) ────────────────────────────────────────
-export { ClientOptionsBuilder } from './client-options.js';
+export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from './client-options.js';
 
 export { PinnedFilesLoader } from './pinned-files.js';
 

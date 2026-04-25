@@ -21,7 +21,7 @@ import { createCopilotBootPlan, readCopilotBootConfig } from '#copilot/boot';
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { HOOKS_LOGGER } from '#copilot/hooks';
 import { ERROR_TRACKER } from '#copilot/observability';
-import { CopilotClient, SDK_LOGGER, TOOLS_BUILDER, checkAuthStatus } from '#copilot/sdk';
+import { SDK_LOGGER, TOOLS_BUILDER, checkAuthStatus, createCopilotClient } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { runCopilotSdkBootPreflight } from './agent/lifecycle/runtime-host.js';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
@@ -83,7 +83,7 @@ export async function bootCopilot() {
         ]);
 
         const bootPreflight = await runCopilotSdkBootPreflight({
-            createClient: () => new CopilotClient(),
+            createClient: () => createCopilotClient(),
             checkAuthStatus,
             configuredModel: COPILOT_MODEL,
             pingTimeoutMs: PING_TIMEOUT_MS,

@@ -30,8 +30,9 @@ describe('terminal/commands/thinking.js', () => {
     });
 
     it('lista thinkings capturados', async () => {
+        /** @type {string[]} */
         const lines = [];
-        mocks.getThinkingHistory.mockReturnValue([
+        const history = /** @type {any} */ ([
             {
                 id: 'dialog-abc123',
                 source: 'dialog',
@@ -42,6 +43,7 @@ describe('terminal/commands/thinking.js', () => {
                 status: 'completed',
             },
         ]);
+        mocks.getThinkingHistory.mockReturnValue(history);
         const { cmdThinking } = await import('../../../src/copilot/terminal/commands/thinking.js');
         cmdThinking({ println: (text) => lines.push(text) }, 'list 5');
         expect(lines.join('\n')).toContain('dialog-abc123'.slice(-12));
@@ -49,10 +51,9 @@ describe('terminal/commands/thinking.js', () => {
     });
 
     it('abre o latest completo', async () => {
+        /** @type {string[]} */
         const lines = [];
-        mocks.getLatestThinkingHistoryEntry.mockReturnValue(
-            /** @type {any} */
-            {
+        const latestEntry = /** @type {any} */ ({
             id: 'dialog-latest',
             source: 'dialog',
             title: 'LLM-B',
@@ -61,6 +62,7 @@ describe('terminal/commands/thinking.js', () => {
             durationMs: 1800,
             status: 'completed',
         });
+        mocks.getLatestThinkingHistoryEntry.mockReturnValue(latestEntry);
         const { cmdThinking } = await import('../../../src/copilot/terminal/commands/thinking.js');
         cmdThinking({ println: (text) => lines.push(text) }, 'latest');
         expect(lines.join('\n')).toContain('linha 1');

@@ -65,9 +65,95 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { createTool } from '#copilot/sdk';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import { log } from './logger.js';
+import { createTool as sdkCreateTool } from '#copilot/sdk';
+import { createRequire } from 'node:module';
+
+/**
+ * @returns {typeof import('zod-to-json-schema').zodToJsonSchema | null}
+ */
+function loadZodToJsonSchema() {
+    const fn = /** @type {typeof loadZodToJsonSchema & {
+    _converter?: typeof import('zod-to-json-schema').zodToJsonSchema | null;
+    _attempted?: boolean;
+}} */ (loadZodToJsonSchema);
+    if (fn._converter || fn._attempted) return fn._converter ?? null;
+    fn._attempted = true;
+    try {
+        const requireFromHere = createRequire(import.meta.url);
+        const mod = requireFromHere('zod-to-json-schema');
+        fn._converter = mod.zodToJsonSchema ?? mod.default ?? null;
+    } catch {
+        fn._converter = null;
+    }
+    return fn._converter ?? null;
+}
+
+/**
+ * Fallback estritamente local para a janela de TDZ do barrel em ciclos ESM/Vitest.
+ *
+ * @param {{
+ *     name: string;
+ *     description: string;
+ *     parameters?: Record<string, unknown>;
+ *     handler: import('#copilot/sdk/types').ToolHandler<any>;
+ *     skipPermission?: boolean;
+ *     overridesBuiltInTool?: boolean;
+ * }} options
+ * @returns {import('#copilot/sdk/types').Tool<any>}
+ */
+function makePlainTool(options) {
+    return /** @type {import('#copilot/sdk/types').Tool<any>} */ ({
+        name: options.name,
+        description: options.description,
+        ...(options.parameters !== undefined ? { parameters: options.parameters } : {}),
+        handler: options.handler,
+        skipPermission: options.skipPermission ?? false,
+        ...(options.overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+    });
+}
+
+/**
+ * Factory SDK-first com fallback apenas para ciclos de inicialização.
+ *
+ * @param {Parameters<typeof sdkCreateTool>[0]} options
+ * @returns {ReturnType<typeof sdkCreateTool>}
+ */
+function createTool(options) {
+    try {
+        const tool = sdkCreateTool(options);
+        if (tool && typeof tool === 'object') {
+            return tool;
+        }
+        return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
+    } catch (err) {
+        if (
+            (err instanceof ReferenceError && /initialization|initializ/i.test(err.message)) ||
+            (err instanceof Error && /defineTool.*export|No "defineTool" export/i.test(err.message))
+        ) {
+            return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
+        }
+        throw err;
+    }
+}
+
+/**
+ * Logger local mínimo para manter a factory livre de ciclos com `tools/index`.
+ *
+ * @param {'DEBUG' | 'INFO' | 'WARN' | 'ERROR'} level
+ * @param {string} message
+ */
+function logToolFactory(level, message) {
+    const line = `[sdk] ${level}: ${message}`;
+    if (level === 'ERROR') {
+        console.error(line);
+    } else if (level === 'WARN') {
+        console.warn(line);
+    } else if (level === 'INFO') {
+        console.info(line);
+    } else if (process.env['COPILOT_LOG_LEVEL'] === 'DEBUG') {
+        console.debug(line);
+    }
+}
 
 /**
  * Opções para `buildTool`.
@@ -100,13 +186,17 @@ function normalizeParameters(parameters, toolName = 'unknown') {
     // H1-FIX: Usar instanceof ZodType quando possível para melhor compatibilidade com versões futuras.
     if ('_def' in parameters || '_zod' in parameters) {
         try {
+            const converter = loadZodToJsonSchema();
+            if (!converter) {
+                throw new Error('zod-to-json-schema indisponível');
+            }
             const jsonSchema = /** @type {Record<string, unknown>} */ (
-                zodToJsonSchema(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))
+                converter(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))
             );
             return jsonSchema;
         } catch (err) {
             const message = /** @type {Error} */ (err).message;
-            log(
+            logToolFactory(
                 'WARN',
                 `[tool-factory] Falha ao converter Zod schema para '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
             );
@@ -145,20 +235,25 @@ export function buildTool({
 
     const wrappedHandler = /** @type {import('#copilot/sdk/types').ToolHandler<TArgs>} */ (
         async (args, invocation) => {
-            log('DEBUG', `[tool-factory] Invocando tool '${name}' (sessionId=${invocation?.sessionId ?? 'n/a'})`);
+            logToolFactory(
+                'DEBUG',
+                `[tool-factory] Invocando tool '${name}' (sessionId=${invocation?.sessionId ?? 'n/a'})`,
+            );
             return handler(args, invocation);
         }
     );
 
-    return createTool({
-        name,
-        description,
-        ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
-        handler: wrappedHandler,
-        // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
-        skipPermission: !requiresApproval,
-        ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    });
+    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ (
+        createTool({
+            name,
+            description,
+            ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
+            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (wrappedHandler),
+            // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
+            skipPermission: !requiresApproval,
+            ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+        })
+    );
 }
 
 /**
@@ -169,5 +264,6 @@ export function buildTool({
  * @param {import('#copilot/sdk/types').Tool<TArgs>} tool - Tool a ser marcada
  * @returns {import('#copilot/sdk/types').Tool<TArgs>} A mesma tool com `skipPermission: true`
  */
-export const withSkipPermission = (tool) =>
-    Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));
+export function withSkipPermission(tool) {
+    return Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));
+}

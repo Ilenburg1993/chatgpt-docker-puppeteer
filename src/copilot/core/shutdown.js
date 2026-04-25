@@ -75,8 +75,8 @@ export function registerShutdownHandler(name, fn, priority = 50, options = {}) {
 }
 
 /**
- * Executa todos os handlers de shutdown em ordem de prioridade. Cada handler tem timeout próprio; o default é 5s. Se
- * um falhar, os próximos continuam. Seguro para chamar múltiplas vezes (idempotente).
+ * Executa todos os handlers de shutdown em ordem de prioridade. Cada handler tem timeout próprio; o default é 5s. Se um
+ * falhar, os próximos continuam. Seguro para chamar múltiplas vezes (idempotente).
  *
  * @param {string} [reason='unknown'] - Motivo do shutdown (para log). Default is `'unknown'`
  * @returns {Promise<void>}

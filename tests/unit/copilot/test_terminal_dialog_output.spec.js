@@ -5,7 +5,32 @@
  * Contrato: terminal/dialog/output.js
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('#copilot/config', () => ({
+    LLM_B_BOOT_PROMPT: undefined,
+    LLM_B_TURN_TIMEOUT_MS: 120_000,
+}));
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+    getSdkSessionMode: vi.fn(() => 'interactive'),
+}));
+vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+    readTerminalActivitySnapshot: vi.fn(() => ({ phase: 'boot', label: 'initial' })),
+}));
+vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+    readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
+    readTerminalRuntimeState: vi.fn(() => ({
+        dialogLoopActive: true,
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        dialogPaused: false,
+        queueSize: 0,
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadowState: null,
+    })),
+}));
+
 describe('terminal/dialog/output.js — contrato', () => {
     it('importa sem erros', async () => {
         const mod = await import('../../../src/copilot/terminal/dialog/output.js');

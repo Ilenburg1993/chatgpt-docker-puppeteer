@@ -237,22 +237,31 @@ export async function runCopilotSdkBootPreflight({
         }
 
         if (configuredModel && configuredModel !== 'gpt-5-mini') {
-            try {
-                const models = await listModels();
-                report.modelValidated = models.some(
-                    (/** @type {{ id: string }} */ model) => model.id === configuredModel,
+            // Special case: 'auto' is resolved at session creation time via ModelSelector (F40.2)
+            if (configuredModel === 'auto') {
+                log(
+                    'INFO',
+                    '[copilot/runtime-host] Modelo configurado como "auto" — será resolvido em runtime via ModelSelector.',
                 );
-                if (!report.modelValidated) {
-                    const warning = `Modelo '${configuredModel}' não encontrado na lista de modelos disponíveis.`;
+                report.modelValidated = true; // Auto-resolution happens at createSession()
+            } else {
+                try {
+                    const models = await listModels();
+                    report.modelValidated = models.some(
+                        (/** @type {{ id: string }} */ model) => model.id === configuredModel,
+                    );
+                    if (!report.modelValidated) {
+                        const warning = `Modelo '${configuredModel}' não encontrado na lista de modelos disponíveis.`;
+                        report.warnings.push(warning);
+                        log('WARN', `[copilot/runtime-host] ${warning}`);
+                    } else {
+                        log('INFO', `[copilot/runtime-host] Modelo '${configuredModel}' validado na lista de modelos.`);
+                    }
+                } catch (e) {
+                    const warning = `Validação de modelo ignorada: ${toError(e).message}`;
                     report.warnings.push(warning);
-                    log('WARN', `[copilot/runtime-host] ${warning}`);
-                } else {
-                    log('INFO', `[copilot/runtime-host] Modelo '${configuredModel}' validado na lista de modelos.`);
+                    log('DEBUG', `[copilot/runtime-host] ${warning}`);
                 }
-            } catch (e) {
-                const warning = `Validação de modelo ignorada: ${toError(e).message}`;
-                report.warnings.push(warning);
-                log('DEBUG', `[copilot/runtime-host] ${warning}`);
             }
         }
 

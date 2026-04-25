@@ -13,10 +13,10 @@
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { log } from '../ports/observability-port.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';
-import { log } from '../ports/observability-port.js';
 
 /**
  * @typedef {import('../types.js').PendingQuestion} PendingQuestion

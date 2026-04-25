@@ -13,7 +13,7 @@
 /**
  * @typedef {{
  *     getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot;
- *     getSdkResourceSnapshot?: () => import('./types.js').AgentSdkAccessSnapshot;
+ *     getSdkResourceSnapshot?: () => import('./types.js').AgentSdkAccessSnapshot | null;
  * }} HealthHost
  */
 

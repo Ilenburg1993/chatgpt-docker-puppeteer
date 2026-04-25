@@ -28,6 +28,22 @@ export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
     'COPILOT_PINNED_CONTEXT_DIRS',
     'COPILOT_DISABLED_SKILLS',
     'COPILOT_CLI_URL',
+    'COPILOT_CLI_PATH',
+    'COPILOT_CLI_ARGS',
+    'COPILOT_CLI_CWD',
+    'COPILOT_CLI_PORT',
+    'COPILOT_USE_STDIO',
+    'COPILOT_AUTO_START',
+    'COPILOT_USE_LOGGED_IN_USER',
+    'COPILOT_CLI_LOG_LEVEL',
+    'COPILOT_LOG_LEVEL',
+    'COPILOT_GITHUB_TOKEN',
+    'GITHUB_TOKEN',
+    'OTEL_EXPORTER_OTLP_ENDPOINT',
+    'COPILOT_OTEL_FILE_EXPORTER_PATH',
+    'COPILOT_OTEL_EXPORTER_TYPE',
+    'COPILOT_OTEL_SOURCE_NAME',
+    'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT',
     'COPILOT_SDK_ENABLED',
     'COPILOT_TERMINAL_ENABLED',
     'COPILOT_SDK_AGENT_COMPAT_ENABLED',
@@ -106,6 +122,22 @@ function envBool(key, fallback) {
  *     sdk: {
  *         enabled: boolean;
  *         cliUrl: string | null;
+ *         cliPath: string | null;
+ *         cliArgs: string | null;
+ *         cliCwd: string | null;
+ *         cliPort: number | null;
+ *         useStdio: boolean | null;
+ *         autoStart: boolean | null;
+ *         useLoggedInUser: boolean | null;
+ *         logLevel: string | null;
+ *         githubTokenConfigured: boolean;
+ *         telemetry: {
+ *             otlpEndpoint: string | null;
+ *             filePath: string | null;
+ *             exporterType: string | null;
+ *             sourceName: string | null;
+ *             captureContent: boolean | null;
+ *         };
  *         baseline: readonly string[];
  *     };
  *     terminal: {
@@ -158,6 +190,26 @@ export function readCopilotBootConfig() {
         sdk: {
             enabled: envBool('COPILOT_SDK_ENABLED', false),
             cliUrl: envOpt('COPILOT_CLI_URL'),
+            cliPath: envOpt('COPILOT_CLI_PATH'),
+            cliArgs: envOpt('COPILOT_CLI_ARGS'),
+            cliCwd: envOpt('COPILOT_CLI_CWD'),
+            cliPort: envOpt('COPILOT_CLI_PORT') === null ? null : envInt('COPILOT_CLI_PORT', 0),
+            useStdio: envOpt('COPILOT_USE_STDIO') === null ? null : envBool('COPILOT_USE_STDIO', true),
+            autoStart: envOpt('COPILOT_AUTO_START') === null ? null : envBool('COPILOT_AUTO_START', true),
+            useLoggedInUser:
+                envOpt('COPILOT_USE_LOGGED_IN_USER') === null ? null : envBool('COPILOT_USE_LOGGED_IN_USER', true),
+            logLevel: envOpt('COPILOT_CLI_LOG_LEVEL') ?? envOpt('COPILOT_LOG_LEVEL'),
+            githubTokenConfigured: Boolean(envOpt('COPILOT_GITHUB_TOKEN') ?? envOpt('GITHUB_TOKEN')),
+            telemetry: {
+                otlpEndpoint: envOpt('OTEL_EXPORTER_OTLP_ENDPOINT'),
+                filePath: envOpt('COPILOT_OTEL_FILE_EXPORTER_PATH'),
+                exporterType: envOpt('COPILOT_OTEL_EXPORTER_TYPE'),
+                sourceName: envOpt('COPILOT_OTEL_SOURCE_NAME'),
+                captureContent:
+                    envOpt('OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT') === null
+                        ? null
+                        : envBool('OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT', false),
+            },
             baseline: contract.sdkBaseline,
         },
         terminal: {

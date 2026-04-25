@@ -5,7 +5,19 @@
  * Contrato: terminal/alias-store.js
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('#copilot/config', () => ({
+    LLM_B_ALIASES_FILE: '/tmp/copilot-aliases.test.json',
+}));
+
+vi.mock('#copilot/observability', () => ({
+    log: vi.fn(),
+}));
+
+vi.mock('../../../src/copilot/core/error-handlers.js', () => ({
+    logSwallowed: vi.fn(),
+}));
 
 describe('terminal/alias-store.js — contrato', () => {
     it('importa sem erros', async () => {

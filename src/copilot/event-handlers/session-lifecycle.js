@@ -6,8 +6,32 @@
  * session.tools_updated, session.snapshot_rewind.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
+
+/**
+ * @param {unknown} raw
+ * @returns {string | undefined}
+ */
+function normalizeSdkMessage(raw) {
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (raw);
+        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
+        const nestedError = rec['error'];
+        if (nestedError && typeof nestedError === 'object') {
+            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
+            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
+        }
+        try {
+            return JSON.stringify(raw);
+        } catch {
+            return String(raw);
+        }
+    }
+    return raw == null ? undefined : String(raw);
+}
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -17,13 +41,13 @@ import { SESSION_EVENTS } from '#copilot/sdk';
 export function wireSessionLifecycleEvents(session, { emit }) {
     return [
         // ── session.idle ─────────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_IDLE, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_IDLE, (evt) => {
             log('DEBUG', '[session-lifecycle] session.idle');
             emit('session.idle', { ts: evt?.timestamp ?? Date.now() });
         }),
 
         // ── session.info ─────────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_INFO, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_INFO, (evt) => {
             const data = evt?.data ?? {};
             const infoType = /** @type {string | undefined} */ (data['infoType']);
             const message = /** @type {string | undefined} */ (data['message']);
@@ -33,16 +57,16 @@ export function wireSessionLifecycleEvents(session, { emit }) {
         }),
 
         // ── session.error ────────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_ERROR, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_ERROR, (evt) => {
             const data = evt?.data ?? {};
             const errorType = /** @type {string | undefined} */ (data['errorType']);
-            const message = /** @type {string | undefined} */ (data['message']);
+            const message = normalizeSdkMessage(data['message']);
             log('WARN', `[session-lifecycle] session.error: type=${errorType ?? 'unknown'} msg=${message ?? ''}`);
             emit('session.error', { errorType, message, ts: evt?.timestamp ?? Date.now() });
         }),
 
         // ── session.warning ──────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_WARNING, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_WARNING, (evt) => {
             const data = evt?.data ?? {};
             const warningType = /** @type {string | undefined} */ (data['warningType']);
             const message = /** @type {string | undefined} */ (data['message']);
@@ -52,7 +76,7 @@ export function wireSessionLifecycleEvents(session, { emit }) {
         }),
 
         // ── session.model_change ─────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_MODEL_CHANGE, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_MODEL_CHANGE, (evt) => {
             const data = evt?.data ?? {};
             const previousModel = /** @type {string | undefined} */ (data['previousModel']);
             const newModel = /** @type {string | undefined} */ (data['newModel']);
@@ -67,7 +91,7 @@ export function wireSessionLifecycleEvents(session, { emit }) {
         }),
 
         // ── session.tools_updated ────────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_TOOLS_UPDATED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_TOOLS_UPDATED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const tools = /** @type {unknown[] | undefined} */ (data['tools']);
@@ -77,7 +101,7 @@ export function wireSessionLifecycleEvents(session, { emit }) {
         }),
 
         // ── session.snapshot_rewind ──────────────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_SNAPSHOT_REWIND, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_SNAPSHOT_REWIND, (evt) => {
             const data = evt?.data ?? {};
             log('INFO', '[session-lifecycle] snapshot_rewind');
             emit('session.snapshot_rewind', { data, ts: evt?.timestamp ?? Date.now() });

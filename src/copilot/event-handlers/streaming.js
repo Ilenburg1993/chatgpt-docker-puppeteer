@@ -5,7 +5,8 @@
  * F62.3: Handler de eventos de streaming de tokens (reasoning + message delta).
  */
 
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { SESSION_EVENTS } from '#copilot/events';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -17,7 +18,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
  */
 export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive }) {
     return [
-        session.on(SESSION_EVENTS.ASSISTANT_STREAMING_DELTA, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.ASSISTANT_STREAMING_DELTA, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const totalResponseSizeBytes = /** @type {number | undefined} */ (data['totalResponseSizeBytes']);
             if (typeof totalResponseSizeBytes === 'number') {
@@ -27,7 +28,7 @@ export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopAct
                 });
             }
         }),
-        session.on(SESSION_EVENTS.ASSISTANT_REASONING_DELTA, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.ASSISTANT_REASONING_DELTA, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const chunk = /** @type {string} */ (data['deltaContent'] ?? '');
             if (chunk)
@@ -36,7 +37,7 @@ export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopAct
                     reasoningId: /** @type {string | null} */ (data['reasoningId'] ?? null),
                 });
         }),
-        session.on(SESSION_EVENTS.ASSISTANT_MESSAGE_DELTA, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.ASSISTANT_MESSAGE_DELTA, (evt) => {
             const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const chunk = /** @type {string} */ (d['deltaContent'] ?? d['content'] ?? '');
             if (!chunk) return;

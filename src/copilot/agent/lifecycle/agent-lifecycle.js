@@ -12,7 +12,7 @@
  * @see EventBus
  */
 
-import { EVENT_BUS, SessionError, toError } from '#copilot/core';
+import { EVENT_BUS, isShuttingDown, SessionError, toError } from '#copilot/core';
 import {
     EMITTER_BEFORE_STOP,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -21,7 +21,7 @@ import {
     EMITTER_STATUS,
     EMITTER_STOPPED,
 } from '#copilot/events';
-import { CopilotClient, raceEvents } from '#copilot/sdk';
+import { createCopilotClient, disconnectSessionSafe, raceEvents } from '#copilot/sdk';
 import { container } from '../../core/di-container.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
@@ -239,10 +239,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         ctx.clearPendingQuestionShadow();
     }
 
-    log(
-        'INFO',
-        `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`,
-    );
+    log('INFO', `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`);
 
     if (isResumed) {
         const convStore = resolveConversationStore(container);
@@ -302,7 +299,7 @@ export async function agentStart(ctx, host) {
 
     try {
         const _otelConfig = buildTelemetryConfig();
-        const client = new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
+        const client = createCopilotClient(_otelConfig ? { telemetry: _otelConfig } : {});
         ctx.setClient(client);
 
         const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.getModelSnapshot() }, () =>
@@ -328,7 +325,11 @@ export async function agentStart(ctx, host) {
  * @param {{ shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }} [opts]
  * @returns {Promise<void>}
  */
-export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS, preserveDialogLoopIntent = false } = {}) {
+export async function agentStop(
+    ctx,
+    host,
+    { shutdownTimeoutMs = SHUTDOWN_TIMEOUT_MS, preserveDialogLoopIntent = false } = {},
+) {
     if (ctx.isStopped()) return;
 
     return startSpan('copilot.agent.stop', { sessionId: host.sessionId ?? '', actor: 'agent' }, async () => {
@@ -456,7 +457,7 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
         const session = ctx.getSessionSnapshot();
         if (session) {
             try {
-                await session.disconnect();
+                await disconnectSessionSafe(session);
             } catch (e) {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
@@ -506,6 +507,10 @@ export async function agentStop(ctx, host, { shutdownTimeoutMs = SHUTDOWN_TIMEOU
  * @returns {Promise<boolean>}
  */
 export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
+    if (isShuttingDown()) {
+        log('INFO', '[AlwaysAlive] Reconexão ignorada: processo em shutdown.');
+        return false;
+    }
     ctx.setReconnectState(true);
     try {
         return await tryReconnect(
@@ -523,7 +528,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
                 },
                 createClient: () => {
                     const _otelConfig = buildTelemetryConfig();
-                    return new CopilotClient(...(_otelConfig ? [{ telemetry: _otelConfig }] : []));
+                    return createCopilotClient(_otelConfig ? { telemetry: _otelConfig } : {});
                 },
                 updateClient: (newClient) => {
                     ctx.setClient(newClient);
@@ -534,7 +539,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
                         emitReady: false,
                     }),
             },
-            opts,
+            { ...opts, shouldAbort: isShuttingDown },
         );
     } finally {
         ctx.setReconnectState(false);

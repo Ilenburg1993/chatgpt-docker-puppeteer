@@ -145,6 +145,8 @@ Sempre que a capacidade nasce no SDK vanilla, o `agent/` deve consumi-la por `sd
 Exemplos já consolidados:
 
 - mode/plan da sessão
+- models/tools/quota server-scoped
+- workspace virtual, compaction, shell, elicitation e pending calls
 - foreground/last session
 - server/session RPC handles
 - hooks tipados

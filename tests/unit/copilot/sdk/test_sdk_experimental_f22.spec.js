@@ -249,20 +249,20 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
 
     it('fleetStart com flag=true chama session.rpc.fleet.start()', async () => {
         featureFlags.setExperimentalFlag('fleet', true);
-        const startMock = vi.fn().mockResolvedValue({ fleetId: 'f1', status: 'starting' });
+        const startMock = vi.fn().mockResolvedValue({ started: true });
         const sess = /** @type {any} */ ({ rpc: { fleet: { start: startMock } } });
-        const result = await expRpc.fleetStart(sess, { maxAgents: 3 });
-        expect(startMock).toHaveBeenCalledWith({ maxAgents: 3 });
-        expect(result).toEqual({ fleetId: 'f1', status: 'starting' });
+        const result = await expRpc.fleetStart(sess, { prompt: 'investigue' });
+        expect(startMock).toHaveBeenCalledWith({ prompt: 'investigue' });
+        expect(result).toEqual({ started: true });
     });
 
     it('mcpList com flag=true chama session.rpc.mcp.list()', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
-        const listMock = vi.fn().mockResolvedValue([{ id: 'mcp1', name: 'Server A', enabled: true, status: 'ok' }]);
+        const listMock = vi.fn().mockResolvedValue([{ name: 'Server A', status: 'connected' }]);
         const sess = /** @type {any} */ ({ rpc: { mcp: { list: listMock } } });
         const result = await expRpc.mcpList(sess);
         expect(listMock).toHaveBeenCalledOnce();
-        expect(result[0]?.id).toBe('mcp1');
+        expect(result[0]?.name).toBe('Server A');
     });
 
     it('sdk/barrel reexporta funções experimentais alinhadas com SDK', () => {
@@ -328,19 +328,19 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(reloadMock).toHaveBeenCalledOnce();
     });
 
-    it('agentSelect valida agentId não-vazio', async () => {
+    it('agentSelect valida name não-vazio', async () => {
         featureFlags.setExperimentalFlag('agents', true);
         const sess = /** @type {any} */ ({ rpc: { agent: { select: vi.fn() } } });
         await expect(expRpc.agentSelect(sess, '')).rejects.toThrow(TypeError);
     });
 
-    it('mcpEnable valida serverId não-vazio', async () => {
+    it('mcpEnable valida serverName não-vazio', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const sess = /** @type {any} */ ({ rpc: { mcp: { enable: vi.fn() } } });
         await expect(expRpc.mcpEnable(sess, '')).rejects.toThrow(TypeError);
     });
 
-    it('extensionsDisable valida extensionId não-vazio', async () => {
+    it('extensionsDisable valida id não-vazio', async () => {
         featureFlags.setExperimentalFlag('extensions', true);
         const sess = /** @type {any} */ ({ rpc: { extensions: { disable: vi.fn() } } });
         await expect(expRpc.extensionsDisable(sess, '')).rejects.toThrow(TypeError);
@@ -358,23 +358,39 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         const sess = /** @type {any} */ ({ rpc: { plugins: { list: listMock } } });
         const result = await expRpc.pluginsList(sess);
         expect(listMock).toHaveBeenCalledOnce();
-        expect(result[0]?.id).toBe('p1');
+        expect(/** @type {{ id?: string }} */ (result[0])?.id).toBe('p1');
     });
 
-    it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ extensionId })', async () => {
+    it('agentSelect com flag=true chama session.rpc.agent.select({ name })', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const selectMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { agent: { select: selectMock } } });
+        await expRpc.agentSelect(sess, 'reviewer');
+        expect(selectMock).toHaveBeenCalledWith({ name: 'reviewer' });
+    });
+
+    it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ id })', async () => {
         featureFlags.setExperimentalFlag('extensions', true);
         const enableMock = vi.fn().mockResolvedValue(undefined);
         const sess = /** @type {any} */ ({ rpc: { extensions: { enable: enableMock } } });
         await expRpc.extensionsEnable(sess, 'ext-1');
-        expect(enableMock).toHaveBeenCalledWith({ extensionId: 'ext-1' });
+        expect(enableMock).toHaveBeenCalledWith({ id: 'ext-1' });
     });
 
-    it('skillsDisable com flag=true chama session.rpc.skills.disable({ skillId })', async () => {
+    it('skillsDisable com flag=true chama session.rpc.skills.disable({ name })', async () => {
         featureFlags.setExperimentalFlag('skills', true);
         const disableMock = vi.fn().mockResolvedValue(undefined);
         const sess = /** @type {any} */ ({ rpc: { skills: { disable: disableMock } } });
         await expRpc.skillsDisable(sess, 'skill-1');
-        expect(disableMock).toHaveBeenCalledWith({ skillId: 'skill-1' });
+        expect(disableMock).toHaveBeenCalledWith({ name: 'skill-1' });
+    });
+
+    it('skillsEnable com flag=true chama session.rpc.skills.enable({ name })', async () => {
+        featureFlags.setExperimentalFlag('skills', true);
+        const enableMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { skills: { enable: enableMock } } });
+        await expRpc.skillsEnable(sess, 'skill-1');
+        expect(enableMock).toHaveBeenCalledWith({ name: 'skill-1' });
     });
 
     it('agentDeselect com flag=true chama session.rpc.agent.deselect()', async () => {
@@ -385,11 +401,19 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(deselectMock).toHaveBeenCalledOnce();
     });
 
-    it('mcpDisable com flag=true chama session.rpc.mcp.disable({ serverId })', async () => {
+    it('mcpDisable com flag=true chama session.rpc.mcp.disable({ serverName })', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const disableMock = vi.fn().mockResolvedValue(undefined);
         const sess = /** @type {any} */ ({ rpc: { mcp: { disable: disableMock } } });
         await expRpc.mcpDisable(sess, 'srv-1');
-        expect(disableMock).toHaveBeenCalledWith({ serverId: 'srv-1' });
+        expect(disableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
+    });
+
+    it('mcpEnable com flag=true chama session.rpc.mcp.enable({ serverName })', async () => {
+        featureFlags.setExperimentalFlag('mcp', true);
+        const enableMock = vi.fn().mockResolvedValue(undefined);
+        const sess = /** @type {any} */ ({ rpc: { mcp: { enable: enableMock } } });
+        await expRpc.mcpEnable(sess, 'srv-1');
+        expect(enableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
     });
 });

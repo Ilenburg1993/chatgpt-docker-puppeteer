@@ -5,8 +5,9 @@
  * Faixa B2: Handlers dedicados para MCP server status e OAuth events.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -16,7 +17,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
 export function wireMcpEvents(session, { emit }) {
     return [
         // ── session.mcp_server_status_changed ────────────────────────────
-        session.on(SESSION_EVENTS.SESSION_MCP_SERVER_STATUS_CHANGED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SESSION_MCP_SERVER_STATUS_CHANGED, (evt) => {
             const { serverName, status } = evt?.data ?? {};
             const statusStr = /** @type {string} */ (status ?? 'unknown');
             const serverStr = /** @type {string} */ (serverName ?? 'unknown');
@@ -36,7 +37,7 @@ export function wireMcpEvents(session, { emit }) {
         }),
 
         // ── mcp.oauth_required ───────────────────────────────────────────
-        session.on(SESSION_EVENTS.MCP_OAUTH_REQUIRED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.MCP_OAUTH_REQUIRED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const serverName = /** @type {string | undefined} */ (data['serverName']);
@@ -46,7 +47,7 @@ export function wireMcpEvents(session, { emit }) {
         }),
 
         // ── mcp.oauth_completed ──────────────────────────────────────────
-        session.on(SESSION_EVENTS.MCP_OAUTH_COMPLETED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.MCP_OAUTH_COMPLETED, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const requestId = data['requestId'];
             log('INFO', `[mcp-events] OAuth completed: requestId=${requestId ?? '?'}`);

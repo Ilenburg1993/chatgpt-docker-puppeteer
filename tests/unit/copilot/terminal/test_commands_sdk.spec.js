@@ -1,0 +1,100 @@
+// @ts-check
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const runtimeMocks = vi.hoisted(() => ({
+    compactTerminalSdkSession: vi.fn(async () => ({ success: true })),
+    createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
+    getTerminalSdkQuota: vi.fn(async () => ({
+        quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
+    })),
+    listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
+    listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
+    listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
+    readTerminalRuntimeState: vi.fn(() => ({
+        runtimeId: 'default',
+        sessionId: 'sdk-1',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'high',
+    })),
+    readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
+    requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => runtimeMocks);
+
+import { cmdElicitation, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
+import {
+    clearTerminalElicitation,
+    recordTerminalElicitationPending,
+} from '../../../../src/copilot/terminal/sdk-interactions.js';
+
+function mockCtx() {
+    /** @type {string[]} */
+    const lines = [];
+    return {
+        println: (/** @type {string} */ line) => lines.push(line),
+        output: () => lines.join('\n'),
+    };
+}
+
+describe('terminal/commands/sdk', () => {
+    beforeEach(() => {
+        clearTerminalElicitation('all');
+        vi.clearAllMocks();
+    });
+
+    it('/sdk status exibe runtime, sessão e quota', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'status');
+        expect(ctx.output()).toContain('SDK Runtime');
+        expect(ctx.output()).toContain('sdk-1');
+        expect(ctx.output()).toContain('chat');
+    });
+
+    it('/sdk models e /sdk tools consultam o Agent SDK facade', async () => {
+        const models = mockCtx();
+        await cmdSdk({ println: models.println }, 'models');
+        expect(models.output()).toContain('gpt-5-mini');
+
+        const tools = mockCtx();
+        await cmdSdk({ println: tools.println }, 'tools gpt-5-mini');
+        expect(runtimeMocks.listTerminalSdkTools).toHaveBeenCalledWith({ model: 'gpt-5-mini' });
+        expect(tools.output()).toContain('read_file');
+    });
+
+    it('/workspace lista, lê e escreve no workspace virtual SDK', async () => {
+        const list = mockCtx();
+        await cmdWorkspace({ println: list.println }, 'list');
+        expect(list.output()).toContain('plan.md');
+
+        const read = mockCtx();
+        await cmdWorkspace({ println: read.println }, 'read plan.md');
+        expect(runtimeMocks.readTerminalSdkWorkspaceFile).toHaveBeenCalledWith('plan.md');
+        expect(read.output()).toContain('hello');
+
+        const write = mockCtx();
+        await cmdWorkspace({ println: write.println }, 'write notes.md oi');
+        expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith('notes.md', 'oi');
+        expect(write.output()).toContain('notes.md');
+    });
+
+    it('/elicitation lista pendências e dispara request estruturado', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-1',
+            message: 'Informe o branch',
+            mode: 'form',
+            requestedSchema: { type: 'object' },
+        });
+
+        const list = mockCtx();
+        await cmdElicitation({ println: list.println }, 'list');
+        expect(list.output()).toContain('el-1');
+        expect(list.output()).toContain('ask_user = conversa');
+
+        const request = mockCtx();
+        await cmdElicitation({ println: request.println }, 'request Dados?');
+        expect(runtimeMocks.requestTerminalSdkElicitation).toHaveBeenCalled();
+        expect(request.output()).toContain('accept');
+    });
+});

@@ -3,13 +3,13 @@
  * src/copilot/config/client-options.js
  *
  * Builder tipado para `CopilotClientOptions` do `@github/copilot-sdk`. Centraliza a construção de opções do client com
- * suporte a logLevel mapping, env passthrough, BYOK onListModels e githubToken.
+ * suporte a logLevel mapping, env passthrough, BYOK onListModels, githubToken, telemetria e boot por env.
  *
  * @module copilot/config/client-options
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
+import { log } from '../observability/logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
@@ -33,6 +33,63 @@ const LOG_LEVEL_MAP = /** @type {const} */ ({
     NONE: 'none',
     SILENT: 'none',
 });
+
+/**
+ * @param {string | undefined} value
+ * @returns {boolean | undefined}
+ */
+function parseBooleanEnv(value) {
+    if (value === undefined || value === '') return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+    return undefined;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {number | undefined}
+ */
+function parseIntegerEnv(value) {
+    if (value === undefined || value.trim() === '') return undefined;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+/**
+ * Aceita `COPILOT_CLI_ARGS='["--foo","bar"]'` ou `COPILOT_CLI_ARGS='--foo bar'`.
+ *
+ * @param {string | undefined} value
+ * @returns {string[] | undefined}
+ */
+function parseCliArgsEnv(value) {
+    if (!value || value.trim() === '') return undefined;
+    const raw = value.trim();
+    if (raw.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) return parsed;
+        } catch {
+            // Fallback abaixo: mantém boot resiliente mesmo se a env foi escrita manualmente.
+        }
+    }
+    return raw.split(/\s+/).filter(Boolean);
+}
+
+/**
+ * @param {string | undefined} raw
+ * @returns {NonNullable<CopilotClientOptions['logLevel']> | undefined}
+ */
+function parseLogLevelEnv(raw) {
+    if (!raw) return undefined;
+    const upper = raw.toUpperCase();
+    if (LOG_LEVEL_MAP[upper]) return LOG_LEVEL_MAP[upper];
+    const lower = raw.toLowerCase();
+    if (['none', 'error', 'warning', 'info', 'debug', 'all'].includes(lower)) {
+        return /** @type {NonNullable<CopilotClientOptions['logLevel']>} */ (lower);
+    }
+    return undefined;
+}
 
 /**
  * Builder fluent para `CopilotClientOptions`.
@@ -275,4 +332,81 @@ export class ClientOptionsBuilder {
     build() {
         return /** @type {CopilotClientOptions} */ (/** @type {unknown} */ ({ ...this.#opts }));
     }
+}
+
+/**
+ * Constrói as opções canônicas do `CopilotClient` a partir do ambiente do boot.
+ *
+ * Regras rígidas:
+ *
+ * - `COPILOT_CLI_URL` vence o transporte: quando definido, o SDK conecta a um CLI já existente e não configura `cliPath`,
+ *   `cliArgs`, `port` nem `useStdio`, pois o contrato do SDK os marca como mutuamente exclusivos.
+ * - `GITHUB_TOKEN`/`COPILOT_GITHUB_TOKEN` vencem autenticação interativa; se `COPILOT_USE_LOGGED_IN_USER` não foi
+ *   definido, `useLoggedInUser` passa a `false`.
+ * - `COPILOT_CLI_LOG_LEVEL`, `COPILOT_LOG_LEVEL` e `LOG_LEVEL` são aceitos nesta ordem.
+ * - Telemetria aceita todos os campos documentados pelo SDK (`otlpEndpoint`, `filePath`, `exporterType`, `sourceName`,
+ *   `captureContent`).
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides]
+ * @returns {Partial<CopilotClientOptions>}
+ */
+export function buildCopilotClientOptionsFromEnv(overrides = {}) {
+    const builder = new ClientOptionsBuilder();
+    const cliUrl = process.env['COPILOT_CLI_URL']?.trim();
+    const githubToken = process.env['COPILOT_GITHUB_TOKEN'] || process.env['GITHUB_TOKEN'];
+    const explicitUseLoggedInUser = parseBooleanEnv(process.env['COPILOT_USE_LOGGED_IN_USER']);
+    const logLevel = parseLogLevelEnv(
+        process.env['COPILOT_CLI_LOG_LEVEL'] || process.env['COPILOT_LOG_LEVEL'] || process.env['LOG_LEVEL'],
+    );
+
+    if (cliUrl) {
+        builder.cliUrl(cliUrl);
+        log('INFO', `[ClientOptionsBuilder] cliUrl ativo: conectando ao CLI em ${cliUrl}`);
+    } else {
+        const cliPath = process.env['COPILOT_CLI_PATH']?.trim();
+        const cliArgs = parseCliArgsEnv(process.env['COPILOT_CLI_ARGS']);
+        const cwd = process.env['COPILOT_CLI_CWD'] || process.env['COPILOT_WORKING_DIRECTORY'];
+        const port = parseIntegerEnv(process.env['COPILOT_CLI_PORT']);
+        const useStdio = parseBooleanEnv(process.env['COPILOT_USE_STDIO']);
+
+        if (cliPath) builder.cliPath(cliPath);
+        if (cliArgs) builder.cliArgs(cliArgs);
+        if (cwd) builder.merge({ cwd });
+        if (port !== undefined) builder.port(port);
+        if (useStdio !== undefined) builder.useStdio(useStdio);
+        builder.envPassthrough(['PATH', 'HOME', 'SHELL', 'USER', 'USERNAME', 'TMPDIR']);
+    }
+
+    if (logLevel) builder.logLevel(logLevel);
+
+    const autoStart = parseBooleanEnv(process.env['COPILOT_AUTO_START']);
+    if (autoStart !== undefined) builder.autoStart(autoStart);
+
+    if (githubToken) {
+        builder.githubToken(githubToken);
+        if (explicitUseLoggedInUser === undefined) builder.useLoggedInUser(false);
+    }
+    if (explicitUseLoggedInUser !== undefined && !cliUrl) {
+        builder.useLoggedInUser(explicitUseLoggedInUser);
+    }
+
+    /** @type {NonNullable<CopilotClientOptions['telemetry']>} */
+    const telemetry = {};
+    if (process.env['OTEL_EXPORTER_OTLP_ENDPOINT']) {
+        telemetry.otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
+    }
+    if (process.env['COPILOT_OTEL_FILE_EXPORTER_PATH']) {
+        telemetry.filePath = process.env['COPILOT_OTEL_FILE_EXPORTER_PATH'];
+    }
+    if (process.env['COPILOT_OTEL_EXPORTER_TYPE']) {
+        telemetry.exporterType = process.env['COPILOT_OTEL_EXPORTER_TYPE'];
+    }
+    if (process.env['COPILOT_OTEL_SOURCE_NAME']) {
+        telemetry.sourceName = process.env['COPILOT_OTEL_SOURCE_NAME'];
+    }
+    const captureContent = parseBooleanEnv(process.env['OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT']);
+    if (captureContent !== undefined) telemetry.captureContent = captureContent;
+    if (Object.keys(telemetry).length > 0) builder.telemetry(telemetry);
+
+    return builder.merge(overrides).build();
 }

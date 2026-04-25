@@ -10,6 +10,7 @@
  * @see EventBus
  */
 
+import { getSessionMessages } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log } from '../ports/observability-port.js';
 
@@ -59,7 +60,7 @@ async function runSdkHistorySync(session, deps) {
         };
     }
 
-    const messages = await sdkSession.getMessages();
+    const messages = await getSessionMessages(session);
     if (!Array.isArray(messages) || messages.length === 0) {
         return { hubSessionId, synced: 0, skipped: 0, unavailableReason: null };
     }
@@ -67,7 +68,9 @@ async function runSdkHistorySync(session, deps) {
     const { synced, skipped } = deps.conversationStore.syncFromSdkHistory(
         hubSessionId,
         session.sessionId,
-        /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (messages),
+        /** @type {{ id?: string; type: string; content: string; createdAt?: number }[]} */ (
+            /** @type {unknown} */ (messages)
+        ),
     );
 
     return { hubSessionId, synced, skipped, unavailableReason: null };
@@ -178,7 +181,7 @@ export class SessionMessagesCache {
             return this.#cache;
         }
         try {
-            const messages = await session.getMessages();
+            const messages = await getSessionMessages(session);
             this.#cache = messages.length > this.#maxItems ? messages.slice(-this.#maxItems) : messages;
             this.#cacheAt = now;
             return this.#cache;

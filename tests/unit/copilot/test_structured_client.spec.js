@@ -16,7 +16,7 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
@@ -67,25 +67,16 @@ function structuredJsonResponse(extra = {}) {
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
 describe('LlmBridgeClient › chatStructured()', () => {
-    /** @type {import('../../../src/copilot/channel/client.js').LlmBridgeClient} */
-    let bridge;
-
-    beforeAll(async () => {
-        // Importamos o módulo real — mas substitui a chamada interna de chat() via spy
-        const mod = await import('../../../src/copilot/channel/client.js');
-        // Injeta mock como bridge agent para que requireAgent() não lance
-        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
-        bridge = new mod.LlmBridgeClient();
-    });
-
     it('exporta chatStructured como método de LlmBridgeClient', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const instance = new mod.LlmBridgeClient();
         expect(typeof instance.chatStructured === 'function').toBeTruthy(); // chatStructured deve ser método;
     });
 
     it('chatStructured() retorna shape StructuredChatResult', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         // Spy em chat() para retornar resposta estruturada sem rede
@@ -116,6 +107,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
     it('parseia resposta JSON de LLM-B → structured ≠ null', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         const mockChat = vi.fn(async () => ({
@@ -140,6 +132,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
     it('retorna structured=null quando LLM-B responde texto puro', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         const mockChat = vi.fn(async () => ({
@@ -163,6 +156,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
     it('propaga raw sempre (JSON e texto puro)', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         const responseText = structuredJsonResponse();
@@ -181,6 +175,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
     it('inclui taskId, durationMs, chunks, responseLen no resultado', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         const mockChat = vi.fn(async () => ({
@@ -201,6 +196,7 @@ describe('LlmBridgeClient › chatStructured()', () => {
 
     it('passa onDelta para chat() como opção', async () => {
         const mod = await import('../../../src/copilot/channel/client.js');
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
         /** @type {any} */

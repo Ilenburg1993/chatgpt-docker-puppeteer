@@ -31,9 +31,17 @@ import {
 } from '../../presentation/runtime-controls.js';
 import { readAgentRuntimeOverviewProjection } from '../../presentation/runtime-overview.js';
 import {
+    compactAgentSdkSession,
+    createAgentSdkWorkspaceFile,
     deleteAgentSdkPlan,
+    getAgentSdkQuota,
     getAgentSdkSessionMode,
+    listAgentSdkModels,
+    listAgentSdkTools,
+    listAgentSdkWorkspaceFiles,
     readAgentSdkPlan,
+    readAgentSdkWorkspaceFile,
+    requestAgentSdkElicitation,
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
 } from '../../presentation/runtime-sdk-session.js';
@@ -85,10 +93,12 @@ export function readTerminalRuntimeState(runtimeId) {
         pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
         contextWindow: runtime.contextWindow,
-        lastPrInfo:
-            /** @type {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} */ (
-                runtime.lastPrInfo
-            ),
+        lastPrInfo: /** @type {{
+    model?: string;
+    cost?: number;
+    quotaSnapshots?: Record<string, unknown>;
+    ts: number;
+} | null} */ (runtime.lastPrInfo),
     };
 }
 
@@ -301,6 +311,76 @@ export async function updateTerminalSdkPlan(content, runtimeId) {
  */
 export async function deleteTerminalSdkPlan(runtimeId) {
     return deleteAgentSdkPlan(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listTerminalSdkModels(runtimeId) {
+    return listAgentSdkModels(runtimeId);
+}
+
+/**
+ * @param {{ model?: string }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listTerminalSdkTools(options, runtimeId) {
+    return listAgentSdkTools(options, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function getTerminalSdkQuota(runtimeId) {
+    return getAgentSdkQuota(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listTerminalSdkWorkspaceFiles(runtimeId) {
+    return listAgentSdkWorkspaceFiles(runtimeId);
+}
+
+/**
+ * @param {string} path
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function readTerminalSdkWorkspaceFile(path, runtimeId) {
+    return readAgentSdkWorkspaceFile(path, runtimeId);
+}
+
+/**
+ * @param {string} path
+ * @param {string} content
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function createTerminalSdkWorkspaceFile(path, content, runtimeId) {
+    return createAgentSdkWorkspaceFile(path, content, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function compactTerminalSdkSession(runtimeId) {
+    return compactAgentSdkSession(runtimeId);
+}
+
+/**
+ * @param {string} message
+ * @param {object} requestedSchema
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function requestTerminalSdkElicitation(message, requestedSchema, runtimeId) {
+    return requestAgentSdkElicitation(message, requestedSchema, runtimeId);
 }
 
 /**

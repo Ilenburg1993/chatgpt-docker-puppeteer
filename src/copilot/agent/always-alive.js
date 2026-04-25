@@ -52,21 +52,34 @@ import {
     setReasoningEffort,
 } from './facades/agent-model-config.js';
 import {
+    compactSdkSession,
+    createSdkWorkspaceFile,
     deleteSdkPlan,
     deselectSdkAgent,
+    execSdkShell,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
     getLastSdkSessionId,
     getSdkAuthStatus,
     getSdkHandles,
+    getSdkQuota,
     getSdkResourceSnapshot,
     getSdkSessionMode,
     getSdkStatus,
+    handleSdkPendingCommand,
+    handleSdkPendingPermission,
+    handleSdkPendingToolCall,
+    killSdkShell,
     listSdkAgents,
+    listSdkBuiltInTools,
+    listSdkModels,
     listSdkSessions,
+    listSdkWorkspaceFiles,
     pingSdk,
     readSdkPlan,
+    readSdkWorkspaceFile,
     reloadSdkAgents,
+    requestSdkElicitation,
     selectSdkAgent,
     setForegroundSdkSessionId,
     setSdkSessionMode,
@@ -550,6 +563,34 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Lista modelos disponíveis via RPC server-scoped do SDK.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async listSdkModels() {
+        return listSdkModels(this.ctx);
+    }
+
+    /**
+     * Lista tools expostas pelo runtime SDK/CLI, opcionalmente filtradas por modelo.
+     *
+     * @param {{ model?: string }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async listSdkBuiltInTools(options) {
+        return listSdkBuiltInTools(this.ctx, options);
+    }
+
+    /**
+     * Retorna snapshot de quota via RPC server-scoped do SDK.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async getSdkQuota() {
+        return getSdkQuota(this.ctx);
+    }
+
+    /**
      * Retorna o ID da última sessão conhecida pelo client SDK atual.
      *
      * @returns {Promise<string | undefined>}
@@ -632,6 +673,114 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async deleteSdkPlan() {
         return deleteSdkPlan(this.ctx);
+    }
+
+    /**
+     * Lista arquivos no workspace virtual da sessão SDK.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async listSdkWorkspaceFiles() {
+        return listSdkWorkspaceFiles(this.ctx);
+    }
+
+    /**
+     * Lê arquivo no workspace virtual da sessão SDK.
+     *
+     * @param {string} path
+     * @returns {Promise<unknown>}
+     */
+    async readSdkWorkspaceFile(path) {
+        return readSdkWorkspaceFile(this.ctx, path);
+    }
+
+    /**
+     * Cria ou sobrescreve arquivo no workspace virtual da sessão SDK.
+     *
+     * @param {string} path
+     * @param {string} content
+     * @returns {Promise<unknown>}
+     */
+    async createSdkWorkspaceFile(path, content) {
+        return createSdkWorkspaceFile(this.ctx, path, content);
+    }
+
+    /**
+     * Executa compaction manual da sessão SDK infinita.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async compactSdkSession() {
+        return compactSdkSession(this.ctx);
+    }
+
+    /**
+     * Solicita elicitation estruturada pela superfície SDK.
+     *
+     * @param {string} message
+     * @param {object} requestedSchema
+     * @returns {Promise<unknown>}
+     */
+    async requestSdkElicitation(message, requestedSchema) {
+        return requestSdkElicitation(this.ctx, message, requestedSchema);
+    }
+
+    /**
+     * Resolve permissão pendente do SDK.
+     *
+     * @param {string} requestId
+     * @param {{ kind: string } & Record<string, unknown>} result
+     * @returns {Promise<unknown>}
+     */
+    async handleSdkPendingPermission(requestId, result) {
+        return handleSdkPendingPermission(this.ctx, requestId, result);
+    }
+
+    /**
+     * Resolve tool call pendente do SDK.
+     *
+     * @param {string} requestId
+     * @param {{
+     *     result?: string | { textResultForLlm: string; resultType?: string; error?: string };
+     *     error?: string;
+     * }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async handleSdkPendingToolCall(requestId, options) {
+        return handleSdkPendingToolCall(this.ctx, requestId, options);
+    }
+
+    /**
+     * Resolve comando pendente do SDK.
+     *
+     * @param {string} requestId
+     * @param {{ error?: string }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async handleSdkPendingCommand(requestId, options) {
+        return handleSdkPendingCommand(this.ctx, requestId, options);
+    }
+
+    /**
+     * Executa comando shell pela superfície SDK.
+     *
+     * @param {string} command
+     * @param {{ cwd?: string; timeout?: number }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async execSdkShell(command, options) {
+        return execSdkShell(this.ctx, command, options);
+    }
+
+    /**
+     * Envia sinal para processo shell iniciado pela superfície SDK.
+     *
+     * @param {string} processId
+     * @param {'SIGTERM' | 'SIGKILL' | 'SIGINT'} [signal]
+     * @returns {Promise<unknown>}
+     */
+    async killSdkShell(processId, signal) {
+        return killSdkShell(this.ctx, processId, signal);
     }
 
     /**

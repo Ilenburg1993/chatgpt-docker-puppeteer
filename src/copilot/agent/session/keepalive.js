@@ -12,6 +12,7 @@
  */
 
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
+import { sendSession } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log } from '../ports/observability-port.js';
 
@@ -148,7 +149,7 @@ export class SessionKeepalive {
                     onError: (error) => {
                         log(
                             'WARN',
-                            `[SessionKeepalive] Ping keepalive falhou: ${error.message} — tentando session.send()`,
+                            `[SessionKeepalive] Ping keepalive falhou: ${error.message} — tentando session.send()`, // crude-ok: string de log descritiva
                         );
                     },
                 });
@@ -165,16 +166,22 @@ export class SessionKeepalive {
 
             // Fallback: session.send() consome 1 PR, mas garante que a sessão não expire
             const session = getSession();
-            const sessionSend = session?.send;
-            if (typeof sessionSend !== 'function') return;
+            if (!session || !('sessionId' in session)) return;
 
-            const sendResult = await withAgentErrorPolicy(() => sessionSend.call(session, { prompt: '[keepalive]' }), {
-                label: 'session.keepalive.send',
-                phase: 'keepalive',
-                onError: (error) => {
-                    log('WARN', `[SessionKeepalive] Heartbeat falhou: ${error.message}`);
+            const sendResult = await withAgentErrorPolicy(
+                () =>
+                    sendSession(
+                        /** @type {import('#copilot/sdk/types').CopilotSession} */ (/** @type {unknown} */ (session)),
+                        { prompt: '[keepalive]' },
+                    ),
+                {
+                    label: 'session.keepalive.send',
+                    phase: 'keepalive',
+                    onError: (error) => {
+                        log('WARN', `[SessionKeepalive] Heartbeat falhou: ${error.message}`);
+                    },
                 },
-            });
+            );
             if (sendResult.ok) {
                 this.#lastActivityAt = Date.now();
                 log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);

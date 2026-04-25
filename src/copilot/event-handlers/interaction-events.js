@@ -5,8 +5,9 @@
  * Faixa B4: Handlers dedicados para skill, command, permission e subagent events.
  */
 
+import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { SESSION_EVENTS } from '#copilot/sdk';
+import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
  * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
@@ -16,7 +17,7 @@ import { SESSION_EVENTS } from '#copilot/sdk';
 export function wireInteractionEvents(session, { emit }) {
     return [
         // ── skill.invoked ────────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SKILL_INVOKED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SKILL_INVOKED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const skillName = /** @type {string | undefined} */ (data['skillName'] ?? data['name']);
@@ -25,7 +26,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── command.execute ──────────────────────────────────────────────
-        session.on(SESSION_EVENTS.COMMAND_EXECUTE, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.COMMAND_EXECUTE, (evt) => {
             const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const commandName = /** @type {string | undefined} */ (data['commandName']);
             log('INFO', `[interaction-events] command.execute: /${commandName ?? '?'}`);
@@ -33,7 +34,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── command.queued ───────────────────────────────────────────────
-        session.on(SESSION_EVENTS.COMMAND_QUEUED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.COMMAND_QUEUED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const requestId = /** @type {string | undefined} */ (data['requestId']);
@@ -42,7 +43,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── command.completed ────────────────────────────────────────────
-        session.on(SESSION_EVENTS.COMMAND_COMPLETED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.COMMAND_COMPLETED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const requestId = /** @type {string | undefined} */ (data['requestId']);
@@ -51,7 +52,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── permission.requested ─────────────────────────────────────────
-        session.on(SESSION_EVENTS.PERMISSION_REQUESTED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.PERMISSION_REQUESTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const permissionType = /** @type {string | undefined} */ (data['permissionType'] ?? data['type']);
@@ -60,7 +61,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── permission.completed ─────────────────────────────────────────
-        session.on(SESSION_EVENTS.PERMISSION_COMPLETED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.PERMISSION_COMPLETED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const granted = /** @type {boolean | undefined} */ (data['granted'] ?? data['approved']);
@@ -69,7 +70,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── subagent.started ─────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SUBAGENT_STARTED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SUBAGENT_STARTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
@@ -78,7 +79,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── subagent.completed ───────────────────────────────────────────
-        session.on(SESSION_EVENTS.SUBAGENT_COMPLETED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SUBAGENT_COMPLETED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
@@ -87,7 +88,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── subagent.failed ──────────────────────────────────────────────
-        session.on(SESSION_EVENTS.SUBAGENT_FAILED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SUBAGENT_FAILED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
@@ -97,7 +98,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── subagent.selected / deselected ───────────────────────────────
-        session.on(SESSION_EVENTS.SUBAGENT_SELECTED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SUBAGENT_SELECTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
@@ -105,7 +106,7 @@ export function wireInteractionEvents(session, { emit }) {
             emit('subagent.selected', { agentName, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
-        session.on(SESSION_EVENTS.SUBAGENT_DESELECTED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.SUBAGENT_DESELECTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
@@ -114,7 +115,7 @@ export function wireInteractionEvents(session, { emit }) {
         }),
 
         // ── exit_plan_mode.completed ───────────────────────────────────
-        session.on(SESSION_EVENTS.EXIT_PLAN_MODE_COMPLETED, (evt) => {
+        onSessionEvent(session, SESSION_EVENTS.EXIT_PLAN_MODE_COMPLETED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const requestId = /** @type {string | undefined} */ (data['requestId']);
