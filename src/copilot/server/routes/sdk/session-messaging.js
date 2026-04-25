@@ -155,7 +155,7 @@ function ensureSessionStreamState(routeDeps, id, entry) {
 
     const unsubscribe = onAllSessionEvents(
         entry.session,
-        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
             const type = /** @type {string} */ (event?.type ?? 'message');
             const payload = standardizeSsePayload(event);
             pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
@@ -182,10 +182,10 @@ function maybeDisposeSessionStreamState(routeDeps, state) {
 /**
  * @param {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session']} session
  * @param {import('#copilot/sdk/types').MessageOptions} messageOptions
- * @returns {Promise<import('@github/copilot-sdk').AssistantMessageEvent | undefined>}
+ * @returns {Promise<import('#copilot/sdk/types').AssistantMessageEvent | undefined>}
  */
 async function sendAndWaitWithoutTimeout(session, messageOptions) {
-    /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */
+    /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */
     let lastAssistantMessage;
 
     /** @type {() => void} */
@@ -200,7 +200,7 @@ async function sendAndWaitWithoutTimeout(session, messageOptions) {
 
     const unsubscribe = onAllSessionEvents(
         session,
-        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
             if (event.type === 'assistant.message') {
                 lastAssistantMessage = event;
             } else if (event.type === 'session.idle') {

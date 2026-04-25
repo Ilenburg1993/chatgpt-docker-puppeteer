@@ -20,7 +20,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  * @property {(event: string, payload?: unknown) => void} emit - Emite eventos no host
  * @property {(
  *     client: import('#copilot/sdk/types').CopilotClient,
- * ) => Promise<{ session: import('@github/copilot-sdk').CopilotSession; isResumed: boolean }>} initSession
+ * ) => Promise<{ session: import('#copilot/sdk/types').CopilotSession; isResumed: boolean }>} initSession
  *   - Reinicializa a sessão SDK
  *
  * @property {{ active: boolean; notifyReconnect: () => void }} dialogLoop - Handle do dialog loop
@@ -31,7 +31,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  *   CopilotClient
  * @property {(
  *     client: import('#copilot/sdk/types').CopilotClient,
- *     session: import('@github/copilot-sdk').CopilotSession,
+ *     session: import('#copilot/sdk/types').CopilotSession,
  *     isResumed: boolean,
  * ) => Promise<void>} [onSessionReady]
  *   - Reaplica o runtime governado pela sessão reconectada.

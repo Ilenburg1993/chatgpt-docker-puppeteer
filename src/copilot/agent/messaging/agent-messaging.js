@@ -89,7 +89,7 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @param {import('#copilot/sdk/types').MessageOptions} sendOpts
  * @param {number} timeoutMs
- * @returns {Promise<import('@github/copilot-sdk').AssistantMessageEvent | undefined>}
+ * @returns {Promise<import('#copilot/sdk/types').AssistantMessageEvent | undefined>}
  */
 async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
     if (typeof session.send !== 'function') {
@@ -99,7 +99,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
         throw new Error('session.send is not a function');
     }
 
-    /** @type {import('@github/copilot-sdk').AssistantMessageEvent | undefined} */
+    /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */
     let lastAssistantMessage;
 
     /** @type {() => void} */
@@ -118,7 +118,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
 
     const unsubscribe = onAllSessionEvents(
         session,
-        (/** @type {import('@github/copilot-sdk').SessionEvent} */ event) => {
+        (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
             if (event.type === 'assistant.message') {
                 lastAssistantMessage = event;
                 inactivityGuard.ping();

@@ -12,9 +12,9 @@
 import { log } from '../observability/logger.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
+ * @typedef {import('#copilot/sdk/types').CopilotClientOptions} CopilotClientOptions
  *
- * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
+ * @typedef {import('#copilot/sdk/types').ModelInfo} ModelInfo
  */
 
 /**

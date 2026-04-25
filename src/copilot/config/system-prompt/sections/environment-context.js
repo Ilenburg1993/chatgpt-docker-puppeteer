@@ -18,6 +18,6 @@ Scripts npm: lint, format:check, test:unit, test:fast, typecheck:node, audit:qui
 /**
  * Override action para mode 'customize'.
  *
- * @type {import('@github/copilot-sdk').SectionOverrideAction}
+ * @type {import('#copilot/sdk/types').SectionOverrideAction}
  */
 export const ACTION = 'replace';

@@ -13,23 +13,23 @@ import { log } from '#copilot/observability';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-config-port.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
  *
- * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ * @typedef {import('#copilot/sdk/types').ResumeSessionConfig} ResumeSessionConfig
  *
- * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ * @typedef {import('#copilot/sdk/types').PermissionHandler} PermissionHandler
  *
- * @typedef {import('@github/copilot-sdk').Tool} Tool
+ * @typedef {import('#copilot/sdk/types').Tool} Tool
  *
- * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
+ * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
  *
- * @typedef {import('@github/copilot-sdk').MCPServerConfig} MCPServerConfig
+ * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
  *
- * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
+ * @typedef {import('#copilot/sdk/types').CustomAgentConfig} CustomAgentConfig
  *
- * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
+ * @typedef {import('#copilot/sdk/types').InfiniteSessionConfig} InfiniteSessionConfig
  *
- * @typedef {import('@github/copilot-sdk').SessionEventHandler} SessionEventHandler
+ * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */

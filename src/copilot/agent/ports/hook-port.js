@@ -38,7 +38,7 @@ import { createRuntimeDisableHook } from '../../hooks/tool-interceptor.js';
  * acopla o bus canônico.
  *
  * @param {AgentSessionHookInput} input
- * @returns {NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>}
+ * @returns {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>}
  */
 export function buildAgentBusHooks(input) {
     const lifecycleHooks = createSessionHooks(input);
@@ -58,9 +58,9 @@ export function buildAgentBusHooks(input) {
  * `session-setup` conhece a denylist/allowlist efetiva, mas não deve conhecer a implementação concreta de hooks. Esta
  * função mantém a tradução `agent policy -> SDK preToolUse hook` dentro da porta.
  *
- * @param {NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>} busHooks
+ * @param {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>} busHooks
  * @param {(toolName: string) => boolean} isToolDisabled
- * @returns {NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>}
+ * @returns {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>}
  */
 export function withAgentRuntimeToolPolicy(busHooks, isToolDisabled) {
     const runtimeDisableHook = createRuntimeDisableHook(isToolDisabled);

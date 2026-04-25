@@ -14,6 +14,6 @@ Use Markdown para estruturar respostas longas.`;
 /**
  * Override action para mode 'customize'.
  *
- * @type {import('@github/copilot-sdk').SectionOverrideAction}
+ * @type {import('#copilot/sdk/types').SectionOverrideAction}
  */
 export const ACTION = 'replace';

@@ -7,7 +7,7 @@
  *   via `#copilot/sdk` e reduzindo o statefulness do módulo de wrapper.
  */
 
-/** @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession */
+/** @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession */
 
 /**
  * @typedef {Object} SessionEntry

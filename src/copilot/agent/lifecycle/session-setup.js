@@ -80,7 +80,7 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  *
  * @typedef {{
  *     tools: import('#copilot/sdk/types').Tool[];
- *     busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']>;
+ *     busHooks: NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>;
  * }} PreparedSessionDeps
  */
 
@@ -189,7 +189,7 @@ export async function buildSessionTools(ctx) {
  *
  * @param {SessionSetupContext} ctx
  * @param {LifecycleHost} host
- * @returns {{ busHooks: NonNullable<import('@github/copilot-sdk').SessionConfig['hooks']> }}
+ * @returns {{ busHooks: NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']> }}
  */
 export function buildSessionHooks(ctx, host) {
     /** @type {{ recordSessionStart: () => void; recordSessionEnd: () => void }} */

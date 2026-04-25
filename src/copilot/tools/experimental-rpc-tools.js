@@ -44,13 +44,13 @@ import {
 
 // ─── Session handle ──────────────────────────────────────────────────────────
 
-/** @type {import('@github/copilot-sdk').CopilotSession | null} */
+/** @type {import('#copilot/sdk/types').CopilotSession | null} */
 let _session = null;
 
 /**
  * Injeta a CopilotSession completa para uso nos experimental tools. Chamar após `initOrResumeSession()`.
  *
- * @param {import('@github/copilot-sdk').CopilotSession | null} session
+ * @param {import('#copilot/sdk/types').CopilotSession | null} session
  */
 export function setExperimentalSession(session) {
     _session = session;
@@ -60,7 +60,7 @@ export function setExperimentalSession(session) {
 /**
  * Retorna a sessão ou lança erro padronizado.
  *
- * @returns {import('@github/copilot-sdk').CopilotSession}
+ * @returns {import('#copilot/sdk/types').CopilotSession}
  */
 function getSession() {
     if (!_session) throw new Error('Sessão SDK não disponível. Agent não inicializado ou em reconexão.');
@@ -72,7 +72,7 @@ function getSession() {
  *
  * @template T
  * @param {string} toolName
- * @param {(session: import('@github/copilot-sdk').CopilotSession) => Promise<T>} fn
+ * @param {(session: import('#copilot/sdk/types').CopilotSession) => Promise<T>} fn
  * @returns {Promise<T | { error: string }>}
  */
 async function wrapExp(toolName, fn) {
