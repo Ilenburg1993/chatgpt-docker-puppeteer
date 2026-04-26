@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { SdkOperationError } from '#copilot/sdk/errors';
 import {
     commandsHandlePending,
     compactionCompact,
@@ -40,7 +41,7 @@ import {
 /**
  * Cria sessão mock com todos os subsistemas RPC.
  *
- * @param {Record<string, Record<string, Function>>} [overrides]
+ * @param {Record<string, Record<string, Function> | Function>} [overrides]
  */
 function mockSession(overrides = {}) {
     return {
@@ -68,7 +69,7 @@ function mockSession(overrides = {}) {
                 createFile: async () => ({}),
                 ...overrides['workspace'],
             },
-            log: { event: async () => ({ eventId: 'e1' }), ...overrides['log'] },
+            log: overrides['log'] ?? (async () => ({ eventId: 'e1' })),
             compaction: {
                 compact: async () => ({ success: true, tokensRemoved: 100, messagesRemoved: 5 }),
                 ...overrides['compaction'],
@@ -189,6 +190,18 @@ describe('F41 — Error propagation across subsystems', () => {
         await expect(compactionCompact(/** @type {any} */ (s))).rejects.toThrow('quota exhausted');
     });
 
+    it('compactionCompact converte falha em SdkOperationError', async () => {
+        const s = mockSession({
+            compaction: {
+                compact: async () => {
+                    throw Object.assign(new Error('quota exhausted'), { status: 429 });
+                },
+            },
+        });
+
+        await expect(compactionCompact(/** @type {any} */ (s))).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
     it('shellExec propaga erro de timeout', async () => {
         const s = mockSession({
             shell: {
@@ -200,6 +213,19 @@ describe('F41 — Error propagation across subsystems', () => {
         });
 
         await expect(shellExec(/** @type {any} */ (s), 'slow-cmd')).rejects.toThrow('process timed out');
+    });
+
+    it('shellExec converte timeout em SdkOperationError', async () => {
+        const s = mockSession({
+            shell: {
+                exec: async () => {
+                    throw Object.assign(new Error('process timed out'), { code: 'ETIMEDOUT' });
+                },
+                kill: async () => ({ killed: true }),
+            },
+        });
+
+        await expect(shellExec(/** @type {any} */ (s), 'slow-cmd')).rejects.toBeInstanceOf(SdkOperationError);
     });
 
     it('uiElicitation propaga erro de cancelamento', async () => {
@@ -228,6 +254,70 @@ describe('F41 — Error propagation across subsystems', () => {
         });
 
         await expect(workspaceReadFile(/** @type {any} */ (s), 'missing.js')).rejects.toThrow('ENOENT');
+    });
+
+    it('modelGetCurrent converte erro em SdkOperationError', async () => {
+        const s = mockSession({
+            model: {
+                getCurrent: async () => {
+                    throw Object.assign(new Error('auth expired'), { status: 401 });
+                },
+                switchTo: async () => ({ modelId: 'gpt-4o' }),
+            },
+        });
+
+        await expect(modelGetCurrent(/** @type {any} */ (s))).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('modeGet converte erro em SdkOperationError', async () => {
+        const s = mockSession({
+            mode: {
+                get: async () => {
+                    throw Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' });
+                },
+                set: async () => ({ mode: 'plan' }),
+            },
+        });
+
+        await expect(modeGet(/** @type {any} */ (s))).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('planRead converte erro em SdkOperationError', async () => {
+        const s = mockSession({
+            plan: {
+                read: async () => {
+                    throw new Error('plan backend unavailable');
+                },
+                update: async () => ({}),
+                delete: async () => ({}),
+            },
+        });
+
+        await expect(planRead(/** @type {any} */ (s))).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('workspaceListFiles converte erro em SdkOperationError', async () => {
+        const s = mockSession({
+            workspace: {
+                listFiles: async () => {
+                    throw new Error('workspace disconnected');
+                },
+                readFile: async () => ({ content: 'x' }),
+                createFile: async () => ({}),
+            },
+        });
+
+        await expect(workspaceListFiles(/** @type {any} */ (s))).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('sessionLog converte erro em SdkOperationError', async () => {
+        const s = mockSession({
+            log: async () => {
+                throw new Error('log stream unavailable');
+            },
+        });
+
+        await expect(sessionLog(/** @type {any} */ (s), 'hello')).rejects.toBeInstanceOf(SdkOperationError);
     });
 });
 

@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
 
 /**
@@ -19,11 +20,30 @@ import { log as appLog } from '../logger.js';
  *
  * @typedef {{ agents: AgentInfo[] }} AgentListResult
  *
+ * @typedef {{ agent: AgentInfo | null }} AgentCurrentResult
+ *
  * @typedef {{ agent: AgentInfo }} AgentSelectResult
  *
  * @typedef {{}} AgentDeselectResult
  *
+ * @typedef {{ agents: AgentInfo[] }} AgentReloadResult
+ *
  * @typedef {{ success: boolean; tokensRemoved: number; messagesRemoved: number }} CompactionCompactResult
+ *
+ * @typedef {{ processId: string; stdout?: string; stderr?: string; exitCode?: number }} ShellExecResult
+ *
+ * @typedef {{ killed: boolean }} ShellKillResult
+ *
+ * @typedef {{ action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> }} ElicitationResult
+ *
+ * @typedef {{ success: boolean }} HandleResult
+ *
+ * @typedef {import('../types.js').PermissionRequestResult | ({ kind: string } & Record<string, unknown>)} PermissionRequestResolution
+ *
+ *
+ * @typedef {import('../types.js').ToolResult} ToolResult
+ *
+ * @typedef {{ textResultForLlm: string; resultType?: string; error?: string }} ToolResultObjectLike
  */
 
 /**
@@ -39,12 +59,16 @@ function assertSession(session, caller) {
 
 /**
  * @param {CopilotSession} session
- * @returns {Promise<unknown>}
+ * @returns {Promise<CompactionCompactResult>}
  */
 export async function compactionCompact(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
-    return session.rpc.compaction.compact();
+    try {
+        return /** @type {CompactionCompactResult} */ (await session.rpc.compaction.compact());
+    } catch (error) {
+        throw toSdkOperationError('compaction.compact', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -57,7 +81,7 @@ export async function compactionCompact(session) {
  * @param {CopilotSession} session
  * @param {string} command - Comando shell a executar
  * @param {{ cwd?: string; timeout?: number }} [options]
- * @returns {Promise<unknown>}
+ * @returns {Promise<ShellExecResult>}
  */
 export async function shellExec(session, command, options) {
     assertSession(session, 'shell.exec');
@@ -69,7 +93,11 @@ export async function shellExec(session, command, options) {
     if (options?.timeout !== undefined) params.timeout = options.timeout;
 
     appLog('INFO', `[sdk/rpc] shell.exec: command='${command.slice(0, 80)}', sessionId='${session.sessionId}'`);
-    return session.rpc.shell.exec(params);
+    try {
+        return /** @type {ShellExecResult} */ (await session.rpc.shell.exec(params));
+    } catch (error) {
+        throw toSdkOperationError('shell.exec', error);
+    }
 }
 
 /**
@@ -78,7 +106,7 @@ export async function shellExec(session, command, options) {
  * @param {CopilotSession} session
  * @param {string} processId - ID do processo retornado por shellExec
  * @param {'SIGTERM' | 'SIGKILL' | 'SIGINT'} [signal='SIGTERM'] Default is `'SIGTERM'`
- * @returns {Promise<unknown>}
+ * @returns {Promise<ShellKillResult>}
  */
 export async function shellKill(session, processId, signal) {
     assertSession(session, 'shell.kill');
@@ -93,9 +121,15 @@ export async function shellKill(session, processId, signal) {
         'INFO',
         `[sdk/rpc] shell.kill: processId='${processId}', signal='${signal ?? 'SIGTERM'}', sessionId='${session.sessionId}'`,
     );
-    return session.rpc.shell.kill(
-        /** @type {{ processId: string; signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' }} */ (params),
-    );
+    try {
+        return /** @type {ShellKillResult} */ (
+            await session.rpc.shell.kill(
+                /** @type {{ processId: string; signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' }} */ (params),
+            )
+        );
+    } catch (error) {
+        throw toSdkOperationError('shell.kill', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -108,7 +142,7 @@ export async function shellKill(session, processId, signal) {
  * @param {CopilotSession} session
  * @param {string} message - Mensagem descrevendo a informação necessária
  * @param {object} requestedSchema - JSON Schema do formulário
- * @returns {Promise<unknown>}
+ * @returns {Promise<ElicitationResult>}
  */
 export async function uiElicitation(session, message, requestedSchema) {
     assertSession(session, 'ui.elicitation');
@@ -119,14 +153,20 @@ export async function uiElicitation(session, message, requestedSchema) {
         throw new TypeError('[sdk/rpc/ui.elicitation] requestedSchema deve ser um objeto.');
     }
     appLog('INFO', `[sdk/rpc] ui.elicitation: sessionId='${session.sessionId}'`);
-    return session.rpc.ui.elicitation(
-        /** @type {Parameters<typeof session.rpc.ui.elicitation>[0]} */ (
-            /** @type {unknown} */ ({
-                message,
-                requestedSchema,
-            })
-        ),
-    );
+    try {
+        return /** @type {ElicitationResult} */ (
+            await session.rpc.ui.elicitation(
+                /** @type {Parameters<typeof session.rpc.ui.elicitation>[0]} */ (
+                    /** @type {unknown} */ ({
+                        message,
+                        requestedSchema,
+                    })
+                ),
+            )
+        );
+    } catch (error) {
+        throw toSdkOperationError('ui.elicitation', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -139,7 +179,7 @@ export async function uiElicitation(session, message, requestedSchema) {
  * @param {CopilotSession} session
  * @param {string} requestId - ID da requisição do comando
  * @param {{ error?: string }} [options]
- * @returns {Promise<unknown>}
+ * @returns {Promise<HandleResult>}
  */
 export async function commandsHandlePending(session, requestId, options) {
     assertSession(session, 'commands.handlePendingCommand');
@@ -153,7 +193,11 @@ export async function commandsHandlePending(session, requestId, options) {
         'DEBUG',
         `[sdk/rpc] commands.handlePendingCommand: requestId='${requestId}', sessionId='${session.sessionId}'`,
     );
-    return session.rpc.commands.handlePendingCommand(params);
+    try {
+        return /** @type {HandleResult} */ (await session.rpc.commands.handlePendingCommand(params));
+    } catch (error) {
+        throw toSdkOperationError('commands.handlePendingCommand', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -165,8 +209,8 @@ export async function commandsHandlePending(session, requestId, options) {
  *
  * @param {CopilotSession} session
  * @param {string} requestId
- * @param {{ kind: string } & Record<string, unknown>} result - Resultado da permissão (approved, denied-*)
- * @returns {Promise<unknown>}
+ * @param {PermissionRequestResolution} result - Resultado da permissão (approved, denied-*)
+ * @returns {Promise<HandleResult>}
  */
 export async function permissionsHandlePending(session, requestId, result) {
     assertSession(session, 'permissions.handlePendingPermissionRequest');
@@ -179,14 +223,20 @@ export async function permissionsHandlePending(session, requestId, result) {
         throw new TypeError('[sdk/rpc/permissions.handlePendingPermissionRequest] result deve ter propriedade kind.');
     }
     appLog('DEBUG', `[sdk/rpc] permissions.handlePending: kind='${result.kind}', sessionId='${session.sessionId}'`);
-    return session.rpc.permissions.handlePendingPermissionRequest(
-        /** @type {Parameters<typeof session.rpc.permissions.handlePendingPermissionRequest>[0]} */ (
-            /** @type {unknown} */ ({
-                requestId,
-                result,
-            })
-        ),
-    );
+    try {
+        return /** @type {HandleResult} */ (
+            await session.rpc.permissions.handlePendingPermissionRequest(
+                /** @type {Parameters<typeof session.rpc.permissions.handlePendingPermissionRequest>[0]} */ (
+                    /** @type {unknown} */ ({
+                        requestId,
+                        result,
+                    })
+                ),
+            )
+        );
+    } catch (error) {
+        throw toSdkOperationError('permissions.handlePendingPermissionRequest', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -198,8 +248,8 @@ export async function permissionsHandlePending(session, requestId, result) {
  *
  * @param {CopilotSession} session
  * @param {string} requestId
- * @param {{ result?: string | { textResultForLlm: string; resultType?: string; error?: string }; error?: string }} [options]
- * @returns {Promise<unknown>}
+ * @param {{ result?: ToolResult | ToolResultObjectLike; error?: string }} [options]
+ * @returns {Promise<HandleResult>}
  */
 export async function toolsHandlePendingCall(session, requestId, options) {
     assertSession(session, 'tools.handlePendingToolCall');
@@ -215,15 +265,21 @@ export async function toolsHandlePendingCall(session, requestId, options) {
         'DEBUG',
         `[sdk/rpc] tools.handlePendingToolCall: requestId='${requestId}', sessionId='${session.sessionId}'`,
     );
-    return session.rpc.tools.handlePendingToolCall(
-        /**
-         * @type {{
-         *     requestId: string;
-         *     result?: string | { textResultForLlm: string; resultType?: string; error?: string };
-         *     error?: string;
-         * }}
-         */ (params),
-    );
+    try {
+        return /** @type {HandleResult} */ (
+            await session.rpc.tools.handlePendingToolCall(
+                /**
+                 * @type {{
+                 *     requestId: string;
+                 *     result?: ToolResult | ToolResultObjectLike;
+                 *     error?: string;
+                 * }}
+                 */ (params),
+            )
+        );
+    } catch (error) {
+        throw toSdkOperationError('tools.handlePendingToolCall', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -239,7 +295,27 @@ export async function toolsHandlePendingCall(session, requestId, options) {
 export async function agentList(session) {
     assertSession(session, 'agent.list');
     appLog('DEBUG', `[sdk/rpc] agent.list: sessionId='${session.sessionId}'`);
-    return /** @type {Promise<AgentListResult>} */ (session.rpc.agent.list());
+    try {
+        return /** @type {AgentListResult} */ (await session.rpc.agent.list());
+    } catch (error) {
+        throw toSdkOperationError('agent.list', error);
+    }
+}
+
+/**
+ * Retorna o agente atualmente selecionado para a sessão.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<AgentCurrentResult>}
+ */
+export async function agentGetCurrent(session) {
+    assertSession(session, 'agent.getCurrent');
+    appLog('DEBUG', `[sdk/rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
+    try {
+        return /** @type {AgentCurrentResult} */ (await session.rpc.agent.getCurrent());
+    } catch (error) {
+        throw toSdkOperationError('agent.getCurrent', error);
+    }
 }
 
 /**
@@ -255,7 +331,11 @@ export async function agentSelect(session, name) {
         throw new TypeError('[sdk/rpc/agent.select] name deve ser string não-vazia.');
     }
     appLog('INFO', `[sdk/rpc] agent.select: name='${name}', sessionId='${session.sessionId}'`);
-    return /** @type {Promise<AgentSelectResult>} */ (session.rpc.agent.select({ name }));
+    try {
+        return /** @type {AgentSelectResult} */ (await session.rpc.agent.select({ name }));
+    } catch (error) {
+        throw toSdkOperationError('agent.select', error);
+    }
 }
 
 /**
@@ -267,7 +347,27 @@ export async function agentSelect(session, name) {
 export async function agentDeselect(session) {
     assertSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/rpc] agent.deselect: sessionId='${session.sessionId}'`);
-    return /** @type {Promise<AgentDeselectResult>} */ (session.rpc.agent.deselect());
+    try {
+        return /** @type {AgentDeselectResult} */ (await session.rpc.agent.deselect());
+    } catch (error) {
+        throw toSdkOperationError('agent.deselect', error);
+    }
+}
+
+/**
+ * Recarrega a lista de agentes disponíveis na sessão.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<AgentReloadResult>}
+ */
+export async function agentReload(session) {
+    assertSession(session, 'agent.reload');
+    appLog('INFO', `[sdk/rpc] agent.reload: sessionId='${session.sessionId}'`);
+    try {
+        return /** @type {AgentReloadResult} */ (await session.rpc.agent.reload());
+    } catch (error) {
+        throw toSdkOperationError('agent.reload', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -283,5 +383,9 @@ export async function agentDeselect(session) {
 export async function compactionCompactTyped(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
-    return /** @type {Promise<CompactionCompactResult>} */ (session.rpc.compaction.compact());
+    try {
+        return /** @type {CompactionCompactResult} */ (await session.rpc.compaction.compact());
+    } catch (error) {
+        throw toSdkOperationError('compaction.compact', error);
+    }
 }

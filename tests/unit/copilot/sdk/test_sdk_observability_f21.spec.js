@@ -5,8 +5,8 @@
  * Faixa 21 — Observability Integration: typed events, quota monitor, auth status.
  *
  * F113: event-collector usa onSessionEvent (typed events bridge) F114: (removido — nerv-bridge.js excluído em L36)
- * F115: quota-monitor.js — polling periódico com callbacks F116: health.js — checkAuthStatus exposto no barrel +
- * healthGetAuthStatus alias F117: integração typed events → quota → auth
+ * F115: quota-monitor.js — polling periódico com callbacks F116: health.js — checkAuthStatus exposto no barrel F117:
+ * integração typed events → quota → auth
  */
 
 import { createRequire } from 'node:module';
@@ -131,9 +131,9 @@ describe('F21 — F116: checkAuthStatus no barrel e health.js', () => {
         expect(src).toContain('createQuotaMonitor');
     });
 
-    it('sdk/index.js mantém healthGetAuthStatus (backward compat)', () => {
+    it('sdk/index.js não exporta alias redundante healthGetAuthStatus', () => {
         const src = readSource('sdk/index.js');
-        expect(src).toContain('healthGetAuthStatus');
+        expect(src).not.toContain('healthGetAuthStatus');
     });
 
     it('health.js tem getAuthStatus implementado', () => {

@@ -29,9 +29,11 @@ import { log } from '../logger.js';
  * @returns {{ converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean }}
  */
 function getZodConverterState() {
-    const fn = /** @type {typeof getZodConverterState & {
-    _state?: { converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean };
-}} */ (getZodConverterState);
+    const fn = /**
+     * @type {typeof getZodConverterState & {
+     *     _state?: { converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean };
+     * }}
+     */ (getZodConverterState);
     if (!fn._state) {
         fn._state = { converter: null, attempted: false };
     }
@@ -159,7 +161,7 @@ function defineToolSafe(name, config) {
  *
  * @example
  *     ```js
- *     import { createTool } from '#copilot/sdk/tools';
+ *     import { createTool } from '#copilot/sdk';
  *     import { z } from 'zod/v3';
  *
  *     const readFileTool = createTool({

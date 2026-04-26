@@ -7,6 +7,7 @@
  * runSessionLifecycle
  */
 
+import { SdkOperationError } from '#copilot/sdk/errors';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
@@ -101,6 +102,13 @@ describe('sdk/session-lifecycle', () => {
             const s = fakeSession({ abort: vi.fn().mockRejectedValue(new Error('disconnect')) });
             await expect(abortSession(s)).rejects.toThrow('disconnect');
         });
+
+        it('normaliza erro do SDK em SdkOperationError', async () => {
+            const s = fakeSession({
+                abort: vi.fn().mockRejectedValue(Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' })),
+            });
+            await expect(abortSession(s)).rejects.toBeInstanceOf(SdkOperationError);
+        });
     });
 
     // ─── setSessionModel ───────────────────────────────────────────────────
@@ -158,6 +166,11 @@ describe('sdk/session-lifecycle', () => {
         it('propaga erro do SDK', async () => {
             const s = fakeSession({ getMessages: vi.fn().mockRejectedValue(new Error('no connection')) });
             await expect(getSessionMessages(s)).rejects.toThrow('no connection');
+        });
+
+        it('normaliza erro de getMessages em SdkOperationError', async () => {
+            const s = fakeSession({ getMessages: vi.fn().mockRejectedValue(new Error('connection reset')) });
+            await expect(getSessionMessages(s)).rejects.toBeInstanceOf(SdkOperationError);
         });
     });
 

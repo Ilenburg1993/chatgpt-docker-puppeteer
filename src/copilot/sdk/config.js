@@ -25,6 +25,10 @@ import { approveAll } from '@github/copilot-sdk';
  * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
  *
  * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
+ *
+ * @typedef {Omit<Partial<SessionConfig>, 'onPermissionRequest'> & {
+ *     onPermissionRequest?: PermissionHandler | undefined;
+ * }} SessionConfigOverrides
  */
 
 // ─── Defaults canônicos do projeto ────────────────────────────────────────────
@@ -86,16 +90,11 @@ export function getProjectDefaults() {
  * SUBSTITUÍDOS (não concatenados). Campos objeto (infiniteSessions, systemMessage, provider) fazem shallow merge.
  *
  * @deprecated Use SessionConfigBuilder de `#copilot/config/session-config` em vez desta função. Será removida na M-04.
- * @param {Partial<SessionConfig>} [input={}] - Overrides de maior prioridade. Default is `{}`
- * @param {Partial<SessionConfig>} [defaults={}] - Overrides intermediários. Default is `{}`
+ * @param {SessionConfigOverrides} [input={}] - Overrides de maior prioridade. Default is `{}`
+ * @param {SessionConfigOverrides} [defaults={}] - Overrides intermediários. Default is `{}`
  * @returns {SessionConfig}
  */
-let _buildSessionConfigWarned = false;
 export function buildSessionConfig(input = {}, defaults = {}) {
-    if (!_buildSessionConfigWarned) {
-        console.warn('[DEPRECATED] buildSessionConfig — use SessionConfigBuilder from #copilot/config/session-config');
-        _buildSessionConfigWarned = true;
-    }
     const base = /** @type {Partial<SessionConfig> & { infiniteSessions?: InfiniteSessionConfig }} */ (
         getProjectDefaults()
     );

@@ -26,7 +26,7 @@ import {
 } from '#copilot/event-handlers';
 
 // Re-exportar KNOWN_SDK_EVENTS para consumidores existentes
-export { KNOWN_SDK_EVENTS } from '#copilot/event-handlers/catch-all';
+export { KNOWN_SDK_EVENTS } from '../../event-handlers/catch-all.js';
 
 /**
  * Tipo mínimo de sessão SDK usado pelos handlers — compatível com CopilotSession.

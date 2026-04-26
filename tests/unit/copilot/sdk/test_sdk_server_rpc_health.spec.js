@@ -7,6 +7,7 @@
  * fullHealthCheck, isServerReachable
  */
 
+import { SdkOperationError } from '#copilot/sdk/errors';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
@@ -111,6 +112,11 @@ describe('sdk/server-rpc', () => {
         it('rejeita client inválido', async () => {
             await expect(ping(null)).rejects.toThrow(TypeError);
         });
+
+        it('converte erro de ping em SdkOperationError', async () => {
+            const c = fakeClient({ ping: vi.fn().mockRejectedValue(new Error('socket hang up')) });
+            await expect(ping(c)).rejects.toBeInstanceOf(SdkOperationError);
+        });
     });
 
     // ─── MODELS ────────────────────────────────────────────────────────────
@@ -125,6 +131,15 @@ describe('sdk/server-rpc', () => {
 
         it('rejeita client inválido', async () => {
             await expect(modelsList(null)).rejects.toThrow(TypeError);
+        });
+
+        it('converte erro de models.list em SdkOperationError', async () => {
+            const c = fakeClient({
+                models: {
+                    list: vi.fn().mockRejectedValue(new Error('models unavailable')),
+                },
+            });
+            await expect(modelsList(c)).rejects.toBeInstanceOf(SdkOperationError);
         });
     });
 
@@ -147,6 +162,15 @@ describe('sdk/server-rpc', () => {
         it('rejeita client inválido', async () => {
             await expect(toolsList(null)).rejects.toThrow(TypeError);
         });
+
+        it('converte erro de tools.list em SdkOperationError', async () => {
+            const c = fakeClient({
+                tools: {
+                    list: vi.fn().mockRejectedValue(new Error('tools backend down')),
+                },
+            });
+            await expect(toolsList(c)).rejects.toBeInstanceOf(SdkOperationError);
+        });
     });
 
     // ─── QUOTA ─────────────────────────────────────────────────────────────
@@ -161,6 +185,15 @@ describe('sdk/server-rpc', () => {
 
         it('rejeita client inválido', async () => {
             await expect(accountGetQuota(null)).rejects.toThrow(TypeError);
+        });
+
+        it('converte erro de account.getQuota em SdkOperationError', async () => {
+            const c = fakeClient({
+                account: {
+                    getQuota: vi.fn().mockRejectedValue(new Error('quota endpoint timeout')),
+                },
+            });
+            await expect(accountGetQuota(c)).rejects.toBeInstanceOf(SdkOperationError);
         });
     });
 
@@ -386,7 +419,7 @@ describe('sdk/health', () => {
     // ─── Barrel re-export ──────────────────────────────────────────────────
 
     describe('barrel re-export (Faixa 9)', () => {
-        it('exporta 10 símbolos via barrel', async () => {
+        it('exporta 9 símbolos via barrel (sem alias redundante)', async () => {
             const barrel = await import('#copilot/sdk');
             expect(barrel.ping).toBeTypeOf('function');
             expect(barrel.modelsList).toBeTypeOf('function');
@@ -394,7 +427,6 @@ describe('sdk/health', () => {
             expect(barrel.accountGetQuota).toBeTypeOf('function');
             expect(barrel.createServerRpcFacade).toBeTypeOf('function');
             expect(barrel.pingCheck).toBeTypeOf('function');
-            expect(barrel.healthGetAuthStatus).toBeTypeOf('function');
             expect(barrel.getQuota).toBeTypeOf('function');
             expect(barrel.fullHealthCheck).toBeTypeOf('function');
             expect(barrel.isServerReachable).toBeTypeOf('function');

@@ -10,6 +10,7 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
+import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 
 /**
@@ -52,7 +53,11 @@ function assertSession(session, caller) {
 export async function abortSession(session) {
     assertSession(session, 'abort');
     log('INFO', `[session-lifecycle] Abortando mensagem: sessionId='${session.sessionId}'`);
-    await session.abort();
+    try {
+        await session.abort();
+    } catch (error) {
+        throw toSdkOperationError('session.abort', error);
+    }
     log('INFO', `[session-lifecycle] Abort concluído: sessionId='${session.sessionId}'`);
 }
 
@@ -67,7 +72,11 @@ export async function abortSession(session) {
 export async function disconnectSessionSafe(session) {
     assertSession(session, 'disconnect');
     log('INFO', `[session-lifecycle] Desconectando sessão: sessionId='${session.sessionId}'`);
-    await session.disconnect();
+    try {
+        await session.disconnect();
+    } catch (error) {
+        throw toSdkOperationError('session.disconnect', error);
+    }
     log('INFO', `[session-lifecycle] Sessão desconectada: sessionId='${session.sessionId}'`);
 }
 
@@ -90,9 +99,15 @@ export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
         'DEBUG',
         `[session-lifecycle] sendAndWait: sessionId='${session.sessionId}', timeout=${hasTimeout ? String(timeoutMs) : 'none'}`,
     );
-    const event = hasTimeout
-        ? await session.sendAndWait(messageOptions, timeoutMs)
-        : await session.sendAndWait(messageOptions);
+    /** @type {AssistantMessageEvent | undefined} */
+    let event;
+    try {
+        event = hasTimeout
+            ? await session.sendAndWait(messageOptions, timeoutMs)
+            : await session.sendAndWait(messageOptions);
+    } catch (error) {
+        throw toSdkOperationError('session.sendAndWait', error);
+    }
     log('DEBUG', `[session-lifecycle] sendAndWait concluído: sessionId='${session.sessionId}'`);
     return event;
 }
@@ -112,7 +127,12 @@ export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
 export async function sendSession(session, messageOptions) {
     assertSession(session, 'send');
     log('DEBUG', `[session-lifecycle] send: sessionId='${session.sessionId}'`);
-    const messageId = await session.send(messageOptions);
+    let messageId;
+    try {
+        messageId = await session.send(messageOptions);
+    } catch (error) {
+        throw toSdkOperationError('session.send', error);
+    }
     log(
         'DEBUG',
         `[session-lifecycle] send enfileirado: sessionId='${session.sessionId}', messageId=${messageId ?? 'n/a'}`,
@@ -136,7 +156,11 @@ export async function setSessionModel(session, model, options) {
         throw new TypeError('[session-lifecycle/setModel] model deve ser string não-vazia.');
     }
     log('INFO', `[session-lifecycle] setModel: sessionId='${session.sessionId}', model='${model}'`);
-    await session.setModel(model, options);
+    try {
+        await session.setModel(model, options);
+    } catch (error) {
+        throw toSdkOperationError('session.setModel', error);
+    }
     log('INFO', `[session-lifecycle] Modelo alterado para '${model}': sessionId='${session.sessionId}'`);
 }
 
@@ -151,7 +175,12 @@ export async function setSessionModel(session, model, options) {
 export async function getSessionMessages(session) {
     assertSession(session, 'getMessages');
     log('DEBUG', `[session-lifecycle] getMessages: sessionId='${session.sessionId}'`);
-    const messages = await session.getMessages();
+    let messages;
+    try {
+        messages = await session.getMessages();
+    } catch (error) {
+        throw toSdkOperationError('session.getMessages', error);
+    }
     log(
         'DEBUG',
         `[session-lifecycle] getMessages retornou ${messages.length} eventos: sessionId='${session.sessionId}'`,
@@ -184,7 +213,11 @@ export function getSessionWorkspacePath(session) {
 export async function disposeSession(session) {
     assertSession(session, 'dispose');
     log('INFO', `[session-lifecycle] Disposing sessão: sessionId='${session.sessionId}'`);
-    await session[Symbol.asyncDispose]();
+    try {
+        await session[Symbol.asyncDispose]();
+    } catch (error) {
+        throw toSdkOperationError('session.dispose', error);
+    }
     log('INFO', `[session-lifecycle] Sessão disposed: sessionId='${session.sessionId}'`);
 }
 

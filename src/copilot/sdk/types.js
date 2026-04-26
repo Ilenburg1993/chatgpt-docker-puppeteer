@@ -2,64 +2,75 @@
 /**
  * src/copilot/sdk/types.js
  *
- * Re-exportação COMPLETA de todos os tipos do `@github/copilot-sdk`. Este módulo é o SSOT (Single Source of Truth) para
- * tipos SDK no projeto.
+ * SSOT (Single Source of Truth) para todos os tipos do `@github/copilot-sdk` neste projeto.
  *
- * Consumers devem importar tipos via `import('./types.js').NomeTipo` ou via `import('#copilot/sdk').NomeTipo` (pelo
- * barrel).
+ * **Regras:**
  *
- * **Não contém runtime** — puro barrel de tipos para JSDoc.
+ * - Tipos públicos exportados pela raiz do SDK são importados via `@typedef {import('@github/copilot-sdk').TypeName}`.
+ * - Tipos internos do SDK (presentes em `dist/types.d.ts`, mas não re-exportados na raiz) e tipos locais/projeto são
+ *   definidos aqui e documentados como tal.
+ * - Não contém runtime — apenas barrel de tipos para JSDoc.
+ * - Consumers de tipos devem importar via `import('./types.js').NomeTipo` ou pelo barrel `#copilot/sdk`.
  *
  * @module copilot/sdk/types
- * @see EventBus
  */
 
 // ─── Core Client & Session ────────────────────────────────────────────────────
 
 /**
  * Classe principal do SDK. Gerencia conexão com o CLI, autenticação, criação/resumo de sessões e lifecycle events.
+ * Métodos: `start()`, `stop()`, `session.create()`, `session.resume()`, `listModels()`, `getStatus()`,
+ * `getAuthStatus()`, `on()` (lifecycle).
  *
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  */
 
 /**
- * Opções para criação do CopilotClient (cliPath, port, transport, telemetry, etc.).
+ * Opções de criação do CopilotClient. Permite configurar: `cliPath`, `cliArgs`, `cwd`, `port`, `useStdio`,
+ * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `env`, `githubToken`, `useLoggedInUser`, `onListModels`,
+ * `telemetry`, `onGetTraceContext`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
  */
 
 /**
- * Sessão ativa do SDK. Expõe sendAndWait, on, abort, setModel, rpc, etc.
+ * Sessão ativa do SDK. Expõe: `sendAndWait()`, `on()`, `abort()`, `setModel()`, `rpc`, `sessionId`, `workingDirectory`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */
 
 /**
- * Configuração completa para criação de sessão (model, tools, hooks, etc.).
+ * Configuração completa para criação de sessão. Campos principais: `sessionId?`, `clientName?`, `model?`,
+ * `reasoningEffort?`, `configDir?`, `tools?`, `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`,
+ * `onPermissionRequest`, `onUserInputRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `mcpServers?`,
+ * `customAgents?`, `agent?`, `skillDirectories?`, `disabledSkills?`, `infiniteSessions?`, `onEvent?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  */
 
 /**
- * Configuração para retomar sessão existente (subset de SessionConfig + sessionId).
+ * Configuração para retomar sessão existente. Subconjunto de `SessionConfig` que exclui `sessionId`. Adicionalmente
+ * aceita `disableResume?: boolean` para reconectar sem emitir `session.resume`.
  *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
  */
 
 /**
- * Opções para session.sendAndWait(message, options).
+ * Opções para `session.sendAndWait(message, options)`. Campos: `prompt`, `attachments?` (file, directory, selection,
+ * blob), `mode?` ("enqueue" | "immediate").
  *
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  */
 
 /**
- * Estado da conexão do client com o CLI server.
+ * Estado da conexão do client com o CLI server. Valores: `"disconnected"` | `"connecting"` | `"connected"` | `"error"`.
  *
  * @typedef {import('@github/copilot-sdk').ConnectionState} ConnectionState
  */
 
 /**
- * Nível de esforço de reasoning (low, medium, high, xhigh).
+ * Nível de esforço de reasoning para modelos que suportam (via `SessionConfig.reasoningEffort`). Valores: `"low"` |
+ * `"medium"` | `"high"` | `"xhigh"`. Use `client.listModels()` para verificar se o modelo suporta reasoning effort.
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
  */
@@ -67,63 +78,81 @@
 // ─── Tools ────────────────────────────────────────────────────────────────────
 
 /**
- * Definição de tool para o SDK (retornada por defineTool).
+ * Definição de tool para o SDK. Campos: `name`, `description?`, `parameters?` (ZodSchema | JSON schema), `handler`,
+ * `overridesBuiltInTool?` (bool — obrigatório se sobrescrever tool builtin), `skipPermission?` (bool — pula prompt de
+ * permissão).
  *
  * @template [TArgs=unknown] Default is `unknown`
  * @typedef {import('@github/copilot-sdk').Tool<TArgs>} Tool
  */
 
 /**
- * Handler de execução de tool.
+ * Handler de execução de tool. Recebe `(args: TArgs, invocation: ToolInvocation)`.
  *
  * @template [TArgs=unknown] Default is `unknown`
  * @typedef {import('@github/copilot-sdk').ToolHandler<TArgs>} ToolHandler
  */
 
 /**
- * Contexto de invocação de tool (sessionId, toolCallId, etc.).
+ * Contexto de invocação de tool. Campos: `sessionId`, `toolCallId`, `toolName`, `arguments`, `traceparent?` (W3C trace
+ * — do span execute_tool do CLI), `tracestate?` (W3C trace).
  *
  * @typedef {import('@github/copilot-sdk').ToolInvocation} ToolInvocation
  */
 
 /**
- * Resultado de tool como objeto (type + content ou data).
+ * Resultado de tool como objeto estruturado. Campos: `textResultForLlm` (texto para o LLM), `binaryResultsForLlm?`
+ * (array de `ToolBinaryResult`), `resultType` (`ToolResultType`), `error?`, `sessionLog?`, `toolTelemetry?`.
  *
  * @typedef {import('@github/copilot-sdk').ToolResultObject} ToolResultObject
  */
 
 /**
- * Resultado de tool binário.
+ * Resultado de tool binário (embutido em `ToolResultObject.binaryResultsForLlm`). Campos: `data` (string base64),
+ * `mimeType`, `type` (string), `description?`. Nota: NÃO é membro direto de `ToolResult` — está encapsulado dentro de
+ * `ToolResultObject`.
  *
- * @typedef {{ type: 'binary'; mimeType: string; data: Buffer | Uint8Array }} ToolBinaryResult
+ * @typedef {{
+ *     data: string;
+ *     mimeType: string;
+ *     type: string;
+ *     description?: string;
+ * }} ToolBinaryResult
  */
 
 /**
- * Resultado de tool: string | ToolResultObject | ToolBinaryResult.
+ * Resultado de tool: string literal (retorno direto) ou `ToolResultObject` (resultado estruturado). `ToolBinaryResult`
+ * é encapsulado dentro de `ToolResultObject.binaryResultsForLlm`, não é um membro direto desta union.
  *
- * @typedef {string | ToolResultObject | ToolBinaryResult} ToolResult
+ * @typedef {string | ToolResultObject} ToolResult
  */
 
 /**
- * Tipo do resultado de tool (success, failure, rejected, denied).
+ * Tipo do resultado de tool. Valores: `"success"` | `"failure"` | `"rejected"` | `"denied"`.
  *
  * @typedef {'success' | 'failure' | 'rejected' | 'denied'} ToolResultType
  */
 
 /**
- * Payload de requisição de tool call.
+ * Payload de requisição de tool call. Campos: `sessionId`, `toolCallId`, `toolName`, `arguments` (unknown).
  *
- * @typedef {{ toolName: string; toolCallId: string; args: Record<string, unknown> }} ToolCallRequestPayload
+ * @typedef {{
+ *     sessionId: string;
+ *     toolCallId: string;
+ *     toolName: string;
+ *     arguments: unknown;
+ * }} ToolCallRequestPayload
  */
 
 /**
- * Payload de resposta de tool call.
+ * Payload de resposta de tool call. Campo: `result` (`ToolResult`).
  *
- * @typedef {{ toolCallId: string; result: ToolResult; type?: ToolResultType }} ToolCallResponsePayload
+ * @typedef {{ result: ToolResult }} ToolCallResponsePayload
  */
 
 /**
- * Schema Zod usado pelo SDK para validação de parâmetros de tool.
+ * Schema Zod-like usado pelo SDK para validação e inferência de tipos de parâmetros de tool. Requerido: método
+ * `toJSONSchema()` e propriedade `_output` para inferência.
  *
  * @template [T=unknown] Default is `unknown`
  * @typedef {import('@github/copilot-sdk').ZodSchema<T>} ZodSchema
@@ -132,19 +161,24 @@
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
 /**
- * Pedido de permissão emitido pelo SDK quando uma tool quer executar ação protegida.
+ * Pedido de permissão emitido pelo CLI quando uma tool quer executar ação protegida. Campo discriminador: `kind`
+ * (`"shell"` | `"write"` | `"mcp"` | `"read"` | `"url"` | `"custom-tool"`). Campos adicionais variam por kind (index
+ * signature `[key: string]: unknown`).
  *
  * @typedef {import('@github/copilot-sdk').PermissionRequest} PermissionRequest
  */
 
 /**
- * Resultado da decisão de permissão (allow, deny, allowAlways, denyAlways, dismiss).
+ * Resultado da decisão de permissão. Union de `SessionPermissionsHandlePendingPermissionRequestParams["result"]` | `{
+ * kind: "no-result" }`.
  *
  * @typedef {import('@github/copilot-sdk').PermissionRequestResult} PermissionRequestResult
  */
 
 /**
- * Handler de permissão do SDK. Recebe PermissionRequest, retorna PermissionRequestResult.
+ * Handler de permissão do SDK. Assinatura: `(request: PermissionRequest, invocation: { sessionId: string }) =>
+ * Promise<PermissionRequestResult> | PermissionRequestResult`. Disponível o helper runtime `approveAll` (em
+ * `sdk/index.js`) para desenvolvimento/testes.
  *
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
  */
@@ -152,7 +186,8 @@
 // ─── User Input ───────────────────────────────────────────────────────────────
 
 /**
- * Pedido de input interativo do usuário emitido pelo SDK.
+ * Pedido de input interativo do usuário. Habilita a tool `ask_user`. Campos: `question`, `choices?` (múltipla escolha),
+ * `allowFreeform?` (default `true`).
  *
  * @typedef {{
  *     question: string;
@@ -162,13 +197,17 @@
  */
 
 /**
- * Resposta do input interativo do usuário.
+ * Resposta do input interativo do usuário. Campos: `answer` (string), `wasFreeform` (bool).
  *
- * @typedef {{ answer: string; wasFreeform: boolean }} UserInputResponse
+ * @typedef {{
+ *     answer: string;
+ *     wasFreeform: boolean;
+ * }} UserInputResponse
  */
 
 /**
- * Handler de input interativo do usuário.
+ * Handler de input interativo. Assinatura: `(request: UserInputRequest, invocation: { sessionId: string }) =>
+ * Promise<UserInputResponse> | UserInputResponse`.
  *
  * @typedef {(
  *     request: UserInputRequest,
@@ -179,49 +218,56 @@
 // ─── System Message ───────────────────────────────────────────────────────────
 
 /**
- * Configuração de system message (união: append | replace | customize).
+ * Configuração de system message (union: `SystemMessageAppendConfig` | `SystemMessageReplaceConfig`
+ *
+ * | `SystemMessageCustomizeConfig`).
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
  */
 
 /**
- * System message em modo append (adiciona ao final do prompt).
+ * System message em modo **append** (padrão). Adiciona `content?` após as seções gerenciadas pelo SDK. Campo `mode?:
+ * "append"`.
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageAppendConfig} SystemMessageAppendConfig
  */
 
 /**
- * System message em modo replace (substitui todo o prompt — cuidado: remove guardrails).
+ * System message em modo **replace**. Substitui todo o prompt — remove guardrails de segurança. Campos: `mode:
+ * "replace"`, `content: string`.
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageReplaceConfig} SystemMessageReplaceConfig
  */
 
 /**
- * System message em modo customize (override por seção — mais seguro e poderoso).
+ * System message em modo **customize**. Override por seção — mais seguro e preciso. Campos: `mode: "customize"`,
+ * `sections?: Partial<Record<SystemPromptSection, SectionOverride>>`, `content?` (appended após todas as seções).
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageCustomizeConfig} SystemMessageCustomizeConfig
  */
 
 /**
- * Nome de seção do system prompt (identity, tone, guidelines, safety, etc.).
+ * Nome de seção do system prompt. Valores: `"identity"` | `"tone"` | `"tool_efficiency"` | `"environment_context"` |
+ * `"code_change_rules"` | `"guidelines"` | `"safety"` | `"tool_instructions"` | `"custom_instructions"` |
+ * `"last_instructions"`.
  *
  * @typedef {import('@github/copilot-sdk').SystemPromptSection} SystemPromptSection
  */
 
 /**
- * Override de uma seção específica do system prompt.
+ * Override de uma seção específica do system prompt. Campos: `action` (`SectionOverrideAction`), `content?` (string).
  *
  * @typedef {import('@github/copilot-sdk').SectionOverride} SectionOverride
  */
 
 /**
- * Ação de override de seção (replace, remove, append, prepend, ou transform fn).
+ * Ação de override de seção. Valores: `"replace"` | `"remove"` | `"append"` | `"prepend"` | `SectionTransformFn`.
  *
  * @typedef {import('@github/copilot-sdk').SectionOverrideAction} SectionOverrideAction
  */
 
 /**
- * Função de transformação de seção: recebe conteúdo atual, retorna novo conteúdo.
+ * Função de transformação de seção: `(currentContent: string) => string | Promise<string>`.
  *
  * @typedef {import('@github/copilot-sdk').SectionTransformFn} SectionTransformFn
  */
@@ -229,13 +275,17 @@
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
- * Campos base compartilhados por todos os hook inputs.
+ * Campos base compartilhados por todos os hook inputs. Campos: `timestamp` (number — ms epoch), `cwd` (string).
  *
- * @typedef {{ timestamp: number; cwd: string }} BaseHookInput
+ * @typedef {{
+ *     timestamp: number;
+ *     cwd: string;
+ * }} BaseHookInput
  */
 
 /**
- * Configuração de hooks de sessão alinhada ao SDK 0.2.0.
+ * Configuração de hooks de sessão. Todos os handlers são opcionais. Campos: `onPreToolUse?`, `onPostToolUse?`,
+ * `onUserPromptSubmitted?`, `onSessionStart?`, `onSessionEnd?`, `onErrorOccurred?`.
  *
  * @typedef {{
  *     onPreToolUse?: PreToolUseHandler;
@@ -248,13 +298,17 @@
  */
 
 /**
- * Input do hook preToolUse (toolName, args, etc.).
+ * Input do hook `preToolUse`. Campos herdados de `BaseHookInput` + `toolName`, `toolArgs` (unknown).
  *
- * @typedef {BaseHookInput & { toolName: string; toolArgs: unknown }} PreToolUseHookInput
+ * @typedef {BaseHookInput & {
+ *     toolName: string;
+ *     toolArgs: unknown;
+ * }} PreToolUseHookInput
  */
 
 /**
- * Output do hook preToolUse (allow, deny, modify).
+ * Output do hook `preToolUse`. Campos opcionais: `permissionDecision` (`"allow"` | `"deny"` | `"ask"`),
+ * `permissionDecisionReason?`, `modifiedArgs?`, `additionalContext?`, `suppressOutput?`.
  *
  * @typedef {{
  *     permissionDecision?: 'allow' | 'deny' | 'ask';
@@ -262,17 +316,23 @@
  *     modifiedArgs?: unknown;
  *     additionalContext?: string;
  *     suppressOutput?: boolean;
- * } | void} PreToolUseHookOutput
+ * }} PreToolUseHookOutput
  */
 
 /**
- * Handler do hook preToolUse.
+ * Handler do hook `preToolUse`. Assinatura: `(input: PreToolUseHookInput, invocation: { sessionId: string }) =>
+ * Promise<PreToolUseHookOutput | void> | PreToolUseHookOutput | void`.
  *
- * @typedef {(input: PreToolUseHookInput) => Promise<PreToolUseHookOutput> | PreToolUseHookOutput} PreToolUseHandler
+ * @typedef {(
+ *     input: PreToolUseHookInput,
+ *     invocation: { sessionId: string },
+ * ) => Promise<PreToolUseHookOutput | void> | PreToolUseHookOutput | void} PreToolUseHandler
  */
 
 /**
- * Input do hook postToolUse (toolName, result, etc.).
+ * Input do hook `postToolUse`. Campos: `toolName`, `toolArgs`, `toolResult` (`ToolResultObject`)
+ *
+ * - campos de `BaseHookInput`.
  *
  * @typedef {BaseHookInput & {
  *     toolName: string;
@@ -282,57 +342,84 @@
  */
 
 /**
- * Output do hook postToolUse.
+ * Output do hook `postToolUse`. Campos opcionais: `modifiedResult?` (`ToolResultObject`), `additionalContext?`,
+ * `suppressOutput?`.
  *
- * @typedef {{ modifiedResult?: ToolResultObject; additionalContext?: string; suppressOutput?: boolean } | void} PostToolUseHookOutput
+ * @typedef {{
+ *     modifiedResult?: ToolResultObject;
+ *     additionalContext?: string;
+ *     suppressOutput?: boolean;
+ * }} PostToolUseHookOutput
  */
 
 /**
- * Handler do hook postToolUse.
+ * Handler do hook `postToolUse`. Assinatura: `(input: PostToolUseHookInput, invocation: { sessionId: string }) =>
+ * Promise<PostToolUseHookOutput | void> | PostToolUseHookOutput | void`.
  *
- * @typedef {(input: PostToolUseHookInput) => Promise<PostToolUseHookOutput> | PostToolUseHookOutput} PostToolUseHandler
+ * @typedef {(
+ *     input: PostToolUseHookInput,
+ *     invocation: { sessionId: string },
+ * ) => Promise<PostToolUseHookOutput | void> | PostToolUseHookOutput | void} PostToolUseHandler
  */
 
 /**
- * Input do hook userPromptSubmitted (message text).
+ * Input do hook `userPromptSubmitted`. Campos: `prompt` (string) + campos de `BaseHookInput`.
  *
  * @typedef {BaseHookInput & { prompt: string }} UserPromptSubmittedHookInput
  */
 
 /**
- * Output do hook userPromptSubmitted.
+ * Output do hook `userPromptSubmitted`. Campos opcionais: `modifiedPrompt?`, `additionalContext?`, `suppressOutput?`.
  *
- * @typedef {{ modifiedPrompt?: string; additionalContext?: string; suppressOutput?: boolean } | void} UserPromptSubmittedHookOutput
+ * @typedef {{
+ *     modifiedPrompt?: string;
+ *     additionalContext?: string;
+ *     suppressOutput?: boolean;
+ * }} UserPromptSubmittedHookOutput
  */
 
 /**
- * Handler do hook userPromptSubmitted.
+ * Handler do hook `userPromptSubmitted`. Assinatura: `(input: UserPromptSubmittedHookInput, invocation: { sessionId:
+ * string }) => Promise<UserPromptSubmittedHookOutput | void> | UserPromptSubmittedHookOutput | void`.
  *
  * @typedef {(
  *     input: UserPromptSubmittedHookInput,
- * ) => Promise<UserPromptSubmittedHookOutput> | UserPromptSubmittedHookOutput} UserPromptSubmittedHandler
+ *     invocation: { sessionId: string },
+ * ) => Promise<UserPromptSubmittedHookOutput | void> | UserPromptSubmittedHookOutput | void} UserPromptSubmittedHandler
  */
 
 /**
- * Input do hook sessionStart.
+ * Input do hook `sessionStart`. Campos: `source` (`"startup"` | `"resume"` | `"new"`), `initialPrompt?` + campos de
+ * `BaseHookInput`.
  *
- * @typedef {BaseHookInput & { source: 'startup' | 'resume' | 'new'; initialPrompt?: string }} SessionStartHookInput
+ * @typedef {BaseHookInput & {
+ *     source: 'startup' | 'resume' | 'new';
+ *     initialPrompt?: string;
+ * }} SessionStartHookInput
  */
 
 /**
- * Output do hook sessionStart.
+ * Output do hook `sessionStart`. Campos opcionais: `additionalContext?`, `modifiedConfig?` (`Record<string, unknown>`).
  *
- * @typedef {{ additionalContext?: string; modifiedConfig?: Record<string, unknown> } | void} SessionStartHookOutput
+ * @typedef {{
+ *     additionalContext?: string;
+ *     modifiedConfig?: Record<string, unknown>;
+ * }} SessionStartHookOutput
  */
 
 /**
- * Handler do hook sessionStart.
+ * Handler do hook `sessionStart`. Assinatura: `(input: SessionStartHookInput, invocation: { sessionId: string }) =>
+ * Promise<SessionStartHookOutput | void> | SessionStartHookOutput | void`.
  *
- * @typedef {(input: SessionStartHookInput) => Promise<SessionStartHookOutput> | SessionStartHookOutput} SessionStartHandler
+ * @typedef {(
+ *     input: SessionStartHookInput,
+ *     invocation: { sessionId: string },
+ * ) => Promise<SessionStartHookOutput | void> | SessionStartHookOutput | void} SessionStartHandler
  */
 
 /**
- * Input do hook sessionEnd.
+ * Input do hook `sessionEnd`. Campos: `reason` (`"complete"` | `"error"` | `"abort"` | `"timeout"` | `"user_exit"`),
+ * `finalMessage?`, `error?` + campos de `BaseHookInput`.
  *
  * @typedef {BaseHookInput & {
  *     reason: 'complete' | 'error' | 'abort' | 'timeout' | 'user_exit';
@@ -342,80 +429,96 @@
  */
 
 /**
- * Output do hook sessionEnd.
+ * Output do hook `sessionEnd`. Campos opcionais: `suppressOutput?`, `cleanupActions?` (string[]), `sessionSummary?`.
  *
- * @typedef {{ suppressOutput?: boolean; cleanupActions?: string[]; sessionSummary?: string } | void} SessionEndHookOutput
+ * @typedef {{
+ *     suppressOutput?: boolean;
+ *     cleanupActions?: string[];
+ *     sessionSummary?: string;
+ * }} SessionEndHookOutput
  */
 
 /**
- * Handler do hook sessionEnd.
+ * Handler do hook `sessionEnd`. Assinatura: `(input: SessionEndHookInput, invocation: { sessionId: string }) =>
+ * Promise<SessionEndHookOutput | void> | SessionEndHookOutput | void`.
  *
- * @typedef {(input: SessionEndHookInput) => Promise<SessionEndHookOutput> | SessionEndHookOutput} SessionEndHandler
+ * @typedef {(
+ *     input: SessionEndHookInput,
+ *     invocation: { sessionId: string },
+ * ) => Promise<SessionEndHookOutput | void> | SessionEndHookOutput | void} SessionEndHandler
  */
 
 /**
- * Input do hook errorOccurred.
+ * Input do hook `errorOccurred`. Campos: `error` (string), `errorContext` (`"model_call"` | `"tool_execution"` |
+ * `"system"` | `"user_input"`), `recoverable` (bool) + `BaseHookInput`.
  *
  * @typedef {BaseHookInput & {
  *     error: string;
- *     errorContext: string;
+ *     errorContext: 'model_call' | 'tool_execution' | 'system' | 'user_input';
  *     recoverable: boolean;
  * }} ErrorOccurredHookInput
  */
 
 /**
- * Output do hook errorOccurred.
+ * Output do hook `errorOccurred`. Campos opcionais: `suppressOutput?`, `errorHandling?` (`"retry"` | `"skip"` |
+ * `"abort"`), `retryCount?`, `userNotification?`.
  *
  * @typedef {{
  *     suppressOutput?: boolean;
  *     errorHandling?: 'retry' | 'skip' | 'abort';
  *     retryCount?: number;
  *     userNotification?: string;
- * } | void} ErrorOccurredHookOutput
+ * }} ErrorOccurredHookOutput
  */
 
 /**
- * Handler do hook errorOccurred.
+ * Handler do hook `errorOccurred`. Assinatura: `(input: ErrorOccurredHookInput, invocation: { sessionId: string }) =>
+ * Promise<ErrorOccurredHookOutput | void> | ErrorOccurredHookOutput | void`.
  *
- * @typedef {(input: ErrorOccurredHookInput) => Promise<ErrorOccurredHookOutput> | ErrorOccurredHookOutput} ErrorOccurredHandler
+ * @typedef {(
+ *     input: ErrorOccurredHookInput,
+ *     invocation: { sessionId: string },
+ * ) => Promise<ErrorOccurredHookOutput | void> | ErrorOccurredHookOutput | void} ErrorOccurredHandler
  */
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
 /**
- * Evento genérico da sessão SDK (união discriminada pelo campo type).
+ * Evento genérico da sessão SDK (union discriminada pelo campo `type`). Inclui 70+ tipos de eventos: session.start,
+ * session.end, tool.execute, model.call, compaction, etc. Gerado automaticamente em
+ * `@github/copilot-sdk/dist/generated/session-events.d.ts`.
  *
  * @typedef {import('@github/copilot-sdk').SessionEvent} SessionEvent
  */
 
 /**
- * Tipo de evento da sessão SDK (string literal union de 70+ eventos).
+ * Tipo de evento da sessão SDK (string literal union derivada de `SessionEvent["type"]`).
  *
  * @typedef {import('@github/copilot-sdk').SessionEventType} SessionEventType
  */
 
 /**
- * Payload tipado para um tipo de evento específico.
+ * Extrai o payload tipado para um tipo de evento específico via `Extract<SessionEvent, {type: T}>`.
  *
  * @template {import('@github/copilot-sdk').SessionEventType} T
  * @typedef {import('@github/copilot-sdk').SessionEventPayload<T>} SessionEventPayload
  */
 
 /**
- * Handler tipado para um tipo de evento específico.
+ * Handler tipado para um tipo de evento específico. Assinatura: `(event: SessionEventPayload<T>) => void`.
  *
  * @template {import('@github/copilot-sdk').SessionEventType} T
  * @typedef {import('@github/copilot-sdk').TypedSessionEventHandler<T>} TypedSessionEventHandler
  */
 
 /**
- * Handler genérico para qualquer evento de sessão.
+ * Handler genérico para qualquer evento de sessão. Assinatura: `(event: SessionEvent) => void`.
  *
  * @typedef {import('@github/copilot-sdk').SessionEventHandler} SessionEventHandler
  */
 
 /**
- * Evento de mensagem do assistente (inclui content, role, etc.).
+ * Evento de mensagem do assistente. Contém conteúdo e metadata da resposta do modelo.
  *
  * @typedef {import('@github/copilot-sdk').AssistantMessageEvent} AssistantMessageEvent
  */
@@ -423,25 +526,28 @@
 // ─── Session Lifecycle ────────────────────────────────────────────────────────
 
 /**
- * Tipo de evento de lifecycle de sessão (created, deleted, updated, foreground, background).
+ * Tipo de evento de lifecycle de sessão emitido pelo `CopilotClient` (não pela sessão). Valores: `"session.created"` |
+ * `"session.deleted"` | `"session.updated"` | `"session.foreground"` | `"session.background"`.
  *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleEventType} SessionLifecycleEventType
  */
 
 /**
- * Evento de lifecycle de sessão emitido pelo client.
+ * Evento de lifecycle de sessão. Campos: `type` (`SessionLifecycleEventType`), `sessionId`, `metadata?` (`{ startTime:
+ * string; modifiedTime: string; summary?: string }`).
  *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleEvent} SessionLifecycleEvent
  */
 
 /**
- * Handler de lifecycle de sessão.
+ * Handler de lifecycle de sessão. Assinatura: `(event: SessionLifecycleEvent) => void`.
  *
  * @typedef {import('@github/copilot-sdk').SessionLifecycleHandler} SessionLifecycleHandler
  */
 
 /**
- * Handler tipado de lifecycle de sessão para um tipo específico.
+ * Handler tipado de lifecycle de sessão para um tipo específico. Assinatura: `(event: SessionLifecycleEvent & {type:
+ * K}) => void`.
  *
  * @template {import('@github/copilot-sdk').SessionLifecycleEventType} K
  * @typedef {import('@github/copilot-sdk').TypedSessionLifecycleHandler<K>} TypedSessionLifecycleHandler
@@ -450,25 +556,29 @@
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 /**
- * Informações de modelo (id, name, capabilities, policy, billing).
+ * Informações de modelo retornadas por `client.listModels()`. Campos: `id`, `name`, `capabilities`
+ * (`ModelCapabilities`), `policy?` (`ModelPolicy`), `billing?` (`ModelBilling`), `supportedReasoningEfforts?`
+ * (`ReasoningEffort[]`), `defaultReasoningEffort?` (`ReasoningEffort`).
  *
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
  */
 
 /**
- * Capacidades do modelo (vision, reasoning, maxTokens, etc.).
+ * Capacidades do modelo. Campos: `supports.vision` (bool), `supports.reasoningEffort` (bool),
+ * `limits.max_prompt_tokens?`, `limits.max_context_window_tokens`, `limits.vision?` (supported_media_types,
+ * max_prompt_images, max_prompt_image_size).
  *
  * @typedef {import('@github/copilot-sdk').ModelCapabilities} ModelCapabilities
  */
 
 /**
- * Política do modelo (limites, restrições).
+ * Política do modelo. Campos: `state` (`"enabled"` | `"disabled"` | `"unconfigured"`), `terms`.
  *
  * @typedef {import('@github/copilot-sdk').ModelPolicy} ModelPolicy
  */
 
 /**
- * Billing info do modelo (custo, tier).
+ * Informações de billing do modelo. Campo: `multiplier` (number).
  *
  * @typedef {import('@github/copilot-sdk').ModelBilling} ModelBilling
  */
@@ -476,19 +586,21 @@
 // ─── MCP ──────────────────────────────────────────────────────────────────────
 
 /**
- * Configuração de MCP server (união: local | remote).
+ * Configuração de MCP server (union: `MCPLocalServerConfig` | `MCPRemoteServerConfig`).
  *
  * @typedef {import('@github/copilot-sdk').MCPServerConfig} MCPServerConfig
  */
 
 /**
- * Configuração de MCP server local (command + args).
+ * Configuração de MCP server local/stdio. Campos: `command`, `args` (string[]), `tools` (string[] — `[]` = nenhum,
+ * `"*"` = todos), `type?` (`"local"` | `"stdio"`), `timeout?` (ms), `env?` (`Record<string, string>`), `cwd?`.
  *
  * @typedef {import('@github/copilot-sdk').MCPLocalServerConfig} MCPLocalServerConfig
  */
 
 /**
- * Configuração de MCP server remoto (url + headers).
+ * Configuração de MCP server remoto (HTTP ou SSE). Campos: `url`, `tools` (string[] | `"*"`), `type` (`"http"` |
+ * `"sse"`), `timeout?` (ms), `headers?` (`Record<string, string>`).
  *
  * @typedef {import('@github/copilot-sdk').MCPRemoteServerConfig} MCPRemoteServerConfig
  */
@@ -496,7 +608,9 @@
 // ─── Custom Agents ────────────────────────────────────────────────────────────
 
 /**
- * Configuração de agente customizado.
+ * Configuração de agente customizado. Campos: `name` (único), `displayName?`, `description?`, `tools?` (string[] | null
+ * — null = todas as tools disponíveis), `prompt` (conteúdo do agente), `mcpServers?` (`Record<string,
+ * MCPServerConfig>`), `infer?` (bool, default `true`).
  *
  * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
  */
@@ -504,7 +618,10 @@
 // ─── Infinite Sessions ────────────────────────────────────────────────────────
 
 /**
- * Configuração de sessão infinita (compaction thresholds).
+ * Configuração de sessão infinita (compaction automático + persistência de workspace). Campos: `enabled?` (bool,
+ * default `true`), `backgroundCompactionThreshold?` (float 0..1, default 0.80 — inicia compaction assíncrono),
+ * `bufferExhaustionThreshold?` (float 0..1, default 0.95 — bloqueia até compaction completar para evitar overflow de
+ * contexto).
  *
  * @typedef {import('@github/copilot-sdk').InfiniteSessionConfig} InfiniteSessionConfig
  */
@@ -512,39 +629,44 @@
 // ─── Provider (BYOK) ─────────────────────────────────────────────────────────
 
 /**
- * Configuração de provider externo (OpenAI, Azure, Anthropic).
+ * Configuração de provider externo (BYOK — Bring Your Own Key). Campos: `baseUrl` (obrigatório), `type?` (`"openai"` |
+ * `"azure"` | `"anthropic"`, default `"openai"`), `wireApi?` (`"completions"` | `"responses"`, default `"completions"`
+ * — apenas openai/azure), `apiKey?`, `bearerToken?` (toma precedência sobre `apiKey` no header `Authorization`),
+ * `azure?` (`{ apiVersion?: string }` — default `"2024-10-21"`).
  *
  * @typedef {{
- *     provider: 'openai' | 'azure' | 'anthropic' | string;
+ *     type?: 'openai' | 'azure' | 'anthropic';
+ *     wireApi?: 'completions' | 'responses';
+ *     baseUrl: string;
  *     apiKey?: string;
- *     baseUrl?: string;
- *     model?: string;
- *     [key: string]: unknown;
+ *     bearerToken?: string;
+ *     azure?: { apiVersion?: string };
  * }} ProviderConfig
  */
 
 // ─── Session Context & Metadata ───────────────────────────────────────────────
 
 /**
- * Contexto da sessão (workspacePath, etc.).
+ * Contexto de workspace da sessão. Campos: `cwd`, `gitRoot?`, `repository?` (owner/repo), `branch?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionContext} SessionContext
  */
 
 /**
- * Metadados de sessão (id, model, status, etc.).
+ * Metadados de sessão. Campos: `sessionId`, `startTime` (Date), `modifiedTime` (Date), `summary?`, `isRemote` (bool),
+ * `context?` (`SessionContext`).
  *
  * @typedef {import('@github/copilot-sdk').SessionMetadata} SessionMetadata
  */
 
 /**
- * Filtro para listagem de sessões.
+ * Filtro para listagem de sessões. Campos opcionais: `cwd?`, `gitRoot?`, `repository?`, `branch?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionListFilter} SessionListFilter
  */
 
 /**
- * Info da sessão em foreground.
+ * Info da sessão em foreground (modo TUI+server). Campos: `sessionId?`, `workspacePath?`.
  *
  * @typedef {import('@github/copilot-sdk').ForegroundSessionInfo} ForegroundSessionInfo
  */
@@ -552,19 +674,21 @@
 // ─── Telemetry ────────────────────────────────────────────────────────────────
 
 /**
- * Configuração de telemetria OpenTelemetry.
+ * Configuração de telemetria OpenTelemetry para o CLI. Campos: `otlpEndpoint?`, `filePath?`, `exporterType?`
+ * (`"otlp-http"` | `"file"`), `sourceName?`, `captureContent?` (bool — captura prompts/respostas nos traces).
  *
  * @typedef {import('@github/copilot-sdk').TelemetryConfig} TelemetryConfig
  */
 
 /**
- * Contexto de trace W3C (traceparent, tracestate).
+ * Contexto de trace W3C para propagação de traces distribuídos. Campos: `traceparent?`, `tracestate?`. Injetado em
+ * `session.create`, `session.resume` e `session.send`.
  *
  * @typedef {import('@github/copilot-sdk').TraceContext} TraceContext
  */
 
 /**
- * Provider de trace context (retorna TraceContext).
+ * Provider de trace context. Assinatura: `() => TraceContext | Promise<TraceContext>`.
  *
  * @typedef {import('@github/copilot-sdk').TraceContextProvider} TraceContextProvider
  */
@@ -572,35 +696,49 @@
 // ─── Status & Auth ────────────────────────────────────────────────────────────
 
 /**
- * Resposta de getStatus() do CLI server.
+ * Resposta de `client.getStatus()` — verifica versão do CLI e compatibilidade de protocolo. Campos: `version` (string,
+ * ex: `"1.0.0"`), `protocolVersion` (number).
  *
  * @typedef {import('@github/copilot-sdk').GetStatusResponse} GetStatusResponse
  */
 
 /**
- * Resposta de getAuthStatus() para verificação de autenticação GitHub Copilot.
+ * Resposta de `client.getAuthStatus()` — verifica autenticação do usuário no GitHub Copilot. Campos: `isAuthenticated`
+ * (bool), `authType?` (`"user"` | `"env"` | `"gh-cli"` | `"hmac"` | `"api-key"` | `"token"`), `host?`, `login?`,
+ * `statusMessage?`.
  *
  * @typedef {import('@github/copilot-sdk').GetAuthStatusResponse} GetAuthStatusResponse
  */
 
-// ─── RPC Result Types ─────────────────────────────────────────────────────────
-// Tipos de retorno das chamadas RPC do sdk/rpc-ops.js e sdk/rpc-session.js.
-// O SDK não exporta esses tipos — definidos localmente como objetos genéricos.
+// ─── Extension Subpath ────────────────────────────────────────────────────────
 
 /**
- * Resultado de shell.exec() — contém processId, stdout, stderr, exitCode.
+ * Configuração para `joinSession()` do subpath `@github/copilot-sdk/extension`. Equivalente a
+ * `Omit<ResumeSessionConfig, "onPermissionRequest"> & { onPermissionRequest?: PermissionHandler }`. Permite adicionar
+ * tools/hooks à sessão ativa em foreground sem exigir `onPermissionRequest`.
+ *
+ * @typedef {import('@github/copilot-sdk/extension').JoinSessionConfig} JoinSessionConfig
+ */
+
+// ─── RPC Result Types (projeto-local) ────────────────────────────────────────
+// Tipos de retorno das chamadas RPC do sdk/rpc-ops.js e sdk/rpc-session.js.
+// Não são exportados pelo SDK — definidos localmente com base nos contratos observados em
+// node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts.
+
+/**
+ * Resultado de `shell.exec()` — contém `processId`, `stdout`, `stderr`, `exitCode`.
  *
  * @typedef {{ processId: string; stdout?: string; stderr?: string; exitCode?: number; [k: string]: unknown }} ShellExecResult
  */
 
 /**
- * Resultado de shell.kill() — confirmação de sinal enviado.
+ * Resultado de `shell.kill()` — confirmação de sinal enviado.
  *
  * @typedef {{ killed: boolean; [k: string]: unknown }} ShellKillResult
  */
 
 /**
- * Resultado de ui.elicitation() — resposta do formulário pelo usuário.
+ * Resultado de `ui.elicitation()` — resposta do formulário pelo usuário.
  *
  * @typedef {{ action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} ElicitationResult
  */
@@ -612,60 +750,60 @@
  */
 
 /**
- * Resultado de model.getCurrent() — modelo ativo da sessão.
+ * Resultado de `model.getCurrent()` — modelo ativo da sessão.
  *
  * @typedef {{ modelId: string; [k: string]: unknown }} ModelCurrentResult
  */
 
 /**
- * Resultado de model.switchTo() — confirmação de troca de modelo.
+ * Resultado de `model.switchTo()` — confirmação de troca de modelo.
  *
  * @typedef {{ modelId: string; [k: string]: unknown }} ModelSwitchResult
  */
 
 /**
- * Modo atual da sessão (interactive, plan, autopilot).
+ * Modo atual da sessão (projeto-local — não exportado diretamente pelo SDK).
  *
  * @typedef {'interactive' | 'plan' | 'autopilot'} SessionMode
  */
 
 /**
- * Resultado de mode.get() / mode.set() — modo atual após a operação.
+ * Resultado de `mode.get()` / `mode.set()` — modo atual após a operação.
  *
  * @typedef {{ mode: SessionMode; [k: string]: unknown }} ModeResult
  */
 
 /**
- * Resultado de plan.read() — conteúdo do plan.md da sessão.
+ * Resultado de `plan.read()` — conteúdo do `plan.md` da sessão.
  *
  * @typedef {{ exists: boolean; content: string | null; path: string | null; [k: string]: unknown }} PlanReadResult
  */
 
 /**
- * Resultado de workspace.listFiles() — lista de arquivos no workspace.
+ * Resultado de `workspace.listFiles()` — lista de arquivos no workspace.
  *
  * @typedef {{ files: string[]; [k: string]: unknown }} WorkspaceListResult
  */
 
 /**
- * Resultado de workspace.readFile() — conteúdo de um arquivo do workspace.
+ * Resultado de `workspace.readFile()` — conteúdo de um arquivo do workspace.
  *
  * @typedef {{ content: string; [k: string]: unknown }} WorkspaceReadResult
  */
 
 /**
- * Resultado de session.log() — confirmação de log emitido.
+ * Resultado de `session.log()` — confirmação de log emitido.
  *
  * @typedef {{ logId?: string; [k: string]: unknown }} LogResult
  */
 
-// ─── Loose-typed SDK interfaces ───────────────────────────────────────────────
-// Interfaces com assinaturas relaxadas para permitir chamadas com `string`
-// em vez de literal unions (necessário em wrappers dinâmicos).
+// ─── Loose-typed SDK interfaces (projeto-local) ───────────────────────────────
+// Interfaces com assinaturas relaxadas para wrappers dinâmicos que precisam aceitar
+// strings arbitrárias em lugar de literal unions (necessário em event-wirer.js, etc.).
 
 /**
  * Interface loose-typed para `CopilotSession.on()`. Permite `.on(eventType: string, handler)` sem exigir literal
- * `SessionEventType`.
+ * `SessionEventType`. O overload sem eventType registra handler para todos os eventos e retorna unsubscribe function.
  *
  * @typedef {object} SessionEventSubscriber
  * @property {((eventType: string, handler: (event: SessionEvent) => void) => () => void) &
@@ -682,10 +820,10 @@
  */
 
 /**
- * Interface para RPC experimental do SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`, `extensions`.
- * Alinhado com `createSessionRpc()` do SDK gerado.
+ * Interface para namespace RPC experimental do SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`,
+ * `extensions`. Alinhado com `createSessionRpc()` do SDK.
  *
- * Cada namespace usa apenas um subconjunto dos métodos. O typedef é uma união de todos os métodos possíveis para
+ * Cada namespace usa apenas um subconjunto dos métodos. O typedef é uma union de todos os métodos possíveis para
  * simplificar o cast — cada função wrapper já valida feature flag e sessão antes de invocar.
  *
  * @typedef {object} ExperimentalRpcNamespace
@@ -700,7 +838,8 @@
  */
 
 /**
- * Sessão com surface de RPC experimental.
+ * Sessão com surface de RPC experimental. Campo `rpc` expõe os namespaces: `fleet`, `agent`, `skills`, `mcp`,
+ * `plugins`, `extensions`.
  *
  * @typedef {object} ExperimentalSession
  * @property {{
@@ -714,8 +853,7 @@
  */
 
 // ─── Runtime re-exports (non-type) ───────────────────────────────────────────
-// Nota: defineTool, approveAll, SYSTEM_PROMPT_SECTIONS são runtime values.
-// Re-exportados aqui para conveniência; consumers de runtime DEVEM usar
-// o barrel sdk/index.js.
+// Nota: `defineTool`, `approveAll`, `SYSTEM_PROMPT_SECTIONS` são runtime values.
+// Re-exportados no barrel sdk/index.js — consumers de runtime DEVEM usar #copilot/sdk.
 
 export {};

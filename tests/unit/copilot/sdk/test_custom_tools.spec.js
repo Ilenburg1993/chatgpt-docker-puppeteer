@@ -47,7 +47,7 @@ vi.mock('#copilot/core/schemas', () => ({
     },
 }));
 
-// Mock node:fs (sync) — usado pelo loadCustomTools() no init e por registerCustomTool / removeCustomTool
+// Mock node:fs (sync) — usado no init e por registerCustomTool / removeCustomTool
 vi.mock('node:fs', () => ({
     existsSync: vi.fn(() => false),
     readFileSync: vi.fn(() => '[]'),

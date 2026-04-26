@@ -33,7 +33,7 @@ import { createSession, disconnectSession, resumeOrCreate } from './lifecycle.js
  *
  * @example
  *     ```js
- *     import { quickSession } from '#copilot/sdk/client-facade';
+ *     import { quickSession } from '#copilot/sdk';
  *     const { session, sessionId } = await quickSession({ model: 'claude-4' });
  *     const reply = await session.sendAndWait({ prompt: 'Hello!' });
  *     ```;
@@ -113,19 +113,3 @@ export async function shutdownClient(options = {}) {
 export function isClientReady() {
     return getClientState() === 'connected';
 }
-
-// ─── getDefaults ──────────────────────────────────────────────────────────────
-
-/**
- * Retorna os project defaults — alias para `getProjectDefaults()` da config.
- *
- * @returns {Partial<SessionConfig>}
- */
-export { getProjectDefaults as getDefaults } from '../config.js';
-
-// ─── buildConfig ──────────────────────────────────────────────────────────────
-
-/**
- * Alias para `buildSessionConfig()` — constrói SessionConfig com merge de defaults.
- */
-export { buildSessionConfig as buildConfig } from '../config.js';

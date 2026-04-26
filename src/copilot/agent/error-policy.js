@@ -11,6 +11,19 @@
 import { isFatalError, toError } from '#copilot/core';
 import { isSdkQuotaOrRateLimitError } from '../sdk/errors.js';
 
+/**
+ * @param {Error} error
+ * @returns {Error}
+ */
+function unwrapSdkOperationCause(error) {
+    const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (error));
+    const cause = raw['cause'];
+    if (cause instanceof Error) {
+        return cause;
+    }
+    return error;
+}
+
 /** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
 
 /** @template T @typedef {T | Promise<T>} Awaitable */
@@ -71,13 +84,18 @@ function normalizeAgentError(error) {
  */
 export function classifyAgentError(error) {
     const normalized = normalizeAgentError(error);
-    if (normalized instanceof DOMException && normalized.name === 'AbortError') {
+    const cause = unwrapSdkOperationCause(normalized);
+
+    if (
+        (normalized instanceof DOMException && normalized.name === 'AbortError') ||
+        (cause instanceof DOMException && cause.name === 'AbortError')
+    ) {
         return 'ignore';
     }
-    if (isSdkQuotaOrRateLimitError(normalized)) {
+    if (isSdkQuotaOrRateLimitError(normalized) || isSdkQuotaOrRateLimitError(cause)) {
         return 'fatal';
     }
-    if (typeof isFatalError === 'function' && isFatalError(normalized)) {
+    if (typeof isFatalError === 'function' && (isFatalError(normalized) || isFatalError(cause))) {
         return 'fatal';
     }
     return 'retry';

@@ -14,7 +14,9 @@
  * @see module:copilot/sdk/rpc
  */
 
+import { toSdkOperationError } from '../errors.js';
 import { isExperimentalEnabled } from '../feature-flags.js';
+import { log as appLog } from '../logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -79,7 +81,12 @@ function getRpc(session) {
 export async function fleetStart(session, options) {
     if (!isExperimentalEnabled('fleet')) throwNotEnabled('fleet', 'fleet.start');
     assertSession(session, 'fleet.start');
-    return getRpc(session).fleet.start(options ?? {});
+    appLog('INFO', `[sdk/experimental-rpc] fleet.start: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).fleet.start(options ?? {});
+    } catch (error) {
+        throw toSdkOperationError('experimental.fleet.start', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -100,7 +107,12 @@ export async function fleetStart(session, options) {
 export async function agentList(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.list');
     assertSession(session, 'agent.list');
-    return getRpc(session).agent.list();
+    appLog('DEBUG', `[sdk/experimental-rpc] agent.list: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).agent.list();
+    } catch (error) {
+        throw toSdkOperationError('experimental.agent.list', error);
+    }
 }
 
 /**
@@ -112,7 +124,12 @@ export async function agentList(session) {
 export async function agentGetCurrent(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.getCurrent');
     assertSession(session, 'agent.getCurrent');
-    return getRpc(session).agent.getCurrent();
+    appLog('DEBUG', `[sdk/experimental-rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).agent.getCurrent();
+    } catch (error) {
+        throw toSdkOperationError('experimental.agent.getCurrent', error);
+    }
 }
 
 /**
@@ -128,7 +145,12 @@ export async function agentSelect(session, name) {
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/agent.select] name deve ser string não-vazia.');
     }
-    return getRpc(session).agent.select({ name });
+    appLog('INFO', `[sdk/experimental-rpc] agent.select: name='${name}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).agent.select({ name });
+    } catch (error) {
+        throw toSdkOperationError('experimental.agent.select', error);
+    }
 }
 
 /**
@@ -140,7 +162,12 @@ export async function agentSelect(session, name) {
 export async function agentDeselect(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.deselect');
     assertSession(session, 'agent.deselect');
-    return getRpc(session).agent.deselect();
+    appLog('INFO', `[sdk/experimental-rpc] agent.deselect: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).agent.deselect();
+    } catch (error) {
+        throw toSdkOperationError('experimental.agent.deselect', error);
+    }
 }
 
 /**
@@ -152,7 +179,12 @@ export async function agentDeselect(session) {
 export async function agentReload(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.reload');
     assertSession(session, 'agent.reload');
-    return getRpc(session).agent.reload();
+    appLog('INFO', `[sdk/experimental-rpc] agent.reload: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).agent.reload();
+    } catch (error) {
+        throw toSdkOperationError('experimental.agent.reload', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -180,7 +212,12 @@ export async function agentReload(session) {
 export async function skillsList(session) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.list');
     assertSession(session, 'skills.list');
-    return getRpc(session).skills.list();
+    appLog('DEBUG', `[sdk/experimental-rpc] skills.list: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).skills.list();
+    } catch (error) {
+        throw toSdkOperationError('experimental.skills.list', error);
+    }
 }
 
 /**
@@ -196,7 +233,12 @@ export async function skillsEnable(session, name) {
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.enable] name deve ser string não-vazia.');
     }
-    return getRpc(session).skills.enable({ name });
+    appLog('INFO', `[sdk/experimental-rpc] skills.enable: name='${name}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).skills.enable({ name });
+    } catch (error) {
+        throw toSdkOperationError('experimental.skills.enable', error);
+    }
 }
 
 /**
@@ -212,7 +254,12 @@ export async function skillsDisable(session, name) {
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.disable] name deve ser string não-vazia.');
     }
-    return getRpc(session).skills.disable({ name });
+    appLog('INFO', `[sdk/experimental-rpc] skills.disable: name='${name}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).skills.disable({ name });
+    } catch (error) {
+        throw toSdkOperationError('experimental.skills.disable', error);
+    }
 }
 
 /**
@@ -224,7 +271,12 @@ export async function skillsDisable(session, name) {
 export async function skillsReload(session) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.reload');
     assertSession(session, 'skills.reload');
-    return getRpc(session).skills.reload();
+    appLog('INFO', `[sdk/experimental-rpc] skills.reload: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).skills.reload();
+    } catch (error) {
+        throw toSdkOperationError('experimental.skills.reload', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -250,7 +302,12 @@ export async function skillsReload(session) {
 export async function mcpList(session) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.list');
     assertSession(session, 'mcp.list');
-    return getRpc(session).mcp.list();
+    appLog('DEBUG', `[sdk/experimental-rpc] mcp.list: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).mcp.list();
+    } catch (error) {
+        throw toSdkOperationError('experimental.mcp.list', error);
+    }
 }
 
 /**
@@ -266,7 +323,12 @@ export async function mcpEnable(session, serverName) {
     if (typeof serverName !== 'string' || serverName.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.enable] serverName deve ser string não-vazia.');
     }
-    return getRpc(session).mcp.enable({ serverName });
+    appLog('INFO', `[sdk/experimental-rpc] mcp.enable: serverName='${serverName}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).mcp.enable({ serverName });
+    } catch (error) {
+        throw toSdkOperationError('experimental.mcp.enable', error);
+    }
 }
 
 /**
@@ -282,7 +344,12 @@ export async function mcpDisable(session, serverName) {
     if (typeof serverName !== 'string' || serverName.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.disable] serverName deve ser string não-vazia.');
     }
-    return getRpc(session).mcp.disable({ serverName });
+    appLog('INFO', `[sdk/experimental-rpc] mcp.disable: serverName='${serverName}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).mcp.disable({ serverName });
+    } catch (error) {
+        throw toSdkOperationError('experimental.mcp.disable', error);
+    }
 }
 
 /**
@@ -294,7 +361,12 @@ export async function mcpDisable(session, serverName) {
 export async function mcpReload(session) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.reload');
     assertSession(session, 'mcp.reload');
-    return getRpc(session).mcp.reload();
+    appLog('INFO', `[sdk/experimental-rpc] mcp.reload: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).mcp.reload();
+    } catch (error) {
+        throw toSdkOperationError('experimental.mcp.reload', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -314,7 +386,12 @@ export async function mcpReload(session) {
 export async function pluginsList(session) {
     if (!isExperimentalEnabled('plugins')) throwNotEnabled('plugins', 'plugins.list');
     assertSession(session, 'plugins.list');
-    return getRpc(session).plugins.list();
+    appLog('DEBUG', `[sdk/experimental-rpc] plugins.list: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).plugins.list();
+    } catch (error) {
+        throw toSdkOperationError('experimental.plugins.list', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -341,7 +418,12 @@ export async function pluginsList(session) {
 export async function extensionsList(session) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.list');
     assertSession(session, 'extensions.list');
-    return getRpc(session).extensions.list();
+    appLog('DEBUG', `[sdk/experimental-rpc] extensions.list: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).extensions.list();
+    } catch (error) {
+        throw toSdkOperationError('experimental.extensions.list', error);
+    }
 }
 
 /**
@@ -357,7 +439,12 @@ export async function extensionsEnable(session, id) {
     if (typeof id !== 'string' || id.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.enable] id deve ser string não-vazia.');
     }
-    return getRpc(session).extensions.enable({ id });
+    appLog('INFO', `[sdk/experimental-rpc] extensions.enable: id='${id}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).extensions.enable({ id });
+    } catch (error) {
+        throw toSdkOperationError('experimental.extensions.enable', error);
+    }
 }
 
 /**
@@ -373,7 +460,12 @@ export async function extensionsDisable(session, id) {
     if (typeof id !== 'string' || id.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.disable] id deve ser string não-vazia.');
     }
-    return getRpc(session).extensions.disable({ id });
+    appLog('INFO', `[sdk/experimental-rpc] extensions.disable: id='${id}', sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).extensions.disable({ id });
+    } catch (error) {
+        throw toSdkOperationError('experimental.extensions.disable', error);
+    }
 }
 
 /**
@@ -385,5 +477,10 @@ export async function extensionsDisable(session, id) {
 export async function extensionsReload(session) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.reload');
     assertSession(session, 'extensions.reload');
-    return getRpc(session).extensions.reload();
+    appLog('INFO', `[sdk/experimental-rpc] extensions.reload: sessionId='${session.sessionId}'`);
+    try {
+        return await getRpc(session).extensions.reload();
+    } catch (error) {
+        throw toSdkOperationError('experimental.extensions.reload', error);
+    }
 }

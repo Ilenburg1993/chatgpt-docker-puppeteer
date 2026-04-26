@@ -12,6 +12,8 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { SdkOperationError } from '#copilot/sdk/errors';
+
 const require = createRequire(import.meta.url);
 const { readFileSync } = require('node:fs');
 
@@ -415,5 +417,12 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         const sess = /** @type {any} */ ({ rpc: { mcp: { enable: enableMock } } });
         await expRpc.mcpEnable(sess, 'srv-1');
         expect(enableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
+    });
+
+    it('agentList converte falha de auth em SdkOperationError', async () => {
+        featureFlags.setExperimentalFlag('agents', true);
+        const listMock = vi.fn().mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
+        const sess = /** @type {any} */ ({ sessionId: 'sess-exp-1', rpc: { agent: { list: listMock } } });
+        await expect(expRpc.agentList(sess)).rejects.toBeInstanceOf(SdkOperationError);
     });
 });

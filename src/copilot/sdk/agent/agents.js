@@ -1,13 +1,19 @@
 // @ts-check
 import { ConfigError } from '#copilot/core';
-import { log as appLog } from '../logger.js';
+import {
+    agentDeselect as rpcAgentDeselect,
+    agentGetCurrent as rpcAgentGetCurrent,
+    agentList as rpcAgentList,
+    agentReload as rpcAgentReload,
+    agentSelect as rpcAgentSelect,
+} from '../rpc/ops.js';
 /**
  * src/copilot/sdk/agents.js
  *
  * Factory lib para construcao de CustomAgentConfig do Copilot SDK + funcoes RPC de runtime para listagem,
  * selecao/deselecao e reload de agents em sessao ativa.
  *
- * Uso tipico: import { createAgent, createReadOnlyAgent, listAgents } from '#copilot/sdk/agents'; const session = await
+ * Uso tipico: import { createAgent, createReadOnlyAgent, listAgents } from '#copilot/sdk'; const session = await
  * client.createSession({ customAgents: [createReadOnlyAgent('auditor', 'Analisa codigo')] }); const { agents } = await
  * listAgents(session);
  *
@@ -178,7 +184,7 @@ export function filterInferableAgents(agents) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Faixa 15 - Agent Runtime Management (RPC)
+// Faixa 15 - Agent Runtime Management (via wrappers canônicos de RPC)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -190,28 +196,13 @@ export function filterInferableAgents(agents) {
  */
 
 /**
- * Valida sessao para chamadas RPC de agent.
- *
- * @param {unknown} session
- * @param {string} caller
- * @returns {asserts session is CopilotSession}
- */
-function assertAgentSession(session, caller) {
-    if (!session || typeof session !== 'object' || !('rpc' in session)) {
-        throw new TypeError(`[sdk/agents/${caller}] Sessao invalida ou sem RPC disponivel.`);
-    }
-}
-
-/**
  * Lista todos os agents customizados disponiveis na sessao.
  *
  * @param {CopilotSession} session - Sessao ativa com RPC
  * @returns {Promise<{ agents: AgentInfo[] }>} Lista de agents
  */
 export async function listAgents(session) {
-    assertAgentSession(session, 'listAgents');
-    appLog('DEBUG', `[sdk/agents] listAgents: sessionId='${session.sessionId}'`);
-    return session.rpc.agent.list();
+    return rpcAgentList(session);
 }
 
 /**
@@ -221,9 +212,7 @@ export async function listAgents(session) {
  * @returns {Promise<{ agent: AgentInfo | null }>} Agent atual ou null
  */
 export async function getCurrentAgent(session) {
-    assertAgentSession(session, 'getCurrentAgent');
-    appLog('DEBUG', `[sdk/agents] getCurrentAgent: sessionId='${session.sessionId}'`);
-    return session.rpc.agent.getCurrent();
+    return rpcAgentGetCurrent(session);
 }
 
 /**
@@ -235,12 +224,7 @@ export async function getCurrentAgent(session) {
  * @throws {TypeError} Se name nao for string nao-vazia
  */
 export async function selectAgent(session, name) {
-    assertAgentSession(session, 'selectAgent');
-    if (typeof name !== 'string' || name.length === 0) {
-        throw new TypeError('[sdk/agents/selectAgent] name deve ser string nao-vazia.');
-    }
-    appLog('INFO', `[sdk/agents] selectAgent: name='${name}', sessionId='${session.sessionId}'`);
-    return session.rpc.agent.select({ name });
+    return rpcAgentSelect(session, name);
 }
 
 /**
@@ -250,9 +234,7 @@ export async function selectAgent(session, name) {
  * @returns {Promise<{}>} Resultado vazio (deselect nao retorna dados)
  */
 export async function deselectAgent(session) {
-    assertAgentSession(session, 'deselectAgent');
-    appLog('INFO', `[sdk/agents] deselectAgent: sessionId='${session.sessionId}'`);
-    return session.rpc.agent.deselect();
+    return rpcAgentDeselect(session);
 }
 
 /**
@@ -262,7 +244,5 @@ export async function deselectAgent(session) {
  * @returns {Promise<{ agents: AgentInfo[] }>} Lista atualizada de agents
  */
 export async function reloadAgents(session) {
-    assertAgentSession(session, 'reloadAgents');
-    appLog('INFO', `[sdk/agents] reloadAgents: sessionId='${session.sessionId}'`);
-    return session.rpc.agent.reload();
+    return rpcAgentReload(session);
 }

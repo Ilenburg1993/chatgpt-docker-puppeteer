@@ -95,9 +95,7 @@ vi.mock('#copilot/observability/logger', () => ({
 }));
 
 import {
-    buildConfig,
     ensureClient,
-    getDefaults,
     isClientReady,
     quickDisconnect,
     quickResume,
@@ -201,26 +199,6 @@ describe('isClientReady()', () => {
     it('retorna false quando not_started', () => {
         mockGetClientState.mockReturnValue('not_started');
         expect(isClientReady()).toBe(false);
-    });
-});
-
-// ─── getDefaults (alias) ──────────────────────────────────────────────────────
-
-describe('getDefaults()', () => {
-    it('retorna project defaults com model e streaming', () => {
-        const d = getDefaults();
-        expect(typeof d.model).toBe('string');
-        expect(d.streaming).toBe(true);
-    });
-});
-
-// ─── buildConfig (alias) ──────────────────────────────────────────────────────
-
-describe('buildConfig()', () => {
-    it('constrói config com merge de defaults', () => {
-        const cfg = buildConfig({ model: 'claude-4' });
-        expect(cfg.model).toBe('claude-4');
-        expect(cfg.streaming).toBe(true);
     });
 });
 

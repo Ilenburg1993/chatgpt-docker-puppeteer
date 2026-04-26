@@ -195,12 +195,11 @@ export default function createAgentRouter(deps) {
     });
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // GET /agent/telemetry  +  GET /telemetry (alias retrocompatível)  +  POST /agent/telemetry/clear
+    // GET /agent/telemetry + POST /agent/telemetry/clear
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Retorna o resumo de telemetria do agente (sessões, erros, latências). Alias /telemetry mantido para
-     * compatibilidade retroativa (UPG-N08/GAP-N14).
+     * Retorna o resumo de telemetria do agente (sessões, erros, latências).
      *
      * @param {import('express').Request} _req
      * @param {import('express').Response} res
@@ -211,7 +210,6 @@ export default function createAgentRouter(deps) {
     }
 
     router.get('/agent/telemetry', handleGetTelemetry);
-    router.get('/telemetry', handleGetTelemetry);
 
     /**
      * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.

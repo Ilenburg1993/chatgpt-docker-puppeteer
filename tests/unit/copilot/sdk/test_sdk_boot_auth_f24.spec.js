@@ -57,14 +57,9 @@ describe('F117 — barrel exporta funções de health e auth', () => {
         expect(typeof sdk.isServerReachable).toBe('function');
     });
 
-    it('exporta healthGetAuthStatus como alias', async () => {
+    it('não exporta alias redundante healthGetAuthStatus', async () => {
         const sdk = await import('#copilot/sdk');
-        expect(typeof sdk.healthGetAuthStatus).toBe('function');
-    });
-
-    it('checkAuthStatus e healthGetAuthStatus são a mesma função', async () => {
-        const sdk = await import('#copilot/sdk');
-        expect(sdk.checkAuthStatus).toBe(sdk.healthGetAuthStatus);
+        expect('healthGetAuthStatus' in sdk).toBe(false);
     });
 });
 

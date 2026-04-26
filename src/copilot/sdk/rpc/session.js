@@ -8,10 +8,31 @@
  * @see EventBus
  */
 
+import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ *
+ * @typedef {{ modelId?: string }} ModelCurrentResult
+ *
+ * @typedef {{ modelId?: string }} ModelSwitchResult
+ *
+ * @typedef {{ mode: 'interactive' | 'plan' | 'autopilot' }} ModeGetResult
+ *
+ * @typedef {{ mode: 'interactive' | 'plan' | 'autopilot' }} ModeSetResult
+ *
+ * @typedef {{ exists: boolean; content: string | null; path: string | null }} PlanReadResult
+ *
+ * @typedef {{ success?: boolean }} PlanMutationResult
+ *
+ * @typedef {{ files: string[] }} WorkspaceListResult
+ *
+ * @typedef {{ content: string }} WorkspaceReadResult
+ *
+ * @typedef {{ success?: boolean }} WorkspaceCreateResult
+ *
+ * @typedef {{ eventId: string }} LogResult
  */
 
 /**
@@ -26,13 +47,19 @@ function assertSession(session, caller) {
 }
 
 /**
+ * Retorna o modelo atualmente ativo da sessão.
+ *
  * @param {CopilotSession} session
- * @returns {Promise<unknown>}
+ * @returns {Promise<ModelCurrentResult>}
  */
 export async function modelGetCurrent(session) {
     assertSession(session, 'model.getCurrent');
     appLog('DEBUG', `[sdk/rpc] model.getCurrent: sessionId='${session.sessionId}'`);
-    return session.rpc.model.getCurrent();
+    try {
+        return /** @type {ModelCurrentResult} */ (await session.rpc.model.getCurrent());
+    } catch (error) {
+        throw toSdkOperationError('model.getCurrent', error);
+    }
 }
 
 /**
@@ -45,7 +72,7 @@ export async function modelGetCurrent(session) {
  * @param {CopilotSession} session
  * @param {string} modelId
  * @param {{ reasoningEffort?: string }} [options]
- * @returns {Promise<unknown>}
+ * @returns {Promise<ModelSwitchResult>}
  */
 export async function modelSwitchTo(session, modelId, options) {
     assertSession(session, 'model.switchTo');
@@ -57,7 +84,11 @@ export async function modelSwitchTo(session, modelId, options) {
     if (options?.reasoningEffort) {
         params.reasoningEffort = options.reasoningEffort;
     }
-    return session.rpc.model.switchTo(params);
+    try {
+        return /** @type {ModelSwitchResult} */ (await session.rpc.model.switchTo(params));
+    } catch (error) {
+        throw toSdkOperationError('model.switchTo', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -68,12 +99,16 @@ export async function modelSwitchTo(session, modelId, options) {
  * Retorna o modo atual da sessão (interactive, plan, autopilot).
  *
  * @param {CopilotSession} session
- * @returns {Promise<unknown>}
+ * @returns {Promise<ModeGetResult>}
  */
 export async function modeGet(session) {
     assertSession(session, 'mode.get');
     appLog('DEBUG', `[sdk/rpc] mode.get: sessionId='${session.sessionId}'`);
-    return session.rpc.mode.get();
+    try {
+        return /** @type {ModeGetResult} */ (await session.rpc.mode.get());
+    } catch (error) {
+        throw toSdkOperationError('mode.get', error);
+    }
 }
 
 /**
@@ -81,7 +116,7 @@ export async function modeGet(session) {
  *
  * @param {CopilotSession} session
  * @param {'interactive' | 'plan' | 'autopilot'} mode
- * @returns {Promise<unknown>}
+ * @returns {Promise<ModeSetResult>}
  */
 export async function modeSet(session, mode) {
     assertSession(session, 'mode.set');
@@ -90,7 +125,11 @@ export async function modeSet(session, mode) {
         throw new TypeError(`[sdk/rpc/mode.set] mode deve ser um de: ${valid.join(', ')}.`);
     }
     appLog('INFO', `[sdk/rpc] mode.set: mode='${mode}', sessionId='${session.sessionId}'`);
-    return session.rpc.mode.set({ mode });
+    try {
+        return /** @type {ModeSetResult} */ (await session.rpc.mode.set({ mode }));
+    } catch (error) {
+        throw toSdkOperationError('mode.set', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -101,12 +140,16 @@ export async function modeSet(session, mode) {
  * Lê o plano da sessão (plan.md do workspace infinito).
  *
  * @param {CopilotSession} session
- * @returns {Promise<unknown>}
+ * @returns {Promise<PlanReadResult>}
  */
 export async function planRead(session) {
     assertSession(session, 'plan.read');
     appLog('DEBUG', `[sdk/rpc] plan.read: sessionId='${session.sessionId}'`);
-    return session.rpc.plan.read();
+    try {
+        return /** @type {PlanReadResult} */ (await session.rpc.plan.read());
+    } catch (error) {
+        throw toSdkOperationError('plan.read', error);
+    }
 }
 
 /**
@@ -114,7 +157,7 @@ export async function planRead(session) {
  *
  * @param {CopilotSession} session
  * @param {string} content - Novo conteúdo do plan.md
- * @returns {Promise<object>}
+ * @returns {Promise<PlanMutationResult>}
  */
 export async function planUpdate(session, content) {
     assertSession(session, 'plan.update');
@@ -122,19 +165,27 @@ export async function planUpdate(session, content) {
         throw new TypeError('[sdk/rpc/plan.update] content deve ser string.');
     }
     appLog('INFO', `[sdk/rpc] plan.update: ${content.length} chars, sessionId='${session.sessionId}'`);
-    return session.rpc.plan.update({ content });
+    try {
+        return /** @type {PlanMutationResult} */ (await session.rpc.plan.update({ content }));
+    } catch (error) {
+        throw toSdkOperationError('plan.update', error);
+    }
 }
 
 /**
  * Remove o plano da sessão.
  *
  * @param {CopilotSession} session
- * @returns {Promise<object>}
+ * @returns {Promise<PlanMutationResult>}
  */
 export async function planDelete(session) {
     assertSession(session, 'plan.delete');
     appLog('INFO', `[sdk/rpc] plan.delete: sessionId='${session.sessionId}'`);
-    return session.rpc.plan.delete();
+    try {
+        return /** @type {PlanMutationResult} */ (await session.rpc.plan.delete());
+    } catch (error) {
+        throw toSdkOperationError('plan.delete', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -145,12 +196,16 @@ export async function planDelete(session) {
  * Lista arquivos no diretório workspace da sessão infinita.
  *
  * @param {CopilotSession} session
- * @returns {Promise<unknown>}
+ * @returns {Promise<WorkspaceListResult>}
  */
 export async function workspaceListFiles(session) {
     assertSession(session, 'workspace.listFiles');
     appLog('DEBUG', `[sdk/rpc] workspace.listFiles: sessionId='${session.sessionId}'`);
-    return session.rpc.workspace.listFiles();
+    try {
+        return /** @type {WorkspaceListResult} */ (await session.rpc.workspace.listFiles());
+    } catch (error) {
+        throw toSdkOperationError('workspace.listFiles', error);
+    }
 }
 
 /**
@@ -158,7 +213,7 @@ export async function workspaceListFiles(session) {
  *
  * @param {CopilotSession} session
  * @param {string} path - Caminho relativo dentro do diretório workspace
- * @returns {Promise<unknown>}
+ * @returns {Promise<WorkspaceReadResult>}
  */
 export async function workspaceReadFile(session, path) {
     assertSession(session, 'workspace.readFile');
@@ -166,7 +221,11 @@ export async function workspaceReadFile(session, path) {
         throw new TypeError('[sdk/rpc/workspace.readFile] path deve ser string não-vazia.');
     }
     appLog('DEBUG', `[sdk/rpc] workspace.readFile: path='${path}', sessionId='${session.sessionId}'`);
-    return session.rpc.workspace.readFile({ path });
+    try {
+        return /** @type {WorkspaceReadResult} */ (await session.rpc.workspace.readFile({ path }));
+    } catch (error) {
+        throw toSdkOperationError('workspace.readFile', error);
+    }
 }
 
 /**
@@ -175,7 +234,7 @@ export async function workspaceReadFile(session, path) {
  * @param {CopilotSession} session
  * @param {string} path - Caminho relativo dentro do diretório workspace
  * @param {string} content - Conteúdo UTF-8 do arquivo
- * @returns {Promise<object>}
+ * @returns {Promise<WorkspaceCreateResult>}
  */
 export async function workspaceCreateFile(session, path, content) {
     assertSession(session, 'workspace.createFile');
@@ -189,7 +248,11 @@ export async function workspaceCreateFile(session, path, content) {
         'INFO',
         `[sdk/rpc] workspace.createFile: path='${path}', ${content.length} chars, sessionId='${session.sessionId}'`,
     );
-    return session.rpc.workspace.createFile({ path, content });
+    try {
+        return /** @type {WorkspaceCreateResult} */ (await session.rpc.workspace.createFile({ path, content }));
+    } catch (error) {
+        throw toSdkOperationError('workspace.createFile', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -202,7 +265,7 @@ export async function workspaceCreateFile(session, path, content) {
  * @param {CopilotSession} session
  * @param {string} message - Texto legível
  * @param {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string }} [options]
- * @returns {Promise<unknown>}
+ * @returns {Promise<LogResult>}
  */
 export async function sessionLog(session, message, options) {
     assertSession(session, 'log');
@@ -216,41 +279,18 @@ export async function sessionLog(session, message, options) {
     if (options?.url) params['url'] = options.url;
 
     appLog('DEBUG', `[sdk/rpc] log: level='${options?.level ?? 'info'}', sessionId='${session.sessionId}'`);
-    return session.rpc.log(
-        /** @type {{ message: string; level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string }} */ (
-            params
-        ),
-    );
+    try {
+        return /** @type {LogResult} */ (
+            await session.rpc.log(
+                /** @type {{
+    message: string;
+    level?: 'info' | 'warning' | 'error';
+    ephemeral?: boolean;
+    url?: string;
+}} */ (params),
+            )
+        );
+    } catch (error) {
+        throw toSdkOperationError('log', error);
+    }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Aggregate — createSessionRpcFacade
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Cria um objeto façade com todos os RPCs core agrupados por subsistema. Permite uso ergonômico: `const rpc =
- * createSessionRpcFacade(session); await rpc.model.getCurrent();`
- *
- * @param {CopilotSession} session
- * @returns {{
- *     model: {
- *         getCurrent: () => Promise<ModelCurrentResult>;
- *         switchTo: (modelId: string, options?: { reasoningEffort?: string }) => Promise<ModelSwitchResult>;
- *     };
- *     mode: { get: () => Promise<any>; set: (mode: 'interactive' | 'plan' | 'autopilot') => Promise<any> };
- *     plan: {
- *         read: () => Promise<PlanReadResult>;
- *         update: (content: string) => Promise<object>;
- *         delete: () => Promise<object>;
- *     };
- *     workspace: {
- *         listFiles: () => Promise<WorkspaceListResult>;
- *         readFile: (path: string) => Promise<WorkspaceReadResult>;
- *         createFile: (path: string, content: string) => Promise<object>;
- *     };
- *     log: (
- *         message: string,
- *         options?: { level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string },
- *     ) => Promise<LogResult>;
- * }}
- */

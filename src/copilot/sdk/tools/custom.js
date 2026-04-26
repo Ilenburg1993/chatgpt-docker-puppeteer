@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/config/custom-tools-registry.js
+ * src/copilot/sdk/tools/custom.js
  *
  * AI.2 — Registry em runtime de Custom Tools declarativas. Permite registrar, listar e remover tools por nome via API
  * HTTP sem reinicialização do agente. O registry persiste em `custom-tools.json` na raiz do projeto.
@@ -12,13 +12,12 @@
  * **Integração**: `getCustomToolDefinitions()` retorna os registros declarativos. `buildCustomTools()` instancia os
  * objetos `Tool` a partir dos registros, para uso por `tools-bootstrap.js`.
  *
- * @module copilot/config/custom-tools-registry
+ * @module copilot/sdk/tools/custom
  * @see EventBus
  */
 
-import { resolvePersistentConfigFile } from '#copilot/boot';
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolvePersistentConfigFile } from '../../config/persistent-paths.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
@@ -45,35 +44,19 @@ export function setCustomToolsBuilder(fn) {
     if (typeof fn === 'function') _buildTool = fn;
 }
 
-const LEGACY_COPILOT_ROOT = resolve(import.meta.dirname, '../..');
-
 /** Caminho canônico do arquivo de persistência. @type {string} */
 const CUSTOM_TOOLS_PATH = resolvePersistentConfigFile('custom-tools.json');
 
-/** Caminho legado mantido apenas para compatibilidade de leitura. @type {string} */
-const LEGACY_CUSTOM_TOOLS_PATH = resolve(LEGACY_COPILOT_ROOT, 'custom-tools.json');
-
-/** @type {boolean} */
-let _legacyPathWarned = false;
-
 /**
- * Lê o arquivo de registry no caminho canônico ou, em fallback, no caminho legado.
+ * Lê o arquivo de registry no caminho canônico.
  *
- * @returns {Promise<{ raw: string | null; path: string | null; legacy: boolean }>}
+ * @returns {Promise<string | null>}
  */
 async function _readRegistryFile() {
     try {
-        return { raw: await readFile(CUSTOM_TOOLS_PATH, 'utf8'), path: CUSTOM_TOOLS_PATH, legacy: false };
+        return await readFile(CUSTOM_TOOLS_PATH, 'utf8');
     } catch (e) {
-        if (toError(e).code !== 'ENOENT') throw e;
-    }
-
-    try {
-        return { raw: await readFile(LEGACY_CUSTOM_TOOLS_PATH, 'utf8'), path: LEGACY_CUSTOM_TOOLS_PATH, legacy: true };
-    } catch (e) {
-        if (toError(e).code === 'ENOENT') {
-            return { raw: null, path: null, legacy: false };
-        }
+        if (toError(e).code === 'ENOENT') return null;
         throw e;
     }
 }
@@ -188,18 +171,11 @@ let _registry = new Map();
  */
 export async function loadCustomToolsAsync() {
     try {
-        const { raw, path: sourcePath, legacy } = await _readRegistryFile();
+        const raw = await _readRegistryFile();
         if (raw === null) {
             _registry = new Map();
             log('DEBUG', '[custom-tools-registry] custom-tools.json ausente — registry vazio (opcional).');
             return;
-        }
-        if (legacy && !_legacyPathWarned) {
-            _legacyPathWarned = true;
-            log(
-                'WARN',
-                `[custom-tools-registry] Usando caminho legado '${sourcePath}'. Migre o arquivo para '${CUSTOM_TOOLS_PATH}'.`,
-            );
         }
         const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomToolsAsync]');
         if (!jsonResult.ok) {
@@ -214,21 +190,11 @@ export async function loadCustomToolsAsync() {
         }
         const items = result.data;
         _registry = new Map(items.map((item) => [item.name, item]));
-        log(
-            'INFO',
-            `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async${legacy ? ', legado' : ''}).`,
-        );
+        log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
     } catch (e) {
         logSwallowed(e, 'sdk.customTools.loadRegistry');
     }
 }
-
-/**
- * Alias compatível legado para o carregamento do registry de custom tools.
- *
- * @returns {Promise<void>}
- */
-export const loadCustomTools = loadCustomToolsAsync;
 
 /**
  * F92: Versão async de persistCustomTools — usa fs/promises com write atômico.

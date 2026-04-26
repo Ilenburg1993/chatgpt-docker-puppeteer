@@ -117,7 +117,7 @@ describe('F175 — Barrel exporta exports críticos de tools-registry', () => {
 describe('F176 — Barrel exporta exports críticos de config', () => {
     const CONFIG_EXPORTS = [
         'getToolsConfig',
-        'loadToolsConfig',
+        'loadToolsConfigAsync',
         'buildSessionConfig',
         // buildFullAccessConfig e buildReadOnlyConfig movidos para #copilot/hooks/presets/profiles
     ];

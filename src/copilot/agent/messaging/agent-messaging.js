@@ -46,6 +46,22 @@ function normalizeTimeoutMs(timeoutMs) {
 }
 
 /**
+ * Preserva a causa raiz de wrappers de erro (ex.: SdkOperationError) para manter semântica de domínio no nível do
+ * agente (AbortError, SESSION_FATAL etc.).
+ *
+ * @param {Error} error
+ * @returns {Error}
+ */
+function unwrapTaskError(error) {
+    const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (error));
+    const cause = raw['cause'];
+    if (cause instanceof Error) {
+        return cause;
+    }
+    return error;
+}
+
+/**
  * @param {number} timeoutMs
  * @param {() => void} onTimeout
  * @returns {{ ping: () => void; clear: () => void }}
@@ -361,22 +377,23 @@ export async function executeTask(session, task, callbacks) {
 
         if (!execution.ok) {
             const { disposition, error } = execution;
+            const taskError = unwrapTaskError(error);
 
             if (disposition === 'ignore') {
                 setStatus('idle');
                 emit('task.error', { taskId: task.id, error: 'AbortError' });
-                task.reject(error);
+                task.reject(taskError);
                 return;
             }
 
             if (disposition === 'fatal') {
                 setStatus('idle');
-                emit('task.error', { taskId: task.id, error: error.message });
-                task.reject(error);
+                emit('task.error', { taskId: task.id, error: taskError.message });
+                task.reject(taskError);
                 return;
             }
 
-            const recovered = await tryReconnect(error);
+            const recovered = await tryReconnect(taskError);
             if (recovered) {
                 task.attempts = (task.attempts ?? 0) + 1;
                 if (task.attempts >= MAX_TASK_RETRIES) {
@@ -396,8 +413,8 @@ export async function executeTask(session, task, callbacks) {
                 }
             } else {
                 setStatus('idle');
-                emit('task.error', { taskId: task.id, error: error.message });
-                task.reject(error);
+                emit('task.error', { taskId: task.id, error: taskError.message });
+                task.reject(taskError);
             }
             return;
         }

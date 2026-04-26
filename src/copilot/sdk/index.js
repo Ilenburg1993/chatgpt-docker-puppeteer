@@ -127,8 +127,7 @@ export {
     supportsReasoning,
 } from './models/helpers.js';
 
-export { validateUrl, validateUrlString } from '#copilot/core';
-export { classifySdkError, getSdkErrorFingerprint, isSdkQuotaOrRateLimitError } from './errors.js';
+export { classifySdkError, getSdkErrorFingerprint, isSdkQuotaOrRateLimitError, SdkOperationError } from './errors.js';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
 export { pickDefined } from './utils.js';
@@ -262,7 +261,6 @@ export {
     getAuthStatus as checkAuthStatus,
     fullHealthCheck,
     getQuota,
-    getAuthStatus as healthGetAuthStatus,
     isServerReachable,
     pingCheck,
 } from './telemetry/health.js';
@@ -326,13 +324,12 @@ export {
     buildCustomTools,
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
-    loadCustomTools,
     loadCustomToolsAsync,
     registerCustomTool,
     removeCustomTool,
 } from './tools/custom.js';
 
-export { getToolsConfig, loadToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/state.js';
+export { getToolsConfig, loadToolsConfigAsync, patchToolsConfig } from './tools/state.js';
 
 // ─── tools-registry.js — registry de ferramentas por sessão ─
 export {

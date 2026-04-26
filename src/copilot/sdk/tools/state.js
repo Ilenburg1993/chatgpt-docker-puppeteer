@@ -1,19 +1,19 @@
 // @ts-check
 /**
- * src/copilot/config/tools-state.js
+ * src/copilot/sdk/tools/state.js
  *
  * AH.2 — Estado compartilhado de configuração de ferramentas (allowlist/denylist). Módulo isolado para evitar
  * dependências circulares entre session-manager.js e http-handlers.js.
  *
- * AI.1 — Persistência em `tools-config.json` na raiz do projeto. Carregado no boot via `loadToolsConfig()`; gravado a
- * cada `patchToolsConfig()` para sobreviver a restarts.
+ * AI.1 — Persistência em `tools-config.json` na raiz do projeto. Carregado no boot via `loadToolsConfigAsync()`;
+ * gravado a cada `patchToolsConfig()` para sobreviver a restarts.
  *
- * @module copilot/config/tools-state
+ * @module copilot/sdk/tools/state
  * @see EventBus
  */
 
-import { resolvePersistentConfigFile } from '#copilot/boot';
 import { readFile, writeFile } from 'node:fs/promises';
+import { resolvePersistentConfigFile } from '../../config/persistent-paths.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { ToolsConfigSchema } from '../../core/schemas.js';
@@ -62,13 +62,6 @@ export async function loadToolsConfigAsync() {
         logSwallowed(e, 'sdk.toolsState.loadConfig');
     }
 }
-
-/**
- * Alias compatível legado para o carregamento da configuração de tools.
- *
- * @returns {Promise<void>}
- */
-export const loadToolsConfig = loadToolsConfigAsync;
 
 /**
  * F92: Versão async de persistToolsConfig — usa fs/promises.

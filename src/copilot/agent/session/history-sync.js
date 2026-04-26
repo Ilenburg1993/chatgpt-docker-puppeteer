@@ -17,6 +17,22 @@ import { log } from '../ports/observability-port.js';
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
 
 /**
+ * @param {unknown} err
+ * @returns {string}
+ */
+function getRootErrorMessage(err) {
+    if (err instanceof Error) {
+        const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (err));
+        const cause = raw['cause'];
+        if (cause instanceof Error && typeof cause.message === 'string' && cause.message.length > 0) {
+            return cause.message;
+        }
+        return err.message;
+    }
+    return String(err);
+}
+
+/**
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
@@ -100,10 +116,11 @@ export async function syncSdkHistory(session, emit, deps, policy = {}) {
         ...(policy.taskId !== undefined ? { taskId: policy.taskId } : {}),
         sessionId: session.sessionId,
         onError: (error, disposition, context) => {
-            log('WARN', `[AlwaysAlive] ${context.label ?? label} falhou (${disposition}): ${error.message}`);
+            const rootMessage = getRootErrorMessage(error);
+            log('WARN', `[AlwaysAlive] ${context.label ?? label} falhou (${disposition}): ${rootMessage}`);
             emit('session.history_synced', {
                 ok: false,
-                error: error.message,
+                error: rootMessage,
                 disposition,
                 sessionId: session.sessionId,
             });

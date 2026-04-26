@@ -60,9 +60,9 @@ export function createRegistry() {
  * @see createRegistry
  */
 export function registerTool(registry, tool, meta = {}) {
-    if (!registry || !registry.entries) throw new ConfigError('[lib/tools-registry] registry inválido.');
+    if (!registry || !registry.entries) throw new ConfigError('[sdk/tools-registry] registry inválido.');
     if (!tool || typeof tool.name !== 'string' || !tool.name)
-        throw new ConfigError('[lib/tools-registry] registerTool: tool.name (string) é obrigatório.');
+        throw new ConfigError('[sdk/tools-registry] registerTool: tool.name (string) é obrigatório.');
 
     const { category = 'uncategorized', tags = [], readOnly = false } = meta;
 

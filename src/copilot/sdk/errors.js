@@ -103,3 +103,45 @@ export function isSdkQuotaOrRateLimitError(error) {
     const kind = classifySdkError(error);
     return kind === 'rate_limit' || kind === 'quota_exhausted';
 }
+
+/**
+ * Normaliza qualquer falha do SDK para `SdkOperationError` preservando a causa original.
+ *
+ * @param {string} operation
+ * @param {unknown} error
+ * @returns {SdkOperationError}
+ */
+export function toSdkOperationError(operation, error) {
+    if (error instanceof SdkOperationError) {
+        return error;
+    }
+    return new SdkOperationError(operation, classifySdkError(error), error);
+}
+
+// ─── SdkOperationError ───────────────────────────────────────────────────────
+
+/**
+ * Erro estruturado lançado por wrappers SDK quando uma operação falha. Inclui a operação, o kind classificado e a causa
+ * original para rastreabilidade completa.
+ *
+ * @example
+ *     throw new SdkOperationError('model.switchTo', classifySdkError(err), err);
+ */
+export class SdkOperationError extends Error {
+    /**
+     * @param {string} operation - Nome canônico da operação (ex: `'model.switchTo'`)
+     * @param {SdkErrorKind} kind - Kind classificado via `classifySdkError`
+     * @param {unknown} [cause] - Erro original do SDK
+     */
+    constructor(operation, kind, cause) {
+        const causeMsg = cause instanceof Error ? cause.message : String(cause ?? '');
+        super(`[sdk/${operation}] falhou (${kind}): ${causeMsg}`);
+        this.name = 'SdkOperationError';
+        /** @type {string} */
+        this.operation = operation;
+        /** @type {SdkErrorKind} */
+        this.kind = kind;
+        /** @type {unknown} */
+        this.cause = cause;
+    }
+}

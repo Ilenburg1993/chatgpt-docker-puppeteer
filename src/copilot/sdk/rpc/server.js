@@ -18,6 +18,7 @@
  * @see module:copilot/sdk/health
  */
 
+import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
 
 /**
@@ -100,7 +101,11 @@ export async function ping(client, message) {
     if (message) params['message'] = message;
 
     appLog('DEBUG', `[sdk/server-rpc] ping: message='${message ?? ''}'`);
-    return client.rpc.ping(/** @type {{ message?: string }} */ (params));
+    try {
+        return /** @type {PingResult} */ (await client.rpc.ping(/** @type {{ message?: string }} */ (params)));
+    } catch (error) {
+        throw toSdkOperationError('server.ping', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -116,7 +121,11 @@ export async function ping(client, message) {
 export async function modelsList(client) {
     assertClient(client, 'models.list');
     appLog('DEBUG', '[sdk/server-rpc] models.list');
-    return client.rpc.models.list();
+    try {
+        return /** @type {ModelsListResult} */ (await client.rpc.models.list());
+    } catch (error) {
+        throw toSdkOperationError('server.models.list', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -137,7 +146,11 @@ export async function toolsList(client, options) {
     if (options?.model) params['model'] = options.model;
 
     appLog('DEBUG', `[sdk/server-rpc] tools.list: model='${options?.model ?? 'all'}'`);
-    return client.rpc.tools.list(/** @type {{ model?: string }} */ (params));
+    try {
+        return /** @type {ToolsListResult} */ (await client.rpc.tools.list(/** @type {{ model?: string }} */ (params)));
+    } catch (error) {
+        throw toSdkOperationError('server.tools.list', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -153,7 +166,11 @@ export async function toolsList(client, options) {
 export async function accountGetQuota(client) {
     assertClient(client, 'account.getQuota');
     appLog('DEBUG', '[sdk/server-rpc] account.getQuota');
-    return client.rpc.account.getQuota();
+    try {
+        return /** @type {AccountQuotaResult} */ (await client.rpc.account.getQuota());
+    } catch (error) {
+        throw toSdkOperationError('server.account.getQuota', error);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

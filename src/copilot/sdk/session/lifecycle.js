@@ -19,6 +19,7 @@
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { toError } from '../../core/error-handlers.js';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
+import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 
 import { listModels, resolveModelIdAuto } from '../models/index.js';
@@ -97,6 +98,28 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  * @property {boolean} isResumed - true se foi retomada, false se criada
  * @property {string} sessionId - ID da sessao
  */
+
+/**
+ * @param {unknown} client
+ * @param {string} caller
+ * @returns {asserts client is import('@github/copilot-sdk').CopilotClient}
+ */
+function assertClient(client, caller) {
+    if (!client || typeof client !== 'object') {
+        throw new TypeError(`[lib/session/${caller}] client inválido ou não fornecido.`);
+    }
+}
+
+/**
+ * @param {unknown} session
+ * @param {string} caller
+ * @returns {asserts session is CopilotSession}
+ */
+function assertSession(session, caller) {
+    if (!session || typeof session !== 'object' || !('sessionId' in session)) {
+        throw new TypeError(`[lib/session/${caller}] sessão inválida ou não fornecida.`);
+    }
+}
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
@@ -225,6 +248,7 @@ function buildSessionConfig(opts, mode) {
  * @throws {Error} Se o SDK falhar ao criar sessão
  */
 export async function createSession(client, opts) {
+    assertClient(client, 'createSession');
     const options = opts ?? {};
     let model = options.model ?? 'gpt-5-mini';
     let reasoningEffort = options.reasoningEffort;
@@ -250,7 +274,12 @@ export async function createSession(client, opts) {
     const config = buildSessionConfig({ ...options, model, ...(reasoningEffort ? { reasoningEffort } : {}) }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
-    const session = await client.createSession(config);
+    let session;
+    try {
+        session = await client.createSession(config);
+    } catch (error) {
+        throw toSdkOperationError('session.create', error);
+    }
     log('INFO', `[lib/session] Sessao criada: ${session.sessionId}`);
     return { session, isResumed: false, sessionId: session.sessionId };
 }
@@ -268,11 +297,20 @@ export async function createSession(client, opts) {
  * @throws {Error} Se a sessao nao existir ou estiver expirada
  */
 export async function resumeSession(client, sessionId, opts) {
+    assertClient(client, 'resumeSession');
+    if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new TypeError('[lib/session/resumeSession] sessionId deve ser string não-vazia.');
+    }
     const options = opts ?? {};
     const config = buildSessionConfig(options, 'resume');
 
     log('INFO', `[lib/session] Retomando sessao: ${sessionId}`);
-    const session = await client.resumeSession(sessionId, config);
+    let session;
+    try {
+        session = await client.resumeSession(sessionId, config);
+    } catch (error) {
+        throw toSdkOperationError('session.resume', error);
+    }
     log('INFO', `[lib/session] Sessao retomada: ${session.sessionId}`);
     return { session, isResumed: true, sessionId: session.sessionId };
 }
@@ -310,7 +348,12 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
  * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function listSessions(client, filter) {
-    return client.listSessions(filter);
+    assertClient(client, 'listSessions');
+    try {
+        return await client.listSessions(filter);
+    } catch (error) {
+        throw toSdkOperationError('session.list', error);
+    }
 }
 
 /**
@@ -322,7 +365,15 @@ export async function listSessions(client, filter) {
  * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function deleteSession(client, sessionId) {
-    await client.deleteSession(sessionId);
+    assertClient(client, 'deleteSession');
+    if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new TypeError('[lib/session/deleteSession] sessionId deve ser string não-vazia.');
+    }
+    try {
+        await client.deleteSession(sessionId);
+    } catch (error) {
+        throw toSdkOperationError('session.delete', error);
+    }
     log('INFO', `[lib/session] Sessao removida: ${sessionId}`);
 }
 
@@ -334,8 +385,13 @@ export async function deleteSession(client, sessionId) {
  * @throws {Error} Se a sessão já estiver desconectada ou comunicação falhar
  */
 export async function disconnectSession(session) {
+    assertSession(session, 'disconnectSession');
     log('INFO', `[lib/session] Desconectando sessao: ${session.sessionId}`);
-    await session.disconnect();
+    try {
+        await session.disconnect();
+    } catch (error) {
+        throw toSdkOperationError('session.disconnect', error);
+    }
     log('INFO', `[lib/session] Sessao desconectada: ${session.sessionId}`);
 }
 
@@ -351,6 +407,9 @@ export async function disconnectSession(session) {
  * @returns {CopilotClient}
  */
 export function createClientFromCliUrl(cliUrl) {
+    if (typeof cliUrl !== 'string' || cliUrl.length === 0) {
+        throw new TypeError('[lib/session/createClientFromCliUrl] cliUrl deve ser string não-vazia.');
+    }
     log('INFO', `[lib/session] Conectando ao CLI externo: ${cliUrl}`);
     return new CopilotClient({ cliUrl });
 }

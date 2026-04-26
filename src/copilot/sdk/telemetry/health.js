@@ -69,6 +69,24 @@ function assertClient(client, caller) {
     }
 }
 
+/**
+ * Extrai mensagem de erro priorizando `error.cause.message` quando disponível (ex.: wrappers `SdkOperationError`).
+ *
+ * @param {unknown} err
+ * @returns {string}
+ */
+function getErrorMessage(err) {
+    if (err instanceof Error) {
+        const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (err));
+        const cause = raw['cause'];
+        if (cause instanceof Error && typeof cause.message === 'string' && cause.message.length > 0) {
+            return cause.message;
+        }
+        return err.message;
+    }
+    return String(err);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROBES INDIVIDUAIS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -94,12 +112,13 @@ export async function pingCheck(client) {
         };
     } catch (err) {
         const latencyMs = Date.now() - start;
-        appLog('WARN', `[sdk/health] ping FAILED: ${/** @type {Error} */ (err).message}`);
+        const message = getErrorMessage(err);
+        appLog('WARN', `[sdk/health] ping FAILED: ${message}`);
         return {
             ok: false,
             latencyMs,
             protocolVersion: 0,
-            message: /** @type {Error} */ (err).message,
+            message,
         };
     }
 }
@@ -118,7 +137,7 @@ export async function getAuthStatus(client) {
         appLog('DEBUG', '[sdk/health] auth: authenticated');
         return { ok: true, authenticated: true };
     } catch (err) {
-        const msg = /** @type {Error} */ (err).message;
+        const msg = getErrorMessage(err);
         appLog('WARN', `[sdk/health] auth FAILED: ${msg}`);
         return { ok: false, authenticated: false, error: msg };
     }
@@ -141,7 +160,7 @@ export async function getQuota(client) {
         appLog('DEBUG', `[sdk/health] quota: exhausted=${exhausted}, types=${Object.keys(snapshots).length}`);
         return { ok: !exhausted, quotaSnapshots: snapshots, exhausted };
     } catch (err) {
-        const msg = /** @type {Error} */ (err).message;
+        const msg = getErrorMessage(err);
         appLog('WARN', `[sdk/health] quota FAILED: ${msg}`);
         return { ok: false, exhausted: false, error: msg };
     }

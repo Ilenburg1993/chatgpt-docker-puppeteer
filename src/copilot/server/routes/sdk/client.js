@@ -60,9 +60,6 @@ function resolveClientRouterDeps(binding, req) {
     return typeof binding === 'function' ? binding(req) : binding;
 }
 
-/** @type {ReadonlySet<string>} */
-const DEPRECATED_CUSTOM_TOOL_NAMES = new Set(['legacy_web_fetch', 'legacy_report_intent']);
-
 /**
  * Factory que cria o router de rotas `/client/*` com dependências injetadas.
  *
@@ -252,9 +249,6 @@ export default function createClientRouter(deps) {
             }
 
             const cliNames = new Set(cliBuiltins.map((tool) => tool.name));
-            const deprecatedCustomTools = projection.tools.filter((tool) =>
-                DEPRECATED_CUSTOM_TOOL_NAMES.has(tool.name),
-            );
             const collisions = projection.tools
                 .filter((tool) => cliNames.has(tool.name))
                 .map((tool) => ({
@@ -267,7 +261,6 @@ export default function createClientRouter(deps) {
                 catalog: {
                     policy: {
                         cliBuiltinsPrecedeCustomTools: true,
-                        deprecatedCustomOverrides: [...DEPRECATED_CUSTOM_TOOL_NAMES],
                     },
                     cli: {
                         source: cliToolsSource,
@@ -279,7 +272,6 @@ export default function createClientRouter(deps) {
                         count: projection.tools.length,
                         tools: projection.tools,
                     },
-                    deprecatedCustomTools,
                     collisions,
                 },
             });

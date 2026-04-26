@@ -230,7 +230,6 @@ describe('F86 - Barrel complete export coverage', () => {
             'toolsList',
             'fullHealthCheck',
             'getQuota',
-            'healthGetAuthStatus',
             'isServerReachable',
             'pingCheck',
         ];
@@ -409,7 +408,6 @@ describe('F16 - Newly added module exports', () => {
             'BUILTIN_HANDLER_MAP',
             'buildCustomTools',
             'getCustomToolDefinitions',
-            'loadCustomTools',
             'loadCustomToolsAsync',
             'registerCustomTool',
             'removeCustomTool',
@@ -421,7 +419,7 @@ describe('F16 - Newly added module exports', () => {
     it('exports tools-state.js', async () => {
         const barrel = await import('#copilot/sdk/index');
         const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
-        const names = ['getToolsConfig', 'loadToolsConfig', 'loadToolsConfigAsync', 'patchToolsConfig'];
+        const names = ['getToolsConfig', 'loadToolsConfigAsync', 'patchToolsConfig'];
         for (const n of names) expect(barrelMap[n], `missing: ${n}`).toBeDefined();
     });
 });
@@ -442,10 +440,10 @@ describe('F89 - Utility and helper exports', () => {
         expect(typeof barrel.httpRequest).toBe('function');
     });
 
-    it('exports url-validator.js', async () => {
+    it('não re-exporta url-validator.js (permanece em #copilot/core)', async () => {
         const barrel = await import('#copilot/sdk/index');
-        expect(typeof barrel.validateUrl).toBe('function');
-        expect(typeof barrel.validateUrlString).toBe('function');
+        expect('validateUrl' in barrel).toBe(false);
+        expect('validateUrlString' in barrel).toBe(false);
     });
 
     it('exports utils.js', async () => {
