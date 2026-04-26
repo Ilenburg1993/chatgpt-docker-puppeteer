@@ -32,3 +32,12 @@ export function registerClearRateLimiters(fn) {
 export function clearRateLimiters() {
     _clearFn();
 }
+
+/**
+ * Reseta o estado do rate limiter para isolamento de testes.
+ *
+ * @returns {void}
+ */
+export function resetRateLimiterStateForTests() {
+    _clearFn = () => {};
+}

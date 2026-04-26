@@ -158,6 +158,18 @@ export function registerForIntrospection(tools) {
 
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
 }
+/**
+ * Reseta o estado de introspecção para isolamento de testes.
+ *
+ * @returns {void}
+ */
+export function resetIntrospectionStateForTests() {
+    _registeredTools = [];
+    _disabledTools.clear();
+    _toolNameToCategoryMap.clear();
+    _CATEGORY_TOOL_MAP_DYNAMIC = {};
+}
+
 // TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.
 
 /**
@@ -327,15 +339,15 @@ const getTelemetryTool = createTool({
 });
 
 /**
- * Tool: legacy_report_intent — compat legado para logging local de intenção.
+ * Tool: report_intent_local — logging local de intenção.
  *
- * A built-in do CLI (`report_intent`) deve prevalecer quando disponível. Este fallback é mantido apenas por
- * retrocompatibilidade em runtimes sem a built-in.
+ * A built-in do CLI (`report_intent`) deve prevalecer quando disponível. Este fallback local é mantido para runtimes
+ * sem a built-in.
  */
 const reportIntentTool = createTool({
-    name: 'legacy_report_intent',
+    name: 'report_intent_local',
     description:
-        '[DEPRECATED] Compat legado para intent logging local. Prefira a built-in do CLI: "report_intent". ' +
+        'Intent logging local. Prefira a built-in do CLI: "report_intent" quando disponível. ' +
         'Registra a intenção do agente antes de executar uma ação sensível (ex: deletar arquivo, fazer push, ' +
         'executar comando destrutivo). Use ANTES de chamar uma tool que modifique estado externo irreversível. ' +
         'Não executa nenhuma ação — apenas registra e retorna confirmação de auditoria.',
@@ -370,7 +382,7 @@ const PROTECTED_TOOLS = new Set([
     'list_tools',
     'get_agent_info',
     'get_telemetry',
-    'legacy_report_intent',
+    'report_intent_local',
     'toggle_tool',
 ]);
 

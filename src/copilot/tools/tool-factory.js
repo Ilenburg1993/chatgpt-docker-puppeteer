@@ -53,7 +53,7 @@
  *
  * @module copilot/tools/tool-factory
  * @see EventBus
- * @see module:copilot/lib/tools-registry
+ * @see module:copilot/sdk/tools-registry
  * @see module:copilot/agent/tools-bootstrap
  *
  * ## Quando usar `buildTool` vs `defineTool`
@@ -72,10 +72,12 @@ import { createRequire } from 'node:module';
  * @returns {typeof import('zod-to-json-schema').zodToJsonSchema | null}
  */
 function loadZodToJsonSchema() {
-    const fn = /** @type {typeof loadZodToJsonSchema & {
-    _converter?: typeof import('zod-to-json-schema').zodToJsonSchema | null;
-    _attempted?: boolean;
-}} */ (loadZodToJsonSchema);
+    const fn = /**
+     * @type {typeof loadZodToJsonSchema & {
+     *     _converter?: typeof import('zod-to-json-schema').zodToJsonSchema | null;
+     *     _attempted?: boolean;
+     * }}
+     */ (loadZodToJsonSchema);
     if (fn._converter || fn._attempted) return fn._converter ?? null;
     fn._attempted = true;
     try {

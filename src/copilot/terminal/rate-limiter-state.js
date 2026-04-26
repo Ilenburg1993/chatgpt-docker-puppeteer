@@ -4,4 +4,8 @@
  * @file Adapter fino do terminal para a SSOT compartilhada de rate-limiter-state em `presentation/`.
  */
 
-export { clearRateLimiters, registerClearRateLimiters } from '../presentation/realtime.js';
+export {
+    clearRateLimiters,
+    registerClearRateLimiters,
+    resetRateLimiterStateForTests,
+} from '../presentation/realtime.js';

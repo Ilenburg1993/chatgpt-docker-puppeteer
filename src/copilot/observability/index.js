@@ -55,7 +55,6 @@ export {
 
 // ─── EventBus Observers ───────────────────────────────────────────────────────
 export { createLogObserver } from './bus-actions/log-observer.js';
-export { attachEventBusObservers, detachEventBusObservers } from './event-bus-observers.js';
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 export { createAuditLog, defaultAuditLog } from '#copilot/audit';

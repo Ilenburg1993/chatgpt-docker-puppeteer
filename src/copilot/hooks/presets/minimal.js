@@ -22,7 +22,7 @@ import { createPermissionHandler } from '../permission-handler.js';
  * Preset minimal: permite tudo, loga os eventos principais. Adequado para ambientes de desenvolvimento sem restrições.
  *
  * @example
- *     import { createMinimalPreset } from '#copilot/hooks/presets/minimal.js';
+ *     import { createMinimalPreset } from '#copilot/hooks';
  *     const session = await client.createSession({
  *         onPermissionRequest: createMinimalPreset().onPermissionRequest,
  *         hooks: createMinimalPreset().hooks,

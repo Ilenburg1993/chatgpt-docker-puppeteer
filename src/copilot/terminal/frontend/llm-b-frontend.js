@@ -9,6 +9,7 @@
  *   por conta própria.
  */
 
+import { getWorkspaceContext } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { sendRuntimeDialogTurnForRuntime } from '../../presentation/runtime-dialog.js';
@@ -35,7 +36,6 @@ import {
     getShowUsage,
 } from '../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
-import { getWorkspaceContext } from '../workspace-context.js';
 import {
     answerTerminalPendingQuestion,
     canSearchTerminalHubTurns,

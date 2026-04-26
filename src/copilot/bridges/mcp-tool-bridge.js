@@ -20,7 +20,7 @@
  * @module copilot/bridges/mcp-tool-bridge
  * @see EventBus
  * @see module:copilot/agent/tools-bootstrap
- * @see module:copilot/lib/tools-registry
+ * @see module:copilot/sdk/tools-registry
  */
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';

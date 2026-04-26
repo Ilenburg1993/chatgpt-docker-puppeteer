@@ -46,6 +46,15 @@ export function setSessionRpc(rpc) {
     log('DEBUG', `[session-rpc-tools] RPC ${rpc ? 'registrado' : 'removido'}.`);
 }
 
+/**
+ * Reseta o estado do RPC para isolamento de testes.
+ *
+ * @returns {void}
+ */
+export function resetSessionRpcForTests() {
+    _rpc = null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

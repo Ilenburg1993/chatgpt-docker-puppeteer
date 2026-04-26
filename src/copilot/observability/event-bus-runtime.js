@@ -4,8 +4,8 @@
  *
  * Runtime canônico de observabilidade sobre o EventBus.
  *
- * Consolida a composição de `bus-actions/*` em um único owner de wiring, evitando que `bootstrap.js`,
- * `event-bus-observers.js` e consumidores externos precisem decidir individualmente quais subscribers ativar.
+ * Consolida a composição de `bus-actions/*` em um único owner de wiring, evitando que `bootstrap.js` e consumidores
+ * externos precisem decidir individualmente quais subscribers ativar.
  */
 
 import {

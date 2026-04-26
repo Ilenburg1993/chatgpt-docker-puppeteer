@@ -68,6 +68,15 @@ export function setBridgeAgent(agent) {
     }
     _agent = agent;
 }
+
+/**
+ * Utilitário de teste para limpar o singleton injetado.
+ *
+ * @returns {void}
+ */
+export function resetBridgeAgentForTests() {
+    _agent = null;
+}
 /**
  * @returns {BridgeAgentLike}
  * @throws {Error} Se o agent não foi injetado via `setBridgeAgent()`.

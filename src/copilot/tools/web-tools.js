@@ -25,6 +25,15 @@ const RATE_WINDOW = new Map();
 const MAX_REQUESTS_PER_MINUTE = 20;
 
 /**
+ * Reset util para testes — limpa buckets de rate-limit em memória.
+ *
+ * @returns {void}
+ */
+export function resetWebToolsRateLimitWindowForTests() {
+    RATE_WINDOW.clear();
+}
+
+/**
  * Verifica e registra rate limit.
  *
  * @returns {boolean} true se dentro do limite, false se excedido
@@ -41,16 +50,16 @@ function checkRateLimit() {
     return true;
 }
 
-// ─── Tool: web_fetch ─────────────────────────────────────────────────────────
+// ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
- * Tool: web_fetch — busca o conteúdo de uma URL pública com proteção SSRF.
+ * Tool: web_fetch_local — busca o conteúdo de uma URL pública com proteção SSRF.
  */
 const webFetchTool = buildTool({
-    name: 'legacy_web_fetch',
+    name: 'web_fetch_local',
     requiresApproval: false,
     description:
-        '[DEPRECATED] Compat legado de fetch web. Prefira a built-in do CLI: "web_fetch". ' +
+        'Fetch web local com proteção SSRF. Em runtimes com built-in do CLI (`web_fetch`), a built-in prevalece. ' +
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
         'Limite: 20 requisições/minuto.',

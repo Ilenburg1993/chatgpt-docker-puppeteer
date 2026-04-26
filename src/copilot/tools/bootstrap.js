@@ -13,31 +13,25 @@
  *   mas a limitação real está no SDK.
  * @see EventBus
  * @see module:copilot/tools/tool-factory
- * @see module:copilot/lib/tools-registry
+ * @see module:copilot/sdk/tools-registry
  */
 
 import { log, wrapWithStats } from '#copilot/observability';
 import { buildCustomTools, registerTools } from '#copilot/sdk';
-import {
-    codeTools,
-    experimentalRpcTools,
-    fileReadTools,
-    fileWriteTools,
-    gitTools,
-    hookTools,
-    hubTools,
-    introspectionTools,
-    permissionTools,
-    recordToolCategory,
-    registerForIntrospection,
-    sessionRpcTools,
-    sessionTools,
-    shellTools,
-    taskTools,
-    todoReadTools,
-    todoWriteTools,
-    webTools,
-} from '#copilot/tools';
+import { codeTools } from './code-tools.js';
+import { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
+import { fileReadTools, fileWriteTools } from './file/index.js';
+import { gitTools } from './git/index.js';
+import { configureHookTools, hookTools } from './hook-tools.js';
+import { hubTools, setHub } from './hub-tools.js';
+import { introspectionTools, recordToolCategory, registerForIntrospection } from './introspection-tools.js';
+import { permissionTools, setPermissionAgent } from './permission-tools.js';
+import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
+import { sessionTools } from './session-tools.js';
+import { shellTools } from './shell/index.js';
+import { taskTools } from './task-tools.js';
+import { todoReadTools, todoWriteTools } from './todo/index.js';
+import { webTools } from './web-tools.js';
 
 /**
  * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
@@ -47,7 +41,7 @@ import {
 
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc, setExperimentalSession exportados diretamente de tools/index.js
 // O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
-export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc } from '#copilot/tools';
+export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as

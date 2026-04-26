@@ -34,6 +34,17 @@ import { startCopilotServer } from './server/index.js';
 let _booted = false;
 
 /**
+ * Reseta a trava de boot para permitir nova tentativa em testes.
+ *
+ * **Uso exclusivo em testes** — não chamar em código de produção.
+ *
+ * @returns {void}
+ */
+export function resetBootFlagForTests() {
+    _booted = false;
+}
+
+/**
  * Inicializa o módulo copilot (modo terminal — único modo canônico).
  *
  * Idempotente — chamadas subsequentes são ignoradas com log de aviso.

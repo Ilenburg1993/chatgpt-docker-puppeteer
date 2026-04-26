@@ -39,6 +39,15 @@ export function setHub(hub) {
 }
 
 /**
+ * Reseta o estado de injeção do hub para isolamento de testes.
+ *
+ * @returns {void}
+ */
+export function resetHubForTests() {
+    _injectedHub = null;
+}
+
+/**
  * Retorna o hub injetado via `setHub()`. Retorna null se não injetado ou não pronto.
  *
  * @returns {import('../conversation-hub/hub.js').ConversationHub | null}
