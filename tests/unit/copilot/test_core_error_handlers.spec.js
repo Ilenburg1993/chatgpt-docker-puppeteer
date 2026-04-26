@@ -1,5 +1,11 @@
 // @ts-check
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../src/copilot/observability/logger.js', () => ({ log: vi.fn() }));
+vi.mock('../../../src/copilot/observability/error-tracker.js', () => ({
+    defaultErrorTracker: { trackError: vi.fn() },
+    createErrorTracker: vi.fn(),
+}));
 
 describe('core/error-handlers', () => {
     /** @type {typeof import('../../../src/copilot/core/error-handlers.js')} */
@@ -10,19 +16,13 @@ describe('core/error-handlers', () => {
     /** @type {any} */
     let mockTracker;
 
-    beforeEach(async () => {
-        vi.resetModules();
+    beforeAll(async () => {
+        mod = await import('../../../src/copilot/core/error-handlers.js');
+    });
 
+    beforeEach(() => {
         mockLog = vi.fn();
         mockTracker = { trackError: vi.fn() };
-
-        vi.doMock('../../../src/copilot/observability/logger.js', () => ({ log: mockLog }));
-        vi.doMock('../../../src/copilot/observability/error-tracker.js', () => ({
-            defaultErrorTracker: mockTracker,
-            createErrorTracker: vi.fn(),
-        }));
-
-        mod = await import('../../../src/copilot/core/error-handlers.js');
         mod.registerErrorHandlerDeps({ log: mockLog, tracker: mockTracker });
     });
 

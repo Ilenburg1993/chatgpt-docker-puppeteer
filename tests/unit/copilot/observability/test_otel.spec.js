@@ -7,7 +7,7 @@
  * F207: buildTelemetryConfig, isOtelEnabled, startSpan fallback, startSpanImmediate fallback.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock dinâmico do módulo env ──────────────────────────────────────────────
 
@@ -43,20 +43,20 @@ describe('otel.js', () => {
     /** @type {typeof import('../../../../src/copilot/observability/otel.js')} */
     let mod;
 
-    beforeEach(async () => {
-        envOverrides = {};
-        vi.resetModules();
+    beforeAll(async () => {
         mod = await import('../../../../src/copilot/observability/otel.js');
+    });
+
+    beforeEach(() => {
+        envOverrides = {};
     });
 
     // ── buildTelemetryConfig ──────────────────────────────────────────────
 
     describe('buildTelemetryConfig', () => {
-        it('retorna undefined quando OTEL está desabilitado', async () => {
+        it('retorna undefined quando OTEL está desabilitado', () => {
             envOverrides.COPILOT_OTEL_DISABLED = true;
-            vi.resetModules();
-            const m = await import('../../../../src/copilot/observability/otel.js');
-            expect(m.buildTelemetryConfig()).toBeUndefined();
+            expect(mod.buildTelemetryConfig()).toBeUndefined();
         });
 
         it('retorna config file como padrão', () => {
@@ -66,21 +66,17 @@ describe('otel.js', () => {
             expect(cfg?.filePath).toBeTruthy();
         });
 
-        it('retorna otlp-http quando endpoint definido', async () => {
+        it('retorna otlp-http quando endpoint definido', () => {
             envOverrides.COPILOT_OTEL_ENDPOINT = 'http://localhost:4318';
-            vi.resetModules();
-            const m = await import('../../../../src/copilot/observability/otel.js');
-            const cfg = m.buildTelemetryConfig();
+            const cfg = mod.buildTelemetryConfig();
             expect(cfg?.exporterType).toBe('otlp-http');
             expect(cfg?.otlpEndpoint).toBe('http://localhost:4318');
         });
 
-        it('respeita explicitExporterType quando endpoint definido', async () => {
+        it('respeita explicitExporterType quando endpoint definido', () => {
             envOverrides.COPILOT_OTEL_ENDPOINT = 'http://localhost:4318';
             envOverrides.COPILOT_OTEL_EXPORTER_TYPE = 'custom';
-            vi.resetModules();
-            const m = await import('../../../../src/copilot/observability/otel.js');
-            const cfg = m.buildTelemetryConfig();
+            const cfg = mod.buildTelemetryConfig();
             expect(cfg?.exporterType).toBe('custom');
         });
 
@@ -98,11 +94,9 @@ describe('otel.js', () => {
             expect(mod.isOtelEnabled()).toBe(true);
         });
 
-        it('retorna false quando OTEL está desabilitado', async () => {
+        it('retorna false quando OTEL está desabilitado', () => {
             envOverrides.COPILOT_OTEL_DISABLED = true;
-            vi.resetModules();
-            const m = await import('../../../../src/copilot/observability/otel.js');
-            expect(m.isOtelEnabled()).toBe(false);
+            expect(mod.isOtelEnabled()).toBe(false);
         });
     });
 

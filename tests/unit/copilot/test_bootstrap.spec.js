@@ -1,6 +1,6 @@
 // @ts-check
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     bootstrapObservability: vi.fn(),
@@ -118,8 +118,15 @@ vi.mock('../../../src/copilot/observability/logger.js', () => ({
 }));
 
 describe('copilot/bootstrap', () => {
+    /** @type {typeof import('../../../src/copilot/bootstrap.js')} */
+    let bootstrapMod;
+
+    beforeAll(async () => {
+        bootstrapMod = await import('../../../src/copilot/bootstrap.js');
+    });
+
     beforeEach(() => {
-        vi.resetModules();
+        bootstrapMod.resetBootFlagForTests();
         vi.clearAllMocks();
         mocks.createCopilotBootPlan.mockReturnValue({
             phases: [{ id: 'observability' }, { id: 'terminal' }],
@@ -138,7 +145,7 @@ describe('copilot/bootstrap', () => {
     it('reseta a trava de boot quando o boot falha e permite nova tentativa', async () => {
         mocks.startTerminalServer.mockRejectedValueOnce(new Error('boot failed')).mockResolvedValueOnce(undefined);
 
-        const { bootCopilot } = await import('../../../src/copilot/bootstrap.js');
+        const { bootCopilot } = bootstrapMod;
 
         await expect(bootCopilot()).rejects.toThrow('boot failed');
         await expect(bootCopilot()).resolves.toBeUndefined();

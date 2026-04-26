@@ -7,7 +7,7 @@
  * F208: counter increment/reset, metric export, memory bounds, summary structure.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -40,10 +40,15 @@ describe('createMetricsStore', () => {
     /** @type {import('../../../../src/copilot/observability/metrics.js').MetricsStore} */
     let store;
 
-    beforeEach(async () => {
-        vi.resetModules();
-        const mod = await import('../../../../src/copilot/observability/metrics.js');
-        store = mod.createMetricsStore();
+    /** @type {typeof import('../../../../src/copilot/observability/metrics.js')} */
+    let metricsModule;
+
+    beforeAll(async () => {
+        metricsModule = await import('../../../../src/copilot/observability/metrics.js');
+    });
+
+    beforeEach(() => {
+        store = metricsModule.createMetricsStore();
     });
 
     afterEach(() => {

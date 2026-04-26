@@ -9,7 +9,7 @@
  *   - terminal/dialog/engine-persistence.js (148L) — persistTurnToHub, failure count
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
 
@@ -171,14 +171,19 @@ const mockFs = vi.hoisted(() => ({
 vi.mock('node:fs/promises', () => mockFs);
 
 describe('F49 — createJsonlWriter', () => {
+    /** @type {typeof import('#copilot/audit/jsonl-writer')} */
+    let jsonlMod;
+
+    beforeAll(async () => {
+        jsonlMod = await import('#copilot/audit/jsonl-writer');
+    });
+
     beforeEach(() => {
-        vi.resetModules();
         Object.values(mockFs).forEach((fn) => fn.mockClear());
     });
 
     it('write() enfileira e flush escreve JSON line', async () => {
-        const { createJsonlWriter } = await import('#copilot/audit/jsonl-writer');
-        const writer = createJsonlWriter({ filePath: '/tmp/test.jsonl' });
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/test.jsonl' });
         writer.write({ event: 'test', ts: 123 });
         // Flush is scheduled via setImmediate — wait for it
         await new Promise((r) => setTimeout(r, 50));
@@ -192,8 +197,7 @@ describe('F49 — createJsonlWriter', () => {
 
     it('rotação acontece quando arquivo excede maxBytes', async () => {
         mockFs.stat.mockResolvedValue({ size: 11_000_000 }); // > 10MB default
-        const { createJsonlWriter } = await import('#copilot/audit/jsonl-writer');
-        const writer = createJsonlWriter({ filePath: '/tmp/test.jsonl' });
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/test.jsonl' });
         writer.write({ x: 1 });
         await new Promise((r) => setTimeout(r, 50));
         expect(mockFs.rename).toHaveBeenCalledWith('/tmp/test.jsonl', '/tmp/test.jsonl.1');
@@ -201,8 +205,7 @@ describe('F49 — createJsonlWriter', () => {
 
     it('sem rotação quando arquivo é menor que maxBytes', async () => {
         mockFs.stat.mockResolvedValue({ size: 100 });
-        const { createJsonlWriter } = await import('#copilot/audit/jsonl-writer');
-        const writer = createJsonlWriter({ filePath: '/tmp/small.jsonl' });
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/small.jsonl' });
         writer.write({ x: 1 });
         await new Promise((r) => setTimeout(r, 50));
         expect(mockFs.rename).not.toHaveBeenCalled();

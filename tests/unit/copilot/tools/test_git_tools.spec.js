@@ -19,7 +19,7 @@
  * - git_is_dirty: isDirty true/false, changedFiles count
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -117,12 +117,14 @@ describe('git-tools', () => {
     /** @type {typeof import('../../../../src/copilot/tools/git/index.js')} */
     let mod;
 
-    beforeEach(async () => {
-        vi.resetModules();
+    beforeAll(async () => {
+        mod = await import('../../../../src/copilot/tools/git/index.js');
+    });
+
+    beforeEach(() => {
         // Reset mock
         execFileMockImpl = vi.fn();
         mockGitOutput('');
-        mod = await import('../../../../src/copilot/tools/git/index.js');
     });
 
     // ── Exports ───────────────────────────────────────────────────────────

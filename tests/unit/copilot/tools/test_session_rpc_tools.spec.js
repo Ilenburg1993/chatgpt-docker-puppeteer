@@ -20,7 +20,7 @@
  * - wrapRpc: timeout, erro genérico
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -110,11 +110,18 @@ describe('session-rpc-tools', () => {
     /** @type {ReturnType<typeof createFakeRpc>} */
     let fakeRpc;
 
-    beforeEach(async () => {
-        vi.resetModules();
+    beforeAll(async () => {
         mod = await import('../../../../src/copilot/tools/session-rpc-tools.js');
+    });
+
+    beforeEach(() => {
+        mod.resetSessionRpcForTests();
         fakeRpc = createFakeRpc();
         mod.setSessionRpc(fakeRpc);
+    });
+
+    afterEach(() => {
+        mod.resetSessionRpcForTests();
     });
 
     // ── Exports ───────────────────────────────────────────────────────────

@@ -96,7 +96,6 @@ describe('session-handlers', () => {
     let unsubs;
 
     beforeEach(async () => {
-        vi.resetModules();
         mock = createMockSession();
         ctx = createMockCtx(mock);
         const mod = await import('../../../../src/copilot/observability/collectors/session-handlers.js');

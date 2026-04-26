@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -59,8 +59,14 @@ describe('dialog-task-handlers', () => {
      */
     let accessors;
 
-    beforeEach(async () => {
-        vi.resetModules();
+    /** @type {typeof import('../../../../src/copilot/observability/observers/dialog-task-handlers.js')} */
+    let handlersMod;
+
+    beforeAll(async () => {
+        handlersMod = await import('../../../../src/copilot/observability/observers/dialog-task-handlers.js');
+    });
+
+    beforeEach(() => {
         agent = new EventEmitter();
         metrics = {
             recordDialogTurn: vi.fn(),
@@ -76,7 +82,6 @@ describe('dialog-task-handlers', () => {
         errorTracker = { trackError: vi.fn() };
         modelStatsTracker = { record: vi.fn() };
 
-        const mod = await import('../../../../src/copilot/observability/observers/dialog-task-handlers.js');
         const ctx = {
             metrics,
             errorTracker,
@@ -87,7 +92,7 @@ describe('dialog-task-handlers', () => {
             },
             safe: (/** @type {Function} */ fn, /** @type {string} */ _context) => /** @type {any} */ (fn),
         };
-        accessors = mod.attachDialogTaskHandlers(/** @type {any} */ (ctx));
+        accessors = handlersMod.attachDialogTaskHandlers(/** @type {any} */ (ctx));
     });
 
     // ── dialog.turn_start + turn_end ──────────────────────────────────────

@@ -15,7 +15,7 @@
  * - hub_list_sessions: sucesso, filtro por status, hub indisponível
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -88,11 +88,18 @@ describe('hub-tools', () => {
     /** @type {ReturnType<typeof createFakeHub>} */
     let fakeHub;
 
-    beforeEach(async () => {
-        vi.resetModules();
+    beforeAll(async () => {
         mod = await import('../../../../src/copilot/tools/hub-tools.js');
+    });
+
+    beforeEach(() => {
+        mod.resetHubForTests();
         fakeHub = createFakeHub();
         mod.setHub(/** @type {any} */ (fakeHub));
+    });
+
+    afterEach(() => {
+        mod.resetHubForTests();
     });
 
     // ── Exports ───────────────────────────────────────────────────────────

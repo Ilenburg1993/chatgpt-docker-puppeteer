@@ -334,14 +334,18 @@ vi.mock('#copilot/sdk', () => ({
     },
     createTool: vi.fn((spec) => spec),
     SYSTEM_PROMPT_SECTIONS: {},
-    loadCustomTools: vi.fn(async () => []),
-    loadToolsConfig: vi.fn(async () => ({ categories: [] })),
+    loadCustomToolsAsync: vi.fn(async () => []),
     loadToolsConfigAsync: vi.fn(async () => ({ categories: [] })),
 }));
 
-vi.mock('../../../src/copilot/terminal/workspace-context.js', () => ({
-    getWorkspaceContext: () => ({ cwd: '/repo', gitRoot: '/repo', currentBranch: 'main' }),
-}));
+vi.mock('#copilot/boot', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        getWorkspaceContext: () => ({ cwd: '/repo', gitRoot: '/repo', currentBranch: 'main' }),
+        getWorkspaceContextAsync: async () => ({ cwd: '/repo', gitRoot: '/repo', currentBranch: 'main' }),
+    };
+});
 
 vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
     ...(await importOriginal()),

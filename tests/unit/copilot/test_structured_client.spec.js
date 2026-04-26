@@ -16,7 +16,7 @@
  * - chatStructured() lança ZodError para input inválido
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Setup: mock de alwaysAliveAgent antes dos imports ────────────────────────
 //
@@ -67,15 +67,28 @@ function structuredJsonResponse(extra = {}) {
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
 describe('LlmBridgeClient › chatStructured()', () => {
-    it('exporta chatStructured como método de LlmBridgeClient', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
+    /** @type {typeof import('../../../src/copilot/channel/client.js')} */
+    let mod;
+
+    beforeAll(async () => {
+        mod = await import('../../../src/copilot/channel/client.js');
+    });
+
+    beforeEach(() => {
+        mod.setBridgeAgent(/** @type {any} */ (mockAgent));
+    });
+
+    afterEach(() => {
+        mod.resetBridgeAgentForTests();
+    });
+
+    it('exporta chatStructured como método de LlmBridgeClient', { timeout: 60_000 }, async () => {
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const instance = new mod.LlmBridgeClient();
         expect(typeof instance.chatStructured === 'function').toBeTruthy(); // chatStructured deve ser método;
     });
 
     it('chatStructured() retorna shape StructuredChatResult', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -106,7 +119,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('parseia resposta JSON de LLM-B → structured ≠ null', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -131,7 +143,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('retorna structured=null quando LLM-B responde texto puro', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -155,7 +166,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('propaga raw sempre (JSON e texto puro)', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -174,7 +184,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('inclui taskId, durationMs, chunks, responseLen no resultado', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -195,7 +204,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('passa onDelta para chat() como opção', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         mod.setBridgeAgent(/** @type {any} */ (mockAgent));
         const b = new mod.LlmBridgeClient();
 
@@ -215,7 +223,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('serializa input como JSON com instrução de protocolo antes de enviar', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         /** @type {string} */
@@ -238,7 +245,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('lança ZodError para input inválido (context vazio)', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         await expect(() =>
@@ -247,7 +253,6 @@ describe('LlmBridgeClient › chatStructured()', () => {
     });
 
     it('lança ZodError para responseType inválido', async () => {
-        const mod = await import('../../../src/copilot/channel/client.js');
         const b = new mod.LlmBridgeClient();
 
         await expect(

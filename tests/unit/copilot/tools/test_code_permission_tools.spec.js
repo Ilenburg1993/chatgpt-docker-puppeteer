@@ -9,36 +9,41 @@
  *   - terminal/rate-limiter-state.js (34L) — DI bridge pattern
  */
 
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. terminal/rate-limiter-state.js — DI bridge (sem mocks — pura lógica)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F46 — rate-limiter-state DI bridge', () => {
-    it('clearRateLimiters() é no-op antes de register', async () => {
-        vi.resetModules();
-        const { clearRateLimiters } = await import('#copilot/terminal/rate-limiter-state');
-        expect(() => clearRateLimiters()).not.toThrow();
+    /** @type {typeof import('#copilot/terminal/rate-limiter-state')} */
+    let rlMod;
+
+    beforeAll(async () => {
+        rlMod = await import('#copilot/terminal/rate-limiter-state');
     });
 
-    it('registerClearRateLimiters + clearRateLimiters chama a fn registrada', async () => {
-        vi.resetModules();
-        const { registerClearRateLimiters, clearRateLimiters } = await import('#copilot/terminal/rate-limiter-state');
+    beforeEach(() => {
+        rlMod.resetRateLimiterStateForTests();
+    });
+
+    it('clearRateLimiters() é no-op antes de register', () => {
+        expect(() => rlMod.clearRateLimiters()).not.toThrow();
+    });
+
+    it('registerClearRateLimiters + clearRateLimiters chama a fn registrada', () => {
         const fn = vi.fn();
-        registerClearRateLimiters(fn);
-        clearRateLimiters();
+        rlMod.registerClearRateLimiters(fn);
+        rlMod.clearRateLimiters();
         expect(fn).toHaveBeenCalledOnce();
     });
 
-    it('registrar nova fn sobrescreve a anterior', async () => {
-        vi.resetModules();
-        const { registerClearRateLimiters, clearRateLimiters } = await import('#copilot/terminal/rate-limiter-state');
+    it('registrar nova fn sobrescreve a anterior', () => {
         const fn1 = vi.fn();
         const fn2 = vi.fn();
-        registerClearRateLimiters(fn1);
-        registerClearRateLimiters(fn2);
-        clearRateLimiters();
+        rlMod.registerClearRateLimiters(fn1);
+        rlMod.registerClearRateLimiters(fn2);
+        rlMod.clearRateLimiters();
         expect(fn1).not.toHaveBeenCalled();
         expect(fn2).toHaveBeenCalledOnce();
     });
