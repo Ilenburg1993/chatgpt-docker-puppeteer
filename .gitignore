@@ -97,6 +97,7 @@ local-login/profile/
 # Temporary files
 *.tmp
 *.tmp.*
+.cache/
 .tmp.driveupload/
 .tmp.drivedownload/
 .tmp.driveupdate/

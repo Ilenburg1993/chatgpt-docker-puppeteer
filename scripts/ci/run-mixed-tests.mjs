@@ -3,6 +3,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 /** @param {string} dir */
@@ -35,10 +36,21 @@ function isVitestFile(filePath) {
 function runCommand(cmd, args) {
     const printable = `${cmd} ${args.join(' ')}`;
     console.log(`\n[test-runner] Running: ${printable}`);
+
+    const compileCacheDir =
+        process.env.NODE_COMPILE_CACHE ||
+        (process.env.XDG_CACHE_HOME
+            ? join(process.env.XDG_CACHE_HOME, 'node-compile')
+            : join(homedir(), '.cache', 'node-compile'));
     const result = spawnSync(cmd, args, {
         stdio: 'inherit',
         shell: process.platform === 'win32',
+        env: {
+            ...process.env,
+            NODE_COMPILE_CACHE: compileCacheDir,
+        },
     });
+
     return result.status ?? 1;
 }
 
@@ -89,9 +101,11 @@ for (const chunk of chunkFiles(nodeTestFiles)) {
     if (status !== 0) exitCode = status;
 }
 
-for (const chunk of chunkFiles(vitestFiles)) {
-    if (chunk.length === 0) continue;
-    const status = runCommand('npx', ['vitest', 'run', ...chunk]);
+if (vitestFiles.length > 0) {
+    const hasOnlyCopilotSpecs = vitestFiles.every((filePath) => /[/\\]copilot[/\\]/.test(filePath));
+    const vitestConfigPath = hasOnlyCopilotSpecs ? 'vitest.copilot.config.js' : 'vitest.config.js';
+
+    const status = runCommand('npx', ['vitest', 'run', '--config', vitestConfigPath, ...vitestFiles]);
     if (status !== 0) exitCode = status;
 }
 
