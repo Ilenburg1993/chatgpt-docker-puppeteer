@@ -132,10 +132,33 @@ export async function shellExec(session, command, options) {
     if (options?.timeout !== undefined) params.timeout = options.timeout;
 
     appLog('INFO', `[sdk/rpc] shell.exec: command='${command.slice(0, 80)}', sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'rpc.shell.exec',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: { commandPreview: command.slice(0, 80), ...(options?.cwd ? { cwd: options.cwd } : {}) },
+    });
     try {
-        return /** @type {ShellExecResult} */ (await session.rpc.shell.exec(params));
+        const result = /** @type {ShellExecResult} */ (await session.rpc.shell.exec(params));
+        emitSdkOperationMetric({
+            operation: 'rpc.shell.exec',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { processId: result.processId },
+        });
+        return result;
     } catch (error) {
-        throw toSdkOperationError('shell.exec', error);
+        const sdkError = toSdkOperationError('shell.exec', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.shell.exec',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 

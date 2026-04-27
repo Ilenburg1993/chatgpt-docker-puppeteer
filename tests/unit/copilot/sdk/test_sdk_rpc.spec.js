@@ -8,6 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
@@ -87,8 +88,17 @@ function fakeSession(rpcOverrides = {}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('sdk/rpc — Core Subsystems', () => {
+    /** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+    let metrics;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
+    });
+
+    afterEach(() => {
+        setSdkMetricEmitter(null);
     });
 
     // ─── MODEL ─────────────────────────────────────────────────────────────
@@ -118,6 +128,9 @@ describe('sdk/rpc — Core Subsystems', () => {
                 modelId: 'claude-sonnet-4-5',
                 reasoningEffort: 'high',
             });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.model.switchTo:started', 'rpc.model.switchTo:succeeded']),
+            );
         });
 
         it('troca modelo sem options', async () => {
@@ -144,6 +157,9 @@ describe('sdk/rpc — Core Subsystems', () => {
                 },
             });
             await expect(modelSwitchTo(s, 'invalid')).rejects.toThrow('model not found');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.model.switchTo:started', 'rpc.model.switchTo:failed']),
+            );
         });
     });
 

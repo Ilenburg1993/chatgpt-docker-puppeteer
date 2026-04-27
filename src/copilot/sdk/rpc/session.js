@@ -10,6 +10,7 @@
 
 import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -115,10 +116,36 @@ export async function modelSwitchTo(session, modelId, options) {
     if (options?.reasoningEffort) {
         params.reasoningEffort = options.reasoningEffort;
     }
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'rpc.model.switchTo',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: {
+            modelId,
+            ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+        },
+    });
     try {
-        return /** @type {ModelSwitchResult} */ (await session.rpc.model.switchTo(params));
+        const result = /** @type {ModelSwitchResult} */ (await session.rpc.model.switchTo(params));
+        emitSdkOperationMetric({
+            operation: 'rpc.model.switchTo',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { modelId },
+        });
+        return result;
     } catch (error) {
-        throw toSdkOperationError('model.switchTo', error);
+        const sdkError = toSdkOperationError('model.switchTo', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.model.switchTo',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { modelId, errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 

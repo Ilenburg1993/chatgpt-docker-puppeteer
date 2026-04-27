@@ -134,6 +134,9 @@ describe('sdk/rpc — Advanced Subsystems', () => {
             const result = await shellExec(s, 'ls -la');
             expect(s.rpc.shell.exec).toHaveBeenCalledWith({ command: 'ls -la' });
             expect(result.processId).toBe('proc-001');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.shell.exec:started', 'rpc.shell.exec:succeeded']),
+            );
         });
 
         it('passa opções cwd e timeout', async () => {
@@ -153,6 +156,19 @@ describe('sdk/rpc — Advanced Subsystems', () => {
 
         it('rejeita sessão inválida', async () => {
             await expect(shellExec(null, 'ls')).rejects.toThrow(TypeError);
+        });
+
+        it('emite métrica failed quando shell.exec falha', async () => {
+            const s = fakeSession({
+                shell: {
+                    exec: vi.fn().mockRejectedValue(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' })),
+                    kill: vi.fn().mockResolvedValue({ killed: true }),
+                },
+            });
+            await expect(shellExec(s, 'ls -la')).rejects.toThrow('socket closed');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.shell.exec:started', 'rpc.shell.exec:failed']),
+            );
         });
     });
 
