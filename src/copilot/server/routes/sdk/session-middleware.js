@@ -199,15 +199,16 @@ export const ElicitationBodySchema = z.object({
 /** Schema para POST /sessions/:id/permissions/:requestId body */
 export const PermissionDecisionBodySchema = z.object({
     result: z.union([
-        z.object({ kind: z.literal('approved') }),
-        z.object({ kind: z.literal('denied-by-rules'), rules: z.array(z.unknown()) }),
-        z.object({ kind: z.literal('denied-no-approval-rule-and-could-not-request-from-user') }),
-        z.object({ kind: z.literal('denied-interactively-by-user'), feedback: z.string().optional() }),
+        z.object({ kind: z.literal('approve-once') }),
+        z.object({ kind: z.literal('approve-for-session'), approval: z.record(z.string(), z.unknown()) }),
         z.object({
-            kind: z.literal('denied-by-content-exclusion-policy'),
-            path: z.string(),
-            message: z.string(),
+            kind: z.literal('approve-for-location'),
+            approval: z.record(z.string(), z.unknown()),
+            locationKey: z.string().min(1),
         }),
+        z.object({ kind: z.literal('reject'), feedback: z.string().optional() }),
+        z.object({ kind: z.literal('user-not-available') }),
+        z.object({ kind: z.literal('no-result') }),
     ]),
 });
 

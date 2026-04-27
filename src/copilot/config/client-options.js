@@ -230,7 +230,7 @@ export class ClientOptionsBuilder {
      * @returns {this}
      */
     githubToken(token) {
-        this.#opts.githubToken = token;
+        this.#opts.gitHubToken = token;
         return this;
     }
 
@@ -242,7 +242,7 @@ export class ClientOptionsBuilder {
     githubTokenFromEnv() {
         const token = process.env['GITHUB_TOKEN'];
         if (token) {
-            this.#opts.githubToken = token;
+            this.#opts.gitHubToken = token;
         }
         return this;
     }

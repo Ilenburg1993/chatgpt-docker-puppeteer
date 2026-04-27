@@ -286,7 +286,7 @@ describe('ClientOptionsBuilder', () => {
 
     it('githubToken() define token', () => {
         const opts = new ClientOptionsBuilder().githubToken('ghp_test123').build();
-        expect(opts.githubToken).toBe('ghp_test123');
+        expect(opts.gitHubToken).toBe('ghp_test123');
     });
 
     it('githubTokenFromEnv() lê GITHUB_TOKEN', () => {
@@ -294,7 +294,7 @@ describe('ClientOptionsBuilder', () => {
         try {
             process.env.GITHUB_TOKEN = 'ghp_from_env';
             const opts = new ClientOptionsBuilder().githubTokenFromEnv().build();
-            expect(opts.githubToken).toBe('ghp_from_env');
+            expect(opts.gitHubToken).toBe('ghp_from_env');
         } finally {
             if (original !== undefined) {
                 process.env.GITHUB_TOKEN = original;
@@ -424,7 +424,7 @@ describe('ClientOptionsBuilder', () => {
             expect(opts.cliArgs).toEqual(['--stdio']);
             expect(opts.useStdio).toBe(true);
             expect(opts.autoStart).toBe(false);
-            expect(opts.githubToken).toBe('ghp_env');
+            expect(opts.gitHubToken).toBe('ghp_env');
             expect(opts.useLoggedInUser).toBe(false);
             expect(opts.telemetry).toMatchObject({
                 otlpEndpoint: 'http://localhost:4318',

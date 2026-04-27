@@ -131,16 +131,19 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
         }
     });
 
-    describe('Arquivos com CopilotClient', () => {
+    describe('Arquivos com client SDK via façade', () => {
         const clientFiles = ['agent/lifecycle/agent-lifecycle.js', 'agent/lifecycle/entry.js'];
 
         for (const file of clientFiles) {
-            it(`${file}: CopilotClient importado de #copilot/sdk`, () => {
+            it(`${file}: cria client via agent-sdk-access`, () => {
                 const src = readSource(file);
-                const hasCorrectImport = src
+                const hasFacadeImport = src
                     .split('\n')
-                    .some((line) => /import.*CopilotClient.*from\s+['"]#copilot\/sdk['"]/.test(line));
-                expect(hasCorrectImport, `${file}: CopilotClient deveria vir de #copilot/sdk`).toBe(true);
+                    .some((line) => /from\s+['"].*agent-sdk-access\.js['"]/.test(line));
+                const hasClientCall = src.includes('createAgentSdkClient');
+                expect(hasFacadeImport && hasClientCall, `${file}: deveria usar createAgentSdkClient via façade`).toBe(
+                    true,
+                );
             });
         }
     });

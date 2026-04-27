@@ -25,7 +25,7 @@ vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
 
 // Mock approveAll + SYSTEM_PROMPT_SECTIONS (necessário para barrel import)
 vi.mock('@github/copilot-sdk', () => ({
-    approveAll: vi.fn(async () => ({ kind: 'approved' })),
+    approveAll: vi.fn(async () => ({ kind: 'approve-once' })),
     SYSTEM_PROMPT_SECTIONS: {
         identity: { description: 'Identity' },
         tone: { description: 'Tone' },
@@ -69,13 +69,13 @@ describe('sdk/permissions.js', () => {
         it('sem config, aprova por padrão', async () => {
             const handler = perms.createPermissionHandler();
             const result = await handler(makeRequest('any_tool'), { sessionId: 's1' });
-            expect(result.kind).toBe('approved');
+            expect(result.kind).toBe('approve-once');
         });
 
         it('allowAll: true, aprova tudo', async () => {
             const handler = perms.createPermissionHandler({ allowAll: true });
             const result = await handler(makeRequest('shell'), { sessionId: 's1' });
-            expect(result.kind).toBe('approved');
+            expect(result.kind).toBe('approve-once');
         });
 
         it('allowTools whitelist: aprova tools na lista', async () => {
@@ -83,7 +83,7 @@ describe('sdk/permissions.js', () => {
                 allowTools: ['read_file', 'write_file'],
             });
             const approved = await handler(makeRequest('read_file'), { sessionId: 's1' });
-            expect(approved.kind).toBe('approved');
+            expect(approved.kind).toBe('approve-once');
         });
 
         it('allowTools whitelist: nega tools fora da lista', async () => {
@@ -91,7 +91,7 @@ describe('sdk/permissions.js', () => {
                 allowTools: ['read_file'],
             });
             const denied = await handler(makeRequest('shell'), { sessionId: 's1' });
-            expect(denied.kind).toBe('denied-by-rules');
+            expect(denied.kind).toBe('reject');
         });
 
         it('denyTools: nega tools na blacklist', async () => {
@@ -99,7 +99,7 @@ describe('sdk/permissions.js', () => {
                 denyTools: ['dangerous_tool'],
             });
             const denied = await handler(makeRequest('dangerous_tool'), { sessionId: 's1' });
-            expect(denied.kind).toBe('denied-by-rules');
+            expect(denied.kind).toBe('reject');
         });
 
         it('denyTools: aprova tools fora da blacklist', async () => {
@@ -107,7 +107,7 @@ describe('sdk/permissions.js', () => {
                 denyTools: ['dangerous_tool'],
             });
             const approved = await handler(makeRequest('safe_tool'), { sessionId: 's1' });
-            expect(approved.kind).toBe('approved');
+            expect(approved.kind).toBe('approve-once');
         });
 
         it('denyKinds: nega pelo kind canônico do SDK antes de allowAll', async () => {
@@ -118,7 +118,7 @@ describe('sdk/permissions.js', () => {
             const denied = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: 'tc-1' }), {
                 sessionId: 's1',
             });
-            expect(denied.kind).toBe('denied-by-rules');
+            expect(denied.kind).toBe('reject');
         });
 
         it('denyPatterns: nega tools com match no regex', async () => {
@@ -126,7 +126,7 @@ describe('sdk/permissions.js', () => {
                 denyPatterns: [/^shell/],
             });
             const denied = await handler(makeRequest('shell_exec'), { sessionId: 's1' });
-            expect(denied.kind).toBe('denied-by-rules');
+            expect(denied.kind).toBe('reject');
         });
 
         it('denyPatterns: aprova tools sem match no regex', async () => {
@@ -134,7 +134,7 @@ describe('sdk/permissions.js', () => {
                 denyPatterns: [/^shell/],
             });
             const approved = await handler(makeRequest('read_file'), { sessionId: 's1' });
-            expect(approved.kind).toBe('approved');
+            expect(approved.kind).toBe('approve-once');
         });
 
         it('denyPatterns: lança TypeError se não for RegExp', () => {
@@ -147,10 +147,10 @@ describe('sdk/permissions.js', () => {
 
         it('onRequest: override prevalece', async () => {
             const handler = perms.createPermissionHandler({
-                onRequest: () => /** @type {any} */ ({ kind: 'denied-by-rules', rules: ['custom'] }),
+                onRequest: () => /** @type {any} */ ({ kind: 'reject', feedback: 'custom' }),
             });
             const result = await handler(makeRequest('any'), { sessionId: 's1' });
-            expect(result.kind).toBe('denied-by-rules');
+            expect(result.kind).toBe('reject');
         });
 
         it('onRequest: retorno undefined delega para lógica padrão', async () => {
@@ -158,7 +158,7 @@ describe('sdk/permissions.js', () => {
                 onRequest: () => undefined,
             });
             const result = await handler(makeRequest('safe_tool'), { sessionId: 's1' });
-            expect(result.kind).toBe('approved');
+            expect(result.kind).toBe('approve-once');
         });
 
         it('auditMode: loga sem negar', async () => {
@@ -182,13 +182,13 @@ describe('sdk/permissions.js', () => {
         it('aprova tools listadas', async () => {
             const handler = perms.createAllowlistPermissionHandler(['read_file', 'search']);
             const result = await handler(makeRequest('read_file'), { sessionId: 's1' });
-            expect(result.kind).toBe('approved');
+            expect(result.kind).toBe('approve-once');
         });
 
         it('nega tools não listadas', async () => {
             const handler = perms.createAllowlistPermissionHandler(['read_file']);
             const result = await handler(makeRequest('shell'), { sessionId: 's1' });
-            expect(result.kind).toBe('denied-by-rules');
+            expect(result.kind).toBe('reject');
         });
 
         it('lança TypeError se não receber array', () => {
@@ -200,7 +200,7 @@ describe('sdk/permissions.js', () => {
         it('lista vazia nega tudo', async () => {
             const handler = perms.createAllowlistPermissionHandler([]);
             const result = await handler(makeRequest('any'), { sessionId: 's1' });
-            expect(result.kind).toBe('denied-by-rules');
+            expect(result.kind).toBe('reject');
         });
     });
 

@@ -47,6 +47,37 @@ function assertSession(session, caller) {
 }
 
 /**
+ * Resolve namespace de workspace compatível entre SDKs (`workspaces` no v0.3.0, `workspace` em versões anteriores).
+ *
+ * @param {CopilotSession} session
+ * @returns {{
+ *     listFiles: () => Promise<WorkspaceListResult>;
+ *     readFile: (params: { path: string }) => Promise<WorkspaceReadResult>;
+ *     createFile: (params: { path: string; content: string }) => Promise<unknown>;
+ * }}
+ */
+function getWorkspaceRpc(session) {
+    const rpc = /** @type {{ workspaces?: unknown; workspace?: unknown }} */ (session.rpc);
+    const candidate =
+        (rpc.workspaces && typeof rpc.workspaces === 'object' ? rpc.workspaces : undefined) ??
+        (rpc.workspace && typeof rpc.workspace === 'object' ? rpc.workspace : undefined);
+
+    if (!candidate) {
+        throw new TypeError('[sdk/rpc/workspace] namespace indisponível (expected workspaces/workspace).');
+    }
+
+    const workspaceRpc = /**
+     * @type {{
+     *     listFiles: () => Promise<WorkspaceListResult>;
+     *     readFile: (params: { path: string }) => Promise<WorkspaceReadResult>;
+     *     createFile: (params: { path: string; content: string }) => Promise<unknown>;
+     * }}
+     */ (candidate);
+
+    return workspaceRpc;
+}
+
+/**
  * Retorna o modelo atualmente ativo da sessão.
  *
  * @param {CopilotSession} session
@@ -105,7 +136,12 @@ export async function modeGet(session) {
     assertSession(session, 'mode.get');
     appLog('DEBUG', `[sdk/rpc] mode.get: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {ModeGetResult} */ (await session.rpc.mode.get());
+        const rawMode = /** @type {unknown} */ (await session.rpc.mode.get());
+        const mode =
+            typeof rawMode === 'string'
+                ? rawMode
+                : /** @type {{ mode?: 'interactive' | 'plan' | 'autopilot' } | undefined} */ (rawMode)?.mode;
+        return /** @type {ModeGetResult} */ ({ mode: /** @type {'interactive' | 'plan' | 'autopilot'} */ (mode) });
     } catch (error) {
         throw toSdkOperationError('mode.get', error);
     }
@@ -126,7 +162,8 @@ export async function modeSet(session, mode) {
     }
     appLog('INFO', `[sdk/rpc] mode.set: mode='${mode}', sessionId='${session.sessionId}'`);
     try {
-        return /** @type {ModeSetResult} */ (await session.rpc.mode.set({ mode }));
+        await session.rpc.mode.set({ mode });
+        return /** @type {ModeSetResult} */ ({ mode });
     } catch (error) {
         throw toSdkOperationError('mode.set', error);
     }
@@ -166,7 +203,8 @@ export async function planUpdate(session, content) {
     }
     appLog('INFO', `[sdk/rpc] plan.update: ${content.length} chars, sessionId='${session.sessionId}'`);
     try {
-        return /** @type {PlanMutationResult} */ (await session.rpc.plan.update({ content }));
+        await session.rpc.plan.update({ content });
+        return /** @type {PlanMutationResult} */ ({ success: true });
     } catch (error) {
         throw toSdkOperationError('plan.update', error);
     }
@@ -182,7 +220,8 @@ export async function planDelete(session) {
     assertSession(session, 'plan.delete');
     appLog('INFO', `[sdk/rpc] plan.delete: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {PlanMutationResult} */ (await session.rpc.plan.delete());
+        await session.rpc.plan.delete();
+        return /** @type {PlanMutationResult} */ ({ success: true });
     } catch (error) {
         throw toSdkOperationError('plan.delete', error);
     }
@@ -202,7 +241,8 @@ export async function workspaceListFiles(session) {
     assertSession(session, 'workspace.listFiles');
     appLog('DEBUG', `[sdk/rpc] workspace.listFiles: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {WorkspaceListResult} */ (await session.rpc.workspace.listFiles());
+        const workspaceRpc = getWorkspaceRpc(session);
+        return /** @type {WorkspaceListResult} */ (await workspaceRpc.listFiles());
     } catch (error) {
         throw toSdkOperationError('workspace.listFiles', error);
     }
@@ -222,7 +262,8 @@ export async function workspaceReadFile(session, path) {
     }
     appLog('DEBUG', `[sdk/rpc] workspace.readFile: path='${path}', sessionId='${session.sessionId}'`);
     try {
-        return /** @type {WorkspaceReadResult} */ (await session.rpc.workspace.readFile({ path }));
+        const workspaceRpc = getWorkspaceRpc(session);
+        return /** @type {WorkspaceReadResult} */ (await workspaceRpc.readFile({ path }));
     } catch (error) {
         throw toSdkOperationError('workspace.readFile', error);
     }
@@ -249,7 +290,9 @@ export async function workspaceCreateFile(session, path, content) {
         `[sdk/rpc] workspace.createFile: path='${path}', ${content.length} chars, sessionId='${session.sessionId}'`,
     );
     try {
-        return /** @type {WorkspaceCreateResult} */ (await session.rpc.workspace.createFile({ path, content }));
+        const workspaceRpc = getWorkspaceRpc(session);
+        await workspaceRpc.createFile({ path, content });
+        return /** @type {WorkspaceCreateResult} */ ({ success: true });
     } catch (error) {
         throw toSdkOperationError('workspace.createFile', error);
     }
@@ -282,12 +325,14 @@ export async function sessionLog(session, message, options) {
     try {
         return /** @type {LogResult} */ (
             await session.rpc.log(
-                /** @type {{
-    message: string;
-    level?: 'info' | 'warning' | 'error';
-    ephemeral?: boolean;
-    url?: string;
-}} */ (params),
+                /**
+                 * @type {{
+                 *     message: string;
+                 *     level?: 'info' | 'warning' | 'error';
+                 *     ephemeral?: boolean;
+                 *     url?: string;
+                 * }}
+                 */ (params),
             )
         );
     } catch (error) {

@@ -42,12 +42,12 @@ export { approveAll };
 
 /** @returns {PermissionRequestResult} */
 function approved() {
-    return /** @type {PermissionRequestResult} */ ({ kind: 'approved' });
+    return /** @type {PermissionRequestResult} */ ({ kind: 'approve-once' });
 }
 
 /** @returns {PermissionRequestResult} */
 function denied() {
-    return /** @type {PermissionRequestResult} */ ({ kind: 'denied-by-rules', rules: [] });
+    return /** @type {PermissionRequestResult} */ ({ kind: 'reject' });
 }
 
 /**

@@ -27,7 +27,7 @@
 
 /**
  * Opções de criação do CopilotClient. Permite configurar: `cliPath`, `cliArgs`, `cwd`, `port`, `useStdio`,
- * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `env`, `githubToken`, `useLoggedInUser`, `onListModels`,
+ * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `env`, `gitHubToken`, `useLoggedInUser`, `onListModels`,
  * `telemetry`, `onGetTraceContext`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
@@ -586,7 +586,7 @@
 // ─── MCP ──────────────────────────────────────────────────────────────────────
 
 /**
- * Configuração de MCP server (union: `MCPLocalServerConfig` | `MCPRemoteServerConfig`).
+ * Configuração de MCP server (union: `MCPStdioServerConfig` | `MCPHTTPServerConfig`).
  *
  * @typedef {import('@github/copilot-sdk').MCPServerConfig} MCPServerConfig
  */
@@ -595,14 +595,14 @@
  * Configuração de MCP server local/stdio. Campos: `command`, `args` (string[]), `tools` (string[] — `[]` = nenhum,
  * `"*"` = todos), `type?` (`"local"` | `"stdio"`), `timeout?` (ms), `env?` (`Record<string, string>`), `cwd?`.
  *
- * @typedef {import('@github/copilot-sdk').MCPLocalServerConfig} MCPLocalServerConfig
+ * @typedef {import('@github/copilot-sdk').MCPStdioServerConfig} MCPStdioServerConfig
  */
 
 /**
  * Configuração de MCP server remoto (HTTP ou SSE). Campos: `url`, `tools` (string[] | `"*"`), `type` (`"http"` |
  * `"sse"`), `timeout?` (ms), `headers?` (`Record<string, string>`).
  *
- * @typedef {import('@github/copilot-sdk').MCPRemoteServerConfig} MCPRemoteServerConfig
+ * @typedef {import('@github/copilot-sdk').MCPHTTPServerConfig} MCPHTTPServerConfig
  */
 
 // ─── Custom Agents ────────────────────────────────────────────────────────────

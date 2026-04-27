@@ -9,11 +9,11 @@
  *
  * Contratos do SDK — PermissionRequestResult union:
  *
- * - `{ kind: "approved" }`
- * - `{ kind: "denied-by-rules"; rules: unknown[] }`
- * - `{ kind: "denied-no-approval-rule-and-could-not-request-from-user" }`
- * - `{ kind: "denied-interactively-by-user"; feedback?: string }`
- * - `{ kind: "denied-by-content-exclusion-policy"; path: string; message: string }`
+ * - `{ kind: "approve-once" }`
+ * - `{ kind: "approve-for-session"; approval: ... }`
+ * - `{ kind: "approve-for-location"; approval: ...; locationKey: string }`
+ * - `{ kind: "reject"; feedback?: string }`
+ * - `{ kind: "user-not-available" }`
  * - `{ kind: "no-result" }` (somente protocolo v1; protocolo v2 rejeita)
  *
  * @module copilot/hooks/permission-handler
@@ -40,14 +40,14 @@ import { log } from './logger.js';
  * @returns {PermissionRequestResult}
  */
 function makeApproved() {
-    return /** @type {PermissionRequestResult} */ ({ kind: 'approved' });
+    return /** @type {PermissionRequestResult} */ ({ kind: 'approve-once' });
 }
 
 /**
  * @returns {PermissionRequestResult}
  */
 function makeDenied() {
-    return /** @type {PermissionRequestResult} */ ({ kind: 'denied-by-rules', rules: [] });
+    return /** @type {PermissionRequestResult} */ ({ kind: 'reject' });
 }
 
 /**
@@ -136,9 +136,8 @@ export function createPermissionHandler(config) {
             const path = /** @type {{ path?: string }} */ (request)?.path ?? 'desconhecido';
             log('WARN', `[hooks/permission] NEGADO (content-exclusion-policy): path='${path}'`);
             return /** @type {PermissionRequestResult} */ ({
-                kind: 'denied-by-content-exclusion-policy',
-                path,
-                message: 'Arquivo bloqueado pela política de exclusão de conteúdo.',
+                kind: 'reject',
+                feedback: `Arquivo bloqueado pela política de exclusão de conteúdo: ${path}`,
             });
         }
 
@@ -147,7 +146,7 @@ export function createPermissionHandler(config) {
             const customResult = await onRequest(request, invocation);
             if (customResult !== undefined) {
                 const result = normalizeCustomDecision(customResult);
-                if (auditMode || result.kind !== 'approved') {
+                if (auditMode || result.kind !== 'approve-once') {
                     log('INFO', `[hooks/permission] onRequest: kind='${kind}', tool='${toolName}' → ${result.kind}`);
                 }
                 return result;

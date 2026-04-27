@@ -58,6 +58,24 @@ function assertSession(session, caller) {
 }
 
 /**
+ * Resolve método de compaction compatível entre SDKs (`history.compact` no v0.3.0, `compaction.compact` legado).
+ *
+ * @param {CopilotSession} session
+ * @returns {() => Promise<CompactionCompactResult>}
+ */
+function getCompactionMethod(session) {
+    const rpc = /** @type {{
+    history?: { compact?: () => Promise<CompactionCompactResult> };
+    compaction?: { compact?: () => Promise<CompactionCompactResult> };
+}} */ (session.rpc);
+    const fn = rpc.history?.compact ?? rpc.compaction?.compact;
+    if (typeof fn !== 'function') {
+        throw new TypeError('[sdk/rpc/compaction.compact] RPC de compaction indisponível (history/compaction).');
+    }
+    return fn.bind(rpc.history ?? rpc.compaction);
+}
+
+/**
  * @param {CopilotSession} session
  * @returns {Promise<CompactionCompactResult>}
  */
@@ -65,7 +83,7 @@ export async function compactionCompact(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {CompactionCompactResult} */ (await session.rpc.compaction.compact());
+        return await getCompactionMethod(session)();
     } catch (error) {
         throw toSdkOperationError('compaction.compact', error);
     }
@@ -348,7 +366,8 @@ export async function agentDeselect(session) {
     assertSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/rpc] agent.deselect: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {AgentDeselectResult} */ (await session.rpc.agent.deselect());
+        await session.rpc.agent.deselect();
+        return /** @type {AgentDeselectResult} */ ({});
     } catch (error) {
         throw toSdkOperationError('agent.deselect', error);
     }
@@ -384,7 +403,7 @@ export async function compactionCompactTyped(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {CompactionCompactResult} */ (await session.rpc.compaction.compact());
+        return await getCompactionMethod(session)();
     } catch (error) {
         throw toSdkOperationError('compaction.compact', error);
     }

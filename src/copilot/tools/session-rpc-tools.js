@@ -288,7 +288,6 @@ const sessionCompactTool = createTool({
     ),
     handler: async () =>
         wrapRpc('session_compact', async (rpc) => {
-            // SDK-05: rpc.compaction.compact() é API interna — sem equivalente público no SDK v0.2.0
             const result = await rpc.compaction.compact();
             log(
                 'INFO',
