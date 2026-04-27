@@ -469,7 +469,7 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 | Definir interface `SdkOperationMetric` em `types.js`                              | ✅                                                                                        |
 | Introduzir emitter injetável em L1 (`sdk/telemetry/operation-metrics.js`)         | ✅                                                                                        |
 | Integrar emitter ao bootstrap de observabilidade                                  | ✅                                                                                        |
-| Emitir evento em `modelSwitchTo`, `shellExec`, `compactionCompact`, `sendAndWait` | 🔄 (`compactionCompact` + `sendAndWait` entregues; `shellExec`/`modelSwitchTo` pendentes) |
+| Emitir evento em `modelSwitchTo`, `shellExec`, `compactionCompact`, `sendAndWait` | ✅ (`modelSwitchTo`, `shellExec`, `compactionCompact` e `sendAndWait` entregues) |
 | Emitir evento em `session.ui.elicitation/confirm/select/input`                    | ✅                                                                                        |
 | Emitir evento em provider-side `elicitation.pending/completed`                    | ✅                                                                                        |
 | Integrar com observability event bus existente                                    | ⬜                                                                                        |
@@ -715,7 +715,8 @@ Estado complementar validado após a primeira onda da Fase 4:
 - wrappers já instrumentados:
   - `sdk/session/ui.js`
   - `sdk/session/wrapper.js` (`session.sendAndWait`, `session.setModel`)
-  - `sdk/rpc/ops.js` (`compactionCompact`, `uiElicitation`)
+  - `sdk/rpc/ops.js` (`compactionCompact`, `shellExec`, `uiElicitation`)
+  - `sdk/rpc/session.js` (`modelSwitchTo`)
 - provider-side de ELICITATION também emite métricas no runtime via `agent/context-factories.js`
   (`sdk.elicitation.provider.pending/completed/action/*`)
 
@@ -726,5 +727,6 @@ Validação executada neste checkpoint:
   - `tests/unit/copilot/hooks/test_elicitation_handlers.spec.js`
   - `tests/unit/copilot/sdk/test_sdk_session_lifecycle.spec.js`
   - `tests/unit/copilot/sdk/test_sdk_rpc_advanced.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_rpc.spec.js`
 - `npm run typecheck:node` ✅
 - `npm run lint` ✅
