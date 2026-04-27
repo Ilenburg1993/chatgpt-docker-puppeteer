@@ -18,11 +18,12 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
+import { createQueuedElicitationHandler } from '#copilot/hooks';
 import { MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
-import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
+import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
@@ -48,6 +49,14 @@ import { SessionKeepalive } from './session/keepalive.js';
  *     createKeepalive: (host: AgentContextFactoryHost) => SessionKeepalive;
  *     createHandoff: (host: AgentContextFactoryHost) => HandoffManager;
  *     createMessagesCache: (host: AgentContextFactoryHost) => SessionMessagesCache;
+ *     createSdkElicitation: (host: AgentContextFactoryHost) => {
+ *         handler: import('#copilot/sdk/types').ElicitationHandler;
+ *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
+ *         listPending: (opts?: { sessionId?: string }) => import('../hooks/elicitation.js').QueuedElicitationEntry[];
+ *         getPending: (id: string) => import('../hooks/elicitation.js').QueuedElicitationEntry | null;
+ *         clearPending: (id: string, result?: import('#copilot/sdk/types').ElicitationResult) => boolean;
+ *         pendingCount: () => number;
+ *     };
  *     createBackgroundTasks: (host: AgentContextFactoryHost) => BackgroundTasks;
  *     describePermissionsCapability: (host: AgentContextFactoryHost) => Record<string, unknown>;
  *     describeFactorySet: (host: AgentContextFactoryHost) => Record<string, Record<string, unknown>>;
@@ -71,6 +80,37 @@ export const defaultAgentContextFactories = Object.freeze({
     createKeepalive: () => new SessionKeepalive(),
     createHandoff: () => new HandoffManager(),
     createMessagesCache: () => new SessionMessagesCache(MESSAGES_CACHE_TTL_MS),
+    createSdkElicitation: (host) =>
+        createQueuedElicitationHandler({
+            onPending: (entry) => {
+                host.invalidateStatusSnapshot();
+                host.emitter.emit('elicitation.pending', {
+                    requestId: entry.id,
+                    sessionId: entry.sessionId,
+                    message: entry.message,
+                    mode: entry.mode,
+                    requestedSchema: entry.requestedSchema ?? null,
+                    url: entry.url ?? null,
+                    elicitationSource: entry.elicitationSource ?? null,
+                    providerRequest: true,
+                    actionable: true,
+                    ts: entry.createdAt,
+                });
+            },
+            onCompleted: (entry) => {
+                host.invalidateStatusSnapshot();
+                host.emitter.emit('elicitation.completed', {
+                    requestId: entry.id,
+                    sessionId: entry.sessionId,
+                    providerRequest: true,
+                    actionable: true,
+                    data: entry.result,
+                    action: entry.result.action,
+                    content: entry.result.content ?? null,
+                    ts: entry.completedAt,
+                });
+            },
+        }),
     createBackgroundTasks: (host) =>
         new BackgroundTasks({
             onCompleted: (event) => {
@@ -129,6 +169,12 @@ export const defaultAgentContextFactories = Object.freeze({
         'sdk.session-history-cache': {
             provider: 'agent/session/history-sync',
             factory: 'defaultAgentContextFactories.createMessagesCache',
+            runtimeAuthority: 'agent',
+        },
+        'sdk.elicitation-provider': {
+            provider: 'hooks/elicitation',
+            factory: 'defaultAgentContextFactories.createSdkElicitation',
+            sdkFirst: true,
             runtimeAuthority: 'agent',
         },
     }),

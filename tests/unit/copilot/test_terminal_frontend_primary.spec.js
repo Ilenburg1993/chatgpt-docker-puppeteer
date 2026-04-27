@@ -10,11 +10,21 @@ const startAgentDialogLoop = vi.fn(async (/** @type {any} */ runtime, /** @type 
 const sendAgentDialogTurn = vi.fn(async () => 'Resumo final');
 const defaultGetSdkSessionMode = vi.fn(async () => ({ mode: 'interactive' }));
 const defaultSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
+const defaultGetSdkSessionCapabilities = vi.fn(() => ({ ui: { elicitation: true } }));
+const defaultIsSdkSessionUiElicitationAvailable = vi.fn(() => true);
+const defaultConfirmSdkSessionUi = vi.fn(async () => true);
+const defaultSelectSdkSessionUi = vi.fn(async (_message, options) => options[0] ?? null);
+const defaultInputSdkSessionUi = vi.fn(async (message) => `${message}:default`);
 const defaultReadSdkPlan = vi.fn(async () => ({ path: '/tmp/default-plan.md', content: 'default plan' }));
 const defaultUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
 const defaultDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
 const altGetSdkSessionMode = vi.fn(async () => ({ mode: 'plan' }));
 const altSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
+const altGetSdkSessionCapabilities = vi.fn(() => ({ ui: { elicitation: false } }));
+const altIsSdkSessionUiElicitationAvailable = vi.fn(() => false);
+const altConfirmSdkSessionUi = vi.fn(async () => false);
+const altSelectSdkSessionUi = vi.fn(async (_message, options) => options.at(-1) ?? null);
+const altInputSdkSessionUi = vi.fn(async (message) => `${message}:alt`);
 const altReadSdkPlan = vi.fn(async () => ({ path: '/tmp/alt-plan.md', content: 'alt plan' }));
 const altUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
 const altDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
@@ -32,6 +42,11 @@ const defaultRuntime = /** @type {any} */ ({
     startDialogLoop: vi.fn(async () => {}),
     getSdkSessionMode: defaultGetSdkSessionMode,
     setSdkSessionMode: defaultSetSdkSessionMode,
+    getSdkSessionCapabilities: defaultGetSdkSessionCapabilities,
+    isSdkSessionUiElicitationAvailable: defaultIsSdkSessionUiElicitationAvailable,
+    confirmSdkSessionUi: defaultConfirmSdkSessionUi,
+    selectSdkSessionUi: defaultSelectSdkSessionUi,
+    inputSdkSessionUi: defaultInputSdkSessionUi,
     readSdkPlan: defaultReadSdkPlan,
     updateSdkPlan: defaultUpdateSdkPlan,
     deleteSdkPlan: defaultDeleteSdkPlan,
@@ -82,6 +97,11 @@ const altRuntime = /** @type {any} */ ({
     startDialogLoop: vi.fn(async () => {}),
     getSdkSessionMode: altGetSdkSessionMode,
     setSdkSessionMode: altSetSdkSessionMode,
+    getSdkSessionCapabilities: altGetSdkSessionCapabilities,
+    isSdkSessionUiElicitationAvailable: altIsSdkSessionUiElicitationAvailable,
+    confirmSdkSessionUi: altConfirmSdkSessionUi,
+    selectSdkSessionUi: altSelectSdkSessionUi,
+    inputSdkSessionUi: altInputSdkSessionUi,
     readSdkPlan: altReadSdkPlan,
     updateSdkPlan: altUpdateSdkPlan,
     deleteSdkPlan: altDeleteSdkPlan,
@@ -205,6 +225,14 @@ vi.mock('#copilot/agent', () => ({
     clearRuntimePendingQuestionShadow: (/** @type {any} */ runtime) => runtime.clearPendingQuestionShadow(),
     readAgentSdkSessionMode: (/** @type {any} */ runtime) => runtime.getSdkSessionMode(),
     setAgentSdkSessionMode: (/** @type {any} */ runtime, /** @type {any} */ mode) => runtime.setSdkSessionMode(mode),
+    getSdkSessionCapabilities: (/** @type {any} */ runtime) => runtime.getSdkSessionCapabilities(),
+    isSdkSessionUiElicitationAvailable: (/** @type {any} */ runtime) => runtime.isSdkSessionUiElicitationAvailable(),
+    confirmSdkSessionUi: (/** @type {any} */ runtime, /** @type {string} */ message) =>
+        runtime.confirmSdkSessionUi(message),
+    selectSdkSessionUi: (/** @type {any} */ runtime, /** @type {string} */ message, /** @type {string[]} */ options) =>
+        runtime.selectSdkSessionUi(message, options),
+    inputSdkSessionUi: (/** @type {any} */ runtime, /** @type {string} */ message, /** @type {any} */ options) =>
+        runtime.inputSdkSessionUi(message, options),
     readAgentSdkPlan: (/** @type {any} */ runtime) => runtime.readSdkPlan(),
     updateAgentSdkPlan: (/** @type {any} */ runtime, /** @type {string} */ content) => runtime.updateSdkPlan(content),
     deleteAgentSdkPlan: (/** @type {any} */ runtime) => runtime.deleteSdkPlan(),

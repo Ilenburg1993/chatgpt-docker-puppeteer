@@ -24,6 +24,7 @@ function makeSession(sessionId) {
     return {
         sessionId,
         workspacePath: `/tmp/${sessionId}`,
+        capabilities: { ui: { elicitation: true } },
         disconnect: async () => {},
         setModel: async () => {},
         abort: async () => {},
@@ -31,6 +32,23 @@ function makeSession(sessionId) {
         getMessages: async () => [],
         send: async () => `${sessionId}-msg`,
         sendAndWait: async () => ({ data: { content: 'ok', messageId: `${sessionId}-reply` } }),
+        ui: {
+            elicitation: async (/** @type {{ message: string; requestedSchema: object }} */ params) => ({
+                action: 'accept',
+                content: { answer: params.message },
+            }),
+            confirm: async () => true,
+            select: async (/** @type {string} */ _message, /** @type {string[]} */ options) => options[0] ?? null,
+            input: async (/** @type {string} */ message) => `${message}:typed`,
+        },
+        rpc: {
+            ui: {
+                elicitation: async (/** @type {{ message: string; requestedSchema: object }} */ params) => ({
+                    action: 'accept',
+                    content: { answer: params.message },
+                }),
+            },
+        },
         on: () => () => {},
     };
 }
@@ -311,5 +329,75 @@ describe('sdk routes session ownership SSOT', () => {
 
         assert.equal(res.body.sessionId, 'sdk-log');
         assert.deepEqual(logCalls, [{ message: 'hello timeline', options: { level: 'warning', ephemeral: true } }]);
+    });
+
+    it('GET /sessions/:id/ui/capabilities projeta capabilities e disponibilidade de elicitation', async () => {
+        setSharedHubSessionId('hub-ui');
+        setSharedSdkSessionId('sdk-ui');
+        registerActiveSdkSession(makeSession('sdk-ui'), { model: 'gpt-4.1' });
+
+        const res = await request(createApp()).get('/sessions/sdk-ui/ui/capabilities').expect(200);
+
+        assert.equal(res.body.sessionId, 'sdk-ui');
+        assert.equal(res.body.elicitationAvailable, true);
+        assert.deepEqual(res.body.capabilities, { ui: { elicitation: true } });
+    });
+
+    it('POST /sessions/:id/ui/elicitation|confirm|select|input delega para session.ui.*', async () => {
+        setSharedHubSessionId('hub-ui-actions');
+        setSharedSdkSessionId('sdk-ui-actions');
+        /** @type {any[]} */
+        const uiCalls = [];
+        const session = makeSession('sdk-ui-actions');
+        session.ui = {
+            elicitation: async (/** @type {any} */ params) => {
+                uiCalls.push({ method: 'elicitation', params });
+                return { action: 'accept', content: { answer: params.message } };
+            },
+            confirm: async (/** @type {string} */ message) => {
+                uiCalls.push({ method: 'confirm', message });
+                return true;
+            },
+            select: async (/** @type {string} */ message, /** @type {string[]} */ options) => {
+                uiCalls.push({ method: 'select', message, options });
+                return options.at(-1) ?? null;
+            },
+            input: async (/** @type {string} */ message, /** @type {unknown} */ options) => {
+                uiCalls.push({ method: 'input', message, options });
+                return `${message}:typed`;
+            },
+        };
+        registerActiveSdkSession(session, { model: 'gpt-4.1' });
+
+        const elicitation = await request(createApp())
+            .post('/sessions/sdk-ui-actions/ui/elicitation')
+            .send({ message: 'Dados?', requestedSchema: { type: 'object', properties: {} } })
+            .expect(200);
+        const confirm = await request(createApp())
+            .post('/sessions/sdk-ui-actions/ui/confirm')
+            .send({ message: 'Confirma?' })
+            .expect(200);
+        const select = await request(createApp())
+            .post('/sessions/sdk-ui-actions/ui/select')
+            .send({ message: 'Escolha', options: ['dev', 'prod'] })
+            .expect(200);
+        const input = await request(createApp())
+            .post('/sessions/sdk-ui-actions/ui/input')
+            .send({ message: 'Nome?', options: { title: 'Nome' } })
+            .expect(200);
+
+        assert.deepEqual(elicitation.body.result, { action: 'accept', content: { answer: 'Dados?' } });
+        assert.equal(confirm.body.result, true);
+        assert.equal(select.body.result, 'prod');
+        assert.equal(input.body.result, 'Nome?:typed');
+        assert.deepEqual(uiCalls, [
+            {
+                method: 'elicitation',
+                params: { message: 'Dados?', requestedSchema: { type: 'object', properties: {} } },
+            },
+            { method: 'confirm', message: 'Confirma?' },
+            { method: 'select', message: 'Escolha', options: ['dev', 'prod'] },
+            { method: 'input', message: 'Nome?', options: { title: 'Nome' } },
+        ]);
     });
 });

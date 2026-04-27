@@ -230,6 +230,15 @@ export {
     setSessionModel,
 } from './session/wrapper.js';
 
+export {
+    getSessionCapabilities,
+    isSessionUiElicitationAvailable,
+    sessionUiConfirm,
+    sessionUiElicitation,
+    sessionUiInput,
+    sessionUiSelect,
+} from './session/ui.js';
+
 // ─── Faixa 7: RPC Core Subsystems (rev.4) ────────────────────────────────────
 export {
     commandsHandlePending,

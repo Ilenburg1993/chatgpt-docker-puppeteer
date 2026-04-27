@@ -32,16 +32,24 @@ import {
 import { readAgentRuntimeOverviewProjection } from '../../presentation/runtime-overview.js';
 import {
     compactAgentSdkSession,
+    confirmAgentSdkSessionUi,
     createAgentSdkWorkspaceFile,
     deleteAgentSdkPlan,
+    getAgentSdkPendingElicitation,
     getAgentSdkQuota,
+    getAgentSdkSessionCapabilities,
     getAgentSdkSessionMode,
+    inputAgentSdkSessionUi,
+    isAgentSdkSessionUiElicitationAvailable,
     listAgentSdkModels,
+    listAgentSdkPendingElicitations,
     listAgentSdkTools,
     listAgentSdkWorkspaceFiles,
     readAgentSdkPlan,
     readAgentSdkWorkspaceFile,
     requestAgentSdkElicitation,
+    resolveAgentSdkPendingElicitation,
+    selectAgentSdkSessionUi,
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
 } from '../../presentation/runtime-sdk-session.js';
@@ -93,12 +101,14 @@ export function readTerminalRuntimeState(runtimeId) {
         pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
         contextWindow: runtime.contextWindow,
-        lastPrInfo: /** @type {{
-    model?: string;
-    cost?: number;
-    quotaSnapshots?: Record<string, unknown>;
-    ts: number;
-} | null} */ (runtime.lastPrInfo),
+        lastPrInfo: /**
+         * @type {{
+         *     model?: string;
+         *     cost?: number;
+         *     quotaSnapshots?: Record<string, unknown>;
+         *     ts: number;
+         * } | null}
+         */ (runtime.lastPrInfo),
     };
 }
 
@@ -381,6 +391,79 @@ export async function compactTerminalSdkSession(runtimeId) {
  */
 export async function requestTerminalSdkElicitation(message, requestedSchema, runtimeId) {
     return requestAgentSdkElicitation(message, requestedSchema, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {import('#copilot/sdk/types').SessionCapabilities}
+ */
+export function getTerminalSdkSessionCapabilities(runtimeId) {
+    return getAgentSdkSessionCapabilities(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function isTerminalSdkSessionUiElicitationAvailable(runtimeId) {
+    return isAgentSdkSessionUiElicitationAvailable(runtimeId);
+}
+
+/**
+ * @param {string} message
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<boolean>}
+ */
+export async function confirmTerminalSdkSessionUi(message, runtimeId) {
+    return confirmAgentSdkSessionUi(message, runtimeId);
+}
+
+/**
+ * @param {string} message
+ * @param {string[]} options
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<string | null>}
+ */
+export async function selectTerminalSdkSessionUi(message, options, runtimeId) {
+    return selectAgentSdkSessionUi(message, options, runtimeId);
+}
+
+/**
+ * @param {string} message
+ * @param {import('#copilot/sdk/types').InputOptions | undefined} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<string | null>}
+ */
+export async function inputTerminalSdkSessionUi(message, options, runtimeId) {
+    return inputAgentSdkSessionUi(message, options, runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ sessionId?: string }} [options]
+ * @returns {ReturnType<typeof listAgentSdkPendingElicitations>}
+ */
+export function listTerminalSdkPendingElicitations(runtimeId, options = {}) {
+    return listAgentSdkPendingElicitations(runtimeId, options);
+}
+
+/**
+ * @param {string} id
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<typeof getAgentSdkPendingElicitation>}
+ */
+export function getTerminalSdkPendingElicitation(id, runtimeId) {
+    return getAgentSdkPendingElicitation(id, runtimeId);
+}
+
+/**
+ * @param {string} id
+ * @param {import('#copilot/sdk/types').ElicitationResult} result
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function resolveTerminalSdkPendingElicitation(id, result, runtimeId) {
+    return resolveAgentSdkPendingElicitation(id, result, runtimeId);
 }
 
 /**

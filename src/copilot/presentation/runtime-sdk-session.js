@@ -28,6 +28,22 @@ export function getAgentSdkSessionTarget(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
+ * @returns {import('#copilot/sdk/types').SessionCapabilities}
+ */
+export function getAgentSdkSessionCapabilities(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).getSdkSessionCapabilities();
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function isAgentSdkSessionUiElicitationAvailable(runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).isSdkSessionUiElicitationAvailable();
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<RuntimeSdkModeResult>}
  */
 export async function getAgentSdkSessionMode(runtimeId) {
@@ -136,4 +152,61 @@ export async function compactAgentSdkSession(runtimeId) {
  */
 export async function requestAgentSdkElicitation(message, requestedSchema, runtimeId) {
     return getAgentSdkSessionTarget(runtimeId).requestSdkElicitation(message, requestedSchema);
+}
+
+/**
+ * @param {string} message
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<boolean>}
+ */
+export async function confirmAgentSdkSessionUi(message, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).confirmSdkSessionUi(message);
+}
+
+/**
+ * @param {string} message
+ * @param {string[]} options
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<string | null>}
+ */
+export async function selectAgentSdkSessionUi(message, options, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).selectSdkSessionUi(message, options);
+}
+
+/**
+ * @param {string} message
+ * @param {import('#copilot/sdk/types').InputOptions | undefined} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<string | null>}
+ */
+export async function inputAgentSdkSessionUi(message, options, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).inputSdkSessionUi(message, options);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ sessionId?: string }} [options]
+ * @returns {ReturnType<import('#copilot/agent').AlwaysAliveAgent['listPendingSdkElicitations']>}
+ */
+export function listAgentSdkPendingElicitations(runtimeId, options = {}) {
+    return getAgentSdkSessionTarget(runtimeId).listPendingSdkElicitations(options);
+}
+
+/**
+ * @param {string} id
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<import('#copilot/agent').AlwaysAliveAgent['getPendingSdkElicitation']>}
+ */
+export function getAgentSdkPendingElicitation(id, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).getPendingSdkElicitation(id);
+}
+
+/**
+ * @param {string} id
+ * @param {import('#copilot/sdk/types').ElicitationResult} result
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {boolean}
+ */
+export function resolveAgentSdkPendingElicitation(id, result, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).resolvePendingSdkElicitation(id, result);
 }

@@ -8,14 +8,19 @@
 import { toError } from '#copilot/core';
 import {
     compactTerminalSdkSession,
+    confirmTerminalSdkSessionUi,
     createTerminalSdkWorkspaceFile,
     getTerminalSdkQuota,
+    inputTerminalSdkSessionUi,
+    isTerminalSdkSessionUiElicitationAvailable,
     listTerminalSdkModels,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
     readTerminalRuntimeState,
     readTerminalSdkWorkspaceFile,
     requestTerminalSdkElicitation,
+    resolveTerminalSdkPendingElicitation,
+    selectTerminalSdkSessionUi,
 } from '../frontend/llm-b-runtime.js';
 import {
     classifyTerminalSdkQuota,
@@ -79,6 +84,19 @@ function parseJsonObject(rest) {
 }
 
 /**
+ * @param {string[]} parts
+ * @returns {{ left: string[]; right: string[] }}
+ */
+function splitAtDoubleDash(parts) {
+    const idx = parts.indexOf('--');
+    if (idx === -1) return { left: parts, right: [] };
+    return {
+        left: parts.slice(0, idx),
+        right: parts.slice(idx + 1),
+    };
+}
+
+/**
  * @returns {Record<string, unknown>}
  */
 function defaultElicitationSchema() {
@@ -91,6 +109,37 @@ function defaultElicitationSchema() {
             },
         },
         required: ['answer'],
+    };
+}
+
+/**
+ * @param {string | undefined} action
+ * @param {string[]} rest
+ * @returns {{ ok: true; result: import('#copilot/sdk/types').ElicitationResult } | { ok: false; error: string }}
+ */
+function parseElicitationResult(action, rest) {
+    if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
+        return { ok: false, error: 'Ação deve ser accept | decline | cancel.' };
+    }
+    if (action !== 'accept') {
+        return { ok: true, result: { action } };
+    }
+    const parsed = parseJsonObject(rest);
+    if (parsed.error) {
+        return { ok: false, error: parsed.error };
+    }
+    return {
+        ok: true,
+        result: {
+            action,
+            ...(parsed.json
+                ? {
+                      content: /** @type {Record<string, string | number | boolean | string[]>} */ (
+                          /** @type {unknown} */ (parsed.json)
+                      ),
+                  }
+                : {}),
+        },
     };
 }
 
@@ -248,7 +297,46 @@ export async function cmdElicitation({ println }, arg = '') {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [sub = 'list', ...rest] = cleanArg.trim().split(/\s+/).filter(Boolean);
     try {
-        if (sub === 'show') {
+        if (sub === 'confirm') {
+            const message = rest.join(' ').trim() || 'Confirma?';
+            const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
+            println(`\n  \x1b[32m✓ session.ui.confirm concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+        } else if (sub === 'select') {
+            const { left, right } = splitAtDoubleDash(rest);
+            const message = left.join(' ').trim() || 'Selecione uma opção';
+            const options = right
+                .join(' ')
+                .split('|')
+                .map((item) => item.trim())
+                .filter(Boolean);
+            if (options.length === 0) {
+                println('\x1b[33m  Uso: /elicitation select <mensagem> -- opcao1|opcao2|opcao3\x1b[0m');
+                return;
+            }
+            const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
+            println(`\n  \x1b[32m✓ session.ui.select concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+        } else if (sub === 'input') {
+            const { left, right } = splitAtDoubleDash(rest);
+            const message = left.join(' ').trim() || 'Informe um valor';
+            const parsed = parseJsonObject(right);
+            if (parsed.error) {
+                println(`\x1b[31m  JSON inválido: ${parsed.error}\x1b[0m`);
+                return;
+            }
+            const result = callWithRuntimeTarget(
+                inputTerminalSdkSessionUi,
+                runtimeId,
+                message,
+                /** @type {import('#copilot/sdk/types').InputOptions | undefined} */ (parsed.json ?? undefined),
+            );
+            println(`\n  \x1b[32m✓ session.ui.input concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+        } else if (sub === 'capabilities') {
+            const available = callWithRuntimeTarget(isTerminalSdkSessionUiElicitationAvailable, runtimeId);
+            const ok = available;
+            println(`\n  \x1b[36mSession UI\x1b[0m`);
+            println(`  elicitation  ${ok ? '\x1b[32mavailable\x1b[0m' : '\x1b[33munavailable\x1b[0m'}`);
+            println('');
+        } else if (sub === 'show') {
             renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest'));
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
@@ -256,6 +344,30 @@ export async function cmdElicitation({ println }, arg = '') {
                 ok
                     ? '\x1b[32m  Elicitation removida da UX local.\x1b[0m'
                     : '\x1b[33m  Elicitation não encontrada.\x1b[0m',
+            );
+        } else if (sub === 'respond') {
+            const [id = 'latest', action, ...jsonRest] = rest;
+            const entry = getTerminalElicitation(id);
+            if (!entry) {
+                println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
+                return;
+            }
+            const parsedResult = parseElicitationResult(action, jsonRest);
+            if (!parsedResult.ok) {
+                println(`\x1b[31m  Resposta inválida: ${parsedResult.error}\x1b[0m`);
+                return;
+            }
+            const resolved = callWithRuntimeTarget(
+                resolveTerminalSdkPendingElicitation,
+                runtimeId,
+                entry.id,
+                parsedResult.result,
+            );
+            const ok = resolved;
+            println(
+                ok
+                    ? `\n  \x1b[32m✓ Elicitation respondida.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`
+                    : `\n  \x1b[33mElicitation não está mais pendente.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`,
             );
         } else if (sub === 'request') {
             const message = rest.join(' ').trim() || 'Informe os dados solicitados.';
@@ -284,15 +396,15 @@ export async function cmdElicitation({ println }, arg = '') {
                 for (const entry of entries) {
                     const statusColor = entry.status === 'pending' ? '\x1b[33m' : '\x1b[90m';
                     println(
-                        `  ${statusColor}${entry.id}\x1b[0m  ${entry.mode}  ${entry.message.slice(0, 90)}${entry.source ? `  \x1b[90mvia ${entry.source}\x1b[0m` : ''}`,
+                        `  ${statusColor}${entry.id}\x1b[0m  ${entry.mode}${entry.actionable ? '  \x1b[32m[actionable]\x1b[0m' : ''}  ${entry.message.slice(0, 90)}${entry.source ? `  \x1b[90mvia ${entry.source}\x1b[0m` : ''}`,
                     );
                 }
             }
             println(
-                '  \x1b[90mUso: /elicitation [list|all|show latest|clear <id>|request <msg>|request-json <msg> <schemaJson>]\x1b[0m',
+                '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
             );
             println(
-                '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK.\x1b[0m\n',
+                '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -317,8 +429,13 @@ function renderElicitationEntry({ println }, entry) {
     if (entry.url) println(`  url     \x1b[36m${entry.url}\x1b[0m`);
     if (entry.source) println(`  source  \x1b[90m${entry.source}\x1b[0m`);
     if (entry.toolCallId) println(`  tool    \x1b[90m${entry.toolCallId}\x1b[0m`);
+    if (entry.actionable) println('  action  \x1b[32mrespondível pelo runtime\x1b[0m');
+    if (entry.resultAction) println(`  result  \x1b[33m${entry.resultAction}\x1b[0m`);
+    if (entry.resultContent) println(`\n  result content:\n${pretty(entry.resultContent, 2500)}`);
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
     println(
-        '\n  \x1b[90mNota: eventos elicitation.requested são diferentes de ask_user. Nesta versão do SDK local não há método público tipado para responder a uma elicitation recebida por evento; /elicitation request usa a operação de UI elicitation da façade RPC de sessão.\x1b[0m\n',
+        entry.actionable
+            ? '\n  \x1b[90mResponda com /elicitation respond <id> <accept|decline|cancel> [json]\x1b[0m\n'
+            : '',
     );
 }

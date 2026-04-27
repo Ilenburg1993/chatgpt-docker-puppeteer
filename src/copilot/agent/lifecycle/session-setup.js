@@ -143,6 +143,26 @@ function getPermissionHandler(ctx) {
 
 /**
  * @param {SessionSetupContext} ctx
+ * @returns {import('#copilot/sdk/types').ElicitationHandler | null}
+ */
+function getElicitationHandler(ctx) {
+    if (
+        typeof (
+            /** @type {{ getSdkElicitationHandlerSnapshot?: unknown }} */ (ctx).getSdkElicitationHandlerSnapshot
+        ) === 'function'
+    ) {
+        return /** @type {{ getSdkElicitationHandlerSnapshot: () => import('#copilot/sdk/types').ElicitationHandler }} */ (
+            /** @type {unknown} */ (ctx)
+        ).getSdkElicitationHandlerSnapshot();
+    }
+    const compat = /** @type {{ sdkElicitation?: { handler?: import('#copilot/sdk/types').ElicitationHandler } }} */ (
+        ctx
+    );
+    return compat.sdkElicitation?.handler ?? null;
+}
+
+/**
+ * @param {SessionSetupContext} ctx
  * @param {string} model
  * @returns {unknown}
  */
@@ -309,6 +329,11 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             },
         ),
     );
+
+    const elicitationHandler = getElicitationHandler(ctx);
+    if (elicitationHandler) {
+        builder.onElicitationRequest(elicitationHandler);
+    }
 
     const config = builder.build();
 

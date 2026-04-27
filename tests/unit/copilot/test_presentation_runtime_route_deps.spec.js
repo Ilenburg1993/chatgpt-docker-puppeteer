@@ -10,7 +10,13 @@ const mocks = vi.hoisted(() => ({
     getClientState: vi.fn(),
     stopClient: vi.fn(),
     forceStopClient: vi.fn(),
+    getSessionCapabilities: vi.fn(() => ({ ui: { elicitation: true } })),
     resolve: vi.fn(() => ({ name: 'metrics-store' })),
+    isSessionUiElicitationAvailable: vi.fn(() => true),
+    sessionUiConfirm: vi.fn(),
+    sessionUiElicitation: vi.fn(),
+    sessionUiInput: vi.fn(),
+    sessionUiSelect: vi.fn(),
 }));
 
 vi.mock('#copilot/core', () => ({
@@ -73,13 +79,19 @@ vi.mock('#copilot/sdk', () => ({
     getClientState: mocks.getClientState,
     getForegroundClientSessionId: vi.fn(),
     getLastClientSessionId: vi.fn(),
+    getSessionCapabilities: mocks.getSessionCapabilities,
     incrementSessionMessageCount: vi.fn(),
+    isSessionUiElicitationAvailable: mocks.isSessionUiElicitationAvailable,
     listActiveClientSessions: vi.fn(() => []),
     listAllClientSessions: vi.fn(async () => []),
     permissionsHandlePending: vi.fn(),
     pickDefined: (/** @type {Record<string, unknown>} */ value) =>
         Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)),
     resumeClientSession: vi.fn(),
+    sessionUiConfirm: mocks.sessionUiConfirm,
+    sessionUiElicitation: mocks.sessionUiElicitation,
+    sessionUiInput: mocks.sessionUiInput,
+    sessionUiSelect: mocks.sessionUiSelect,
     setForegroundClientSessionId: vi.fn(),
     shellExec: vi.fn(),
     shellKill: vi.fn(),
@@ -164,6 +176,8 @@ describe('server/routes/sdk/deps.js', () => {
         expect(deps.stopClient).toBe(mocks.stopClient);
         expect(deps.forceStopClient).toBe(mocks.forceStopClient);
         expect(deps.sdkSession.getClient).toBe(mocks.getClient);
+        expect(deps.sdkSessionUi.getSessionCapabilities).toBe(mocks.getSessionCapabilities);
+        expect(deps.sdkSessionUi.sessionUiConfirm).toBe(mocks.sessionUiConfirm);
         expect(deps.sdkRuntimeProjection).toHaveProperty('readAgentRuntimeToolsProjection');
         expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjection');
         expect(deps.sdkObservability).toHaveProperty('getCompactionHistory');

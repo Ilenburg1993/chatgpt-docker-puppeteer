@@ -301,6 +301,12 @@
  *     compactionAvailable: boolean;
  *     shellAvailable: boolean;
  *     uiElicitationAvailable: boolean;
+ *     uiApiAvailable: boolean;
+ *     uiElicitationCapabilityAvailable: boolean;
+ *     uiConfirmAvailable: boolean;
+ *     uiSelectAvailable: boolean;
+ *     uiInputAvailable: boolean;
+ *     elicitationProviderAvailable: boolean;
  *     pendingCommandsAvailable: boolean;
  *     pendingPermissionsAvailable: boolean;
  *     pendingToolsAvailable: boolean;
@@ -656,8 +662,30 @@
  * @property {((path: string, content: string) => Promise<unknown>) | undefined} createSdkWorkspaceFile - Cria arquivo
  *   no workspace virtual SDK
  * @property {(() => Promise<unknown>) | undefined} compactSdkSession - Executa compaction manual da sessão SDK
+ * @property {(() => import('#copilot/sdk/types').SessionCapabilities) | undefined} getSdkSessionCapabilities - Lê as
+ *   capabilities atuais da sessão SDK
+ * @property {(() => boolean) | undefined} isSdkSessionUiElicitationAvailable - Indica se a sessão SDK suporta
+ *   elicitation/UI interativa
  * @property {((message: string, requestedSchema: object) => Promise<unknown>) | undefined} requestSdkElicitation -
  *   Solicita elicitation estruturada pela superfície SDK
+ * @property {((message: string) => Promise<boolean>) | undefined} confirmSdkSessionUi - Solicita confirmação via
+ *   `session.ui.confirm()` ou fallback compatível
+ * @property {((message: string, options: string[]) => Promise<string | null>) | undefined} selectSdkSessionUi -
+ *   Solicita seleção via `session.ui.select()` ou fallback compatível
+ * @property {((message: string, options?: import('#copilot/sdk/types').InputOptions) => Promise<string | null>)
+ *     | undefined} inputSdkSessionUi
+ *   - Solicita entrada textual via `session.ui.input()` ou fallback compatível
+ *
+ * @property {((options?: { sessionId?: string }) => import('../hooks/elicitation.js').QueuedElicitationEntry[])
+ *     | undefined} listPendingSdkElicitations
+ *   - Lista solicitações de elicitation pendentes do SDK
+ *
+ * @property {((id: string) => import('../hooks/elicitation.js').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
+ *   - Lê uma solicitação de elicitation pendente por id
+ *
+ * @property {((id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean) | undefined} resolvePendingSdkElicitation
+ *   - Resolve uma solicitação de elicitation pendente do SDK
+ *
  * @property {((requestId: string, result: { kind: string } & Record<string, unknown>) => Promise<unknown>)
  *     | undefined} handleSdkPendingPermission
  *   - Resolve permissão pendente do SDK

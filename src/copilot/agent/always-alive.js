@@ -53,21 +53,27 @@ import {
 } from './facades/agent-model-config.js';
 import {
     compactSdkSession,
+    confirmSdkSessionUi,
     createSdkWorkspaceFile,
     deselectSdkAgent,
     execSdkShell,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
     getLastSdkSessionId,
+    getPendingSdkElicitation,
     getSdkAuthStatus,
     getSdkHandles,
     getSdkQuota,
     getSdkResourceSnapshot,
+    getSdkSessionCapabilities,
     getSdkStatus,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
     handleSdkPendingToolCall,
+    inputSdkSessionUi,
+    isSdkSessionUiElicitationAvailable,
     killSdkShell,
+    listPendingSdkElicitations,
     listSdkAgents,
     listSdkBuiltInTools,
     listSdkModels,
@@ -77,7 +83,9 @@ import {
     readSdkWorkspaceFile,
     reloadSdkAgents,
     requestSdkElicitation,
+    resolvePendingSdkElicitation,
     selectSdkAgent,
+    selectSdkSessionUi,
     setForegroundSdkSessionId,
 } from './facades/agent-sdk-access.js';
 import {
@@ -725,6 +733,87 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async requestSdkElicitation(message, requestedSchema) {
         return requestSdkElicitation(this.ctx, message, requestedSchema);
+    }
+
+    /**
+     * Retorna as capabilities atuais da sessão SDK.
+     *
+     * @returns {import('#copilot/sdk/types').SessionCapabilities}
+     */
+    getSdkSessionCapabilities() {
+        return getSdkSessionCapabilities(this.ctx);
+    }
+
+    /**
+     * Indica se a sessão SDK suporta elicitation/UI interativa.
+     *
+     * @returns {boolean}
+     */
+    isSdkSessionUiElicitationAvailable() {
+        return isSdkSessionUiElicitationAvailable(this.ctx);
+    }
+
+    /**
+     * Solicita confirmação via `session.ui.confirm()` ou fallback compatível.
+     *
+     * @param {string} message
+     * @returns {Promise<boolean>}
+     */
+    async confirmSdkSessionUi(message) {
+        return confirmSdkSessionUi(this.ctx, message);
+    }
+
+    /**
+     * Solicita seleção via `session.ui.select()` ou fallback compatível.
+     *
+     * @param {string} message
+     * @param {string[]} options
+     * @returns {Promise<string | null>}
+     */
+    async selectSdkSessionUi(message, options) {
+        return selectSdkSessionUi(this.ctx, message, options);
+    }
+
+    /**
+     * Solicita input textual via `session.ui.input()` ou fallback compatível.
+     *
+     * @param {string} message
+     * @param {import('#copilot/sdk/types').InputOptions} [options]
+     * @returns {Promise<string | null>}
+     */
+    async inputSdkSessionUi(message, options) {
+        return inputSdkSessionUi(this.ctx, message, options);
+    }
+
+    /**
+     * Lista solicitações de elicitation pendentes vindas do SDK para este runtime.
+     *
+     * @param {{ sessionId?: string }} [options]
+     * @returns {import('../hooks/elicitation.js').QueuedElicitationEntry[]}
+     */
+    listPendingSdkElicitations(options = {}) {
+        return listPendingSdkElicitations(this.ctx, options.sessionId);
+    }
+
+    /**
+     * Retorna uma solicitação de elicitation pendente por id.
+     *
+     * @param {string} id
+     * @returns {import('../hooks/elicitation.js').QueuedElicitationEntry | null}
+     */
+    getPendingSdkElicitation(id) {
+        return getPendingSdkElicitation(this.ctx, id);
+    }
+
+    /**
+     * Resolve uma solicitação de elicitation pendente do SDK.
+     *
+     * @param {string} id
+     * @param {import('#copilot/sdk/types').ElicitationResult} result
+     * @returns {boolean}
+     */
+    resolvePendingSdkElicitation(id, result) {
+        return resolvePendingSdkElicitation(this.ctx, id, result);
     }
 
     /**

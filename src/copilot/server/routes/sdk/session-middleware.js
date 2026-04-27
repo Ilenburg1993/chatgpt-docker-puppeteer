@@ -196,6 +196,32 @@ export const ElicitationBodySchema = z.object({
     requestedSchema: z.record(z.string(), z.unknown()),
 });
 
+/** Schema para POST /sessions/:id/ui/confirm body */
+export const UiConfirmBodySchema = z.object({
+    message: z.string().min(1),
+});
+
+/** Schema para POST /sessions/:id/ui/select body */
+export const UiSelectBodySchema = z.object({
+    message: z.string().min(1),
+    options: z.array(z.string().min(1)).min(1),
+});
+
+/** Schema para POST /sessions/:id/ui/input body */
+export const UiInputBodySchema = z.object({
+    message: z.string().min(1),
+    options: z
+        .object({
+            title: z.string().optional(),
+            description: z.string().optional(),
+            minLength: z.number().int().nonnegative().optional(),
+            maxLength: z.number().int().nonnegative().optional(),
+            format: z.enum(['email', 'uri', 'date', 'date-time']).optional(),
+            default: z.string().optional(),
+        })
+        .optional(),
+});
+
 /** Schema para POST /sessions/:id/permissions/:requestId body */
 export const PermissionDecisionBodySchema = z.object({
     result: z.union([

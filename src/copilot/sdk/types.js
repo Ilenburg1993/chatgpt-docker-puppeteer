@@ -75,6 +75,12 @@
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
  */
 
+/**
+ * Overrides granulares das capabilities de modelo em `SessionConfig.modelCapabilities`.
+ *
+ * @typedef {import('@github/copilot-sdk').ModelCapabilitiesOverride} ModelCapabilitiesOverride
+ */
+
 // ─── Tools ────────────────────────────────────────────────────────────────────
 
 /**
@@ -213,6 +219,97 @@
  *     request: UserInputRequest,
  *     invocation: { sessionId: string },
  * ) => Promise<UserInputResponse> | UserInputResponse} UserInputHandler
+ */
+
+// ─── Elicitation / Session UI ────────────────────────────────────────────────
+
+/**
+ * Contexto recebido por `onElicitationRequest`: `sessionId`, `message`, `requestedSchema?`, `mode?`,
+ * `elicitationSource?`, `url?`.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationContext} ElicitationContext
+ */
+
+/**
+ * Handler de elicitation: permite que o cliente atue como provider de formulários/URL estruturados para o SDK.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationHandler} ElicitationHandler
+ */
+
+/**
+ * Valor primitivo aceito no conteúdo de uma resposta de elicitation.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationFieldValue} ElicitationFieldValue
+ */
+
+/**
+ * Campo individual do schema JSON usado em elicitation.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationSchemaField} ElicitationSchemaField
+ */
+
+/**
+ * Schema de formulário para elicitation. Formato MCP/SDK: `{ type: 'object', properties, required? }`.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationSchema} ElicitationSchema
+ */
+
+/**
+ * Parâmetros da operação `session.ui.elicitation()`.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationParams} ElicitationParams
+ */
+
+/**
+ * Resultado de `session.ui.elicitation()` ou de `onElicitationRequest`: `{ action: 'accept' | 'decline' | 'cancel',
+ * content? }`.
+ *
+ * @typedef {import('@github/copilot-sdk').ElicitationResult} ElicitationResult
+ */
+
+/**
+ * Opções da conveniência `session.ui.input()`.
+ *
+ * @typedef {import('@github/copilot-sdk').InputOptions} InputOptions
+ */
+
+/**
+ * API de UI interativa exposta em `session.ui`: `elicitation()`, `confirm()`, `select()`, `input()`.
+ *
+ * @typedef {import('@github/copilot-sdk').SessionUiApi} SessionUiApi
+ */
+
+/**
+ * Capabilities da sessão. Atualmente cobre `ui.elicitation` e é atualizada automaticamente pelo SDK em eventos
+ * `capabilities.changed`.
+ *
+ * @typedef {import('@github/copilot-sdk').SessionCapabilities} SessionCapabilities
+ */
+
+// ─── Commands ────────────────────────────────────────────────────────────────
+
+/**
+ * Contexto entregue ao handler de slash command do SDK.
+ *
+ * @typedef {import('@github/copilot-sdk').CommandContext} CommandContext
+ */
+
+/**
+ * Handler de slash command.
+ *
+ * @typedef {import('@github/copilot-sdk').CommandHandler} CommandHandler
+ */
+
+/**
+ * Definição de slash command registrada na sessão.
+ *
+ * @typedef {import('@github/copilot-sdk').CommandDefinition} CommandDefinition
+ */
+
+/**
+ * Configuração do default agent do SDK.
+ *
+ * @typedef {import('@github/copilot-sdk').DefaultAgentConfig} DefaultAgentConfig
  */
 
 // ─── System Message ───────────────────────────────────────────────────────────
@@ -738,9 +835,9 @@
  */
 
 /**
- * Resultado de `ui.elicitation()` — resposta do formulário pelo usuário.
+ * Resultado local legado de `ui.elicitation()` em wrappers RPC antigos.
  *
- * @typedef {{ action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} ElicitationResult
+ * @typedef {{ action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown>; [k: string]: unknown }} RpcElicitationResult
  */
 
 /**

@@ -27,7 +27,15 @@ import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-
  *
  * @typedef {import('#copilot/sdk/types').CustomAgentConfig} CustomAgentConfig
  *
+ * @typedef {import('#copilot/sdk/types').DefaultAgentConfig} DefaultAgentConfig
+ *
  * @typedef {import('#copilot/sdk/types').InfiniteSessionConfig} InfiniteSessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
+ *
+ * @typedef {import('#copilot/sdk/types').ElicitationHandler} ElicitationHandler
+ *
+ * @typedef {import('#copilot/sdk/types').ModelCapabilitiesOverride} ModelCapabilitiesOverride
  *
  * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
  *
@@ -195,6 +203,24 @@ export class SessionConfigBuilder {
         return this;
     }
 
+    /**
+     * @param {DefaultAgentConfig} config
+     * @returns {this}
+     */
+    defaultAgent(config) {
+        this.#config.defaultAgent = config;
+        return this;
+    }
+
+    /**
+     * @param {ModelCapabilitiesOverride} overrides
+     * @returns {this}
+     */
+    modelCapabilities(overrides) {
+        this.#config.modelCapabilities = overrides;
+        return this;
+    }
+
     // ─── MCP ──────────────────────────────────────────────────────────────
 
     /**
@@ -214,6 +240,15 @@ export class SessionConfigBuilder {
      */
     systemMessage(msg) {
         this.#config.systemMessage = msg;
+        return this;
+    }
+
+    /**
+     * @param {CommandDefinition[]} commands
+     * @returns {this}
+     */
+    commands(commands) {
+        this.#config.commands = commands;
         return this;
     }
 
@@ -246,6 +281,24 @@ export class SessionConfigBuilder {
         return this;
     }
 
+    /**
+     * @param {boolean} enabled
+     * @returns {this}
+     */
+    enableConfigDiscovery(enabled) {
+        this.#config.enableConfigDiscovery = enabled;
+        return this;
+    }
+
+    /**
+     * @param {boolean} enabled
+     * @returns {this}
+     */
+    includeSubAgentStreamingEvents(enabled) {
+        this.#config.includeSubAgentStreamingEvents = enabled;
+        return this;
+    }
+
     // ─── Handlers / Callbacks ─────────────────────────────────────────────
 
     /**
@@ -263,6 +316,15 @@ export class SessionConfigBuilder {
      */
     onUserInputRequest(handler) {
         this.#config.onUserInputRequest = handler;
+        return this;
+    }
+
+    /**
+     * @param {ElicitationHandler} handler
+     * @returns {this}
+     */
+    onElicitationRequest(handler) {
+        this.#config.onElicitationRequest = handler;
         return this;
     }
 

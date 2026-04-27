@@ -160,6 +160,9 @@ export class AgentContext {
     /** @type {import('./background-tasks.js').BackgroundTasks} */
     backgroundTasks;
 
+    /** @type {ReturnType<import('#copilot/hooks').createQueuedElicitationHandler>} */
+    sdkElicitation;
+
     /**
      * @param {import('node:events').EventEmitter} emitter - Referência ao AlwaysAliveAgent (para emit)
      * @param {{
@@ -228,6 +231,7 @@ export class AgentContext {
         this.keepalive = this.#factories.createKeepalive(this.#factoryHost);
         this.handoff = this.#factories.createHandoff(this.#factoryHost);
         this.messagesCache = this.#factories.createMessagesCache(this.#factoryHost);
+        this.sdkElicitation = this.#factories.createSdkElicitation(this.#factoryHost);
         this.backgroundTasks = this.#factories.createBackgroundTasks(this.#factoryHost);
     }
 
@@ -1060,6 +1064,60 @@ export class AgentContext {
         question.resolve(answer);
         this.clearPendingQuestion();
         return true;
+    }
+
+    /**
+     * Retorna o handler SDK de elicitation atualmente governado pelo contexto.
+     *
+     * @returns {import('#copilot/sdk/types').ElicitationHandler}
+     */
+    getSdkElicitationHandlerSnapshot() {
+        return this.sdkElicitation.handler;
+    }
+
+    /**
+     * Lista solicitações de elicitation pendentes.
+     *
+     * @param {{ sessionId?: string }} [opts]
+     * @returns {ReturnType<AgentContext['sdkElicitation']['listPending']>}
+     */
+    listPendingSdkElicitations(opts = {}) {
+        return this.sdkElicitation.listPending(opts);
+    }
+
+    /**
+     * Retorna uma solicitação de elicitation pendente por id.
+     *
+     * @param {string} id
+     * @returns {ReturnType<AgentContext['sdkElicitation']['getPending']>}
+     */
+    getPendingSdkElicitation(id) {
+        return this.sdkElicitation.getPending(id);
+    }
+
+    /**
+     * Resolve uma solicitação de elicitation pendente.
+     *
+     * @param {string} id
+     * @param {import('#copilot/sdk/types').ElicitationResult} result
+     * @returns {boolean}
+     */
+    resolvePendingSdkElicitation(id, result) {
+        const resolved = this.sdkElicitation.resolvePending(id, result);
+        if (resolved) this.invalidateStatusSnapshot();
+        return resolved;
+    }
+
+    /**
+     * Cancela ou limpa uma solicitação de elicitation pendente.
+     *
+     * @param {string} id
+     * @returns {boolean}
+     */
+    clearPendingSdkElicitation(id) {
+        const cleared = this.sdkElicitation.clearPending(id, { action: 'cancel' });
+        if (cleared) this.invalidateStatusSnapshot();
+        return cleared;
     }
 
     /**

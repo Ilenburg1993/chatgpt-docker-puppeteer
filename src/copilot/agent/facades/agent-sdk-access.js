@@ -26,10 +26,12 @@ import {
     deselectAgent,
     disconnectSessionSafe,
     getCurrentAgent,
+    getSessionCapabilities,
     getSessionMessages,
     getToolsConfig,
     isExperimentalEnabled,
     isSdkQuotaOrRateLimitError,
+    isSessionUiElicitationAvailable,
     LIFECYCLE_EVENTS,
     listAgents,
     listModels,
@@ -46,6 +48,10 @@ import {
     resumeOrCreate,
     selectAgent,
     SESSION_LIFECYCLE_EVENTS,
+    sessionUiConfirm,
+    sessionUiElicitation,
+    sessionUiInput,
+    sessionUiSelect,
     shellExec,
     shellKill,
     toolsHandlePendingCall,
@@ -382,6 +388,28 @@ export function pickDefinedAgentSdkOptions(value) {
 }
 
 /**
+ * @param {AgentContext} ctx
+ * @returns {{
+ *     handler?: import('#copilot/sdk/types').ElicitationHandler;
+ *     listPending?: (opts?: { sessionId?: string }) => import('../../hooks/elicitation.js').QueuedElicitationEntry[];
+ *     getPending?: (id: string) => import('../../hooks/elicitation.js').QueuedElicitationEntry | null;
+ *     resolvePending?: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
+ * } | null}
+ */
+function getSdkElicitationRef(ctx) {
+    const compat = /** @type {{ sdkElicitation?: unknown }} */ (ctx);
+    const elicitationRef = /**
+     * @type {{
+     *     handler?: import('#copilot/sdk/types').ElicitationHandler;
+     *     listPending?: (opts?: { sessionId?: string }) => import('../../hooks/elicitation.js').QueuedElicitationEntry[];
+     *     getPending?: (id: string) => import('../../hooks/elicitation.js').QueuedElicitationEntry | null;
+     *     resolvePending?: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
+     * } | null}
+     */ (compat.sdkElicitation ?? null);
+    return elicitationRef;
+}
+
+/**
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {string | null | undefined} sessionId
  * @param {Record<string, unknown>} options
@@ -440,6 +468,21 @@ export function getSdkResourceSnapshot(ctx) {
             hasRpcNamespace(handles.sessionRpc, 'history') || hasRpcNamespace(handles.sessionRpc, 'compaction'),
         shellAvailable: hasRpcNamespace(handles.sessionRpc, 'shell'),
         uiElicitationAvailable: hasRpcNamespace(handles.sessionRpc, 'ui'),
+        uiApiAvailable: Boolean(handles.session?.ui),
+        uiElicitationCapabilityAvailable: Boolean(handles.session?.capabilities?.ui?.elicitation),
+        uiConfirmAvailable:
+            typeof handles.session?.ui?.confirm === 'function' ||
+            Boolean(handles.session?.ui?.elicitation) ||
+            hasRpcNamespace(handles.sessionRpc, 'ui'),
+        uiSelectAvailable:
+            typeof handles.session?.ui?.select === 'function' ||
+            Boolean(handles.session?.ui?.elicitation) ||
+            hasRpcNamespace(handles.sessionRpc, 'ui'),
+        uiInputAvailable:
+            typeof handles.session?.ui?.input === 'function' ||
+            Boolean(handles.session?.ui?.elicitation) ||
+            hasRpcNamespace(handles.sessionRpc, 'ui'),
+        elicitationProviderAvailable: typeof getSdkElicitationRef(ctx)?.handler === 'function',
         pendingCommandsAvailable: hasRpcNamespace(handles.sessionRpc, 'commands'),
         pendingPermissionsAvailable: hasRpcNamespace(handles.sessionRpc, 'permissions'),
         pendingToolsAvailable: hasRpcNamespace(handles.sessionRpc, 'tools'),
@@ -583,7 +626,89 @@ export async function compactSdkSession(ctx) {
  * @returns {Promise<Awaited<ReturnType<typeof uiElicitation>>>}
  */
 export async function requestSdkElicitation(ctx, message, requestedSchema) {
-    return uiElicitation(requireSession(ctx, 'requestSdkElicitation'), message, requestedSchema);
+    const session = requireSession(ctx, 'requestSdkElicitation');
+    if (session.ui || session.capabilities?.ui?.elicitation) {
+        return sessionUiElicitation(session, {
+            message,
+            requestedSchema: /** @type {import('#copilot/sdk/types').ElicitationSchema} */ (
+                /** @type {unknown} */ (requestedSchema)
+            ),
+        });
+    }
+    return uiElicitation(session, message, requestedSchema);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {import('#copilot/sdk/types').SessionCapabilities}
+ */
+export function getSdkSessionCapabilities(ctx) {
+    return getSessionCapabilities(requireSession(ctx, 'getSdkSessionCapabilities'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @returns {boolean}
+ */
+export function isSdkSessionUiElicitationAvailable(ctx) {
+    return isSessionUiElicitationAvailable(requireSession(ctx, 'isSdkSessionUiElicitationAvailable'));
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
+export async function confirmSdkSessionUi(ctx, message) {
+    return sessionUiConfirm(requireSession(ctx, 'confirmSdkSessionUi'), message);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} message
+ * @param {string[]} options
+ * @returns {Promise<string | null>}
+ */
+export async function selectSdkSessionUi(ctx, message, options) {
+    return sessionUiSelect(requireSession(ctx, 'selectSdkSessionUi'), message, options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} message
+ * @param {import('#copilot/sdk/types').InputOptions} [options]
+ * @returns {Promise<string | null>}
+ */
+export async function inputSdkSessionUi(ctx, message, options) {
+    return sessionUiInput(requireSession(ctx, 'inputSdkSessionUi'), message, options);
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} [sessionId]
+ * @returns {import('../../hooks/elicitation.js').QueuedElicitationEntry[]}
+ */
+export function listPendingSdkElicitations(ctx, sessionId) {
+    return getSdkElicitationRef(ctx)?.listPending?.({ ...(sessionId ? { sessionId } : {}) }) ?? [];
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} id
+ * @returns {import('../../hooks/elicitation.js').QueuedElicitationEntry | null}
+ */
+export function getPendingSdkElicitation(ctx, id) {
+    return getSdkElicitationRef(ctx)?.getPending?.(id) ?? null;
+}
+
+/**
+ * @param {AgentContext} ctx
+ * @param {string} id
+ * @param {import('#copilot/sdk/types').ElicitationResult} result
+ * @returns {boolean}
+ */
+export function resolvePendingSdkElicitation(ctx, id, result) {
+    return getSdkElicitationRef(ctx)?.resolvePending?.(id, result) ?? false;
 }
 
 /**

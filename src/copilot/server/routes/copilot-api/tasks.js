@@ -218,4 +218,56 @@ export function registerTaskRoutes(bridge, binding) {
         }
         return res.json({ ok: true, message: 'Shadow persistida de ask_user limpa.' });
     });
+
+    // ─── GET /elicitation ───────────────────────────────────────────────────
+
+    bridge.get('/elicitation', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        if (typeof agent.listPendingSdkElicitations !== 'function') {
+            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+        }
+        return res.json({ ok: true, entries: agent.listPendingSdkElicitations() });
+    });
+
+    // ─── GET /elicitation/:id ───────────────────────────────────────────────
+
+    bridge.get('/elicitation/:id', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        if (typeof agent.getPendingSdkElicitation !== 'function') {
+            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+        }
+        const id = /** @type {string} */ (req.params['id']);
+        const entry = agent.getPendingSdkElicitation(id);
+        if (!entry) {
+            return res.status(404).json({ ok: false, error: 'Elicitation pendente não encontrada.' });
+        }
+        return res.json({ ok: true, entry });
+    });
+
+    // ─── POST /elicitation/:id/respond ──────────────────────────────────────
+
+    bridge.post('/elicitation/:id/respond', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        if (typeof agent.resolvePendingSdkElicitation !== 'function') {
+            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+        }
+
+        const id = /** @type {string} */ (req.params['id']);
+        const { action, content } = req.body ?? {};
+        if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
+            return res.status(400).json({ ok: false, error: 'Campo "action" deve ser accept | decline | cancel.' });
+        }
+        if (content !== undefined && (typeof content !== 'object' || content === null || Array.isArray(content))) {
+            return res.status(400).json({ ok: false, error: 'Campo "content" deve ser um objeto quando fornecido.' });
+        }
+
+        const ok = agent.resolvePendingSdkElicitation(id, {
+            action,
+            ...(content !== undefined ? { content } : {}),
+        });
+        if (!ok) {
+            return res.status(409).json({ ok: false, error: 'Elicitation não está mais pendente.' });
+        }
+        return res.json({ ok: true, message: 'Resposta de elicitation enviada ao SDK.' });
+    });
 }

@@ -77,6 +77,7 @@ export {
 } from './tool-interceptor.js';
 
 // ─── User input handler (Gap 5) ───────────────────────────────────────────────
+export { createQueuedElicitationHandler } from './elicitation.js';
 export { createQueuedInputHandler, createReadlineInputHandler, createStaticInputHandler } from './user-input.js';
 
 // ─── HookBus (Gap 6) ──────────────────────────────────────────────────────────

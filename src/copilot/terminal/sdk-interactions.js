@@ -20,7 +20,11 @@
  * @property {string | null} url
  * @property {string | null} toolCallId
  * @property {string | null} source
+ * @property {boolean} actionable
+ * @property {boolean} providerRequest
  * @property {Record<string, unknown>} data
+ * @property {'accept' | 'decline' | 'cancel' | null} resultAction
+ * @property {Record<string, unknown> | null} resultContent
  * @property {number} createdAt
  * @property {number | null} completedAt
  * @property {SdkInteractionStatus} status
@@ -50,6 +54,14 @@ function objectOrNull(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {'accept' | 'decline' | 'cancel' | null}
+ */
+function elicitationActionOrNull(value) {
+    return value === 'accept' || value === 'decline' || value === 'cancel' ? value : null;
+}
+
+/**
  * @param {unknown} evt
  * @returns {TerminalElicitationEntry}
  */
@@ -66,7 +78,11 @@ export function recordTerminalElicitationPending(evt) {
         url: stringOr(data['url'], '') || null,
         toolCallId: stringOr(data['toolCallId'], '') || null,
         source: stringOr(data['elicitationSource'], '') || null,
+        actionable: data['actionable'] === true,
+        providerRequest: data['providerRequest'] === true,
         data,
+        resultAction: null,
+        resultContent: null,
         createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
         completedAt: null,
         status: /** @type {SdkInteractionStatus} */ ('pending'),
@@ -88,6 +104,9 @@ export function recordTerminalElicitationCompleted(evt) {
     if (!entry) return null;
     entry.status = 'completed';
     entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
+    entry.resultAction =
+        elicitationActionOrNull(data['action']) ?? elicitationActionOrNull(objectOrNull(data['data'])?.['action']);
+    entry.resultContent = objectOrNull(data['content']) ?? objectOrNull(objectOrNull(data['data'])?.['content']);
     return entry;
 }
 

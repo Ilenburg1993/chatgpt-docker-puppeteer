@@ -6,13 +6,19 @@ vi.mock('#copilot/sdk', () => ({
     accountGetQuota: vi.fn(async (client) => client.rpc.account.getQuota()),
     commandsHandlePending: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
     compactionCompact: vi.fn(async () => ({ success: true })),
+    getSessionCapabilities: vi.fn((session) => session.capabilities ?? {}),
     getCurrentAgent: vi.fn(async (session) => ({ agent: { name: `current:${session.sessionId}` } })),
+    isSessionUiElicitationAvailable: vi.fn((session) => Boolean(session.capabilities?.ui?.elicitation || session.ui)),
     listAgents: vi.fn(async (session) => ({ agents: [{ name: `agent:${session.sessionId}` }] })),
     modelsList: vi.fn(async (client) => client.rpc.models.list()),
     permissionsHandlePending: vi.fn(async (_session, requestId, result) => ({ requestId, result })),
     reloadAgents: vi.fn(async (session) => ({ agents: [{ name: `reloaded:${session.sessionId}` }] })),
     selectAgent: vi.fn(async (_session, name) => ({ agent: { name } })),
     deselectAgent: vi.fn(async () => ({})),
+    sessionUiConfirm: vi.fn(async (_session, message) => message === 'Confirma?'),
+    sessionUiElicitation: vi.fn(async (_session, params) => ({ action: 'accept', params })),
+    sessionUiInput: vi.fn(async (_session, message) => `${message}:input`),
+    sessionUiSelect: vi.fn(async (_session, _message, options) => options[0] ?? null),
     shellExec: vi.fn(async (_session, command, options) => ({ command, ...options })),
     shellKill: vi.fn(async (_session, processId, signal) => ({ processId, signal })),
     toolsHandlePendingCall: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
@@ -29,6 +35,7 @@ vi.mock('#copilot/sdk', () => ({
 
 import {
     compactSdkSession,
+    confirmSdkSessionUi,
     createSdkWorkspaceFile,
     deselectSdkAgent,
     execSdkShell,
@@ -39,10 +46,13 @@ import {
     getSdkHandles,
     getSdkQuota,
     getSdkResourceSnapshot,
+    getSdkSessionCapabilities,
     getSdkStatus,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
     handleSdkPendingToolCall,
+    inputSdkSessionUi,
+    isSdkSessionUiElicitationAvailable,
     killSdkShell,
     listSdkAgents,
     listSdkBuiltInTools,
@@ -54,6 +64,7 @@ import {
     reloadSdkAgents,
     requestSdkElicitation,
     selectSdkAgent,
+    selectSdkSessionUi,
     setForegroundSdkSessionId,
 } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 
@@ -83,6 +94,13 @@ describe('agent-sdk-access facade', () => {
 
         session = {
             sessionId: 'sdk-session-1',
+            capabilities: { ui: { elicitation: true } },
+            ui: {
+                confirm: vi.fn(async () => true),
+                select: vi.fn(async (_message, options) => options.at(-1) ?? null),
+                input: vi.fn(async (message) => `${message}:ui`),
+                elicitation: vi.fn(async (params) => ({ action: 'accept', content: { answer: params.message } })),
+            },
             rpc: {
                 agent: { list: vi.fn() },
                 commands: { handlePendingCommand: vi.fn() },
@@ -110,6 +128,30 @@ describe('agent-sdk-access facade', () => {
             sessionState: { session },
             permissions: { handler: vi.fn() },
             toolsRegistry: new Map(),
+            sdkElicitation: {
+                handler: vi.fn(),
+                listPending: vi.fn(() => [
+                    {
+                        id: 'elicitation-1',
+                        sessionId: 'sdk-session-1',
+                        message: 'Escolha o ambiente',
+                        mode: 'form',
+                        createdAt: 123,
+                    },
+                ]),
+                getPending: vi.fn((id) =>
+                    id === 'elicitation-1'
+                        ? {
+                              id,
+                              sessionId: 'sdk-session-1',
+                              message: 'Escolha o ambiente',
+                              mode: 'form',
+                              createdAt: 123,
+                          }
+                        : null,
+                ),
+                resolvePending: vi.fn((id) => id === 'elicitation-1'),
+            },
         };
     });
 
@@ -135,6 +177,12 @@ describe('agent-sdk-access facade', () => {
         expect(snapshot.resources.compactionAvailable).toBe(true);
         expect(snapshot.resources.shellAvailable).toBe(true);
         expect(snapshot.resources.uiElicitationAvailable).toBe(true);
+        expect(snapshot.resources.uiApiAvailable).toBe(true);
+        expect(snapshot.resources.uiElicitationCapabilityAvailable).toBe(true);
+        expect(snapshot.resources.uiConfirmAvailable).toBe(true);
+        expect(snapshot.resources.uiSelectAvailable).toBe(true);
+        expect(snapshot.resources.uiInputAvailable).toBe(true);
+        expect(snapshot.resources.elicitationProviderAvailable).toBe(true);
         expect(snapshot.resources.pendingCommandsAvailable).toBe(true);
         expect(snapshot.resources.pendingPermissionsAvailable).toBe(true);
         expect(snapshot.resources.pendingToolsAvailable).toBe(true);
@@ -211,8 +259,16 @@ describe('agent-sdk-access facade', () => {
         await expect(compactSdkSession(ctx)).resolves.toEqual({ success: true });
         await expect(requestSdkElicitation(ctx, 'Dados?', { type: 'object' })).resolves.toMatchObject({
             action: 'accept',
-            message: 'Dados?',
+            params: {
+                message: 'Dados?',
+                requestedSchema: { type: 'object' },
+            },
         });
+        await expect(confirmSdkSessionUi(ctx, 'Confirma?')).resolves.toBe(true);
+        await expect(selectSdkSessionUi(ctx, 'Escolha', ['dev', 'prod'])).resolves.toBe('dev');
+        await expect(inputSdkSessionUi(ctx, 'Nome?')).resolves.toBe('Nome?:input');
+        expect(getSdkSessionCapabilities(ctx)).toEqual({ ui: { elicitation: true } });
+        expect(isSdkSessionUiElicitationAvailable(ctx)).toBe(true);
         await expect(handleSdkPendingPermission(ctx, 'perm-1', { kind: 'approved' })).resolves.toEqual({
             requestId: 'perm-1',
             result: { kind: 'approved' },
@@ -233,5 +289,13 @@ describe('agent-sdk-access facade', () => {
             processId: 'proc-1',
             signal: 'SIGINT',
         });
+    });
+
+    it('provider-side elicitation fica acessível pela facade do agent', async () => {
+        const { getPendingSdkElicitation, listPendingSdkElicitations, resolvePendingSdkElicitation } =
+            await import('../../../src/copilot/agent/facades/agent-sdk-access.js');
+        expect(listPendingSdkElicitations(ctx)).toHaveLength(1);
+        expect(getPendingSdkElicitation(ctx, 'elicitation-1')).toMatchObject({ message: 'Escolha o ambiente' });
+        expect(resolvePendingSdkElicitation(ctx, 'elicitation-1', { action: 'accept' })).toBe(true);
     });
 });

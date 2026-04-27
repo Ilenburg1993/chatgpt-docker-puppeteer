@@ -4,10 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeMocks = vi.hoisted(() => ({
     compactTerminalSdkSession: vi.fn(async () => ({ success: true })),
+    confirmTerminalSdkSessionUi: vi.fn(async () => true),
     createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
     getTerminalSdkQuota: vi.fn(async () => ({
         quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
     })),
+    inputTerminalSdkSessionUi: vi.fn(async (message) => `${message}:typed`),
+    isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
     listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
     listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
     listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
@@ -19,6 +22,8 @@ const runtimeMocks = vi.hoisted(() => ({
     })),
     readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
     requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
+    resolveTerminalSdkPendingElicitation: vi.fn(() => true),
+    selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => runtimeMocks);
@@ -96,5 +101,34 @@ describe('terminal/commands/sdk', () => {
         await cmdElicitation({ println: request.println }, 'request Dados?');
         expect(runtimeMocks.requestTerminalSdkElicitation).toHaveBeenCalled();
         expect(request.output()).toContain('accept');
+
+        const respond = mockCtx();
+        await cmdElicitation({ println: respond.println }, 'respond el-1 accept {"env":"dev"}');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-1', {
+            action: 'accept',
+            content: { env: 'dev' },
+        });
+        expect(respond.output()).toContain('respondida');
+    });
+
+    it('/elicitation expõe confirm/select/input/capabilities via session.ui.*', async () => {
+        const capabilities = mockCtx();
+        await cmdElicitation({ println: capabilities.println }, 'capabilities');
+        expect(capabilities.output()).toContain('available');
+
+        const confirm = mockCtx();
+        await cmdElicitation({ println: confirm.println }, 'confirm Confirma deploy?');
+        expect(runtimeMocks.confirmTerminalSdkSessionUi).toHaveBeenCalledWith('Confirma deploy?');
+        expect(confirm.output()).toContain('session.ui.confirm');
+
+        const select = mockCtx();
+        await cmdElicitation({ println: select.println }, 'select Escolha ambiente -- dev|prod');
+        expect(runtimeMocks.selectTerminalSdkSessionUi).toHaveBeenCalledWith('Escolha ambiente', ['dev', 'prod']);
+        expect(select.output()).toContain('session.ui.select');
+
+        const input = mockCtx();
+        await cmdElicitation({ println: input.println }, 'input Nome do projeto -- {"title":"Nome"}');
+        expect(runtimeMocks.inputTerminalSdkSessionUi).toHaveBeenCalledWith('Nome do projeto', { title: 'Nome' });
+        expect(input.output()).toContain('session.ui.input');
     });
 });

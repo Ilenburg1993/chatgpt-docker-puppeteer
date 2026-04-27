@@ -38,12 +38,18 @@ import {
     getClientState,
     getForegroundClientSessionId,
     getLastClientSessionId,
+    getSessionCapabilities,
     incrementSessionMessageCount,
+    isSessionUiElicitationAvailable,
     listActiveClientSessions,
     listAllClientSessions,
     permissionsHandlePending,
     pickDefined,
     resumeClientSession,
+    sessionUiConfirm,
+    sessionUiElicitation,
+    sessionUiInput,
+    sessionUiSelect,
     setForegroundClientSessionId,
     shellExec,
     shellKill,
@@ -99,6 +105,15 @@ const sdkSessionRpcOps = Object.freeze({
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
+});
+
+const sdkSessionUiOps = Object.freeze({
+    getSessionCapabilities,
+    isSessionUiElicitationAvailable,
+    sessionUiConfirm,
+    sessionUiElicitation,
+    sessionUiInput,
+    sessionUiSelect,
 });
 
 const sdkSessionOwnershipOps = Object.freeze({
@@ -175,6 +190,7 @@ function resolveMetricsStore() {
  *     allTools: ReturnType<typeof getAllTools>;
  *     sdkSession: typeof sdkSessionOps;
  *     sdkSessionRpc: typeof sdkSessionRpcOps;
+ *     sdkSessionUi: typeof sdkSessionUiOps;
  *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
  *     sdkRuntimeProjection: typeof sdkRuntimeProjectionOps;
  *     sdkObservability: typeof sdkObservabilityOps;
@@ -200,6 +216,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         allTools: getAllTools(),
         sdkSession: sdkSessionOps,
         sdkSessionRpc: sdkSessionRpcOps,
+        sdkSessionUi: sdkSessionUiOps,
         sdkSessionOwnership: sdkSessionOwnershipOps,
         sdkRuntimeProjection: sdkRuntimeProjectionOps,
         sdkObservability: sdkObservabilityOps,

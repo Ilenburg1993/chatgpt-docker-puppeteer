@@ -37,6 +37,9 @@ import {
     SetModelBodySchema,
     ShellExecBodySchema,
     ShellKillBodySchema,
+    UiConfirmBodySchema,
+    UiInputBodySchema,
+    UiSelectBodySchema,
     validateBody,
     validateModel,
     withErrorHandler,
@@ -576,7 +579,31 @@ router.post('/sessions/:id/workspace/file', validateBody(WorkspaceCreateFileBody
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Aciona a operação de UI elicitation via façade RPC de sessão para formulários estruturados.
+ * Expõe as capabilities atuais de `session.ui` para o caller HTTP.
+ */
+router.get('/sessions/:id/ui/capabilities', (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const capabilities = routeDeps.sdkSessionUi.getSessionCapabilities(entry.session);
+        const available = routeDeps.sdkSessionUi.isSessionUiElicitationAvailable(entry.session);
+        res.json(
+            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                { ok: true, sessionId: id, capabilities, elicitationAvailable: available },
+                id,
+            ),
+        );
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/ui/elicitation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aciona a operação de UI elicitation via façade `session.ui` para formulários estruturados.
  */
 router.post('/sessions/:id/ui/elicitation', validateBody(ElicitationBodySchema), (req, res) => {
     void withErrorHandler(req, res, async () => {
@@ -585,7 +612,64 @@ router.post('/sessions/:id/ui/elicitation', validateBody(ElicitationBodySchema),
         const { message, requestedSchema } = req.body ?? {};
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
-        const result = await routeDeps.sdkSessionRpc.uiElicitation(entry.session, message, requestedSchema);
+        const result = await routeDeps.sdkSessionUi.sessionUiElicitation(entry.session, { message, requestedSchema });
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/ui/confirm
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Executa `session.ui.confirm()` ou fallback compatível.
+ */
+router.post('/sessions/:id/ui/confirm', validateBody(UiConfirmBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { message } = req.body ?? {};
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionUi.sessionUiConfirm(entry.session, message);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/ui/select
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Executa `session.ui.select()` ou fallback compatível.
+ */
+router.post('/sessions/:id/ui/select', validateBody(UiSelectBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { message, options } = req.body ?? {};
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionUi.sessionUiSelect(entry.session, message, options);
+        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/ui/input
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Executa `session.ui.input()` ou fallback compatível.
+ */
+router.post('/sessions/:id/ui/input', validateBody(UiInputBodySchema), (req, res) => {
+    void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const id = /** @type {string} */ (req.params['id']);
+        const { message, options } = req.body ?? {};
+        const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+        if (!entry) return;
+        const result = await routeDeps.sdkSessionUi.sessionUiInput(entry.session, message, options);
         res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
     });
 });
