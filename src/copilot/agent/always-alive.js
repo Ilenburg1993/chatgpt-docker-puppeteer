@@ -54,7 +54,6 @@ import {
 import {
     compactSdkSession,
     createSdkWorkspaceFile,
-    deleteSdkPlan,
     deselectSdkAgent,
     execSdkShell,
     getCurrentSdkAgent,
@@ -64,7 +63,6 @@ import {
     getSdkHandles,
     getSdkQuota,
     getSdkResourceSnapshot,
-    getSdkSessionMode,
     getSdkStatus,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
@@ -76,15 +74,19 @@ import {
     listSdkSessions,
     listSdkWorkspaceFiles,
     pingSdk,
-    readSdkPlan,
     readSdkWorkspaceFile,
     reloadSdkAgents,
     requestSdkElicitation,
     selectSdkAgent,
     setForegroundSdkSessionId,
+} from './facades/agent-sdk-access.js';
+import {
+    deleteSdkPlan,
+    getSdkSessionMode,
+    readSdkPlan,
     setSdkSessionMode,
     updateSdkPlan,
-} from './facades/agent-sdk-access.js';
+} from './facades/agent-sdk-session.js';
 import {
     abortCurrentMessage,
     getSessionMessages,

@@ -172,7 +172,7 @@ export async function operationName(session, param, options) {
 | `sdk/session/provider.js`                      | Verificar crude calls para provider RPC                   | 🟡 Médio                                                |
 | `sdk/telemetry/`                               | Verificar cobertura de telemetria em todos os wrappers    | 🟡 Médio                                                |
 | `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC | 🔄 Em progresso (owner ampliado para lifecycle/session) |
-| `agent/facades/agent-sdk-session.js`           | Consolidar owner único de mode/plan/session ops           | 🟠 Alto                                                 |
+| `agent/facades/agent-sdk-session.js`           | Owner canônico de mode/plan/session ops                   | ✅ Consolidado nesta onda                               |
 | `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop   | ✅ Resolvido nesta onda (loop/resume convergidos)       |
 | `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0    | 🟠 Alto                                                 |
 | Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas               | 🔴 Importante                                           |
@@ -246,9 +246,9 @@ A sobreposição foi reduzida de forma significativa nesta onda:
      - convergido para `agent-sdk-runtime.js` (`messaging`, `history-sync`, `keepalive`, `dialog/*`)
 
 3. **Superfície de capacidades da sessão**
-     - `agent/facades/agent-sdk-access.js` (owner principal)
-     - `agent/facades/agent-sdk-session.js` (ainda em fechamento)
-     - `agent/ports/tool-port.js` (seam legítimo de integração viva)
+    - `agent/facades/agent-sdk-access.js` (reads/status/server+session RPC)
+    - `agent/facades/agent-sdk-session.js` (owner de mode/plan/session ops)
+    - `agent/ports/tool-port.js` (seam legítimo de integração viva)
 
 O principal problema, portanto, **não é mais crude call direta ao vendor** — isso já foi quase todo eliminado fora de
 `sdk/`. O problema restante é:
@@ -418,7 +418,7 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 | Convergir `lifecycle/{entry,agent-lifecycle,runtime-host,session-setup}` para façades         | ✅                                 |
 | Convergir `session/{cleanup,boot-steps,boot-wiring,initializer}` para façades                 | ✅                                 |
 | Fechar `agent/facades/agent-sdk-access.js` como owner canônico de server/session RPC read     | ✅ (owner majoritário)             |
-| Fechar `agent/facades/agent-sdk-session.js` como owner canônico de mode/plan/session ops      | 🔄                                 |
+| Fechar `agent/facades/agent-sdk-session.js` como owner canônico de mode/plan/session ops      | ✅                                 |
 | Remover conhecimento de `sessionRpc` de módulos de domínio fora de `facades/ports`            | ✅ para módulos quentes principais |
 | Criar guardrail CI/grep para bloquear novos imports `agent -> sdk/*` internos                 | ✅                                 |
 

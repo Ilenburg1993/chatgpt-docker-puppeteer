@@ -69,7 +69,6 @@ export {
     compactSdkSession,
     disconnectAgentSdkSession,
     createSdkWorkspaceFile,
-    deleteSdkPlan,
     deselectSdkAgent,
     execSdkShell,
     getCurrentSdkAgent,
@@ -80,7 +79,6 @@ export {
     getAgentSdkToolsConfig,
     getSdkQuota,
     getSdkResourceSnapshot,
-    getSdkSessionMode,
     getSdkStatus,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
@@ -92,7 +90,6 @@ export {
     listSdkSessions,
     listSdkWorkspaceFiles,
     pingSdk,
-    readSdkPlan,
     readAgentSdkModelRegistryEntry,
     readSdkWorkspaceFile,
     raceAgentSdkEvents,
@@ -100,8 +97,6 @@ export {
     requestSdkElicitation,
     selectSdkAgent,
     setForegroundSdkSessionId,
-    setSdkSessionMode,
-    updateSdkPlan,
 } from './agent-sdk-access.js';
 export {
     onAgentSdkSessionEvent,
@@ -112,10 +107,15 @@ export {
     waitForAgentSdkEvent,
 } from './agent-sdk-runtime.js';
 export {
+    deleteSdkPlan,
     deleteAgentSdkPlan,
+    getSdkSessionMode,
     readAgentSdkPlan,
     readAgentSdkSessionMode,
+    readSdkPlan,
+    setSdkSessionMode,
     setAgentSdkSessionMode,
+    updateSdkPlan,
     updateAgentSdkPlan,
 } from './agent-sdk-session.js';
 export { abortCurrentMessage, getSessionMessages, pingDialogWatchdog, sessionLog } from './agent-session-ops.js';
