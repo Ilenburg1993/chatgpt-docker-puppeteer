@@ -434,7 +434,7 @@
     "@babel/parser": "^7.29.2",
     "@babel/traverse": "^7.29.0",
     "@github/copilot-sdk": "^0.3.0",
-    "@lancedb/lancedb": "^0.26.2",
+    "@lancedb/lancedb": "^0.27.2",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "axios": "^1.13.6",
     "better-sqlite3": "^12.6.2",
