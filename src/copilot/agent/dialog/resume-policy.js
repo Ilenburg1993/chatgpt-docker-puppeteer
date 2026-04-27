@@ -7,9 +7,9 @@
  *   persistência, métricas e chamada a `start()`.
  */
 
-import { waitForEvent } from '#copilot/sdk';
 import { EventEmitter } from 'node:events';
 import { RESUME_QUESTION_WAIT_MS } from '../../config/agent.js';
+import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
 
 /**
  * @typedef {import('../types.js').DialogLoopHost} AgentHost
@@ -57,7 +57,7 @@ export async function selectDialogResumeStrategy({ host, fallbackTarget, timeout
     }
 
     const pendingTarget = isEventEmitterTarget(host) ? host : fallbackTarget;
-    const preserved = await waitForEvent(pendingTarget, 'question.pending', { timeoutMs })
+    const preserved = await waitForAgentSdkEvent(pendingTarget, 'question.pending', { timeoutMs })
         .then(() => true)
         .catch(() => false);
 

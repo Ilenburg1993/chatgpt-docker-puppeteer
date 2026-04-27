@@ -23,9 +23,13 @@
 
 import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
-import { SESSION_LIFECYCLE_EVENTS, createQuotaMonitor } from '#copilot/sdk';
-import { LIFECYCLE_EVENTS, onLifecycleEvents } from '../../sdk/session/client-events.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import {
+    createAgentSdkQuotaMonitor,
+    getAgentSdkLifecycleEvents,
+    getAgentSdkSessionLifecycleEvents,
+    onAgentSdkLifecycleEvents,
+} from '../facades/agent-sdk-access.js';
 import { defaultMetrics, log } from '../ports/observability-port.js';
 import {
     createBootWiringState,
@@ -167,27 +171,32 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
         return;
     }
 
-    const unsubLifecycle = onLifecycleEvents(
+    const lifecycleEvents = getAgentSdkLifecycleEvents();
+    const sessionLifecycleEvents = getAgentSdkSessionLifecycleEvents();
+    const unsubLifecycle = onAgentSdkLifecycleEvents(
         {
-            [LIFECYCLE_EVENTS.CREATED]: (evt) => {
-                log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${evt?.sessionId}`);
+            [lifecycleEvents.CREATED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${payload?.sessionId}`);
                 ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: SESSION_LIFECYCLE_EVENTS.CREATED,
-                    sessionId: evt?.sessionId,
+                    type: sessionLifecycleEvents.CREATED,
+                    sessionId: payload?.sessionId,
                 });
             },
-            [LIFECYCLE_EVENTS.DELETED]: (evt) => {
-                log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${evt?.sessionId}`);
+            [lifecycleEvents.DELETED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${payload?.sessionId}`);
                 ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: SESSION_LIFECYCLE_EVENTS.DELETED,
-                    sessionId: evt?.sessionId,
+                    type: sessionLifecycleEvents.DELETED,
+                    sessionId: payload?.sessionId,
                 });
             },
-            [LIFECYCLE_EVENTS.UPDATED]: (evt) => {
-                log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${evt?.sessionId}`);
+            [lifecycleEvents.UPDATED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${payload?.sessionId}`);
                 ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: SESSION_LIFECYCLE_EVENTS.UPDATED,
-                    sessionId: evt?.sessionId,
+                    type: sessionLifecycleEvents.UPDATED,
+                    sessionId: payload?.sessionId,
                 });
             },
         },
@@ -209,7 +218,7 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
  */
 function stepStartQuotaMonitor(client, ctx, state) {
     try {
-        const quotaMonitor = createQuotaMonitor({
+        const quotaMonitor = createAgentSdkQuotaMonitor({
             client,
             intervalMs: 5 * 60 * 1000,
             warningThreshold: 20,

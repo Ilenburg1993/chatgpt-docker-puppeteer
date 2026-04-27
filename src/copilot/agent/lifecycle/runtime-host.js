@@ -15,7 +15,7 @@
  */
 
 import { TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
-import { listModels } from '#copilot/sdk';
+import { listSdkCatalogModels } from '../facades/agent-model-config.js';
 
 /** @type {boolean} */
 let _processSignalHandlersRegistered = false;
@@ -246,7 +246,7 @@ export async function runCopilotSdkBootPreflight({
                 report.modelValidated = true; // Auto-resolution happens at createSession()
             } else {
                 try {
-                    const models = await listModels();
+                    const models = await listSdkCatalogModels();
                     report.modelValidated = models.some(
                         (/** @type {{ id: string }} */ model) => model.id === configuredModel,
                     );

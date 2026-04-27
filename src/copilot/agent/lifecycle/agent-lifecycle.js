@@ -21,7 +21,6 @@ import {
     EMITTER_STATUS,
     EMITTER_STOPPED,
 } from '#copilot/events';
-import { createCopilotClient, disconnectSessionSafe, raceEvents } from '#copilot/sdk';
 import { container } from '../../core/di-container.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import {
@@ -36,6 +35,7 @@ import {
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
 import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
+import { createAgentSdkClient, disconnectAgentSdkSession, raceAgentSdkEvents } from '../facades/agent-sdk-access.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -299,7 +299,7 @@ export async function agentStart(ctx, host) {
 
     try {
         const _otelConfig = buildTelemetryConfig();
-        const client = createCopilotClient(_otelConfig ? { telemetry: _otelConfig } : {});
+        const client = createAgentSdkClient(_otelConfig ? { telemetry: _otelConfig } : {});
         ctx.setClient(client);
 
         const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.getModelSnapshot() }, () =>
@@ -345,7 +345,7 @@ export async function agentStop(
 
         if (ctx.isStarting()) {
             log('INFO', '[AlwaysAlive] stop() durante boot — aguardando conclusão (máx 15s)...');
-            await raceEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((e) =>
+            await raceAgentSdkEvents(host, ['ready', 'error'], { timeoutMs: STOP_BOOT_WAIT_MS }).catch((e) =>
                 logSwallowed(e, 'agent.lifecycle.stopBootWait'),
             );
         }
@@ -457,7 +457,7 @@ export async function agentStop(
         const session = ctx.getSessionSnapshot();
         if (session) {
             try {
-                await disconnectSessionSafe(session);
+                await disconnectAgentSdkSession(session);
             } catch (e) {
                 log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
             }
@@ -528,7 +528,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
                 },
                 createClient: () => {
                     const _otelConfig = buildTelemetryConfig();
-                    return createCopilotClient(_otelConfig ? { telemetry: _otelConfig } : {});
+                    return createAgentSdkClient(_otelConfig ? { telemetry: _otelConfig } : {});
                 },
                 updateClient: (newClient) => {
                     ctx.setClient(newClient);

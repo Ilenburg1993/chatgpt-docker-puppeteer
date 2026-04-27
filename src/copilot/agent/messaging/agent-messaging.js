@@ -21,9 +21,13 @@ import {
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
-import { onAllSessionEvents, onSessionEvent } from '../../sdk/session/events.js';
-import { sendSession, sendSessionAndWait } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import {
+    onAgentSdkSessionEvent,
+    onAllAgentSdkSessionEvents,
+    sendAgentSdkSession,
+    sendAgentSdkSessionAndWait,
+} from '../facades/agent-sdk-runtime.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 import { log, startSpan, startSpanImmediate } from '../ports/observability-port.js';
 
@@ -110,7 +114,7 @@ function createInactivityGuard(timeoutMs, onTimeout) {
 async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
     if (typeof session.send !== 'function') {
         if (typeof session.sendAndWait === 'function') {
-            return sendSessionAndWait(session, sendOpts, timeoutMs);
+            return sendAgentSdkSessionAndWait(session, sendOpts, timeoutMs);
         }
         throw new Error('session.send is not a function');
     }
@@ -132,7 +136,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
         rejectIdle(new Error(`[agent-messaging] Timeout por inatividade após ${timeoutMs}ms aguardando session.idle`));
     });
 
-    const unsubscribe = onAllSessionEvents(
+    const unsubscribe = onAllAgentSdkSessionEvents(
         session,
         (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
             if (event.type === 'assistant.message') {
@@ -163,7 +167,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
 
     try {
         inactivityGuard.ping();
-        await sendSession(session, sendOpts);
+        await sendAgentSdkSession(session, sendOpts);
         await waitForIdle;
         return lastAssistantMessage;
     } finally {
@@ -301,61 +305,52 @@ export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
 export async function executeTask(session, task, callbacks) {
     const { onDelta, setStatus, emit, tryReconnect, scheduleNext, requeueTask } = callbacks;
 
-    const unsubDelta = onSessionEvent(
-        session,
-        'assistant.message_delta',
-        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            const chunk = /** @type {string} */ (event?.data?.['deltaContent'] ?? '');
-            if (chunk) onDelta(chunk, task.id);
-        },
-    );
+    const unsubDelta = onAgentSdkSessionEvent(session, 'assistant.message_delta', (event) => {
+        const payload = /** @type {{ deltaContent?: string } | undefined} */ (event?.data);
+        const chunk = payload?.deltaContent ?? '';
+        if (chunk) onDelta(chunk, task.id);
+    });
 
     const taskSpan = startSpanImmediate('copilot.task', { taskId: task.id });
 
     /** @type {Map<string, import('../../observability/otel.js').OtelSpan>} */
     const toolSpans = new Map();
 
-    const unsubToolStart = onSessionEvent(
-        session,
-        'tool.execution_start',
-        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
-            const toolName = /** @type {string} */ (event?.data?.['toolName'] ?? '');
-            const toolSpan = startSpanImmediate('copilot.tool', { toolName, toolCallId, taskId: task.id });
-            if (toolSpan && toolCallId) toolSpans.set(toolCallId, toolSpan);
-            emit('tool.execution_start', {
-                toolCallId,
-                toolName,
-                args: event?.data?.['arguments'] ?? {},
-                mcpServerName: /** @type {string | null} */ (event?.data?.['mcpServerName'] ?? null),
-                taskId: task.id,
-            });
-        },
-    );
+    const unsubToolStart = onAgentSdkSessionEvent(session, 'tool.execution_start', (event) => {
+        const payload = /** @type {Record<string, unknown> | undefined} */ (/** @type {unknown} */ (event?.data));
+        const toolCallId = /** @type {string} */ (payload?.['toolCallId'] ?? '');
+        const toolName = /** @type {string} */ (payload?.['toolName'] ?? '');
+        const toolSpan = startSpanImmediate('copilot.tool', { toolName, toolCallId, taskId: task.id });
+        if (toolSpan && toolCallId) toolSpans.set(toolCallId, toolSpan);
+        emit('tool.execution_start', {
+            toolCallId,
+            toolName,
+            args: payload?.['arguments'] ?? {},
+            mcpServerName: /** @type {string | null} */ (payload?.['mcpServerName'] ?? null),
+            taskId: task.id,
+        });
+    });
 
-    const unsubToolComplete = onSessionEvent(
-        session,
-        'tool.execution_complete',
-        (/** @type {{ data?: Record<string, unknown> }} */ event) => {
-            const toolCallId = /** @type {string} */ (event?.data?.['toolCallId'] ?? '');
-            const toolSpan = toolSpans.get(toolCallId);
-            if (toolSpan) {
-                toolSpan.end();
-                toolSpans.delete(toolCallId);
-            }
-            emit('tool.execution_complete', {
-                toolCallId,
-                toolName: /** @type {string | null} */ (event?.data?.['toolName'] ?? null),
-                success: /** @type {boolean} */ (event?.data?.['success'] ?? false),
-                taskId: task.id,
-            });
-        },
-    );
+    const unsubToolComplete = onAgentSdkSessionEvent(session, 'tool.execution_complete', (event) => {
+        const payload = /** @type {Record<string, unknown> | undefined} */ (/** @type {unknown} */ (event?.data));
+        const toolCallId = /** @type {string} */ (payload?.['toolCallId'] ?? '');
+        const toolSpan = toolSpans.get(toolCallId);
+        if (toolSpan) {
+            toolSpan.end();
+            toolSpans.delete(toolCallId);
+        }
+        emit('tool.execution_complete', {
+            toolCallId,
+            toolName: /** @type {string | null} */ (payload?.['toolName'] ?? null),
+            success: /** @type {boolean} */ (payload?.['success'] ?? false),
+            taskId: task.id,
+        });
+    });
 
     const startTime = Date.now();
     /** @type {number | undefined} */
     let idleTime;
-    const unsubIdle = onSessionEvent(session, 'session.idle', () => {
+    const unsubIdle = onAgentSdkSessionEvent(session, 'session.idle', () => {
         idleTime = Date.now();
     });
 
@@ -494,7 +489,7 @@ export async function steerMessage(ctx, host, prompt, { signal } = {}) {
         throw new SessionError('[AlwaysAlive] steerMessage() requer sessão ativa.', 'NO_SESSION');
     }
     return startSpan('copilot.agent.steer', { model: ctx.getModelSnapshot(), actor: 'agent' }, async () => {
-        const messageId = await sendSession(session, { prompt, mode: 'immediate' });
+        const messageId = await sendAgentSdkSession(session, { prompt, mode: 'immediate' });
         log('INFO', `[AlwaysAlive] Steering enviado: messageId=${messageId}`);
         host.emit(EMITTER_STEERING_SENT, { messageId, prompt: prompt.slice(0, 200), ts: Date.now() });
         return messageId ?? '';

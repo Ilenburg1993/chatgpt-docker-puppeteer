@@ -24,7 +24,6 @@ import {
     EMITTER_LOOP_STALLED,
     EMITTER_LOOP_TURN_TIMEOUT,
 } from '#copilot/events';
-import { waitForEvent } from '#copilot/sdk';
 import { EventEmitter } from 'node:events';
 import {
     BOOT_LATE_PROTOCOL_GRACE_MS,
@@ -36,6 +35,7 @@ import {
 } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
+import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 import { log, startSpanImmediate } from '../ports/observability-port.js';
 import { TurnQueue } from './backpressure.js';
@@ -274,7 +274,7 @@ export class DialogLoopManager extends EventEmitter {
 
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 
-        const bootPromise = waitForEvent(this, 'ready', {
+        const bootPromise = waitForAgentSdkEvent(this, 'ready', {
             timeoutMs: this.#bootTimeoutMs,
             timeoutError: `[DialogLoopManager] Boot timeout após ${this.#bootTimeoutMs}ms`,
         });
@@ -594,7 +594,7 @@ export class DialogLoopManager extends EventEmitter {
             `[DialogLoopManager] Boot timeout atingido; aguardando READY tardio por ${BOOT_LATE_PROTOCOL_GRACE_MS}ms antes de falhar.`,
         );
         try {
-            await waitForEvent(this, EMITTER_LOOP_READY, {
+            await waitForAgentSdkEvent(this, EMITTER_LOOP_READY, {
                 timeoutMs: BOOT_LATE_PROTOCOL_GRACE_MS,
                 timeoutError: `[DialogLoopManager] READY tardio não chegou após ${BOOT_LATE_PROTOCOL_GRACE_MS}ms`,
             });

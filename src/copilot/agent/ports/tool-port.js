@@ -19,8 +19,8 @@
  * @internal
  */
 
+import { createSessionRpcFacade } from '#copilot/sdk';
 import { isToolDisabled, readStore } from '#copilot/tools';
-import { createSessionRpcFacade } from '../../sdk/rpc.js';
 import {
     bootstrapTools,
     configureHookTools,

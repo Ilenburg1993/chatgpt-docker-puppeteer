@@ -10,10 +10,14 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
-import { listModels, modelRegistry, modelStatsTracker } from '../../sdk/index.js';
 import { log } from '../ports/observability-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
 import { readAgentRuntimeStatusSnapshot } from './agent-runtime-status.js';
+import {
+    listAgentSdkCatalogModels,
+    readAgentSdkModelRegistryEntry,
+    readAgentSdkModelStats,
+} from './agent-sdk-access.js';
 
 /**
  * Retorna o ID do modelo atual configurado no contexto.
@@ -44,10 +48,9 @@ export function setModel(ctx, modelId) {
  * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
  */
 export async function listAvailableModels(ctx) {
-    const client = ctx.getClientSnapshot();
-    if (!client) return [];
+    if (!ctx.getClientSnapshot()) return [];
     try {
-        return await client.listModels();
+        return await listAgentSdkCatalogModels();
     } catch (e) {
         log('WARN', `[AlwaysAlive] listModels() falhou: ${toError(e).message}`);
         return [];
@@ -60,7 +63,7 @@ export async function listAvailableModels(ctx) {
  * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
  */
 export async function listSdkCatalogModels() {
-    return listModels();
+    return listAgentSdkCatalogModels();
 }
 
 /**
@@ -76,23 +79,14 @@ export async function listSdkCatalogModels() {
  * } | null}
  */
 export function readSdkModelMetadata(modelId) {
-    const rawMeta = modelRegistry.get(modelId);
-    return rawMeta
-        ? {
-              costTier: rawMeta.costTier,
-              speedTier: rawMeta.speedTier,
-              contextWindow: rawMeta.contextWindow,
-              supportsReasoning: rawMeta.supportsReasoning,
-              supportsVision: rawMeta.supportsVision,
-          }
-        : null;
+    return readAgentSdkModelRegistryEntry(modelId);
 }
 
 /**
- * @returns {ReturnType<typeof modelStatsTracker.allStats>}
+ * @returns {ReturnType<typeof readAgentSdkModelStats>}
  */
 export function readSdkModelStats() {
-    return modelStatsTracker.allStats();
+    return readAgentSdkModelStats();
 }
 
 /**

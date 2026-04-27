@@ -15,20 +15,42 @@
 import { SessionError } from '#copilot/core';
 import {
     accountGetQuota,
+    checkAuthStatus,
     commandsHandlePending,
     compactionCompact,
+    createCopilotClient,
+    createQuotaMonitor,
+    createRegistry,
+    createSession,
+    deleteSession,
     deselectAgent,
+    disconnectSessionSafe,
     getCurrentAgent,
+    getSessionMessages,
+    getToolsConfig,
+    isExperimentalEnabled,
+    isSdkQuotaOrRateLimitError,
+    LIFECYCLE_EVENTS,
     listAgents,
+    listModels,
+    listSessions,
+    loadToolsConfigAsync,
     modeGet,
+    modelRegistry,
     modelsList,
+    modelStatsTracker,
     modeSet,
+    onLifecycleEvents,
     permissionsHandlePending,
+    pickDefined,
     planDelete,
     planRead,
     planUpdate,
+    raceEvents,
     reloadAgents,
+    resumeOrCreate,
     selectAgent,
+    SESSION_LIFECYCLE_EVENTS,
     shellExec,
     shellKill,
     toolsHandlePendingCall,
@@ -147,6 +169,234 @@ export function getSdkHandles(ctx) {
 }
 
 /**
+ * Cria um novo client SDK usando a fábrica canônica do wrapper.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClientOptions} [options]
+ * @returns {import('#copilot/sdk/types').CopilotClient}
+ */
+export function createAgentSdkClient(options) {
+    return createCopilotClient(options);
+}
+
+/**
+ * Lê o estado de autenticação do usuário no SDK.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @returns {Promise<Awaited<ReturnType<typeof checkAuthStatus>>>}
+ */
+export async function checkAgentSdkAuthStatus(client) {
+    return checkAuthStatus(client);
+}
+
+/**
+ * Desconecta uma sessão SDK ativa com fallback seguro.
+ *
+ * @param {import('#copilot/sdk/types').CopilotSession} session
+ * @returns {Promise<void>}
+ */
+export async function disconnectAgentSdkSession(session) {
+    await disconnectSessionSafe(session);
+}
+
+/**
+ * Aguarda a primeira ocorrência entre múltiplos eventos em um EventEmitter.
+ *
+ * @param {import('node:events').EventEmitter} emitter
+ * @param {string[]} events
+ * @param {{ timeoutMs?: number; signal?: AbortSignal; timeoutError?: string }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof raceEvents>>>}
+ */
+export async function raceAgentSdkEvents(emitter, events, options) {
+    return raceEvents(emitter, events, options);
+}
+
+/**
+ * Cria o registry canônico de tools do SDK para o runtime do agent.
+ *
+ * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+ */
+export function createAgentSdkToolsRegistry() {
+    return createRegistry();
+}
+
+/**
+ * Lê a configuração efetiva de tools carregada no wrapper SDK.
+ *
+ * @returns {{ denylist: string[]; allowlist: string[] | null }}
+ */
+export function getAgentSdkToolsConfig() {
+    return getToolsConfig();
+}
+
+/**
+ * Lê os metadados do model registry canônico do SDK.
+ *
+ * @param {string} modelId
+ * @returns {{
+ *     costTier?: string;
+ *     speedTier?: string;
+ *     contextWindow?: number;
+ *     supportsReasoning?: boolean;
+ *     supportsVision?: boolean;
+ * } | null}
+ */
+export function readAgentSdkModelRegistryEntry(modelId) {
+    const rawMeta = modelRegistry.get(modelId);
+    return rawMeta
+        ? {
+              costTier: rawMeta.costTier,
+              speedTier: rawMeta.speedTier,
+              contextWindow: rawMeta.contextWindow,
+              supportsReasoning: rawMeta.supportsReasoning,
+              supportsVision: rawMeta.supportsVision,
+          }
+        : null;
+}
+
+/**
+ * Lista o catálogo de modelos conhecido pelo SDK (sem depender de sessão/contexto).
+ *
+ * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
+ */
+export async function listAgentSdkCatalogModels() {
+    return listModels();
+}
+
+/**
+ * Retorna estatísticas agregadas de uso de modelos coletadas pelo SDK wrapper.
+ *
+ * @returns {ReturnType<typeof modelStatsTracker.allStats>}
+ */
+export function readAgentSdkModelStats() {
+    return modelStatsTracker.allStats();
+}
+
+/**
+ * @param {Parameters<typeof isExperimentalEnabled>[0]} featureName
+ * @returns {boolean}
+ */
+export function isAgentSdkExperimentalEnabled(featureName) {
+    return isExperimentalEnabled(featureName);
+}
+
+/**
+ * Exposição controlada do tracker de modelos para consumidores de observabilidade do runtime.
+ *
+ * @returns {{
+ *     record: (
+ *         model: string,
+ *         stats: { latencyMs: number; success: boolean; inputTokens?: number; outputTokens?: number },
+ *     ) => void;
+ * }}
+ */
+export function getAgentSdkModelStatsTracker() {
+    return modelStatsTracker;
+}
+
+/**
+ * @returns {{ CREATED: string; UPDATED: string; DELETED: string }}
+ */
+export function getAgentSdkLifecycleEvents() {
+    return LIFECYCLE_EVENTS;
+}
+
+/**
+ * @returns {{ CREATED: string; UPDATED: string; DELETED: string }}
+ */
+export function getAgentSdkSessionLifecycleEvents() {
+    return SESSION_LIFECYCLE_EVENTS;
+}
+
+/**
+ * @param {Record<string, (event: unknown) => void>} handlers
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @returns {() => void}
+ */
+export function onAgentSdkLifecycleEvents(handlers, client) {
+    return onLifecycleEvents(handlers, client);
+}
+
+/**
+ * @param {import('#copilot/sdk/quota-monitor').QuotaMonitorOptions} options
+ * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ */
+export function createAgentSdkQuotaMonitor(options) {
+    return createQuotaMonitor(options);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {SessionListFilter} [filter]
+ * @returns {Promise<import('#copilot/sdk/types').SessionMetadata[]>}
+ */
+export async function listAgentSdkSessionsByClient(client, filter) {
+    return listSessions(client, filter);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {string} sessionId
+ * @returns {Promise<void>}
+ */
+export async function deleteAgentSdkSessionByClient(client, sessionId) {
+    await deleteSession(client, sessionId);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {Record<string, unknown>} options
+ * @returns {Promise<Awaited<ReturnType<typeof createSession>>>}
+ */
+export async function createAgentSdkSessionByClient(client, options) {
+    return createSession(client, options);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotSession} session
+ * @returns {Promise<unknown[]>}
+ */
+export async function readAgentSdkSessionMessages(session) {
+    return getSessionMessages(session);
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isAgentSdkQuotaOrRateLimitError(error) {
+    return isSdkQuotaOrRateLimitError(error);
+}
+
+/** @type {string} */
+export const AGENT_SDK_DEFAULT_MODEL = 'gpt-5-mini';
+
+/**
+ * @returns {Promise<void>}
+ */
+export async function loadAgentSdkToolsConfigAsync() {
+    await loadToolsConfigAsync();
+}
+
+/**
+ * @template {Record<string, unknown>} T
+ * @param {T} value
+ * @returns {Partial<T>}
+ */
+export function pickDefinedAgentSdkOptions(value) {
+    return /** @type {Partial<T>} */ (pickDefined(value));
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {string | null | undefined} sessionId
+ * @param {Record<string, unknown>} options
+ * @returns {Promise<{ session: import('#copilot/sdk/types').CopilotSession; isResumed: boolean }>}
+ */
+export async function resumeOrCreateAgentSdkSession(client, sessionId, options) {
+    return resumeOrCreate(client, sessionId ?? null, options);
+}
+
+/**
  * Snapshot verificável da cobertura de recursos SDK disponíveis ao runtime atual do agent.
  *
  * @param {AgentContext} ctx
@@ -189,8 +439,10 @@ export function getSdkResourceSnapshot(ctx) {
         foregroundControlAvailable:
             typeof handles.client?.getForegroundSessionId === 'function' &&
             typeof handles.client?.setForegroundSessionId === 'function',
-        workspaceRpcAvailable: hasRpcNamespace(handles.sessionRpc, 'workspace'),
-        compactionAvailable: hasRpcNamespace(handles.sessionRpc, 'compaction'),
+        workspaceRpcAvailable:
+            hasRpcNamespace(handles.sessionRpc, 'workspaces') || hasRpcNamespace(handles.sessionRpc, 'workspace'),
+        compactionAvailable:
+            hasRpcNamespace(handles.sessionRpc, 'history') || hasRpcNamespace(handles.sessionRpc, 'compaction'),
         shellAvailable: hasRpcNamespace(handles.sessionRpc, 'shell'),
         uiElicitationAvailable: hasRpcNamespace(handles.sessionRpc, 'ui'),
         pendingCommandsAvailable: hasRpcNamespace(handles.sessionRpc, 'commands'),

@@ -20,7 +20,6 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { EVENT_BUS, bridgeEmitter, container, toError, withRetry } from '#copilot/core';
 import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
-import { checkAuthStatus, createCopilotClient } from '#copilot/sdk';
 import {
     BOOT_MAX_RETRIES,
     COPILOT_MODEL,
@@ -41,6 +40,7 @@ import {
     HOOK_SESSION_START,
 } from '../../events/index.js';
 import { getAgent } from '../always-alive.js';
+import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../facades/agent-sdk-access.js';
 import { getDefaultHookBus } from '../ports/hook-port.js';
 import { ERROR_TRACKER, log } from '../ports/observability-port.js';
 import {
@@ -149,8 +149,8 @@ export async function startAgentLoop() {
     });
 
     const preflightReport = await runCopilotSdkBootPreflight({
-        createClient: () => createCopilotClient(),
-        checkAuthStatus,
+        createClient: () => createAgentSdkClient(),
+        checkAuthStatus: checkAgentSdkAuthStatus,
         configuredModel: COPILOT_MODEL,
         pingTimeoutMs: PING_TIMEOUT_MS,
         log,

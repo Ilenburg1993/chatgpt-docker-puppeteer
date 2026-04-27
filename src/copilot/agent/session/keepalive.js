@@ -12,8 +12,8 @@
  */
 
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
-import { sendSession } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { sendAgentSdkSession } from '../facades/agent-sdk-runtime.js';
 import { log } from '../ports/observability-port.js';
 
 /**
@@ -170,7 +170,7 @@ export class SessionKeepalive {
 
             const sendResult = await withAgentErrorPolicy(
                 () =>
-                    sendSession(
+                    sendAgentSdkSession(
                         /** @type {import('#copilot/sdk/types').CopilotSession} */ (/** @type {unknown} */ (session)),
                         { prompt: '[keepalive]' },
                     ),

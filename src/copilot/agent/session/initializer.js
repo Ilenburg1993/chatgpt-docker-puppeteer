@@ -19,16 +19,16 @@ import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { buildCustomAgentsConfig } from '#copilot/config';
 import { toError } from '#copilot/core';
-import {
-    DEFAULT_MODEL,
-    createSession,
-    getSessionMessages,
-    loadToolsConfigAsync,
-    pickDefined,
-    resumeOrCreate,
-} from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
+import {
+    AGENT_SDK_DEFAULT_MODEL,
+    createAgentSdkSessionByClient,
+    loadAgentSdkToolsConfigAsync,
+    pickDefinedAgentSdkOptions,
+    readAgentSdkSessionMessages,
+    resumeOrCreateAgentSdkSession,
+} from '../facades/agent-sdk-access.js';
 import {
     persistStateWithPolicy as _persistStateWithPolicy,
     readStateAsync as _readStateAsync,
@@ -46,7 +46,7 @@ export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe }
  */
 
 // F51: Carrega configuração de tools persistida (async).
-await loadToolsConfigAsync();
+await loadAgentSdkToolsConfigAsync();
 
 /**
  * Threshold dinâmico de compaction — configurável em runtime via PUT /config/infinite-session.
@@ -71,7 +71,7 @@ async function _validateResumedSession(session) {
     if (typeof session.getMessages !== 'function') return true;
     try {
         await Promise.race([
-            getSessionMessages(session),
+            readAgentSdkSessionMessages(session),
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('resume-health-timeout')), RESUMED_SESSION_HEALTH_TIMEOUT_MS),
             ),
@@ -153,7 +153,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  */
 export async function initOrResumeSession(client, sessionOptions) {
     const state = await _readStateAsync();
-    const model = sessionOptions.model ?? DEFAULT_MODEL;
+    const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
     const bootSkills = readBootSkillConfig();
 
@@ -172,7 +172,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         workingDirectory: WORKSPACE_ROOT,
         // Diretórios de skills para o SDK carregar.
         skillDirectories: bootSkills.skillDirectories,
-        ...pickDefined({
+        ...pickDefinedAgentSdkOptions({
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,
             hooks: sessionOptions.hooks,
@@ -202,10 +202,10 @@ export async function initOrResumeSession(client, sessionOptions) {
             savedSessionId = null;
         }
     }
-    let result = await resumeOrCreate(client, savedSessionId, opts);
+    let result = await resumeOrCreateAgentSdkSession(client, savedSessionId, opts);
     if (result.isResumed && !(await _validateResumedSession(result.session))) {
         log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
-        result = await createSession(client, opts);
+        result = await createAgentSdkSessionByClient(client, opts);
     }
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
@@ -224,7 +224,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     } else {
         const persistedNewSession = await _persistStateWithPolicy(
             {
-                sessionId: result.sessionId,
+                sessionId: result.session.sessionId,
                 startedAt: Date.now(),
                 resumedAt: Date.now(),
                 resumeCount: 0,
@@ -238,7 +238,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         if (!persistedNewSession.ok) {
             throw persistedNewSession.error;
         }
-        log('INFO', `[PersistentSession] Nova sessão criada: ${result.sessionId}`);
+        log('INFO', `[PersistentSession] Nova sessão criada: ${result.session.sessionId}`);
     }
 
     return { session: result.session, isResumed: result.isResumed };

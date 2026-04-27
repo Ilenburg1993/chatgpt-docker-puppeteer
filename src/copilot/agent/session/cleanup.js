@@ -12,10 +12,10 @@
  * @see EventBus
  */
 
-import { deleteSession, listSessions } from '#copilot/sdk';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { deleteAgentSdkSessionByClient, listAgentSdkSessionsByClient } from '../facades/agent-sdk-access.js';
 import { log, startSpan } from '../ports/observability-port.js';
 
 /**
@@ -49,7 +49,7 @@ export async function cleanupStaleSessions(client, options = {}) {
             const result = { total: 0, deleted: 0, deletedIds: [], kept: 0, errors: [] };
 
             try {
-                const sessions = await listSessions(client);
+                const sessions = await listAgentSdkSessionsByClient(client);
                 if (!Array.isArray(sessions)) {
                     log('WARN', '[SessionCleanup] listSessions não retornou array.');
                     return result;
@@ -90,7 +90,7 @@ export async function cleanupStaleSessions(client, options = {}) {
                 if (toDelete.length > 0) {
                     const outcomes = await Promise.allSettled(
                         toDelete.map(({ id, ageMs }) =>
-                            deleteSession(client, id).then(() => {
+                            deleteAgentSdkSessionByClient(client, id).then(() => {
                                 log(
                                     'DEBUG',
                                     `[SessionCleanup] Sessão ${id} removida (idade: ${Math.round(ageMs / 3600_000)}h).`,

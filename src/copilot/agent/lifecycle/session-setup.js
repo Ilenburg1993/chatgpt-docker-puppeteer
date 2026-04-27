@@ -22,11 +22,15 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { createRegistry, getToolsConfig, modelRegistry } from '#copilot/sdk';
 import { log, METRICS_STORE } from '../ports/observability-port.js';
 
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';
+import {
+    createAgentSdkToolsRegistry,
+    getAgentSdkToolsConfig,
+    readAgentSdkModelRegistryEntry,
+} from '../facades/agent-sdk-access.js';
 import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../ports/hook-port.js';
 import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
 import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../ports/tool-port.js';
@@ -106,7 +110,7 @@ function resetToolsRegistry(ctx) {
         return ctx.resetToolsRegistry();
     }
     const compat = /** @type {{ toolsRegistry?: import('#copilot/sdk/tools-registry').ToolRegistry | null }} */ (ctx);
-    compat.toolsRegistry = createRegistry();
+    compat.toolsRegistry = createAgentSdkToolsRegistry();
     return compat.toolsRegistry;
 }
 
@@ -134,7 +138,7 @@ function getPermissionHandler(ctx) {
         return ctx.getPermissionHandlerSnapshot();
     }
     const compat = /** @type {{ permissions?: { handler?: import('#copilot/sdk/types').PermissionHandler } }} */ (ctx);
-    return compat.permissions?.handler ?? (() => ({ kind: 'approved' }));
+    return compat.permissions?.handler ?? (() => ({ kind: 'approve-once' }));
 }
 
 /**
@@ -213,7 +217,7 @@ export function buildSessionHooks(ctx, host) {
         metrics: metricsStore,
     });
 
-    const toolsConfig = getToolsConfig();
+    const toolsConfig = getAgentSdkToolsConfig();
     const defaultRuntimeDenylist = [...DEFAULT_EXCLUDED_TOOLS, ...toolsConfig.denylist];
     const hasRuntimeToolPolicy = defaultRuntimeDenylist.length > 0 || toolsConfig.allowlist !== null;
 
@@ -266,7 +270,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
 
     const reasoningEffort = ctx.getReasoningEffortSnapshot();
     if (reasoningEffort) {
-        const modelMeta = modelRegistry.get(ctx.getModelSnapshot());
+        const modelMeta = readAgentSdkModelRegistryEntry(ctx.getModelSnapshot());
         if (modelMeta?.supportsReasoning === false) {
             log(
                 'INFO',

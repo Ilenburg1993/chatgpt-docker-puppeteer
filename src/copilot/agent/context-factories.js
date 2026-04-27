@@ -18,8 +18,8 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
-import { createRegistry } from '#copilot/sdk';
 import { MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
+import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { DialogLoopManager } from './dialog/loop-manager.js';
@@ -67,7 +67,7 @@ export const defaultAgentContextFactories = Object.freeze({
         createAgentPermissionController({
             onModeChanged: (mode) => host.emitter.emit(EMITTER_PERMISSION_MODE_CHANGED, { mode }),
         }),
-    createToolsRegistry: () => createRegistry(),
+    createToolsRegistry: () => createAgentSdkToolsRegistry(),
     createKeepalive: () => new SessionKeepalive(),
     createHandoff: () => new HandoffManager(),
     createMessagesCache: () => new SessionMessagesCache(MESSAGES_CACHE_TTL_MS),

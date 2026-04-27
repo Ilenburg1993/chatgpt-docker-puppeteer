@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
-import { getSessionMessages } from '../../sdk/session/wrapper.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { readAgentSdkSessionMessages } from '../facades/agent-sdk-runtime.js';
 import { log } from '../ports/observability-port.js';
 
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
@@ -76,7 +76,7 @@ async function runSdkHistorySync(session, deps) {
         };
     }
 
-    const messages = await getSessionMessages(session);
+    const messages = await readAgentSdkSessionMessages(session);
     if (!Array.isArray(messages) || messages.length === 0) {
         return { hubSessionId, synced: 0, skipped: 0, unavailableReason: null };
     }
@@ -198,7 +198,7 @@ export class SessionMessagesCache {
             return this.#cache;
         }
         try {
-            const messages = await getSessionMessages(session);
+            const messages = await readAgentSdkSessionMessages(session);
             this.#cache = messages.length > this.#maxItems ? messages.slice(-this.#maxItems) : messages;
             this.#cacheAt = now;
             return this.#cache;

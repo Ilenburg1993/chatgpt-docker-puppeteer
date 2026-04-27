@@ -19,10 +19,10 @@ import {
     EMITTER_SESSION_CLEANUP,
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
-import { isExperimentalEnabled, modelStatsTracker } from '#copilot/sdk';
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
+import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../facades/agent-sdk-access.js';
 import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
 import { startDefaultMcpAutoReconnect } from '../ports/mcp-port.js';
 import {
@@ -166,7 +166,7 @@ export function stepAttachAgentObserver(agentEmitter, state, options) {
     const agentObserver = createAgentEventObserver({
         metrics: defaultMetrics,
         errorTracker: defaultErrorTracker,
-        modelStatsTracker,
+        modelStatsTracker: getAgentSdkModelStatsTracker(),
     });
     if (options?.eventBus) {
         agentObserver.attachToBus(options.eventBus);
@@ -379,7 +379,7 @@ export function stepStartKeepalive(ctx) {
  * @returns {void}
  */
 export function stepWireHandoff(agentEmitter, ctx, state) {
-    if (isExperimentalEnabled('fleet')) {
+    if (isAgentSdkExperimentalEnabled('fleet')) {
         const onHandoff = (
             /**
              * @type {{

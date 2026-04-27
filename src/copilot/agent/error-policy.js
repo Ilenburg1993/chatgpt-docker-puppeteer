@@ -9,7 +9,7 @@
  */
 
 import { isFatalError, toError } from '#copilot/core';
-import { isSdkQuotaOrRateLimitError } from '../sdk/errors.js';
+import { isAgentSdkQuotaOrRateLimitError } from './facades/agent-sdk-access.js';
 
 /**
  * @param {Error} error
@@ -92,7 +92,7 @@ export function classifyAgentError(error) {
     ) {
         return 'ignore';
     }
-    if (isSdkQuotaOrRateLimitError(normalized) || isSdkQuotaOrRateLimitError(cause)) {
+    if (isAgentSdkQuotaOrRateLimitError(normalized) || isAgentSdkQuotaOrRateLimitError(cause)) {
         return 'fatal';
     }
     if (typeof isFatalError === 'function' && (isFatalError(normalized) || isFatalError(cause))) {

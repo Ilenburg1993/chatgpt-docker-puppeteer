@@ -63,7 +63,11 @@ export {
     unregisterAgentRuntimeWebhook,
 } from './agent-runtime-webhooks.js';
 export {
+    checkAgentSdkAuthStatus,
+    createAgentSdkClient,
+    createAgentSdkToolsRegistry,
     compactSdkSession,
+    disconnectAgentSdkSession,
     createSdkWorkspaceFile,
     deleteSdkPlan,
     deselectSdkAgent,
@@ -73,6 +77,7 @@ export {
     getLastSdkSessionId,
     getSdkAuthStatus,
     getSdkHandles,
+    getAgentSdkToolsConfig,
     getSdkQuota,
     getSdkResourceSnapshot,
     getSdkSessionMode,
@@ -88,7 +93,9 @@ export {
     listSdkWorkspaceFiles,
     pingSdk,
     readSdkPlan,
+    readAgentSdkModelRegistryEntry,
     readSdkWorkspaceFile,
+    raceAgentSdkEvents,
     reloadSdkAgents,
     requestSdkElicitation,
     selectSdkAgent,
@@ -96,6 +103,14 @@ export {
     setSdkSessionMode,
     updateSdkPlan,
 } from './agent-sdk-access.js';
+export {
+    onAgentSdkSessionEvent,
+    onAllAgentSdkSessionEvents,
+    readAgentSdkSessionMessages,
+    sendAgentSdkSession,
+    sendAgentSdkSessionAndWait,
+    waitForAgentSdkEvent,
+} from './agent-sdk-runtime.js';
 export {
     deleteAgentSdkPlan,
     readAgentSdkPlan,
