@@ -52,8 +52,10 @@ import {
     getSessionMessages,
     getSessionWorkspacePath,
     runSessionLifecycle,
+    sendSessionAndWait,
     setSessionModel,
 } from '#copilot/sdk/sdk-session-wrapper';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 // ─── Helper: fake session ──────────────────────────────────────────────────
 
@@ -77,8 +79,17 @@ function fakeSession(overrides = {}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('sdk/session-lifecycle', () => {
+    /** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+    let metrics;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
+    });
+
+    afterEach(() => {
+        setSdkMetricEmitter(null);
     });
 
     // ─── abortSession ──────────────────────────────────────────────────────
@@ -118,6 +129,9 @@ describe('sdk/session-lifecycle', () => {
             const s = fakeSession();
             await setSessionModel(s, 'gpt-4.1', { reasoningEffort: 'high' });
             expect(s.setModel).toHaveBeenCalledWith('gpt-4.1', { reasoningEffort: 'high' });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['session.setModel:started', 'session.setModel:succeeded']),
+            );
         });
 
         it('funciona sem options', async () => {
@@ -139,6 +153,18 @@ describe('sdk/session-lifecycle', () => {
 
         it('rejeita para sessão inválida', async () => {
             await expect(setSessionModel(null, 'gpt-4.1')).rejects.toThrow(TypeError);
+        });
+    });
+
+    describe('sendSessionAndWait', () => {
+        it('emite métricas de sucesso', async () => {
+            const s = fakeSession({ sendAndWait: vi.fn().mockResolvedValue({ data: { content: 'ok' } }) });
+            await expect(sendSessionAndWait(s, /** @type {any} */ ({ prompt: 'oi' }))).resolves.toEqual({
+                data: { content: 'ok' },
+            });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['session.sendAndWait:started', 'session.sendAndWait:succeeded']),
+            );
         });
     });
 

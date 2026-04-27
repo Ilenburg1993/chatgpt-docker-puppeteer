@@ -12,6 +12,7 @@
 import { toError } from '../../core/error-handlers.js';
 import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -99,6 +100,8 @@ export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
         'DEBUG',
         `[session-lifecycle] sendAndWait: sessionId='${session.sessionId}', timeout=${hasTimeout ? String(timeoutMs) : 'none'}`,
     );
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'session.sendAndWait', status: 'started', sessionId: session.sessionId });
     /** @type {AssistantMessageEvent | undefined} */
     let event;
     try {
@@ -106,8 +109,23 @@ export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
             ? await session.sendAndWait(messageOptions, timeoutMs)
             : await session.sendAndWait(messageOptions);
     } catch (error) {
-        throw toSdkOperationError('session.sendAndWait', error);
+        const sdkError = toSdkOperationError('session.sendAndWait', error);
+        emitSdkOperationMetric({
+            operation: 'session.sendAndWait',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
+    emitSdkOperationMetric({
+        operation: 'session.sendAndWait',
+        status: 'succeeded',
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+        attributes: { hasAssistantMessage: Boolean(event) },
+    });
     log('DEBUG', `[session-lifecycle] sendAndWait concluído: sessionId='${session.sessionId}'`);
     return event;
 }
@@ -156,11 +174,33 @@ export async function setSessionModel(session, model, options) {
         throw new TypeError('[session-lifecycle/setModel] model deve ser string não-vazia.');
     }
     log('INFO', `[session-lifecycle] setModel: sessionId='${session.sessionId}', model='${model}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'session.setModel',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: { model },
+    });
     try {
         await session.setModel(model, options);
     } catch (error) {
-        throw toSdkOperationError('session.setModel', error);
+        const sdkError = toSdkOperationError('session.setModel', error);
+        emitSdkOperationMetric({
+            operation: 'session.setModel',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { model, errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
+    emitSdkOperationMetric({
+        operation: 'session.setModel',
+        status: 'succeeded',
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+        attributes: { model },
+    });
     log('INFO', `[session-lifecycle] Modelo alterado para '${model}': sessionId='${session.sessionId}'`);
 }
 

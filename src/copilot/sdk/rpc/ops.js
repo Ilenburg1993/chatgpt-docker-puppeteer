@@ -10,6 +10,7 @@
 
 import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -64,10 +65,12 @@ function assertSession(session, caller) {
  * @returns {() => Promise<CompactionCompactResult>}
  */
 function getCompactionMethod(session) {
-    const rpc = /** @type {{
-    history?: { compact?: () => Promise<CompactionCompactResult> };
-    compaction?: { compact?: () => Promise<CompactionCompactResult> };
-}} */ (session.rpc);
+    const rpc = /**
+     * @type {{
+     *     history?: { compact?: () => Promise<CompactionCompactResult> };
+     *     compaction?: { compact?: () => Promise<CompactionCompactResult> };
+     * }}
+     */ (session.rpc);
     const fn = rpc.history?.compact ?? rpc.compaction?.compact;
     if (typeof fn !== 'function') {
         throw new TypeError('[sdk/rpc/compaction.compact] RPC de compaction indisponível (history/compaction).');
@@ -82,10 +85,28 @@ function getCompactionMethod(session) {
 export async function compactionCompact(session) {
     assertSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'rpc.compaction.compact', status: 'started', sessionId: session.sessionId });
     try {
-        return await getCompactionMethod(session)();
+        const result = await getCompactionMethod(session)();
+        emitSdkOperationMetric({
+            operation: 'rpc.compaction.compact',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { tokensRemoved: result.tokensRemoved, messagesRemoved: result.messagesRemoved },
+        });
+        return result;
     } catch (error) {
-        throw toSdkOperationError('compaction.compact', error);
+        const sdkError = toSdkOperationError('compaction.compact', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.compaction.compact',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -171,8 +192,10 @@ export async function uiElicitation(session, message, requestedSchema) {
         throw new TypeError('[sdk/rpc/ui.elicitation] requestedSchema deve ser um objeto.');
     }
     appLog('INFO', `[sdk/rpc] ui.elicitation: sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'rpc.ui.elicitation', status: 'started', sessionId: session.sessionId });
     try {
-        return /** @type {ElicitationResult} */ (
+        const result = /** @type {ElicitationResult} */ (
             await session.rpc.ui.elicitation(
                 /** @type {Parameters<typeof session.rpc.ui.elicitation>[0]} */ (
                     /** @type {unknown} */ ({
@@ -182,8 +205,24 @@ export async function uiElicitation(session, message, requestedSchema) {
                 ),
             )
         );
+        emitSdkOperationMetric({
+            operation: 'rpc.ui.elicitation',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { action: result.action },
+        });
+        return result;
     } catch (error) {
-        throw toSdkOperationError('ui.elicitation', error);
+        const sdkError = toSdkOperationError('ui.elicitation', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.ui.elicitation',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 

@@ -27,6 +27,7 @@ describe('hooks/elicitation', () => {
         expect(onCompleted).toHaveBeenCalledWith(
             expect.objectContaining({ result: { action: 'accept', content: { env: 'dev' } } }),
         );
+        expect(queued.pendingCount()).toBe(0);
     });
 
     it('cancela automaticamente quando a fila enche', async () => {

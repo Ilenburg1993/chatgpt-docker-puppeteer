@@ -393,6 +393,7 @@ export {
 } from './rpc/experimental.js';
 
 export { setSdkLogger } from './logger.js';
+export { emitSdkOperationMetric, setSdkMetricEmitter } from './telemetry/operation-metrics.js';
 export { setCustomToolsBuilder } from './tools/custom.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────

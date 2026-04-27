@@ -8,6 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
@@ -85,8 +86,17 @@ function fakeSession(rpcOverrides = {}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('sdk/rpc — Advanced Subsystems', () => {
+    /** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+    let metrics;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
+    });
+
+    afterEach(() => {
+        setSdkMetricEmitter(null);
     });
 
     // ─── COMPACTION ────────────────────────────────────────────────────────
@@ -99,6 +109,9 @@ describe('sdk/rpc — Advanced Subsystems', () => {
             expect(result.tokensRemoved).toBe(500);
             expect(result.messagesRemoved).toBe(10);
             expect(s.rpc.compaction.compact).toHaveBeenCalledOnce();
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.compaction.compact:started', 'rpc.compaction.compact:succeeded']),
+            );
         });
 
         it('rejeita sessão inválida', async () => {
@@ -180,6 +193,9 @@ describe('sdk/rpc — Advanced Subsystems', () => {
                 message: 'Confirme seu nome',
                 requestedSchema: schema,
             });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.ui.elicitation:started', 'rpc.ui.elicitation:succeeded']),
+            );
         });
 
         it('rejeita message vazia', async () => {

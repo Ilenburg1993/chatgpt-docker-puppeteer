@@ -148,37 +148,38 @@ export async function operationName(session, param, options) {
 
 ### 4.1 O que já está correto
 
-| Módulo                     | Status      | Notas                                                                 |
-| -------------------------- | ----------- | --------------------------------------------------------------------- |
-| `sdk/types.js`             | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                    |
-| `sdk/errors.js`            | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`              |
-| `sdk/session/client.js`    | ✅ Completo | Circuit breaker, registry externalizado                               |
-| `sdk/session/lifecycle.js` | ✅ Completo | create/resume/list/delete com normalização de erro                    |
-| `sdk/session/ui.js`        | ✅ Completo | capabilities + `session.ui.elicitation/confirm/select/input`          |
-| `sdk/session/wrapper.js`   | ✅ Completo | abort, disconnect, sendAndWait, send, setModel com tratamento         |
-| `sdk/rpc/session.js`       | ✅ Completo | model, mode, plan, workspace com retornos tipados                     |
-| `sdk/rpc/ops.js`           | ✅ Completo | compaction, shell, elicitation, tools, agent ops com erro normalizado |
-| `sdk/rpc/server.js`        | ✅ Completo | superfície server RPC convergida no wrapper                           |
-| `sdk/rpc/experimental.js`  | ✅ Completo | wrappers experimentais com `SdkOperationError`                        |
-| `hooks/elicitation.js`     | ✅ Completo | provider-side queue de `onElicitationRequest` com resolução externa   |
-| `sdk/tools/core.js`        | ✅ Completo | createTool, createToolSync                                            |
-| `sdk/config.js`            | ✅ Completo | buildSessionConfig com SessionConfigOverrides                         |
-| `sdk/constants.js`         | ✅ Completo |                                                                       |
-| `sdk/logger.js`            | ✅ Completo |                                                                       |
+| Módulo                               | Status      | Notas                                                                   |
+| ------------------------------------ | ----------- | ----------------------------------------------------------------------- |
+| `sdk/types.js`                       | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                      |
+| `sdk/errors.js`                      | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`                |
+| `sdk/session/client.js`              | ✅ Completo | Circuit breaker, registry externalizado                                 |
+| `sdk/session/lifecycle.js`           | ✅ Completo | create/resume/list/delete com normalização de erro                      |
+| `sdk/telemetry/operation-metrics.js` | ✅ Completo | emitter injetável de métricas de operação para L1 sem dependência L1→L2 |
+| `sdk/session/ui.js`                  | ✅ Completo | capabilities + `session.ui.elicitation/confirm/select/input`            |
+| `sdk/session/wrapper.js`             | ✅ Completo | abort, disconnect, sendAndWait, send, setModel com tratamento           |
+| `sdk/rpc/session.js`                 | ✅ Completo | model, mode, plan, workspace com retornos tipados                       |
+| `sdk/rpc/ops.js`                     | ✅ Completo | compaction, shell, elicitation, tools, agent ops com erro normalizado   |
+| `sdk/rpc/server.js`                  | ✅ Completo | superfície server RPC convergida no wrapper                             |
+| `sdk/rpc/experimental.js`            | ✅ Completo | wrappers experimentais com `SdkOperationError`                          |
+| `hooks/elicitation.js`               | ✅ Completo | provider-side queue de `onElicitationRequest` com resolução externa     |
+| `sdk/tools/core.js`                  | ✅ Completo | createTool, createToolSync                                              |
+| `sdk/config.js`                      | ✅ Completo | buildSessionConfig com SessionConfigOverrides                           |
+| `sdk/constants.js`                   | ✅ Completo |                                                                         |
+| `sdk/logger.js`                      | ✅ Completo |                                                                         |
 
 ### 4.2 Gaps conhecidos (a resolver no roadmap)
 
-| Módulo                                         | Gap                                                       | Severidade                                              |
-| ---------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
-| `sdk/session/permissions.js`                   | Verificar se tem try/catch padronizado                    | 🟡 Médio                                                |
-| `sdk/session/provider.js`                      | Verificar crude calls para provider RPC                   | 🟡 Médio                                                |
-| `sdk/telemetry/`                               | Verificar cobertura de telemetria em todos os wrappers    | 🟡 Médio                                                |
-| `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC | 🔄 Em progresso (owner ampliado para lifecycle/session) |
-| `agent/facades/agent-sdk-session.js`           | Owner canônico de mode/plan/session ops                   | ✅ Consolidado nesta onda                               |
-| `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop   | ✅ Resolvido nesta onda (loop/resume convergidos)       |
-| `server/routes/sdk/session-messaging.js`       | Consolidar cobertura de testes HTTP para toda UI SDK      | 🔄 Em progresso                                         |
-| `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0    | 🟠 Alto                                                 |
-| Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas               | 🔴 Importante                                           |
+| Módulo                                         | Gap                                                                                                   | Severidade                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `sdk/session/permissions.js`                   | Verificar se tem try/catch padronizado                                                                | 🟡 Médio                                                |
+| `sdk/session/provider.js`                      | Verificar crude calls para provider RPC                                                               | 🟡 Médio                                                |
+| `sdk/telemetry/`                               | Expandir cobertura além de `session.ui.*`, `sendAndWait`, `setModel`, `compaction` e `ui.elicitation` | 🟡 Médio                                                |
+| `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC                                             | 🔄 Em progresso (owner ampliado para lifecycle/session) |
+| `agent/facades/agent-sdk-session.js`           | Owner canônico de mode/plan/session ops                                                               | ✅ Consolidado nesta onda                               |
+| `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop                                               | ✅ Resolvido nesta onda (loop/resume convergidos)       |
+| `server/routes/sdk/session-messaging.js`       | Consolidar cobertura de testes HTTP para toda UI SDK                                                  | 🔄 Em progresso                                         |
+| `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0                                                | 🟠 Alto                                                 |
+| Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas                                                           | 🔴 Importante                                           |
 
 ### 4.3 Comunicação atual entre `src/copilot/agent/` e `src/copilot/sdk/`
 
@@ -273,6 +274,14 @@ A sobreposição foi reduzida de forma significativa nesta onda:
    `hooks/elicitation.js` (provider-side queue do SDK) - `server/routes/sdk/session-messaging.js`
    (adapter HTTP para `ui/capabilities`, `ui/elicitation`, `ui/confirm`, `ui/select`, `ui/input`) -
    `terminal/commands/sdk.js` (UX de `/elicitation`, incluindo `confirm/select/input/capabilities`)
+
+5. **Observabilidade das operações SDK**
+
+- `sdk/telemetry/operation-metrics.js` (emitter injetável L1)
+- `observability/bootstrap.js` (binding canônico do emitter para `defaultMetrics`)
+- `sdk/session/ui.js`, `sdk/session/wrapper.js`, `sdk/rpc/ops.js` (operações já instrumentadas)
+- `agent/context-factories.js` (provider-side `elicitation.pending/completed` instrumentado no
+  runtime)
 
 O principal problema, portanto, **não é mais crude call direta ao vendor** — isso já foi quase todo
 eliminado fora de `sdk/`. O problema restante é:
@@ -451,19 +460,20 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 | Remover conhecimento de `sessionRpc` de módulos de domínio fora de `facades/ports`            | ✅ para módulos quentes principais |
 | Criar guardrail CI/grep para bloquear novos imports `agent -> sdk/*` internos                 | ✅                                 |
 
-### Fase 4 — Observabilidade nos wrappers (⬜ PENDENTE)
+### Fase 4 — Observabilidade nos wrappers (🔄 EM ANDAMENTO)
 
 **Meta**: cada wrapper RPC que representa uma operação de negócio emite um evento de métricas.
 
-| Item                                                                              | Status |
-| --------------------------------------------------------------------------------- | ------ |
-| Definir interface `SdkOperationMetric` em `types.js`                              | ⬜     |
-| Injetar `emitMetric` opcional via DI nos wrappers RPC                             | ⬜     |
-| Emitir evento em `modelSwitchTo`, `shellExec`, `compactionCompact`, `sendAndWait` | ⬜     |
-| Emitir evento em `session.ui.elicitation/confirm/select/input`                    | ⬜     |
-| Emitir evento em provider-side `elicitation.pending/completed`                    | ⬜     |
-| Integrar com observability event bus existente                                    | ⬜     |
-| Dashboard: contadores de chamadas RPC por tipo                                    | ⬜     |
+| Item                                                                              | Status                                                                                    |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Definir interface `SdkOperationMetric` em `types.js`                              | ✅                                                                                        |
+| Introduzir emitter injetável em L1 (`sdk/telemetry/operation-metrics.js`)         | ✅                                                                                        |
+| Integrar emitter ao bootstrap de observabilidade                                  | ✅                                                                                        |
+| Emitir evento em `modelSwitchTo`, `shellExec`, `compactionCompact`, `sendAndWait` | 🔄 (`compactionCompact` + `sendAndWait` entregues; `shellExec`/`modelSwitchTo` pendentes) |
+| Emitir evento em `session.ui.elicitation/confirm/select/input`                    | ✅                                                                                        |
+| Emitir evento em provider-side `elicitation.pending/completed`                    | ✅                                                                                        |
+| Integrar com observability event bus existente                                    | ⬜                                                                                        |
+| Dashboard: contadores de chamadas RPC por tipo                                    | ⬜                                                                                        |
 
 ### Fase 5 — Auditoria de boundary (🔄 EM ANDAMENTO)
 
@@ -693,3 +703,28 @@ Validação executada neste checkpoint:
   - `tests/unit/copilot/test_terminal_runtime_frontend.spec.js`
   - `tests/unit/copilot/test_terminal_frontend_primary.spec.js`
   - `tests/unit/copilot/test_sdk_route_session_ownership.spec.js`
+
+### 10.7 Checkpoint complementar — Observabilidade inicial dos wrappers SDK (2026-04-27)
+
+Estado complementar validado após a primeira onda da Fase 4:
+
+- `sdk/telemetry/operation-metrics.js` fornece um emitter injetável para L1, evitando dependência
+  direta `sdk/` → `observability/`
+- `observability/bootstrap.js` liga esse emitter em runtime ao `defaultMetrics`, materializando
+  counters/gauges por operação SDK
+- wrappers já instrumentados:
+  - `sdk/session/ui.js`
+  - `sdk/session/wrapper.js` (`session.sendAndWait`, `session.setModel`)
+  - `sdk/rpc/ops.js` (`compactionCompact`, `uiElicitation`)
+- provider-side de ELICITATION também emite métricas no runtime via `agent/context-factories.js`
+  (`sdk.elicitation.provider.pending/completed/action/*`)
+
+Validação executada neste checkpoint:
+
+- lote focado de observabilidade SDK ✅
+  - `tests/unit/copilot/sdk/test_sdk_session_ui.spec.js`
+  - `tests/unit/copilot/hooks/test_elicitation_handlers.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_session_lifecycle.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_rpc_advanced.spec.js`
+- `npm run typecheck:node` ✅
+- `npm run lint` ✅

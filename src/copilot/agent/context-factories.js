@@ -26,6 +26,7 @@ import { DialogLoopManager } from './dialog/loop-manager.js';
 import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
+import { defaultMetrics } from './ports/observability-port.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history-sync.js';
 import { SessionKeepalive } from './session/keepalive.js';
@@ -80,9 +81,11 @@ export const defaultAgentContextFactories = Object.freeze({
     createKeepalive: () => new SessionKeepalive(),
     createHandoff: () => new HandoffManager(),
     createMessagesCache: () => new SessionMessagesCache(MESSAGES_CACHE_TTL_MS),
-    createSdkElicitation: (host) =>
-        createQueuedElicitationHandler({
+    createSdkElicitation: (host) => {
+        const queued = createQueuedElicitationHandler({
             onPending: (entry) => {
+                defaultMetrics.recordCounter('sdk.elicitation.provider.pending.total');
+                defaultMetrics.recordGauge('sdk.elicitation.provider.pending.current', queued.pendingCount());
                 host.invalidateStatusSnapshot();
                 host.emitter.emit('elicitation.pending', {
                     requestId: entry.id,
@@ -98,6 +101,11 @@ export const defaultAgentContextFactories = Object.freeze({
                 });
             },
             onCompleted: (entry) => {
+                const waitMs = Math.max(0, entry.completedAt - entry.createdAt);
+                defaultMetrics.recordCounter('sdk.elicitation.provider.completed.total');
+                defaultMetrics.recordCounter(`sdk.elicitation.provider.action.${entry.result.action}`);
+                defaultMetrics.recordGauge('sdk.elicitation.provider.pending.current', queued.pendingCount());
+                defaultMetrics.recordGauge('sdk.elicitation.provider.last_wait_ms', waitMs);
                 host.invalidateStatusSnapshot();
                 host.emitter.emit('elicitation.completed', {
                     requestId: entry.id,
@@ -110,7 +118,9 @@ export const defaultAgentContextFactories = Object.freeze({
                     ts: entry.completedAt,
                 });
             },
-        }),
+        });
+        return queued;
+    },
     createBackgroundTasks: (host) =>
         new BackgroundTasks({
             onCompleted: (event) => {

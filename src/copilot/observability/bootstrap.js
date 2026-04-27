@@ -28,6 +28,7 @@ import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
 import { setHooksLogger } from '../hooks/logger.js';
 import { setSdkLogger } from '../sdk/logger.js';
+import { setSdkMetricEmitter } from '../sdk/telemetry/operation-metrics.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
 import { setToolsLogger } from '../tools/logger.js';
 import { setToolsMetrics } from '../tools/metrics-proxy.js';
@@ -41,6 +42,39 @@ import { getToolStats, recordToolCall } from './tool-stats.js';
 
 /** @type {boolean} */
 let _obsBooted = false;
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeMetricSegment(value) {
+    return String(value || 'unknown').replace(/[^a-zA-Z0-9_.-]+/gu, '_');
+}
+
+/**
+ * @param {import('../sdk/types.js').SdkOperationMetric} metric
+ * @returns {void}
+ */
+function emitSdkMetric(metric) {
+    const op = normalizeMetricSegment(metric.operation);
+    const status = normalizeMetricSegment(metric.status);
+    defaultMetrics.recordCounter(`sdk.operation.${op}.total`);
+    defaultMetrics.recordCounter(`sdk.operation.${op}.${status}`);
+    if (typeof metric.durationMs === 'number') {
+        defaultMetrics.recordGauge(`sdk.operation.${op}.last_duration_ms`, metric.durationMs);
+    }
+    const errorKind = metric.attributes?.['errorKind'];
+    if (typeof errorKind === 'string' && errorKind) {
+        defaultMetrics.recordCounter(`sdk.operation.${op}.error_kind.${normalizeMetricSegment(errorKind)}`);
+    }
+    const action = metric.attributes?.['action'];
+    if (typeof action === 'string' && action) {
+        defaultMetrics.recordCounter(`sdk.operation.${op}.action.${normalizeMetricSegment(action)}`);
+    }
+    if (metric.operation === 'session.sendAndWait' && typeof metric.durationMs === 'number') {
+        defaultMetrics.recordSdkDialogTurn(metric.durationMs, metric.status === 'succeeded');
+    }
+}
 
 /**
  * Conecta `core/error-handlers`, `core/shutdown`, `db/sqlite`, `sdk/` e `audit/` às implementações reais de log e
@@ -60,6 +94,7 @@ export function bootstrapObservability() {
         log,
         tracker: defaultErrorTracker,
     });
+    setSdkMetricEmitter(emitSdkMetric);
 
     // DI container — registrar as dependências como tokens
     container.register(SHUTDOWN_LOGGER, () => log, 'singleton');

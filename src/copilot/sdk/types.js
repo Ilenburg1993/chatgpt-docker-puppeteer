@@ -189,6 +189,24 @@
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
  */
 
+/**
+ * Evento genérico de métrica emitido pela SDK Wrapper Layer. É transportado por um emitter injetável para evitar
+ * dependência direta de L1 → L2.
+ *
+ * @typedef {object} SdkOperationMetric
+ * @property {string} operation
+ * @property {'started' | 'succeeded' | 'failed'} status
+ * @property {string} [sessionId]
+ * @property {number} [durationMs]
+ * @property {Record<string, unknown>} [attributes]
+ */
+
+/**
+ * Callback opcional de observabilidade para métricas da SDK Wrapper Layer.
+ *
+ * @typedef {(metric: SdkOperationMetric) => void} SdkMetricEmitter
+ */
+
 // ─── User Input ───────────────────────────────────────────────────────────────
 
 /**

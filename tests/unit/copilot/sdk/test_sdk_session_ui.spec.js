@@ -10,6 +10,7 @@ import {
     sessionUiInput,
     sessionUiSelect,
 } from '../../../../src/copilot/sdk/session/ui.js';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 function fakeSession() {
     return /** @type {any} */ ({
@@ -50,6 +51,18 @@ function fakeFallbackSession() {
 }
 
 describe('sdk/session/ui', () => {
+    /** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+    let metrics;
+
+    beforeEach(() => {
+        metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
+    });
+
+    afterEach(() => {
+        setSdkMetricEmitter(null);
+    });
+
     it('lê capabilities e disponibilidade de elicitation', () => {
         const session = fakeSession();
         expect(getSessionCapabilities(session)).toEqual({ ui: { elicitation: true } });
@@ -64,6 +77,18 @@ describe('sdk/session/ui', () => {
         await expect(sessionUiConfirm(session, 'Confirma?')).resolves.toBe(true);
         await expect(sessionUiSelect(session, 'Selecione', ['dev', 'prod'])).resolves.toBe('dev');
         await expect(sessionUiInput(session, 'Nome?')).resolves.toBe('Nome?');
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining([
+                'session.ui.elicitation:started',
+                'session.ui.elicitation:succeeded',
+                'session.ui.confirm:started',
+                'session.ui.confirm:succeeded',
+                'session.ui.select:started',
+                'session.ui.select:succeeded',
+                'session.ui.input:started',
+                'session.ui.input:succeeded',
+            ]),
+        );
     });
 
     it('emula confirm/select/input quando apenas rpc.ui.elicitation está disponível', async () => {
@@ -75,5 +100,15 @@ describe('sdk/session/ui', () => {
         await expect(
             sessionUiElicitation(session, { message: 'Dados?', requestedSchema: { type: 'object', properties: {} } }),
         ).resolves.toEqual({ action: 'accept', content: { value: 'fallback-value' } });
+    });
+
+    it('emite métrica failed quando a operação falha', async () => {
+        const session = fakeSession();
+        session.ui.confirm.mockRejectedValueOnce(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }));
+
+        await expect(sessionUiConfirm(session, 'Confirma?')).rejects.toThrow('timeout');
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining(['session.ui.confirm:started', 'session.ui.confirm:failed']),
+        );
     });
 });

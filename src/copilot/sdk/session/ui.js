@@ -10,6 +10,7 @@
 
 import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -143,10 +144,28 @@ export async function sessionUiElicitation(session, params) {
         throw new TypeError('[sdk/session/ui.elicitation] params.requestedSchema deve ser um objeto.');
     }
     appLog('INFO', `[sdk/session/ui] elicitation: sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'session.ui.elicitation', status: 'started', sessionId: session.sessionId });
     try {
-        return await invokeGenericElicitation(session, params);
+        const result = await invokeGenericElicitation(session, params);
+        emitSdkOperationMetric({
+            operation: 'session.ui.elicitation',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { action: result.action },
+        });
+        return result;
     } catch (error) {
-        throw toSdkOperationError('session.ui.elicitation', error);
+        const sdkError = toSdkOperationError('session.ui.elicitation', error);
+        emitSdkOperationMetric({
+            operation: 'session.ui.elicitation',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -160,10 +179,20 @@ export async function sessionUiConfirm(session, message) {
     if (typeof message !== 'string' || message.length === 0) {
         throw new TypeError('[sdk/session/ui.confirm] message deve ser string não-vazia.');
     }
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'session.ui.confirm', status: 'started', sessionId: session.sessionId });
     try {
         const ui = getSessionUiRef(session);
         if (typeof ui?.confirm === 'function') {
-            return await ui.confirm(message);
+            const result = await ui.confirm(message);
+            emitSdkOperationMetric({
+                operation: 'session.ui.confirm',
+                status: 'succeeded',
+                sessionId: session.sessionId,
+                durationMs: Date.now() - startedAt,
+                attributes: { accepted: result },
+            });
+            return result;
         }
         const result = await invokeGenericElicitation(session, {
             message,
@@ -180,10 +209,25 @@ export async function sessionUiConfirm(session, message) {
                 required: ['confirmed'],
             },
         });
-        if (result.action !== 'accept') return false;
-        return readBooleanField(result, 'confirmed') ?? true;
+        const normalized = result.action !== 'accept' ? false : (readBooleanField(result, 'confirmed') ?? true);
+        emitSdkOperationMetric({
+            operation: 'session.ui.confirm',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { action: result.action, accepted: normalized },
+        });
+        return normalized;
     } catch (error) {
-        throw toSdkOperationError('session.ui.confirm', error);
+        const sdkError = toSdkOperationError('session.ui.confirm', error);
+        emitSdkOperationMetric({
+            operation: 'session.ui.confirm',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -201,10 +245,20 @@ export async function sessionUiSelect(session, message, options) {
     if (!Array.isArray(options) || options.length === 0 || options.some((item) => typeof item !== 'string')) {
         throw new TypeError('[sdk/session/ui.select] options deve ser um array não-vazio de strings.');
     }
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'session.ui.select', status: 'started', sessionId: session.sessionId });
     try {
         const ui = getSessionUiRef(session);
         if (typeof ui?.select === 'function') {
-            return await ui.select(message, options);
+            const value = await ui.select(message, options);
+            emitSdkOperationMetric({
+                operation: 'session.ui.select',
+                status: 'succeeded',
+                sessionId: session.sessionId,
+                durationMs: Date.now() - startedAt,
+                attributes: { selected: value },
+            });
+            return value;
         }
         const result = await invokeGenericElicitation(session, {
             message,
@@ -221,10 +275,25 @@ export async function sessionUiSelect(session, message, options) {
                 required: ['value'],
             },
         });
-        if (result.action !== 'accept') return null;
-        return readStringField(result, 'value');
+        const value = result.action !== 'accept' ? null : readStringField(result, 'value');
+        emitSdkOperationMetric({
+            operation: 'session.ui.select',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { action: result.action, selected: value },
+        });
+        return value;
     } catch (error) {
-        throw toSdkOperationError('session.ui.select', error);
+        const sdkError = toSdkOperationError('session.ui.select', error);
+        emitSdkOperationMetric({
+            operation: 'session.ui.select',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -239,10 +308,20 @@ export async function sessionUiInput(session, message, options) {
     if (typeof message !== 'string' || message.length === 0) {
         throw new TypeError('[sdk/session/ui.input] message deve ser string não-vazia.');
     }
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'session.ui.input', status: 'started', sessionId: session.sessionId });
     try {
         const ui = getSessionUiRef(session);
         if (typeof ui?.input === 'function') {
-            return options ? await ui.input(message, options) : await ui.input(message);
+            const value = options ? await ui.input(message, options) : await ui.input(message);
+            emitSdkOperationMetric({
+                operation: 'session.ui.input',
+                status: 'succeeded',
+                sessionId: session.sessionId,
+                durationMs: Date.now() - startedAt,
+                attributes: { accepted: value !== null },
+            });
+            return value;
         }
         const result = await invokeGenericElicitation(session, {
             message,
@@ -262,9 +341,24 @@ export async function sessionUiInput(session, message, options) {
                 required: ['value'],
             },
         });
-        if (result.action !== 'accept') return null;
-        return readStringField(result, 'value');
+        const value = result.action !== 'accept' ? null : readStringField(result, 'value');
+        emitSdkOperationMetric({
+            operation: 'session.ui.input',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { action: result.action, accepted: value !== null },
+        });
+        return value;
     } catch (error) {
-        throw toSdkOperationError('session.ui.input', error);
+        const sdkError = toSdkOperationError('session.ui.input', error);
+        emitSdkOperationMetric({
+            operation: 'session.ui.input',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
