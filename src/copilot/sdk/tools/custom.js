@@ -17,11 +17,11 @@
  */
 
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { resolvePersistentConfigFile } from '../../config/persistent-paths.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
+import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
 /**
  * @typedef {(opts: {

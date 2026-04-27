@@ -13,11 +13,11 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { resolvePersistentConfigFile } from '../../config/persistent-paths.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { ToolsConfigSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
+import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
 /** Caminho do arquivo de persistência. @type {string} */
 const TOOLS_CONFIG_PATH = resolvePersistentConfigFile('tools-config.json');

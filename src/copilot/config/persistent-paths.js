@@ -10,7 +10,7 @@
  * @module copilot/config/persistent-paths
  */
 
-import { resolvePersistentConfigFile as resolvePersistentConfigFileFromBoot } from '#copilot/boot';
+import { resolvePersistentConfigFile as resolvePersistentConfigFileFromSdk } from '../sdk/persistent-paths.js';
 
 /**
  * Resolve o caminho absoluto de um arquivo de configuração persistente no workspace.
@@ -19,5 +19,5 @@ import { resolvePersistentConfigFile as resolvePersistentConfigFileFromBoot } fr
  * @returns {string}
  */
 export function resolvePersistentConfigFile(name) {
-    return resolvePersistentConfigFileFromBoot(name);
+    return resolvePersistentConfigFileFromSdk(name);
 }

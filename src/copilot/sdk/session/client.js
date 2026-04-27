@@ -11,7 +11,6 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
-import { buildCopilotClientOptionsFromEnv } from '../../config/client-options.js';
 import { CircuitBreaker } from '../../core/circuit-breaker.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import {
@@ -24,6 +23,7 @@ import {
     removeActiveSdkSession,
 } from '../../infra/sdk-session-registry.js';
 import { log } from '../logger.js';
+import { buildCopilotClientOptionsFromEnv } from './client-options.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
 export { CopilotClient };

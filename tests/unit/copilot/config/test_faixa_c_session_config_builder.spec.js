@@ -188,6 +188,38 @@ describe('SessionConfigBuilder', () => {
         expect(config.onEvent).toBe(handler);
     });
 
+    it('commands() define slash commands da sessão', () => {
+        const commands = [{ name: 'deploy', handler: vi.fn() }];
+        const config = new SessionConfigBuilder().commands(/** @type {any} */ (commands)).build();
+        expect(config.commands).toEqual(commands);
+    });
+
+    it('onElicitationRequest() define handler provider-side', () => {
+        const handler = vi.fn();
+        const config = new SessionConfigBuilder().onElicitationRequest(/** @type {any} */ (handler)).build();
+        expect(config.onElicitationRequest).toBe(handler);
+    });
+
+    it('enableConfigDiscovery() e includeSubAgentStreamingEvents() passam pela build', () => {
+        const config = new SessionConfigBuilder()
+            .enableConfigDiscovery(true)
+            .includeSubAgentStreamingEvents(false)
+            .build();
+        expect(config.enableConfigDiscovery).toBe(true);
+        expect(config.includeSubAgentStreamingEvents).toBe(false);
+    });
+
+    it('defaultAgent() e modelCapabilities() passam pela build', () => {
+        const defaultAgent = { excludedTools: ['shell'] };
+        const modelCapabilities = { supports: { reasoningEffort: false } };
+        const config = new SessionConfigBuilder()
+            .defaultAgent(/** @type {any} */ (defaultAgent))
+            .modelCapabilities(/** @type {any} */ (modelCapabilities))
+            .build();
+        expect(config.defaultAgent).toEqual(defaultAgent);
+        expect(config.modelCapabilities).toEqual(modelCapabilities);
+    });
+
     it('merge() aplica overrides parciais', () => {
         const config = new SessionConfigBuilder()
             .model('gpt-4.1')
