@@ -124,11 +124,15 @@ describe('AgentContext', () => {
         const emitter = new EventEmitter();
         /** @type {'approve_all' | 'audit_only' | 'selective'} */
         let mode = 'approve_all';
+        /** @type {import('../../../src/copilot/sdk/types.js').PermissionHandler} */
         const injectedHandler = async (/** @type {any} */ _request, /** @type {any} */ _invocation) =>
-            /** @type {import('../../../src/copilot/sdk/types.js').PermissionRequestResult} */ ({
-                kind: mode === 'selective' ? 'denied-by-rules' : 'approved',
-                ...(mode === 'selective' ? { rules: [] } : {}),
-            });
+            mode === 'selective'
+                ? /** @type {import('../../../src/copilot/sdk/types.js').PermissionRequestResult} */ ({
+                      kind: 'reject',
+                  })
+                : /** @type {import('../../../src/copilot/sdk/types.js').PermissionRequestResult} */ ({
+                      kind: 'approve-once',
+                  });
 
         const ctx = new AgentContext(emitter, {
             factories: {
@@ -155,14 +159,14 @@ describe('AgentContext', () => {
         assert.equal(
             (await ctx.getPermissionHandlerSnapshot()(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' }))
                 .kind,
-            'approved',
+            'approve-once',
         );
         ctx.setPermissionMode('selective', { denyShell: true });
         assert.equal(ctx.getPermissionModeSnapshot(), 'selective');
         assert.equal(ctx.getPermissionCapabilitySnapshot().mode, 'selective');
         assert.equal(
             (await injectedHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind,
-            'denied-by-rules',
+            'reject',
         );
     });
 

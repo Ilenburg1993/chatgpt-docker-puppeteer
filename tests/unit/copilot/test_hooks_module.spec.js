@@ -261,7 +261,7 @@ describe('hooks/factory › createHooks', () => {
 describe('hooks/permission-handler › createPermissionHandler', () => {
     it('mode approve-all: aprova tudo', async () => {
         const handler = createPermissionHandler({ allowAll: true });
-        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
+        const result = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: '1', toolName: 'shell' }), inv());
         assert.ok(
             ['approve-once'].includes(result?.kind ?? result),
             `esperado approve-once, recebido: ${JSON.stringify(result)}`,
@@ -270,7 +270,7 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
 
     it('mode deny-all: nega ferramentas listadas', async () => {
         const handler = createPermissionHandler({ denyTools: ['shell'] });
-        const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
+        const result = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: '1', toolName: 'shell' }), inv());
         assert.ok(result?.kind === 'reject', `esperado reject, recebido: ${JSON.stringify(result)}`);
     });
 
@@ -283,13 +283,13 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
     it('SDK first: onRequest pode devolver PermissionRequestResult canônico sem tradução booleana', async () => {
         const handler = createPermissionHandler({
             onRequest: (_request, invocation) => ({
-                kind: 'denied-interactively-by-user',
+                kind: 'reject',
                 feedback: `session=${invocation.sessionId}`,
             }),
         });
         const result = await handler({ kind: 'write', toolCallId: '2' }, inv('sdk-session'));
         assert.deepEqual(result, {
-            kind: 'denied-interactively-by-user',
+            kind: 'reject',
             feedback: 'session=sdk-session',
         });
     });
