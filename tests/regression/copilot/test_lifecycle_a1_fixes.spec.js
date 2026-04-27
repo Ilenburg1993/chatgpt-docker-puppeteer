@@ -320,15 +320,18 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
 
     // ─── A3.1: boot-wiring importa e usa client-events.js ──────────────
 
-    describe('A3.1: boot-wiring usa onLifecycleEvents de client-events.js', () => {
-        it('boot-wiring.js importa onLifecycleEvents e LIFECYCLE_EVENTS', async () => {
+    describe('A3.1: boot-wiring usa façade de lifecycle/quota do SDK', () => {
+        it('boot-wiring.js usa helpers de lifecycle via agent-sdk-access', async () => {
             const fs = await import('node:fs');
             const src = fs.readFileSync(
                 new URL('../../../src/copilot/agent/session/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
-            expect(src).toContain('import { LIFECYCLE_EVENTS, onLifecycleEvents }');
-            expect(src).toContain("from '../../sdk/session/client-events.js'");
+            expect(src).toContain('onAgentSdkLifecycleEvents');
+            expect(src).toContain('getAgentSdkLifecycleEvents');
+            expect(src).toContain('getAgentSdkSessionLifecycleEvents');
+            expect(src).toContain("from '../facades/agent-sdk-access.js'");
+            expect(src).not.toContain("from '#copilot/sdk'");
         });
 
         it('boot-wiring.js NÃO usa SESSION_LIFECYCLE_EVENTS diretamente em client.on()', async () => {
@@ -337,11 +340,10 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                 new URL('../../../src/copilot/agent/session/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
-            // Seção 3 não deve mais ter client.on(SESSION_LIFECYCLE_EVENTS.X, ...)
             const section3Match = src.match(/\/\/ ── 3\. Client lifecycle[\s\S]*?\/\/ ── 4\./);
             if (section3Match) {
                 expect(section3Match[0]).not.toMatch(/client\.on\(SESSION_LIFECYCLE_EVENTS\./);
-                expect(section3Match[0]).toContain('onLifecycleEvents');
+                expect(section3Match[0]).toContain('onAgentSdkLifecycleEvents');
             }
         });
     });

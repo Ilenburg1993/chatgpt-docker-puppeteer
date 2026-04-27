@@ -115,13 +115,13 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
     it('handler entregue ao SDK é estável e passa a usar a policy atual', async () => {
         const sdkHandler = ctrl.handler;
         ctrl.setMode('approve_all');
-        assert.equal((await sdkHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind, 'approved');
-
-        ctrl.setMode('selective', { denyShell: true });
         assert.equal(
             (await sdkHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind,
-            'denied-by-rules',
+            'approve-once',
         );
+
+        ctrl.setMode('selective', { denyShell: true });
+        assert.equal((await sdkHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind, 'reject');
         assert.equal(ctrl.handler, sdkHandler, 'referência do handler deve permanecer estável para o SDK');
     });
 });

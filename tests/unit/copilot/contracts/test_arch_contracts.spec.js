@@ -14,7 +14,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -36,6 +36,26 @@ function copilotPath(...parts) {
  */
 function readSrc(relPath) {
     return readFileSync(copilotPath(relPath), 'utf-8');
+}
+
+/**
+ * @param {string} dirAbs
+ * @returns {string[]}
+ */
+function listJsFilesRecursive(dirAbs) {
+    /** @type {string[]} */
+    const out = [];
+    const entries = readdirSync(dirAbs);
+    for (const entry of entries) {
+        const abs = join(dirAbs, entry);
+        const st = statSync(abs);
+        if (st.isDirectory()) {
+            out.push(...listJsFilesRecursive(abs));
+        } else if (st.isFile() && entry.endsWith('.js')) {
+            out.push(abs);
+        }
+    }
+    return out;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -150,6 +170,60 @@ describe('W4-9 — violação de camada L3→L4: bridges não importa agent', ()
         }
 
         assert.deepEqual(violations, [], `Violações tools→agent:\n${violations.join('\n')}`);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3B. Fronteira agent→sdk: sem deep-import interno fora de facades/ports
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('W4-9 — fronteira agent→sdk: barrel-only fora de facades/ports', () => {
+    it('agent/**/*.js não importa ../../sdk/* fora de facades/ports', () => {
+        const agentDir = copilotPath('agent');
+        const files = listJsFilesRecursive(agentDir);
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            const allowDeepSdk = rel.startsWith('agent/facades/') || rel.startsWith('agent/ports/');
+            if (allowDeepSdk) continue;
+
+            const src = readFileSync(abs, 'utf-8');
+            const lines = src.split('\n');
+            for (const line of lines) {
+                const t = line.trim();
+                if (t.startsWith('//') || t.startsWith('*')) continue;
+                if (/import.+from.+['"]\.{1,2}\/.*sdk\//.test(t)) {
+                    violations.push(`${rel}: ${t.slice(0, 120)}`);
+                }
+            }
+        }
+
+        assert.deepEqual(violations, [], `Deep-imports agent→sdk fora da fronteira:\n${violations.join('\n')}`);
+    });
+
+    it('agent/**/*.js não importa #copilot/sdk/* interno fora de facades/ports', () => {
+        const agentDir = copilotPath('agent');
+        const files = listJsFilesRecursive(agentDir);
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            const allowDeepSdk = rel.startsWith('agent/facades/') || rel.startsWith('agent/ports/');
+            if (allowDeepSdk) continue;
+
+            const src = readFileSync(abs, 'utf-8');
+            const lines = src.split('\n');
+            for (const line of lines) {
+                const t = line.trim();
+                if (t.startsWith('//') || t.startsWith('*')) continue;
+                if (/import.+from.+['"]#copilot\/sdk\/.+['"]/.test(t)) {
+                    violations.push(`${rel}: ${t.slice(0, 120)}`);
+                }
+            }
+        }
+
+        assert.deepEqual(violations, [], `Deep-imports #copilot/sdk/* fora da fronteira:\n${violations.join('\n')}`);
     });
 });
 

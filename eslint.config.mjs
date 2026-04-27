@@ -439,4 +439,31 @@ export default tseslint.config(
             ],
         },
     },
+
+    // ── F21B: agent/** fora de facades/ports só pode usar #copilot/sdk barrel ─
+    {
+        files: ['src/copilot/agent/**/*.js'],
+        ignores: ['src/copilot/agent/facades/**', 'src/copilot/agent/ports/**'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            regex: '^#copilot/sdk/.+',
+                            message:
+                                'Fora de agent/facades e agent/ports, use apenas o barrel "#copilot/sdk" ' +
+                                'ou uma façade local do agent; não importe subpaths internos do SDK.',
+                        },
+                        {
+                            regex: '^\\.{1,2}/.*sdk/.+',
+                            message:
+                                'Fora de agent/facades e agent/ports, módulos do agent não podem fazer deep-import ' +
+                                'relativo para sdk/*; use "#copilot/sdk" ou uma façade local do agent.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 );

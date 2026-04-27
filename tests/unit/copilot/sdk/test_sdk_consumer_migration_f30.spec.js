@@ -69,28 +69,46 @@ describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
         expect(src('agent/lifecycle/agent-lifecycle.js')).not.toContain("from '#copilot/sdk/event-helpers'");
     });
 
-    it('agent-lifecycle.js importa raceEvents de #copilot/sdk', () => {
-        expect(src('agent/lifecycle/agent-lifecycle.js')).toContain("from '#copilot/sdk'");
+    it('agent-lifecycle.js usa façade agent-sdk-access para raceAgentSdkEvents', () => {
+        const content = src('agent/lifecycle/agent-lifecycle.js');
+        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        expect(content).toContain('raceAgentSdkEvents');
+        expect(content).not.toContain("from '#copilot/sdk'");
     });
 
     it('loop-manager.js não importa de #copilot/sdk/event-helpers', () => {
         expect(src('agent/dialog/loop-manager.js')).not.toContain("from '#copilot/sdk/event-helpers'");
     });
 
-    it('loop-manager.js importa waitForEvent de #copilot/sdk', () => {
-        expect(src('agent/dialog/loop-manager.js')).toContain("from '#copilot/sdk'");
+    it('loop-manager.js não importa waitForEvent diretamente de #copilot/sdk', () => {
+        expect(src('agent/dialog/loop-manager.js')).not.toContain("from '#copilot/sdk'");
+    });
+
+    it('loop-manager.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
+        expect(src('agent/dialog/loop-manager.js')).toContain("from '../facades/agent-sdk-runtime.js'");
+        expect(src('agent/dialog/loop-manager.js')).toContain('waitForAgentSdkEvent');
+    });
+
+    it('resume-policy.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
+        expect(src('agent/dialog/resume-policy.js')).toContain("from '../facades/agent-sdk-runtime.js'");
+        expect(src('agent/dialog/resume-policy.js')).toContain('waitForAgentSdkEvent');
+        expect(src('agent/dialog/resume-policy.js')).not.toContain("from '#copilot/sdk'");
     });
 });
 
 // ─── F149: agent/session/ usa barrel ───────────────────────────────────────
 
-describe('F149 — agent/session/ usa barrel para session, tools-state, utils', () => {
+describe('F149 — agent/session/ converge para façades do agent', () => {
     it('cleanup.js não importa de #copilot/sdk/session', () => {
         expect(src('agent/session/cleanup.js')).not.toContain("from '#copilot/sdk/session'");
     });
 
-    it('cleanup.js importa deleteSession de #copilot/sdk', () => {
-        expect(src('agent/session/cleanup.js')).toContain("from '#copilot/sdk'");
+    it('cleanup.js usa façade agent-sdk-access', () => {
+        const content = src('agent/session/cleanup.js');
+        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        expect(content).toContain('listAgentSdkSessionsByClient');
+        expect(content).toContain('deleteAgentSdkSessionByClient');
+        expect(content).not.toContain("from '#copilot/sdk'");
     });
 
     it('initializer.js não importa de #copilot/sdk/tools-state', () => {
@@ -101,8 +119,12 @@ describe('F149 — agent/session/ usa barrel para session, tools-state, utils', 
         expect(src('agent/session/initializer.js')).not.toContain("from '#copilot/sdk/utils'");
     });
 
-    it('initializer.js importa do barrel #copilot/sdk', () => {
-        expect(src('agent/session/initializer.js')).toContain("from '#copilot/sdk'");
+    it('initializer.js usa façade agent-sdk-access', () => {
+        const content = src('agent/session/initializer.js');
+        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        expect(content).toContain('resumeOrCreateAgentSdkSession');
+        expect(content).toContain('createAgentSdkSessionByClient');
+        expect(content).not.toContain("from '#copilot/sdk'");
     });
 });
 

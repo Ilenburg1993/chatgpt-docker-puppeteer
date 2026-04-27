@@ -113,9 +113,11 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
         expect(unexpected).toHaveLength(0);
     });
 
-    it('boot-wiring.js importa createQuotaMonitor do barrel (não bypass)', () => {
+    it('boot-wiring.js usa fachada agent-sdk-access para quota monitor (sem bypass)', () => {
         const src = read('src/copilot/agent/session/boot-wiring.js');
-        expect(src).toContain("from '#copilot/sdk'");
+        expect(src).toContain("from '../facades/agent-sdk-access.js'");
+        expect(src).toContain('createAgentSdkQuotaMonitor');
+        expect(src).not.toContain("from '#copilot/sdk'");
     });
 
     // F54: re-export de tools-state removido de config/index.js (zero consumers)

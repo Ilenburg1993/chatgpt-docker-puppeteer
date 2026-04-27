@@ -59,16 +59,16 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-// Mock waitForEvent — resolve imediatamente por padrão
-const mockWaitForEvent = vi.fn((/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) =>
-    Promise.resolve({}),
+// Mock waitForAgentSdkEvent — resolve imediatamente por padrão
+const mockWaitForAgentSdkEvent = vi.fn(
+    (/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) => Promise.resolve({}),
 );
-vi.mock('#copilot/sdk/event-helpers', () => ({
-    waitForEvent: (
+vi.mock('../../../src/copilot/agent/facades/agent-sdk-runtime.js', () => ({
+    waitForAgentSdkEvent: (
         /** @type {import('node:events').EventEmitter} */ emitter,
         /** @type {string} */ event,
         /** @type {{ timeoutMs?: number; timeoutError?: string; signal?: AbortSignal }} */ opts,
-    ) => mockWaitForEvent(emitter, event, opts),
+    ) => mockWaitForAgentSdkEvent(emitter, event, opts),
 }));
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
@@ -136,7 +136,7 @@ describe('DialogLoopManager', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockWaitForEvent.mockImplementation(() => Promise.resolve({}));
+        mockWaitForAgentSdkEvent.mockImplementation(() => Promise.resolve({}));
         vi.mocked(readState).mockReturnValue(null);
         dlm = new DialogLoopManager({ bootTimeoutMs: 500, watchdogIntervalMs: 60000, watchdogStallMs: 120000 });
         host = createMockHost();
@@ -215,18 +215,18 @@ describe('DialogLoopManager', () => {
         });
 
         it('start() aceita READY tardio após timeout nominal de boot sem derrubar o loop', async () => {
-            mockWaitForEvent
+            mockWaitForAgentSdkEvent
                 .mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'))
                 .mockResolvedValueOnce({});
 
             await dlm.start('Hello');
 
             expect(dlm.active).toBe(true);
-            expect(mockWaitForEvent).toHaveBeenCalledTimes(2);
+            expect(mockWaitForAgentSdkEvent).toHaveBeenCalledTimes(2);
         });
 
         it('start() limpa active/watchdog quando timeout e READY tardio falham', async () => {
-            mockWaitForEvent
+            mockWaitForAgentSdkEvent
                 .mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'))
                 .mockRejectedValueOnce(new Error('[DialogLoopManager] READY tardio não chegou'));
 
@@ -236,7 +236,7 @@ describe('DialogLoopManager', () => {
         });
 
         it('start() falha pelo erro de envio do boot sem emitir stopped duas vezes', async () => {
-            mockWaitForEvent.mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+            mockWaitForAgentSdkEvent.mockRejectedValueOnce(new Error('[DialogLoopManager] Boot timeout após 10ms'));
             host.sendMessageDialogBoot.mockRejectedValueOnce(new Error('pipe closed'));
             const stoppedSpy = vi.fn();
             dlm.on('stopped', stoppedSpy);
@@ -249,7 +249,7 @@ describe('DialogLoopManager', () => {
         });
 
         it('abre circuit breaker após falhas repetidas de boot para evitar storm de PR', async () => {
-            mockWaitForEvent.mockRejectedValue(new Error('[DialogLoopManager] Boot timeout após 10ms'));
+            mockWaitForAgentSdkEvent.mockRejectedValue(new Error('[DialogLoopManager] Boot timeout após 10ms'));
             host.sendMessageDialogBoot.mockRejectedValue(new Error('pipe closed'));
 
             await expect(dlm.start('Hello 1')).rejects.toThrow('pipe closed');
@@ -277,7 +277,7 @@ describe('DialogLoopManager', () => {
         });
 
         it('não reinicia automaticamente turno enfileirado quando READY ainda não reapareceu', async () => {
-            mockWaitForEvent.mockResolvedValueOnce({});
+            mockWaitForAgentSdkEvent.mockResolvedValueOnce({});
             await dlm.start('Hello');
             const recoverySpy = vi.fn();
             const stoppedSpy = vi.fn();
@@ -299,7 +299,7 @@ describe('DialogLoopManager', () => {
                 pending = true;
                 return 'REPLY: ok';
             });
-            mockWaitForEvent.mockResolvedValueOnce({});
+            mockWaitForAgentSdkEvent.mockResolvedValueOnce({});
             await dlm.start('Hello');
             const recoverySpy = vi.fn();
             dlm.on('recovery', recoverySpy);
@@ -317,7 +317,7 @@ describe('DialogLoopManager', () => {
                 pending = false;
                 return 'REPLY: ok';
             });
-            mockWaitForEvent.mockResolvedValueOnce({});
+            mockWaitForAgentSdkEvent.mockResolvedValueOnce({});
             await dlm.start('Hello');
             const recoverySpy = vi.fn();
             const stoppedSpy = vi.fn();
@@ -668,7 +668,7 @@ describe('selectDialogResumeStrategy', () => {
     });
 
     it('seleciona restart com PR quando pending question não é preservado', async () => {
-        mockWaitForEvent.mockRejectedValueOnce(new Error('timeout'));
+        mockWaitForAgentSdkEvent.mockRejectedValueOnce(new Error('timeout'));
         const host = createMockHost();
 
         const strategy = await selectDialogResumeStrategy({

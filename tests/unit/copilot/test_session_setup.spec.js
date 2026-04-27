@@ -8,16 +8,7 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 vi.mock('#copilot/sdk/index', () => ({
-    createRegistry: vi.fn(() => new Map()),
-    getToolsConfig: vi.fn(() => ({ allowlist: null, denylist: [] })),
-    modelRegistry: {
-        get: vi.fn((modelId) => {
-            if (modelId === 'gpt-4.1') {
-                return { supportsReasoning: false };
-            }
-            return { supportsReasoning: true };
-        }),
-    },
+    createSessionRpcFacade: vi.fn((session) => ({ session })),
     REASONING_EFFORTS: {
         LOW: 'low',
         MEDIUM: 'medium',
@@ -29,6 +20,16 @@ vi.mock('#copilot/sdk/index', () => ({
     createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
     createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
     defineTool: vi.fn(() => ({ name: 'mock-defined', execute: vi.fn() })),
+}));
+vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
+    createAgentSdkToolsRegistry: vi.fn(() => new Map()),
+    getAgentSdkToolsConfig: vi.fn(() => ({ allowlist: null, denylist: [] })),
+    readAgentSdkModelRegistryEntry: vi.fn((modelId) => {
+        if (modelId === 'gpt-4.1') {
+            return { supportsReasoning: false };
+        }
+        return { supportsReasoning: true };
+    }),
 }));
 vi.mock('../../../src/copilot/bridges/mcp-tool-bridge.js', () => ({ buildMcpTools: vi.fn(async () => []) }));
 vi.mock('../../../src/copilot/config/mcp-servers.js', () => ({ buildMcpConfig: vi.fn(() => ({})) }));
@@ -53,9 +54,10 @@ vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
-import { getToolsConfig } from '#copilot/sdk';
+import { createSessionRpcFacade } from '#copilot/sdk';
 import { isToolDisabled } from '#copilot/tools';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
+import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 import {
     buildSessionHooks,
     buildSessionOptions,
@@ -127,7 +129,7 @@ describe('session-setup (F63)', () => {
         });
 
         it('aplica a denylist local do runtime via onPreToolUse', async () => {
-            vi.mocked(getToolsConfig).mockReturnValue({ allowlist: null, denylist: ['custom-danger'] });
+            vi.mocked(getAgentSdkToolsConfig).mockReturnValue({ allowlist: null, denylist: ['custom-danger'] });
 
             const result = buildSessionHooks(ctx, host);
             const decision = await result.busHooks.onPreToolUse?.(
@@ -140,7 +142,7 @@ describe('session-setup (F63)', () => {
         });
 
         it('nega tool desabilitada dinamicamente em runtime (toggle_tool)', async () => {
-            vi.mocked(getToolsConfig).mockReturnValue({ allowlist: null, denylist: [] });
+            vi.mocked(getAgentSdkToolsConfig).mockReturnValue({ allowlist: null, denylist: [] });
             vi.mocked(isToolDisabled).mockReturnValueOnce(true);
 
             const result = buildSessionHooks(ctx, host);
@@ -235,32 +237,8 @@ describe('session-setup (F63)', () => {
 
             expect(ctx.session).toBe(session);
             expect(ctx.isResumed).toBe(true);
-            expect(setSessionRpc).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    model: expect.objectContaining({
-                        getCurrent: expect.any(Function),
-                        switchTo: expect.any(Function),
-                    }),
-                    mode: expect.objectContaining({ get: expect.any(Function), set: expect.any(Function) }),
-                    plan: expect.objectContaining({
-                        read: expect.any(Function),
-                        update: expect.any(Function),
-                        delete: expect.any(Function),
-                    }),
-                    workspace: expect.objectContaining({
-                        listFiles: expect.any(Function),
-                        readFile: expect.any(Function),
-                        createFile: expect.any(Function),
-                    }),
-                    log: expect.any(Function),
-                    agent: expect.objectContaining({
-                        list: expect.any(Function),
-                        select: expect.any(Function),
-                        deselect: expect.any(Function),
-                    }),
-                    compaction: expect.objectContaining({ compact: expect.any(Function) }),
-                }),
-            );
+            expect(createSessionRpcFacade).toHaveBeenCalledWith(session);
+            expect(setSessionRpc).toHaveBeenCalledWith(expect.objectContaining({ session }));
         });
     });
 });

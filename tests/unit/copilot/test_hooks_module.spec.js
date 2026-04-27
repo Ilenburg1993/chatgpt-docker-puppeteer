@@ -263,21 +263,21 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
         const handler = createPermissionHandler({ allowAll: true });
         const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
         assert.ok(
-            ['approved'].includes(result?.kind ?? result),
-            `esperado approved, recebido: ${JSON.stringify(result)}`,
+            ['approve-once'].includes(result?.kind ?? result),
+            `esperado approve-once, recebido: ${JSON.stringify(result)}`,
         );
     });
 
     it('mode deny-all: nega ferramentas listadas', async () => {
         const handler = createPermissionHandler({ denyTools: ['shell'] });
         const result = await handler({ kind: 'shell', toolCallId: '1', toolName: 'shell' }, inv());
-        assert.ok(result?.kind === 'denied-by-rules', `esperado denied-by-rules, recebido: ${JSON.stringify(result)}`);
+        assert.ok(result?.kind === 'reject', `esperado reject, recebido: ${JSON.stringify(result)}`);
     });
 
     it('SDK first: denyKinds nega pelo kind canônico do SDK mesmo sem toolName', async () => {
         const handler = createPermissionHandler({ denyKinds: ['shell'] });
         const result = await handler({ kind: 'shell', toolCallId: '1' }, inv());
-        assert.equal(result?.kind, 'denied-by-rules');
+        assert.equal(result?.kind, 'reject');
     });
 
     it('SDK first: onRequest pode devolver PermissionRequestResult canônico sem tradução booleana', async () => {

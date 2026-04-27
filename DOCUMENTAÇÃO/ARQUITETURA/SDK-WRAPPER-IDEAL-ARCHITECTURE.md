@@ -1,7 +1,7 @@
 # Arquitetura Ideal — SDK Wrapper Layer (`src/copilot/sdk/`)
 
 **Status**: 🗺️ Visão alvo (em construção iterativa)
-**Última atualização**: 2026-04-25
+**Última atualização**: 2026-04-26
 **Autores**: Agente Copilot + sessão de hardening profundo
 **Relacionados**:
 - `SDK-COPILOT-ARQUITETURA-PROFUNDA.md` — visão de integração histórica
@@ -61,7 +61,7 @@ construtores do SDK sem este envelope. Crude calls são proibidas fora de `src/c
 │  └──────────────────────────────────────────────────────────────┘   │
 │                            ↑ somente via #copilot/sdk                │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  [L2] src/copilot/agent/ + orchestrator/ + kernel/           │   │
+│  │  [L2] src/copilot/agent/        │   │
 │  │  (domínio de missão — consome SDK via L1, não diretamente)   │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                            ↑                                         │
@@ -148,32 +148,181 @@ export async function operationName(session, param, options) {
 
 ### 4.1 O que já está correto
 
-| Módulo                   | Status     | Notas                                         |
-| ------------------------ | ---------- | --------------------------------------------- |
-| `sdk/types.js`           | ✅ Completo | SSOT, strict-compliant, 781+ linhas           |
-| `sdk/errors.js`          | ✅ Completo | Classificação por kind, fingerprint           |
-| `sdk/session/client.js`  | ✅ Completo | Circuit breaker, registry externalizado       |
-| `sdk/session/wrapper.js` | ✅ Completo | Abort, disconnect, sendAndWait com tratamento |
-| `sdk/rpc/session.js`     | ✅ Completo | model, mode, plan — validados e logados       |
-| `sdk/rpc/ops.js`         | ✅ Completo | compaction, shell, elicitation, tools         |
-| `sdk/tools/core.js`      | ✅ Completo | createTool, createToolSync                    |
-| `sdk/config.js`          | ✅ Completo | buildSessionConfig com SessionConfigOverrides |
-| `sdk/constants.js`       | ✅ Completo |                                               |
-| `sdk/logger.js`          | ✅ Completo |                                               |
+| Módulo                     | Status     | Notas                                                                 |
+| -------------------------- | ---------- | --------------------------------------------------------------------- |
+| `sdk/types.js`             | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                    |
+| `sdk/errors.js`            | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`              |
+| `sdk/session/client.js`    | ✅ Completo | Circuit breaker, registry externalizado                               |
+| `sdk/session/lifecycle.js` | ✅ Completo | create/resume/list/delete com normalização de erro                    |
+| `sdk/session/wrapper.js`   | ✅ Completo | abort, disconnect, sendAndWait, send, setModel com tratamento         |
+| `sdk/rpc/session.js`       | ✅ Completo | model, mode, plan, workspace com retornos tipados                     |
+| `sdk/rpc/ops.js`           | ✅ Completo | compaction, shell, elicitation, tools, agent ops com erro normalizado |
+| `sdk/rpc/server.js`        | ✅ Completo | superfície server RPC convergida no wrapper                           |
+| `sdk/rpc/experimental.js`  | ✅ Completo | wrappers experimentais com `SdkOperationError`                        |
+| `sdk/tools/core.js`        | ✅ Completo | createTool, createToolSync                                            |
+| `sdk/config.js`            | ✅ Completo | buildSessionConfig com SessionConfigOverrides                         |
+| `sdk/constants.js`         | ✅ Completo |                                                                       |
+| `sdk/logger.js`            | ✅ Completo |                                                                       |
 
 ### 4.2 Gaps conhecidos (a resolver no roadmap)
 
-| Módulo                                             | Gap                                                    | Severidade   |
-| -------------------------------------------------- | ------------------------------------------------------ | ------------ |
-| `sdk/rpc/ops.js` — retornos `Promise<unknown>`     | Retornos não tipados nas funções públicas              | 🟡 Médio      |
-| `sdk/rpc/session.js` — retornos `Promise<unknown>` | Retornos não tipados nas funções públicas              | 🟡 Médio      |
-| `sdk/session/permissions.js`                       | Verificar se tem try/catch padronizado                 | 🟡 Médio      |
-| `sdk/session/provider.js`                          | Verificar crude calls para provider RPC                | 🟡 Médio      |
-| `sdk/telemetry/`                                   | Verificar cobertura de telemetria em todos os wrappers | 🟡 Médio      |
-| `sdk/rpc/experimental.js`                          | Features experimentais sem try/catch                   | 🟠 Alto       |
-| `agent/` — chamadas via `#copilot/sdk`             | Verificar se TODOS os acessos vão pelo barrel          | 🟠 Alto       |
-| `runtime-wiring.js`                                | DI e wiring — verificar ausência de imports diretos L0 | 🟠 Alto       |
-| Telemetria de observabilidade nos wrappers RPC     | Nenhum wrapper RPC emite evento de métricas            | 🔴 Importante |
+| Módulo                                         | Gap                                                       | Severidade                                             |
+| ---------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------ |
+| `sdk/session/permissions.js`                   | Verificar se tem try/catch padronizado                    | 🟡 Médio                                                |
+| `sdk/session/provider.js`                      | Verificar crude calls para provider RPC                   | 🟡 Médio                                                |
+| `sdk/telemetry/`                               | Verificar cobertura de telemetria em todos os wrappers    | 🟡 Médio                                                |
+| `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC | 🔄 Em progresso (owner ampliado para lifecycle/session) |
+| `agent/facades/agent-sdk-session.js`           | Consolidar owner único de mode/plan/session ops           | 🟠 Alto                                                 |
+| `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop   | ✅ Resolvido nesta onda (loop/resume convergidos)       |
+| `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0    | 🟠 Alto                                                 |
+| Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas               | 🔴 Importante                                           |
+
+### 4.3 Comunicação atual entre `src/copilot/agent/` e `src/copilot/sdk/`
+
+Hoje a comunicação `agent ↔ sdk` acontece por **quatro estilos diferentes ao mesmo tempo**:
+
+#### A. Barrel canônico `#copilot/sdk` (o estilo correto)
+
+Exemplos já presentes (restantes e intencionais):
+
+- `agent/facades/agent-sdk-access.js`
+    - owner canônico de reads/status/lifecycle/session wrappers
+- `agent/facades/agent-sdk-runtime.js`
+    - owner canônico de sessão ativa e waitForEvent
+- `agent/ports/tool-port.js`
+    - integração viva com sessionRpc/tools (seam legítimo)
+
+Esse é o padrão alvo: o `agent` depende da superfície pública de L1 sem conhecer a topologia interna do SDK.
+
+#### B. Imports internos de submódulos `sdk/*` (ainda aceitáveis, mas já considerados dívida)
+
+Este documento reconhece como **estado atual, não estado ideal**, imports como:
+
+- `agent/messaging/agent-messaging.js`
+- `agent/session/history-sync.js`
+- `agent/session/keepalive.js`
+- `agent/session/boot-wiring.js`
+- `agent/ports/tool-port.js`
+
+Nessa rodada, parte desses imports já foi convergida para `#copilot/sdk`, mas a auditoria deixa explícito que qualquer
+novo import de `../../sdk/*` dentro de `agent/` deve ser tratado como regressão arquitetural.
+
+Além disso, `messaging`, `history-sync`, `keepalive`, `loop-manager` e `resume-policy` já começaram a sair até mesmo
+da dependência direta do barrel do SDK, passando a consumir uma façade local (`agent-sdk-runtime.js`) que concentra
+operações de sessão ativa e espera de eventos (`waitForAgentSdkEvent`).
+
+#### C. Handles crus carregados no `AgentContext`
+
+`AgentContext` continua sendo o repositório dos handles vivos do runtime:
+
+- `client`
+- `session`
+- `serverRpc`
+- `sessionRpc`
+- `toolsRegistry`
+- `permissionHandler`
+
+Isso é inevitável no runtime, mas **não deve significar liberdade para cada módulo falar com o SDK do seu jeito**.
+O problema não é o handle existir; o problema é **cada consumer construir sua própria semântica de acesso**.
+
+#### D. Facades e ports do agent sobre o SDK
+
+Já existe uma camada embrionária muito importante:
+
+- `agent/facades/agent-sdk-access.js`
+- `agent/facades/agent-sdk-session.js`
+- `agent/ports/tool-port.js`
+
+Esses módulos apontam a direção certa, mas ainda não monopolizam a fronteira toda.
+
+### 4.4 Diagnóstico objetivo da fronteira `agent ↔ sdk`
+
+A sobreposição foi reduzida de forma significativa nesta onda:
+
+1. **Criação / retomada de sessão**
+     - convergida para `agent/facades/agent-sdk-access.js` em callers de lifecycle/session
+
+2. **Uso operacional da sessão ativa**
+     - convergido para `agent-sdk-runtime.js` (`messaging`, `history-sync`, `keepalive`, `dialog/*`)
+
+3. **Superfície de capacidades da sessão**
+     - `agent/facades/agent-sdk-access.js` (owner principal)
+     - `agent/facades/agent-sdk-session.js` (ainda em fechamento)
+     - `agent/ports/tool-port.js` (seam legítimo de integração viva)
+
+O principal problema, portanto, **não é mais crude call direta ao vendor** — isso já foi quase todo eliminado fora de
+`sdk/`. O problema restante é:
+
+> **o `agent` ainda conversa com o SDK por caminhos demais, com semânticas parcialmente repetidas.**
+
+### 4.5 Situação ideal para `agent ↔ sdk`
+
+O estado ideal busca três níveis de fronteira claros:
+
+#### Nível 1 — `src/copilot/sdk/`
+
+É a **única** camada que fala com `@github/copilot-sdk`.
+
+Responsável por:
+
+- client lifecycle
+- session lifecycle
+- session runtime wrappers
+- RPC wrappers
+- error normalization
+- vendor typing
+
+#### Nível 2 — `agent/facades/agent-sdk-*.js`
+
+É a **única** superfície pela qual o runtime do agente faz perguntas de alto nível ao SDK.
+
+Responsável por:
+
+- status/auth/quota
+- listagem/foreground/sessions
+- mode/plan/workspace
+- agent selection / experimental surfaces expostas ao runtime
+- leitura dos handles vivos do contexto
+
+Regra:
+
+- módulos de `agent/` fora de `facades/` e `ports/` **não** devem conhecer `sessionRpc`, `serverRpc` ou a topologia de
+    `sdk/`.
+
+#### Nível 3 — `agent/ports/*.js`
+
+É a camada onde o `agent` liga o SDK ao resto do runtime:
+
+- `tool-port.js` para `sessionRpc` e tools
+- `hook-port.js` para hooks
+- futuras portas para messaging/session-runtime se necessário
+
+Regra:
+
+- se uma integração depende de **estado vivo da sessão** ou de **adaptação para outro subsistema**, ela deve morar em
+    `ports/`, não em módulos quentes de domínio.
+
+### 4.6 Invariante novo da arquitetura
+
+Além dos invariantes gerais, a fronteira `agent ↔ sdk` passa a obedecer esta regra explícita:
+
+> **Nenhum módulo de `agent/` fora de `facades/` e `ports/` pode importar `../../sdk/*` ou `#copilot/sdk/*` interno.**
+
+Forma permitida:
+
+- `#copilot/sdk` (barrel)
+- ou `agent/facades/*`
+- ou `agent/ports/*`
+
+Forma proibida:
+
+- `../../sdk/session/*`
+- `../../sdk/rpc/*`
+- `#copilot/sdk/rpc-session`
+- `#copilot/sdk/rpc-ops`
+- `#copilot/sdk/server-rpc`
+
+exceto dentro de `src/copilot/sdk/` e, por decisão explícita, dentro de facades/ports do agent.
 
 ---
 
@@ -248,11 +397,30 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                                          | Status |
 | ----------------------------------------------------------------------------- | ------ |
-| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation   | 🔄      |
-| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace | 🔄      |
-| Definir tipos de retorno para `rpc/server.js` — status, health, port          | 🔄      |
-| Adicionar try/catch padronizado em `rpc/experimental.js`                      | 🔄      |
+| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation   | ✅      |
+| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace | ✅      |
+| Definir tipos de retorno para `rpc/server.js` — status, health, port          | ✅      |
+| Adicionar try/catch padronizado em `rpc/experimental.js`                      | ✅      |
 | Verificar `sdk/session/permissions.js` e `sdk/session/provider.js`            | 🔄      |
+
+### Fase 3B — Convergência explícita de `agent ↔ sdk` (🔄 EM ANDAMENTO)
+
+**Meta**: o runtime do agente falar com o SDK por um conjunto pequeno de seams previsíveis.
+
+| Item                                                                                          | Status                            |
+| --------------------------------------------------------------------------------------------- | --------------------------------- |
+| Convergir imports de `agent/messaging/*` para `#copilot/sdk` barrel                           | ✅                                 |
+| Convergir imports de `agent/session/{history-sync,keepalive,boot-wiring}` para barrel         | ✅                                 |
+| Convergir `agent/ports/tool-port.js` para `#copilot/sdk` barrel                               | ✅                                 |
+| Mapear todos os imports restantes `agent/** -> ../../sdk/*`                                   | ✅                                 |
+| Introduzir façade de sessão ativa (`agent-sdk-runtime.js`) para `messaging/history/keepalive` | ✅                                 |
+| Convergir `dialog/loop-manager` e `dialog/resume-policy` para `agent-sdk-runtime.js`          | ✅                                 |
+| Convergir `lifecycle/{entry,agent-lifecycle,runtime-host,session-setup}` para façades         | ✅                                 |
+| Convergir `session/{cleanup,boot-steps,boot-wiring,initializer}` para façades                 | ✅                                 |
+| Fechar `agent/facades/agent-sdk-access.js` como owner canônico de server/session RPC read     | ✅ (owner majoritário)             |
+| Fechar `agent/facades/agent-sdk-session.js` como owner canônico de mode/plan/session ops      | 🔄                                 |
+| Remover conhecimento de `sessionRpc` de módulos de domínio fora de `facades/ports`            | ✅ para módulos quentes principais |
+| Criar guardrail CI/grep para bloquear novos imports `agent -> sdk/*` internos                 | ✅                                 |
 
 ### Fase 4 — Observabilidade nos wrappers (⬜ PENDENTE)
 
@@ -266,27 +434,27 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 | Integrar com observability event bus existente                                    | ⬜      |
 | Dashboard: contadores de chamadas RPC por tipo                                    | ⬜      |
 
-### Fase 5 — Auditoria de boundary (⬜ PENDENTE)
+### Fase 5 — Auditoria de boundary (🔄 EM ANDAMENTO)
 
 **Meta**: nenhum módulo fora de `src/copilot/sdk/` importa `@github/copilot-sdk` diretamente.
 
-| Item                                                                          | Status |
-| ----------------------------------------------------------------------------- | ------ |
-| Scan automático: `rg "from '@github/copilot-sdk'"` fora de `src/copilot/sdk/` | ⬜      |
-| Configurar ESLint `no-restricted-imports` para enforçar boundary L0→L1        | ⬜      |
-| Adicionar ao CI: falha se import direto detectado fora de `sdk/`              | ⬜      |
+| Item                                                                   | Status                                  |
+| ---------------------------------------------------------------------- | --------------------------------------- |
+| Scan automático: `check:copilot:boundary` fora de `src/copilot/sdk/`   | ✅                                       |
+| Configurar ESLint `no-restricted-imports` para enforçar boundary L0→L1 | ✅                                       |
+| Adicionar ao CI: falha se import direto detectado fora de `sdk/`       | 🔄 (via gate `check:copilot:guardrails`) |
 
-### Fase 6 — Erro de domínio `SdkOperationError` (⬜ PENDENTE)
+### Fase 6 — Erro de domínio `SdkOperationError` (✅ CONCLUÍDA)
 
 **Meta**: toda falha do SDK é relançada como `SdkOperationError` com kind, operação e causa.
 
-| Item                                                                          | Status |
-| ----------------------------------------------------------------------------- | ------ |
-| Criar classe `SdkOperationError extends Error` em `sdk/errors.js`             | ⬜      |
-| Adicionar `name`, `kind`, `operation`, `cause` como campos                    | ⬜      |
-| Migrar todos os catch em wrappers RPC para usar `SdkOperationError`           | ⬜      |
-| Adicionar ao `types.js`: `SdkErrorKind` union já existe — usar em constructor | ⬜      |
-| Atualizar JSDoc de todos os wrappers: `@throws {SdkOperationError}`           | ⬜      |
+| Item                                                                    | Status |
+| ----------------------------------------------------------------------- | ------ |
+| Criar classe `SdkOperationError extends Error` em `sdk/errors.js`       | ✅      |
+| Adicionar `name`, `kind`, `operation`, `cause` como campos              | ✅      |
+| Migrar todos os catch em wrappers RPC para usar `SdkOperationError`     | ✅      |
+| Adicionar helper `toSdkOperationError()` para normalização centralizada | ✅      |
+| Atualizar JSDoc de todos os wrappers: `@throws {SdkOperationError}`     | 🔄      |
 
 ### Fase 7 — Session `SdkOperationError` + recovery (⬜ PENDENTE)
 
@@ -297,6 +465,24 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 | Integrar `classifySdkError` com circuit breaker no `session/client.js`          | ⬜      |
 | Políticas de retry por `SdkErrorKind` (`rate_limit` → back-off, `auth` → abort) | ⬜      |
 | Integrar com watchdog agent para notificar sobre `quota_exhausted`              | ⬜      |
+
+### Fase 8 — Guardrails de fronteira `agent ↔ sdk` (🔄 EM ANDAMENTO)
+
+**Checkpoint atual (2026-04-26):** apenas **3 imports diretos de `#copilot/sdk`** permanecem em `agent/**`:
+
+- `agent/facades/agent-sdk-access.js`
+- `agent/facades/agent-sdk-runtime.js`
+- `agent/ports/tool-port.js`
+
+**Meta**: institucionalizar a arquitetura para impedir regressão futura.
+
+| Item                                                                                       | Status |
+| ------------------------------------------------------------------------------------------ | ------ |
+| Adicionar teste estrutural cobrando ausência de `../../sdk/*` em `agent/` fora de ports    | ✅      |
+| Adicionar teste estrutural cobrando ausência de `#copilot/sdk/*` interno fora da fronteira | ✅      |
+| Adicionar regra de lint/restricted-imports para `agent/**`                                 | ✅      |
+| Documentar explicitamente `facades/` e `ports/` como boundary de integração com o SDK      | ✅      |
+| Medir a redução de pontos de contato `agent ↔ sdk` por checkpoint                          | 🔄      |
 
 ---
 
@@ -312,6 +498,7 @@ Estas regras devem ser verdadeiras em qualquer ponto do tempo, e violações dev
 6. **assertSession em todo wrapper de sessão**: nunca chamar `session.rpc.*` sem validação prévia
 7. **Logging rastreável**: toda operação com `sessionId` loga o `sessionId`
 8. **Erros classificados**: nenhum `catch (e) { throw e; }` direto — sempre classifica e contextualiza
+9. **Fronteira agent→sdk controlada**: fora de `facades/` e `ports/`, `agent/` fala com o SDK apenas via barrel `#copilot/sdk`
 
 ---
 
@@ -322,9 +509,9 @@ Estas regras devem ser verdadeiras em qualquer ponto do tempo, e violações dev
 | **Crude call**       | Acesso direto a `session.rpc.*`, `client.*` ou construtor SDK sem wrapper            |
 | **Wrapper completo** | Função com os 8 critérios obrigatórios da seção 3                                    |
 | **L0**               | Camada vendor: `@github/copilot-sdk` (não tocado diretamente)                        |
-| **L1**               | SDK Wrapper Layer: `src/copilot/sdk/` — único ponto de contato com L0                |
-| **L2**               | Domínio: `agent/`, `orchestrator/`, `kernel/` — consumem L1 via barrel               |
-| **L3**               | Superfície: `server/`, `terminal/` — consomem L2 e L1                                |
+| **L1**               | SDK Wrapper Layer: `src/copilot/sdk/` — único ponto de contato com                   |
+|                      |
+| **L3**               | Superfície: `server/`, `terminal/` — consomem L1                                     |
 | **SSOT**             | Single Source of Truth — `types.js` para tipos, `index.js` para exports              |
 | **Barrel**           | Módulo de re-exportação: `index.js` expõe tudo de L1 via `#copilot/sdk`              |
 | **DI Token**         | Identificador de injeção de dependência em `sdk/di-tokens.js`                        |
@@ -345,3 +532,89 @@ Antes de mergear qualquer mudança em `src/copilot/sdk/`:
 - [ ] `npm run typecheck:strict` → 0 erros
 - [ ] `npm run lint` → 0 erros
 - [ ] Testes unitários cobrem o novo código
+
+---
+
+## 10. Upgrade oficial para `@github/copilot-sdk@0.3.0` (2026-04-26)
+
+### 10.1 Status do upgrade
+
+- `package.json` atualizado para `@github/copilot-sdk: ^0.3.0`
+- `package-lock.json` resolvido em `0.3.0`
+- Migração de API concluída nos wrappers/consumers principais (`rpc/session`, `rpc/ops`, permissões, schemas HTTP)
+
+### 10.2 Quebras relevantes da v0.3.0 absorvidas
+
+1. **Permissões (decision kind mudou)**
+    - antigo: `approved` / `denied-*`
+    - novo: `approve-once`, `approve-for-session`, `approve-for-location`, `reject`, `user-not-available`, `no-result`
+    - impacto: `hooks/permission-handler.js`, `sdk/session/permissions.js`, `session-middleware.js`
+
+2. **RPC namespace de workspace mudou**
+    - antigo: `session.rpc.workspace.*`
+    - novo: `session.rpc.workspaces.*`
+    - impacto: `sdk/rpc/session.js` + snapshot de capacidades em `agent-sdk-access.js`
+
+3. **Compaction mudou para history**
+    - antigo: `session.rpc.compaction.compact()`
+    - novo: `session.rpc.history.compact()`
+    - impacto: `sdk/rpc/ops.js`, `tools/session-rpc-tools.js`, snapshot de capacidades
+
+4. **Mutators RPC retornam `void` em vários pontos**
+    - `mode.set`, `plan.update`, `plan.delete`, `workspaces.createFile`, `agent.deselect`
+    - wrappers agora normalizam retorno para objetos de domínio (`{ success: true }`, `{ mode }`, `{}`)
+
+5. **Renome de tipos MCP exportados no root**
+    - antigo: `MCPLocalServerConfig` / `MCPRemoteServerConfig`
+    - novo: `MCPStdioServerConfig` / `MCPHTTPServerConfig`
+    - impacto: `sdk/types.js` (SSOT)
+
+6. **Opção de token no client options**
+    - antigo: `githubToken`
+    - novo: `gitHubToken`
+    - impacto: `config/client-options.js`
+
+### 10.3 Guardrails NPM para evitar recorrência
+
+Foram institucionalizados guardrails de instalação/resolução para evitar nova investigação longa de "versão existe no npm mas não resolve localmente":
+
+- `.npmrc`:
+    - `registry=https://registry.npmjs.org/`
+    - `@github:registry=https://registry.npmjs.org/`
+    - `prefer-online=true`
+    - `prefer-offline=false`
+    - `legacy-peer-deps=true` (conflito conhecido `madge@8` × `typescript@6`)
+
+- scripts novos:
+    - `npm run check:npm`
+    - `npm run check:npm:copilot-sdk`
+    - `npm run deps:refresh:online`
+
+- script novo de validação online:
+    - `scripts/ci/check-npm-registry-freshness.mjs`
+    - valida dist-tags/version online com `--prefer-online` + cache fresh (`/tmp/npm-cache-fresh`)
+    - confirma que o range declarado em `package.json` resolve no registry real
+
+### 10.4 Procedimento canônico para futuros upgrades do SDK
+
+1. Atualizar range no `package.json`.
+2. Executar `npm run deps:refresh:online`.
+3. Executar `npm run check:npm:copilot-sdk`.
+4. Executar `npm run typecheck:node`.
+5. Executar suíte de testes Copilot/contratos.
+6. Atualizar este documento com breaking changes absorvidas.
+
+### 10.5 Checkpoint de validação (fechamento desta onda)
+
+Estado validado em `2026-04-26`:
+
+- `npm run check:npm` ✅
+- `npm run typecheck:node` ✅
+- `npm run test:copilot` ✅ (`273 passed`, `20 skipped`; `4140 passed`, `33 skipped`)
+
+Correção estrutural adicional aplicada durante a validação:
+
+- `sdk/rpc/session.js` (`getWorkspaceRpc`) recebeu hardening para compatibilidade `workspaces` (v0.3.0) +
+    `workspace` (legado)
+- foi removido um pitfall de ASI em `return` com cast JSDoc multiline que podia retornar `undefined` em runtime,
+    causando falhas intermitentes de `workspace.*`

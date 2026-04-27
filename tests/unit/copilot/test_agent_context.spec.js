@@ -87,7 +87,7 @@ describe('AgentContext', () => {
         assert.equal(ctx.getPermissionHandlerSnapshot(), initialHandler, 'handler SDK deve ser referência estável');
         assert.equal(
             (await initialHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 'ctx-session' })).kind,
-            'denied-by-rules',
+            'reject',
         );
 
         const originalRegistry = ctx.getToolRegistrySnapshot();
