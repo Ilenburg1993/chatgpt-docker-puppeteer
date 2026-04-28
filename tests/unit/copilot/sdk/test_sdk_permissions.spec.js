@@ -153,12 +153,43 @@ describe('sdk/permissions.js', () => {
             expect(result.kind).toBe('reject');
         });
 
+        it('onRequest: aceita boolean e normaliza resultado', async () => {
+            const approvedHandler = perms.createPermissionHandler({ onRequest: () => true });
+            const deniedHandler = perms.createPermissionHandler({ onRequest: () => false });
+
+            await expect(approvedHandler(makeRequest('any'), { sessionId: 's1' })).resolves.toMatchObject({
+                kind: 'approve-once',
+            });
+            await expect(deniedHandler(makeRequest('any'), { sessionId: 's1' })).resolves.toMatchObject({
+                kind: 'reject',
+            });
+        });
+
+        it('onRequest: recebe invocation completo', async () => {
+            const spy = vi.fn(() => true);
+            const handler = perms.createPermissionHandler({ onRequest: spy });
+            await handler(makeRequest('any'), { sessionId: 'sess-123' });
+            expect(spy).toHaveBeenCalledWith(expect.anything(), { sessionId: 'sess-123' });
+        });
+
         it('onRequest: retorno undefined delega para lógica padrão', async () => {
             const handler = perms.createPermissionHandler({
                 onRequest: () => undefined,
             });
             const result = await handler(makeRequest('safe_tool'), { sessionId: 's1' });
             expect(result.kind).toBe('approve-once');
+        });
+
+        it('onRequest: falha é normalizada como SdkOperationError', async () => {
+            const handler = perms.createPermissionHandler({
+                onRequest: () => {
+                    throw new Error('boom');
+                },
+            });
+            await expect(handler(makeRequest('safe_tool'), { sessionId: 's1' })).rejects.toMatchObject({
+                name: 'SdkOperationError',
+                operation: 'permissions.onRequest',
+            });
         });
 
         it('auditMode: loga sem negar', async () => {
@@ -195,6 +226,13 @@ describe('sdk/permissions.js', () => {
             expect(() => perms.createAllowlistPermissionHandler(/** @type {any} */ ('not-an-array'))).toThrow(
                 TypeError,
             );
+        });
+
+        it('createPermissionHandler valida allowTools/denyTools como arrays de strings', () => {
+            expect(() => perms.createPermissionHandler({ allowTools: /** @type {any} */ ('shell') })).toThrow(
+                TypeError,
+            );
+            expect(() => perms.createPermissionHandler({ denyTools: /** @type {any} */ ([123]) })).toThrow(TypeError);
         });
 
         it('lista vazia nega tudo', async () => {

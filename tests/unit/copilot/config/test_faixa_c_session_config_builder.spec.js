@@ -258,6 +258,17 @@ describe('SessionConfigBuilder', () => {
         const config = new SessionConfigBuilder().provider(/** @type {any} */ (provider)).build();
         expect(config.provider).toEqual(provider);
     });
+
+    it('gitHubToken() define token por sessão', () => {
+        const config = new SessionConfigBuilder().gitHubToken('ghs_session_token').build();
+        expect(config.gitHubToken).toBe('ghs_session_token');
+    });
+
+    it('createSessionFsHandler() define handler de session filesystem', () => {
+        const handler = vi.fn();
+        const config = new SessionConfigBuilder().createSessionFsHandler(/** @type {any} */ (handler)).build();
+        expect(config.createSessionFsHandler).toBe(handler);
+    });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -379,6 +390,21 @@ describe('ClientOptionsBuilder', () => {
         const handler = vi.fn(() => []);
         const opts = new ClientOptionsBuilder().onListModels(handler).build();
         expect(opts.onListModels).toBe(handler);
+    });
+
+    it('sessionFs() define config de session filesystem', () => {
+        const sessionFs = {
+            initialCwd: '/workspace',
+            sessionStatePath: '.copilot/session-state',
+            conventions: /** @type {const} */ ('posix'),
+        };
+        const opts = new ClientOptionsBuilder().sessionFs(/** @type {any} */ (sessionFs)).build();
+        expect(opts.sessionFs).toEqual(sessionFs);
+    });
+
+    it('sessionIdleTimeoutSeconds() define timeout de idle do server', () => {
+        const opts = new ClientOptionsBuilder().sessionIdleTimeoutSeconds(600).build();
+        expect(opts.sessionIdleTimeoutSeconds).toBe(600);
     });
 
     it('telemetry() define config OTel', () => {

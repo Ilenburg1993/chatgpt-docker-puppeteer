@@ -13,6 +13,7 @@
  */
 
 import { approveAll } from '@github/copilot-sdk';
+import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 
 // Re-export canônico do SDK
@@ -34,8 +35,16 @@ export { approveAll };
  * @property {string[]} [denyTools] - Blacklist de nomes de tools negadas
  * @property {RegExp[]} [denyPatterns] - Regex patterns para negar tools por nome
  * @property {boolean} [auditMode=false] - Logar todas as decisões sem negar. Default is `false`
- * @property {(request: PermissionRequest) => PermissionRequestResult | undefined} [onRequest] - Handler custom
- *   pré-avaliação
+ * @property {(
+ *     request: PermissionRequest,
+ *     invocation: { sessionId: string },
+ * ) =>
+ *     | boolean
+ *     | 'deny'
+ *     | PermissionRequestResult
+ *     | undefined
+ *     | Promise<boolean | 'deny' | PermissionRequestResult | undefined>} [onRequest]
+ *   - Handler custom pré-avaliação
  */
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -48,6 +57,41 @@ function approved() {
 /** @returns {PermissionRequestResult} */
 function denied() {
     return /** @type {PermissionRequestResult} */ ({ kind: 'reject' });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is PermissionRequestResult}
+ */
+function isPermissionResult(value) {
+    return Boolean(value && typeof value === 'object' && typeof Reflect.get(value, 'kind') === 'string');
+}
+
+/**
+ * @param {boolean | 'deny' | PermissionRequestResult} value
+ * @returns {PermissionRequestResult}
+ */
+function normalizeCustomDecision(value) {
+    if (value === true) return approved();
+    if (value === false || value === 'deny') return denied();
+    if (isPermissionResult(value)) return value;
+    return denied();
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fieldName
+ */
+function assertOptionalStringArray(value, fieldName) {
+    if (value === undefined) return;
+    if (!Array.isArray(value)) {
+        throw new TypeError(`[sdk/permissions] ${fieldName} deve ser um array de strings`);
+    }
+    for (const item of value) {
+        if (typeof item !== 'string') {
+            throw new TypeError(`[sdk/permissions] ${fieldName} deve conter apenas strings`);
+        }
+    }
 }
 
 /**
@@ -100,6 +144,10 @@ export function createPermissionHandler(config) {
     const auditMode = cfg.auditMode ?? false;
     const onRequest = cfg.onRequest;
 
+    assertOptionalStringArray(allowTools, 'allowTools');
+    assertOptionalStringArray(denyTools, 'denyTools');
+    assertOptionalStringArray(denyKinds, 'denyKinds');
+
     // Fail-fast: validar denyPatterns
     for (const p of denyPatterns) {
         if (!(p instanceof RegExp)) {
@@ -108,21 +156,37 @@ export function createPermissionHandler(config) {
     }
 
     return /** @type {PermissionHandler} */ (
-        async (request) => {
+        async (request, invocation) => {
             const kind = extractKind(request);
             const toolName = extractToolName(request);
+            const sessionId = invocation?.sessionId ?? 'unknown';
 
             // 1. Custom handler pré-avaliação
             if (onRequest) {
-                const custom = onRequest(request);
-                if (custom !== undefined) {
-                    log('DEBUG', `[sdk/permissions] onRequest override para '${toolName}': ${custom.kind}`);
-                    return custom;
+                try {
+                    const custom = await onRequest(request, invocation);
+                    if (custom !== undefined) {
+                        const result = normalizeCustomDecision(custom);
+                        log(
+                            'DEBUG',
+                            `[sdk/permissions] onRequest override: sessionId='${sessionId}' kind='${kind}' tool='${toolName}' → ${result.kind}`,
+                        );
+                        return result;
+                    }
+                } catch (err) {
+                    log(
+                        'ERROR',
+                        `[sdk/permissions] onRequest falhou: sessionId='${sessionId}' kind='${kind}' tool='${toolName}'`,
+                    );
+                    throw toSdkOperationError('permissions.onRequest', err);
                 }
             }
 
             if (denyKinds.includes(/** @type {PermissionRequest['kind']} */ (kind))) {
-                log('DEBUG', `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyKinds)`);
+                log(
+                    'DEBUG',
+                    `[sdk/permissions] NEGADO sessionId='${sessionId}' kind='${kind}' tool='${toolName}' (denyKinds)`,
+                );
                 return denied();
             }
 
@@ -130,21 +194,27 @@ export function createPermissionHandler(config) {
                 if (pattern.test(toolName)) {
                     log(
                         'DEBUG',
-                        `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyPattern: ${pattern})`,
+                        `[sdk/permissions] NEGADO sessionId='${sessionId}' kind='${kind}' tool='${toolName}' (denyPattern: ${pattern})`,
                     );
                     return denied();
                 }
             }
 
             if (denyTools.includes(toolName)) {
-                log('DEBUG', `[sdk/permissions] NEGADO kind='${kind}' tool='${toolName}' (denyTools)`);
+                log(
+                    'DEBUG',
+                    `[sdk/permissions] NEGADO sessionId='${sessionId}' kind='${kind}' tool='${toolName}' (denyTools)`,
+                );
                 return denied();
             }
 
             // 2. Allow all
             if (allowAll) {
                 if (auditMode) {
-                    log('INFO', `[sdk/permissions] AUDIT: aprovando kind='${kind}' tool='${toolName}' (allowAll)`);
+                    log(
+                        'INFO',
+                        `[sdk/permissions] AUDIT: sessionId='${sessionId}' aprovando kind='${kind}' tool='${toolName}' (allowAll)`,
+                    );
                 }
                 return approved();
             }
@@ -155,7 +225,7 @@ export function createPermissionHandler(config) {
                 if (auditMode) {
                     log(
                         'INFO',
-                        `[sdk/permissions] AUDIT: kind='${kind}' tool='${toolName}' → ${result.kind} (allowTools)`,
+                        `[sdk/permissions] AUDIT: sessionId='${sessionId}' kind='${kind}' tool='${toolName}' → ${result.kind} (allowTools)`,
                     );
                 }
                 return result;
@@ -163,7 +233,10 @@ export function createPermissionHandler(config) {
 
             // 6. Default: aprovar
             if (auditMode)
-                log('INFO', `[sdk/permissions] AUDIT: aprovando kind='${kind}' tool='${toolName}' (default)`);
+                log(
+                    'INFO',
+                    `[sdk/permissions] AUDIT: sessionId='${sessionId}' aprovando kind='${kind}' tool='${toolName}' (default)`,
+                );
             return approved();
         }
     );

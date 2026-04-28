@@ -10,5 +10,6 @@
 export * from './config.js';
 export * from './contract.js';
 export * from './plan.js';
+export * from './session-fs.js';
 export * from './skills.js';
 export * from './workspace.js';

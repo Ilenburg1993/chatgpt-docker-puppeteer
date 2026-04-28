@@ -19,8 +19,9 @@
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { toError } from '../../core/error-handlers.js';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
-import { toSdkOperationError } from '../errors.js';
+import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 import { listModels, resolveModelIdAuto } from '../models/index.js';
 /**
@@ -50,6 +51,7 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
 
 /**
  * @typedef {Object} SessionCreateOptions
+ * @property {string} [sessionId] - ID customizado da sessão
  * @property {string} [model] - Modelo LLM (ex: 'gpt-4.1', 'claude-sonnet-4-5')
  * @property {string} [clientName] - Identificador do client no User-Agent do SDK
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
@@ -66,29 +68,42 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  * @property {boolean} [streaming] - Habilitar streaming (default: true)
  * @property {string[]} [availableTools] - Lista de tools permitidas (overrides excludedTools)
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
+ * @property {SessionConfig['provider']} [provider] - Provider/BYOK por sessão
  * @property {string} [configDir] - Diretorio de configuracao do SDK
  * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos do SDK
  * @property {string} [agent] - Agente customizado a selecionar na sessao
  * @property {string[]} [skillDirectories] - Diretórios de skills customizadas
  * @property {string[]} [disabledSkills] - Skills a desabilitar
+ * @property {string} [gitHubToken] - Token GitHub por sessão (multitenancy/session-level auth)
+ * @property {SessionConfig['createSessionFsHandler']} [createSessionFsHandler] - Factory de SessionFs por sessão
  */
 
 /**
  * @typedef {Object} SessionResumeOptions
+ * @property {string} [clientName] - Identificador do client no User-Agent do SDK
+ * @property {string} [model] - Modelo alvo da sessão retomada, quando suportado
+ * @property {ReasoningEffortLevel} [reasoningEffort] - Esforço de reasoning para a sessão retomada
  * @property {PermissionHandler} [onPermissionRequest]
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest]
  * @property {SessionConfig['hooks']} [hooks]
  * @property {ToolList} [tools]
+ * @property {InfiniteSessionOptions} [infiniteSessions] - Configuração de InfiniteSession
  * @property {boolean | object} [systemMessage]
  * @property {string} [systemMessageContent]
+ * @property {string} [workingDirectory] - Diretório de trabalho da sessão
+ * @property {Record<string, import('@github/copilot-sdk').MCPServerConfig>} [mcpServers] - MCP servers da sessão
+ * @property {import('@github/copilot-sdk').CustomAgentConfig[]} [customAgents] - Agentes customizados
  * @property {boolean} [streaming]
  * @property {string[]} [availableTools] - Lista de tools permitidas
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
+ * @property {SessionConfig['provider']} [provider] - Provider/BYOK da sessão retomada
  * @property {string} [configDir] - Diretorio de configuracao
  * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos
  * @property {string} [agent] - Agente customizado a selecionar
  * @property {string[]} [skillDirectories] - Diretórios de skills
  * @property {string[]} [disabledSkills] - Skills a desabilitar
+ * @property {string} [gitHubToken] - Token GitHub por sessão
+ * @property {SessionConfig['createSessionFsHandler']} [createSessionFsHandler] - Factory de SessionFs por sessão
  * @property {boolean} [disableResume] - RF-PR-06: se true, reconecta sem emitir session.resume (reconexão silenciosa)
  */
 
@@ -119,6 +134,112 @@ function assertSession(session, caller) {
     if (!session || typeof session !== 'object' || !('sessionId' in session)) {
         throw new TypeError(`[lib/session/${caller}] sessão inválida ou não fornecida.`);
     }
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+async function wait(ms) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * @param {import('@github/copilot-sdk').CopilotClient} client
+ * @param {string} operation
+ * @returns {Promise<void>}
+ */
+async function reconnectClientBestEffort(client, operation) {
+    if (typeof client.start !== 'function') return;
+    try {
+        await client.start();
+        log('INFO', `[lib/session] ${operation}: reconnect best-effort concluído via client.start().`);
+    } catch (error) {
+        log('WARN', `[lib/session] ${operation}: reconnect best-effort falhou: ${toError(error).message}`);
+    }
+}
+
+/**
+ * @template T
+ * @param {{
+ *     client: import('@github/copilot-sdk').CopilotClient;
+ *     operation: 'session.create' | 'session.resume';
+ *     successAttributes?: Record<string, unknown>;
+ *     run: () => Promise<T>;
+ * }} params
+ * @returns {Promise<T>}
+ */
+async function runSessionLifecycleOperation(params) {
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: params.operation,
+        status: 'started',
+        ...(params.successAttributes ? { attributes: params.successAttributes } : {}),
+    });
+
+    const maxAttempts = 2;
+    /** @type {unknown} */
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const result = await params.run();
+            emitSdkOperationMetric({
+                operation: params.operation,
+                status: 'succeeded',
+                durationMs: Date.now() - startedAt,
+                attributes: {
+                    ...(params.successAttributes ?? {}),
+                    attempt,
+                },
+            });
+            return result;
+        } catch (error) {
+            lastError = error;
+            const policy = getSdkRecoveryPolicy(error, 'session');
+            const shouldRetry = policy.retryable && attempt < maxAttempts;
+
+            log(
+                shouldRetry ? 'WARN' : 'ERROR',
+                `[lib/session] ${params.operation} falhou (attempt=${attempt}/${maxAttempts}, kind=${policy.kind}, retryable=${policy.retryable}, reconnect=${policy.allowReconnect}): ${toError(error).message}`,
+            );
+
+            if (shouldRetry) {
+                if (policy.allowReconnect) {
+                    await reconnectClientBestEffort(params.client, params.operation);
+                }
+                await wait(policy.backoffMs);
+                continue;
+            }
+
+            const finalError = toSdkOperationError(params.operation, error);
+            emitSdkOperationMetric({
+                operation: params.operation,
+                status: 'failed',
+                durationMs: Date.now() - startedAt,
+                attributes: {
+                    ...(params.successAttributes ?? {}),
+                    attempt,
+                    retryable: policy.retryable,
+                    allowReconnect: policy.allowReconnect,
+                    errorKind: finalError.kind,
+                },
+            });
+            throw finalError;
+        }
+    }
+
+    const finalError = toSdkOperationError(params.operation, lastError);
+    emitSdkOperationMetric({
+        operation: params.operation,
+        status: 'failed',
+        durationMs: Date.now() - startedAt,
+        attributes: {
+            ...(params.successAttributes ?? {}),
+            errorKind: finalError.kind,
+        },
+    });
+    throw finalError;
 }
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -182,6 +303,7 @@ function buildSessionConfig(opts, mode) {
 
     if (mode === 'create') {
         const co = /** @type {SessionCreateOptions} */ (opts);
+        if (co.sessionId !== undefined) cfg.sessionId = co.sessionId;
         if (co.model !== undefined) cfg.model = co.model;
         if (co.clientName !== undefined) cfg.clientName = co.clientName;
         if (co.reasoningEffort !== undefined) {
@@ -199,11 +321,14 @@ function buildSessionConfig(opts, mode) {
         if (co.customAgents !== undefined) cfg.customAgents = co.customAgents;
         if (co.availableTools !== undefined) cfg.availableTools = co.availableTools;
         if (co.excludedTools !== undefined) cfg.excludedTools = co.excludedTools;
+        if (co.provider !== undefined) cfg.provider = co.provider;
         if (co.configDir !== undefined) cfg.configDir = co.configDir;
         if (co.onEvent !== undefined) cfg.onEvent = co.onEvent;
         if (co.agent !== undefined) cfg.agent = co.agent;
         if (co.skillDirectories !== undefined) cfg.skillDirectories = co.skillDirectories;
         if (co.disabledSkills !== undefined) cfg.disabledSkills = co.disabledSkills;
+        if (co.gitHubToken !== undefined) cfg.gitHubToken = co.gitHubToken;
+        if (co.createSessionFsHandler !== undefined) cfg.createSessionFsHandler = co.createSessionFsHandler;
         // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
         // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
         if (co.infiniteSessions !== undefined) {
@@ -224,6 +349,34 @@ function buildSessionConfig(opts, mode) {
     // RF-PR-06: disableResume — reconexão silenciosa sem emitir session.resume
     if (mode === 'resume') {
         const ro = /** @type {SessionResumeOptions} */ (opts);
+        if (ro.clientName !== undefined) cfg.clientName = ro.clientName;
+        if (ro.model !== undefined) cfg.model = ro.model;
+        if (ro.reasoningEffort !== undefined) {
+            const valid = /** @type {string[]} */ (Object.values(REASONING_EFFORTS));
+            if (!valid.includes(ro.reasoningEffort)) {
+                log(
+                    'WARN',
+                    `[lib/session] reasoningEffort '${ro.reasoningEffort}' inválido. Valores aceitos: ${valid.join(', ')}`,
+                );
+            }
+            cfg.reasoningEffort = /** @type {ReasoningEffortLevel} */ (ro.reasoningEffort);
+        }
+        if (ro.workingDirectory !== undefined) cfg.workingDirectory = ro.workingDirectory;
+        if (ro.mcpServers !== undefined) cfg.mcpServers = ro.mcpServers;
+        if (ro.customAgents !== undefined) cfg.customAgents = ro.customAgents;
+        if (ro.availableTools !== undefined) cfg.availableTools = ro.availableTools;
+        if (ro.excludedTools !== undefined) cfg.excludedTools = ro.excludedTools;
+        if (ro.provider !== undefined) cfg.provider = ro.provider;
+        if (ro.configDir !== undefined) cfg.configDir = ro.configDir;
+        if (ro.onEvent !== undefined) cfg.onEvent = ro.onEvent;
+        if (ro.agent !== undefined) cfg.agent = ro.agent;
+        if (ro.skillDirectories !== undefined) cfg.skillDirectories = ro.skillDirectories;
+        if (ro.disabledSkills !== undefined) cfg.disabledSkills = ro.disabledSkills;
+        if (ro.infiniteSessions !== undefined) {
+            cfg.infiniteSessions = buildInfiniteSessionConfig(ro.infiniteSessions);
+        }
+        if (ro.gitHubToken !== undefined) cfg.gitHubToken = ro.gitHubToken;
+        if (ro.createSessionFsHandler !== undefined) cfg.createSessionFsHandler = ro.createSessionFsHandler;
         if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
     }
 
@@ -274,12 +427,15 @@ export async function createSession(client, opts) {
     const config = buildSessionConfig({ ...options, model, ...(reasoningEffort ? { reasoningEffort } : {}) }, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
-    let session;
-    try {
-        session = await client.createSession(config);
-    } catch (error) {
-        throw toSdkOperationError('session.create', error);
-    }
+    const session = await runSessionLifecycleOperation({
+        client,
+        operation: 'session.create',
+        successAttributes: {
+            model,
+            reasoningEffort: reasoningEffort ?? null,
+        },
+        run: async () => client.createSession(config),
+    });
     log('INFO', `[lib/session] Sessao criada: ${session.sessionId}`);
     return { session, isResumed: false, sessionId: session.sessionId };
 }
@@ -305,12 +461,15 @@ export async function resumeSession(client, sessionId, opts) {
     const config = buildSessionConfig(options, 'resume');
 
     log('INFO', `[lib/session] Retomando sessao: ${sessionId}`);
-    let session;
-    try {
-        session = await client.resumeSession(sessionId, config);
-    } catch (error) {
-        throw toSdkOperationError('session.resume', error);
-    }
+    const session = await runSessionLifecycleOperation({
+        client,
+        operation: 'session.resume',
+        successAttributes: {
+            sessionId,
+            disableResume: Boolean(/** @type {{ disableResume?: boolean }} */ (config).disableResume),
+        },
+        run: async () => client.resumeSession(sessionId, config),
+    });
     log('INFO', `[lib/session] Sessao retomada: ${session.sessionId}`);
     return { session, isResumed: true, sessionId: session.sessionId };
 }

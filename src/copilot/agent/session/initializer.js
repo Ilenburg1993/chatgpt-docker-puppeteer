@@ -24,6 +24,7 @@ import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
     AGENT_SDK_DEFAULT_MODEL,
     createAgentSdkSessionByClient,
+    getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions,
     readAgentSdkSessionMessages,
@@ -156,6 +157,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
     const bootSkills = readBootSkillConfig();
+    const createSessionFsHandler = getAgentConfiguredSessionFsHandler();
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
     const systemMessage = injectContext
@@ -175,6 +177,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         ...pickDefinedAgentSdkOptions({
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,
+            createSessionFsHandler,
             hooks: sessionOptions.hooks,
             tools: sessionOptions.tools,
             mcpServers: sessionOptions.mcpServers,

@@ -22,8 +22,11 @@ import {
     registerActiveSdkSession,
     removeActiveSdkSession,
 } from '../../infra/sdk-session-registry.js';
+import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
+import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { buildCopilotClientOptionsFromEnv } from './client-options.js';
+import { createSession as createLifecycleSession, resumeSession as resumeLifecycleSession } from './lifecycle.js';
 
 // Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
 export { CopilotClient };
@@ -85,6 +88,14 @@ let _startPromise = null;
 let _registryHasActiveSessions = false;
 
 /**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+async function wait(ms) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Constrói as opções canônicas do CopilotClient.
  *
  * A fonte de verdade mora em `config/client-options.js`: este wrapper existe para preservar a API pública histórica de
@@ -129,13 +140,71 @@ export async function getClient(overrides = {}) {
     }
 
     _startPromise = (async () => {
+        const startedAt = Date.now();
+        emitSdkOperationMetric({ operation: 'client.connect', status: 'started' });
         try {
             log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
-            const client = createCopilotClient(overrides);
-            await client.start();
-            _client = client;
-            log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
-            return client;
+            const maxAttempts = 2;
+            /** @type {unknown} */
+            let lastError = null;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    sdkConnectionCircuitBreaker.guard();
+                    const client = createCopilotClient(overrides);
+                    await client.start();
+                    sdkConnectionCircuitBreaker.recordSuccess();
+                    _client = client;
+                    log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
+                    emitSdkOperationMetric({
+                        operation: 'client.connect',
+                        status: 'succeeded',
+                        durationMs: Date.now() - startedAt,
+                        attributes: {
+                            attempt,
+                            breakerState: sdkConnectionCircuitBreaker.getState(),
+                        },
+                    });
+                    return client;
+                } catch (error) {
+                    lastError = error;
+                    const policy = getSdkRecoveryPolicy(error, 'connection');
+
+                    if (policy.tripCircuit) {
+                        sdkConnectionCircuitBreaker.recordFailure();
+                    } else if (policy.resetCircuit) {
+                        sdkConnectionCircuitBreaker.reset();
+                    }
+
+                    const shouldRetry = policy.retryable && attempt < maxAttempts;
+                    log(
+                        shouldRetry ? 'WARN' : 'ERROR',
+                        `[lib/sdk-client] conexão ao CopilotClient falhou (attempt=${attempt}/${maxAttempts}, kind=${policy.kind}, retryable=${policy.retryable}, tripCircuit=${policy.tripCircuit}): ${toError(error).message}`,
+                    );
+
+                    if (shouldRetry) {
+                        await wait(policy.backoffMs);
+                        continue;
+                    }
+
+                    break;
+                }
+            }
+
+            const policy = getSdkRecoveryPolicy(lastError, 'connection');
+            const finalSdkError = toSdkOperationError('client.connect', lastError);
+            emitSdkOperationMetric({
+                operation: 'client.connect',
+                status: 'failed',
+                durationMs: Date.now() - startedAt,
+                attributes: {
+                    errorKind: finalSdkError.kind,
+                    breakerState: sdkConnectionCircuitBreaker.getState(),
+                    retryable: policy.retryable,
+                    tripCircuit: policy.tripCircuit,
+                },
+            });
+            throw finalSdkError;
         } finally {
             _startPromise = null;
         }
@@ -280,7 +349,10 @@ export async function getServerRpc() {
  */
 export async function createClientSession(config) {
     const client = await getClient();
-    const session = await client.createSession(config);
+    const { session } = await createLifecycleSession(
+        client,
+        /** @type {import('./lifecycle.js').SessionCreateOptions} */ (/** @type {unknown} */ (config)),
+    );
     registerActiveSdkSession(session, {
         model: config.model ?? 'unknown',
         createdAt: Date.now(),
@@ -306,7 +378,11 @@ export async function resumeClientSession(sessionId, config) {
     }
 
     const client = await getClient();
-    const session = await client.resumeSession(sessionId, config);
+    const { session } = await resumeLifecycleSession(
+        client,
+        sessionId,
+        /** @type {import('./lifecycle.js').SessionResumeOptions} */ (/** @type {unknown} */ (config)),
+    );
     registerActiveSdkSession(session, {
         model: /** @type {string} */ (/** @type {Record<string, unknown>} */ (config)['model'] ?? 'unknown'),
         createdAt: Date.now(),
@@ -416,6 +492,7 @@ export function getActiveSessionCount() {
 export function _resetClientState() {
     _client = null;
     _startPromise = null;
+    sdkConnectionCircuitBreaker.reset();
     clearActiveSdkSessions();
 }
 /**

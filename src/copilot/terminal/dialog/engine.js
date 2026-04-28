@@ -22,7 +22,7 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/runtime-ui-state-store.js';
-import { isSdkQuotaOrRateLimitError } from '../../sdk/errors.js';
+import { getSdkRecoveryPolicy } from '../../sdk/errors.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import {
     readTerminalDialogStreamMeta,
@@ -124,21 +124,26 @@ async function _doEnsureDialogLoop() {
             return;
         } catch (err) {
             attempt++;
-            if (isSdkQuotaOrRateLimitError(err)) {
+            const sdkRecoveryPolicy = getSdkRecoveryPolicy(err, 'session');
+            if (sdkRecoveryPolicy.kind !== 'unknown' && !sdkRecoveryPolicy.allowReconnect) {
                 const message = toError(err).message;
-                log('WARN', `[dialog] ensureDialogLoop pausado por quota/rate-limit SDK: ${message}`);
-                recordTerminalActivity('error', 'Quota Copilot indisponivel', {
+                log(
+                    'WARN',
+                    `[dialog] ensureDialogLoop pausado por policy SDK (kind=${sdkRecoveryPolicy.kind}): ${message}`,
+                );
+                recordTerminalActivity('error', 'Boot do dialog loop bloqueado pela policy SDK', {
                     detail: message,
                     severity: 'warn',
                     source: 'sdk',
                 });
-                println(`\n\x1b[31m  [sdk quota]\x1b[0m ${message}`);
+                const label = sdkRecoveryPolicy.kind === 'auth' ? '[sdk auth]' : '[sdk quota]';
+                println(`\n\x1b[31m  ${label}\x1b[0m ${message}`);
                 println(
                     '  \x1b[90mDialog loop pausado; reconnect nao sera tentado automaticamente para preservar PRs.\x1b[0m',
                 );
                 emitNerv('copilot:dialog:boot_blocked', {
                     error: message,
-                    reason: 'sdk_quota_or_rate_limit',
+                    reason: `sdk_${sdkRecoveryPolicy.kind}`,
                     severity: 'warn',
                 });
                 return;

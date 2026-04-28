@@ -35,7 +35,13 @@ import {
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
 import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
-import { createAgentSdkClient, disconnectAgentSdkSession, raceAgentSdkEvents } from '../facades/agent-sdk-access.js';
+import {
+    createAgentSdkClient,
+    disconnectAgentSdkSession,
+    ensureAgentSdkClientStarted,
+    raceAgentSdkEvents,
+    stopAgentSdkClient,
+} from '../facades/agent-sdk-access.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -74,6 +80,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
  */
 export async function initSession(ctx, client, host) {
+    await ensureAgentSdkClientStarted(client);
     const { tools } = await buildSessionTools(ctx);
     const { busHooks } = buildSessionHooks(ctx, host);
     const options = buildSessionOptions(ctx, host, { tools, busHooks });
@@ -469,7 +476,7 @@ export async function agentStop(
         const client = ctx.getClientSnapshot();
         if (client) {
             try {
-                const stopErrors = await client.stop();
+                const stopErrors = await stopAgentSdkClient(client);
                 if (stopErrors.length > 0) {
                     log(
                         'WARN',

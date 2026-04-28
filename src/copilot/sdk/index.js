@@ -127,7 +127,13 @@ export {
     supportsReasoning,
 } from './models/helpers.js';
 
-export { classifySdkError, getSdkErrorFingerprint, isSdkQuotaOrRateLimitError, SdkOperationError } from './errors.js';
+export {
+    classifySdkError,
+    getSdkErrorFingerprint,
+    getSdkRecoveryPolicy,
+    isSdkQuotaOrRateLimitError,
+    SdkOperationError,
+} from './errors.js';
 export { raceEvents, waitForEvent } from './event-helpers.js';
 export { httpRequest } from './http-request.js';
 export { pickDefined } from './utils.js';
@@ -238,6 +244,14 @@ export {
     sessionUiInput,
     sessionUiSelect,
 } from './session/ui.js';
+
+export {
+    buildConfiguredClientSessionFsConfig,
+    createLocalSessionFsProvider,
+    createWorkspaceSessionFsHandler,
+    getConfiguredSessionFsHandler,
+    getConfiguredSessionIdleTimeoutSeconds,
+} from './session/session-fs.js';
 
 // ─── Faixa 7: RPC Core Subsystems (rev.4) ────────────────────────────────────
 export {

@@ -25,7 +25,9 @@ import {
     deleteSession,
     deselectAgent,
     disconnectSessionSafe,
+    getConfiguredSessionFsHandler,
     getCurrentAgent,
+    getSdkRecoveryPolicy,
     getSessionCapabilities,
     getSessionMessages,
     getToolsConfig,
@@ -177,6 +179,42 @@ export function getSdkHandles(ctx) {
  */
 export function createAgentSdkClient(options) {
     return createCopilotClient(options);
+}
+
+/**
+ * Garante que um client SDK esteja explicitamente conectado antes de uso no lifecycle do agent.
+ *
+ * Regra arquitetural: módulos de `agent/lifecycle/*` tratam `CopilotClient` como handle opaco e delegam
+ * `start/ping/stop` a esta façade, evitando espalhar semântica vendor-level por múltiplos callers do runtime.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @returns {Promise<void>}
+ */
+export async function ensureAgentSdkClientStarted(client) {
+    if (typeof client?.getState === 'function' && client.getState() === 'connected') {
+        return;
+    }
+    await client.start();
+}
+
+/**
+ * Executa `client.ping()` pela fronteira canônica do runtime do agent.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+ */
+export async function pingAgentSdkClient(client) {
+    return client.ping();
+}
+
+/**
+ * Executa `client.stop()` pela fronteira canônica do runtime do agent.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @returns {Promise<Error[]>}
+ */
+export async function stopAgentSdkClient(client) {
+    return client.stop();
 }
 
 /**
@@ -353,6 +391,13 @@ export async function createAgentSdkSessionByClient(client, options) {
 }
 
 /**
+ * @returns {import('#copilot/sdk/types').CreateSessionFsHandler | undefined}
+ */
+export function getAgentConfiguredSessionFsHandler() {
+    return getConfiguredSessionFsHandler();
+}
+
+/**
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @returns {Promise<unknown[]>}
  */
@@ -366,6 +411,15 @@ export async function readAgentSdkSessionMessages(session) {
  */
 export function isAgentSdkQuotaOrRateLimitError(error) {
     return isSdkQuotaOrRateLimitError(error);
+}
+
+/**
+ * @param {unknown} error
+ * @param {'connection' | 'session'} [scope]
+ * @returns {import('#copilot/sdk/types').SdkRecoveryPolicy}
+ */
+export function getAgentSdkRecoveryPolicy(error, scope) {
+    return getSdkRecoveryPolicy(error, scope);
 }
 
 /** @type {string} */

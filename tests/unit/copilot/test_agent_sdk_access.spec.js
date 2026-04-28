@@ -6,6 +6,11 @@ vi.mock('#copilot/sdk', () => ({
     accountGetQuota: vi.fn(async (client) => client.rpc.account.getQuota()),
     commandsHandlePending: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
     compactionCompact: vi.fn(async () => ({ success: true })),
+    getSdkRecoveryPolicy: vi.fn((error, scope) => ({
+        kind: error && typeof error === 'object' && 'code' in error ? 'network' : 'unknown',
+        scope: scope ?? 'connection',
+        retryable: true,
+    })),
     getSessionCapabilities: vi.fn((session) => session.capabilities ?? {}),
     getCurrentAgent: vi.fn(async (session) => ({ agent: { name: `current:${session.sessionId}` } })),
     isSessionUiElicitationAvailable: vi.fn((session) => Boolean(session.capabilities?.ui?.elicitation || session.ui)),
@@ -38,7 +43,9 @@ import {
     confirmSdkSessionUi,
     createSdkWorkspaceFile,
     deselectSdkAgent,
+    ensureAgentSdkClientStarted,
     execSdkShell,
+    getAgentSdkRecoveryPolicy,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
     getLastSdkSessionId,
@@ -59,6 +66,7 @@ import {
     listSdkModels,
     listSdkSessions,
     listSdkWorkspaceFiles,
+    pingAgentSdkClient,
     pingSdk,
     readSdkWorkspaceFile,
     reloadSdkAgents,
@@ -66,6 +74,7 @@ import {
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
+    stopAgentSdkClient,
 } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 
 describe('agent-sdk-access facade', () => {
@@ -83,7 +92,10 @@ describe('agent-sdk-access facade', () => {
                 models: { list: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini' }] })) },
                 tools: { list: vi.fn(async (options) => ({ tools: [{ name: options?.model ?? 'all' }] })) },
             },
+            start: vi.fn(async () => {}),
+            stop: vi.fn(async () => []),
             ping: vi.fn(async () => ({ message: 'pong', timestamp: 123, protocolVersion: 2 })),
+            getState: vi.fn(() => 'disconnected'),
             getStatus: vi.fn(async () => ({ version: '0.2.0', protocolVersion: 2 })),
             getAuthStatus: vi.fn(async () => ({ isAuthenticated: true, authType: 'user' })),
             getLastSessionId: vi.fn(async () => 'last-sdk-session'),
@@ -231,6 +243,28 @@ describe('agent-sdk-access facade', () => {
         expect(client.setForegroundSessionId).toHaveBeenCalledWith('sdk-session-999');
     });
 
+    it('operações canônicas de lifecycle do client passam pela façade do agent', async () => {
+        await expect(ensureAgentSdkClientStarted(client)).resolves.toBeUndefined();
+        await expect(pingAgentSdkClient(client)).resolves.toEqual({
+            message: 'pong',
+            timestamp: 123,
+            protocolVersion: 2,
+        });
+        await expect(stopAgentSdkClient(client)).resolves.toEqual([]);
+
+        expect(client.start).toHaveBeenCalledTimes(1);
+        expect(client.ping).toHaveBeenCalledTimes(1);
+        expect(client.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('ensureAgentSdkClientStarted não reexecuta start quando o client já está conectado', async () => {
+        client.getState.mockReturnValue('connected');
+
+        await expect(ensureAgentSdkClientStarted(client)).resolves.toBeUndefined();
+
+        expect(client.start).not.toHaveBeenCalled();
+    });
+
     it('operações server RPC de alto valor delegam pelo client atual do agent', async () => {
         await expect(listSdkModels(ctx)).resolves.toEqual({ models: [{ id: 'gpt-5-mini' }] });
         await expect(listSdkBuiltInTools(ctx, { model: 'gpt-5-mini' })).resolves.toEqual({
@@ -238,6 +272,14 @@ describe('agent-sdk-access facade', () => {
         });
         await expect(getSdkQuota(ctx)).resolves.toEqual({
             quotaSnapshots: { chat: { remainingPercentage: 90 } },
+        });
+    });
+
+    it('expõe a policy de recovery do SDK sem reabrir o boundary no agent', () => {
+        expect(getAgentSdkRecoveryPolicy({ code: 'ECONNREFUSED' }, 'connection')).toMatchObject({
+            kind: 'network',
+            scope: 'connection',
+            retryable: true,
         });
     });
 

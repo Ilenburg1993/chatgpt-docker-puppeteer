@@ -92,6 +92,19 @@ describe('reconnect-policy › retorno imediato sem tentativas', () => {
         assert.strictEqual(result, false);
         assert.strictEqual(cbs._emitted.length, 0, 'Nenhum evento deve ser emitido se client nulo');
     });
+
+    it('deve retornar false sem tentativas quando a policy SDK bloqueia reconnect (auth)', async () => {
+        const cbs = makeCallbacks();
+        const result = await tryReconnect(
+            Object.assign(new Error('unauthorized'), { status: 401 }),
+            { stop: async () => {} },
+            'processing',
+            cbs,
+            FAST_OPTS,
+        );
+        assert.strictEqual(result, false);
+        assert.strictEqual(cbs._emitted.length, 0, 'Nenhum evento deve ser emitido quando auth bloqueia reconnect');
+    });
 });
 
 describe('reconnect-policy › reconexão bem-sucedida', () => {
@@ -318,6 +331,45 @@ describe('reconnect-policy › jitter determinístico (G1-DX-03)', () => {
         const firstDelay = delays[0];
         assert.ok(firstDelay !== undefined);
         assert.strictEqual(firstDelay, 100, `Delay da tentativa 1 deve ser 100ms, obtido: ${firstDelay}`);
+    });
+
+    it('usa backoff mínimo ditado pela policy SDK quando maior que o baseDelay local', async () => {
+        const delays = /** @type {number[]} */ ([]);
+        const origSetTimeout = globalThis.setTimeout;
+        globalThis.setTimeout = /** @type {any} */ (
+            (/** @type {() => void} */ fn, /** @type {number} */ delay) => {
+                delays.push(delay);
+                return origSetTimeout(fn, 0);
+            }
+        );
+
+        let attempts = 0;
+        const cbs = makeCallbacks({
+            initSession: async () => {
+                attempts++;
+                if (attempts < 2) throw Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
+                return { session: { sessionId: 's' }, isResumed: false };
+            },
+        });
+
+        try {
+            await tryReconnect(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }), {}, 'idle', cbs, {
+                baseDelayMs: 100,
+                jitterFn: () => 0,
+                maxAttempts: 3,
+            });
+        } finally {
+            globalThis.setTimeout = origSetTimeout;
+        }
+
+        assert.ok(delays.length >= 1, 'Pelo menos 1 setTimeout deve ter sido chamado');
+        const firstDelay = delays[0];
+        assert.ok(firstDelay !== undefined);
+        assert.strictEqual(
+            firstDelay,
+            1000,
+            `Delay da tentativa 1 deve respeitar o floor de 1000ms da policy SDK, obtido: ${firstDelay}`,
+        );
     });
 });
 

@@ -148,38 +148,41 @@ export async function operationName(session, param, options) {
 
 ### 4.1 O que já está correto
 
-| Módulo                               | Status      | Notas                                                                   |
-| ------------------------------------ | ----------- | ----------------------------------------------------------------------- |
-| `sdk/types.js`                       | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                      |
-| `sdk/errors.js`                      | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`                |
-| `sdk/session/client.js`              | ✅ Completo | Circuit breaker, registry externalizado                                 |
-| `sdk/session/lifecycle.js`           | ✅ Completo | create/resume/list/delete com normalização de erro                      |
-| `sdk/telemetry/operation-metrics.js` | ✅ Completo | emitter injetável de métricas de operação para L1 sem dependência L1→L2 |
-| `sdk/session/ui.js`                  | ✅ Completo | capabilities + `session.ui.elicitation/confirm/select/input`            |
-| `sdk/session/wrapper.js`             | ✅ Completo | abort, disconnect, sendAndWait, send, setModel com tratamento           |
-| `sdk/rpc/session.js`                 | ✅ Completo | model, mode, plan, workspace com retornos tipados                       |
-| `sdk/rpc/ops.js`                     | ✅ Completo | compaction, shell, elicitation, tools, agent ops com erro normalizado   |
-| `sdk/rpc/server.js`                  | ✅ Completo | superfície server RPC convergida no wrapper                             |
-| `sdk/rpc/experimental.js`            | ✅ Completo | wrappers experimentais com `SdkOperationError`                          |
-| `hooks/elicitation.js`               | ✅ Completo | provider-side queue de `onElicitationRequest` com resolução externa     |
-| `sdk/tools/core.js`                  | ✅ Completo | createTool, createToolSync                                              |
-| `sdk/config.js`                      | ✅ Completo | buildSessionConfig com SessionConfigOverrides                           |
-| `sdk/constants.js`                   | ✅ Completo |                                                                         |
-| `sdk/logger.js`                      | ✅ Completo |                                                                         |
+| Módulo                               | Status      | Notas                                                                         |
+| ------------------------------------ | ----------- | ----------------------------------------------------------------------------- |
+| `sdk/types.js`                       | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                            |
+| `sdk/errors.js`                      | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`                      |
+| `sdk/session/client.js`              | ✅ Completo | Circuit breaker, registry externalizado + recovery inicial por `SdkErrorKind` |
+| `sdk/session/lifecycle.js`           | ✅ Completo | create/resume/list/delete com normalização de erro + recovery curto/métricas  |
+| `sdk/session/session-fs.js`          | ✅ Completo | SessionFs local: config client-side, provider local e handler por sessão      |
+| `sdk/telemetry/operation-metrics.js` | ✅ Completo | emitter injetável de métricas de operação para L1 sem dependência L1→L2       |
+| `sdk/session/ui.js`                  | ✅ Completo | capabilities + `session.ui.elicitation/confirm/select/input`                  |
+| `sdk/session/wrapper.js`             | ✅ Completo | abort, disconnect, sendAndWait, send, setModel com tratamento                 |
+| `sdk/rpc/session.js`                 | ✅ Completo | model, mode, plan, workspace com retornos tipados + métricas mutadoras        |
+| `sdk/rpc/ops.js`                     | ✅ Completo | compaction, shell, elicitation, tools, agent ops com erro normalizado         |
+| `sdk/rpc/server.js`                  | ✅ Completo | superfície server RPC convergida no wrapper                                   |
+| `sdk/rpc/experimental.js`            | ✅ Completo | wrappers experimentais com `SdkOperationError`                                |
+| `hooks/elicitation.js`               | ✅ Completo | provider-side queue de `onElicitationRequest` com resolução externa           |
+| `sdk/tools/core.js`                  | ✅ Completo | createTool, createToolSync                                                    |
+| `sdk/config.js`                      | ✅ Completo | buildSessionConfig com SessionConfigOverrides                                 |
+| `sdk/constants.js`                   | ✅ Completo |                                                                               |
+| `sdk/logger.js`                      | ✅ Completo |                                                                               |
 
 ### 4.2 Gaps conhecidos (a resolver no roadmap)
 
-| Módulo                                         | Gap                                                                                                   | Severidade                                              |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `sdk/session/permissions.js`                   | Verificar se tem try/catch padronizado                                                                | 🟡 Médio                                                |
-| `sdk/session/provider.js`                      | Verificar crude calls para provider RPC                                                               | 🟡 Médio                                                |
-| `sdk/telemetry/`                               | Expandir cobertura além de `session.ui.*`, `sendAndWait`, `setModel`, `compaction` e `ui.elicitation` | 🟡 Médio                                                |
-| `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC                                             | 🔄 Em progresso (owner ampliado para lifecycle/session) |
-| `agent/facades/agent-sdk-session.js`           | Owner canônico de mode/plan/session ops                                                               | ✅ Consolidado nesta onda                               |
-| `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop                                               | ✅ Resolvido nesta onda (loop/resume convergidos)       |
-| `server/routes/sdk/session-messaging.js`       | Consolidar cobertura de testes HTTP para toda UI SDK                                                  | 🔄 Em progresso                                         |
-| `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0                                                | 🟠 Alto                                                 |
-| Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas                                                           | 🔴 Importante                                           |
+| Módulo                                         | Gap                                                                                                                                       | Severidade                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `sdk/session/permissions.js`                   | Hardening inicial aplicado; revisar métricas, owner e alinhamento fino com policy layer (`hooks/`)                                        | 🟡 Médio                                                |
+| `sdk/session/provider.js`                      | Hardening inicial aplicado; aprofundar ownership de BYOK/session auth e integração fina com lifecycle                                     | 🟡 Médio                                                |
+| `sdk/session/session-fs.js`                    | Wiring inicial + métricas L1 + gate de soberania + projeção no EventBus aplicados; decidir adapters além do provider local                | 🟡 Médio                                                |
+| `sdk/session/client.js`                        | Expandir recovery por `SdkErrorKind` para fluxos vivos adicionais além de `client.connect` e do lifecycle básico                          | 🟡 Médio                                                |
+| `sdk/telemetry/`                               | Expandir cobertura além de `session.ui.*`, `sendAndWait`, `setModel`, `compaction`, `ui.elicitation` e mutações principais de session RPC | 🟡 Médio                                                |
+| `agent/facades/agent-sdk-access.js`            | Consolidar owner único de reads/status/server+session RPC                                                                                 | 🔄 Em progresso (owner ampliado para lifecycle/session) |
+| `agent/facades/agent-sdk-session.js`           | Owner canônico de mode/plan/session ops                                                                                                   | ✅ Consolidado nesta onda                               |
+| `agent/dialog/*`                               | Remover imports residuais do SDK em utilitários de loop                                                                                   | ✅ Resolvido nesta onda (loop/resume convergidos)       |
+| `server/routes/sdk/session-messaging.js`       | Consolidar cobertura de testes HTTP para toda UI SDK                                                                                      | 🔄 Em progresso                                         |
+| `runtime-wiring.js`                            | DI e wiring — verificar ausência de imports diretos L0                                                                                    | 🟠 Alto                                                 |
+| Telemetria de observabilidade nos wrappers RPC | Nenhum wrapper RPC emite evento de métricas                                                                                               | 🔴 Importante                                           |
 
 ### 4.3 Comunicação atual entre `src/copilot/agent/` e `src/copilot/sdk/`
 
@@ -430,14 +433,14 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 **Meta**: nenhuma função pública em `sdk/rpc/` retorna `Promise<unknown>`.
 
-| Item                                                                            | Status |
-| ------------------------------------------------------------------------------- | ------ |
-| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation     | ✅     |
-| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace   | ✅     |
-| Definir tipos de retorno para `rpc/server.js` — status, health, port            | ✅     |
-| Adicionar try/catch padronizado em `rpc/experimental.js`                        | ✅     |
-| Fechar wrappers de `session.ui.*` (`elicitation`, `confirm`, `select`, `input`) | ✅     |
-| Verificar `sdk/session/permissions.js` e `sdk/session/provider.js`              | 🔄     |
+| Item                                                                                       | Status |
+| ------------------------------------------------------------------------------------------ | ------ |
+| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation                | ✅     |
+| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace              | ✅     |
+| Definir tipos de retorno para `rpc/server.js` — status, health, port                       | ✅     |
+| Adicionar try/catch padronizado em `rpc/experimental.js`                                   | ✅     |
+| Fechar wrappers de `session.ui.*` (`elicitation`, `confirm`, `select`, `input`)            | ✅     |
+| Verificar `sdk/session/permissions.js`, `sdk/session/provider.js` e endurecer `session-fs` | 🔄     |
 
 ### Fase 3B — Convergência explícita de `agent ↔ sdk` (🔄 EM ANDAMENTO)
 
@@ -464,16 +467,17 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 **Meta**: cada wrapper RPC que representa uma operação de negócio emite um evento de métricas.
 
-| Item                                                                              | Status                                                                                    |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Definir interface `SdkOperationMetric` em `types.js`                              | ✅                                                                                        |
-| Introduzir emitter injetável em L1 (`sdk/telemetry/operation-metrics.js`)         | ✅                                                                                        |
-| Integrar emitter ao bootstrap de observabilidade                                  | ✅                                                                                        |
+| Item                                                                              | Status                                                                           |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Definir interface `SdkOperationMetric` em `types.js`                              | ✅                                                                               |
+| Introduzir emitter injetável em L1 (`sdk/telemetry/operation-metrics.js`)         | ✅                                                                               |
+| Integrar emitter ao bootstrap de observabilidade                                  | ✅                                                                               |
 | Emitir evento em `modelSwitchTo`, `shellExec`, `compactionCompact`, `sendAndWait` | ✅ (`modelSwitchTo`, `shellExec`, `compactionCompact` e `sendAndWait` entregues) |
-| Emitir evento em `session.ui.elicitation/confirm/select/input`                    | ✅                                                                                        |
-| Emitir evento em provider-side `elicitation.pending/completed`                    | ✅                                                                                        |
-| Integrar com observability event bus existente                                    | ⬜                                                                                        |
-| Dashboard: contadores de chamadas RPC por tipo                                    | ⬜                                                                                        |
+| Emitir evento em `modeSet`, `planUpdate`, `planDelete`, `workspaceCreateFile`     | ✅                                                                               |
+| Emitir evento em `session.ui.elicitation/confirm/select/input`                    | ✅                                                                               |
+| Emitir evento em provider-side `elicitation.pending/completed`                    | ✅                                                                               |
+| Integrar com observability event bus existente                                    | ⬜                                                                               |
+| Dashboard: contadores de chamadas RPC por tipo                                    | ⬜                                                                               |
 
 ### Fase 5 — Auditoria de boundary (🔄 EM ANDAMENTO)
 
@@ -716,7 +720,8 @@ Estado complementar validado após a primeira onda da Fase 4:
   - `sdk/session/ui.js`
   - `sdk/session/wrapper.js` (`session.sendAndWait`, `session.setModel`)
   - `sdk/rpc/ops.js` (`compactionCompact`, `shellExec`, `uiElicitation`)
-  - `sdk/rpc/session.js` (`modelSwitchTo`)
+  - `sdk/rpc/session.js` (`modelSwitchTo`, `modeSet`, `planUpdate`, `planDelete`,
+    `workspaceCreateFile`)
 - provider-side de ELICITATION também emite métricas no runtime via `agent/context-factories.js`
   (`sdk.elicitation.provider.pending/completed/action/*`)
 
@@ -730,3 +735,248 @@ Validação executada neste checkpoint:
   - `tests/unit/copilot/sdk/test_sdk_rpc.spec.js`
 - `npm run typecheck:node` ✅
 - `npm run lint` ✅
+
+Expansão subsequente validada ainda na mesma onda:
+
+- métricas adicionais adicionadas em `sdk/rpc/session.js` para:
+  - `modeSet`
+  - `planUpdate`
+  - `planDelete`
+  - `workspaceCreateFile`
+- lote focado complementar ✅
+  - `tests/unit/copilot/sdk/test_sdk_rpc.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_rpc_advanced.spec.js`
+
+### 10.8 Checkpoint complementar — Primeira onda efetiva do Bloco B (2026-04-27)
+
+Estado complementar validado após o início da transformação concreta do programa P1:
+
+- `sdk/session/permissions.js` passou a ter:
+  - validação fail-fast de `allowTools`, `denyTools`, `denyKinds` e `denyPatterns`;
+  - normalização de decisões custom booleanas / `'deny'`;
+  - try/catch com `SdkOperationError` para falhas de `onRequest`;
+  - logging enriquecido com `sessionId`.
+- `sdk/session/provider.js` passou a ter:
+  - suporte a `headers` em configs BYOK;
+  - validação canônica de `baseUrl`, protocolo e strings opcionais;
+  - `type: 'openai'` explícito como default em `validateProviderConfig()`;
+  - rejeição de `wireApi` para Anthropic;
+  - warning para `baseUrl` Azure contendo path.
+- `config/session-config.js` passou a expor:
+  - `gitHubToken()` para auth por sessão;
+  - `createSessionFsHandler()` para session filesystem custom.
+- `sdk/types.js` foi expandido com:
+  - `ProviderConfig.headers`;
+  - `SessionFsProvider`;
+  - `CreateSessionFsHandler`.
+
+Validação executada neste checkpoint:
+
+- lote focado do Bloco B ✅
+  - `tests/unit/copilot/sdk/test_sdk_permissions.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_provider.spec.js`
+  - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
+- `npm run typecheck:node` ✅
+- `npm run lint` ✅
+
+### 10.9 Checkpoint complementar — Wiring inicial de SessionFs no runtime real (2026-04-27)
+
+Estado complementar validado após a promoção concreta de `sessionFs` no runtime local:
+
+- `boot/session-fs.js` passou a ser o owner canônico de defaults/env/paths de SessionFs;
+- `sdk/session/session-fs.js` introduziu:
+  - provider local baseado em `node:fs/promises`;
+  - proteção contra path traversal;
+  - `buildConfiguredClientSessionFsConfig()`;
+  - `getConfiguredSessionIdleTimeoutSeconds()`;
+  - `getConfiguredSessionFsHandler()`;
+  - `createWorkspaceSessionFsHandler()`;
+- `sdk/session/client-options.js` passou a promover automaticamente `sessionFs` e
+  `sessionIdleTimeoutSeconds` a partir do contrato de boot;
+- `agent/session/initializer.js` passou a injetar `createSessionFsHandler` configurado no fluxo real
+  de `initOrResumeSession()`;
+- `boot/config.js` passou a expor `sdk.sessionFs`, `sdk.sessionIdleTimeoutSeconds` e
+  `paths.sessionFsRootDir` no painel canônico de boot.
+
+Validação executada neste checkpoint:
+
+- `npm run typecheck:strict:src.copilot` ✅
+- lint/prettier focados apenas nos arquivos tocados de `src/copilot/` e docs correlatos ✅
+- lote focado de testes ✅
+  - `tests/unit/copilot/sdk/test_sdk_session_fs.spec.js`
+  - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
+  - `tests/unit/copilot/test_boot_config.spec.js`
+  - `tests/unit/copilot/test_initializer_session_fs.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_session_core_lifecycle.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_config.spec.js`
+
+### 10.10 Checkpoint complementar — SessionFs com observabilidade e soberania estrutural (2026-04-27)
+
+Estado complementar validado após o endurecimento do eixo `sessionFs`:
+
+- `sdk/session/session-fs.js` passou a emitir métricas L1 por operação para:
+  - `session.fs.readFile`
+  - `session.fs.writeFile`
+  - `session.fs.appendFile`
+  - `session.fs.exists`
+  - `session.fs.stat`
+  - `session.fs.mkdir`
+  - `session.fs.readdir`
+  - `session.fs.readdirWithTypes`
+  - `session.fs.rm`
+  - `session.fs.rename`
+  - `session.fs.handler.create`
+- as métricas incluem `sessionId` quando disponível, `durationMs` e `errorKind` nas falhas,
+  alinhando SessionFs ao mesmo padrão de observabilidade L1 dos wrappers críticos do SDK;
+- `scripts/check-copilot-official-seams.mjs` passou a proteger explicitamente o owner interno de
+  SessionFs com a regra `non-sdk-must-not-deep-import-session-fs`;
+- o contrato estrutural dessa capability passou a ser coberto por
+  `tests/unit/copilot/contracts/test_sdk_boundary_block_b.spec.js`.
+
+Validação executada neste checkpoint:
+
+- `npm run typecheck:strict:src.copilot` ✅
+- lint/prettier focados apenas nos arquivos tocados de `src/copilot/` e docs correlatos ✅
+- lote focado de testes/contratos ✅
+  - `tests/unit/copilot/sdk/test_sdk_session_fs.spec.js`
+  - `tests/unit/copilot/contracts/test_sdk_boundary_block_b.spec.js`
+  - `tests/unit/copilot/contracts/test_owner_sovereignty_block_a.spec.js`
+
+### 10.11 Checkpoint complementar — Métricas SDK projetadas no EventBus (2026-04-27)
+
+Estado complementar validado após a projeção do eixo `SdkOperationMetric` no runtime observável:
+
+- `observability/sdk-metric-bridge.js` passou a ser o owner canônico da projeção de
+  `SdkOperationMetric` em:
+  - `MetricsStore`;
+  - `EventBus` (`sdk:operation:metric`);
+- `observability/bootstrap.js` deixou de manter a lógica inline de projeção de métricas do SDK e
+  passou a delegá-la ao bridge dedicado;
+- `observability/bus-actions/activity-tracker.js` passou a rastrear `sdk:operation:metric`,
+  permitindo que a atividade do L1 apareça no snapshot de activity/tracing do runtime observacional;
+- o contrato estrutural desse seam passou a ser coberto por:
+  - `tests/unit/copilot/observability/test_sdk_metric_bridge.spec.js`
+  - `tests/unit/copilot/test_observability_runtime_contract.spec.js`
+
+Validação executada neste checkpoint:
+
+- formatter/lint focados nos arquivos tocados ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- lote focado de observabilidade SDK/EventBus ✅
+
+### 10.12 Checkpoint complementar — Recovery inicial por `SdkErrorKind` no client SDK (2026-04-27)
+
+Estado complementar validado após a primeira onda de W13 no boundary SDK:
+
+- `sdk/errors.js` agora expõe `getSdkRecoveryPolicy(error, scope)` como policy estável de retry,
+  reconnect, backoff e integração com circuit breaker;
+- `core/circuit-breaker.js` passou a expor `guard()`, `recordSuccess()` e `recordFailure()`,
+  permitindo que o owner do callsite decida quais falhas devem ou não alimentar o circuito;
+- `sdk/session/client.js` integra essa policy em `getClient()`:
+  - `auth`, `rate_limit` e `quota_exhausted` não abrem o circuito local;
+  - `network`, `timeout` e `unknown` em escopo de conexão passam a alimentar retry/backoff e o
+    breaker;
+  - `client.connect` agora emite métricas L1.
+
+Validação executada neste checkpoint:
+
+- formatter/lint focados apenas nos arquivos tocados desta subonda ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- lote focado de recovery/breaker/client SDK ✅
+  - `tests/unit/copilot/test_core_circuit_breaker.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_client.spec.js`
+
+### 10.13 Checkpoint complementar — Recovery no lifecycle de sessão (2026-04-27)
+
+Estado complementar validado após a expansão do W13 para o lifecycle básico:
+
+- `sdk/session/lifecycle.js` agora integra `getSdkRecoveryPolicy(error, 'session')` em:
+  - `session.create`
+  - `session.resume`
+- essas operações passam a emitir métricas L1 started/succeeded/failed com `attempt`, `errorKind` e
+  atributos de contexto (`model`, `sessionId`, `disableResume`)
+- `sdk/session/client.js` deixa de manter semântica paralela de lifecycle para:
+  - `createClientSession()`
+  - `resumeClientSession()` passando a reutilizar as wrappers canônicas de
+    `sdk/session/lifecycle.js`
+
+Validação executada neste checkpoint:
+
+- formatter/lint focados apenas nos arquivos tocados desta subonda ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- lote focado de recovery/lifecycle/session wrappers ✅
+  - `tests/unit/copilot/sdk/test_sdk_session_core_lifecycle.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_client.spec.js`
+  - `tests/unit/copilot/sdk/test_sdk_session_registry_f26.spec.js`
+  - `tests/unit/copilot/test_lib_session.spec.js`
+
+### 10.14 Checkpoint complementar — Convergência da elegibilidade de reconnect (2026-04-27)
+
+Estado complementar validado após a investigação do reconnect já existente no runtime:
+
+- `agent/error-policy.js` deixa de bloquear apenas `rate_limit`/`quota` por heurística local e passa
+  a derivar erros fatais de reconnect também da `SdkRecoveryPolicy` canônica
+- `agent/lifecycle/reconnect-policy.js` continua owner da reconstrução da sessão viva, mas agora:
+  - bloqueia reconnect quando a policy do SDK explicitamente não permite reconnect
+  - usa `backoffMs` da policy SDK como floor do backoff do runtime
+- `terminal/dialog/engine.js` deixa de usar apenas `isSdkQuotaOrRateLimitError()` e passa a
+  consultar `getSdkRecoveryPolicy(err, 'session')` para bloquear retry de boot do dialog loop em
+  cenários como `auth`, `rate_limit` e `quota_exhausted`
+
+Leitura arquitetural deste checkpoint:
+
+- o reconnect do `sdk/` e o reconnect do `agent/` não são a mesma coisa;
+- o primeiro governa elegibilidade e recovery vanilla de baixo nível;
+- o segundo governa reconstrução da sessão viva e rewire do runtime;
+- a convergência aplicada aqui reduz duplicação de heurísticas sem colapsar owners legítimos.
+
+Validação executada neste checkpoint:
+
+- formatter/lint focados apenas nos arquivos tocados desta subonda ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- lote focado de reconnect/agent/terminal ✅
+  - `tests/unit/copilot/test_agent_error_policy.spec.js`
+  - `tests/unit/copilot/test_reconnect_policy.spec.js`
+  - `tests/unit/copilot/test_terminal_dialog_engine.spec.js`
+  - `tests/unit/copilot/test_observability_f68_f70.spec.js`
+
+### 10.15 Checkpoint complementar — Delimitação do lifecycle `agent` vs `sdk` (2026-04-27)
+
+Estado complementar validado após a leitura integral de `agent/lifecycle/*`,
+`agent/session/initializer.js` e `sdk/session/*` focado em lifecycle:
+
+- a regra geral ficou explicitada como:
+  - `sdk/session/*` = owner do lifecycle vanilla (`create/resume/list/delete/disconnect`)
+  - `agent/` = owner da sessão viva, do wiring de runtime, do reconnect da sessão viva e da
+    persistência local
+- `agent/lifecycle/*` passa a tratar `CopilotClient`/`CopilotSession` como handles opacos e deixa de
+  espalhar transições method-level do SDK pelo runtime
+- `agent/facades/agent-sdk-access.js` agora expõe wrappers canônicos para operações cruas de client
+  necessárias ao lifecycle do agent:
+  - `ensureAgentSdkClientStarted()`
+  - `pingAgentSdkClient()`
+  - `stopAgentSdkClient()`
+- esses wrappers passam a ser consumidos por:
+  - `agent/lifecycle/agent-lifecycle.js`
+  - `agent/lifecycle/reconnect-policy.js`
+  - `agent/lifecycle/runtime-host.js`
+- `agent/session/initializer.js` permanece no papel correto de owner da política de retomada da
+  sessão viva, mas sem reabrir o vanilla SDK por `client.createSession()` / `client.resumeSession()`
+
+Leitura arquitetural deste checkpoint:
+
+- o lifecycle do `sdk` e o lifecycle do `agent` se complementam, mas não podem colapsar num único
+  owner;
+- o `sdk` governa transições vanilla e recovery semantics de baixo nível;
+- o `agent` governa a sessão viva e a reconstrução do runtime;
+- a fronteira correta entre ambos é uma façade do agent sobre a surface pública de L1, nunca
+  chamadas cruas dispersas aos métodos do `CopilotClient`.
+
+Validação executada neste checkpoint:
+
+- formatter/lint focados apenas nos arquivos tocados desta subonda ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- lote focado de lifecycle boundary ✅
+  - `tests/unit/copilot/test_agent_sdk_access.spec.js`
+  - `tests/unit/copilot/test_agent_lifecycle.spec.js`
+  - `tests/unit/copilot/contracts/test_lifecycle_boundary_block_b.spec.js`

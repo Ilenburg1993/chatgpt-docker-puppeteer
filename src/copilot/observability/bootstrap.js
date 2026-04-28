@@ -38,42 +38,19 @@ import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './
 import { defaultEventCollector } from './event-collector.js';
 import { LOG_DIR, log } from './logger.js';
 import { defaultMetrics } from './metrics.js';
+import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
 import { getToolStats, recordToolCall } from './tool-stats.js';
 
 /** @type {boolean} */
 let _obsBooted = false;
 
 /**
- * @param {string} value
- * @returns {string}
- */
-function normalizeMetricSegment(value) {
-    return String(value || 'unknown').replace(/[^a-zA-Z0-9_.-]+/gu, '_');
-}
-
-/**
  * @param {import('../sdk/types.js').SdkOperationMetric} metric
  * @returns {void}
  */
 function emitSdkMetric(metric) {
-    const op = normalizeMetricSegment(metric.operation);
-    const status = normalizeMetricSegment(metric.status);
-    defaultMetrics.recordCounter(`sdk.operation.${op}.total`);
-    defaultMetrics.recordCounter(`sdk.operation.${op}.${status}`);
-    if (typeof metric.durationMs === 'number') {
-        defaultMetrics.recordGauge(`sdk.operation.${op}.last_duration_ms`, metric.durationMs);
-    }
-    const errorKind = metric.attributes?.['errorKind'];
-    if (typeof errorKind === 'string' && errorKind) {
-        defaultMetrics.recordCounter(`sdk.operation.${op}.error_kind.${normalizeMetricSegment(errorKind)}`);
-    }
-    const action = metric.attributes?.['action'];
-    if (typeof action === 'string' && action) {
-        defaultMetrics.recordCounter(`sdk.operation.${op}.action.${normalizeMetricSegment(action)}`);
-    }
-    if (metric.operation === 'session.sendAndWait' && typeof metric.durationMs === 'number') {
-        defaultMetrics.recordSdkDialogTurn(metric.durationMs, metric.status === 'succeeded');
-    }
+    const bus = container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null;
+    projectSdkOperationMetric(metric, { metrics: defaultMetrics, bus });
 }
 
 /**

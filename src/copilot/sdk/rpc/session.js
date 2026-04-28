@@ -188,11 +188,33 @@ export async function modeSet(session, mode) {
         throw new TypeError(`[sdk/rpc/mode.set] mode deve ser um de: ${valid.join(', ')}.`);
     }
     appLog('INFO', `[sdk/rpc] mode.set: mode='${mode}', sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'rpc.mode.set',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: { mode },
+    });
     try {
         await session.rpc.mode.set({ mode });
+        emitSdkOperationMetric({
+            operation: 'rpc.mode.set',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { mode },
+        });
         return /** @type {ModeSetResult} */ ({ mode });
     } catch (error) {
-        throw toSdkOperationError('mode.set', error);
+        const sdkError = toSdkOperationError('mode.set', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.mode.set',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { mode, errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -229,11 +251,33 @@ export async function planUpdate(session, content) {
         throw new TypeError('[sdk/rpc/plan.update] content deve ser string.');
     }
     appLog('INFO', `[sdk/rpc] plan.update: ${content.length} chars, sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'rpc.plan.update',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: { contentLength: content.length },
+    });
     try {
         await session.rpc.plan.update({ content });
+        emitSdkOperationMetric({
+            operation: 'rpc.plan.update',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { contentLength: content.length },
+        });
         return /** @type {PlanMutationResult} */ ({ success: true });
     } catch (error) {
-        throw toSdkOperationError('plan.update', error);
+        const sdkError = toSdkOperationError('plan.update', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.plan.update',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { contentLength: content.length, errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -246,11 +290,27 @@ export async function planUpdate(session, content) {
 export async function planDelete(session) {
     assertSession(session, 'plan.delete');
     appLog('INFO', `[sdk/rpc] plan.delete: sessionId='${session.sessionId}'`);
+    const startedAt = Date.now();
+    emitSdkOperationMetric({ operation: 'rpc.plan.delete', status: 'started', sessionId: session.sessionId });
     try {
         await session.rpc.plan.delete();
+        emitSdkOperationMetric({
+            operation: 'rpc.plan.delete',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+        });
         return /** @type {PlanMutationResult} */ ({ success: true });
     } catch (error) {
-        throw toSdkOperationError('plan.delete', error);
+        const sdkError = toSdkOperationError('plan.delete', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.plan.delete',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 
@@ -316,12 +376,34 @@ export async function workspaceCreateFile(session, path, content) {
         'INFO',
         `[sdk/rpc] workspace.createFile: path='${path}', ${content.length} chars, sessionId='${session.sessionId}'`,
     );
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'rpc.workspace.createFile',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: { path, contentLength: content.length },
+    });
     try {
         const workspaceRpc = getWorkspaceRpc(session);
         await workspaceRpc.createFile({ path, content });
+        emitSdkOperationMetric({
+            operation: 'rpc.workspace.createFile',
+            status: 'succeeded',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { path, contentLength: content.length },
+        });
         return /** @type {WorkspaceCreateResult} */ ({ success: true });
     } catch (error) {
-        throw toSdkOperationError('workspace.createFile', error);
+        const sdkError = toSdkOperationError('workspace.createFile', error);
+        emitSdkOperationMetric({
+            operation: 'rpc.workspace.createFile',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { path, contentLength: content.length, errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
 }
 

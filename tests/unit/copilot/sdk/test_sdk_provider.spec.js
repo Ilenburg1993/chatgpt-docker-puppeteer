@@ -58,6 +58,14 @@ describe('F67 — openaiProvider', () => {
         expect(config.wireApi).toBe('responses');
     });
 
+    it('aceita headers adicionais', () => {
+        const config = openaiProvider({
+            baseUrl: 'https://api.openai.com/v1',
+            headers: { 'x-test': 'enabled' },
+        });
+        expect(config.headers).toEqual({ 'x-test': 'enabled' });
+    });
+
     it('lanca erro se baseUrl esta vazio', () => {
         expect(() => openaiProvider({ baseUrl: '' })).toThrow('baseUrl is required');
     });
@@ -90,6 +98,11 @@ describe('F68 — azureProvider', () => {
         expect(config.wireApi).toBe('completions');
     });
 
+    it('preserva headers adicionais', () => {
+        const config = azureProvider({ baseUrl: 'https://x.azure.com', headers: { 'api-key': 'abc' } });
+        expect(config.headers).toEqual({ 'api-key': 'abc' });
+    });
+
     it('lanca erro se baseUrl esta vazio', () => {
         expect(() => azureProvider({ baseUrl: '' })).toThrow('baseUrl is required');
     });
@@ -112,9 +125,27 @@ describe('F69 — anthropicProvider', () => {
         expect(config.bearerToken).toBe('tok');
     });
 
+    it('aceita headers adicionais', () => {
+        const config = anthropicProvider({
+            baseUrl: 'https://api.anthropic.com',
+            headers: { 'anthropic-version': '2023-06-01' },
+        });
+        expect(config.headers).toEqual({ 'anthropic-version': '2023-06-01' });
+    });
+
     it('nao inclui wireApi (anthropic nao usa)', () => {
         const config = anthropicProvider({ baseUrl: 'https://api.anthropic.com' });
         expect(config.wireApi).toBeUndefined();
+    });
+
+    it('rejeita wireApi para anthropic', () => {
+        expect(() =>
+            validateProviderConfig({
+                baseUrl: 'https://api.anthropic.com',
+                type: 'anthropic',
+                wireApi: /** @type {any} */ ('responses'),
+            }),
+        ).toThrow('wireApi is not supported for anthropic');
     });
 
     it('lanca erro se baseUrl esta vazio', () => {
@@ -130,6 +161,7 @@ describe('F70 — validateProviderConfig', () => {
     it('valida config valido sem tipo (default openai)', () => {
         const config = validateProviderConfig({ baseUrl: 'http://localhost:8080' });
         expect(config.baseUrl).toBe('http://localhost:8080');
+        expect(config.type).toBe('openai');
     });
 
     it('lanca erro se config e null', () => {
@@ -161,6 +193,18 @@ describe('F70 — validateProviderConfig', () => {
     it('aceita wireApi completions e responses', () => {
         expect(validateProviderConfig({ baseUrl: 'http://x', wireApi: 'completions' }).wireApi).toBe('completions');
         expect(validateProviderConfig({ baseUrl: 'http://x', wireApi: 'responses' }).wireApi).toBe('responses');
+    });
+
+    it('lanca erro para headers invalidos', () => {
+        expect(() => validateProviderConfig({ baseUrl: 'http://x', headers: /** @type {any} */ ([]) })).toThrow(
+            'headers must be a plain object',
+        );
+    });
+
+    it('lanca erro para apiKey vazia', () => {
+        expect(() => validateProviderConfig({ baseUrl: 'http://x', apiKey: '   ' })).toThrow(
+            'apiKey must be a non-empty string',
+        );
     });
 });
 

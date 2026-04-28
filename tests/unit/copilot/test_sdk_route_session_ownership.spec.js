@@ -264,6 +264,10 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(resumedConfigs[0], {
             onPermissionRequest: resumedConfigs[0].onPermissionRequest,
             ...body,
+            infiniteSessions: {
+                enabled: false,
+                backgroundCompactionThreshold: 0.8,
+            },
         });
         assert.equal(typeof resumedConfigs[0].onPermissionRequest, 'function');
     });

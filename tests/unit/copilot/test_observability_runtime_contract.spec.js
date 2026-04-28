@@ -16,6 +16,13 @@ describe('observability runtime contract', () => {
         assert.match(src, /attachObservabilityBusRuntime/);
     });
 
+    it('bootstrap projeta métricas SDK no bridge observável canônico', () => {
+        const bootstrapSrc = read('observability/bootstrap.js');
+        const bridgeSrc = read('observability/sdk-metric-bridge.js');
+        assert.match(bootstrapSrc, /projectSdkOperationMetric/);
+        assert.match(bridgeSrc, /type: 'sdk:operation:metric'/);
+    });
+
     it('event-bus-observers (shim legado) foi removido', () => {
         const shimPath = path.join(root, 'observability/event-bus-observers.js');
         assert.equal(existsSync(shimPath), false);

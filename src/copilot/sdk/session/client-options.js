@@ -10,6 +10,7 @@
  */
 
 import { log } from '../logger.js';
+import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSeconds } from './session-fs.js';
 
 /**
  * @typedef {import('../types.js').CopilotClientOptions} CopilotClientOptions
@@ -180,6 +181,18 @@ export class ClientOptionsBuilder {
         return this;
     }
 
+    /** @param {NonNullable<CopilotClientOptions['sessionFs']>} sessionFs @returns {this} */
+    sessionFs(sessionFs) {
+        this.#opts.sessionFs = sessionFs;
+        return this;
+    }
+
+    /** @param {number} seconds @returns {this} */
+    sessionIdleTimeoutSeconds(seconds) {
+        this.#opts.sessionIdleTimeoutSeconds = seconds;
+        return this;
+    }
+
     /** @param {() => Promise<ModelInfo[]> | ModelInfo[]} fn @returns {this} */
     onListModels(fn) {
         this.#opts.onListModels = fn;
@@ -315,6 +328,14 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
     const captureContent = parseBooleanEnv(process.env['OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT']);
     if (captureContent !== undefined) telemetry.captureContent = captureContent;
     if (Object.keys(telemetry).length > 0) builder.telemetry(telemetry);
+
+    const sessionFs = buildConfiguredClientSessionFsConfig();
+    if (sessionFs) builder.sessionFs(sessionFs);
+
+    const sessionIdleTimeoutSeconds = getConfiguredSessionIdleTimeoutSeconds();
+    if (sessionIdleTimeoutSeconds !== undefined) {
+        builder.sessionIdleTimeoutSeconds(sessionIdleTimeoutSeconds);
+    }
 
     return builder.merge(overrides).build();
 }

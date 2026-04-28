@@ -34,6 +34,14 @@ describe('agent/error-policy', () => {
         assert.equal(shouldRetryAgentError(err), false);
     });
 
+    it('classifica auth do SDK como fatal operacional sem retry', () => {
+        const err = Object.assign(new Error('unauthorized'), {
+            status: 401,
+        });
+        assert.equal(classifyAgentError(err), 'fatal');
+        assert.equal(shouldRetryAgentError(err), false);
+    });
+
     it('classifica erro genérico como retry', () => {
         const err = new Error('network-ish unknown');
         assert.equal(classifyAgentError(err), 'retry');

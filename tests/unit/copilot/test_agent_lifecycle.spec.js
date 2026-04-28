@@ -106,8 +106,20 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes('function initSession(ctx, client, host)'), 'initSession deve ter assinatura correta');
     });
 
+    it('initSession explicita start do client SDK pela façade antes de criar/retomar sessão', () => {
+        assert.ok(
+            src.includes('ensureAgentSdkClientStarted(client)'),
+            'initSession deve explicitar start do client via façade',
+        );
+    });
+
     it('agentTryReconnect delega para tryReconnect policy', () => {
         assert.ok(src.includes('tryReconnect('), 'agentTryReconnect deve usar reconnect-policy');
+    });
+
+    it('agentStop para o client SDK pela façade, sem chamar client.stop() cru', () => {
+        assert.ok(src.includes('stopAgentSdkClient(client)'), 'agentStop deve usar a façade para parar o client SDK');
+        assert.ok(!src.includes('await client.stop()'), 'agentStop não deve chamar client.stop() cru');
     });
 
     it('hot path evita aliases crus de subestado no lifecycle', () => {

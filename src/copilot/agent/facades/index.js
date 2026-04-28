@@ -71,6 +71,7 @@ export {
     createSdkWorkspaceFile,
     deselectSdkAgent,
     disconnectAgentSdkSession,
+    ensureAgentSdkClientStarted,
     execSdkShell,
     getAgentSdkToolsConfig,
     getCurrentSdkAgent,
@@ -95,6 +96,7 @@ export {
     listSdkModels,
     listSdkSessions,
     listSdkWorkspaceFiles,
+    pingAgentSdkClient,
     pingSdk,
     raceAgentSdkEvents,
     readAgentSdkModelRegistryEntry,
@@ -105,6 +107,7 @@ export {
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
+    stopAgentSdkClient,
 } from './agent-sdk-access.js';
 export {
     onAgentSdkSessionEvent,

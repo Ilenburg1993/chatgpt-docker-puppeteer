@@ -12,14 +12,15 @@
 
 import { resolve } from 'node:path';
 import { readCopilotBootContract } from './contract.js';
+import { readCopilotSessionFsBootConfig, SESSION_FS_ENV_KEYS } from './session-fs.js';
 import { readBootSkillConfig } from './skills.js';
 import {
     COPILOT_PACKAGE_ROOT,
     COPILOT_SOURCE_ROOT,
-    WORKSPACE_ROOT,
     getWorkspaceContext,
     resolveHooksStateDir,
     resolvePersistentConfigFile,
+    WORKSPACE_ROOT,
 } from './workspace.js';
 
 export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
@@ -44,6 +45,7 @@ export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
     'COPILOT_OTEL_EXPORTER_TYPE',
     'COPILOT_OTEL_SOURCE_NAME',
     'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT',
+    ...SESSION_FS_ENV_KEYS,
     'COPILOT_SDK_ENABLED',
     'COPILOT_TERMINAL_ENABLED',
     'COPILOT_SDK_AGENT_COMPAT_ENABLED',
@@ -110,6 +112,7 @@ function envBool(key, fallback) {
  *     paths: {
  *         skillsConfigFile: string;
  *         pluginsDir: string;
+ *         sessionFsRootDir: string;
  *         toolsConfigFile: string;
  *         customToolsFile: string;
  *     };
@@ -138,6 +141,14 @@ function envBool(key, fallback) {
  *             sourceName: string | null;
  *             captureContent: boolean | null;
  *         };
+ *         sessionFs: {
+ *             enabled: boolean;
+ *             initialCwd: string;
+ *             sessionStatePath: string;
+ *             conventions: 'windows' | 'posix';
+ *             storageRootDir: string;
+ *         };
+ *         sessionIdleTimeoutSeconds: number | null;
  *         baseline: readonly string[];
  *     };
  *     terminal: {
@@ -162,6 +173,7 @@ function envBool(key, fallback) {
 export function readCopilotBootConfig() {
     const contract = readCopilotBootContract();
     const workspace = getWorkspaceContext();
+    const sessionFs = readCopilotSessionFsBootConfig();
     const host = envStr('LLM_B_TERMINAL_HOST', '127.0.0.1');
     const port = envInt('LLM_B_TERMINAL_PORT', 3009);
     return {
@@ -178,6 +190,7 @@ export function readCopilotBootConfig() {
         paths: {
             skillsConfigFile: resolvePersistentConfigFile('skills.json'),
             pluginsDir: resolve(COPILOT_SOURCE_ROOT, 'plugins'),
+            sessionFsRootDir: sessionFs.storageRootDir,
             toolsConfigFile: resolvePersistentConfigFile('tools-config.json'),
             customToolsFile: resolvePersistentConfigFile('custom-tools.json'),
         },
@@ -210,6 +223,14 @@ export function readCopilotBootConfig() {
                         ? null
                         : envBool('OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT', false),
             },
+            sessionFs: {
+                enabled: sessionFs.enabled,
+                initialCwd: sessionFs.initialCwd,
+                sessionStatePath: sessionFs.sessionStatePath,
+                conventions: sessionFs.conventions,
+                storageRootDir: sessionFs.storageRootDir,
+            },
+            sessionIdleTimeoutSeconds: sessionFs.sessionIdleTimeoutSeconds,
             baseline: contract.sdkBaseline,
         },
         terminal: {

@@ -61,21 +61,48 @@ function mockClient() {
 vi.mock('@github/copilot-sdk', () => {
     class MockCopilotClient {
         constructor() {
-            this.getState = vi.fn(() => 'connected');
-            this.start = vi.fn().mockResolvedValue(undefined);
-            this.stop = vi.fn().mockResolvedValue([]);
-            this.ping = vi.fn().mockResolvedValue({ message: 'pong', timestamp: Date.now() });
-            this.getStatus = vi.fn().mockResolvedValue({ version: '1.0' });
-            this.getAuthStatus = vi.fn().mockResolvedValue({ authenticated: true });
-            this.getLastSessionId = vi.fn().mockResolvedValue('last-session-id');
-            this.getForegroundSessionId = vi.fn().mockResolvedValue('foreground-session-id');
-            this.setForegroundSessionId = vi.fn().mockResolvedValue(undefined);
             this.listModels = vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }]);
             this.rpc = { tools: { list: vi.fn() } };
             this.createSession = vi.fn((_cfg) => Promise.resolve({ sessionId: 'sess-1', disconnect: vi.fn() }));
             this.resumeSession = vi.fn((id, _cfg) => Promise.resolve({ sessionId: id, disconnect: vi.fn() }));
             this.deleteSession = vi.fn().mockResolvedValue(undefined);
             this.listSessions = vi.fn().mockResolvedValue([]);
+        }
+
+        getState() {
+            return 'connected';
+        }
+
+        async start() {
+            return undefined;
+        }
+
+        async stop() {
+            return [];
+        }
+
+        async ping() {
+            return { message: 'pong', timestamp: Date.now() };
+        }
+
+        async getStatus() {
+            return { version: '1.0' };
+        }
+
+        async getAuthStatus() {
+            return { authenticated: true };
+        }
+
+        async getLastSessionId() {
+            return 'last-session-id';
+        }
+
+        async getForegroundSessionId() {
+            return 'foreground-session-id';
+        }
+
+        async setForegroundSessionId() {
+            return undefined;
         }
     }
     return {
@@ -84,6 +111,7 @@ vi.mock('@github/copilot-sdk', () => {
     };
 });
 
+import { getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
 import {
     _injectClientForTest,
     _resetClientState,
@@ -102,14 +130,18 @@ import {
     incrementSessionMessageCount,
     listActiveClientSessions,
     resumeClientSession,
+    sdkConnectionCircuitBreaker,
     setForegroundClientSessionId,
     stopClient,
 } from '../../../../src/copilot/sdk/session/client.js';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
+    vi.restoreAllMocks();
     _resetClientState();
+    setSdkMetricEmitter(null);
 });
 
 // ─── buildClientOptions ──────────────────────────────────────────────────────
@@ -145,6 +177,68 @@ describe('sdk/client › getClient', () => {
         const c1 = await getClient();
         const c2 = await getClient();
         expect(c1).toBe(c2);
+    });
+
+    it('não abre o circuit breaker para falha auth', async () => {
+        const { CopilotClient: MockCopilotClient } = await import('@github/copilot-sdk');
+        vi.spyOn(MockCopilotClient.prototype, 'start').mockRejectedValueOnce(
+            Object.assign(new Error('unauthorized'), { status: 401 }),
+        );
+
+        await expect(getClient()).rejects.toMatchObject({ name: 'SdkOperationError', kind: 'auth' });
+        expect(sdkConnectionCircuitBreaker.getState()).toBe('closed');
+    });
+
+    it('usa retry curto em falha transitória e emite métricas de client.connect', async () => {
+        const { CopilotClient: MockCopilotClient } = await import('@github/copilot-sdk');
+        const startSpy = vi
+            .spyOn(MockCopilotClient.prototype, 'start')
+            .mockRejectedValueOnce(Object.assign(new Error('conn refused'), { code: 'ECONNREFUSED' }))
+            .mockResolvedValueOnce(undefined);
+
+        /** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+        const metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
+
+        const client = await getClient();
+        expect(client).toBeDefined();
+        expect(startSpy).toHaveBeenCalledTimes(2);
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining(['client.connect:started', 'client.connect:succeeded']),
+        );
+        expect(sdkConnectionCircuitBreaker.getState()).toBe('closed');
+    });
+});
+
+describe('sdk/errors › getSdkRecoveryPolicy', () => {
+    it('classifica rate_limit/quota/auth sem circuit breaker', () => {
+        expect(getSdkRecoveryPolicy({ status: 429, message: 'Too many requests' }, 'connection')).toMatchObject({
+            kind: 'rate_limit',
+            retryable: false,
+            tripCircuit: false,
+            resetCircuit: true,
+        });
+        expect(getSdkRecoveryPolicy({ message: 'quota exceeded' }, 'connection')).toMatchObject({
+            kind: 'quota_exhausted',
+            allowReconnect: false,
+        });
+        expect(getSdkRecoveryPolicy({ status: 401, message: 'unauthorized' }, 'connection')).toMatchObject({
+            kind: 'auth',
+            tripCircuit: false,
+        });
+    });
+
+    it('classifica network/timeout como transitórios com backoff', () => {
+        expect(getSdkRecoveryPolicy({ code: 'ECONNREFUSED', message: 'conn refused' }, 'connection')).toMatchObject({
+            kind: 'network',
+            retryable: true,
+            tripCircuit: true,
+        });
+        expect(getSdkRecoveryPolicy({ code: 'ETIMEDOUT', message: 'timeout' }, 'connection')).toMatchObject({
+            kind: 'timeout',
+            retryable: true,
+            tripCircuit: true,
+        });
     });
 });
 
@@ -244,6 +338,21 @@ describe('sdk/client › session management', () => {
         const entry = getClientSession('sess-1');
         expect(entry).toBeDefined();
         expect(entry?.model).toBe('gpt-4.1');
+    });
+
+    it('createClientSession herda retry transitório do lifecycle wrapper', async () => {
+        const mc = mockClient();
+        mc.createSession
+            .mockRejectedValueOnce(Object.assign(new Error('network down'), { code: 'ECONNRESET' }))
+            .mockResolvedValueOnce(mockSession('sess-1'));
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        const session = await createClientSession(/** @type {any} */ ({ model: 'gpt-4.1' }));
+
+        expect(session.sessionId).toBe('sess-1');
+        expect(mc.start).toHaveBeenCalledTimes(1);
+        expect(mc.createSession).toHaveBeenCalledTimes(2);
+        expect(getActiveSessionCount()).toBe(1);
     });
 
     it('resumeClientSession retorna sessão existente do registry', async () => {

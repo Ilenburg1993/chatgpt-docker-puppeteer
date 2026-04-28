@@ -13,6 +13,7 @@
 
 import { toError } from '#copilot/core';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
 import { log, startSpan } from '../ports/observability-port.js';
 
 /**
@@ -65,9 +66,20 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
     const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog, shouldAbort } = opts;
     const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient, onSessionReady } =
         callbacks;
+    const originalSdkPolicy = getAgentSdkRecoveryPolicy(originalError, 'session');
 
     // Só tenta reconectar se o cliente ainda existe e o agente não foi parado.
     if (!client || currentStatus === 'stopped') return false;
+    if (originalSdkPolicy.kind !== 'unknown' && !originalSdkPolicy.allowReconnect) {
+        log(
+            'WARN',
+            `[AlwaysAlive] Reconexão bloqueada pela policy SDK (kind=${originalSdkPolicy.kind}): ${originalError.message}`,
+        );
+        await sessionLog?.(
+            `[reconnect-policy] Reconexão bloqueada pela policy SDK (kind=${originalSdkPolicy.kind}): ${originalError.message}`,
+        );
+        return false;
+    }
 
     log('WARN', `[AlwaysAlive] Erro de sessão detectado: ${originalError.message}. Iniciando reconexão...`);
 
@@ -85,7 +97,8 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                 }
                 // Backoff exponencial com jitter: delay = base * 2^(attempt-1) + jitter(0..base)
                 // G2-ARCH-09: cap no máximo de 30s para evitar esperas excessivas
-                const raw = baseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * baseDelayMs;
+                const effectiveBaseDelayMs = Math.max(baseDelayMs, originalSdkPolicy.backoffMs || 0);
+                const raw = effectiveBaseDelayMs * Math.pow(2, attempt - 1) + jitterFn() * effectiveBaseDelayMs;
                 const delay = Math.min(raw, 30_000);
                 log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
                 emit('status', `reconnecting:${attempt}/${maxAttempts}`);
@@ -102,7 +115,7 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         // e recursos pendurados da sessão anterior.
                         if (typeof client.stop === 'function') {
                             try {
-                                await client.stop();
+                                await stopAgentSdkClient(client);
                             } catch (stopErr) {
                                 log(
                                     'WARN',
@@ -127,7 +140,7 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                         // antes de declarar sucesso, evitando falso-positivo com pipe quebrado.
                         if (typeof activeClient.ping === 'function') {
                             try {
-                                await activeClient.ping();
+                                await pingAgentSdkClient(activeClient);
                             } catch (pingErr) {
                                 log(
                                     'WARN',

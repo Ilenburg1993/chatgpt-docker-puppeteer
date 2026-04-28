@@ -133,6 +133,16 @@ describe('buildSessionConfig()', () => {
         expect(cfg.availableTools).toEqual(['myTool']);
         expect(cfg.onPermissionRequest).toBe(handler);
     });
+
+    it('preserva gitHubToken e createSessionFsHandler no merge', () => {
+        const sessionFsHandler = vi.fn();
+        const cfg = buildSessionConfig({
+            gitHubToken: 'ghs_cfg_token',
+            createSessionFsHandler: /** @type {any} */ (sessionFsHandler),
+        });
+        expect(cfg.gitHubToken).toBe('ghs_cfg_token');
+        expect(cfg.createSessionFsHandler).toBe(sessionFsHandler);
+    });
 });
 
 // ─── mergeTools ───────────────────────────────────────────────────────────────

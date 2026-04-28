@@ -43,6 +43,7 @@ export function createActivityTracker({ bus, trackTypes }) {
         'hook:pre_tool_use',
         'hook:post_tool_use',
         'agent:session:keepalive',
+        'sdk:operation:metric',
     ];
 
     for (const type of types) {

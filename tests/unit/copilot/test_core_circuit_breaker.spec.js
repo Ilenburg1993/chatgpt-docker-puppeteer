@@ -111,4 +111,27 @@ describe('core/circuit-breaker.js › CircuitBreaker', () => {
         assert.equal(err.code, 'CIRCUIT_OPEN');
         assert.ok(err.message.includes('my-breaker'));
     });
+
+    it('guard() e recordFailure()/recordSuccess() permitem controle manual do circuito', async () => {
+        const cb = new CircuitBreaker('test', { failThreshold: 2, resetTimeoutMs: 10 });
+
+        cb.guard();
+        cb.recordFailure();
+        assert.equal(cb.getState(), 'closed');
+
+        cb.guard();
+        cb.recordFailure();
+        assert.equal(cb.getState(), 'open');
+
+        await assert.rejects(
+            () => Promise.resolve().then(() => cb.guard()),
+            (err) => err instanceof CircuitOpenError,
+        );
+
+        await new Promise((r) => setTimeout(r, 15));
+        cb.guard();
+        assert.equal(cb.getState(), 'half-open');
+        cb.recordSuccess();
+        assert.equal(cb.getState(), 'closed');
+    });
 });

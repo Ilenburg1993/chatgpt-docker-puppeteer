@@ -16,6 +16,7 @@
 
 import { TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
 import { listSdkCatalogModels } from '../facades/agent-model-config.js';
+import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
 
 /** @type {boolean} */
 let _processSignalHandlersRegistered = false;
@@ -210,9 +211,9 @@ export async function runCopilotSdkBootPreflight({
     let client = null;
     try {
         client = createClient();
-        await client.start();
+        await ensureAgentSdkClientStarted(client);
         await Promise.race([
-            client.ping(),
+            pingAgentSdkClient(client),
             new Promise((_, reject) =>
                 setTimeout(() => reject(new TimeoutError(`Ping timeout (${pingTimeoutMs}ms)`)), pingTimeoutMs),
             ),
@@ -273,7 +274,7 @@ export async function runCopilotSdkBootPreflight({
         log('WARN', `[copilot/runtime-host] ${warning}`);
         return report;
     } finally {
-        await client?.stop().catch((e) => {
+        await (client ? stopAgentSdkClient(client) : Promise.resolve([])).catch((e) => {
             log('DEBUG', `[copilot/runtime-host] Falha ao encerrar cliente de preflight: ${toError(e).message}`);
         });
     }

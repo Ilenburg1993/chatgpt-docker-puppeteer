@@ -35,9 +35,14 @@ import {
     listSessions,
     resumeSession,
 } from '../../../../src/copilot/sdk/session/lifecycle.js';
+import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
+
+/** @type {import('../../../../src/copilot/sdk/types.js').SdkOperationMetric[]} */
+let metrics = [];
 
 function fakeClient(overrides = {}) {
     return {
+        start: vi.fn().mockResolvedValue(undefined),
         createSession: vi.fn().mockResolvedValue({ sessionId: 's1' }),
         resumeSession: vi.fn().mockResolvedValue({ sessionId: 's2' }),
         listSessions: vi.fn().mockResolvedValue([{ id: 's1' }]),
@@ -49,6 +54,8 @@ function fakeClient(overrides = {}) {
 describe('sdk/session/lifecycle core hardening', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        metrics = [];
+        setSdkMetricEmitter((metric) => metrics.push(metric));
     });
 
     it('createSession converte erro do SDK em SdkOperationError', async () => {
@@ -57,6 +64,48 @@ describe('sdk/session/lifecycle core hardening', () => {
         });
 
         await expect(createSession(client, { model: 'gpt-4.1' })).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('createSession propaga gitHubToken e createSessionFsHandler', async () => {
+        const client = fakeClient();
+        const sessionFsHandler = vi.fn();
+
+        await createSession(client, {
+            model: 'gpt-4.1',
+            gitHubToken: 'ghs_session',
+            createSessionFsHandler: sessionFsHandler,
+        });
+
+        expect(client.createSession).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'gpt-4.1',
+                gitHubToken: 'ghs_session',
+                createSessionFsHandler: sessionFsHandler,
+            }),
+        );
+    });
+
+    it('createSession aplica retry curto e emite métricas em falha transitória', async () => {
+        const client = fakeClient({
+            createSession: vi
+                .fn()
+                .mockRejectedValueOnce(Object.assign(new Error('conn reset'), { code: 'ECONNRESET' }))
+                .mockResolvedValueOnce({ sessionId: 's1' }),
+        });
+
+        const result = await createSession(client, { model: 'gpt-4.1' });
+
+        expect(result.sessionId).toBe('s1');
+        expect(client.start).toHaveBeenCalledTimes(1);
+        expect(client.createSession).toHaveBeenCalledTimes(2);
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining(['session.create:started', 'session.create:succeeded']),
+        );
+        expect(
+            metrics.find((metric) => metric.operation === 'session.create' && metric.status === 'succeeded'),
+        ).toMatchObject({
+            attributes: expect.objectContaining({ attempt: 2, model: 'gpt-4.1' }),
+        });
     });
 
     it('resumeSession valida sessionId não-vazio', async () => {
@@ -70,6 +119,47 @@ describe('sdk/session/lifecycle core hardening', () => {
         });
 
         await expect(resumeSession(client, 's2')).rejects.toBeInstanceOf(SdkOperationError);
+    });
+
+    it('resumeSession propaga gitHubToken e createSessionFsHandler', async () => {
+        const client = fakeClient();
+        const sessionFsHandler = vi.fn();
+
+        await resumeSession(client, 's2', {
+            gitHubToken: 'ghs_resume',
+            createSessionFsHandler: sessionFsHandler,
+        });
+
+        expect(client.resumeSession).toHaveBeenCalledWith(
+            's2',
+            expect.objectContaining({
+                gitHubToken: 'ghs_resume',
+                createSessionFsHandler: sessionFsHandler,
+            }),
+        );
+    });
+
+    it('resumeSession aplica retry curto, reconnect best-effort e métricas em timeout', async () => {
+        const client = fakeClient({
+            resumeSession: vi
+                .fn()
+                .mockRejectedValueOnce(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }))
+                .mockResolvedValueOnce({ sessionId: 's2' }),
+        });
+
+        const result = await resumeSession(client, 's2');
+
+        expect(result.sessionId).toBe('s2');
+        expect(client.start).toHaveBeenCalledTimes(1);
+        expect(client.resumeSession).toHaveBeenCalledTimes(2);
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining(['session.resume:started', 'session.resume:succeeded']),
+        );
+        expect(
+            metrics.find((metric) => metric.operation === 'session.resume' && metric.status === 'succeeded'),
+        ).toMatchObject({
+            attributes: expect.objectContaining({ attempt: 2, sessionId: 's2' }),
+        });
     });
 
     it('listSessions converte erro do SDK em SdkOperationError', async () => {

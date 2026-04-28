@@ -9,7 +9,7 @@
  */
 
 import { isFatalError, toError } from '#copilot/core';
-import { isAgentSdkQuotaOrRateLimitError } from './facades/agent-sdk-access.js';
+import { getAgentSdkRecoveryPolicy } from './facades/agent-sdk-access.js';
 
 /**
  * @param {Error} error
@@ -85,6 +85,8 @@ function normalizeAgentError(error) {
 export function classifyAgentError(error) {
     const normalized = normalizeAgentError(error);
     const cause = unwrapSdkOperationCause(normalized);
+    const normalizedSdkPolicy = getAgentSdkRecoveryPolicy(normalized, 'session');
+    const causeSdkPolicy = getAgentSdkRecoveryPolicy(cause, 'session');
 
     if (
         (normalized instanceof DOMException && normalized.name === 'AbortError') ||
@@ -92,7 +94,12 @@ export function classifyAgentError(error) {
     ) {
         return 'ignore';
     }
-    if (isAgentSdkQuotaOrRateLimitError(normalized) || isAgentSdkQuotaOrRateLimitError(cause)) {
+    if (
+        (normalizedSdkPolicy.kind !== 'unknown' &&
+            !normalizedSdkPolicy.allowReconnect &&
+            !normalizedSdkPolicy.retryable) ||
+        (causeSdkPolicy.kind !== 'unknown' && !causeSdkPolicy.allowReconnect && !causeSdkPolicy.retryable)
+    ) {
         return 'fatal';
     }
     if (typeof isFatalError === 'function' && (isFatalError(normalized) || isFatalError(cause))) {

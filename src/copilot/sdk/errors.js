@@ -10,6 +10,12 @@
 
 /** @typedef {'rate_limit' | 'quota_exhausted' | 'auth' | 'network' | 'timeout' | 'unknown'} SdkErrorKind */
 
+/** @typedef {'connection' | 'session'} SdkRecoveryScope */
+
+/**
+ * @typedef {import('./types.js').SdkRecoveryPolicy} SdkRecoveryPolicy
+ */
+
 /**
  * @param {unknown} value
  * @returns {string}
@@ -102,6 +108,91 @@ export function classifySdkError(error) {
 export function isSdkQuotaOrRateLimitError(error) {
     const kind = classifySdkError(error);
     return kind === 'rate_limit' || kind === 'quota_exhausted';
+}
+
+/**
+ * Deriva uma política operacional estável a partir do `SdkErrorKind`, permitindo decisões consistentes de retry,
+ * reconnect e circuit breaker.
+ *
+ * @param {unknown} error
+ * @param {SdkRecoveryScope} [scope='connection'] Default is `'connection'`
+ * @returns {SdkRecoveryPolicy}
+ */
+export function getSdkRecoveryPolicy(error, scope = 'connection') {
+    const kind = classifySdkError(error);
+
+    switch (kind) {
+        case 'rate_limit':
+            return {
+                kind,
+                scope,
+                retryable: false,
+                allowReconnect: false,
+                tripCircuit: false,
+                resetCircuit: true,
+                backoffMs: 0,
+                reason: 'rate limit do SDK não deve abrir circuito local nem disparar reconnect automático',
+            };
+        case 'quota_exhausted':
+            return {
+                kind,
+                scope,
+                retryable: false,
+                allowReconnect: false,
+                tripCircuit: false,
+                resetCircuit: true,
+                backoffMs: 0,
+                reason: 'quota esgotada exige intervenção externa; reconnect local só piora a UX',
+            };
+        case 'auth':
+            return {
+                kind,
+                scope,
+                retryable: false,
+                allowReconnect: false,
+                tripCircuit: false,
+                resetCircuit: true,
+                backoffMs: 0,
+                reason: 'falha de autenticação não representa indisponibilidade do transporte',
+            };
+        case 'timeout':
+            return {
+                kind,
+                scope,
+                retryable: true,
+                allowReconnect: true,
+                tripCircuit: true,
+                resetCircuit: false,
+                backoffMs: scope === 'connection' ? 1_500 : 1_000,
+                reason: 'timeout é tratado como falha transitória e deve alimentar backoff/circuit breaker',
+            };
+        case 'network':
+            return {
+                kind,
+                scope,
+                retryable: true,
+                allowReconnect: true,
+                tripCircuit: true,
+                resetCircuit: false,
+                backoffMs: scope === 'connection' ? 1_000 : 750,
+                reason: 'falha de rede é transitória e deve contribuir para abrir o circuito',
+            };
+        case 'unknown':
+        default:
+            return {
+                kind,
+                scope,
+                retryable: scope === 'connection',
+                allowReconnect: scope === 'connection',
+                tripCircuit: scope === 'connection',
+                resetCircuit: false,
+                backoffMs: scope === 'connection' ? 750 : 0,
+                reason:
+                    scope === 'connection'
+                        ? 'falha desconhecida de conexão é tratada conservadoramente como transitória'
+                        : 'falha desconhecida fora da conexão não recebe reconnect automático por padrão',
+            };
+    }
 }
 
 /**

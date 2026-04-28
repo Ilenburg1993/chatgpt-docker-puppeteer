@@ -63,15 +63,13 @@ export class CircuitBreaker {
     }
 
     /**
-     * Executa a função protegida pelo circuit breaker. Lança `CircuitOpenError` se o circuito estiver aberto e o
-     * timeout de reset ainda não expirou.
+     * Verifica se o circuito pode executar uma nova operação, aplicando a transição automática de `open` para
+     * `half-open` quando o timeout expira.
      *
-     * @template T
-     * @param {() => Promise<T>} fn - Função async a executar
-     * @returns {Promise<T>}
-     * @throws {CircuitOpenError} Se o circuito estiver aberto
+     * @returns {void}
+     * @throws {CircuitOpenError} Se o circuito continuar aberto
      */
-    async execute(fn) {
+    guard() {
         if (this.#state === 'open') {
             if (Date.now() - this.#openedAt >= this.#resetTimeoutMs) {
                 this.#state = 'half-open';
@@ -89,13 +87,44 @@ export class CircuitBreaker {
                 throw new CircuitOpenError(this.#name);
             }
         }
+    }
+
+    /**
+     * Registra sucesso manualmente, fechando o circuito e zerando contadores.
+     *
+     * @returns {void}
+     */
+    recordSuccess() {
+        this.#onSuccess();
+    }
+
+    /**
+     * Registra falha manualmente, permitindo que o caller decida quais erros devem ou não contaminar o breaker.
+     *
+     * @returns {void}
+     */
+    recordFailure() {
+        this.#onFailure();
+    }
+
+    /**
+     * Executa a função protegida pelo circuit breaker. Lança `CircuitOpenError` se o circuito estiver aberto e o
+     * timeout de reset ainda não expirou.
+     *
+     * @template T
+     * @param {() => Promise<T>} fn - Função async a executar
+     * @returns {Promise<T>}
+     * @throws {CircuitOpenError} Se o circuito estiver aberto
+     */
+    async execute(fn) {
+        this.guard();
 
         try {
             const result = await fn();
-            this.#onSuccess();
+            this.recordSuccess();
             return result;
         } catch (err) {
-            this.#onFailure();
+            this.recordFailure();
             throw err;
         }
     }

@@ -38,8 +38,36 @@ vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
 }));
 vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
-    readTerminalRuntimeControlState: vi.fn(() => ({ dialogLoopActive: true, dialogPaused: false, status: 'idle' })),
-    readTerminalRuntimeState: vi.fn(() => ({ status: 'idle', pendingQuestionKind: null })),
+    readTerminalRuntimeControlState: vi.fn(() => ({
+        status: 'idle',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        sessionId: null,
+        dialogLoopActive: true,
+        dialogPaused: false,
+        queueSize: 0,
+    })),
+    readTerminalRuntimeState: vi.fn(() => ({
+        runtimeId: 'default',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        status: 'idle',
+        sessionId: null,
+        dialogLoopActive: true,
+        dialogPaused: false,
+        queueSize: 0,
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+        contextWindow: null,
+        lastPrInfo: null,
+    })),
     runTerminalDialogTurn: vi.fn(async () => 'ok'),
     startTerminalAgentRuntime: vi.fn(async () => undefined),
     startTerminalDialogMode: vi.fn(async () => undefined),
@@ -79,5 +107,95 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('exporta getTurnQueueDepth', async () => {
         expect(typeof mod.getTurnQueueDepth).toBe('function');
+    });
+
+    it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {
+        const runtime = await import('../../../src/copilot/terminal/frontend/llm-b-runtime.js');
+        const nerv = await import('#copilot/bridges');
+
+        vi.mocked(runtime.readTerminalRuntimeControlState).mockReturnValue({
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            sessionId: null,
+            dialogLoopActive: false,
+            dialogPaused: false,
+            status: 'stopped',
+            queueSize: 0,
+        });
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+            runtimeId: 'default',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            status: 'idle',
+            sessionId: null,
+            dialogLoopActive: false,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: null,
+            lastPrInfo: null,
+        });
+        vi.mocked(runtime.startTerminalAgentRuntime).mockRejectedValueOnce(
+            Object.assign(new Error('unauthorized'), { status: 401 }),
+        );
+
+        await expect(mod.ensureDialogLoop()).resolves.toBeUndefined();
+        expect(vi.mocked(nerv.emitNerv)).toHaveBeenCalledWith(
+            'copilot:dialog:boot_blocked',
+            expect.objectContaining({ reason: 'sdk_auth' }),
+        );
+    });
+
+    it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por rate_limit', async () => {
+        const runtime = await import('../../../src/copilot/terminal/frontend/llm-b-runtime.js');
+        const nerv = await import('#copilot/bridges');
+
+        vi.mocked(runtime.readTerminalRuntimeControlState).mockReturnValue({
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            sessionId: null,
+            dialogLoopActive: false,
+            dialogPaused: false,
+            status: 'stopped',
+            queueSize: 0,
+        });
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+            runtimeId: 'default',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            status: 'idle',
+            sessionId: null,
+            dialogLoopActive: false,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: null,
+            lastPrInfo: null,
+        });
+        vi.mocked(runtime.startTerminalAgentRuntime).mockRejectedValueOnce(
+            Object.assign(new Error('Too many requests'), { status: 429 }),
+        );
+
+        await expect(mod.ensureDialogLoop()).resolves.toBeUndefined();
+        expect(vi.mocked(nerv.emitNerv)).toHaveBeenCalledWith(
+            'copilot:dialog:boot_blocked',
+            expect.objectContaining({ reason: 'sdk_rate_limit' }),
+        );
     });
 });

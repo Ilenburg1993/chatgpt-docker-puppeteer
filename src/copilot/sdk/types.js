@@ -207,6 +207,21 @@
  * @typedef {(metric: SdkOperationMetric) => void} SdkMetricEmitter
  */
 
+/**
+ * Política operacional derivada de `SdkErrorKind`, usada para governar retry/backoff, reconnect e integração com
+ * circuit breaker no boundary SDK.
+ *
+ * @typedef {object} SdkRecoveryPolicy
+ * @property {import('./errors.js').SdkErrorKind} kind
+ * @property {'connection' | 'session'} scope
+ * @property {boolean} retryable
+ * @property {boolean} allowReconnect
+ * @property {boolean} tripCircuit
+ * @property {boolean} resetCircuit
+ * @property {number} backoffMs
+ * @property {string} reason
+ */
+
 // ─── User Input ───────────────────────────────────────────────────────────────
 
 /**
@@ -756,7 +771,22 @@
  *     apiKey?: string;
  *     bearerToken?: string;
  *     azure?: { apiVersion?: string };
+ *     headers?: Record<string, string>;
  * }} ProviderConfig
+ */
+
+/**
+ * Provider de filesystem de sessão do SDK. É usado quando `CopilotClientOptions.sessionFs` está configurado para
+ * redirecionar I/O de sessão para uma implementação customizada.
+ *
+ * @typedef {import('@github/copilot-sdk').SessionFsProvider} SessionFsProvider
+ */
+
+/**
+ * Factory opcional de handler de session filesystem por sessão. Assinatura: `(session: CopilotSession) =>
+ * SessionFsProvider`.
+ *
+ * @typedef {(session: CopilotSession) => SessionFsProvider} CreateSessionFsHandler
  */
 
 // ─── Session Context & Metadata ───────────────────────────────────────────────

@@ -39,6 +39,8 @@ import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-
  *
  * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
  *
+ * @typedef {import('#copilot/sdk/types').CreateSessionFsHandler} CreateSessionFsHandler
+ *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
 
@@ -282,6 +284,15 @@ export class SessionConfigBuilder {
     }
 
     /**
+     * @param {string} token
+     * @returns {this}
+     */
+    gitHubToken(token) {
+        this.#config.gitHubToken = token;
+        return this;
+    }
+
+    /**
      * @param {boolean} enabled
      * @returns {this}
      */
@@ -334,6 +345,15 @@ export class SessionConfigBuilder {
      */
     onEvent(handler) {
         this.#config.onEvent = handler;
+        return this;
+    }
+
+    /**
+     * @param {CreateSessionFsHandler} handler
+     * @returns {this}
+     */
+    createSessionFsHandler(handler) {
+        this.#config.createSessionFsHandler = handler;
         return this;
     }
 

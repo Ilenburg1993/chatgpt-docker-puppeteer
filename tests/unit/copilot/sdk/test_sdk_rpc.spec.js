@@ -183,6 +183,9 @@ describe('sdk/rpc — Core Subsystems', () => {
             const result = await modeSet(s, 'plan');
             expect(s.rpc.mode.set).toHaveBeenCalledWith({ mode: 'plan' });
             expect(result.mode).toBe('plan');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.mode.set:started', 'rpc.mode.set:succeeded']),
+            );
         });
 
         it('altera para autopilot', async () => {
@@ -198,6 +201,19 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita para sessão inválida', async () => {
             await expect(modeSet(null, 'plan')).rejects.toThrow(TypeError);
+        });
+
+        it('emite métrica failed quando mode.set falha', async () => {
+            const s = fakeSession({
+                mode: {
+                    get: vi.fn().mockResolvedValue({ mode: 'interactive' }),
+                    set: vi.fn().mockRejectedValue(new Error('mode unavailable')),
+                },
+            });
+            await expect(modeSet(s, 'plan')).rejects.toThrow('mode unavailable');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.mode.set:started', 'rpc.mode.set:failed']),
+            );
         });
     });
 
@@ -221,6 +237,9 @@ describe('sdk/rpc — Core Subsystems', () => {
             const s = fakeSession();
             await planUpdate(s, '# Updated Plan');
             expect(s.rpc.plan.update).toHaveBeenCalledWith({ content: '# Updated Plan' });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.plan.update:started', 'rpc.plan.update:succeeded']),
+            );
         });
 
         it('rejeita content não-string', async () => {
@@ -231,6 +250,20 @@ describe('sdk/rpc — Core Subsystems', () => {
         it('rejeita para sessão inválida', async () => {
             await expect(planUpdate(null, 'x')).rejects.toThrow(TypeError);
         });
+
+        it('emite métrica failed quando plan.update falha', async () => {
+            const s = fakeSession({
+                plan: {
+                    read: vi.fn().mockResolvedValue({ exists: true, content: '# Plan', path: '/tmp/plan.md' }),
+                    update: vi.fn().mockRejectedValue(new Error('plan locked')),
+                    delete: vi.fn().mockResolvedValue({}),
+                },
+            });
+            await expect(planUpdate(s, '# Updated Plan')).rejects.toThrow('plan locked');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.plan.update:started', 'rpc.plan.update:failed']),
+            );
+        });
     });
 
     describe('plan.delete', () => {
@@ -238,10 +271,27 @@ describe('sdk/rpc — Core Subsystems', () => {
             const s = fakeSession();
             await planDelete(s);
             expect(s.rpc.plan.delete).toHaveBeenCalledOnce();
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.plan.delete:started', 'rpc.plan.delete:succeeded']),
+            );
         });
 
         it('rejeita para sessão inválida', async () => {
             await expect(planDelete(null)).rejects.toThrow(TypeError);
+        });
+
+        it('emite métrica failed quando plan.delete falha', async () => {
+            const s = fakeSession({
+                plan: {
+                    read: vi.fn().mockResolvedValue({ exists: true, content: '# Plan', path: '/tmp/plan.md' }),
+                    update: vi.fn().mockResolvedValue({}),
+                    delete: vi.fn().mockRejectedValue(new Error('delete forbidden')),
+                },
+            });
+            await expect(planDelete(s)).rejects.toThrow('delete forbidden');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.plan.delete:started', 'rpc.plan.delete:failed']),
+            );
         });
     });
 
@@ -283,6 +333,9 @@ describe('sdk/rpc — Core Subsystems', () => {
             const s = fakeSession();
             await workspaceCreateFile(s, 'out.txt', 'content');
             expect(s.rpc.workspace.createFile).toHaveBeenCalledWith({ path: 'out.txt', content: 'content' });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.workspace.createFile:started', 'rpc.workspace.createFile:succeeded']),
+            );
         });
 
         it('rejeita path vazio', async () => {
@@ -293,6 +346,20 @@ describe('sdk/rpc — Core Subsystems', () => {
         it('rejeita content não-string', async () => {
             const s = fakeSession();
             await expect(workspaceCreateFile(s, 'f.txt', 42)).rejects.toThrow('deve ser string');
+        });
+
+        it('emite métrica failed quando workspace.createFile falha', async () => {
+            const s = fakeSession({
+                workspace: {
+                    listFiles: vi.fn().mockResolvedValue({ files: ['a.txt', 'b.txt'] }),
+                    readFile: vi.fn().mockResolvedValue({ content: 'hello' }),
+                    createFile: vi.fn().mockRejectedValue(new Error('disk full')),
+                },
+            });
+            await expect(workspaceCreateFile(s, 'out.txt', 'content')).rejects.toThrow('disk full');
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['rpc.workspace.createFile:started', 'rpc.workspace.createFile:failed']),
+            );
         });
     });
 
