@@ -31,7 +31,7 @@ describe('SessionKeepalive', () => {
         expect(ka.running).toBe(false);
 
         ka.start({
-            getSession: () => null,
+            performKeepalive: vi.fn(async () => null),
             isIdle: () => false,
             isDialogLoopActive: () => false,
         });
@@ -42,11 +42,11 @@ describe('SessionKeepalive', () => {
     });
 
     it('não envia heartbeat quando dialog loop está ativo', async () => {
-        const sendFn = vi.fn();
+        const keepaliveFn = vi.fn();
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 50 });
 
         ka.start({
-            getSession: () => ({ sessionId: 'session-test-keepalive', send: sendFn }),
+            performKeepalive: keepaliveFn,
             isIdle: () => true,
             isDialogLoopActive: () => true,
         });
@@ -54,15 +54,15 @@ describe('SessionKeepalive', () => {
         await vi.advanceTimersByTimeAsync(300);
         ka.stop();
 
-        expect(sendFn).not.toHaveBeenCalled();
+        expect(keepaliveFn).not.toHaveBeenCalled();
     });
 
     it('não envia heartbeat quando não está idle', async () => {
-        const sendFn = vi.fn();
+        const keepaliveFn = vi.fn();
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 50 });
 
         ka.start({
-            getSession: () => ({ sessionId: 'session-test-keepalive', send: sendFn }),
+            performKeepalive: keepaliveFn,
             isIdle: () => false,
             isDialogLoopActive: () => false,
         });
@@ -70,19 +70,15 @@ describe('SessionKeepalive', () => {
         await vi.advanceTimersByTimeAsync(300);
         ka.stop();
 
-        expect(sendFn).not.toHaveBeenCalled();
+        expect(keepaliveFn).not.toHaveBeenCalled();
     });
 
-    it('usa client.ping() como primeiro recurso de keepalive', async () => {
-        const pingFn = vi.fn().mockResolvedValue(undefined);
-        const sendFn = vi.fn();
+    it('propaga a estratégia usada no keepalive sem conhecer handles crus do SDK', async () => {
         const onKeepalive = vi.fn();
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 0 });
 
-        // Força lastActivityAt no passado simulando idle
         ka.start({
-            getSession: () => ({ sessionId: 'session-test-keepalive-fallback', send: sendFn }),
-            getClient: () => ({ ping: pingFn }),
+            performKeepalive: vi.fn(async () => 'client.ping'),
             isIdle: () => true,
             isDialogLoopActive: () => false,
             onKeepalive,
@@ -91,35 +87,34 @@ describe('SessionKeepalive', () => {
         await vi.advanceTimersByTimeAsync(150);
         ka.stop();
 
-        expect(pingFn).toHaveBeenCalled();
-        expect(sendFn).not.toHaveBeenCalled();
+        expect(onKeepalive).toHaveBeenCalledWith(
+            expect.objectContaining({ strategy: 'client.ping', ts: expect.any(Number) }),
+        );
     });
 
-    it('fallback para session.send() quando ping falha', async () => {
-        const pingFn = vi.fn().mockRejectedValue(new Error('ping failed'));
-        const sendFn = vi.fn().mockResolvedValue(undefined);
+    it('não emite callback quando a ação semântica não toca o SDK', async () => {
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 0 });
+        const onKeepalive = vi.fn();
 
         ka.start({
-            getSession: () => ({ sessionId: 'session-test-keepalive-fallback', send: sendFn }),
-            getClient: () => ({ ping: pingFn }),
+            performKeepalive: vi.fn(async () => null),
             isIdle: () => true,
             isDialogLoopActive: () => false,
+            onKeepalive,
         });
 
         await vi.advanceTimersByTimeAsync(150);
         ka.stop();
 
-        expect(pingFn).toHaveBeenCalled();
-        expect(sendFn).toHaveBeenCalledWith({ prompt: '[keepalive]' });
+        expect(onKeepalive).not.toHaveBeenCalled();
     });
 
     it('ping() reseta lastActivity (evita heartbeat prematuro)', async () => {
-        const sendFn = vi.fn();
+        const keepaliveFn = vi.fn();
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 200 });
 
         ka.start({
-            getSession: () => ({ send: sendFn }),
+            performKeepalive: keepaliveFn,
             isIdle: () => true,
             isDialogLoopActive: () => false,
         });
@@ -133,6 +128,6 @@ describe('SessionKeepalive', () => {
         ka.stop();
 
         // Nenhum heartbeat porque idle threshold nunca foi atingido
-        expect(sendFn).not.toHaveBeenCalled();
+        expect(keepaliveFn).not.toHaveBeenCalled();
     });
 });

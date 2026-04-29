@@ -39,6 +39,12 @@ const MAX_DELTA_FALLBACK_CHARS = 50_000;
  *     off: (event: string, listener: (...args: any[]) => void) => void;
  *     emit: (event: string, ...args: any[]) => void;
  * }} TurnEmitter
+ *
+ *
+ * @typedef {{
+ *     on?: ((event: string, listener: (...args: any[]) => void) => void) | undefined;
+ *     off?: ((event: string, listener: (...args: any[]) => void) => void) | undefined;
+ * }} ProgressEventSource
  */
 
 /** @typedef {import('../types.js').DialogTurnHost} TurnHost */
@@ -191,8 +197,14 @@ function traceLabel(traceId) {
  * mais do que a janela calculada pela policy.
  *
  * @param {TurnEmitter} emitter
- * @param {{ timeout: number | null; onTimeout: () => void; traceId?: string; phase: string }} opts Quando `timeout` é
- *   `null`, nenhum timer é criado — o watchdog do dialog loop torna-se o único guardião de stall.
+ * @param {{
+ *     timeout: number | null;
+ *     onTimeout: () => void;
+ *     traceId?: string;
+ *     phase: string;
+ *     progressSources?: ProgressEventSource[] | undefined;
+ * }} opts
+ *   Quando `timeout` é `null`, nenhum timer é criado — o watchdog do dialog loop torna-se o único guardião de stall.
  * @returns {{ timeoutHandle: ReturnType<typeof setTimeout> | null; clear: () => void }}
  */
 function createInactivityTimeout(emitter, opts) {
@@ -227,6 +239,8 @@ function createInactivityTimeout(emitter, opts) {
         arm();
     };
 
+    const sources = [emitter, ...(opts.progressSources ?? [])];
+
     for (const event of [
         EMITTER_ASSISTANT_MESSAGE,
         EMITTER_ASSISTANT_STREAMING_DELTA,
@@ -235,8 +249,13 @@ function createInactivityTimeout(emitter, opts) {
         EMITTER_TASK_REASONING,
         EMITTER_TOOL_EXECUTION_PROGRESS,
     ]) {
-        listeners.push([event, onProgress]);
-        emitter.on(event, onProgress);
+        for (const source of sources) {
+            if (typeof source?.on !== 'function' || typeof source?.off !== 'function') {
+                continue;
+            }
+            listeners.push([event, onProgress]);
+            source.on(event, onProgress);
+        }
     }
 
     arm();
@@ -441,6 +460,7 @@ export function buildTurnResolutionListeners(emitter, opts) {
 
     const turnTimeout = createInactivityTimeout(emitter, {
         timeout,
+        progressSources: [opts.host],
         ...(traceId ? { traceId } : {}),
         phase: 'outer',
         onTimeout: () => {
@@ -617,6 +637,7 @@ export function dispatchTurnToHost(emitter, opts) {
             emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
             const innerTimeout = createInactivityTimeout(emitter, {
                 timeout,
+                progressSources: [host],
                 ...(traceId ? { traceId } : {}),
                 phase: 'pending',
                 onTimeout: () => {

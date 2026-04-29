@@ -83,6 +83,7 @@ export const AliveAgentStateSchema = z
         resumeCount: z.number(),
         sendCount: z.number(),
         model: z.string(),
+        reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
         pendingQuestion: z.string().nullable(),
         pendingQuestionMeta: PendingQuestionMetaSchema.nullable().optional(),
     })

@@ -13,7 +13,6 @@
 
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
-import { sendAgentSdkSession } from '../facades/agent-sdk-runtime.js';
 import { log } from '../ports/observability-port.js';
 
 /**
@@ -56,11 +55,10 @@ export class SessionKeepalive {
      * Inicia o monitor de keepalive.
      *
      * @param {{
-     *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
-     *     getClient?: () => { ping?: () => Promise<unknown> } | null;
+     *     performKeepalive: () => Promise<'client.ping' | 'session.send' | null>;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
-     *     onKeepalive?: (ts: number) => void;
+     *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
      * }} callbacks
      */
     start(callbacks) {
@@ -107,11 +105,10 @@ export class SessionKeepalive {
 
     /**
      * @param {{
-     *     getSession: () => { send?: (opts: { prompt: string }) => Promise<unknown> } | null;
-     *     getClient?: () => { ping?: () => Promise<unknown> } | null;
+     *     performKeepalive: () => Promise<'client.ping' | 'session.send' | null>;
      *     isIdle: () => boolean;
      *     isDialogLoopActive: () => boolean;
-     *     onKeepalive?: (ts: number) => void;
+     *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
      * }} callbacks
      * @returns {Promise<void>}
      */
@@ -123,7 +120,7 @@ export class SessionKeepalive {
         this.#tickInFlight = true;
 
         try {
-            const { getSession, getClient, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
+            const { performKeepalive, isIdle, isDialogLoopActive, onKeepalive } = callbacks;
 
             // Dialog loop ativo mantém a sessão viva — não precisa de heartbeat
             if (isDialogLoopActive()) return;
@@ -138,54 +135,18 @@ export class SessionKeepalive {
             const idleMs = Date.now() - this.#lastActivityAt;
             if (idleMs < this.#idleThresholdMs) return;
 
-            // M-02 (PARTE-8): usar client.ping() (0 PR) como primeiro recurso de keepalive.
-            // Apenas faz fallback para session.send() se ping() não estiver disponível.
-            const client = getClient?.();
-            const clientPing = client?.ping;
-            if (typeof clientPing === 'function') {
-                const pingResult = await withAgentErrorPolicy(() => clientPing.call(client), {
-                    label: 'session.keepalive.ping',
-                    phase: 'keepalive',
-                    onError: (error) => {
-                        log(
-                            'WARN',
-                            `[SessionKeepalive] Ping keepalive falhou: ${error.message} — tentando session.send()`, // crude-ok: string de log descritiva
-                        );
-                    },
-                });
-                if (pingResult.ok) {
-                    this.#lastActivityAt = Date.now();
-                    log(
-                        'DEBUG',
-                        `[SessionKeepalive] Ping keepalive (0 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`,
-                    );
-                    onKeepalive?.(Date.now());
-                    return;
-                }
-            }
-
-            // Fallback: session.send() consome 1 PR, mas garante que a sessão não expire
-            const session = getSession();
-            if (!session || !('sessionId' in session)) return;
-
-            const sendResult = await withAgentErrorPolicy(
-                () =>
-                    sendAgentSdkSession(
-                        /** @type {import('#copilot/sdk/types').CopilotSession} */ (/** @type {unknown} */ (session)),
-                        { prompt: '[keepalive]' },
-                    ),
-                {
-                    label: 'session.keepalive.send',
-                    phase: 'keepalive',
-                    onError: (error) => {
-                        log('WARN', `[SessionKeepalive] Heartbeat falhou: ${error.message}`);
-                    },
+            const keepaliveResult = await withAgentErrorPolicy(() => performKeepalive(), {
+                label: 'session.keepalive.tick',
+                phase: 'keepalive',
+                onError: (error) => {
+                    log('WARN', `[SessionKeepalive] Heartbeat falhou: ${error.message}`);
                 },
-            );
-            if (sendResult.ok) {
+            });
+            if (keepaliveResult.ok && keepaliveResult.value) {
+                const strategy = keepaliveResult.value;
                 this.#lastActivityAt = Date.now();
-                log('DEBUG', `[SessionKeepalive] Heartbeat send (1 PR) enviado (idle: ${Math.round(idleMs / 1000)}s).`);
-                onKeepalive?.(Date.now());
+                log('DEBUG', `[SessionKeepalive] Heartbeat ${strategy} enviado (idle: ${Math.round(idleMs / 1000)}s).`);
+                onKeepalive?.({ ts: Date.now(), strategy });
             }
         } finally {
             this.#tickInFlight = false;

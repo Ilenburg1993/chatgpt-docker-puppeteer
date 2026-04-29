@@ -10,7 +10,7 @@ import { emitNerv } from '#copilot/bridges';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
-import { computeAdaptiveDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
+import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { embedMultiple, readFileContext } from '../../presentation/runtime-file-context.js';
 import {
     clearAttachments,
@@ -355,7 +355,9 @@ async function _executeTurn(message, actor) {
                 return null;
             }
         })();
-        const timeoutDecision = computeAdaptiveDialogTimeout({
+        const timeoutDecision = resolveOptionalDialogTimeout({
+            explicitTimeoutMs: 0,
+            allowDisabled: true,
             defaultTimeoutMs: TURN_TIMEOUT_MS,
             queueDepth: runtimeState.queueSize,
             contextUtilization: runtimeState.contextWindow?.utilization,

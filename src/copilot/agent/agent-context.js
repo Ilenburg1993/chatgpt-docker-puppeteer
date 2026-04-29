@@ -25,6 +25,7 @@ import {
     getPendingQuestionShadowState,
     isPendingQuestionShadowExpired,
 } from './dialog/pending-question-shadow.js';
+import { performKeepaliveSdkTick } from './facades/agent-session-ops.js';
 import { log } from './ports/observability-port.js';
 
 /**
@@ -1474,7 +1475,10 @@ export class AgentContext {
     /**
      * Inicia o keepalive do runtime usando os accessors semânticos atuais do contexto.
      *
-     * @param {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void }} [options]
+     * @param {{
+     *     isIdle?: () => boolean;
+     *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+     * }} [options]
      * @returns {boolean} `true` quando o keepalive pôde ser iniciado.
      */
     startKeepalive(options = {}) {
@@ -1483,8 +1487,7 @@ export class AgentContext {
         }
 
         this.keepalive.start({
-            getSession: () => this.getSessionSnapshot(),
-            getClient: () => this.getClientSnapshot(),
+            performKeepalive: () => performKeepaliveSdkTick(this),
             isIdle: options.isIdle ?? (() => this.status === 'idle'),
             isDialogLoopActive: () => this.isDialogLoopActive(),
             ...(options.onKeepalive !== undefined ? { onKeepalive: options.onKeepalive } : {}),
@@ -1685,7 +1688,7 @@ export class AgentContext {
      * Envia um turno ao dialog loop.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
+     * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts]
      * @returns {Promise<string>}
      */
     sendDialogTurn(message, opts) {

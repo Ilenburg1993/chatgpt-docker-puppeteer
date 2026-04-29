@@ -80,9 +80,9 @@ async function runDialogOperationWithPolicy(label, operation) {
  */
 function startKeepaliveIfPossible(ctx, host) {
     ctx.startKeepalive({
-        onKeepalive: (/** @type {number} */ ts) => {
+        onKeepalive: (/** @type {{ ts: number; strategy: 'client.ping' | 'session.send' }} */ info) => {
             container.resolve(METRICS_STORE).recordKeepalivePing();
-            host.emit(EMITTER_SESSION_KEEPALIVE, { ts });
+            host.emit(EMITTER_SESSION_KEEPALIVE, { ts: info.ts, strategy: info.strategy });
         },
     });
 }

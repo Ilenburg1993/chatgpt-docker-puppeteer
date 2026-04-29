@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
     buildAuditingPermissionHandler: vi.fn((handler) => handler ?? (async () => ({ kind: 'approved' }))),
     buildCustomAgentsConfig: vi.fn(() => []),
     buildSystemMessage: vi.fn(() => ({ mode: 'append', content: 'ctx' })),
+    canReadAgentSdkSessionMessages: vi.fn(() => true),
     createAgentSdkSessionByClient: vi.fn(async (_client, options) => ({
         session: { sessionId: 'new-sess' },
         isResumed: false,
@@ -36,6 +37,7 @@ vi.mock('../../../src/copilot/config/agent.js', () => ({ SESSION_MAX_AGE_MS: 86_
 vi.mock('../../../src/copilot/config/system-prompt/index.js', () => ({ buildSystemMessage: mocks.buildSystemMessage }));
 vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     AGENT_SDK_DEFAULT_MODEL: 'gpt-5-mini',
+    canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient: mocks.createAgentSdkSessionByClient,
     getAgentConfiguredSessionFsHandler: mocks.getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync: mocks.loadAgentSdkToolsConfigAsync,
@@ -73,6 +75,35 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             expect.objectContaining({
                 createSessionFsHandler: customHandler,
                 workingDirectory: '/workspace',
+            }),
+        );
+    });
+
+    it('persiste o modelo efetivo resolvido em vez do placeholder auto', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializer.js');
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: { sessionId: 'resolved-sess' },
+            isResumed: false,
+            model: 'gpt-5-mini',
+            reasoningEffort: 'high',
+        });
+
+        const result = await initOrResumeSession(/** @type {any} */ ({}), {
+            model: 'auto',
+            reasoningEffort: 'high',
+        });
+
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'gpt-5-mini',
+                reasoningEffort: 'high',
+            }),
+            expect.objectContaining({ label: 'session.initializer.create' }),
+        );
+        expect(result).toEqual(
+            expect.objectContaining({
+                model: 'gpt-5-mini',
+                reasoningEffort: 'high',
             }),
         );
     });

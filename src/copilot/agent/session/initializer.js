@@ -23,6 +23,7 @@ import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
     AGENT_SDK_DEFAULT_MODEL,
+    canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient,
     getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync,
@@ -69,7 +70,7 @@ const RESUMED_SESSION_HEALTH_TIMEOUT_MS = 5_000;
  * @returns {Promise<boolean>}
  */
 async function _validateResumedSession(session) {
-    if (typeof session.getMessages !== 'function') return true;
+    if (!canReadAgentSdkSessionMessages(session)) return true;
     try {
         await Promise.race([
             readAgentSdkSessionMessages(session),
@@ -149,7 +150,12 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  * @param {import('#copilot/sdk/types').Tool[]} [sessionOptions.tools] - Custom Tools a registrar na sessão
  * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do hook system (default: true)
  * @param {Record<string, unknown>} [sessionOptions.mcpServers] - Configurações de servidores MCP nativos
- * @returns {Promise<{ session: CopilotSession; isResumed: boolean }>}
+ * @returns {Promise<{
+ *     session: CopilotSession;
+ *     isResumed: boolean;
+ *     model: string;
+ *     reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' | undefined;
+ * }>}
  * @throws {Error} Se a criação/retomada da sessão SDK falhar ou a escrita de estado falhar
  */
 export async function initOrResumeSession(client, sessionOptions) {
@@ -211,12 +217,34 @@ export async function initOrResumeSession(client, sessionOptions) {
         result = await createAgentSdkSessionByClient(client, opts);
     }
 
+    const persistedConcreteModel = typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
+    const effectiveModel =
+        typeof result.model === 'string'
+            ? result.model
+            : (persistedConcreteModel ?? (model === 'auto' ? AGENT_SDK_DEFAULT_MODEL : model));
+    if (result.isResumed && state?.model === 'auto') {
+        log(
+            'WARN',
+            `[PersistentSession] Estado legado com model="auto" detectado no resume — exibindo fallback canônico '${effectiveModel}' até persistir um modelo concreto.`,
+        );
+    }
+    const effectiveReasoningEffort =
+        result.reasoningEffort ??
+        (state?.reasoningEffort === 'low' ||
+        state?.reasoningEffort === 'medium' ||
+        state?.reasoningEffort === 'high' ||
+        state?.reasoningEffort === 'xhigh'
+            ? state.reasoningEffort
+            : sessionOptions.reasoningEffort);
+
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
         const persistedResume = await _persistStateWithPolicy(
             {
                 resumedAt: Date.now(),
                 resumeCount: (state?.resumeCount ?? 0) + 1,
+                model: effectiveModel,
+                ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
             },
             { label: 'session.initializer.resume' },
         );
@@ -232,7 +260,8 @@ export async function initOrResumeSession(client, sessionOptions) {
                 resumedAt: Date.now(),
                 resumeCount: 0,
                 sendCount: 0,
-                model,
+                model: effectiveModel,
+                ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
                 pendingQuestion: null,
                 pendingQuestionMeta: null,
             },
@@ -244,5 +273,10 @@ export async function initOrResumeSession(client, sessionOptions) {
         log('INFO', `[PersistentSession] Nova sessão criada: ${result.session.sessionId}`);
     }
 
-    return { session: result.session, isResumed: result.isResumed };
+    return {
+        session: result.session,
+        isResumed: result.isResumed,
+        model: effectiveModel,
+        ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
+    };
 }

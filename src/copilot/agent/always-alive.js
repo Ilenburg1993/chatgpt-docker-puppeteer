@@ -26,7 +26,6 @@ import {
     dialogStart,
     dialogStop,
 } from './dialog/agent-dialog-controller.js';
-import { persistStateWithPolicy, readState } from './lifecycle/state-io.js';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './agent-context.js';
 import { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
@@ -45,12 +44,31 @@ import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnap
 // O3: Facades extraídas para reduzir LoC desta classe
 import { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
 import {
+    dispatchAgentDialogTurn,
+    isAgentDialogLoopPaused,
+    pauseAgentDialogLoop,
+    readAgentDialogLastPrInfo,
+    readAgentDialogPrMetrics,
+} from './facades/agent-dialog-runtime.js';
+import {
     getModel,
     getReasoningEffort,
     listAvailableModels,
     setModel,
     setReasoningEffort,
 } from './facades/agent-model-config.js';
+import {
+    getRuntimeHandoffManager,
+    readRuntimeContextFactoryCapabilities,
+    readRuntimeControlState,
+    readRuntimeInteractionState,
+    readRuntimePermissionCapability,
+    readRuntimePermissionMode,
+    readRuntimeToolRegistry,
+    readRuntimeToolRegistryEntries,
+    setRuntimePermissionMode,
+} from './facades/agent-runtime-controls.js';
+import { clearAgentRuntimePendingQuestionShadow, readAgentRuntimeSessionId } from './facades/agent-runtime-state.js';
 import {
     compactSdkSession,
     confirmSdkSessionUi,
@@ -158,7 +176,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {'approve_all' | 'audit_only' | 'selective'}
      */
     getPermissionMode() {
-        return this.ctx.getPermissionModeSnapshot();
+        return readRuntimePermissionMode(this.ctx);
     }
 
     /**
@@ -175,7 +193,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setPermissionMode(mode, opts = {}) {
-        this.ctx.setPermissionMode(mode, opts);
+        setRuntimePermissionMode(this.ctx, mode, opts);
     }
 
     /**
@@ -184,7 +202,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {ReturnType<AgentContext['getPermissionCapabilitySnapshot']>}
      */
     getPermissionCapabilitySnapshot() {
-        return this.ctx.getPermissionCapabilitySnapshot();
+        return readRuntimePermissionCapability(this.ctx);
     }
 
     /**
@@ -193,7 +211,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Record<string, Record<string, unknown>>}
      */
     getContextFactoryCapabilitiesSnapshot() {
-        return this.ctx.getContextFactoryCapabilitiesSnapshot();
+        return readRuntimeContextFactoryCapabilities(this.ctx);
     }
 
     /**
@@ -202,7 +220,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     getToolRegistrySnapshot() {
-        return this.ctx.getToolRegistrySnapshot();
+        return readRuntimeToolRegistry(this.ctx);
     }
 
     /**
@@ -211,7 +229,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {ReturnType<AgentContext['getToolRegistryEntriesSnapshot']>}
      */
     getToolRegistryEntriesSnapshot() {
-        return this.ctx.getToolRegistryEntriesSnapshot();
+        return readRuntimeToolRegistryEntries(this.ctx);
     }
 
     /**
@@ -249,7 +267,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return this.ctx.getRuntimeStatus();
+        return /** @type {AgentStatus} */ (readRuntimeControlState(this).status);
     }
 
     /**
@@ -258,16 +276,16 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogLoopActive() {
-        return this.ctx.isDialogLoopActive();
+        return readRuntimeControlState(this).dialogLoopActive;
     }
 
     /**
      * F45: Retorna o HandoffManager para uso em rotas HTTP e terminal.
      *
-     * @returns {import('./infra/handoff-manager.js').HandoffManager}
+     * @returns {import('./infra/handoff-manager.js').HandoffManager | null}
      */
     getHandoffManager() {
-        return this.ctx.getHandoffManagerSnapshot();
+        return getRuntimeHandoffManager(this);
     }
 
     /**
@@ -276,7 +294,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number}
      */
     get queueSize() {
-        return this.ctx.getQueueSnapshot().size;
+        return readRuntimeControlState(this).queueSize;
     }
 
     /**
@@ -285,7 +303,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return this.ctx.getPendingQuestionForStatusSnapshot();
+        return readRuntimeInteractionState(this).pendingQuestion;
     }
 
     /**
@@ -294,7 +312,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionKind() {
-        return this.ctx.getPendingQuestionKind();
+        return readRuntimeInteractionState(this).pendingQuestionKind;
     }
 
     /**
@@ -303,7 +321,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadow | null}
      */
     get pendingQuestionShadow() {
-        return this.ctx.getPendingQuestionShadowSnapshot();
+        return readRuntimeInteractionState(this).pendingQuestionShadow;
     }
 
     /**
@@ -312,7 +330,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionShadowKind() {
-        return this.ctx.getPendingQuestionShadowKind();
+        return readRuntimeInteractionState(this).pendingQuestionShadowKind;
     }
 
     /**
@@ -321,7 +339,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadowState | null}
      */
     get pendingQuestionShadowState() {
-        return this.ctx.getPendingQuestionShadowState();
+        return readRuntimeInteractionState(this).pendingQuestionShadowState;
     }
 
     /**
@@ -330,7 +348,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get pendingQuestionShadowExpired() {
-        return this.ctx.isPendingQuestionShadowExpired();
+        return readRuntimeInteractionState(this).pendingQuestionShadowExpired;
     }
 
     /**
@@ -339,7 +357,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowAgeMs() {
-        return this.ctx.getPendingQuestionShadowAgeMs();
+        return readRuntimeInteractionState(this).pendingQuestionShadowAgeMs;
     }
 
     /**
@@ -348,7 +366,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowExpiresAt() {
-        return this.ctx.getPendingQuestionShadowExpiresAt();
+        return readRuntimeInteractionState(this).pendingQuestionShadowExpiresAt;
     }
 
     /**
@@ -357,7 +375,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowRemainingMs() {
-        return this.ctx.getPendingQuestionShadowRemainingMs();
+        return readRuntimeInteractionState(this).pendingQuestionShadowRemainingMs;
     }
 
     /**
@@ -366,26 +384,10 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     clearPendingQuestionShadow() {
-        if (!this.ctx.hasPendingQuestionShadow()) {
-            return false;
-        }
-        this.ctx.clearPendingQuestionShadow();
-        void this.ctx.trackBackgroundTask(
-            persistStateWithPolicy(
-                { pendingQuestion: null, pendingQuestionMeta: null },
-                { label: 'state.pendingQuestionShadow.clear' },
-            ).then((result) => {
-                if (!result.ok) {
-                    throw result.error;
-                }
-                return undefined;
-            }),
-            {
-                label: 'state.pendingQuestionShadow.clear',
-                description: 'Clear ask_user shadow from persisted state',
-            },
-        );
-        return true;
+        return clearAgentRuntimePendingQuestionShadow(this.ctx, {
+            label: 'state.pendingQuestionShadow.clear',
+            description: 'Clear ask_user shadow from persisted state',
+        });
     }
 
     /**
@@ -394,7 +396,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string | null}
      */
     get sessionId() {
-        return this.ctx.getSessionSnapshot()?.sessionId ?? readState()?.sessionId ?? null;
+        return readAgentRuntimeSessionId(this.ctx);
     }
 
     /**
@@ -944,7 +946,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * G2-PERF-01: Dirty flag primário + TTL safety net. O cache é invalidado (null) em toda mutação de estado
      * (`#setStatus()`, `messageQueue.onChanged`, `stop()`). O TTL existe apenas como segurança para edge cases onde a
-     * invalidação é perdida. `readState()` usa cache interno (O(1) quando warm).
+     * invalidação é perdida. O fallback persistido de sessionId continua canônico via façade de runtime-state.
      *
      * @returns {AgentStatusSnapshot}
      */
@@ -1005,11 +1007,11 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Envia um turno de diálogo. Delega ao DialogLoopManager.
      *
      * @param {string} message
-     * @param {{ timeout?: number; signal?: AbortSignal; traceId?: string }} [opts]
+     * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts]
      * @returns {Promise<string>}
      */
     sendDialogTurn(message, opts) {
-        return this.ctx.sendDialogTurn(message, opts);
+        return dispatchAgentDialogTurn(this.ctx, message, opts);
     }
 
     /**
@@ -1042,7 +1044,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<void>}
      */
     async pauseDialogLoop() {
-        await this.ctx.pauseDialogLoop(this.sessionId);
+        await pauseAgentDialogLoop(this.ctx, this.sessionId);
     }
 
     /**
@@ -1060,7 +1062,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogPaused() {
-        return this.ctx.isDialogLoopPaused();
+        return isAgentDialogLoopPaused(this.ctx);
     }
 
     /**
@@ -1069,7 +1071,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
      */
     get dialogPrMetrics() {
-        return this.ctx.getDialogPrMetricsSnapshot();
+        return readAgentDialogPrMetrics(this.ctx);
     }
 
     /**
@@ -1079,7 +1081,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     get lastPrInfo() {
         // Retorna cópia rasa para evitar mutação externa do estado interno.
-        return this.ctx.getLastPrInfoSnapshot();
+        return readAgentDialogLastPrInfo(this.ctx);
     }
 
     /**

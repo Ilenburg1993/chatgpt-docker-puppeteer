@@ -70,8 +70,11 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes('drainMessageQueue('), 'agentStop deve limpar fila via AgentContext');
     });
 
-    it('agentStop chama persistState com gracefulShutdown=true', () => {
-        assert.ok(src.includes('gracefulShutdown: true'), 'agentStop deve marcar gracefulShutdown=true');
+    it('agentStop delega persistência de gracefulShutdown para a façade de runtime state', () => {
+        assert.ok(
+            src.includes('persistAgentRuntimeGracefulShutdownState('),
+            'agentStop deve persistir gracefulShutdown via façade',
+        );
     });
 
     it('agentStop pode preservar intenção de dialog loop para retomada após restart do processo', () => {
@@ -94,11 +97,10 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes('SHUTDOWN_TIMEOUT_MS'), 'deve importar SHUTDOWN_TIMEOUT_MS');
     });
 
-    it('agentStart reconcilia shadow expirada de ask_user no boot', () => {
-        assert.ok(src.includes('createPendingQuestionShadow('), 'agentStart deve restaurar shadow via helper');
+    it('agentStart reconcilia boot state persistido pela façade de runtime state', () => {
         assert.ok(
-            src.includes('state.pendingQuestionShadow.expire'),
-            'agentStart deve limpar shadow expirada do state',
+            src.includes('restoreAgentRuntimePersistentBootState('),
+            'agentStart deve restaurar sendCount/shadow via façade',
         );
     });
 
@@ -120,6 +122,16 @@ describe('agent-lifecycle › source contracts', () => {
     it('agentStop para o client SDK pela façade, sem chamar client.stop() cru', () => {
         assert.ok(src.includes('stopAgentSdkClient(client)'), 'agentStop deve usar a façade para parar o client SDK');
         assert.ok(!src.includes('await client.stop()'), 'agentStop não deve chamar client.stop() cru');
+    });
+
+    it('lifecycle delega I/O de runtime state e snapshot de shutdown para façades', () => {
+        assert.ok(src.includes('resetAgentRuntimeGracefulShutdownFlag('));
+        assert.ok(src.includes('persistAgentRuntimePrConsumptionSnapshot('));
+        assert.ok(src.includes('saveAgentRuntimeShutdownSnapshot('));
+        assert.ok(!src.includes('readStateAsync('));
+        assert.ok(!src.includes('persistStateWithPolicy('));
+        assert.ok(!src.includes('createSnapshot('));
+        assert.ok(!src.includes('saveSnapshotAsync('));
     });
 
     it('hot path evita aliases crus de subestado no lifecycle', () => {

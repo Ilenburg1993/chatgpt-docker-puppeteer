@@ -29,7 +29,6 @@ import {
     getCurrentAgent,
     getSdkRecoveryPolicy,
     getSessionCapabilities,
-    getSessionMessages,
     getToolsConfig,
     isExperimentalEnabled,
     isSdkQuotaOrRateLimitError,
@@ -63,6 +62,7 @@ import {
     workspaceListFiles,
     workspaceReadFile,
 } from '#copilot/sdk';
+export { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from './agent-sdk-runtime.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -347,6 +347,56 @@ export function getAgentSdkSessionLifecycleEvents() {
 }
 
 /**
+ * Observa os eventos de lifecycle do client SDK e os normaliza para o contrato interno de sessão do agent.
+ *
+ * Regra arquitetural: callers de `agent/*` não devem conhecer a dupla `LIFECYCLE_EVENTS` + `SESSION_LIFECYCLE_EVENTS`
+ * nem refazer esse mapeamento por conta própria.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {(event: { type: string; sessionId?: string }) => void} onEvent
+ * @returns {() => void}
+ */
+export function observeAgentSdkSessionLifecycle(client, onEvent) {
+    return onLifecycleEvents(
+        {
+            [LIFECYCLE_EVENTS.CREATED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                onEvent({
+                    type: SESSION_LIFECYCLE_EVENTS.CREATED,
+                    ...(typeof payload?.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+                });
+            },
+            [LIFECYCLE_EVENTS.DELETED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                onEvent({
+                    type: SESSION_LIFECYCLE_EVENTS.DELETED,
+                    ...(typeof payload?.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+                });
+            },
+            [LIFECYCLE_EVENTS.UPDATED]: (evt) => {
+                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
+                onEvent({
+                    type: SESSION_LIFECYCLE_EVENTS.UPDATED,
+                    ...(typeof payload?.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+                });
+            },
+        },
+        client,
+    );
+}
+
+/**
+ * Acopla o lifecycle vanilla do SDK ao boot/runtime do agent por uma superfície semântica específica de boot.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {(event: { type: string; sessionId?: string }) => void} onEvent
+ * @returns {() => void}
+ */
+export function attachAgentSdkBootLifecycleBridge(client, onEvent) {
+    return observeAgentSdkSessionLifecycle(client, onEvent);
+}
+
+/**
  * @param {Record<string, (event: unknown) => void>} handlers
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @returns {() => void}
@@ -361,6 +411,43 @@ export function onAgentSdkLifecycleEvents(handlers, client) {
  */
 export function createAgentSdkQuotaMonitor(options) {
     return createQuotaMonitor(options);
+}
+
+/**
+ * Inicia o quota monitor do SDK já configurado e pronto para uso pelo runtime do agent.
+ *
+ * Regra arquitetural: módulos de `agent/session/*` decidem o que fazer com warnings/updates, mas a criação/start do
+ * monitor vanilla passa por esta façade canônica.
+ *
+ * @param {{
+ *     client: import('#copilot/sdk/types').CopilotClient;
+ *     intervalMs: number;
+ *     warningThreshold: number;
+ *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/quota-monitor').QuotaSnapshot) => void;
+ *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/quota-monitor').QuotaSnapshot>) => void;
+ * }} options
+ * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ */
+export function startAgentSdkQuotaMonitor(options) {
+    const monitor = createQuotaMonitor(options);
+    monitor.start();
+    return monitor;
+}
+
+/**
+ * Inicia o quota monitor vanilla pela semântica de boot do runtime do agent.
+ *
+ * @param {{
+ *     client: import('#copilot/sdk/types').CopilotClient;
+ *     intervalMs: number;
+ *     warningThreshold: number;
+ *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/quota-monitor').QuotaSnapshot) => void;
+ *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/quota-monitor').QuotaSnapshot>) => void;
+ * }} options
+ * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ */
+export function startAgentSdkBootQuotaBridge(options) {
+    return startAgentSdkQuotaMonitor(options);
 }
 
 /**
@@ -395,14 +482,6 @@ export async function createAgentSdkSessionByClient(client, options) {
  */
 export function getAgentConfiguredSessionFsHandler() {
     return getConfiguredSessionFsHandler();
-}
-
-/**
- * @param {import('#copilot/sdk/types').CopilotSession} session
- * @returns {Promise<unknown[]>}
- */
-export async function readAgentSdkSessionMessages(session) {
-    return getSessionMessages(session);
 }
 
 /**
@@ -467,7 +546,7 @@ function getSdkElicitationRef(ctx) {
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {string | null | undefined} sessionId
  * @param {Record<string, unknown>} options
- * @returns {Promise<{ session: import('#copilot/sdk/types').CopilotSession; isResumed: boolean }>}
+ * @returns {Promise<Awaited<ReturnType<typeof resumeOrCreate>>>}
  */
 export async function resumeOrCreateAgentSdkSession(client, sessionId, options) {
     return resumeOrCreate(client, sessionId ?? null, options);

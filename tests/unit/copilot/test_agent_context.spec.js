@@ -520,15 +520,13 @@ describe('AgentContext', () => {
         }
         const keepaliveCallbacks = /**
          * @type {{
-         *     getSession: () => { sessionId?: string } | null;
-         *     getClient?: () => { id?: string } | null;
+         *     performKeepalive: () => Promise<'client.ping' | 'session.send' | null>;
          *     isIdle: () => boolean;
          *     isDialogLoopActive: () => boolean;
-         *     onKeepalive?: (ts: number) => void;
+         *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
          * }}
          */ (captured);
-        assert.equal(keepaliveCallbacks.getClient?.()?.id, 'client-keepalive');
-        assert.equal(keepaliveCallbacks.getSession()?.sessionId, 'sess-keepalive');
+        assert.equal(typeof keepaliveCallbacks.performKeepalive, 'function');
         assert.equal(keepaliveCallbacks.isIdle(), true);
         assert.equal(keepaliveCallbacks.isDialogLoopActive(), false);
         assert.equal(keepaliveCallbacks.onKeepalive, onKeepalive);

@@ -8,6 +8,11 @@
  */
 
 export {
+    dispatchAgentDialogTurn,
+    isAgentDialogLoopPaused,
+    pauseAgentDialogLoop,
+    readAgentDialogLastPrInfo,
+    readAgentDialogPrMetrics,
     recoverAgentDialogInputChannel,
     sendAgentDialogTurn,
     startAgentDialogLoop,
@@ -40,15 +45,34 @@ export {
     onRuntimeEvent,
     onceRuntimeEvent,
     pauseRuntimeDialogLoop,
+    readRuntimeContextFactoryCapabilities,
     readRuntimeControlState,
+    readRuntimeGovernanceState,
     readRuntimeInteractionState,
+    readRuntimePermissionCapability,
+    readRuntimePermissionMode,
     readRuntimePrBudgetSnapshot,
+    readRuntimeToolRegistry,
+    readRuntimeToolRegistryEntries,
     resumeRuntimeDialogLoop,
     saveRuntimeSnapshot,
     setRuntimeBackgroundCompactionThreshold,
+    setRuntimePermissionMode,
     startRuntime,
 } from './agent-runtime-controls.js';
 export { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from './agent-runtime-ownership.js';
+export {
+    clearAgentRuntimePendingQuestionShadow,
+    markAgentRuntimeDialogPausedForRecovery,
+    persistAgentRuntimeGracefulShutdownState,
+    persistAgentRuntimePrConsumptionSnapshot,
+    readAgentRuntimeSessionId,
+    resetAgentRuntimeGracefulShutdownFlag,
+    restoreAgentRuntimePersistentBootState,
+    saveAgentRuntimeShutdownSnapshot,
+    shouldReapAgentRuntimePendingQuestionShadow,
+    shouldScheduleAgentRuntimeDialogBootRecovery,
+} from './agent-runtime-state.js';
 export {
     readAgentRuntimeHealthSnapshot,
     readAgentRuntimeSdkResourceSnapshot,
@@ -63,6 +87,7 @@ export {
     unregisterAgentRuntimeWebhook,
 } from './agent-runtime-webhooks.js';
 export {
+    attachAgentSdkBootLifecycleBridge,
     checkAgentSdkAuthStatus,
     compactSdkSession,
     confirmSdkSessionUi,
@@ -107,9 +132,11 @@ export {
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
+    startAgentSdkBootQuotaBridge,
     stopAgentSdkClient,
 } from './agent-sdk-access.js';
 export {
+    canReadAgentSdkSessionMessages,
     onAgentSdkSessionEvent,
     onAllAgentSdkSessionEvents,
     readAgentSdkSessionMessages,

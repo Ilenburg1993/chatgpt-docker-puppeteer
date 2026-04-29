@@ -40,7 +40,7 @@ import { chatStructured as _chatStructured } from './client-structured.js';
  * @property {boolean} [dialogPaused]
  * @property {Function} sendMessage
  * @property {(bootPrompt?: string) => Promise<void>} startDialogLoop
- * @property {(message: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn
+ * @property {(message: string, opts?: { timeout?: number | null }) => Promise<string>} sendDialogTurn
  * @property {(opts?: {
  *     authorized?: boolean;
  *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
@@ -454,7 +454,7 @@ export class LlmBridgeClient {
      *
      * @param {string} message
      * @param {{
-     *     timeout?: number;
+     *     timeout?: number | null;
      *     onDelta?: (chunk: string) => void;
      *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
      * }} [opts]

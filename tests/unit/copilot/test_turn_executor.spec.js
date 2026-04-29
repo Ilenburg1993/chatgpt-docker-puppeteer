@@ -253,6 +253,34 @@ describe('turn-executor', () => {
             expect(reject.mock.calls[0]?.[0]?.code).toBe('DIALOG_TIMEOUT');
         });
 
+        it('timeout de inatividade também reinicia com progresso vindo do host vivo', async () => {
+            const resolve = vi.fn();
+            const reject = vi.fn();
+            const host = Object.assign(new EventEmitter(), makeTurnHost());
+
+            buildTurnResolutionListeners(emitter, {
+                host,
+                turnStart: Date.now(),
+                timeout: 3000,
+                message: 'hi',
+                pendingListenerRef: { current: null },
+                resolve,
+                reject,
+                waitForRestartAndReplyFn: vi.fn(),
+            });
+
+            await vi.advanceTimersByTimeAsync(2500);
+            host.emit('tool.execution_progress', { toolName: 'glob', progress: 50 });
+            await vi.advanceTimersByTimeAsync(2500);
+
+            expect(resolve).not.toHaveBeenCalled();
+            expect(reject).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(600);
+            expect(reject).toHaveBeenCalledTimes(1);
+            expect(reject.mock.calls[0]?.[0]?.code).toBe('DIALOG_TIMEOUT');
+        });
+
         it('onReadyOuter usa fallback semântico antes do timeout quando houver reply candidato', () => {
             const resolve = vi.fn();
             const reject = vi.fn();

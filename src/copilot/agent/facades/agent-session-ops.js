@@ -11,6 +11,8 @@
 
 import { logSwallowed, toError } from '#copilot/core';
 import { log } from '../ports/observability-port.js';
+import { pingAgentSdkClient } from './agent-sdk-access.js';
+import { sendAgentSdkSession } from './agent-sdk-runtime.js';
 
 /**
  * Aborta a mensagem SDK em processamento na sessão atual.
@@ -69,4 +71,37 @@ export async function sessionLog(ctx, message, options) {
 export async function getSessionMessages(ctx) {
     const session = ctx.getSessionSnapshot();
     return ctx.getCachedSessionMessages(session);
+}
+
+/**
+ * Executa um tick semântico de keepalive da sessão viva do agent.
+ *
+ * Regra arquitetural: o scheduler de keepalive decide apenas _quando_ manter a sessão viva. A decisão de _como_ tocar o
+ * SDK (`client.ping()` vs `session.send()`) passa por esta façade, evitando que `agent/session/keepalive.js` manipule
+ * handles crus do SDK diretamente.
+ *
+ * @param {import('../agent-context.js').AgentContext} ctx
+ * @returns {Promise<'client.ping' | 'session.send' | null>}
+ */
+export async function performKeepaliveSdkTick(ctx) {
+    const client = ctx.getClientSnapshot();
+    if (client && typeof client.ping === 'function') {
+        try {
+            await pingAgentSdkClient(client);
+            return 'client.ping';
+        } catch (error) {
+            log(
+                'WARN',
+                `[AlwaysAlive] performKeepaliveSdkTick(): client.ping() falhou; fallback para envio semântico da sessão: ${toError(error).message}`,
+            );
+        }
+    }
+
+    const session = ctx.getSessionSnapshot();
+    if (!session) {
+        return null;
+    }
+
+    await sendAgentSdkSession(session, { prompt: '[keepalive]' });
+    return 'session.send';
 }

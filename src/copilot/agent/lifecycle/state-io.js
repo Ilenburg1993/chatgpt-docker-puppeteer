@@ -40,6 +40,7 @@ const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : resolveHooksStat
  * @property {number} resumeCount - Número de retomadas bem-sucedidas desde a criação
  * @property {number} sendCount - Total de mensagens enviadas na sessão (tracking externo)
  * @property {string} model - Modelo configurado para esta sessão
+ * @property {'low' | 'medium' | 'high' | 'xhigh'} [reasoningEffort] - Nível de reasoning efetivo conhecido
  * @property {string | null} pendingQuestion - Texto da pergunta pendente do modelo, ou null
  * @property {{
  *     kind: import('../types.js').PendingQuestionKind;

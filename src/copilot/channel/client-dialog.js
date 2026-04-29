@@ -85,7 +85,7 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
  * @param {BridgeAgentLike} agent
  * @param {string} message
  * @param {{
- *     timeout?: number;
+ *     timeout?: number | null;
  *     onDelta?: (chunk: string) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} [opts]

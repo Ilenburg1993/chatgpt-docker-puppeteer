@@ -24,12 +24,7 @@
 import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
 import { withAgentErrorPolicy } from '../error-policy.js';
-import {
-    createAgentSdkQuotaMonitor,
-    getAgentSdkLifecycleEvents,
-    getAgentSdkSessionLifecycleEvents,
-    onAgentSdkLifecycleEvents,
-} from '../facades/agent-sdk-access.js';
+import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../facades/agent-sdk-access.js';
 import { defaultMetrics, log } from '../ports/observability-port.js';
 import {
     createBootWiringState,
@@ -83,8 +78,11 @@ import {
  * @property {() => void} ensureDialogLoopAttached — Garante DLM attached
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
  * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
- * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive —
- *   Inicia o keepalive usando o contexto semântico atual do runtime
+ * @property {(options?: {
+ *     isIdle?: () => boolean;
+ *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+ * }) => boolean} startKeepalive
+ *   — Inicia o keepalive usando o contexto semântico atual do runtime
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
  *   — Tracker central de tarefas em background do agente
@@ -171,37 +169,11 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
         return;
     }
 
-    const lifecycleEvents = getAgentSdkLifecycleEvents();
-    const sessionLifecycleEvents = getAgentSdkSessionLifecycleEvents();
-    const unsubLifecycle = onAgentSdkLifecycleEvents(
-        {
-            [lifecycleEvents.CREATED]: (evt) => {
-                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
-                log('INFO', `[AlwaysAlive] SDK lifecycle: session.created id=${payload?.sessionId}`);
-                ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: sessionLifecycleEvents.CREATED,
-                    sessionId: payload?.sessionId,
-                });
-            },
-            [lifecycleEvents.DELETED]: (evt) => {
-                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
-                log('INFO', `[AlwaysAlive] SDK lifecycle: session.deleted id=${payload?.sessionId}`);
-                ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: sessionLifecycleEvents.DELETED,
-                    sessionId: payload?.sessionId,
-                });
-            },
-            [lifecycleEvents.UPDATED]: (evt) => {
-                const payload = /** @type {{ sessionId?: string }} */ (/** @type {unknown} */ (evt));
-                log('DEBUG', `[AlwaysAlive] SDK lifecycle: session.updated id=${payload?.sessionId}`);
-                ctx.emit(EMITTER_SDK_LIFECYCLE, {
-                    type: sessionLifecycleEvents.UPDATED,
-                    sessionId: payload?.sessionId,
-                });
-            },
-        },
-        client,
-    );
+    const unsubLifecycle = attachAgentSdkBootLifecycleBridge(client, (event) => {
+        const level = event.type === 'session.updated' ? 'DEBUG' : 'INFO';
+        log(level, `[AlwaysAlive] SDK lifecycle: ${event.type} id=${event.sessionId}`);
+        ctx.emit(EMITTER_SDK_LIFECYCLE, event);
+    });
     state.unsubs.push(unsubLifecycle);
 }
 
@@ -218,7 +190,7 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
  */
 function stepStartQuotaMonitor(client, ctx, state) {
     try {
-        const quotaMonitor = createAgentSdkQuotaMonitor({
+        const quotaMonitor = startAgentSdkBootQuotaBridge({
             client,
             intervalMs: 5 * 60 * 1000,
             warningThreshold: 20,
@@ -234,7 +206,6 @@ function stepStartQuotaMonitor(client, ctx, state) {
                 log('DEBUG', `[boot-wiring] Quota atualizada — types=${Object.keys(snapshots).join(', ')}`);
             },
         });
-        quotaMonitor.start();
         state.quotaMonitor = quotaMonitor;
     } catch (e) {
         const _err = /** @type {Error} */ (e);

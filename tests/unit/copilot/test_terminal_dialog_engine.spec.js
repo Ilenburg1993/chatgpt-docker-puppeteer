@@ -5,6 +5,7 @@
  * Contrato: terminal/dialog/engine.js
  */
 
+import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/bridges', () => ({ emitNerv: vi.fn() }));
@@ -16,7 +17,11 @@ vi.mock('#copilot/config', () => ({
 vi.mock('#copilot/core', () => ({ container: { resolve: vi.fn(() => ({})) }, toError: (/** @type {any} */ e) => e }));
 vi.mock('#copilot/observability', () => ({ log: vi.fn(), METRICS_STORE: Symbol.for('METRICS_STORE') }));
 vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
-    computeAdaptiveDialogTimeout: vi.fn(() => ({ timeoutMs: 120000, strategy: 'adaptive', reasons: ['test'] })),
+    resolveOptionalDialogTimeout: vi.fn(() => ({
+        timeoutMs: null,
+        strategy: 'disabled',
+        reasons: ['caller_disabled'],
+    })),
 }));
 vi.mock('../../../src/copilot/presentation/runtime-file-context.js', () => ({
     embedMultiple: vi.fn(async () => []),
@@ -87,9 +92,12 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
 
 /** @type {any} */
 let mod;
+/** @type {string} */
+let src;
 
 beforeAll(async () => {
     mod = await import('../../../src/copilot/terminal/dialog/engine.js');
+    src = await readFile(new URL('../../../src/copilot/terminal/dialog/engine.js', import.meta.url), 'utf-8');
 });
 
 describe('terminal/dialog/engine.js — contrato', () => {
@@ -197,5 +205,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
             'copilot:dialog:boot_blocked',
             expect.objectContaining({ reason: 'sdk_rate_limit' }),
         );
+    });
+
+    it('envia turnos interativos em modo watchdog-only (timeout nulo) por contrato estrutural', () => {
+        expect(src).toContain('resolveOptionalDialogTimeout({');
+        expect(src).toContain('explicitTimeoutMs: 0');
+        expect(src).toContain('allowDisabled: true');
+        expect(src).toContain('timeout: timeoutDecision.timeoutMs');
     });
 });

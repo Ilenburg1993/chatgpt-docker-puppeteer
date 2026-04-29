@@ -139,6 +139,29 @@ describe('sdk/session/lifecycle core hardening', () => {
         );
     });
 
+    it('resumeSession saneia model="auto" e omite reasoningEffort sem modelo concreto', async () => {
+        const client = fakeClient();
+
+        await resumeSession(client, 's2', {
+            model: 'auto',
+            reasoningEffort: 'high',
+        });
+
+        expect(client.resumeSession).toHaveBeenCalledWith(
+            's2',
+            expect.not.objectContaining({
+                model: 'auto',
+                reasoningEffort: 'high',
+            }),
+        );
+        expect(client.resumeSession).toHaveBeenCalledWith(
+            's2',
+            expect.objectContaining({
+                streaming: true,
+            }),
+        );
+    });
+
     it('resumeSession aplica retry curto, reconnect best-effort e métricas em timeout', async () => {
         const client = fakeClient({
             resumeSession: vi

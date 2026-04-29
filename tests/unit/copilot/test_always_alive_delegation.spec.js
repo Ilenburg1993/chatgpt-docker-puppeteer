@@ -82,23 +82,105 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
         assert.ok(src.includes('resetAgentEventBusBridgeWiring'));
     });
 
+    it('delegação de diálogo usa a façade agent-dialog-runtime para send/pause/PR snapshots', () => {
+        assert.ok(src.includes("from './facades/agent-dialog-runtime.js'"));
+        assert.ok(src.includes('dispatchAgentDialogTurn'));
+        assert.ok(src.includes('pauseAgentDialogLoop'));
+        assert.ok(src.includes('isAgentDialogLoopPaused'));
+        assert.ok(src.includes('readAgentDialogPrMetrics'));
+        assert.ok(src.includes('readAgentDialogLastPrInfo'));
+    });
+
+    it('delegação de sessionId/shadow passa pela façade de runtime-state', () => {
+        assert.ok(src.includes("from './facades/agent-runtime-state.js'"));
+        assert.ok(src.includes('readAgentRuntimeSessionId'));
+        assert.ok(src.includes('clearAgentRuntimePendingQuestionShadow'));
+    });
+
+    it('delegação de status/interação usa a façade agent-runtime-controls', () => {
+        assert.ok(src.includes("from './facades/agent-runtime-controls.js'"));
+        assert.ok(src.includes('readRuntimeControlState'));
+        assert.ok(src.includes('readRuntimeInteractionState'));
+        assert.ok(src.includes('getRuntimeHandoffManager'));
+        assert.ok(src.includes('readRuntimePermissionMode'));
+        assert.ok(src.includes('setRuntimePermissionMode'));
+        assert.ok(src.includes('readRuntimePermissionCapability'));
+        assert.ok(src.includes('readRuntimeContextFactoryCapabilities'));
+        assert.ok(src.includes('readRuntimeToolRegistry'));
+        assert.ok(src.includes('readRuntimeToolRegistryEntries'));
+    });
+
     it('getStatusSnapshot() delega para stateSnapshot(ctx, this)', () => {
         assert.ok(src.includes('stateSnapshot(this.ctx, this)'));
     });
 
-    // ─── Getters delegam para ctx ─────────────────────────────────────────
+    // ─── Getters sem acoplamento direto ao ctx ─────────────────────────────
 
-    it('getters leem de this.ctx (não this.#)', () => {
-        // O ideal: a maioria dos getters usa this.ctx.field
+    it('não mantém chamadas diretas a this.ctx.* no corpo da classe', () => {
         const ctxGets = (src.match(/this\.ctx\./g) || []).length;
-        const privateGets = (src.match(/this\.#/g) || []).length;
-        // Pós-F39: 5 this.# refs vs muitos this.ctx refs
-        assert.ok(ctxGets > privateGets, `this.ctx refs (${ctxGets}) deve exceder this.# refs (${privateGets})`);
+        assert.equal(ctxGets, 0, `esperado zero chamadas diretas a this.ctx.*, encontrado: ${ctxGets}`);
     });
 
     it('apenas 3 métodos privados restam (#setStatus, #processQueue, #tryReconnect)', () => {
         const privateMethodDefs = src.match(/^\s+#\w+\s*\(/gm) || [];
         // #setStatus, #processQueue, #tryReconnect
         assert.ok(privateMethodDefs.length <= 3, `max 3 métodos privados, encontrados: ${privateMethodDefs.length}`);
+    });
+
+    it('sendDialogTurn/pauseDialogLoop/dialogPaused/dialogPrMetrics/lastPrInfo não tocam ctx diretamente', () => {
+        assert.ok(src.includes('dispatchAgentDialogTurn(this.ctx, message, opts)'));
+        assert.ok(src.includes('pauseAgentDialogLoop(this.ctx, this.sessionId)'));
+        assert.ok(src.includes('isAgentDialogLoopPaused(this.ctx)'));
+        assert.ok(src.includes('readAgentDialogPrMetrics(this.ctx)'));
+        assert.ok(src.includes('readAgentDialogLastPrInfo(this.ctx)'));
+        assert.ok(!src.includes('this.ctx.sendDialogTurn(message, opts)'));
+        assert.ok(!src.includes('this.ctx.pauseDialogLoop(this.sessionId)'));
+        assert.ok(!src.includes('this.ctx.isDialogLoopPaused()'));
+        assert.ok(!src.includes('this.ctx.getDialogPrMetricsSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getLastPrInfoSnapshot()'));
+    });
+
+    it('status/dialogLoopActive/queueSize/pendingQuestion/shadow não tocam ctx diretamente', () => {
+        assert.ok(src.includes('readRuntimeControlState(this).status'));
+        assert.ok(src.includes('readRuntimeControlState(this).dialogLoopActive'));
+        assert.ok(src.includes('readRuntimeControlState(this).queueSize'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestion'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionKind'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadow'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowKind'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowState'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowExpired'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowAgeMs'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowExpiresAt'));
+        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowRemainingMs'));
+        assert.ok(src.includes('getRuntimeHandoffManager(this)'));
+        assert.ok(!src.includes('this.ctx.getRuntimeStatus()'));
+        assert.ok(!src.includes('this.ctx.isDialogLoopActive()'));
+        assert.ok(!src.includes('this.ctx.getHandoffManagerSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getQueueSnapshot().size'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionForStatusSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionKind()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowKind()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowState()'));
+        assert.ok(!src.includes('this.ctx.isPendingQuestionShadowExpired()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowAgeMs()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowExpiresAt()'));
+        assert.ok(!src.includes('this.ctx.getPendingQuestionShadowRemainingMs()'));
+    });
+
+    it('permission/capabilities/tool registry não tocam ctx diretamente', () => {
+        assert.ok(src.includes('readRuntimePermissionMode(this.ctx)'));
+        assert.ok(src.includes('setRuntimePermissionMode(this.ctx, mode, opts)'));
+        assert.ok(src.includes('readRuntimePermissionCapability(this.ctx)'));
+        assert.ok(src.includes('readRuntimeContextFactoryCapabilities(this.ctx)'));
+        assert.ok(src.includes('readRuntimeToolRegistry(this.ctx)'));
+        assert.ok(src.includes('readRuntimeToolRegistryEntries(this.ctx)'));
+        assert.ok(!src.includes('this.ctx.getPermissionModeSnapshot()'));
+        assert.ok(!src.includes('this.ctx.setPermissionMode(mode, opts)'));
+        assert.ok(!src.includes('this.ctx.getPermissionCapabilitySnapshot()'));
+        assert.ok(!src.includes('this.ctx.getContextFactoryCapabilitiesSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getToolRegistrySnapshot()'));
+        assert.ok(!src.includes('this.ctx.getToolRegistryEntriesSnapshot()'));
     });
 });

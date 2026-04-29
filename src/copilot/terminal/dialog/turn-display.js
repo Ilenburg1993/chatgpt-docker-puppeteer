@@ -32,8 +32,8 @@ import { broadcastSse } from './sse.js';
  * @property {string} effort
  * @property {boolean} showThinking
  * @property {boolean} showStreaming
- * @property {number | undefined} [timeoutMs]
- * @property {'explicit' | 'adaptive' | undefined} [timeoutStrategy]
+ * @property {number | null | undefined} [timeoutMs]
+ * @property {'explicit' | 'adaptive' | 'disabled' | undefined} [timeoutStrategy]
  */
 
 /**

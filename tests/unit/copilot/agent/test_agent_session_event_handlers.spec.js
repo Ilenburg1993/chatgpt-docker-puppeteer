@@ -528,6 +528,27 @@ describe('F43 — SessionMessagesCache', () => {
         });
     });
 
+    it('syncSdkHistory trata ausência de getMessages como capability indisponível, sem falha estrutural', async () => {
+        const { syncSdkHistory } = await import('#copilot/agent/session/history-sync');
+        const emit = vi.fn();
+
+        const result = await syncSdkHistory(
+            /** @type {any} */ ({ sessionId: 'sess-no-history' }),
+            emit,
+            {
+                getHubSessionId: () => 'hub-1',
+                conversationStore: { syncFromSdkHistory: vi.fn() },
+            },
+            { label: 'session.history.sync', phase: 'resume' },
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.unavailableReason).toBe('sdk_getMessages_unavailable');
+        }
+        expect(emit).not.toHaveBeenCalled();
+    });
+
     it('syncSdkHistory emite falha estruturada quando getMessages explode', async () => {
         const { syncSdkHistory } = await import('#copilot/agent/session/history-sync');
         const session = createMockSession();

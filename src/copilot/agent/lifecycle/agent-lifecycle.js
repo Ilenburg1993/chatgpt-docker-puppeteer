@@ -34,7 +34,6 @@ import {
 
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
-import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
 import {
     createAgentSdkClient,
     disconnectAgentSdkSession,
@@ -42,6 +41,13 @@ import {
     raceAgentSdkEvents,
     stopAgentSdkClient,
 } from '../facades/agent-sdk-access.js';
+import {
+    persistAgentRuntimeGracefulShutdownState,
+    persistAgentRuntimePrConsumptionSnapshot,
+    resetAgentRuntimeGracefulShutdownFlag,
+    restoreAgentRuntimePersistentBootState,
+    saveAgentRuntimeShutdownSnapshot,
+} from '../facades/agent-runtime-state.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -49,7 +55,6 @@ import {
     buildSessionTools,
     finalizeSessionInit,
 } from '../lifecycle/session-setup.js';
-import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
 import { resolveConversationStore } from '../ports/conversation-port.js';
 import { unbindAgentSessionTools } from '../ports/tool-port.js';
 import { performBootWiring } from '../session/boot-wiring.js';
@@ -59,7 +64,6 @@ import {
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnershipWithPolicy,
 } from '../session/ownership.js';
-import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -85,7 +89,10 @@ export async function initSession(ctx, client, host) {
     const { busHooks } = buildSessionHooks(ctx, host);
     const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-    const { session, isResumed } = await initOrResumeSession(client, options);
+    const { session, isResumed, model, reasoningEffort } = await initOrResumeSession(client, options);
+
+    ctx.setModel(model);
+    ctx.setReasoningEffort(reasoningEffort);
 
     finalizeSessionInit(ctx, session, isResumed);
     return { session, isResumed };
@@ -157,16 +164,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
             onPrInfo: (info) => {
                 ctx.setLastPrInfo(info);
                 void ctx.trackBackgroundTask(
-                    persistStateWithPolicy(
-                        {
-                            pendingTurnConsumedPR: true,
-                            lastPrConsumedAt: info.ts,
-                            lastPrModel: info.model ?? '',
-                            lastPrCost: info.cost ?? 0,
-                            lastQuotaSnapshots: info.quotaSnapshots ?? null,
-                        },
-                        { label: 'state.pr_consumed.persist' },
-                    ).then(() => undefined),
+                    persistAgentRuntimePrConsumptionSnapshot(info).then(() => undefined),
                     {
                         label: 'state.pr_consumed.persist',
                         description: 'Persist latest PR consumption snapshot',
@@ -222,29 +220,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
     }
 
     ctx.setStatus('idle', host);
-    const persistedState = await readStateAsync();
-    ctx.setSendCount(persistedState?.sendCount ?? 0);
-    if (persistedState?.pendingQuestion && persistedState.pendingQuestionMeta) {
-        const pendingQuestionShadow = createPendingQuestionShadow(
-            persistedState.pendingQuestion,
-            persistedState.pendingQuestionMeta,
-        );
-        ctx.setPendingQuestionShadow(pendingQuestionShadow);
-        if (isPendingQuestionShadowExpired(pendingQuestionShadow)) {
-            void ctx.trackBackgroundTask(
-                persistStateWithPolicy(
-                    { pendingQuestion: null, pendingQuestionMeta: null },
-                    { label: 'state.pendingQuestionShadow.expire' },
-                ).then(() => undefined),
-                {
-                    label: 'state.pendingQuestionShadow.expire',
-                    description: 'Clear expired ask_user shadow from persisted state',
-                },
-            );
-        }
-    } else {
-        ctx.clearPendingQuestionShadow();
-    }
+    await restoreAgentRuntimePersistentBootState(ctx);
 
     log('INFO', `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`);
 
@@ -285,10 +261,7 @@ export async function agentStart(ctx, host) {
     ctx.setStatus('starting', host);
     log('INFO', '[AlwaysAlive] Iniciando agente...');
 
-    const resetShutdown = await persistStateWithPolicy(
-        { gracefulShutdown: false },
-        { label: 'state.gracefulShutdown.reset' },
-    );
+    const resetShutdown = await resetAgentRuntimeGracefulShutdownFlag();
     if (!resetShutdown.ok) {
         log('WARN', `[AlwaysAlive] gracefulShutdown=false não persistido no startup: ${resetShutdown.error.message}`);
     }
@@ -382,42 +355,19 @@ export async function agentStop(
         }
 
         try {
-            const pendingQuestion = ctx.getPendingQuestionSnapshot();
-            const snap = createSnapshot({
+            await saveAgentRuntimeShutdownSnapshot(ctx, {
                 sessionId: host.sessionId ?? null,
-                model: ctx.getModelSnapshot(),
-                status: ctx.getRuntimeStatus(),
-                sendCount: ctx.getSendCountSnapshot(),
                 dialogLoopActive: restoreDialogLoopOnNextBoot,
-                dialogPaused: ctx.isDialogLoopPaused(),
-                pendingQuestion: pendingQuestion?.question ?? null,
-                pendingQuestionMeta:
-                    pendingQuestion !== null
-                        ? {
-                              kind: pendingQuestion.kind,
-                              askedAt: pendingQuestion.askedAt,
-                              allowFreeform: pendingQuestion.allowFreeform,
-                              protocolControlled: pendingQuestion.protocolControlled,
-                              ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
-                          }
-                        : null,
-                prMetrics: host.dialogPrMetrics,
+                dialogPrMetrics: host.dialogPrMetrics,
                 reason: 'auto-shutdown',
             });
-            await saveSnapshotAsync(snap);
         } catch (e) {
             log('WARN', `[AlwaysAlive] Auto-save snapshot falhou: ${toError(e).message}`);
         }
 
-        const persistedShutdown = await persistStateWithPolicy(
-            {
-                sendCount: ctx.getSendCountSnapshot(),
-                gracefulShutdown: true,
-                dialogLoopActive: restoreDialogLoopOnNextBoot,
-                dialogPaused: ctx.isDialogLoopPaused(),
-            },
-            { label: 'state.gracefulShutdown.persist' },
-        );
+        const persistedShutdown = await persistAgentRuntimeGracefulShutdownState(ctx, {
+            dialogLoopActive: restoreDialogLoopOnNextBoot,
+        });
         if (!persistedShutdown.ok) {
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${persistedShutdown.error.message}`);
         }

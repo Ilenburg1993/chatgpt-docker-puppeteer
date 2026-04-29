@@ -26,15 +26,114 @@ describe('Block B — lifecycle ownership contracts', () => {
 
     it('agent/session não chama createSession/resumeSession crus no client SDK', () => {
         const findings = checkOfficialSeams().filter(
-            (finding) => finding.rule === 'agent-session-must-not-call-raw-sdk-session-create-resume',
+            (finding) =>
+                finding.rule === 'agent-session-must-not-call-raw-sdk-session-create-resume' ||
+                finding.rule === 'agent-session-must-not-check-sdk-getmessages-directly',
         );
         assert.deepEqual(findings, []);
+    });
+
+    it('keepalive usa ação semântica do runtime em vez de client.ping/session.send crus', () => {
+        const findings = checkOfficialSeams().filter(
+            (finding) => finding.rule === 'agent-keepalive-must-not-touch-raw-sdk-handles',
+        );
+        assert.deepEqual(findings, []);
+
+        const src = readFileSync(srcPath('agent', 'session', 'keepalive.js'), 'utf8');
+        assert.match(src, /performKeepalive/);
+        assert.doesNotMatch(src, /\bclient\.(?:ping|start|stop)\(/);
+        assert.doesNotMatch(src, /\bsession\.send\(/);
+    });
+
+    it('boot-wiring usa bridges semânticas para lifecycle/quota do SDK, não mapeamentos crus', () => {
+        const findings = checkOfficialSeams().filter(
+            (finding) =>
+                finding.rule === 'agent-boot-wiring-must-not-map-sdk-lifecycle-constants-directly' ||
+                finding.rule === 'agent-boot-wiring-must-not-start-raw-sdk-quota-monitor' ||
+                finding.rule === 'always-alive-must-not-touch-state-io-for-shadow-or-sessionid' ||
+                finding.rule === 'always-alive-must-not-touch-ctx-dialog-runtime-directly' ||
+                finding.rule === 'always-alive-must-not-touch-ctx-runtime-controls-directly' ||
+                finding.rule === 'always-alive-must-not-touch-ctx-runtime-governance-directly' ||
+                finding.rule === 'boot-steps-must-not-persist-shadow-inline' ||
+                finding.rule === 'boot-steps-must-not-check-shadow-reaper-state-directly' ||
+                finding.rule === 'boot-steps-must-not-touch-state-io-for-dialog-boot-recovery' ||
+                finding.rule === 'agent-lifecycle-must-delegate-runtime-state-io' ||
+                finding.rule === 'agent-lifecycle-must-delegate-shutdown-snapshot',
+        );
+        assert.deepEqual(findings, []);
+
+        const src = readFileSync(srcPath('agent', 'session', 'boot-wiring.js'), 'utf8');
+        const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
+        const bootSteps = readFileSync(srcPath('agent', 'session', 'boot-steps.js'), 'utf8');
+        const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'agent-lifecycle.js'), 'utf8');
+
+        assert.match(src, /attachAgentSdkBootLifecycleBridge/);
+        assert.match(src, /startAgentSdkBootQuotaBridge/);
+        assert.doesNotMatch(src, /observeAgentSdkSessionLifecycle/);
+        assert.doesNotMatch(src, /startAgentSdkQuotaMonitor/);
+        assert.match(alwaysAlive, /readAgentRuntimeSessionId/);
+        assert.match(alwaysAlive, /clearAgentRuntimePendingQuestionShadow/);
+        assert.match(alwaysAlive, /dispatchAgentDialogTurn/);
+        assert.match(alwaysAlive, /pauseAgentDialogLoop/);
+        assert.match(alwaysAlive, /isAgentDialogLoopPaused/);
+        assert.match(alwaysAlive, /readAgentDialogPrMetrics/);
+        assert.match(alwaysAlive, /readAgentDialogLastPrInfo/);
+        assert.match(alwaysAlive, /readRuntimeControlState/);
+        assert.match(alwaysAlive, /readRuntimeInteractionState/);
+        assert.match(alwaysAlive, /getRuntimeHandoffManager/);
+        assert.match(alwaysAlive, /readRuntimePermissionMode/);
+        assert.match(alwaysAlive, /setRuntimePermissionMode/);
+        assert.match(alwaysAlive, /readRuntimePermissionCapability/);
+        assert.match(alwaysAlive, /readRuntimeContextFactoryCapabilities/);
+        assert.match(alwaysAlive, /readRuntimeToolRegistry/);
+        assert.match(alwaysAlive, /readRuntimeToolRegistryEntries/);
+        assert.doesNotMatch(alwaysAlive, /readState\(\)\?\.sessionId/);
+        assert.doesNotMatch(alwaysAlive, /persistStateWithPolicy\(/);
+        assert.doesNotMatch(
+            alwaysAlive,
+            /this\.ctx\.(?:sendDialogTurn|pauseDialogLoop|isDialogLoopPaused|getDialogPrMetricsSnapshot|getLastPrInfoSnapshot)\(/,
+        );
+        assert.doesNotMatch(
+            alwaysAlive,
+            /this\.ctx\.(?:getRuntimeStatus|isDialogLoopActive|getHandoffManagerSnapshot|getQueueSnapshot\(\)\.size|getPendingQuestionForStatusSnapshot|getPendingQuestionKind|getPendingQuestionShadowSnapshot|getPendingQuestionShadowKind|getPendingQuestionShadowState|isPendingQuestionShadowExpired|getPendingQuestionShadowAgeMs|getPendingQuestionShadowExpiresAt|getPendingQuestionShadowRemainingMs)\b/,
+        );
+        assert.doesNotMatch(
+            alwaysAlive,
+            /this\.ctx\.(?:getPermissionModeSnapshot|setPermissionMode|getPermissionCapabilitySnapshot|getContextFactoryCapabilitiesSnapshot|getToolRegistrySnapshot|getToolRegistryEntriesSnapshot)\b/,
+        );
+        assert.match(bootSteps, /clearAgentRuntimePendingQuestionShadow\(/);
+        assert.match(bootSteps, /shouldReapAgentRuntimePendingQuestionShadow\(/);
+        assert.match(bootSteps, /markAgentRuntimeDialogPausedForRecovery\(/);
+        assert.match(bootSteps, /shouldScheduleAgentRuntimeDialogBootRecovery\(/);
+        assert.doesNotMatch(bootSteps, /persistStateWithPolicy\(\s*\{\s*pendingQuestion:\s*null/);
+        assert.doesNotMatch(bootSteps, /persistStateWithPolicy\(\s*\{\s*dialogPaused:\s*true/);
+        assert.doesNotMatch(bootSteps, /\breadStateAsync\(/);
+        assert.doesNotMatch(
+            bootSteps,
+            /\bctx\.(?:hasPendingQuestion|hasPendingQuestionShadow|isPendingQuestionShadowExpired)\(/,
+        );
+        assert.doesNotMatch(
+            src,
+            /getAgentSdkLifecycleEvents|getAgentSdkSessionLifecycleEvents|onAgentSdkLifecycleEvents/,
+        );
+        assert.doesNotMatch(src, /createAgentSdkQuotaMonitor\(/);
+        assert.match(lifecycle, /restoreAgentRuntimePersistentBootState\(/);
+        assert.match(lifecycle, /resetAgentRuntimeGracefulShutdownFlag\(/);
+        assert.match(lifecycle, /persistAgentRuntimePrConsumptionSnapshot\(/);
+        assert.match(lifecycle, /saveAgentRuntimeShutdownSnapshot\(/);
+        assert.match(lifecycle, /persistAgentRuntimeGracefulShutdownState\(/);
+        assert.doesNotMatch(lifecycle, /\breadStateAsync\(/);
+        assert.doesNotMatch(lifecycle, /\bpersistStateWithPolicy\(/);
+        assert.doesNotMatch(lifecycle, /\bcreateSnapshot\(/);
+        assert.doesNotMatch(lifecycle, /\bsaveSnapshotAsync\(/);
     });
 
     it('initializer continua dependendo da façade do agent para o lifecycle vanilla do SDK', () => {
         const src = readFileSync(srcPath('agent', 'session', 'initializer.js'), 'utf8');
         assert.match(src, /resumeOrCreateAgentSdkSession/);
         assert.match(src, /createAgentSdkSessionByClient/);
+        assert.match(src, /canReadAgentSdkSessionMessages/);
         assert.doesNotMatch(src, /\bclient\.(?:createSession|resumeSession)\(/);
+        assert.doesNotMatch(src, /\bsession\.getMessages\b/);
     });
 });

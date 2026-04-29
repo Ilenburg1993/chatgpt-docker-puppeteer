@@ -3,11 +3,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
+    clearAgentRuntimePendingQuestionShadow: vi.fn(() => true),
+    shouldReapAgentRuntimePendingQuestionShadow: vi.fn(() => true),
+}));
+
+vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+    clearAgentRuntimePendingQuestionShadow: mocks.clearAgentRuntimePendingQuestionShadow,
+    shouldReapAgentRuntimePendingQuestionShadow: mocks.shouldReapAgentRuntimePendingQuestionShadow,
 }));
 
 vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
-    persistStateWithPolicy: mocks.persistStateWithPolicy,
     readStateAsync: vi.fn(async () => null),
 }));
 
@@ -15,45 +20,43 @@ import { reapExpiredPendingQuestionShadow } from '../../../src/copilot/agent/ses
 
 describe('boot-steps › pendingQuestionShadow reaper', () => {
     beforeEach(() => {
-        mocks.persistStateWithPolicy.mockClear();
+        mocks.clearAgentRuntimePendingQuestionShadow.mockClear();
+        mocks.clearAgentRuntimePendingQuestionShadow.mockReturnValue(true);
+        mocks.shouldReapAgentRuntimePendingQuestionShadow.mockClear();
+        mocks.shouldReapAgentRuntimePendingQuestionShadow.mockReturnValue(true);
     });
 
     it('limpa shadow expirada em runtime quando não há pergunta viva', async () => {
-        const clearPendingQuestionShadow = vi.fn();
-        const track = vi.fn(async (task) => {
-            await task;
-        });
-
         const reaped = reapExpiredPendingQuestionShadow(
             /** @type {any} */ ({
                 hasPendingQuestion: () => false,
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => true,
-                clearPendingQuestionShadow,
-                trackBackgroundTask: track,
             }),
         );
 
         expect(reaped).toBe(true);
-        expect(clearPendingQuestionShadow).toHaveBeenCalled();
-        expect(mocks.persistStateWithPolicy).toHaveBeenCalledWith(
-            { pendingQuestion: null, pendingQuestionMeta: null },
-            { label: 'state.pendingQuestionShadow.reap' },
+        expect(mocks.clearAgentRuntimePendingQuestionShadow).toHaveBeenCalledWith(
+            expect.objectContaining({
+                hasPendingQuestion: expect.any(Function),
+                hasPendingQuestionShadow: expect.any(Function),
+                isPendingQuestionShadowExpired: expect.any(Function),
+            }),
+            {
+                label: 'state.pendingQuestionShadow.reap',
+                description: 'Reap expired ask_user shadow during runtime metrics tick',
+            },
         );
-        expect(track).toHaveBeenCalled();
+        expect(mocks.shouldReapAgentRuntimePendingQuestionShadow).toHaveBeenCalledTimes(1);
     });
 
     it('não limpa shadow quando ainda existe pergunta viva ou shadow válida', () => {
-        const clearPendingQuestionShadow = vi.fn();
-        const track = vi.fn();
-
+        mocks.shouldReapAgentRuntimePendingQuestionShadow.mockReturnValue(false);
         const withLivePending = reapExpiredPendingQuestionShadow(
             /** @type {any} */ ({
                 hasPendingQuestion: () => true,
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => true,
-                clearPendingQuestionShadow,
-                trackBackgroundTask: track,
             }),
         );
         const withValidShadow = reapExpiredPendingQuestionShadow(
@@ -61,14 +64,12 @@ describe('boot-steps › pendingQuestionShadow reaper', () => {
                 hasPendingQuestion: () => false,
                 hasPendingQuestionShadow: () => true,
                 isPendingQuestionShadowExpired: () => false,
-                clearPendingQuestionShadow,
-                trackBackgroundTask: track,
             }),
         );
 
         expect(withLivePending).toBe(false);
         expect(withValidShadow).toBe(false);
-        expect(clearPendingQuestionShadow).not.toHaveBeenCalled();
-        expect(track).not.toHaveBeenCalled();
+        expect(mocks.clearAgentRuntimePendingQuestionShadow).not.toHaveBeenCalled();
+        expect(mocks.shouldReapAgentRuntimePendingQuestionShadow).toHaveBeenCalledTimes(2);
     });
 });

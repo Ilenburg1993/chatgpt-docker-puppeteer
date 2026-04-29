@@ -11,7 +11,19 @@ const SESSION_FS_INTERNAL_IMPORT =
 
 /** @typedef {{ file: string; line: number; rule: string; text: string }} Finding */
 
-/** @type {{ filePrefix: string; rule: string; regex: RegExp; allowCommentOnly?: boolean }[]} */
+/**
+ * @typedef {{
+ *     filePrefix?: string;
+ *     file?: string;
+ *     rule: string;
+ *     regex?: RegExp;
+ *     patterns?: RegExp[];
+ *     allowCommentOnly?: boolean;
+ *     message?: string;
+ * }} SeamRule
+ */
+
+/** @type {SeamRule[]} */
 const RULES = [
     {
         filePrefix: `hooks${path.sep}`,
@@ -22,6 +34,12 @@ const RULES = [
         filePrefix: `channel${path.sep}`,
         rule: 'channel-must-not-import-conversation-hub',
         regex: /\bimport\s+[^;]*\s+from\s+['"](?:#copilot\/conversation-hub(?:\/.*)?|\.{1,2}\/.*conversation-hub\/.*)['"]/,
+    },
+    {
+        rule: 'boot-steps-must-not-touch-state-io-for-dialog-boot-recovery',
+        file: 'src/copilot/agent/session/boot-steps.js',
+        patterns: [/\breadStateAsync\(/, /\bpersistStateWithPolicy\(\s*\{\s*dialogPaused:\s*true/s],
+        message: 'boot-steps deve delegar a decisão/persistência do dialog boot recovery à façade agent-runtime-state.',
     },
     {
         filePrefix: `channel${path.sep}`,
@@ -49,9 +67,76 @@ const RULES = [
         regex: /\bawait\s+(?:client|activeClient)\.(?:start|stop|ping|createSession|resumeSession)\(/,
     },
     {
+        file: 'src/copilot/agent/lifecycle/agent-lifecycle.js',
+        rule: 'agent-lifecycle-must-delegate-runtime-state-io',
+        patterns: [
+            /\breadStateAsync\(/,
+            /\bpersistStateWithPolicy\(/,
+            /\bcreatePendingQuestionShadow\(/,
+            /\bisPendingQuestionShadowExpired\(\s*pendingQuestionShadow/,
+        ],
+        message: 'agent-lifecycle deve delegar I/O e restauração de runtime state à façade agent-runtime-state.',
+    },
+    {
+        file: 'src/copilot/agent/lifecycle/agent-lifecycle.js',
+        rule: 'agent-lifecycle-must-delegate-shutdown-snapshot',
+        patterns: [/\bcreateSnapshot\(/, /\bsaveSnapshotAsync\(/],
+        message: 'agent-lifecycle deve delegar snapshots de shutdown à façade agent-runtime-state.',
+    },
+    {
         filePrefix: `agent${path.sep}session${path.sep}`,
         rule: 'agent-session-must-not-call-raw-sdk-session-create-resume',
         regex: /\bawait\s+client\.(?:createSession|resumeSession)\(/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}`,
+        rule: 'agent-session-must-not-check-sdk-getmessages-directly',
+        regex: /\b(?:session|sdkSession)\.getMessages\b/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}keepalive.js`,
+        rule: 'agent-keepalive-must-not-touch-raw-sdk-handles',
+        regex: /\b(?:client\.(?:ping|start|stop)|session\.send\()|\bclientPing\s*\.call\(/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}boot-wiring.js`,
+        rule: 'agent-boot-wiring-must-not-map-sdk-lifecycle-constants-directly',
+        regex: /\b(?:getAgentSdkLifecycleEvents|getAgentSdkSessionLifecycleEvents|onAgentSdkLifecycleEvents)\b/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}boot-wiring.js`,
+        rule: 'agent-boot-wiring-must-not-start-raw-sdk-quota-monitor',
+        regex: /\bcreateAgentSdkQuotaMonitor\s*\(/,
+    },
+    {
+        filePrefix: `agent${path.sep}always-alive.js`,
+        rule: 'always-alive-must-not-touch-state-io-for-shadow-or-sessionid',
+        regex: /\b(?:readState\(\)\?\.sessionId|persistStateWithPolicy\(|writeStateAsync\()/,
+    },
+    {
+        filePrefix: `agent${path.sep}always-alive.js`,
+        rule: 'always-alive-must-not-touch-ctx-dialog-runtime-directly',
+        regex: /\bthis\.ctx\.(?:sendDialogTurn|pauseDialogLoop|isDialogLoopPaused|getDialogPrMetricsSnapshot|getLastPrInfoSnapshot)\(/,
+    },
+    {
+        filePrefix: `agent${path.sep}always-alive.js`,
+        rule: 'always-alive-must-not-touch-ctx-runtime-controls-directly',
+        regex: /\bthis\.ctx\.(?:getRuntimeStatus|isDialogLoopActive|getHandoffManagerSnapshot|getQueueSnapshot\(\)\.size|getPendingQuestionForStatusSnapshot|getPendingQuestionKind|getPendingQuestionShadowSnapshot|getPendingQuestionShadowKind|getPendingQuestionShadowState|isPendingQuestionShadowExpired|getPendingQuestionShadowAgeMs|getPendingQuestionShadowExpiresAt|getPendingQuestionShadowRemainingMs)\b/,
+    },
+    {
+        filePrefix: `agent${path.sep}always-alive.js`,
+        rule: 'always-alive-must-not-touch-ctx-runtime-governance-directly',
+        regex: /\bthis\.ctx\.(?:getPermissionModeSnapshot|setPermissionMode|getPermissionCapabilitySnapshot|getContextFactoryCapabilitiesSnapshot|getToolRegistrySnapshot|getToolRegistryEntriesSnapshot)\b/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}boot-steps.js`,
+        rule: 'boot-steps-must-not-persist-shadow-inline',
+        regex: /\bpersistStateWithPolicy\(\s*\{\s*pendingQuestion:\s*null/,
+    },
+    {
+        filePrefix: `agent${path.sep}session${path.sep}boot-steps.js`,
+        rule: 'boot-steps-must-not-check-shadow-reaper-state-directly',
+        regex: /\bctx\.(?:hasPendingQuestion|hasPendingQuestionShadow|isPendingQuestionShadowExpired)\(/,
     },
 ];
 
@@ -84,6 +169,28 @@ function isCommentOnly(line) {
 }
 
 /**
+ * @param {SeamRule} rule
+ * @param {string} rel
+ * @returns {boolean}
+ */
+function ruleAppliesToFile(rule, rel) {
+    if (rule.file) {
+        const targetRel = path.relative(TARGET, path.resolve(ROOT, rule.file));
+        return rel === targetRel;
+    }
+    return typeof rule.filePrefix === 'string' && rel.startsWith(rule.filePrefix);
+}
+
+/**
+ * @param {string} content
+ * @param {number} index
+ * @returns {number}
+ */
+function lineNumberForIndex(content, index) {
+    return content.slice(0, Math.max(0, index)).split('\n').length;
+}
+
+/**
  * @returns {Finding[]}
  */
 export function checkOfficialSeams() {
@@ -92,22 +199,43 @@ export function checkOfficialSeams() {
 
     for (const file of walk(TARGET)) {
         const rel = path.relative(TARGET, file);
-        const content = fs.readFileSync(file, 'utf8').split('\n');
+        const rawContent = fs.readFileSync(file, 'utf8');
+        const content = rawContent.split('\n');
 
         for (const rule of RULES) {
-            if (!rel.startsWith(rule.filePrefix)) continue;
+            if (!ruleAppliesToFile(rule, rel)) continue;
 
-            content.forEach((line, index) => {
-                if (isCommentOnly(line)) return;
-                if (rule.regex.test(line)) {
-                    findings.push({
-                        file: rel,
-                        line: index + 1,
-                        rule: rule.rule,
-                        text: line.trim(),
-                    });
+            if (rule.patterns) {
+                for (const pattern of rule.patterns) {
+                    pattern.lastIndex = 0;
+                    const match = pattern.exec(rawContent);
+                    if (match) {
+                        const line = lineNumberForIndex(rawContent, match.index);
+                        findings.push({
+                            file: rel,
+                            line,
+                            rule: rule.rule,
+                            text: content[line - 1]?.trim() ?? pattern.source,
+                        });
+                    }
                 }
-            });
+                continue;
+            }
+
+            if (rule.regex) {
+                content.forEach((line, index) => {
+                    if (isCommentOnly(line)) return;
+                    rule.regex.lastIndex = 0;
+                    if (rule.regex?.test(line)) {
+                        findings.push({
+                            file: rel,
+                            line: index + 1,
+                            rule: rule.rule,
+                            text: line.trim(),
+                        });
+                    }
+                });
+            }
         }
 
         if (!rel.startsWith(`sdk${path.sep}`)) {

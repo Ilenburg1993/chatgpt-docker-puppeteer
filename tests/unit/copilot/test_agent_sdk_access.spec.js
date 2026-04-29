@@ -2,10 +2,30 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { createQuotaMonitorMock } = vi.hoisted(() => ({
+    createQuotaMonitorMock: vi.fn((options) => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+        poll: vi.fn(),
+        status: vi.fn(() => ({ running: true, options })),
+    })),
+}));
+
 vi.mock('#copilot/sdk', () => ({
+    LIFECYCLE_EVENTS: {
+        CREATED: 'sessionCreated',
+        UPDATED: 'sessionUpdated',
+        DELETED: 'sessionDeleted',
+    },
+    SESSION_LIFECYCLE_EVENTS: {
+        CREATED: 'session.created',
+        UPDATED: 'session.updated',
+        DELETED: 'session.deleted',
+    },
     accountGetQuota: vi.fn(async (client) => client.rpc.account.getQuota()),
     commandsHandlePending: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
     compactionCompact: vi.fn(async () => ({ success: true })),
+    createQuotaMonitor: createQuotaMonitorMock,
     getSdkRecoveryPolicy: vi.fn((error, scope) => ({
         kind: error && typeof error === 'object' && 'code' in error ? 'network' : 'unknown',
         scope: scope ?? 'connection',
@@ -16,6 +36,16 @@ vi.mock('#copilot/sdk', () => ({
     isSessionUiElicitationAvailable: vi.fn((session) => Boolean(session.capabilities?.ui?.elicitation || session.ui)),
     listAgents: vi.fn(async (session) => ({ agents: [{ name: `agent:${session.sessionId}` }] })),
     modelsList: vi.fn(async (client) => client.rpc.models.list()),
+    onLifecycleEvents: vi.fn((handlers, client) => {
+        for (const [event, handler] of Object.entries(handlers)) {
+            client.on?.(event, handler);
+        }
+        return () => {
+            for (const [event, handler] of Object.entries(handlers)) {
+                client.off?.(event, handler);
+            }
+        };
+    }),
     permissionsHandlePending: vi.fn(async (_session, requestId, result) => ({ requestId, result })),
     reloadAgents: vi.fn(async (session) => ({ agents: [{ name: `reloaded:${session.sessionId}` }] })),
     selectAgent: vi.fn(async (_session, name) => ({ agent: { name } })),
@@ -39,12 +69,15 @@ vi.mock('#copilot/sdk', () => ({
 }));
 
 import {
+    attachAgentSdkBootLifecycleBridge,
+    canReadAgentSdkSessionMessages,
     compactSdkSession,
     confirmSdkSessionUi,
     createSdkWorkspaceFile,
     deselectSdkAgent,
     ensureAgentSdkClientStarted,
     execSdkShell,
+    getAgentSdkLifecycleEvents,
     getAgentSdkRecoveryPolicy,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
@@ -66,6 +99,7 @@ import {
     listSdkModels,
     listSdkSessions,
     listSdkWorkspaceFiles,
+    observeAgentSdkSessionLifecycle,
     pingAgentSdkClient,
     pingSdk,
     readSdkWorkspaceFile,
@@ -74,6 +108,8 @@ import {
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
+    startAgentSdkBootQuotaBridge,
+    startAgentSdkQuotaMonitor,
     stopAgentSdkClient,
 } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 
@@ -86,6 +122,7 @@ describe('agent-sdk-access facade', () => {
     let ctx;
 
     beforeEach(() => {
+        createQuotaMonitorMock.mockClear();
         client = {
             rpc: {
                 account: { getQuota: vi.fn(async () => ({ quotaSnapshots: { chat: { remainingPercentage: 90 } } })) },
@@ -207,6 +244,11 @@ describe('agent-sdk-access facade', () => {
         expect(snapshot.resources.fleetAvailable).toBe(true);
     });
 
+    it('canReadAgentSdkSessionMessages reflete a disponibilidade de getMessages na sessão ativa', () => {
+        expect(canReadAgentSdkSessionMessages(session)).toBe(true);
+        expect(canReadAgentSdkSessionMessages(/** @type {any} */ ({ sessionId: 'no-history' }))).toBe(false);
+    });
+
     it('getSdkResourceSnapshot denuncia recursos ausentes quando client/sessão não existem', () => {
         const degradedCtx = {
             ioState: { client: null },
@@ -257,6 +299,23 @@ describe('agent-sdk-access facade', () => {
         expect(client.stop).toHaveBeenCalledTimes(1);
     });
 
+    it('expõe helpers semânticos de boot para lifecycle e quota do SDK', () => {
+        const onEvent = vi.fn();
+
+        const detach = attachAgentSdkBootLifecycleBridge(client, onEvent);
+        const quotaMonitor = startAgentSdkBootQuotaBridge({
+            client,
+            intervalMs: 1000,
+            warningThreshold: 20,
+        });
+
+        expect(typeof detach).toBe('function');
+        expect(createQuotaMonitorMock).toHaveBeenCalledWith(
+            expect.objectContaining({ client, intervalMs: 1000, warningThreshold: 20 }),
+        );
+        expect(quotaMonitor.start).toHaveBeenCalled();
+    });
+
     it('ensureAgentSdkClientStarted não reexecuta start quando o client já está conectado', async () => {
         client.getState.mockReturnValue('connected');
 
@@ -281,6 +340,52 @@ describe('agent-sdk-access facade', () => {
             scope: 'connection',
             retryable: true,
         });
+    });
+
+    it('observeAgentSdkSessionLifecycle normaliza eventos vanilla no contrato interno do agent', () => {
+        const handlers = /** @type {Record<string, (event: unknown) => void>} */ ({});
+        const off = vi.fn();
+        const normalized = [];
+
+        client.on = vi.fn((event, handler) => {
+            handlers[event] = handler;
+        });
+        client.off = vi.fn();
+
+        const unsub = observeAgentSdkSessionLifecycle(client, (event) => {
+            normalized.push(event);
+        });
+
+        handlers[getAgentSdkLifecycleEvents().CREATED]?.({ sessionId: 's-1' });
+        handlers[getAgentSdkLifecycleEvents().UPDATED]?.({ sessionId: 's-2' });
+        handlers[getAgentSdkLifecycleEvents().DELETED]?.({ sessionId: 's-3' });
+
+        expect(normalized).toEqual([
+            { type: 'session.created', sessionId: 's-1' },
+            { type: 'session.updated', sessionId: 's-2' },
+            { type: 'session.deleted', sessionId: 's-3' },
+        ]);
+
+        unsub();
+        expect(client.off).toHaveBeenCalled();
+        expect(off).not.toHaveBeenCalled();
+    });
+
+    it('startAgentSdkQuotaMonitor cria e inicia o monitor vanilla pela façade canônica', () => {
+        const start = vi.fn();
+        const monitor = startAgentSdkQuotaMonitor({
+            client: /** @type {any} */ ({ rpc: {} }),
+            intervalMs: 60_000,
+            warningThreshold: 20,
+            onWarning: vi.fn(),
+            onUpdate: vi.fn(),
+        });
+
+        expect(createQuotaMonitorMock).toHaveBeenCalledWith(
+            expect.objectContaining({ intervalMs: 60_000, warningThreshold: 20 }),
+        );
+        expect(typeof monitor.start).toBe('function');
+        expect(monitor.start).toHaveBeenCalledTimes(1);
     });
 
     it('operações de custom agents delegam para a camada sdk canônica sobre a sessão atual', async () => {

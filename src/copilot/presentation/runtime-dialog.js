@@ -25,7 +25,10 @@ export { MAX_EMBED_BYTES };
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
  *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
- *     sendDialogTurn: (message: string, options?: { timeout?: number; traceId?: string }) => Promise<string | null>;
+ *     sendDialogTurn: (
+ *         message: string,
+ *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
+ *     ) => Promise<string>;
  *     stopDialogLoop: (opts?: {
  *         authorized?: boolean;
  *         reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
@@ -70,9 +73,9 @@ export async function startRuntimeDialogLoop(bootPrompt, runtime) {
  * Envia um turno para um dialog loop já ativo/pausado, sem tentar iniciar automaticamente o loop.
  *
  * @param {string} message
- * @param {{ timeout?: number; traceId?: string }} [options]
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
- * @returns {Promise<string | null>}
+ * @returns {Promise<string>}
  */
 export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
@@ -83,7 +86,7 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
         const reply = await sendAgentDialogTurn(agent, message, options);
         log(
             'INFO',
-            `[runtime-dialog] turn resolved (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, reply=${reply === null ? 'null' : 'ok'})`,
+            `[runtime-dialog] turn resolved (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, reply=ok)`,
         );
         return reply;
     } catch (error) {
@@ -99,9 +102,9 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
 /**
  * @param {string} message
  * @param {string} from
- * @param {{ timeout?: number; traceId?: string }} [options]
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
- * @returns {Promise<string | null>}
+ * @returns {Promise<string>}
  */
 export async function sendRuntimeDialogTurn(message, from, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
@@ -134,9 +137,9 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
 /**
  * @param {string} message
  * @param {string} from
- * @param {{ timeout?: number; traceId?: string }} [options]
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<string | null>}
+ * @returns {Promise<string>}
  */
 export async function sendRuntimeDialogTurnForRuntime(message, from, options, runtimeId) {
     return sendRuntimeDialogTurn(message, from, options, getAgentRuntimeControlsTarget(runtimeId));

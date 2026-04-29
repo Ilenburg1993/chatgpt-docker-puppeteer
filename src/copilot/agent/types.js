@@ -456,8 +456,8 @@
  * Esse adapter é construído por `agent-dialog-controller` a partir do host público do agent.
  *
  * @typedef {Object} DialogLoopHost
- * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessage
- * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot
+ * @property {(message: string, opts?: { timeoutMs?: number | null }) => Promise<string>} sendMessage
+ * @property {(message: string, opts?: { timeoutMs?: number | null }) => Promise<string>} sendMessageDialogBoot
  * @property {() => boolean} hasPendingQuestion
  * @property {(message: string) => boolean} answerPendingQuestion
  * @property {() => {

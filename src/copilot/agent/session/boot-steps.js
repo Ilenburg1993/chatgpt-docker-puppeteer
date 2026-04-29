@@ -22,8 +22,13 @@ import {
 import { BOOT_RECOVERY_DELAY_MS, MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { registerTimer } from '../../core/timer-registry.js';
+import {
+    clearAgentRuntimePendingQuestionShadow,
+    markAgentRuntimeDialogPausedForRecovery,
+    shouldReapAgentRuntimePendingQuestionShadow,
+    shouldScheduleAgentRuntimeDialogBootRecovery,
+} from '../facades/agent-runtime-state.js';
 import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../facades/agent-sdk-access.js';
-import { persistStateWithPolicy, readStateAsync } from '../lifecycle/state-io.js';
 import { startDefaultMcpAutoReconnect } from '../ports/mcp-port.js';
 import {
     createAgentEventObserver,
@@ -74,7 +79,10 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {() => void} ensureDialogLoopAttached
  * @property {() => Promise<void>} resumeDialogLoop
  * @property {() => Promise<void>} startDialogLoop
- * @property {(options?: { isIdle?: () => boolean; onKeepalive?: (ts: number) => void }) => boolean} startKeepalive
+ * @property {(options?: {
+ *     isIdle?: () => boolean;
+ *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+ * }) => boolean} startKeepalive
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
  * @property {() => {
@@ -250,10 +258,7 @@ export async function runDialogBootRecovery(ctx) {
 
     try {
         ctx.ensureDialogLoopAttached();
-        const pausedPersist = await persistStateWithPolicy(
-            { dialogPaused: true },
-            { label: 'dialog.boot_recovery.pause' },
-        );
+        const pausedPersist = await markAgentRuntimeDialogPausedForRecovery();
         if (!pausedPersist.ok) {
             logSwallowed(pausedPersist.error, 'agent.bootWiring.persistDialogPaused');
         }
@@ -281,8 +286,8 @@ export function stepScheduleDialogRecovery(isResumed, ctx) {
     }
 
     void ctx.trackBackgroundTask(
-        readStateAsync().then((savedState) => {
-            if (savedState?.dialogLoopActive && !savedState?.dialogPaused) {
+        shouldScheduleAgentRuntimeDialogBootRecovery().then((shouldSchedule) => {
+            if (shouldSchedule) {
                 scheduleDialogBootRecovery(ctx);
             }
         }),
@@ -322,27 +327,14 @@ export function stepStartMetricsTimer(ctx, state) {
  * @returns {boolean}
  */
 export function reapExpiredPendingQuestionShadow(ctx) {
-    if (ctx.hasPendingQuestion() || !ctx.hasPendingQuestionShadow() || !ctx.isPendingQuestionShadowExpired()) {
+    if (!shouldReapAgentRuntimePendingQuestionShadow(ctx)) {
         return false;
     }
 
-    ctx.clearPendingQuestionShadow();
-    void ctx.trackBackgroundTask(
-        persistStateWithPolicy(
-            { pendingQuestion: null, pendingQuestionMeta: null },
-            { label: 'state.pendingQuestionShadow.reap' },
-        ).then((result) => {
-            if (!result.ok) {
-                throw result.error;
-            }
-            return undefined;
-        }),
-        {
-            label: 'state.pendingQuestionShadow.reap',
-            description: 'Reap expired ask_user shadow during runtime metrics tick',
-        },
-    );
-    return true;
+    return clearAgentRuntimePendingQuestionShadow(ctx, {
+        label: 'state.pendingQuestionShadow.reap',
+        description: 'Reap expired ask_user shadow during runtime metrics tick',
+    });
 }
 
 /**
@@ -365,9 +357,9 @@ export function stepStartMcpReconnect(ctx, state) {
 export function stepStartKeepalive(ctx) {
     ctx.startKeepalive({
         isIdle: () => ctx.getStatus() === 'idle',
-        onKeepalive: (/** @type {number} */ ts) => {
+        onKeepalive: (/** @type {{ ts: number; strategy: 'client.ping' | 'session.send' }} */ info) => {
             defaultMetrics.recordKeepalivePing();
-            ctx.emit(EMITTER_SESSION_KEEPALIVE, { ts });
+            ctx.emit(EMITTER_SESSION_KEEPALIVE, { ts: info.ts, strategy: info.strategy });
         },
     });
 }

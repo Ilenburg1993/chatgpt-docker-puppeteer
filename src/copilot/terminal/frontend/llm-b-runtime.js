@@ -531,7 +531,7 @@ export async function stopTerminalDialogMode() {
  *
  * @param {string} enrichedMessage
  * @param {{
- *     timeout: number;
+ *     timeout: number | null;
  *     onDelta: (chunk: string) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} opts

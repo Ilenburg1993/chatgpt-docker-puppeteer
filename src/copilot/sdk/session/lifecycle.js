@@ -112,6 +112,8 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  * @property {CopilotSession} session - Sessao criada ou retomada
  * @property {boolean} isResumed - true se foi retomada, false se criada
  * @property {string} sessionId - ID da sessao
+ * @property {string | undefined} [model] - Modelo efetivamente aplicado à sessão
+ * @property {ReasoningEffortLevel | undefined} [reasoningEffort] - Reasoning effort efetivamente aplicado
  */
 
 /**
@@ -387,6 +389,47 @@ function buildSessionConfig(opts, mode) {
     return /** @type {import('@github/copilot-sdk').SessionConfig} */ (cfg);
 }
 
+/**
+ * Normaliza model/reasoningEffort para `resumeSession`.
+ *
+ * Regra arquitetural: `model='auto'` é válido para CREATE (onde o wrapper resolve o modelo via catalog/model selector),
+ * mas não deve ser reenviado em RESUME. Em retomadas, `auto` significa “usar a sessão já existente”, portanto o wrapper
+ * omite `model` e também `reasoningEffort` associado quando não houver um modelo concreto explícito.
+ *
+ * @param {SessionResumeOptions} options
+ * @returns {{ model?: string | undefined; reasoningEffort?: ReasoningEffortLevel | undefined }}
+ */
+function normalizeResumeModelSelection(options) {
+    const selectedModel = options.model;
+    if (selectedModel === 'auto') {
+        if (options.reasoningEffort !== undefined) {
+            log(
+                'INFO',
+                '[lib/session] resumeSession: model="auto" em retomada — omitindo também reasoningEffort até que haja modelo concreto.',
+            );
+        } else {
+            log(
+                'INFO',
+                '[lib/session] resumeSession: model="auto" em retomada — usando modelo já persistido na sessão.',
+            );
+        }
+        return {};
+    }
+
+    if (selectedModel === undefined && options.reasoningEffort !== undefined) {
+        log(
+            'INFO',
+            '[lib/session] resumeSession: reasoningEffort omitido porque nenhuma troca explícita de modelo foi solicitada.',
+        );
+        return {};
+    }
+
+    return {
+        ...(selectedModel !== undefined ? { model: selectedModel } : {}),
+        ...(options.reasoningEffort !== undefined ? { reasoningEffort: options.reasoningEffort } : {}),
+    };
+}
+
 // ─── API publica ──────────────────────────────────────────────────────────────
 
 /**
@@ -437,7 +480,13 @@ export async function createSession(client, opts) {
         run: async () => client.createSession(config),
     });
     log('INFO', `[lib/session] Sessao criada: ${session.sessionId}`);
-    return { session, isResumed: false, sessionId: session.sessionId };
+    return {
+        session,
+        isResumed: false,
+        sessionId: session.sessionId,
+        model,
+        ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+    };
 }
 
 /**
@@ -458,7 +507,22 @@ export async function resumeSession(client, sessionId, opts) {
         throw new TypeError('[lib/session/resumeSession] sessionId deve ser string não-vazia.');
     }
     const options = opts ?? {};
-    const config = buildSessionConfig(options, 'resume');
+    const normalizedSelection = normalizeResumeModelSelection(options);
+    /** @type {SessionResumeOptions} */
+    const sanitizedOptions = {
+        ...options,
+        ...(normalizedSelection.model !== undefined ? { model: normalizedSelection.model } : {}),
+        ...(normalizedSelection.reasoningEffort !== undefined
+            ? { reasoningEffort: normalizedSelection.reasoningEffort }
+            : {}),
+    };
+    if (normalizedSelection.model === undefined && 'model' in sanitizedOptions) {
+        delete sanitizedOptions.model;
+    }
+    if (normalizedSelection.reasoningEffort === undefined && 'reasoningEffort' in sanitizedOptions) {
+        delete sanitizedOptions.reasoningEffort;
+    }
+    const config = buildSessionConfig(sanitizedOptions, 'resume');
 
     log('INFO', `[lib/session] Retomando sessao: ${sessionId}`);
     const session = await runSessionLifecycleOperation({
@@ -466,12 +530,22 @@ export async function resumeSession(client, sessionId, opts) {
         operation: 'session.resume',
         successAttributes: {
             sessionId,
+            model: normalizedSelection.model ?? null,
+            reasoningEffort: normalizedSelection.reasoningEffort ?? null,
             disableResume: Boolean(/** @type {{ disableResume?: boolean }} */ (config).disableResume),
         },
         run: async () => client.resumeSession(sessionId, config),
     });
     log('INFO', `[lib/session] Sessao retomada: ${session.sessionId}`);
-    return { session, isResumed: true, sessionId: session.sessionId };
+    return {
+        session,
+        isResumed: true,
+        sessionId: session.sessionId,
+        ...(normalizedSelection.model !== undefined ? { model: normalizedSelection.model } : {}),
+        ...(normalizedSelection.reasoningEffort !== undefined
+            ? { reasoningEffort: normalizedSelection.reasoningEffort }
+            : {}),
+    };
 }
 
 /**
