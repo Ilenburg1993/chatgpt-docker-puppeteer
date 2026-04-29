@@ -9,6 +9,7 @@
 
 import { readAgentRuntimeCapabilities } from '#copilot/agent';
 import { getAgentHealthSnapshotCompat } from './runtime-health.js';
+import { buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 
 /**
  * @typedef {import('../agent/types.js').IAlwaysAliveAgent & {
@@ -17,14 +18,7 @@ import { getAgentHealthSnapshotCompat } from './runtime-health.js';
  * }} CapabilityAgent
  */
 
-/**
- * @typedef {{
- *     runtimeId?: string | null;
- *     requestedRuntimeId?: string | null;
- *     runtimeFound?: boolean;
- *     usedDefaultRuntimeFallback?: boolean;
- * }} RuntimeCapabilitiesMeta
- */
+/** @typedef {import('./runtime-meta.js').RuntimeRouteMeta} RuntimeCapabilitiesMeta */
 
 /**
  * Payload estável para bordas.
@@ -43,18 +37,6 @@ import { getAgentHealthSnapshotCompat } from './runtime-health.js';
  */
 
 /**
- * Normaliza metadata recebida de rotas antigas (`string`) e rotas novas (`RuntimeRouteDeps`).
- *
- * @param {RuntimeCapabilitiesMeta | string | null | undefined} meta
- * @returns {RuntimeCapabilitiesMeta}
- */
-function normalizeMeta(meta) {
-    if (!meta) return {};
-    if (typeof meta === 'string') return { runtimeId: meta };
-    return meta;
-}
-
-/**
  * Monta a projection de capabilities para consumidores de borda.
  *
  * Não adicione decisão operacional aqui. Se uma capability nova precisar de readiness real, a origem correta é
@@ -65,16 +47,10 @@ function normalizeMeta(meta) {
  * @returns {RuntimeCapabilitiesPayload}
  */
 export function buildAgentRuntimeCapabilities(agent, meta) {
-    const runtimeMeta = normalizeMeta(meta);
     return {
         ok: true,
         generatedAt: Date.now(),
-        ...(runtimeMeta.runtimeId ? { runtimeId: runtimeMeta.runtimeId } : {}),
-        ...(runtimeMeta.requestedRuntimeId !== undefined ? { requestedRuntimeId: runtimeMeta.requestedRuntimeId } : {}),
-        ...(runtimeMeta.runtimeFound !== undefined ? { runtimeFound: runtimeMeta.runtimeFound } : {}),
-        ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
-            ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
-            : {}),
+        ...buildRuntimeRouteMetaPayload(meta),
         ...readAgentRuntimeCapabilities(agent, { healthSnapshot: getAgentHealthSnapshotCompat(agent) }),
     };
 }

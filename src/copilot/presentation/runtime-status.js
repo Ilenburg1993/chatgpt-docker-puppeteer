@@ -16,34 +16,10 @@
  */
 
 import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent';
+import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
+import { buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 
-/**
- * Metadata de seleção do runtime.
- *
- * Esses campos acompanham endpoints de status/session para que clientes consigam distinguir "runtime pedido" de
- * "runtime usado após fallback".
- *
- * @typedef {{
- *     runtimeId?: string | null;
- *     requestedRuntimeId?: string | null;
- *     runtimeFound?: boolean;
- *     usedDefaultRuntimeFallback?: boolean;
- * }} RuntimeStatusMeta
- */
-
-/**
- * Normaliza metadata antiga (`runtimeId` string) e metadata nova (`RuntimeRouteDeps`).
- *
- * @param {string | null | undefined | RuntimeStatusMeta} meta
- * @returns {RuntimeStatusMeta}
- */
-function normalizeRuntimeStatusMeta(meta) {
-    if (!meta) return {};
-    if (typeof meta === 'string') {
-        return { runtimeId: meta };
-    }
-    return meta;
-}
+/** @typedef {import('./runtime-meta.js').RuntimeRouteMeta} RuntimeStatusMeta */
 
 /**
  * Lê o snapshot bruto do agent em formato seguro para projections compartilhadas.
@@ -79,15 +55,12 @@ export function readAgentStatusValue(agent) {
  * }}
  */
 export function buildAgentStatusHttpPayload(agent, meta) {
-    const runtimeMeta = normalizeRuntimeStatusMeta(meta);
+    const lifecycle = readRuntimeLifecycleSnapshot();
     return {
         ok: true,
-        ...(runtimeMeta.runtimeId ? { runtimeId: runtimeMeta.runtimeId } : {}),
-        ...(runtimeMeta.requestedRuntimeId !== undefined ? { requestedRuntimeId: runtimeMeta.requestedRuntimeId } : {}),
-        ...(runtimeMeta.runtimeFound !== undefined ? { runtimeFound: runtimeMeta.runtimeFound } : {}),
-        ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
-            ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
-            : {}),
+        ...buildRuntimeRouteMetaPayload(meta),
+        lifecycle,
+        lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),
         ...readAgentStatusSnapshot(agent),
     };
 }
@@ -113,15 +86,9 @@ export function buildAgentStatusHttpPayload(agent, meta) {
  */
 export function buildAgentSessionHttpPayload(agent, meta) {
     const snap = readAgentStatusSnapshot(agent);
-    const runtimeMeta = normalizeRuntimeStatusMeta(meta);
     return {
         ok: true,
-        ...(runtimeMeta.runtimeId ? { runtimeId: runtimeMeta.runtimeId } : {}),
-        ...(runtimeMeta.requestedRuntimeId !== undefined ? { requestedRuntimeId: runtimeMeta.requestedRuntimeId } : {}),
-        ...(runtimeMeta.runtimeFound !== undefined ? { runtimeFound: runtimeMeta.runtimeFound } : {}),
-        ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
-            ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
-            : {}),
+        ...buildRuntimeRouteMetaPayload(meta),
         sessionId: typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null,
         model: typeof snap['model'] === 'string' ? snap['model'] : null,
         isResumed: Boolean(snap['isResumed']),
@@ -145,14 +112,8 @@ export function buildAgentSessionHttpPayload(agent, meta) {
  * }}
  */
 export function buildAgentConnectedSsePayload(agent, meta) {
-    const runtimeMeta = normalizeRuntimeStatusMeta(meta);
     return {
-        ...(runtimeMeta.runtimeId ? { runtimeId: runtimeMeta.runtimeId } : {}),
-        ...(runtimeMeta.requestedRuntimeId !== undefined ? { requestedRuntimeId: runtimeMeta.requestedRuntimeId } : {}),
-        ...(runtimeMeta.runtimeFound !== undefined ? { runtimeFound: runtimeMeta.runtimeFound } : {}),
-        ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
-            ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
-            : {}),
+        ...buildRuntimeRouteMetaPayload(meta),
         ...readAgentStatusSnapshot(agent),
         timestamp: Date.now(),
     };

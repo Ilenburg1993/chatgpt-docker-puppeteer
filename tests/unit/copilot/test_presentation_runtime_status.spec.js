@@ -42,6 +42,8 @@ describe('presentation/runtime-status', () => {
         expect(buildAgentStatusHttpPayload(agent)).toEqual(
             expect.objectContaining({
                 ok: true,
+                lifecycle: expect.any(Object),
+                lifecycleSummary: expect.any(Object),
                 status: 'processing',
                 sessionId: 'sess-123',
                 queueSize: 3,

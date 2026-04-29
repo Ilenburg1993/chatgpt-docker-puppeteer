@@ -758,6 +758,42 @@ Estado complementar validado após o início da transformação concreta do prog
   - logging enriquecido com `sessionId`.
 - `sdk/session/provider.js` passou a ter:
   - suporte a `headers` em configs BYOK;
+
+### 10.25 Checkpoint complementar — Cleanup defensivo e boundary canônico de `provider` (2026-04-29)
+
+Estado complementar validado após a subonda de endurecimento cruzado `agent ↔ sdk`:
+
+- `agent/session/cleanup.js` agora preserva um conjunto canônico de sessões protegidas, composto
+  por:
+  - `currentSessionId` informado pelo caller;
+  - `client.getForegroundSessionId()`;
+  - `client.getLastSessionId()`;
+  - seeds adicionais explícitos, quando presentes.
+- a descoberta desses IDs protegidos foi promovida para a fronteira canônica em
+  `agent/facades/agent-sdk-access.js` via `listAgentSdkProtectedSessionIdsByClient()`.
+- `config/session-config.js` (`SessionConfigBuilder.provider()`) agora valida e normaliza `provider`
+  por meio de `validateProviderConfig()` exposto em `config/sdk-config-port.js`.
+- `server/routes/sdk/session-crud.js` passou a validar `provider` na borda HTTP antes de chamar
+  `createClientSession()`/`resumeClientSession()`, eliminando payloads crus nessa superfície.
+- `server/routes/sdk/deps.js` passou a expor `validateProviderConfig` como parte do contrato
+  canônico de `sdkSession` consumido pelas rotas.
+
+Validação executada neste checkpoint:
+
+- `npm run typecheck:strict:src.copilot` ✅
+- lint focado dos arquivos tocados ✅
+- lote focado de testes ✅
+  - `tests/unit/copilot/test_session_cleanup.spec.js`
+  - `tests/unit/copilot/test_cleanup.spec.js`
+  - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
+  - `tests/unit/copilot/test_sdk_route_session_ownership.spec.js`
+
+Regra arquitetural consolidada neste checkpoint:
+
+- o runtime do `agent` pode decidir **quando** limpar sessões stale, mas a fronteira SDK decide
+  **quais** IDs merecem proteção defensiva por foreground/last-session;
+- a validação de `provider` pertence exclusivamente ao boundary do SDK e deve ser consumida por
+  builders e bordas, não reimplementada localmente.
   - validação canônica de `baseUrl`, protocolo e strings opcionais;
   - `type: 'openai'` explícito como default em `validateProviderConfig()`;
   - rejeição de `wireApi` para Anthropic;
@@ -778,6 +814,67 @@ Validação executada neste checkpoint:
   - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
 - `npm run typecheck:node` ✅
 - `npm run lint` ✅
+
+### 10.26 Checkpoint complementar — `loop-manager` e `health-check` com fronteira semântica de runtime state (2026-04-29)
+
+Estado complementar validado após a subonda de convergência estrutural no runtime do agent:
+
+- `agent/dialog/loop-manager.js` deixou de depender diretamente de `state-io` (`readState`,
+  `readStateAsync`, `persistStateWithPolicy`) e passou a consumir capabilities semânticas em
+  `agent/facades/agent-runtime-state.js`:
+  - `readAgentRuntimeDialogBootstrapState()`
+  - `readAgentRuntimeDialogPersistedState()`
+  - `persistAgentRuntimeDialogState()`
+- `agent/health-check.js` passou a consumir um snapshot agregado de sinais em vez de ler `ctx` de
+  forma espalhada, via nova façade `agent/facades/agent-health-access.js`
+  (`readAgentHealthInputSnapshot`).
+
+Regra arquitetural consolidada neste checkpoint:
+
+- módulos de orquestração (`dialog/loop-manager`) e avaliação (`health-check`) não devem conhecer
+  detalhes de acesso ao storage de state nem multiplicar leitura crua de `AgentContext`;
+- a borda semântica de runtime (`agent/facades/*`) é o único lugar autorizado para encapsular essas
+  leituras/escritas estruturais.
+
+Validação executada neste checkpoint:
+
+- lote focado de testes ✅
+  - `tests/unit/copilot/test_agent_runtime_state.spec.js`
+  - `tests/unit/copilot/test_loop_manager.spec.js`
+  - `tests/unit/copilot/test_agent_health_check.spec.js`
+  - `tests/unit/copilot/test_session_cleanup.spec.js`
+  - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
+  - `tests/unit/copilot/test_sdk_route_session_ownership.spec.js`
+- `npm run typecheck:strict:src.copilot` ✅
+- eslint/prettier focados nos arquivos tocados ✅
+
+### 10.27 Checkpoint complementar — `turn-executor` convergido para runtime-state semântico (2026-04-29)
+
+Estado complementar validado após a subonda de convergência do executor de turno:
+
+- `agent/dialog/turn-executor.js` deixou de chamar `persistStateWithPolicy()` diretamente para
+  marcar `pendingTurnMessage`/`pendingTurnTs`;
+- a persistência do marcador de pending turn foi promovida para
+  `agent/facades/agent-runtime-state.js` por meio da capability
+  `persistAgentRuntimePendingTurnState({ message, ts })`;
+- o eixo de diálogo (`loop-manager` + `turn-executor`) passa a compartilhar uma mesma fronteira
+  semântica de runtime-state para bootstrap, resume, flags e pending turn.
+
+Regra arquitetural consolidada neste checkpoint:
+
+- executores de turno não devem conhecer mecânica de storage/persistência de estado;
+- gravações estruturais do runtime devem ser encapsuladas por façades semânticas em
+  `agent/facades/*`.
+
+Validação executada neste checkpoint:
+
+- lote focado de testes ✅
+  - `tests/unit/copilot/test_turn_executor.spec.js`
+  - `tests/unit/copilot/test_agent_background_tasks_integration.spec.js`
+  - `tests/unit/copilot/test_loop_manager.spec.js`
+  - `tests/unit/copilot/test_agent_runtime_state.spec.js`
+- `npm run typecheck:strict:src.copilot` ✅
+- eslint/prettier focados nos arquivos tocados ✅
 
 ### 10.9 Checkpoint complementar — Wiring inicial de SessionFs no runtime real (2026-04-27)
 
@@ -1283,3 +1380,27 @@ Leitura arquitetural:
 - a purificação do runtime não pode introduzir loops semânticos entre getters do agent e façades;
 - façades devem preferir snapshots/métodos estáveis do `AgentContext` quando o owner alto nível já
   delega leitura para elas.
+
+### 10.25 Checkpoint complementar — convergência de metadata runtime no presentation + auditoria geral de `agent` (2026-04-29)
+
+Estado complementar validado na continuação da trilha P6 (presentation monopoly):
+
+- criação de `presentation/runtime-meta.js` como seam canônica para:
+  - normalização de metadata de runtime (`string` legado vs objeto estruturado);
+  - projeção compartilhada de
+    `runtimeId`/`requestedRuntimeId`/`runtimeFound`/`usedDefaultRuntimeFallback`;
+- `presentation/runtime-status.js` e `presentation/runtime-capabilities.js` deixaram de duplicar
+  lógica de normalize/spread e passaram a consumir `buildRuntimeRouteMetaPayload()`;
+- testes dedicados adicionados para o seam novo:
+  - `tests/unit/copilot/test_presentation_runtime_meta.spec.js`.
+
+Em paralelo, foi consolidada auditoria geral de `src/copilot/agent` em:
+
+- `src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/57-AUDITORIA-GERAL-SRC-COPILOT-AGENT-GRAFOS-ASIS-TOBE-ROADMAP.md`;
+
+incluindo:
+
+- grafo AS-IS com métricas factuais de dependências;
+- grafo operacional boot→loop→health→cleanup;
+- grafo TO-BE por camadas (orchestration, seams, ports, infra);
+- roadmap consolidado do que falta, alinhado aos checkpoints 42–56.
