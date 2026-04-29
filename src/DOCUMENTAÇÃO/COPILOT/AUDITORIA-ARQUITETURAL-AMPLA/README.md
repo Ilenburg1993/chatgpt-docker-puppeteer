@@ -67,6 +67,14 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 40    | `40-BLOCO-B-W13-RECOVERY-NO-LIFECYCLE-E-UNIFICACAO-CLIENT-SESSION.md` | checkpoint da extensão do recovery ao lifecycle e da unificação do singleton session wrapper |
 | 41    | `41-BLOCO-B-W13-TAXONOMIA-RECONNECT-E-CONVERGENCIA.md`                | checkpoint da taxonomia de reconnect e da convergência entre SDK, agent e terminal           |
 | 42    | `42-MAPEAMENTO-LIFECYCLE-AGENT-VS-SDK.md`                             | mapeamento detalhado da fronteira de lifecycle entre SDK vanilla e runtime vivo do agent     |
+| 43    | `43-BLOCO-B-W13-WATCHDOG-ONLY-TURNS-E-RESUME-AUTO-SANITIZATION.md`    | checkpoint da correção do timeout de turno longo e do saneamento do resume com `model=auto`  |
+| 44    | `44-MAPEAMENTO-LIFECYCLE-ADJACENTE-KEEPALIVE-CLEANUP-BOOT.md`         | mapeamento da família adjacente de lifecycle e da nova fronteira semântica do keepalive      |
+| 45    | `45-MAPEAMENTO-HISTORY-CAPABILITY-AGENT-VS-SDK.md`                    | mapeamento da capability `getMessages` e remoção da sondagem crua em `agent/session/*`       |
+| 46    | `46-MAPEAMENTO-RUNTIME-STATE-E-BOOT-SDK-BRIDGES.md`                   | mapeamento do runtime-state sem `state-io` inline e das bridges semânticas de boot do SDK    |
+| 47    | `47-MAPEAMENTO-DIALOG-BOOT-RECOVERY-E-RUNTIME-STATE.md`               | mapeamento da recuperação do dialog loop sem `state-io` direto em `boot-steps.js`            |
+| 48    | `48-MAPEAMENTO-ALWAYSALIVE-RUNTIME-CONTROLS-E-DIALOG.md`              | mapeamento da delegação de `AlwaysAliveAgent` para `runtime-controls` e `dialog-runtime`     |
+| 49    | `49-MAPEAMENTO-ALWAYSALIVE-RUNTIME-GOVERNANCE-E-CAPABILITIES.md`      | mapeamento da delegação de governança/capabilities para `agent-runtime-controls`             |
+| 50    | `50-MAPEAMENTO-BOOTSTEPS-SHADOW-REAPER-RUNTIME-STATE.md`              | mapeamento da extração do reaper de shadow de `boot-steps` para `agent-runtime-state`        |
 
 ---
 
@@ -138,6 +146,33 @@ Na transição para o Bloco B, o pacote já passa a incluir também:
 - checkpoint complementar do Bloco B (`42`), consolidando a regra geral de ownership do lifecycle:
   `sdk/` como owner das transições vanilla e `agent/` como owner da sessão viva, com uso de façades
   canônicas para `start/stop/ping/create/resume` no lifecycle do agent.
+- checkpoint complementar do Bloco B (`43`), cobrindo a introdução do modo `watchdog-only` nos
+  turnos interativos do terminal, o reset de timeout por progresso vindo do host vivo e o saneamento
+  de `model="auto"` no `resumeSession()` com persistência do modelo efetivo.
+- checkpoint complementar do Bloco B (`44`), cobrindo a família adjacente do lifecycle (`keepalive`,
+  `cleanup`, `boot-steps`, `boot-wiring`) e a convergência do keepalive para uma ação semântica
+  única do runtime, sem tocar handles crus do SDK.
+- checkpoint complementar do Bloco B (`45`), cobrindo a capability de histórico da sessão
+  (`getMessages`), a promoção de `canReadAgentSdkSessionMessages()` como descoberta canônica dessa
+  surface e a remoção da sondagem crua em `initializer`/`history-sync`.
+- checkpoint complementar do Bloco B / transição para o Bloco C (`46`), cobrindo a extração de
+  `agent-runtime-state.js`, a remoção de `readState()`/`persistStateWithPolicy()` inline em
+  `AlwaysAliveAgent` e `boot-steps`, e a adoção de bridges semânticas de boot do SDK em
+  `boot-wiring.js`.
+- checkpoint complementar do Bloco B / aprofundamento do Bloco C (`47`), cobrindo a remoção de
+  `readStateAsync()`/`persistStateWithPolicy({ dialogPaused: true })` de `boot-steps.js` para o eixo
+  de dialog boot recovery, agora delegado à façade semântica `agent-runtime-state.js`.
+- checkpoint complementar do Bloco B / aprofundamento do Bloco C (`48`), cobrindo a delegação de
+  `AlwaysAliveAgent` para `agent-runtime-controls` no eixo de status/interação e o alinhamento da
+  cadeia de diálogo em `agent-dialog-runtime.js` / `presentation/runtime-dialog.js`.
+- checkpoint complementar do Bloco B / aprofundamento do Bloco C (`49`), cobrindo a delegação do
+  eixo de governança/capabilities de `AlwaysAliveAgent` para `agent-runtime-controls` (permission
+  mode, permission/context capabilities e tool registry snapshots), com guardrail estrutural
+  dedicado contra regressão para chamadas diretas em `ctx`.
+- checkpoint complementar do Bloco B / aprofundamento do Bloco C (`50`), cobrindo a remoção da
+  inspeção direta de `ctx` no reaper de `pendingQuestionShadow` em `boot-steps.js`, agora delegada
+  para `shouldReapAgentRuntimePendingQuestionShadow()` na façade `agent-runtime-state`, com seam
+  dedicada para impedir regressão.
 
 ---
 
