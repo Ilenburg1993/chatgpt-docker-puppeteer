@@ -38,6 +38,7 @@ describe('presentation/index.js — contrato', () => {
         expect(typeof presentation.stopDefaultAgentDialogLoopAuthorized).toBe('function');
         expect(typeof presentation.getAgentHealthSnapshotCompat).toBe('function');
         expect(typeof presentation.buildAgentModuleHealth).toBe('function');
+        expect(typeof presentation.readRuntimeLifecycleSnapshot).toBe('function');
         expect(typeof presentation.readAgentStatusSnapshot).toBe('function');
         expect(typeof presentation.readAgentStatusValue).toBe('function');
         expect(typeof presentation.buildAgentStatusHttpPayload).toBe('function');

@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
 import { registerShutdownHandler } from './shutdown.js';
 
 /**
@@ -108,6 +109,6 @@ function ensureShutdownRegistered() {
         async () => {
             cancelAll();
         },
-        5,
+        SHUTDOWN_PRIORITY.TIMERS_EARLY,
     );
 }

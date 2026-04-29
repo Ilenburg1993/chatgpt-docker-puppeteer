@@ -10,13 +10,14 @@ import {
     listActiveSdkSessions,
     registerActiveSdkSession,
     removeActiveSdkSession,
-} from '../../../../src/copilot/infra/sdk-session-registry.js';
+} from '../../../../src/copilot/sdk/session/session-registry.js';
 
 describe('D1 — sdk session registry externalization', () => {
-    it('client.js delega o registry para infra/sdk-session-registry.js', async () => {
+    it('client.js delega o registry para sdk/session/session-registry.js', async () => {
         const src = await readFile(new URL('../../../../src/copilot/sdk/session/client.js', import.meta.url), 'utf8');
 
-        assert.match(src, /infra\/sdk-session-registry\.js/);
+        assert.match(src, /session-registry\.js/);
+        assert.doesNotMatch(src, /infra\/sdk-session-registry\.js/);
         assert.doesNotMatch(src, /const _sessions = new Map\(/);
     });
 

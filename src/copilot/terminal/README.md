@@ -37,6 +37,21 @@ Ele consome:
 | `terminal-agent-wiring.js`               | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
 
+## Lifecycle e ownership
+
+- O entrypoint executável continua sendo `terminal/bootstrap.js`.
+- O lifecycle fatal de boot fica em `terminal/bootstrap-lifecycle.js`, que registra sinais de
+  processo e chama `runShutdown('boot_failure')` antes de encerrar em falha fatal.
+- `terminal/index.js` é owner de recursos de UX local: aliases, pinned files, activity listeners,
+  reflection loop, TODO cleanup e REPL.
+- O boot do terminal é dividido em fases exportadas por `terminal/index.js`, para que o
+  `BootLifecycleReport` diferencie aliases, runtime config, pinned context, ConversationHub, HTTP
+  server, listeners e REPL.
+- `server/index.js` é o único owner do HTTP server; o terminal injeta `startCopilotServer`, mas não
+  registra segundo shutdown handler para fechar o mesmo server.
+- Timers do terminal devem ser registrados em `core/timer-registry.js` e handlers explícitos devem
+  usar `SHUTDOWN_PRIORITY`.
+
 ## Regra de ouro
 
 Se algo já existe no SDK vanilla — por exemplo:

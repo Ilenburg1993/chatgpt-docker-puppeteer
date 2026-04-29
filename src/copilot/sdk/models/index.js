@@ -41,6 +41,8 @@ export {
     ModelSelector,
     ModelStatsTracker,
     autoDowngradeDetector,
+    createModelRuntime,
+    defaultModelRuntime,
     modelRegistry,
     modelSelector,
     modelStatsTracker,

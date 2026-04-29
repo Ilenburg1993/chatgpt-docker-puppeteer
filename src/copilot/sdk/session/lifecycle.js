@@ -22,8 +22,6 @@ import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
-
-import { listModels, resolveModelIdAuto } from '../models/index.js';
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
@@ -35,6 +33,48 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
+
+/**
+ * @typedef {(fallback: string) => Promise<string>} AutoModelResolver
+ */
+
+/**
+ * Resolver default carregado de forma lazy para quebrar o ciclo estático `session/lifecycle -> models -> client ->
+ * lifecycle`. A fronteira pública segue igual; apenas o acoplamento de import deixa de ser eager.
+ *
+ * @param {string} fallback
+ * @returns {Promise<string>}
+ */
+async function defaultAutoModelResolver(fallback) {
+    const { listModels, resolveModelIdAuto } = await import('../models/index.js');
+    const availableModels = await listModels();
+    return resolveModelIdAuto(availableModels, 'auto', fallback);
+}
+
+/** @type {AutoModelResolver} */
+let autoModelResolver = defaultAutoModelResolver;
+
+/**
+ * Injeta um resolver de modelo automático. Use em testes ou runtimes que já possuem um ModelRuntime isolado.
+ *
+ * @param {AutoModelResolver | null | undefined} resolver
+ * @returns {void}
+ */
+export function setSessionAutoModelResolver(resolver) {
+    autoModelResolver = typeof resolver === 'function' ? resolver : defaultAutoModelResolver;
+}
+
+/**
+ * Resolve `model: "auto"` sem depender estaticamente do pacote de models.
+ *
+ * @param {string} model
+ * @param {string} [fallback='gpt-5-mini'] Default is `'gpt-5-mini'`
+ * @returns {Promise<string>}
+ */
+export async function resolveSessionCreateModel(model, fallback = 'gpt-5-mini') {
+    if (model !== 'auto') return model;
+    return autoModelResolver(fallback);
+}
 
 /**
  * @typedef {Object} InfiniteSessionOptions
@@ -496,8 +536,7 @@ export async function createSession(client, opts) {
     if (model === 'auto') {
         try {
             log('INFO', '[session] Iniciando auto-seleção de modelo...');
-            const availableModels = await listModels();
-            model = await resolveModelIdAuto(availableModels, 'auto', 'gpt-5-mini');
+            model = await resolveSessionCreateModel(model, 'gpt-5-mini');
             log('INFO', `[session] Modelo auto-selecionado: ${model}`);
         } catch (e) {
             log('WARN', `[session] Auto-seleção de modelo falhou: ${toError(e).message}; usando fallback gpt-5-mini`);

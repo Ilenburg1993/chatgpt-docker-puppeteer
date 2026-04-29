@@ -1,5 +1,6 @@
 // @ts-check
 import { toError } from './error-handlers.js';
+import { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
 /**
  * src/copilot/core/shutdown.js
  *
@@ -14,6 +15,8 @@ import { toError } from './error-handlers.js';
 
 /**
  * @typedef {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', msg: string) => void} ShutdownLogFn
+ *
+ * @typedef {(event: { type: string; timestamp: number; [key: string]: unknown }) => void} ShutdownEventEmitter
  */
 
 /** @type {ShutdownLogFn} */
@@ -22,12 +25,38 @@ let _log = (level, msg) => {
     fn(`[shutdown][${level}] ${msg}`);
 };
 
+/** @type {ShutdownEventEmitter | null} */
+let _emitShutdownEvent = null;
+
 /**
  * @typedef {object} ShutdownHandler
  * @property {string} name - Nome do handler (para log)
  * @property {number} priority - Prioridade (menor = executa primeiro)
  * @property {() => Promise<void>} fn - Função de cleanup
  * @property {number} timeoutMs - Timeout do handler em ms
+ *
+ * @typedef {'ok' | 'failed' | 'timeout'} ShutdownHandlerStatus
+ *
+ * @typedef {object} ShutdownHandlerReport
+ * @property {string} name
+ * @property {number} priority
+ * @property {number} timeoutMs
+ * @property {ShutdownHandlerStatus} status
+ * @property {number} startedAt
+ * @property {number} completedAt
+ * @property {number} durationMs
+ * @property {string | null} error
+ *
+ * @typedef {object} ShutdownReport
+ * @property {string} reason
+ * @property {number} startedAt
+ * @property {number} completedAt
+ * @property {number} durationMs
+ * @property {number} handlerCount
+ * @property {number} okCount
+ * @property {number} failedCount
+ * @property {number} timeoutCount
+ * @property {ShutdownHandlerReport[]} handlers
  */
 
 /** @type {ShutdownHandler[]} */
@@ -36,6 +65,19 @@ const handlers = [];
 /** @type {boolean} */
 let shuttingDown = false;
 
+/** @type {Promise<void> | null} */
+let shutdownInFlight = null;
+
+/** @type {ShutdownReport | null} */
+let lastShutdownReport = null;
+
+class ShutdownHandlerTimeoutError extends Error {
+    constructor(/** @type {string} */ handlerName) {
+        super(`Shutdown handler "${handlerName}" timeout`);
+        this.name = 'ShutdownHandlerTimeoutError';
+    }
+}
+
 /**
  * Injeta logger externo (ex: observability/logger). Chamado no bootstrap.
  *
@@ -43,6 +85,15 @@ let shuttingDown = false;
  */
 export function setShutdownLogger(logFn) {
     _log = logFn;
+}
+
+/**
+ * Injeta emissor opcional de eventos de lifecycle. Mantém `core/` independente do EventBus concreto.
+ *
+ * @param {ShutdownEventEmitter | null | undefined} emitFn
+ */
+export function setShutdownEventEmitter(emitFn) {
+    _emitShutdownEvent = typeof emitFn === 'function' ? emitFn : null;
 }
 
 /**
@@ -59,7 +110,7 @@ export function setShutdownLogger(logFn) {
  * @param {number} [priority=50] - Prioridade (menor = executa primeiro). Default is `50`
  * @param {{ timeoutMs?: number }} [options] - Opções do handler. Default timeout is `5000`
  */
-export function registerShutdownHandler(name, fn, priority = 50, options = {}) {
+export function registerShutdownHandler(name, fn, priority = SHUTDOWN_PRIORITY.DEFAULT, options = {}) {
     const timeoutMs =
         typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
             ? options.timeoutMs
@@ -81,22 +132,95 @@ export function registerShutdownHandler(name, fn, priority = 50, options = {}) {
  * @param {string} [reason='unknown'] - Motivo do shutdown (para log). Default is `'unknown'`
  * @returns {Promise<void>}
  */
-export async function runShutdown(reason = 'unknown') {
-    if (shuttingDown) return;
+export function runShutdown(reason = 'unknown') {
+    if (shutdownInFlight) return shutdownInFlight;
     shuttingDown = true;
 
-    _log('INFO', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
+    shutdownInFlight = (async () => {
+        const startedAt = Date.now();
+        /** @type {ShutdownHandlerReport[]} */
+        const handlerReports = [];
+        _log('INFO', `Graceful shutdown iniciado (reason: ${reason}) — ${handlers.length} handlers`);
+        emitShutdownLifecycleEvent('runtime.shutdown.started', {
+            reason,
+            handlerCount: handlers.length,
+            handlers: listShutdownHandlers(),
+        });
 
-    for (const handler of handlers) {
-        try {
-            await runHandlerWithTimeout(handler);
-            _log('INFO', `  ✓ ${handler.name}`);
-        } catch (err) {
-            _log('WARN', `  ✗ ${handler.name}: ${toError(err).message ?? err}`);
+        for (const handler of handlers) {
+            const handlerStartedAt = Date.now();
+            try {
+                await runHandlerWithTimeout(handler);
+                const completedAt = Date.now();
+                handlerReports.push({
+                    name: handler.name,
+                    priority: handler.priority,
+                    timeoutMs: handler.timeoutMs,
+                    status: 'ok',
+                    startedAt: handlerStartedAt,
+                    completedAt,
+                    durationMs: completedAt - handlerStartedAt,
+                    error: null,
+                });
+                _log('INFO', `  ✓ ${handler.name}`);
+            } catch (err) {
+                const error = toError(err);
+                const completedAt = Date.now();
+                const status = err instanceof ShutdownHandlerTimeoutError ? 'timeout' : 'failed';
+                handlerReports.push({
+                    name: handler.name,
+                    priority: handler.priority,
+                    timeoutMs: handler.timeoutMs,
+                    status,
+                    startedAt: handlerStartedAt,
+                    completedAt,
+                    durationMs: completedAt - handlerStartedAt,
+                    error: error.message,
+                });
+                _log('WARN', `  ✗ ${handler.name}: ${error.message}`);
+                emitShutdownLifecycleEvent('runtime.shutdown.handler_failed', {
+                    reason,
+                    handler: {
+                        name: handler.name,
+                        priority: handler.priority,
+                        timeoutMs: handler.timeoutMs,
+                        status,
+                        durationMs: completedAt - handlerStartedAt,
+                        error: error.message,
+                    },
+                });
+            }
         }
-    }
 
-    _log('INFO', 'Graceful shutdown concluído');
+        const completedAt = Date.now();
+        const okCount = handlerReports.filter((handler) => handler.status === 'ok').length;
+        const timeoutCount = handlerReports.filter((handler) => handler.status === 'timeout').length;
+        const failedCount = handlerReports.length - okCount - timeoutCount;
+        lastShutdownReport = {
+            reason,
+            startedAt,
+            completedAt,
+            durationMs: completedAt - startedAt,
+            handlerCount: handlerReports.length,
+            okCount,
+            failedCount,
+            timeoutCount,
+            handlers: handlerReports,
+        };
+
+        _log('INFO', 'Graceful shutdown concluído');
+        emitShutdownLifecycleEvent('runtime.shutdown.completed', {
+            reason,
+            ok: failedCount === 0 && timeoutCount === 0,
+            durationMs: lastShutdownReport.durationMs,
+            handlerCount: lastShutdownReport.handlerCount,
+            okCount,
+            failedCount,
+            timeoutCount,
+        });
+    })();
+
+    return shutdownInFlight;
 }
 
 /**
@@ -106,6 +230,28 @@ export async function runShutdown(reason = 'unknown') {
  */
 export function isShuttingDown() {
     return shuttingDown;
+}
+
+/**
+ * Retorna um snapshot do último ciclo de shutdown concluído ou `null` se nenhum shutdown terminou ainda.
+ *
+ * @returns {ShutdownReport | null}
+ */
+export function getLastShutdownReport() {
+    if (!lastShutdownReport) return null;
+    return {
+        ...lastShutdownReport,
+        handlers: lastShutdownReport.handlers.map((handler) => ({ ...handler })),
+    };
+}
+
+/**
+ * Snapshot dos handlers registrados, em ordem de execução.
+ *
+ * @returns {{ name: string; priority: number; timeoutMs: number }[]}
+ */
+export function listShutdownHandlers() {
+    return handlers.map(({ name, priority, timeoutMs }) => ({ name, priority, timeoutMs }));
 }
 
 /**
@@ -119,14 +265,27 @@ async function runHandlerWithTimeout(handler) {
         await Promise.race([
             handler.fn(),
             new Promise((_, reject) => {
-                timeout = setTimeout(
-                    () => reject(new Error(`Shutdown handler "${handler.name}" timeout`)),
-                    handler.timeoutMs,
-                );
+                timeout = setTimeout(() => reject(new ShutdownHandlerTimeoutError(handler.name)), handler.timeoutMs);
             }),
         ]);
     } finally {
         if (timeout) clearTimeout(timeout);
+    }
+}
+
+/**
+ * Emite eventos de shutdown em modo best-effort; falha em observabilidade nunca pode interromper shutdown.
+ *
+ * @param {string} type
+ * @param {Record<string, unknown>} payload
+ * @returns {void}
+ */
+function emitShutdownLifecycleEvent(type, payload) {
+    if (!_emitShutdownEvent) return;
+    try {
+        _emitShutdownEvent({ type, timestamp: Date.now(), ...payload });
+    } catch (error) {
+        _log('WARN', `Falha ao emitir evento ${type}: ${toError(error).message}`);
     }
 }
 
@@ -136,4 +295,7 @@ async function runHandlerWithTimeout(handler) {
 export function _resetForTesting() {
     handlers.length = 0;
     shuttingDown = false;
+    shutdownInFlight = null;
+    lastShutdownReport = null;
+    _emitShutdownEvent = null;
 }

@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
+import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -327,5 +327,5 @@ registerShutdownHandler(
     async () => {
         await defaultAuditLog.flush();
     },
-    90,
+    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
 );

@@ -37,7 +37,16 @@ export * from './errors.js';
 export { withRetry, withTimeout } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';
 export * from './schemas.js';
-export { isShuttingDown, registerShutdownHandler, runShutdown, setShutdownLogger } from './shutdown.js';
+export { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
+export {
+    getLastShutdownReport,
+    isShuttingDown,
+    listShutdownHandlers,
+    registerShutdownHandler,
+    runShutdown,
+    setShutdownEventEmitter,
+    setShutdownLogger,
+} from './shutdown.js';
 export * from './structured-message.js';
 export {
     activeCount as activeTimerCount,

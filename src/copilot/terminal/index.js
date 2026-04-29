@@ -19,7 +19,14 @@
 
 import { readCopilotBootConfig } from '#copilot/boot';
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
-import { bridgeEmitter, EVENT_BUS, getSharedSdkSessionId, toError } from '#copilot/core';
+import {
+    bridgeEmitter,
+    EVENT_BUS,
+    getSharedSdkSessionId,
+    registerShutdownHandler,
+    SHUTDOWN_PRIORITY,
+    toError,
+} from '#copilot/core';
 import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
@@ -106,6 +113,27 @@ let _sighupHandlerRegistered = false;
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
  * @property {import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport} [bootPreflight]
+ *
+ * @typedef {object} TerminalBootContext
+ * @property {TerminalServerStartDeps['startCopilotServer']} startCopilotServer
+ * @property {() => void} wireRuntime
+ * @property {() => NodeJS.Timeout} startTodoCleanupJob
+ * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
+ * @property {import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport | null} bootPreflight
+ * @property {PinnedFilesLoader | null} pinnedLoader
+ * @property {(() => void) | null} disposePinnedBridge
+ * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler
+ * @property {((
+ *           current: import('./activity-state.js').TerminalActivitySnapshot,
+ *           previous?: import('./activity-state.js').TerminalActivitySnapshot,
+ *       ) => void)
+ *     | null} activityChangedHandler
+ * @property {((
+ *           activity: import('./activity-state.js').TerminalActivitySnapshot,
+ *           previous?: import('./activity-state.js').TerminalActivitySnapshot,
+ *       ) => void)
+ *     | null} terminalActivityChangedHandler
+ * @property {TerminalCopilotServer | null} copilotServer
  */
 
 /**
@@ -143,12 +171,12 @@ function startReflectionLoop() {
 }
 
 /**
- * Inicia o Terminal Permanente LLM-B.
+ * Cria o contexto transacional das fases do terminal. Nenhum recurso externo é alocado aqui.
  *
  * @param {TerminalServerStartOptions} [options]
- * @returns {Promise<void>}
+ * @returns {TerminalBootContext}
  */
-export async function startTerminalServer(options = {}) {
+export function createTerminalBootContext(options = {}) {
     if (typeof options.startCopilotServer !== 'function') {
         throw new TypeError('[TerminalServer] startCopilotServer dependency is required by the composition root.');
     }
@@ -158,32 +186,68 @@ export async function startTerminalServer(options = {}) {
     if (typeof options.startTodoCleanupJob !== 'function') {
         throw new TypeError('[TerminalServer] startTodoCleanupJob dependency is required by the composition root.');
     }
-    const bootConfig = options.bootConfig ?? readCopilotBootConfig();
-    const bootPreflight = options.bootPreflight ?? null;
+    return {
+        startCopilotServer: options.startCopilotServer,
+        wireRuntime: options.wireRuntime,
+        startTodoCleanupJob: options.startTodoCleanupJob,
+        bootConfig: options.bootConfig ?? readCopilotBootConfig(),
+        bootPreflight: options.bootPreflight ?? null,
+        pinnedLoader: null,
+        disposePinnedBridge: null,
+        pinnedFilesChangedHandler: null,
+        activityChangedHandler: null,
+        terminalActivityChangedHandler: null,
+        copilotServer: null,
+    };
+}
 
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalInitPhase(ctx) {
     recordTerminalActivity('boot', 'Inicializando terminal', {
         detail: 'Preparando aliases, DI, hub e servidor HTTP',
         source: 'terminal',
     });
     log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
+    void ctx;
+}
 
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalAliasesPhase(ctx) {
     recordTerminalActivity('boot', 'Carregando aliases', { source: 'terminal', recordHistory: false });
     await loadAliasesAsync();
+    void ctx;
+}
 
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalRuntimeConfigPhase(ctx) {
     recordTerminalActivity('boot', 'Configurando runtime Copilot', { source: 'terminal', recordHistory: false });
-    options.wireRuntime();
-    if (bootPreflight) {
+    ctx.wireRuntime();
+    if (ctx.bootPreflight) {
         recordTerminalActivity('boot', 'Executando preflight SDK', {
-            detail: bootPreflight.pingOk ? 'CLI acessível' : 'CLI indisponível ou sem resposta',
-            severity: bootPreflight.ok ? 'info' : 'warn',
+            detail: ctx.bootPreflight.pingOk ? 'CLI acessível' : 'CLI indisponível ou sem resposta',
+            severity: ctx.bootPreflight.ok ? 'info' : 'warn',
             source: 'terminal',
             recordHistory: false,
         });
     }
+}
 
-    // ARCH-05 (fix): instanciar PinnedFilesLoader com paths reais dos skills e instruções
-    // Isso habilita o comando /skills reload e o sistema de pinned context files
-    const pinnedLoader = new PinnedFilesLoader(bootConfig.skills.pinnedContextDirectories);
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalPinnedContextPhase(ctx) {
+    const pinnedLoader = new PinnedFilesLoader(ctx.bootConfig.skills.pinnedContextDirectories);
+    ctx.pinnedLoader = pinnedLoader;
     recordTerminalActivity('boot', 'Carregando arquivos pinados', { source: 'terminal', recordHistory: false });
     await pinnedLoader.start().catch((e) => {
         recordTerminalActivity('system', 'Pinned files indisponíveis', {
@@ -194,17 +258,11 @@ export async function startTerminalServer(options = {}) {
         log('WARN', `[TerminalServer] PinnedFilesLoader não pôde iniciar: ${e.message}`);
     });
 
-    // FAIXA-2C: bridge PinnedFilesLoader → EventBus (6/6 emitters bridged)
-    const _pinnedBus = container.resolve(EVENT_BUS);
-    const disposePinnedBridge = _pinnedBus
-        ? bridgeEmitter(pinnedLoader, _pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED })
+    const pinnedBus = container.resolve(EVENT_BUS);
+    ctx.disposePinnedBridge = pinnedBus
+        ? bridgeEmitter(pinnedLoader, pinnedBus, { changed: CONFIG_PINNED_FILES_CHANGED })
         : null;
-
-    const pinnedFilesChangedHandler = (/** @type {{ file: string; type: string }} */ evt) => {
-        // F13.5: hot-reload de skills/instruções sem reiniciar o agente.
-        // buildHookSystemContext() já lê do disco a cada chamada (sem cache), então a próxima
-        // sessão ou turno que chamar initOrResumeSession receberá automaticamente o conteúdo atualizado.
-        // Aqui apenas emitimos o evento SSE para que LLM-A (e dashboards) sejam notificados.
+    ctx.pinnedFilesChangedHandler = (/** @type {{ file: string; type: string }} */ evt) => {
         const updatedAt = new Date().toISOString();
         const fileCount = pinnedLoader.getFiles().length;
         log(
@@ -219,21 +277,23 @@ export async function startTerminalServer(options = {}) {
             note: 'Context refreshed. Next session turn will use updated skills/instructions.',
         });
     };
-    pinnedLoader.on('changed', pinnedFilesChangedHandler);
+    pinnedLoader.on('changed', ctx.pinnedFilesChangedHandler);
 
-    const activityChangedHandler = (
-        /** @type {import('./activity-state.js').TerminalActivitySnapshot} */ current,
-        /** @type {import('./activity-state.js').TerminalActivitySnapshot | undefined} */ previous,
-    ) => {
+    ctx.activityChangedHandler = (current, previous) => {
         broadcastSse('activity.changed', {
             current,
             previous: previous ?? null,
             timestamp: Date.now(),
         });
     };
-    terminalActivityEmitter.on('activity:changed', activityChangedHandler);
+    terminalActivityEmitter.on('activity:changed', ctx.activityChangedHandler);
+}
 
-    // Criar hub_session permanente (best-effort)
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalConversationHubPhase(ctx) {
     try {
         recordTerminalActivity('boot', 'Inicializando conversation hub', { source: 'terminal', recordHistory: false });
         await initTerminalConversationHub();
@@ -253,100 +313,55 @@ export async function startTerminalServer(options = {}) {
         });
         log('WARN', `[TerminalServer] Hub storage indisponível, continua sem persistência: ${toError(e).message}`);
     }
+    void ctx;
+}
 
-    // Onda 3.3: iniciar servidor copilot dedicado (Express + Socket.IO)
-    // Passa orchestrator/store do hub para habilitar Socket.IO quando disponível
-    const _hubReady = isTerminalHubReady();
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalHttpServerPhase(ctx) {
+    const hubReady = isTerminalHubReady();
     /** @type {TerminalCopilotServerOptions} */
-    const _serverOpts = {
-        host: bootConfig.server.host,
-        port: bootConfig.server.port,
+    const serverOpts = {
+        host: ctx.bootConfig.server.host,
+        port: ctx.bootConfig.server.port,
     };
-    if (bootConfig.server.token !== null) _serverOpts.token = bootConfig.server.token;
-    if (_hubReady) {
-        _serverOpts.orchestrator = readTerminalHubOrchestrator();
-        _serverOpts.store = readTerminalHubStore();
+    if (ctx.bootConfig.server.token !== null) serverOpts.token = ctx.bootConfig.server.token;
+    if (hubReady) {
+        serverOpts.orchestrator = readTerminalHubOrchestrator();
+        serverOpts.store = readTerminalHubStore();
     }
     recordTerminalActivity('boot', 'Subindo servidor copilot', { source: 'terminal', recordHistory: false });
-    const copilotServer = await options.startCopilotServer(_serverOpts);
+    ctx.copilotServer = await ctx.startCopilotServer(serverOpts);
+}
 
-    registerAgentEventListeners(() => printStandaloneBanner({ serverUrl: bootConfig.server.url, bootPreflight }));
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalRuntimeListenersPhase(ctx) {
+    const copilotServer = requireTerminalCopilotServer(ctx);
+    registerAgentEventListeners(() =>
+        printStandaloneBanner({ serverUrl: ctx.bootConfig.server.url, bootPreflight: ctx.bootPreflight }),
+    );
     startReflectionLoop();
 
-    const onActivityChanged = (
-        /** @type {import('./activity-state.js').TerminalActivitySnapshot} */ activity,
-        /** @type {import('./activity-state.js').TerminalActivitySnapshot | undefined} */ _,
-    ) => {
+    ctx.terminalActivityChangedHandler = (activity) => {
         broadcastSse('terminal.activity', activity);
     };
-    terminalActivityEmitter.on('activity:changed', onActivityChanged);
+    terminalActivityEmitter.on('activity:changed', ctx.terminalActivityChangedHandler);
 
-    // F7.1: cleanup diário de tarefas TODO antigas (done/cancelled > 7 dias)
-    // F152: registrar no timer-registry para evitar leak (handle era descartado)
-    const todoCleanupTimer = options.startTodoCleanupJob();
+    const todoCleanupTimer = ctx.startTodoCleanupJob();
     if (typeof todoCleanupTimer.unref === 'function') todoCleanupTimer.unref();
     registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
-    // T-21: graceful shutdown handlers via registerShutdownHandler
-    const { registerShutdownHandler } = await import('#copilot/core');
+    registerTerminalShutdownHandlers(ctx);
 
-    // F153: reflectionTimer agora é gerenciado via timer-registry (cancelAll no shutdown),
-    // mas manter shutdown handler para log explícito + nullify da referência local
-    registerShutdownHandler(
-        'terminal.reflectionTimer',
-        async () => {
-            if (_reflectionTimer !== null) {
-                clearInterval(_reflectionTimer);
-                _reflectionTimer = null;
-            }
-            log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
-        },
-        10,
-    );
-
-    registerShutdownHandler(
-        'terminal.pinnedFilesLoader',
-        async () => {
-            disposePinnedBridge?.();
-            terminalActivityEmitter.off('activity:changed', activityChangedHandler);
-            if (typeof pinnedLoader.off === 'function') {
-                pinnedLoader.off('changed', pinnedFilesChangedHandler);
-            } else {
-                pinnedLoader.removeListener('changed', pinnedFilesChangedHandler);
-            }
-            if (typeof pinnedLoader.stop === 'function') {
-                await Promise.resolve(pinnedLoader.stop());
-            }
-            log('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
-        },
-        15,
-    );
-
-    registerShutdownHandler(
-        'terminal.activityEmitter',
-        async () => {
-            terminalActivityEmitter.off('activity:changed', onActivityChanged);
-            log('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
-        },
-        16,
-    );
-
-    // Onda 5.0: conectar Socket.IO ao hub (upgrade de standalone → full)
     if (copilotServer.io && isTerminalHubReady()) {
         attachTerminalHubSocketIO(copilotServer.io);
     }
 
-    registerShutdownHandler(
-        'terminal.injectServer',
-        async () => {
-            await copilotServer.close();
-            log('INFO', '[TerminalServer] Copilot server encerrado via shutdown handler.');
-        },
-        20,
-    );
-
-    // T-22: SIGHUP é enviado pelo VS Code quando o painel do terminal é fechado.
-    // Ignorar para manter o inject server HTTP ativo mesmo após o painel ser fechado.
     if (!_sighupHandlerRegistered) {
         process.on('SIGHUP', () => {
             log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
@@ -354,7 +369,6 @@ export async function startTerminalServer(options = {}) {
         _sighupHandlerRegistered = true;
     }
 
-    // F13.2: emitir evento terminal.started com snapshot de boot para monitoramento
     broadcastSse('terminal.started', {
         timestamp: Date.now(),
         operationMode: (() => {
@@ -365,9 +379,97 @@ export async function startTerminalServer(options = {}) {
         hubSessionId: getHubSessionId(),
         dialogLoopActive: readTerminalRuntimeState().dialogLoopActive,
         model: readTerminalRuntimeState().model,
-        bootPreflight,
+        bootPreflight: ctx.bootPreflight,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
+}
 
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function runTerminalReplPhase(ctx) {
+    const copilotServer = requireTerminalCopilotServer(ctx);
     await startRepl(copilotServer.httpServer);
+}
+
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {TerminalCopilotServer}
+ */
+function requireTerminalCopilotServer(ctx) {
+    if (!ctx.copilotServer) {
+        throw new Error('[TerminalServer] copilot-http-server phase has not completed.');
+    }
+    return ctx.copilotServer;
+}
+
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {void}
+ */
+function registerTerminalShutdownHandlers(ctx) {
+    registerShutdownHandler(
+        'terminal.reflectionTimer',
+        async () => {
+            if (_reflectionTimer !== null) {
+                clearInterval(_reflectionTimer);
+                _reflectionTimer = null;
+            }
+            log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
+    );
+
+    registerShutdownHandler(
+        'terminal.pinnedFilesLoader',
+        async () => {
+            const pinnedLoader = ctx.pinnedLoader;
+            ctx.disposePinnedBridge?.();
+            if (ctx.activityChangedHandler) {
+                terminalActivityEmitter.off('activity:changed', ctx.activityChangedHandler);
+            }
+            if (pinnedLoader && ctx.pinnedFilesChangedHandler) {
+                if (typeof pinnedLoader.off === 'function') {
+                    pinnedLoader.off('changed', ctx.pinnedFilesChangedHandler);
+                } else {
+                    pinnedLoader.removeListener('changed', ctx.pinnedFilesChangedHandler);
+                }
+            }
+            if (pinnedLoader && typeof pinnedLoader.stop === 'function') {
+                await Promise.resolve(pinnedLoader.stop());
+            }
+            log('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.TERMINAL_RESOURCE,
+    );
+
+    registerShutdownHandler(
+        'terminal.activityEmitter',
+        async () => {
+            if (ctx.terminalActivityChangedHandler) {
+                terminalActivityEmitter.off('activity:changed', ctx.terminalActivityChangedHandler);
+            }
+            log('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,
+    );
+}
+
+/**
+ * Inicia o Terminal Permanente LLM-B.
+ *
+ * @param {TerminalServerStartOptions} [options]
+ * @returns {Promise<void>}
+ */
+export async function startTerminalServer(options = {}) {
+    const ctx = createTerminalBootContext(options);
+    await runTerminalInitPhase(ctx);
+    await runTerminalAliasesPhase(ctx);
+    await runTerminalRuntimeConfigPhase(ctx);
+    await runTerminalPinnedContextPhase(ctx);
+    await runTerminalConversationHubPhase(ctx);
+    await runTerminalHttpServerPhase(ctx);
+    await runTerminalRuntimeListenersPhase(ctx);
+    await runTerminalReplPhase(ctx);
 }

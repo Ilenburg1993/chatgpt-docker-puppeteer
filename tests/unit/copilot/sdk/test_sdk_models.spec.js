@@ -64,6 +64,7 @@ import {
     supportsReasoning,
 } from '../../../../src/copilot/sdk/models/helpers.js';
 import { KNOWN_MODELS } from '../../../../src/copilot/sdk/models/known-models.js';
+import { createModelRuntime } from '../../../../src/copilot/sdk/models/registry.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -160,6 +161,28 @@ describe('known model catalog', () => {
     it('inclui variantes Claude 4.5 adicionais como fallback estático', () => {
         expect(KNOWN_MODELS.some((model) => model.id === 'claude-opus-4-5')).toBe(true);
         expect(KNOWN_MODELS.some((model) => model.id === 'claude-haiku-4-5')).toBe(true);
+    });
+});
+
+describe('model runtime factory', () => {
+    it('cria runtimes isolados para registry e métricas', () => {
+        const runtimeA = createModelRuntime();
+        const runtimeB = createModelRuntime();
+
+        runtimeA.registry.register({
+            id: 'local-only-model',
+            costTier: 'low',
+            speedTier: 'fast',
+            contextWindow: 128_000,
+            supportsReasoning: false,
+            supportsVision: false,
+        });
+        runtimeA.statsTracker.record('gpt-4.1', { latencyMs: 100, success: true });
+
+        expect(runtimeA.registry.get('local-only-model')?.id).toBe('local-only-model');
+        expect(runtimeB.registry.get('local-only-model')).toBeUndefined();
+        expect(runtimeA.statsTracker.getStats('gpt-4.1')?.totalCalls).toBe(1);
+        expect(runtimeB.statsTracker.getStats('gpt-4.1')).toBeNull();
     });
 });
 

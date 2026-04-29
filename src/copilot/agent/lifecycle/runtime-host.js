@@ -14,7 +14,7 @@
  * @module copilot/agent/lifecycle/runtime-host
  */
 
-import { TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
+import { SHUTDOWN_PRIORITY, TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
 import { listSdkCatalogModels } from '../facades/agent-model-config.js';
 import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
 
@@ -77,7 +77,7 @@ export function registerRuntimeShutdownHost({ agent, drainStateWrites, drainTime
                 log('WARN', `[copilot/runtime-host] Erro no shutdown do agente: ${toError(e).message}`);
             }
         },
-        0,
+        SHUTDOWN_PRIORITY.COMPAT_RUNTIME_HOST,
     );
 
     registerShutdownHandler(
@@ -85,7 +85,7 @@ export function registerRuntimeShutdownHost({ agent, drainStateWrites, drainTime
         async () => {
             await drainStateWrites(drainTimeoutMs);
         },
-        5,
+        SHUTDOWN_PRIORITY.RUNTIME_STATE_DRAIN,
     );
 
     return async function shutdown(signal = 'SIGTERM') {

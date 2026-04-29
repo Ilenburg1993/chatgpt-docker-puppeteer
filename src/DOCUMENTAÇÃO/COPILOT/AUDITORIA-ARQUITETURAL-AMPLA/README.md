@@ -76,6 +76,8 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 49    | `49-MAPEAMENTO-ALWAYSALIVE-RUNTIME-GOVERNANCE-E-CAPABILITIES.md`      | mapeamento da delegação de governança/capabilities para `agent-runtime-controls`             |
 | 50    | `50-MAPEAMENTO-BOOTSTEPS-SHADOW-REAPER-RUNTIME-STATE.md`              | mapeamento da extração do reaper de shadow de `boot-steps` para `agent-runtime-state`        |
 | 51    | `51-BUGFIX-RECURSAO-ALWAYSALIVE-RUNTIME-CONTROLS-LLMB.md`             | correção do stack overflow no boot da LLM-B por recursão entre `AlwaysAliveAgent` e façades  |
+| 52    | `52-AUDITORIA-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                        | auditoria profunda do ciclo `terminal:llm-b`, boot, lifecycle, recursos e shutdown           |
+| 53    | `53-ROADMAP-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                          | roadmap por faixas para transformar boot/lifecycle/shutdown em runtime lifecycle auditável   |
 
 ---
 
@@ -177,6 +179,12 @@ Na transição para o Bloco B, o pacote já passa a incluir também:
 - checkpoint complementar de bugfix live (`51`), cobrindo a recursão entre `AlwaysAliveAgent` e
   `agent-runtime-controls` que derrubava o boot de `terminal:llm-b`, além do endurecimento da
   preferência por métodos estáveis do `AgentContext` nas façades de runtime.
+- auditoria transversal do ciclo `terminal:llm-b` (`52`), cobrindo entrada via npm/PM2, boot
+  canônico, wiring do runtime, terminal/server, ciclo do `AlwaysAliveAgent`, shutdown central e
+  riscos de ownership/ordem.
+- roadmap específico de lifecycle (`53`), cobrindo shutdown single-flight, cleanup em boot failure,
+  fases explícitas de shutdown, ownership único de recursos, rollback de boot/agent start,
+  observabilidade de lifecycle e matriz de sinais TTY/headless/PM2.
 
 ---
 

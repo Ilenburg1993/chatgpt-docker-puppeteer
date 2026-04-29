@@ -73,7 +73,15 @@ describe('FG-3 — core barrel contract', () => {
 
     it('exports shutdown management', async () => {
         const barrel = await import('#copilot/core/index');
-        const expected = ['registerShutdownHandler', 'runShutdown', 'isShuttingDown'];
+        const expected = [
+            'registerShutdownHandler',
+            'runShutdown',
+            'isShuttingDown',
+            'getLastShutdownReport',
+            'listShutdownHandlers',
+            'SHUTDOWN_PRIORITY',
+            'setShutdownEventEmitter',
+        ];
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }

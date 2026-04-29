@@ -7,6 +7,12 @@
  * @typedef {import('./types.js').RuntimeSdkModeResult} RuntimeSdkModeResult
  *
  * @typedef {import('./types.js').RuntimeSdkPlanReadResult} RuntimeSdkPlanReadResult
+ *
+ * @typedef {import('./types.js').RuntimeSessionCapabilities} RuntimeSessionCapabilities
+ *
+ * @typedef {import('./types.js').RuntimeInputOptions} RuntimeInputOptions
+ *
+ * @typedef {import('./types.js').RuntimeElicitationResult} RuntimeElicitationResult
  */
 
 import {
@@ -28,7 +34,7 @@ export function getAgentSdkSessionTarget(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('#copilot/sdk/types').SessionCapabilities}
+ * @returns {RuntimeSessionCapabilities}
  */
 export function getAgentSdkSessionCapabilities(runtimeId) {
     return getAgentSdkSessionTarget(runtimeId).getSdkSessionCapabilities();
@@ -175,7 +181,7 @@ export async function selectAgentSdkSessionUi(message, options, runtimeId) {
 
 /**
  * @param {string} message
- * @param {import('#copilot/sdk/types').InputOptions | undefined} [options]
+ * @param {RuntimeInputOptions | undefined} [options]
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<string | null>}
  */
@@ -203,7 +209,7 @@ export function getAgentSdkPendingElicitation(id, runtimeId) {
 
 /**
  * @param {string} id
- * @param {import('#copilot/sdk/types').ElicitationResult} result
+ * @param {RuntimeElicitationResult} result
  * @param {string | null | undefined} [runtimeId]
  * @returns {boolean}
  */

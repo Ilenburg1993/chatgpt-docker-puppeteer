@@ -21,7 +21,6 @@
  * @see EventBus
  */
 
-import { toolsList } from '#copilot/sdk';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -36,11 +35,14 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  *
  * @typedef {object} ClientRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
- * @property {() => Promise<import('#copilot/sdk/types').CopilotClient>} getClient - Factory do SDK client.
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['getClient']} getClient - Factory do SDK
+ *   client.
  * @property {() => string} getClientState - Estado de conexão.
  * @property {() => Promise<void | Error[]>} stopClient - Para o client.
  * @property {() => Promise<void>} forceStopClient - Para o client forçadamente.
- * @property {import('#copilot/sdk/types').Tool[]} allTools - Ferramentas estáticas.
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools - Ferramentas
+ *   estáticas.
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
@@ -219,8 +221,15 @@ export default function createClientRouter(deps) {
      */
     router.get('/tools', (_req, res) => {
         void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
-            const { agent, allTools, sdkRuntimeProjection, getClientState, getClient, sdkObservability } =
-                resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
+            const {
+                agent,
+                allTools,
+                sdkRuntimeProjection,
+                getClientState,
+                getClient,
+                sdkObservability,
+                sdkSessionRpc,
+            } = resolveClientRouterDeps(deps, /** @type {Req} */ (_req));
             const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { allTools });
 
             /** @type {{ name: string; description?: string; hasParameters: boolean }[]} */
@@ -230,15 +239,17 @@ export default function createClientRouter(deps) {
             if (state === 'connected') {
                 try {
                     const client = await getClient();
-                    const builtins = await toolsList(client, {});
-                    cliBuiltins = (builtins.tools ?? []).map((tool) => ({
-                        name: tool.name,
-                        ...(tool.description ? { description: tool.description } : {}),
-                        hasParameters:
-                            tool.parameters !== undefined &&
-                            tool.parameters !== null &&
-                            typeof tool.parameters === 'object',
-                    }));
+                    const builtins = await sdkSessionRpc.toolsList(client, {});
+                    cliBuiltins = (builtins.tools ?? []).map(
+                        (/** @type {{ name: string; description?: string; parameters?: unknown }} */ tool) => ({
+                            name: tool.name,
+                            ...(tool.description ? { description: tool.description } : {}),
+                            hasParameters:
+                                tool.parameters !== undefined &&
+                                tool.parameters !== null &&
+                                typeof tool.parameters === 'object',
+                        }),
+                    );
                     cliToolsSource = 'rpc';
                 } catch (error) {
                     sdkObservability.log(

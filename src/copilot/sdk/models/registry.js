@@ -206,11 +206,47 @@ class ModelRegistry {
 
 // ─── Instâncias singleton ───────────────────────────────────────────────────
 
-const modelRegistry = new ModelRegistry();
-const modelStatsTracker = new ModelStatsTracker();
-const modelSelector = new ModelSelector(modelRegistry, modelStatsTracker);
-const autoDowngradeDetector = new AutoDowngradeDetector(modelStatsTracker, modelSelector);
+/**
+ * @typedef {object} ModelRuntime
+ * @property {ModelRegistry} registry
+ * @property {ModelStatsTracker} statsTracker
+ * @property {ModelSelector} selector
+ * @property {AutoDowngradeDetector} autoDowngradeDetector
+ */
+
+/**
+ * Cria um runtime isolado de seleção de modelos. A instância default abaixo preserva a API histórica, enquanto testes,
+ * workers e bootstraps podem operar sem compartilhar catálogo/métricas por acidente.
+ *
+ * @param {object} [deps]
+ * @param {ModelRegistry} [deps.registry]
+ * @param {ModelStatsTracker} [deps.statsTracker]
+ * @param {ModelSelector} [deps.selector]
+ * @param {AutoDowngradeDetector} [deps.autoDowngradeDetector]
+ * @returns {ModelRuntime}
+ */
+function createModelRuntime(deps = {}) {
+    const registry = deps.registry ?? new ModelRegistry();
+    const statsTracker = deps.statsTracker ?? new ModelStatsTracker();
+    const selector = deps.selector ?? new ModelSelector(registry, statsTracker);
+    const autoDowngradeDetector = deps.autoDowngradeDetector ?? new AutoDowngradeDetector(statsTracker, selector);
+    return { registry, statsTracker, selector, autoDowngradeDetector };
+}
+
+const defaultModelRuntime = createModelRuntime();
+const modelRegistry = defaultModelRuntime.registry;
+const modelStatsTracker = defaultModelRuntime.statsTracker;
+const modelSelector = defaultModelRuntime.selector;
+const autoDowngradeDetector = defaultModelRuntime.autoDowngradeDetector;
 
 // ─── Exports ────────────────────────────────────────────────────────────────
 
-export { autoDowngradeDetector, ModelRegistry, modelRegistry, modelSelector, modelStatsTracker };
+export {
+    autoDowngradeDetector,
+    createModelRuntime,
+    defaultModelRuntime,
+    ModelRegistry,
+    modelRegistry,
+    modelSelector,
+    modelStatsTracker,
+};

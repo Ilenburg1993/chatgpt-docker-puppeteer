@@ -19,7 +19,7 @@
 
 import { z } from 'zod';
 import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
-import { resolveHubTurnTimeout } from '../conversation-hub/timeout-policy.js';
+import { resolveHubTurnTimeout } from '../config/hub-timeout-policy.js';
 import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';

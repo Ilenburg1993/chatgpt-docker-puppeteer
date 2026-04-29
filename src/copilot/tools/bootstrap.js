@@ -24,7 +24,7 @@ import { fileReadTools, fileWriteTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
-import { introspectionTools, recordToolCategory, registerForIntrospection } from './introspection-tools.js';
+import { introspectionTools, registerForIntrospection } from './introspection-tools.js';
 import { permissionTools, setPermissionAgent } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
@@ -86,11 +86,6 @@ export function bootstrapTools(registry, mcpTools) {
     for (const [tools, opts] of TOOL_GROUPS) {
         try {
             registerTools(registry, tools, opts);
-            // H2-FIX: Registrar categoria de cada tool para derivação dinâmica posterior
-            const category = /** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown';
-            for (const tool of tools) {
-                recordToolCategory(tool.name, String(category));
-            }
         } catch (err) {
             const category = /** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown';
             const error = /** @type {Error} */ (err);
@@ -102,10 +97,6 @@ export function bootstrapTools(registry, mcpTools) {
     if (mcpTools.length > 0) {
         try {
             registerTools(registry, mcpTools, { category: 'mcp', tags: ['mcp', 'external'] });
-            // H2-FIX: Registrar categoria para mcpTools
-            for (const tool of mcpTools) {
-                recordToolCategory(tool.name, 'mcp');
-            }
         } catch (err) {
             const error = /** @type {Error} */ (err);
             log('ERROR', `[tools-bootstrap] Erro ao registrar MCP tools: ${error.message}`);
@@ -117,10 +108,6 @@ export function bootstrapTools(registry, mcpTools) {
     if (customTools.length > 0) {
         try {
             registerTools(registry, customTools, { category: 'custom', tags: ['runtime', 'declarative'] });
-            // H2-FIX: Registrar categoria para custom tools
-            for (const tool of customTools) {
-                recordToolCategory(tool.name, 'custom');
-            }
         } catch (err) {
             const error = /** @type {Error} */ (err);
             log('ERROR', `[tools-bootstrap] Erro ao registrar custom tools: ${error.message}`);
@@ -133,7 +120,7 @@ export function bootstrapTools(registry, mcpTools) {
     const instrumentedTools = allTools.map(wrapWithStats);
 
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
-    registerForIntrospection(instrumentedTools);
+    registerForIntrospection(instrumentedTools, registry);
 
     // Detecta colisões de nome entre tools. Cada tool com sobreposição potencial com built-ins do CLI
     // deve declarar `overridesBuiltInTool` explicitamente; não forçar globalmente para não mascarar conflitos.

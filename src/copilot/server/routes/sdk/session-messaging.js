@@ -17,7 +17,6 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { onAllSessionEvents } from '../../../sdk/session/events.js';
 import {
     abortSession,
     getSessionMessages,
@@ -52,6 +51,12 @@ import {
  * @typedef {import('express').Response} Res
  *
  * @typedef {ReturnType<typeof resolveSdkRouteSharedDeps>} SdkRouteDeps
+ *
+ * @typedef {{ type?: string; data?: { message?: string; stack?: string }; [key: string]: unknown }} RouteSessionEvent
+ *
+ * @typedef {{ prompt: string; attachments?: unknown; mode?: unknown; [key: string]: unknown }} RouteMessageOptions
+ *
+ * @typedef {RouteSessionEvent & { type: 'assistant.message' }} RouteAssistantMessageEvent
  */
 
 const router = Router();
@@ -156,9 +161,9 @@ function ensureSessionStreamState(routeDeps, id, entry) {
         metrics: routeDeps.metrics,
     });
 
-    const unsubscribe = onAllSessionEvents(
+    const unsubscribe = routeDeps.sdkSessionEvents.onAllSessionEvents(
         entry.session,
-        (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
+        (/** @type {RouteSessionEvent} */ event) => {
             const type = /** @type {string} */ (event?.type ?? 'message');
             const payload = standardizeSsePayload(event);
             pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
@@ -183,12 +188,13 @@ function maybeDisposeSessionStreamState(routeDeps, state) {
 }
 
 /**
+ * @param {SdkRouteDeps} routeDeps
  * @param {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session']} session
- * @param {import('#copilot/sdk/types').MessageOptions} messageOptions
- * @returns {Promise<import('#copilot/sdk/types').AssistantMessageEvent | undefined>}
+ * @param {RouteMessageOptions} messageOptions
+ * @returns {Promise<RouteAssistantMessageEvent | undefined>}
  */
-async function sendAndWaitWithoutTimeout(session, messageOptions) {
-    /** @type {import('#copilot/sdk/types').AssistantMessageEvent | undefined} */
+async function sendAndWaitWithoutTimeout(routeDeps, session, messageOptions) {
+    /** @type {RouteAssistantMessageEvent | undefined} */
     let lastAssistantMessage;
 
     /** @type {() => void} */
@@ -201,23 +207,23 @@ async function sendAndWaitWithoutTimeout(session, messageOptions) {
         rejectIdle = (error) => reject(error);
     });
 
-    const unsubscribe = onAllSessionEvents(
+    const unsubscribe = routeDeps.sdkSessionEvents.onAllSessionEvents(
         session,
-        (/** @type {import('#copilot/sdk/types').SessionEvent} */ event) => {
+        (/** @type {RouteSessionEvent} */ event) => {
             if (event.type === 'assistant.message') {
-                lastAssistantMessage = event;
+                lastAssistantMessage = /** @type {RouteAssistantMessageEvent} */ (event);
             } else if (event.type === 'session.idle') {
                 resolveIdle();
             } else if (event.type === 'session.error') {
-                const error = new Error(event.data.message);
-                if (event.data.stack) error.stack = event.data.stack;
+                const error = new Error(event.data?.message ?? 'Erro desconhecido na sessão SDK.');
+                if (event.data?.stack) error.stack = event.data.stack;
                 rejectIdle(error);
             }
         },
     );
 
     try {
-        await sendSession(session, messageOptions);
+        await sendSession(session, /** @type {never} */ (messageOptions));
         await idlePromise;
         return lastAssistantMessage;
     } finally {
@@ -296,7 +302,7 @@ router.post(
 
             routeDeps.sdkSession.incrementSessionMessageCount(id);
 
-            /** @type {import('#copilot/sdk/types').MessageOptions} */
+            /** @type {RouteMessageOptions} */
             const messageOptions = {
                 prompt,
                 ...(attachments ? { attachments } : {}),
@@ -306,8 +312,12 @@ router.post(
             if (waitForResponse) {
                 const event =
                     timeoutDecision.timeoutMs !== null
-                        ? await sendSessionAndWait(entry.session, messageOptions, timeoutDecision.timeoutMs)
-                        : await sendAndWaitWithoutTimeout(entry.session, messageOptions);
+                        ? await sendSessionAndWait(
+                              entry.session,
+                              /** @type {never} */ (messageOptions),
+                              timeoutDecision.timeoutMs,
+                          )
+                        : await sendAndWaitWithoutTimeout(routeDeps, entry.session, messageOptions);
                 routeDeps.sdkObservability.log(
                     'INFO',
                     `[sdk-api] session.send timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')} session=${id}`,
@@ -332,7 +342,7 @@ router.post(
                     ),
                 );
             } else {
-                const messageId = await sendSession(entry.session, messageOptions);
+                const messageId = await sendSession(entry.session, /** @type {never} */ (messageOptions));
                 res.json(
                     routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
                         { ok: true, sessionId: id, messageId, enqueued: true },

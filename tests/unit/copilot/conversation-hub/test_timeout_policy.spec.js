@@ -5,7 +5,7 @@ import {
     HUB_TURN_TIMEOUT_MAX_MS,
     HUB_TURN_TIMEOUT_MIN_MS,
     resolveHubTurnTimeout,
-} from '../../../../src/copilot/conversation-hub/timeout-policy.js';
+} from '../../../../src/copilot/config/hub-timeout-policy.js';
 
 describe('conversation-hub timeout policy', () => {
     it('retorna watchdog-only quando explicitTimeoutMs=0', () => {

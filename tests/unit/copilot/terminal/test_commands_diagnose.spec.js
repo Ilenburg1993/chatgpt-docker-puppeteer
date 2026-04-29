@@ -162,6 +162,8 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('shadow expirando');
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('*default:gpt-5/processing');
+        expect(ctx.output()).toContain('Boot report');
+        expect(ctx.output()).toContain('Shutdown');
     });
 
     it('aceita runtimeId explícito no comando', async () => {

@@ -1,19 +1,16 @@
 // @ts-check
 /**
- * src/copilot/conversation-hub/timeout-policy.js
+ * src/copilot/config/hub-timeout-policy.js
  *
- * Política canônica de timeout para envios do ConversationHub.
+ * Política canônica de timeout para envios ao ConversationHub.
  *
- * Objetivo: evitar timeouts prematuros em operações legitimamente longas (mensagens grandes, structured/code/plan), sem
- * remover guardrails para casos comuns.
- *
- * @module copilot/conversation-hub/timeout-policy
+ * @module copilot/config/hub-timeout-policy
  */
 
 /** @type {number} */
 export const HUB_TURN_TIMEOUT_MIN_MS = 5_000;
 /** @type {number} */
-export const HUB_TURN_TIMEOUT_MAX_MS = 24 * 60 * 60_000; // 24h
+export const HUB_TURN_TIMEOUT_MAX_MS = 24 * 60 * 60_000;
 
 /**
  * @param {number} value
@@ -50,12 +47,6 @@ function roundToSecond(value) {
 
 /**
  * Resolve timeout semântico para `hub.sendToLlmB`.
- *
- * Regras:
- *
- * - `explicitTimeoutMs === 0 || null` → watchdog-only (sem timeout absoluto).
- * - `explicitTimeoutMs > 0` → clamp [5s, 24h].
- * - `undefined`/inválido → timeout adaptativo a partir do default + heurísticas de payload/contexto.
  *
  * @param {HubTimeoutContext} ctx
  * @returns {HubTimeoutDecision}

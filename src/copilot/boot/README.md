@@ -11,7 +11,9 @@ Regras:
 - `boot/workspace.js` resolve `COPILOT_WORKING_DIRECTORY` e paths persistentes do workspace.
 - `boot/skills.js` resolve `COPILOT_SKILL_DIRECTORIES`, `COPILOT_PINNED_CONTEXT_DIRS` e
   `COPILOT_DISABLED_SKILLS`.
-- `boot/plan.js` descreve as fases e donos do boot.
+- `boot/plan.js` descreve as fases, donos e timeouts do boot.
+- `boot/lifecycle-runner.js` executa o plano por handlers de fase, produz `BootLifecycleReport` e
+  executa rollbacks best-effort quando uma fase falha.
 
 Fronteiras:
 
@@ -19,6 +21,19 @@ Fronteiras:
 - `server/` só hospeda HTTP/Socket.IO.
 - `terminal/` só hospeda UX e compõe o server recebido por injeção.
 - `agent/` só governa sessões e runtime SDK depois que o boot já definiu o ambiente.
+
+Lifecycle:
+
+- `bootCopilot()` monta o plano com `createCopilotBootPlan()` e executa via `runCopilotBootPlan()`.
+- as fases do terminal são executadas separadamente: `terminal-init`, `terminal-aliases`,
+  `terminal-runtime-config`, `terminal-pinned-context`, `terminal-conversation-hub`,
+  `copilot-http-server`, `terminal-runtime-listeners` e `repl`;
+- fases sem handler ficam como `skipped` no relatório; isso é intencional apenas para fases
+  documentais ou compat que sejam deliberadamente delegadas a outro host;
+- o último relatório fica disponível por `getLastBootLifecycleReport()` e é projetado por
+  `presentation/runtime-lifecycle.js`;
+- novas fases que alocarem recursos devem declarar `timeoutMs` e, quando possível, handler
+  `rollback`.
 
 Taxonomia curta:
 

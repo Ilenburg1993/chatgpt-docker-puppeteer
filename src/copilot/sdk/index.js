@@ -39,8 +39,11 @@ export {
     _resetClientState,
     buildClientOptions,
     CopilotClient,
+    CopilotClientManager,
     createClientSession,
     createCopilotClient,
+    createCopilotClientManager,
+    defaultClientManager,
     deleteClientSession,
     disconnectClientSession,
     forceStopClient,
@@ -73,8 +76,10 @@ export {
     deleteSession,
     disconnectSession,
     listSessions,
+    resolveSessionCreateModel,
     resumeOrCreate,
     resumeSession,
+    setSessionAutoModelResolver,
 } from './session/lifecycle.js';
 
 export {
@@ -96,6 +101,8 @@ export {
 export {
     AutoDowngradeDetector,
     autoDowngradeDetector,
+    createModelRuntime,
+    defaultModelRuntime,
     ModelRegistry,
     modelRegistry,
     ModelSelector,
@@ -428,4 +435,4 @@ export { emitSdkOperationMetric, setSdkMetricEmitter } from './telemetry/operati
 export { setCustomToolsBuilder } from './tools/custom.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { SDK_LOGGER, TOOLS_BUILDER } from './di-tokens.js';
+export { SDK_CLIENT_MANAGER, SDK_LOGGER, SDK_MODEL_RUNTIME, TOOLS_BUILDER } from './di-tokens.js';

@@ -395,7 +395,7 @@ export async function requestTerminalSdkElicitation(message, requestedSchema, ru
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('#copilot/sdk/types').SessionCapabilities}
+ * @returns {import('../../presentation/types.js').RuntimeSessionCapabilities}
  */
 export function getTerminalSdkSessionCapabilities(runtimeId) {
     return getAgentSdkSessionCapabilities(runtimeId);
@@ -430,7 +430,7 @@ export async function selectTerminalSdkSessionUi(message, options, runtimeId) {
 
 /**
  * @param {string} message
- * @param {import('#copilot/sdk/types').InputOptions | undefined} [options]
+ * @param {import('../../presentation/types.js').RuntimeInputOptions | undefined} [options]
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<string | null>}
  */
@@ -458,7 +458,7 @@ export function getTerminalSdkPendingElicitation(id, runtimeId) {
 
 /**
  * @param {string} id
- * @param {import('#copilot/sdk/types').ElicitationResult} result
+ * @param {import('../../presentation/types.js').RuntimeElicitationResult} result
  * @param {string | null | undefined} [runtimeId]
  * @returns {boolean}
  */

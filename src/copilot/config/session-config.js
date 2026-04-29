@@ -13,33 +13,33 @@ import { log } from '#copilot/observability';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-config-port.js';
 
 /**
- * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
+ * @typedef {import('./sdk-config-port.js').SessionConfig} SessionConfig
  *
- * @typedef {import('#copilot/sdk/types').ResumeSessionConfig} ResumeSessionConfig
+ * @typedef {import('./sdk-config-port.js').ResumeSessionConfig} ResumeSessionConfig
  *
- * @typedef {import('#copilot/sdk/types').PermissionHandler} PermissionHandler
+ * @typedef {import('./sdk-config-port.js').PermissionHandler} PermissionHandler
  *
- * @typedef {import('#copilot/sdk/types').Tool} Tool
+ * @typedef {import('./sdk-config-port.js').Tool} Tool
  *
- * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
+ * @typedef {import('./sdk-config-port.js').SystemMessageConfig} SystemMessageConfig
  *
- * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
+ * @typedef {import('./sdk-config-port.js').MCPServerConfig} MCPServerConfig
  *
- * @typedef {import('#copilot/sdk/types').CustomAgentConfig} CustomAgentConfig
+ * @typedef {import('./sdk-config-port.js').CustomAgentConfig} CustomAgentConfig
  *
- * @typedef {import('#copilot/sdk/types').DefaultAgentConfig} DefaultAgentConfig
+ * @typedef {import('./sdk-config-port.js').DefaultAgentConfig} DefaultAgentConfig
  *
- * @typedef {import('#copilot/sdk/types').InfiniteSessionConfig} InfiniteSessionConfig
+ * @typedef {import('./sdk-config-port.js').InfiniteSessionConfig} InfiniteSessionConfig
  *
- * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
+ * @typedef {import('./sdk-config-port.js').CommandDefinition} CommandDefinition
  *
- * @typedef {import('#copilot/sdk/types').ElicitationHandler} ElicitationHandler
+ * @typedef {import('./sdk-config-port.js').ElicitationHandler} ElicitationHandler
  *
- * @typedef {import('#copilot/sdk/types').ModelCapabilitiesOverride} ModelCapabilitiesOverride
+ * @typedef {import('./sdk-config-port.js').ModelCapabilitiesOverride} ModelCapabilitiesOverride
  *
- * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
+ * @typedef {import('./sdk-config-port.js').SessionEventHandler} SessionEventHandler
  *
- * @typedef {import('#copilot/sdk/types').CreateSessionFsHandler} CreateSessionFsHandler
+ * @typedef {import('./sdk-config-port.js').CreateSessionFsHandler} CreateSessionFsHandler
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */

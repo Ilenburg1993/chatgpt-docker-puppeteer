@@ -34,7 +34,7 @@ import * as toolInstructions from './sections/tool-instructions.js';
  * `config/` monta declaração em repouso; o adapter de sessão no agent/sdk é quem encosta na sessão viva.
  *
  * @typedef {object} SystemMessageSection
- * @property {import('#copilot/sdk/types').SectionOverrideAction} action
+ * @property {import('../sdk-config-port.js').SectionOverrideAction} action
  * @property {string} content
  *
  * @typedef {{ mode: 'append'; content: string }} SystemMessageAppendConfig
@@ -51,7 +51,7 @@ import * as toolInstructions from './sections/tool-instructions.js';
  * Mapa ordenado de seções — a ordem define a sequência no prompt final. As chaves correspondem aos nomes das seções no
  * SDK (`SYSTEM_PROMPT_SECTIONS`).
  *
- * @type {Record<string, { CONTENT: string; ACTION: import('#copilot/sdk/types').SectionOverrideAction }>}
+ * @type {Record<string, { CONTENT: string; ACTION: import('../sdk-config-port.js').SectionOverrideAction }>}
  */
 const SECTIONS = {
     identity,
@@ -109,7 +109,7 @@ function buildReplaceMode({ extraContext } = {}) {
  * @returns {SystemMessageConfig}
  */
 function buildCustomizeMode({ extraContext } = {}) {
-    /** @type {Record<string, { action: import('#copilot/sdk/types').SectionOverrideAction; content: string }>} */
+    /** @type {Record<string, { action: import('../sdk-config-port.js').SectionOverrideAction; content: string }>} */
     const sections = {};
 
     for (const [key, section] of Object.entries(SECTIONS)) {

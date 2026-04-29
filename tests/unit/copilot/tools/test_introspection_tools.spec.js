@@ -138,6 +138,46 @@ describe('introspection-tools', () => {
             const result = await /** @type {any} */ (listTool).handler({});
             expect(result.count).toBe(5);
         });
+
+        it('usa metadados do ToolRegistry como fonte de verdade', async () => {
+            mod.resetIntrospectionStateForTests();
+            const registry = {
+                entries: new Map([
+                    [
+                        'web_fetch_local',
+                        {
+                            tool: fakeTools[0],
+                            category: 'web',
+                            tags: ['http', 'read'],
+                            readOnly: true,
+                        },
+                    ],
+                    [
+                        'git_status',
+                        {
+                            tool: fakeTools[1],
+                            category: 'git',
+                            tags: ['vcs'],
+                            readOnly: true,
+                        },
+                    ],
+                ]),
+            };
+
+            mod.registerForIntrospection(/** @type {any} */ (fakeTools.slice(0, 2)), /** @type {any} */ (registry));
+
+            const listTool = mod.introspectionTools.find((t) => t.name === 'list_tools');
+            const result = await /** @type {any} */ (listTool).handler({ category: 'web' });
+
+            expect(result.count).toBe(1);
+            expect(result.tools[0]).toMatchObject({
+                name: 'web_fetch_local',
+                category: 'web',
+                tags: ['http', 'read'],
+                readOnly: true,
+                disabled: false,
+            });
+        });
     });
 
     // ── isToolDisabled / getDisabledTools ─────────────────────────────────
@@ -162,6 +202,7 @@ describe('introspection-tools', () => {
             const result = await find().handler({});
             expect(result.count).toBe(5);
             expect(result.tools.length).toBe(5);
+            expect(result.tools[0]).toHaveProperty('category');
         });
 
         it('filtra por search term', async () => {
@@ -201,6 +242,8 @@ describe('introspection-tools', () => {
             expect(result.model).toBe('gpt-4.1-test');
             expect(result.toolsRegistered).toBe(5);
             expect(result.toolNames).toContain('web_fetch_local');
+            expect(result.categories.web).toBe(1);
+            expect(result.disabledTools).toEqual([]);
             expect(result.hasTelemetry).toBe(true);
             expect(result.env.COPILOT_MCP_SERVERS).toBe('test-server');
         });

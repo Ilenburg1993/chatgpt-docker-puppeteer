@@ -10,7 +10,7 @@
  * @module copilot/config/persistent-paths
  */
 
-import { resolvePersistentConfigFile as resolvePersistentConfigFileFromSdk } from '../sdk/persistent-paths.js';
+import { resolvePersistentConfigFile as resolvePersistentConfigFileFromSdk } from './sdk-config-port.js';
 
 /**
  * Resolve o caminho absoluto de um arquivo de configuração persistente no workspace.

@@ -11,6 +11,7 @@ import { readAgentRuntimeHealthSnapshot } from '#copilot/agent';
 import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
 import { readAgentRuntimeSdkResourceSnapshot } from '../agent/facades/agent-runtime-status.js';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
@@ -116,12 +117,14 @@ export function getAgentHealthHttpStatus(health) {
 export function buildAgentModuleHealth(agent) {
     const health = getAgentHealthSnapshotCompat(agent);
     const sdkResources = readAgentRuntimeSdkResourceSnapshot(agent);
+    const lifecycle = readRuntimeLifecycleSnapshot();
 
     return {
-        ok: health.ok,
+        ok: health.ok && !lifecycle.shuttingDown,
         details: {
             status: health.agentStatus,
             healthStatus: health.status,
+            shuttingDown: lifecycle.shuttingDown,
             dialogLoopActive: health.dialogLoopActive,
             dialogAttached: health.checks.dialog.attached,
             dialogPaused: health.checks.dialog.paused,
@@ -142,11 +145,13 @@ export function buildAgentModuleHealth(agent) {
             backgroundPendingLabels: health.backgroundPendingLabels,
             riskFlags: health.riskFlags,
             recommendedAction: health.recommendedAction,
+            startReport: health.startReport,
             bootFailedSteps: health.checks.boot.failedSteps,
             bootDegradedSteps: health.checks.boot.degradedSteps,
             bootLastCompletedAt: health.checks.boot.lastCompletedAt,
             quotaMonitorRunning: health.checks.quota.running,
             sdkResources,
+            lifecycle,
             issues: health.issues,
         },
     };
@@ -209,6 +214,7 @@ export function buildLegacyAgentHealth(agent) {
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
         bootReport: null,
+        startReport: null,
         sdkResources: null,
         checks: {
             runtime: {

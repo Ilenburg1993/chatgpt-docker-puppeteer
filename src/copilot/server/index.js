@@ -10,7 +10,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { registerShutdownHandler } from '#copilot/core';
+import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
 import { log } from '#copilot/observability';
 import http from 'node:http';
 import { createCopilotApp, registerErrorHandler } from './app.js';
@@ -93,9 +93,13 @@ export async function startCopilotServer(opts) {
     let closeInFlight = null;
 
     // Graceful shutdown
-    registerShutdownHandler('copilot.server', async () => {
-        await closeServer();
-    });
+    registerShutdownHandler(
+        'copilot.server',
+        async () => {
+            await closeServer();
+        },
+        SHUTDOWN_PRIORITY.NETWORK,
+    );
 
     /**
      * Fecha o servidor de forma idempotente.
@@ -110,7 +114,15 @@ export async function startCopilotServer(opts) {
             if (io) {
                 await new Promise((resolve) => io.close(() => resolve(undefined)));
             }
-            await new Promise((resolve) => httpServer.close(() => resolve(undefined)));
+            await new Promise((resolve, reject) => {
+                httpServer.close((error) => {
+                    if (error && /** @type {{ code?: string }} */ (error).code !== 'ERR_SERVER_NOT_RUNNING') {
+                        reject(error);
+                        return;
+                    }
+                    resolve(undefined);
+                });
+            });
             log('INFO', '[CopilotServer] Servidor encerrado.');
         })();
         return closeInFlight;

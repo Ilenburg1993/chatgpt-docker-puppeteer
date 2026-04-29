@@ -9,6 +9,7 @@
 
 export * from './config.js';
 export * from './contract.js';
+export * from './lifecycle-runner.js';
 export * from './plan.js';
 export * from './session-fs.js';
 export * from './skills.js';

@@ -104,6 +104,44 @@ describe('agent-lifecycle › source contracts', () => {
         );
     });
 
+    it('agentStart executa rollback best-effort em falha parcial de boot', () => {
+        assert.ok(src.includes('rollbackFailedAgentStart('), 'agentStart deve chamar rollback em falha parcial');
+        assert.ok(
+            src.includes('agent.start.rollback.ownership.clear'),
+            'rollback deve limpar ownership de sessão SDK compartilhada',
+        );
+        assert.ok(
+            src.includes("ctx.stopKeepalive('agent_start_failed')"),
+            'rollback deve parar keepalive iniciado antes da falha',
+        );
+        assert.ok(src.includes('stopAgentSdkClient(client)'), 'rollback deve parar client SDK pela façade canônica');
+        assert.ok(
+            src.includes('disconnectAgentSdkSession(session)'),
+            'rollback deve desconectar sessão SDK pela façade canônica',
+        );
+    });
+
+    it('agentStart registra relatório transacional de load/start', () => {
+        assert.ok(src.includes('runAgentStartPhase('), 'agentStart deve instrumentar fases transacionais');
+        assert.ok(src.includes('ctx.setStartReport('), 'agentStart deve publicar AgentStartReport no contexto');
+        assert.ok(src.includes("'sdk.client.create'"), 'start report deve medir criação do client SDK');
+        assert.ok(src.includes("'sdk.session.init'"), 'start report deve medir init/resume da sessão SDK');
+        assert.ok(src.includes("'agent.session.runtime.wire'"), 'start report deve medir wiring pós sessão');
+        assert.ok(src.includes("'agent.start.rollback'"), 'start report deve medir rollback em falha parcial');
+    });
+
+    it('wireAgentSessionRuntime instala handles de cleanup antes de propagar erro do boot wiring', () => {
+        const unsubsPos = src.indexOf('ctx.setSessionEventUnsubscribers(bootResult.unsubs)');
+        const errorPos = src.indexOf('if (bootResult.error)');
+
+        assert.ok(unsubsPos > 0, 'wireAgentSessionRuntime deve instalar unsubscribers do boot wiring');
+        assert.ok(errorPos > 0, 'wireAgentSessionRuntime deve testar bootResult.error');
+        assert.ok(
+            unsubsPos < errorPos,
+            'handles retornados por performBootWiring precisam ser instalados antes de lançar erro para permitir rollback',
+        );
+    });
+
     it('initSession recebe ctx, client e host como parâmetros', () => {
         assert.ok(src.includes('function initSession(ctx, client, host)'), 'initSession deve ter assinatura correta');
     });

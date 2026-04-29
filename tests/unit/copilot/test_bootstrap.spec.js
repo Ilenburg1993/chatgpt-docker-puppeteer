@@ -7,15 +7,47 @@ const mocks = vi.hoisted(() => ({
     bootstrapLateDeps: vi.fn(),
     validateRequired: vi.fn(),
     createCopilotBootPlan: vi.fn(() => ({
-        phases: [{ id: 'observability' }, { id: 'terminal' }],
+        phases: [
+            { id: 'observability' },
+            { id: 'late-deps' },
+            { id: 'sdk-preflight' },
+            { id: 'runtime-wiring' },
+            { id: 'terminal-init' },
+            { id: 'terminal-aliases' },
+            { id: 'terminal-runtime-config' },
+            { id: 'terminal-pinned-context' },
+            { id: 'terminal-conversation-hub' },
+            { id: 'copilot-http-server' },
+            { id: 'terminal-runtime-listeners' },
+            { id: 'repl' },
+        ],
     })),
+    runCopilotBootPlan: vi.fn(async (plan, options) => {
+        for (const phase of plan.phases) {
+            const handler = options?.phaseHandlers?.[phase.id];
+            if (typeof handler === 'function') {
+                await handler();
+            } else if (handler?.run) {
+                await handler.run();
+            }
+        }
+        return { status: 'ok', phases: [] };
+    }),
     readCopilotBootConfig: vi.fn(() => ({
         mode: 'terminal-runtime',
         workspace: { root: '/workspace' },
         server: { url: 'http://127.0.0.1:3009', host: '127.0.0.1', port: 3009, token: null },
     })),
     runCopilotSdkBootPreflight: vi.fn(async () => ({ ok: true, warnings: [], pingOk: true })),
-    startTerminalServer: vi.fn(),
+    createTerminalBootContext: vi.fn(() => ({ id: 'terminal-context' })),
+    runTerminalInitPhase: vi.fn(),
+    runTerminalAliasesPhase: vi.fn(),
+    runTerminalRuntimeConfigPhase: vi.fn(),
+    runTerminalPinnedContextPhase: vi.fn(),
+    runTerminalConversationHubPhase: vi.fn(),
+    runTerminalHttpServerPhase: vi.fn(),
+    runTerminalRuntimeListenersPhase: vi.fn(),
+    runTerminalReplPhase: vi.fn(),
     wireCopilotRuntimeDI: vi.fn(),
     startTodoCleanupJob: vi.fn(),
     buildTool: vi.fn(),
@@ -31,6 +63,7 @@ vi.mock('../../../src/copilot/observability/bootstrap.js', () => ({
 
 vi.mock('../../../src/copilot/core/di-container.js', () => ({
     container: {
+        has: vi.fn(() => false),
         register: vi.fn(),
         resolve: vi.fn((token) =>
             token === Symbol.for('ERROR_TRACKER') ? { registerGlobalHandlers: mocks.registerGlobalHandlers } : null,
@@ -42,6 +75,7 @@ vi.mock('../../../src/copilot/core/di-container.js', () => ({
 vi.mock('#copilot/boot', () => ({
     createCopilotBootPlan: mocks.createCopilotBootPlan,
     readCopilotBootConfig: mocks.readCopilotBootConfig,
+    runCopilotBootPlan: mocks.runCopilotBootPlan,
 }));
 
 vi.mock('../../../src/copilot/agent/lifecycle/runtime-host.js', () => ({
@@ -49,7 +83,15 @@ vi.mock('../../../src/copilot/agent/lifecycle/runtime-host.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/index.js', () => ({
-    startTerminalServer: mocks.startTerminalServer,
+    createTerminalBootContext: mocks.createTerminalBootContext,
+    runTerminalInitPhase: mocks.runTerminalInitPhase,
+    runTerminalAliasesPhase: mocks.runTerminalAliasesPhase,
+    runTerminalRuntimeConfigPhase: mocks.runTerminalRuntimeConfigPhase,
+    runTerminalPinnedContextPhase: mocks.runTerminalPinnedContextPhase,
+    runTerminalConversationHubPhase: mocks.runTerminalConversationHubPhase,
+    runTerminalHttpServerPhase: mocks.runTerminalHttpServerPhase,
+    runTerminalRuntimeListenersPhase: mocks.runTerminalRuntimeListenersPhase,
+    runTerminalReplPhase: mocks.runTerminalReplPhase,
 }));
 
 vi.mock('../../../src/copilot/runtime-wiring.js', () => ({
@@ -129,7 +171,20 @@ describe('copilot/bootstrap', () => {
         bootstrapMod.resetBootFlagForTests();
         vi.clearAllMocks();
         mocks.createCopilotBootPlan.mockReturnValue({
-            phases: [{ id: 'observability' }, { id: 'terminal' }],
+            phases: [
+                { id: 'observability' },
+                { id: 'late-deps' },
+                { id: 'sdk-preflight' },
+                { id: 'runtime-wiring' },
+                { id: 'terminal-init' },
+                { id: 'terminal-aliases' },
+                { id: 'terminal-runtime-config' },
+                { id: 'terminal-pinned-context' },
+                { id: 'terminal-conversation-hub' },
+                { id: 'copilot-http-server' },
+                { id: 'terminal-runtime-listeners' },
+                { id: 'repl' },
+            ],
         });
         mocks.readCopilotBootConfig.mockReturnValue({
             mode: 'terminal-runtime',
@@ -137,20 +192,28 @@ describe('copilot/bootstrap', () => {
             server: { url: 'http://127.0.0.1:3009', host: '127.0.0.1', port: 3009, token: null },
         });
         mocks.runCopilotSdkBootPreflight.mockResolvedValue({ ok: true, warnings: [], pingOk: true });
-        mocks.startTerminalServer.mockReset();
+        mocks.createTerminalBootContext.mockClear();
+        mocks.runTerminalInitPhase.mockReset();
+        mocks.runTerminalAliasesPhase.mockReset();
+        mocks.runTerminalRuntimeConfigPhase.mockReset();
+        mocks.runTerminalPinnedContextPhase.mockReset();
+        mocks.runTerminalConversationHubPhase.mockReset();
+        mocks.runTerminalHttpServerPhase.mockReset();
+        mocks.runTerminalRuntimeListenersPhase.mockReset();
+        mocks.runTerminalReplPhase.mockReset();
         mocks.wireCopilotRuntimeDI.mockReset();
         mocks.registerGlobalHandlers.mockReset();
     });
 
     it('reseta a trava de boot quando o boot falha e permite nova tentativa', async () => {
-        mocks.startTerminalServer.mockRejectedValueOnce(new Error('boot failed')).mockResolvedValueOnce(undefined);
+        mocks.runTerminalReplPhase.mockRejectedValueOnce(new Error('boot failed')).mockResolvedValueOnce(undefined);
 
         const { bootCopilot } = bootstrapMod;
 
         await expect(bootCopilot()).rejects.toThrow('boot failed');
         await expect(bootCopilot()).resolves.toBeUndefined();
 
-        expect(mocks.startTerminalServer).toHaveBeenCalledTimes(2);
+        expect(mocks.runTerminalReplPhase).toHaveBeenCalledTimes(2);
         expect(mocks.bootstrapObservability).toHaveBeenCalledTimes(2);
         expect(mocks.registerGlobalHandlers).toHaveBeenCalledTimes(2);
     });

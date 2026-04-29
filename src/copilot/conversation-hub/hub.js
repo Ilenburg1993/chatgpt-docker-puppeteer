@@ -12,7 +12,14 @@
  * @see module:copilot/bridges/nerv-event-bus-adapterbus-adapter
  */
 
-import { EVENT_BUS, SessionError, bridgeEmitter, logSwallowed, registerShutdownHandler } from '#copilot/core';
+import {
+    bridgeEmitter,
+    EVENT_BUS,
+    logSwallowed,
+    registerShutdownHandler,
+    SessionError,
+    SHUTDOWN_PRIORITY,
+} from '#copilot/core';
 import {
     HUB_EVENTS,
     HUB_SESSION_CLOSED,
@@ -363,5 +370,5 @@ registerShutdownHandler(
     async () => {
         await conversationHub.close();
     },
-    10,
+    SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
 );

@@ -121,6 +121,7 @@
  *   - Observer do agente para cleanup.
  *
  * @property {AgentBootReport | null} lastBootReport - Último relatório consolidado do pipeline de boot.
+ * @property {AgentStartReport | null} lastStartReport - Último relatório transacional do `agentStart()`.
  */
 
 /**
@@ -263,6 +264,34 @@
  */
 
 /**
+ * Resultado observável de uma fase transacional do `agentStart()`.
+ *
+ * @typedef {Object} AgentStartPhaseResult
+ * @property {string} name
+ * @property {'preflight' | 'client' | 'session' | 'wiring' | 'restore' | 'ready' | 'rollback'} phase
+ * @property {'ok' | 'failed'} status
+ * @property {number} startedAt
+ * @property {number} completedAt
+ * @property {number} durationMs
+ * @property {string | null} error
+ */
+
+/**
+ * Relatório transacional do último `agentStart()`.
+ *
+ * @typedef {Object} AgentStartReport
+ * @property {number} startedAt
+ * @property {number} completedAt
+ * @property {number} durationMs
+ * @property {boolean} ok
+ * @property {string | null} failedPhase
+ * @property {string | null} error
+ * @property {number} phaseCount
+ * @property {number} failedCount
+ * @property {AgentStartPhaseResult[]} phases
+ */
+
+/**
  * Handles crus do SDK atualmente acoplados ao runtime do agent.
  *
  * @typedef {Object} AgentSdkHandles
@@ -358,6 +387,7 @@
  * @property {number | null} uptime - Tempo em ms desde `startedAt`, quando disponível.
  * @property {string[]} issues - Lista canônica de issues operacionais detectadas na coleta.
  * @property {AgentBootReport | null} bootReport - Último relatório de boot conhecido, quando disponível.
+ * @property {AgentStartReport | null} startReport - Último relatório transacional de start conhecido.
  * @property {AgentSdkAccessSnapshot | null} sdkResources - Cobertura verificável dos recursos SDK expostos ao agent.
  * @property {{
  *     runtime: { ok: boolean; status: AgentStatus; operational: boolean };

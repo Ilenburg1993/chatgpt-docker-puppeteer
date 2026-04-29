@@ -20,6 +20,6 @@ export const CONTENT = `\
 /**
  * Override action para mode 'customize'.
  *
- * @type {import('#copilot/sdk/types').SectionOverrideAction}
+ * @type {import('../../sdk-config-port.js').SectionOverrideAction}
  */
 export const ACTION = 'replace';

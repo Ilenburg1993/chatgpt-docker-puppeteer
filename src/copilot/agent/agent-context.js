@@ -53,6 +53,8 @@ import { log } from './ports/observability-port.js';
  *
  * @typedef {import('./types.js').AgentBootReport} AgentBootReport
  *
+ * @typedef {import('./types.js').AgentStartReport} AgentStartReport
+ *
  * @typedef {{ emit: (event: string | symbol, payload?: unknown) => boolean }} StatusEmitterLike
  */
 
@@ -209,6 +211,7 @@ export class AgentContext {
             quotaMonitor: null,
             agentObserver: null,
             lastBootReport: null,
+            lastStartReport: null,
         };
 
         // Compat grep-based contract: quotaMonitor = null
@@ -873,6 +876,17 @@ export class AgentContext {
     }
 
     /**
+     * Registra o último relatório transacional de start conhecido.
+     *
+     * @param {AgentStartReport | null} report
+     * @returns {void}
+     */
+    setStartReport(report) {
+        this.runtimeState.lastStartReport = report;
+        this.invalidateStatusSnapshot();
+    }
+
+    /**
      * Atualiza o timer periódico de métricas do runtime.
      *
      * @param {ReturnType<typeof setInterval>} timer
@@ -1406,6 +1420,22 @@ export class AgentContext {
         return {
             ...report,
             steps: report.steps.map((step) => ({ ...step })),
+        };
+    }
+
+    /**
+     * Retorna uma cópia defensiva do último start report conhecido.
+     *
+     * @returns {AgentStartReport | null}
+     */
+    getStartReportSnapshot() {
+        const report = this.runtimeState.lastStartReport;
+        if (report === null) {
+            return null;
+        }
+        return {
+            ...report,
+            phases: report.phases.map((phase) => ({ ...phase })),
         };
     }
 

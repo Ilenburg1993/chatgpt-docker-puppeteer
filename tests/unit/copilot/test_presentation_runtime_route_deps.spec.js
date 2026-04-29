@@ -84,6 +84,7 @@ vi.mock('#copilot/sdk', () => ({
     isSessionUiElicitationAvailable: mocks.isSessionUiElicitationAvailable,
     listActiveClientSessions: vi.fn(() => []),
     listAllClientSessions: vi.fn(async () => []),
+    onAllSessionEvents: vi.fn(),
     permissionsHandlePending: vi.fn(),
     pickDefined: (/** @type {Record<string, unknown>} */ value) =>
         Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)),
@@ -98,6 +99,7 @@ vi.mock('#copilot/sdk', () => ({
     stopClient: mocks.stopClient,
     forceStopClient: mocks.forceStopClient,
     toolsHandlePendingCall: vi.fn(),
+    toolsList: vi.fn(),
     uiElicitation: vi.fn(),
     workspaceCreateFile: vi.fn(),
     workspaceListFiles: vi.fn(),

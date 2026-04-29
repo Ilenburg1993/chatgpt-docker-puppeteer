@@ -13,6 +13,7 @@ import { getWorkspaceContext } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { sendRuntimeDialogTurnForRuntime } from '../../presentation/runtime-dialog.js';
+import { readRuntimeLifecycleSnapshot } from '../../presentation/runtime-lifecycle.js';
 import {
     listRuntimeAvailableModelsProjection,
     readRuntimeModelMetadata,
@@ -723,6 +724,7 @@ export async function deleteTerminalPlanProjection(runtimeId) {
  *     topToolStats: [string, Record<string, any>][];
  *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  *     display: ReturnType<typeof readTerminalDisplayProjection>;
+ *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
  *     sdkPlanChangedAt: number | null;
@@ -771,6 +773,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
         topToolStats,
         activity: readTerminalActivitySnapshot(),
         display: readTerminalDisplayProjection(),
+        lifecycle: readRuntimeLifecycleSnapshot(),
         sdkSessionMode: getSdkSessionMode(),
         sdkPlanOperation: getLastSdkPlanOperation(),
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),

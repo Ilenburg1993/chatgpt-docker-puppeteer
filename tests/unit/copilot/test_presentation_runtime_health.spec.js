@@ -54,6 +54,13 @@ describe('presentation/runtime-health', () => {
 
         expect(legacy.ok).toBe(true);
         expect(moduleHealth.ok).toBe(true);
-        expect(moduleHealth.details).toEqual(expect.objectContaining({ status: 'idle', model: 'gpt-5-mini' }));
+        expect(moduleHealth.details).toEqual(
+            expect.objectContaining({
+                status: 'idle',
+                model: 'gpt-5-mini',
+                shuttingDown: false,
+                lifecycle: expect.objectContaining({ shuttingDown: false }),
+            }),
+        );
     });
 });

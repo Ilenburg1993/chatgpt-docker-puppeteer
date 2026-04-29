@@ -22,7 +22,8 @@ import { setAuditLogger } from '../audit/logger.js';
 import { container, wireLegacySetters } from '../core/di-container.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
-import { registerShutdownHandler, setShutdownLogger } from '../core/shutdown.js';
+import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
+import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { defaultBus as hookBus } from '../hooks/bus.js';
@@ -51,6 +52,16 @@ let _obsBooted = false;
 function emitSdkMetric(metric) {
     const bus = container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null;
     projectSdkOperationMetric(metric, { metrics: defaultMetrics, bus });
+}
+
+/**
+ * @param {{ type: string; timestamp: number; [key: string]: unknown }} event
+ * @returns {void}
+ */
+function emitShutdownLifecycleEvent(event) {
+    if (!container.has(EVENT_BUS)) return;
+    const bus = container.resolve(EVENT_BUS);
+    bus?.emit(event);
 }
 
 /**
@@ -107,6 +118,7 @@ export function bootstrapObservability() {
 
     // Runtime canônico de observabilidade sobre EventBus.
     if (bus) attachObservabilityBusRuntime({ bus, metrics: defaultMetrics });
+    setShutdownEventEmitter(emitShutdownLifecycleEvent);
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
     registerShutdownHandler(
@@ -115,7 +127,7 @@ export function bootstrapObservability() {
             const bus = container.resolve(EVENT_BUS);
             if (bus?.dispose) bus.dispose();
         },
-        40,
+        SHUTDOWN_PRIORITY.OBSERVABILITY_BUS,
     );
 
     registerShutdownHandler(
@@ -123,7 +135,7 @@ export function bootstrapObservability() {
         async () => {
             defaultErrorTracker.destroy();
         },
-        45,
+        SHUTDOWN_PRIORITY.OBSERVABILITY_TRACKER,
     );
 
     registerShutdownHandler(
@@ -131,7 +143,7 @@ export function bootstrapObservability() {
         async () => {
             detachObservabilityBusRuntime();
         },
-        46,
+        SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
     );
 
     // K-5: wiring centralizado — resolve tokens e invoca setters legados

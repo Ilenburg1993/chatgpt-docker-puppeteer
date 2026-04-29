@@ -20,3 +20,17 @@ export const SDK_LOGGER = createToken('SDK_LOGGER');
  * @type {import('../core/di.js').Token<import('./tools/custom.js').BuildToolFn>}
  */
 export const TOOLS_BUILDER = createToken('TOOLS_BUILDER');
+
+/**
+ * Manager isolável do lifecycle do CopilotClient.
+ *
+ * @type {import('../core/di.js').Token<import('./session/client.js').CopilotClientManager>}
+ */
+export const SDK_CLIENT_MANAGER = createToken('SDK_CLIENT_MANAGER');
+
+/**
+ * Runtime isolável de registry/selector/stats de modelos.
+ *
+ * @type {import('../core/di.js').Token<import('./models/registry.js').ModelRuntime>}
+ */
+export const SDK_MODEL_RUNTIME = createToken('SDK_MODEL_RUNTIME');

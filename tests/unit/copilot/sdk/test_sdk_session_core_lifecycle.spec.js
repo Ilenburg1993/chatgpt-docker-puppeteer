@@ -33,7 +33,9 @@ import {
     deleteSession,
     disconnectSession,
     listSessions,
+    resolveSessionCreateModel,
     resumeSession,
+    setSessionAutoModelResolver,
 } from '../../../../src/copilot/sdk/session/lifecycle.js';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
@@ -55,6 +57,7 @@ describe('sdk/session/lifecycle core hardening', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         metrics = [];
+        setSessionAutoModelResolver(null);
         setSdkMetricEmitter((metric) => metrics.push(metric));
     });
 
@@ -141,6 +144,25 @@ describe('sdk/session/lifecycle core hardening', () => {
                 process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = previous;
             }
         }
+    });
+
+    it('createSession usa resolver injetável para model auto sem import estático de models', async () => {
+        const client = fakeClient();
+        const resolver = vi.fn().mockResolvedValue('resolved-auto-model');
+        setSessionAutoModelResolver(resolver);
+
+        await createSession(client, { model: 'auto' });
+
+        expect(resolver).toHaveBeenCalledWith('gpt-5-mini');
+        expect(client.createSession).toHaveBeenCalledWith(expect.objectContaining({ model: 'resolved-auto-model' }));
+    });
+
+    it('resolveSessionCreateModel retorna modelo explícito sem acionar resolver', async () => {
+        const resolver = vi.fn().mockResolvedValue('should-not-run');
+        setSessionAutoModelResolver(resolver);
+
+        await expect(resolveSessionCreateModel('gpt-4.1')).resolves.toBe('gpt-4.1');
+        expect(resolver).not.toHaveBeenCalled();
     });
 
     it('resumeSession valida sessionId não-vazio', async () => {

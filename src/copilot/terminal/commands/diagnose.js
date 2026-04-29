@@ -63,6 +63,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         topToolStats,
         activity,
         display,
+        lifecycle,
     } = await readTerminalDiagnoseProjection(withRuntimeTarget({ hubSessionId: hubSessionId ?? null }, runtimeId));
 
     const agentStatusColor =
@@ -132,6 +133,16 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                   })
                   .join('  •  ')
             : '(nenhum runtime registrado)';
+    const bootReport = lifecycle.lastBootReport;
+    const bootLine = bootReport
+        ? `${bootReport.status === 'ok' ? C.green : C.red}${bootReport.status}${C.reset} ${C.grey}${bootReport.okCount}/${bootReport.phaseCount} fases · ${bootReport.durationMs}ms${bootReport.failedPhase ? ` · falha=${bootReport.failedPhase}` : ''}${C.reset}`
+        : `${C.grey}n/d${C.reset}`;
+    const shutdownReport = lifecycle.lastShutdownReport;
+    const shutdownLine = lifecycle.shuttingDown
+        ? `${C.yellow}em andamento${C.reset} ${C.grey}${lifecycle.shutdownHandlers.length} handlers${C.reset}`
+        : shutdownReport
+          ? `${shutdownReport.failedCount || shutdownReport.timeoutCount ? C.yellow : C.green}${shutdownReport.reason}${C.reset} ${C.grey}${shutdownReport.okCount}/${shutdownReport.handlerCount} handlers · ${shutdownReport.durationMs}ms${C.reset}`
+          : `${C.grey}n/d${C.reset}`;
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -165,6 +176,8 @@ ${C.cyan}  AGENTE${C.reset}
 ${C.cyan}  INFRAESTRUTURA${C.reset}
     MCP bridge    ${mcpLine}
     Hub storage   ${hubLine}
+    Boot report   ${bootLine}
+    Shutdown      ${shutdownLine}
     Uptime        ${C.grey}${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s${C.reset}
     Memória RSS   ${memMB > 400 ? C.yellow : C.grey}${memMB}MB${C.reset}
 

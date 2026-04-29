@@ -22,7 +22,7 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/runtime-ui-state-store.js';
-import { getSdkRecoveryPolicy } from '../../sdk/errors.js';
+import { getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import {
     readTerminalDialogStreamMeta,

@@ -16,6 +16,6 @@ Tecnologias principais: Node.js 24+ ESM, Puppeteer, NERV event bus, Express/Sock
 /**
  * Override action para mode 'customize'.
  *
- * @type {import('#copilot/sdk/types').SectionOverrideAction}
+ * @type {import('../../sdk-config-port.js').SectionOverrideAction}
  */
 export const ACTION = 'replace';

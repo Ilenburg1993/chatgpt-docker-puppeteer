@@ -16,6 +16,7 @@ import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
 import { conversationStore } from './conversation-hub/store.js';
 import { container, wireLegacySetters } from './core/di-container.js';
+import { SHUTDOWN_PRIORITY } from './core/shutdown-priorities.js';
 import { registerShutdownHandler } from './core/shutdown.js';
 import { log } from './observability/logger.js';
 
@@ -66,7 +67,7 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
             await agent.stop({ preserveDialogLoopIntent: true });
             log('INFO', '[runtime-wiring] AlwaysAliveAgent parado com intenção de dialog loop preservada.');
         },
-        10,
+        SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
         { timeoutMs: 30_000 },
     );
 

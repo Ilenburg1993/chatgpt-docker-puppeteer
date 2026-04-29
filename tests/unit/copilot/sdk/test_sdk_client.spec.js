@@ -118,6 +118,7 @@ import {
     _resetClientState,
     buildClientOptions,
     createClientSession,
+    createCopilotClientManager,
     deleteClientSession,
     disconnectClientSession,
     forceStopClient,
@@ -136,6 +137,7 @@ import {
     setForegroundClientSessionId,
     stopClient,
 } from '../../../../src/copilot/sdk/session/client.js';
+import { createSdkSessionRegistry } from '../../../../src/copilot/sdk/session/session-registry.js';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
@@ -209,6 +211,37 @@ describe('sdk/client › getClient', () => {
             expect.arrayContaining(['client.connect:started', 'client.connect:succeeded']),
         );
         expect(sdkConnectionCircuitBreaker.getState()).toBe('closed');
+    });
+});
+
+describe('sdk/client › CopilotClientManager', () => {
+    it('permite runtimes isolados sem compartilhar client nem registry', async () => {
+        const clientA = mockClient();
+        const clientB = mockClient();
+        clientA.createSession.mockResolvedValue(mockSession('manager-a'));
+        clientB.createSession.mockResolvedValue(mockSession('manager-b'));
+
+        const managerA = createCopilotClientManager({
+            registry: createSdkSessionRegistry(),
+            createClient: () => /** @type {any} */ (clientA),
+        });
+        const managerB = createCopilotClientManager({
+            registry: createSdkSessionRegistry(),
+            createClient: () => /** @type {any} */ (clientB),
+        });
+
+        await managerA.createClientSession(/** @type {any} */ ({ model: 'a' }));
+
+        expect(managerA.getActiveSessionCount()).toBe(1);
+        expect(managerB.getActiveSessionCount()).toBe(0);
+        expect(managerA.getClientSession('manager-a')?.model).toBe('a');
+        expect(managerB.getClientSession('manager-a')).toBeUndefined();
+
+        await managerB.createClientSession(/** @type {any} */ ({ model: 'b' }));
+        expect(managerA.getActiveSessionCount()).toBe(1);
+        expect(managerB.getActiveSessionCount()).toBe(1);
+        expect(clientA.createSession).toHaveBeenCalledTimes(1);
+        expect(clientB.createSession).toHaveBeenCalledTimes(1);
     });
 });
 

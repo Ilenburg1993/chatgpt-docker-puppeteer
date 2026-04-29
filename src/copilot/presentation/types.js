@@ -20,6 +20,19 @@
  * @typedef {{ path?: string | null; content?: string | null; exists?: boolean; [key: string]: unknown }} RuntimeSdkPlanReadResult
  *
  *
+ * @typedef {object} RuntimeSessionCapabilities
+ *
+ * @typedef {object} RuntimeInputOptions
+ *
+ * @typedef {string | number | boolean | string[]} RuntimeElicitationFieldValue
+ *
+ * @typedef {{
+ *     action: 'accept' | 'decline' | 'cancel';
+ *     content?: Record<string, RuntimeElicitationFieldValue>;
+ *     [key: string]: unknown;
+ * }} RuntimeElicitationResult
+ *
+ *
  * @typedef {{
  *     id: string;
  *     capabilities?: {

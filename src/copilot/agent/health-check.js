@@ -78,6 +78,7 @@ export function getAgentHealthSnapshot(ctx, host) {
     const pendingQuestionShadowRemainingMs = ctx.getPendingQuestionShadowRemainingMs();
     const backgroundPendingLabels = ctx.getBackgroundPendingLabels(5);
     const bootReport = ctx.getBootReportSnapshot();
+    const startReport = typeof ctx.getStartReportSnapshot === 'function' ? ctx.getStartReportSnapshot() : null;
     const sdkResources = typeof host.getSdkResourceSnapshot === 'function' ? host.getSdkResourceSnapshot() : null;
 
     const runtimeOperational =
@@ -234,6 +235,7 @@ export function getAgentHealthSnapshot(ctx, host) {
         uptime: snap.startedAt !== null ? Date.now() - snap.startedAt : null,
         issues,
         bootReport,
+        startReport,
         sdkResources,
         checks: {
             runtime: {

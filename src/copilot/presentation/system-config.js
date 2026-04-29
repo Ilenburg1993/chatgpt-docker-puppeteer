@@ -24,6 +24,7 @@ import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
 import { getSseClients, getSseCriticalClients } from '../infra/sse/state.js';
 import { setDefaultAgentBackgroundCompactionThreshold } from './runtime-controls.js';
+import { readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
 import { readAgentRuntimeOverviewProjection } from './runtime-overview.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
 import {
@@ -97,12 +98,16 @@ export function handleHealth(params = {}) {
             hubInfo = { initialized: true, activeSessions: -1 };
         }
     }
+    const lifecycle = readRuntimeLifecycleSnapshot();
+    const baseOk = healthRecord?.['ok'] ?? true;
     return {
-        status: healthRecord?.['ok'] === false ? 503 : 200,
+        status: lifecycle.shuttingDown || baseOk === false ? 503 : 200,
         body: {
-            ok: healthRecord?.['ok'] ?? true,
+            ok: Boolean(baseOk) && !lifecycle.shuttingDown,
             healthStatus: healthRecord?.['status'] ?? 'healthy',
             issues: healthRecord?.['issues'] ?? [],
+            shuttingDown: lifecycle.shuttingDown,
+            lifecycle,
             dialogLoopActive,
             dialogPaused,
             agentStatus,

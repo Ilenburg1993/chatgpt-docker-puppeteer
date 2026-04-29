@@ -9,7 +9,7 @@
  */
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
-import { logSwallowed, registerShutdownHandler } from '#copilot/core';
+import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -109,7 +109,7 @@ registerShutdownHandler(
     async () => {
         await _flushOnExit();
     },
-    90,
+    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
 );
 
 /**

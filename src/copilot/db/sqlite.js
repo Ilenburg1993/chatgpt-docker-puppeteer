@@ -22,7 +22,7 @@
  */
 
 import { resolveWorkspacePath } from '#copilot/boot';
-import { ConfigError, registerShutdownHandler, toError } from '#copilot/core';
+import { ConfigError, registerShutdownHandler, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -252,8 +252,8 @@ function registerExitHandler() {
         exitState.registered = true;
     }
 
-    // Participar do shutdown gracioso centralizado (prioridade 15: após agent.stop)
-    registerShutdownHandler('copilot-db.close', async () => runExitHandlers(), 15);
+    // Participar do shutdown gracioso centralizado na fase de persistência local.
+    registerShutdownHandler('copilot-db.close', async () => runExitHandlers(), SHUTDOWN_PRIORITY.DATABASE);
 }
 
 /**

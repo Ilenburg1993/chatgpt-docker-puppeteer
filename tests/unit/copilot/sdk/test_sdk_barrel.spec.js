@@ -85,6 +85,9 @@ describe('F86 - Barrel complete export coverage', () => {
             'stopClient',
             '_injectClientForTest',
             '_resetClientState',
+            'CopilotClientManager',
+            'createCopilotClientManager',
+            'defaultClientManager',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
@@ -100,6 +103,8 @@ describe('F86 - Barrel complete export coverage', () => {
             'listSessions',
             'resumeOrCreate',
             'resumeSession',
+            'resolveSessionCreateModel',
+            'setSessionAutoModelResolver',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
@@ -347,6 +352,8 @@ describe('F86 - Barrel complete export coverage', () => {
             'ModelSelector',
             'ModelStatsTracker',
             'autoDowngradeDetector',
+            'createModelRuntime',
+            'defaultModelRuntime',
             'modelRegistry',
             'modelSelector',
             'modelStatsTracker',

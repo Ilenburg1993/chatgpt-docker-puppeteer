@@ -115,7 +115,8 @@ function defaultElicitationSchema() {
 /**
  * @param {string | undefined} action
  * @param {string[]} rest
- * @returns {{ ok: true; result: import('#copilot/sdk/types').ElicitationResult } | { ok: false; error: string }}
+ * @returns {{ ok: true; result: import('../../presentation/types.js').RuntimeElicitationResult }
+ *     | { ok: false; error: string }}
  */
 function parseElicitationResult(action, rest) {
     if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
@@ -327,7 +328,9 @@ export async function cmdElicitation({ println }, arg = '') {
                 inputTerminalSdkSessionUi,
                 runtimeId,
                 message,
-                /** @type {import('#copilot/sdk/types').InputOptions | undefined} */ (parsed.json ?? undefined),
+                /** @type {import('../../presentation/types.js').RuntimeInputOptions | undefined} */ (
+                    parsed.json ?? undefined
+                ),
             );
             println(`\n  \x1b[32m✓ session.ui.input concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
         } else if (sub === 'capabilities') {

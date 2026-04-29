@@ -22,6 +22,14 @@ import { withSkipPermission } from './tool-factory.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').Tool} Tool
+ *
+ * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
+ *
+ * @typedef {{
+ *     category: string;
+ *     tags: string[];
+ *     readOnly: boolean;
+ * }} ToolIntrospectionMetadata
  */
 
 /**
@@ -59,40 +67,58 @@ export function getDisabledTools() {
     return [..._disabledTools];
 }
 
-// ─── H2-FIX: Dynamic Category Derivation ─────────────────────────────────────
-
 /**
- * Mapa de categorias derivado dinamicamente do array de tools registradas. Inicialmente vazio; preenchido por
- * _deriveCategoriesFromTools() quando registerForIntrospection() é chamado.
- *
- * Formato: { category: [tool_names] }
+ * Mapa de categorias derivado do ToolRegistry canônico.
  *
  * @type {Record<string, string[]>}
  */
 let _CATEGORY_TOOL_MAP_DYNAMIC = {};
 
 /**
- * Registro auxiliar: tool name → category. Preenchido durante registerTools() em bootstrap.js. Necessário porque o SDK
- * Tool type não armazena metadados de categoria.
+ * Metadados por tool name. A fonte preferida é o ToolRegistry; `recordToolCategory()` preserva compatibilidade para
+ * testes e boots legados que ainda não passam o registry para `registerForIntrospection()`.
  *
- * @type {Map<string, string>}
+ * @type {Map<string, ToolIntrospectionMetadata>}
  */
-export const _toolNameToCategoryMap = new Map();
+export const _toolNameToMetadataMap = new Map();
 
 /**
- * Registra a associação entre uma tool e sua categoria. Chamado durante bootstrap.js registerTools().
+ * Registra a associação compatível entre uma tool e sua categoria.
  *
  * @param {string} toolName
  * @param {string} category
  * @returns {void}
  */
 export function recordToolCategory(toolName, category) {
-    _toolNameToCategoryMap.set(toolName.toLowerCase(), category);
+    const normalized = toolName.toLowerCase();
+    const previous = _toolNameToMetadataMap.get(normalized);
+    _toolNameToMetadataMap.set(normalized, {
+        category,
+        tags: previous?.tags ?? [],
+        readOnly: previous?.readOnly ?? false,
+    });
 }
 
 /**
- * Deriva as categorias das tools a partir do array _registeredTools e constrói _CATEGORY_TOOL_MAP_DYNAMIC. Esta função
- * substitui a necessidade de CATEGORY_TOOL_MAP hardcoded (TODO RF-026).
+ * Captura os metadados canônicos do ToolRegistry para introspecção.
+ *
+ * @param {ToolRegistry | null | undefined} registry
+ * @returns {void}
+ */
+function recordToolRegistryMetadata(registry) {
+    if (!registry?.entries) return;
+
+    for (const [name, entry] of registry.entries) {
+        _toolNameToMetadataMap.set(name.toLowerCase(), {
+            category: entry.category,
+            tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+            readOnly: entry.readOnly === true,
+        });
+    }
+}
+
+/**
+ * Deriva as categorias das tools registradas a partir dos metadados canônicos capturados do registry.
  *
  * @returns {void}
  */
@@ -100,8 +126,7 @@ function _deriveCategoriesFromTools() {
     _CATEGORY_TOOL_MAP_DYNAMIC = {};
 
     for (const tool of _registeredTools) {
-        // Procura a categoria no registro auxiliar _toolNameToCategoryMap (preenchido durante bootstrap)
-        const category = _toolNameToCategoryMap.get(tool.name.toLowerCase()) ?? 'unknown';
+        const category = _toolNameToMetadataMap.get(tool.name.toLowerCase())?.category ?? 'unknown';
 
         if (!_CATEGORY_TOOL_MAP_DYNAMIC[category]) {
             _CATEGORY_TOOL_MAP_DYNAMIC[category] = [];
@@ -117,16 +142,20 @@ function _deriveCategoriesFromTools() {
 }
 
 /**
- * Retorna o mapa de categorias derivado dinamicamente. Se ainda não houver bootstrap, usa o CATEGORY_TOOL_MAP
- * heurístico como fallback.
+ * Retorna o mapa de categorias derivado dinamicamente.
  *
  * @returns {Record<string, string[]>}
  */
 function getCategoryToolMap() {
-    if (Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).length > 0) {
-        return _CATEGORY_TOOL_MAP_DYNAMIC;
-    }
-    return /** @type {Record<string, string[]>} */ (CATEGORY_TOOL_MAP);
+    return _CATEGORY_TOOL_MAP_DYNAMIC;
+}
+
+/**
+ * @param {string} toolName
+ * @returns {ToolIntrospectionMetadata}
+ */
+function getToolMetadata(toolName) {
+    return _toolNameToMetadataMap.get(toolName.toLowerCase()) ?? { category: 'unknown', tags: [], readOnly: false };
 }
 
 /**
@@ -134,9 +163,10 @@ function getCategoryToolMap() {
  * montar o array de tools.
  *
  * @param {Tool[]} tools
+ * @param {ToolRegistry | null} [registry]
  * @returns {void}
  */
-export function registerForIntrospection(tools) {
+export function registerForIntrospection(tools, registry = null) {
     // M1-FIX: Validação de tipo + schema antes de atribuir
     if (!Array.isArray(tools)) {
         log(
@@ -152,8 +182,7 @@ export function registerForIntrospection(tools) {
     }
 
     _registeredTools = tools;
-
-    // H2-FIX: Derivar categorias dinamicamente do array de tools e construir CATEGORY_TOOL_MAP_DYNAMIC
+    recordToolRegistryMetadata(registry);
     _deriveCategoriesFromTools();
 
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
@@ -166,26 +195,9 @@ export function registerForIntrospection(tools) {
 export function resetIntrospectionStateForTests() {
     _registeredTools = [];
     _disabledTools.clear();
-    _toolNameToCategoryMap.clear();
+    _toolNameToMetadataMap.clear();
     _CATEGORY_TOOL_MAP_DYNAMIC = {};
 }
-
-// TODO(RF-026): derivar categorias do ToolRegistry para evitar manutenção manual.
-
-/**
- * Mapa de categoria → nomes de tools pertencentes a ela. Usado quando o registry completo com metadados não está
- * disponível.
- *
- * @type {Readonly<Record<string, readonly string[]>>}
- */
-const CATEGORY_TOOL_MAP = Object.freeze({
-    code: ['lint_check', 'run_tests', 'typecheck'],
-    git: ['git_status', 'git_diff', 'git_commit', 'git_changed_files'],
-    session: ['read_briefing', 'write_pending_task'],
-    task: ['get_tasks', 'add_task', 'get_session_state', 'get_system_health'],
-    hook: ['hook_get_audit_tail', 'request_user_input', 'hook_get_pending_tasks'],
-    introspection: ['list_tools', 'get_agent_info', 'get_telemetry'],
-});
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
 
@@ -234,8 +246,10 @@ const listToolsTool = createTool({
         return {
             count: tools.length,
             tools: tools.map((t) => ({
+                ...getToolMetadata(t.name),
                 name: t.name,
                 description: t.description ?? null,
+                disabled: _disabledTools.has(t.name.toLowerCase()),
             })),
         };
     },
@@ -271,6 +285,13 @@ const getAgentInfoTool = createTool({
             uptime: Math.round(process.uptime()),
             toolsRegistered: _registeredTools.length,
             toolNames: _registeredTools.map((t) => t.name),
+            categories: Object.fromEntries(
+                Object.entries(getCategoryToolMap()).map(([toolCategory, toolNames]) => [
+                    toolCategory,
+                    toolNames.length,
+                ]),
+            ),
+            disabledTools: getDisabledTools(),
             hasTelemetry: true,
             env: {
                 COPILOT_MCP_SERVERS: COPILOT_MCP_SERVERS,

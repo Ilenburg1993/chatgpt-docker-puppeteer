@@ -138,6 +138,13 @@ describe('handlers/system-config — handleHealth', () => {
         expect(body.backgroundPendingCount).toBe(0);
         expect(body.keepaliveRunning).toBe(true);
         expect(body.quotaMonitorRunning).toBe(true);
+        expect(body.shuttingDown).toBe(false);
+        expect(body.lifecycle).toEqual(
+            expect.objectContaining({
+                shuttingDown: false,
+                lastShutdownReport: null,
+            }),
+        );
         expect(typeof body.uptime).toBe('number');
         expect(typeof body.memoryMB).toBe('number');
     });

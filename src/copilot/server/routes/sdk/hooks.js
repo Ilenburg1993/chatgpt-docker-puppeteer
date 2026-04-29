@@ -30,7 +30,7 @@ const _hooksTracker = new SseConnectionTracker('hooks/events');
  *     runtimeId: string;
  *     bus: ReturnType<typeof resolveSdkRouteSharedDeps>['sdkHooks']['bus'];
  *     pool: SseClientPool;
- *     listener: (ev: import('#copilot/hooks/bus').HookBusEvent) => void;
+ *     listener: (ev: unknown) => void;
  * }} HookRuntimeState
  */
 
@@ -57,8 +57,8 @@ function ensureHookRuntimeState(routeDeps) {
         metrics: defaultMetrics,
     });
 
-    const listener = (/** @type {import('#copilot/hooks/bus').HookBusEvent} */ ev) => {
-        const payload = standardizeSsePayload(ev);
+    const listener = (/** @type {unknown} */ ev) => {
+        const payload = standardizeSsePayload(/** @type {object} */ (ev ?? {}));
         pool.broadcast('hook', payload, { replayEvent: 'hook', filterEvent: 'hook' });
     };
 

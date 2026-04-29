@@ -4,7 +4,7 @@
  *
  * Faixa 26 — Session Registry SSOT
  *
- * F123: registry ativo de sessões SDK externalizado para `infra/sdk-session-registry.js`, com fachada preservada em
+ * F123: registry ativo de sessões SDK externalizado para `sdk/session/session-registry.js`, com fachada preservada em
  * `sdk/session/client.js` — verificação estrutural F124: createClientSession/resumeClientSession populam o registry
  * F125: disconnectClientSession/deleteClientSession removem do registry F126: registry: getClientSession,
  * listActiveClientSessions, getActiveSessionCount F127: barrel exporta todas as funções do registry

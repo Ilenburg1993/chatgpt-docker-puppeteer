@@ -13,7 +13,7 @@ import { _injectClientForTest, _resetClientState } from '#copilot/sdk';
 import express from 'express';
 import request from 'supertest';
 
-import { registerActiveSdkSession } from '../../../src/copilot/infra/sdk-session-registry.js';
+import { registerActiveSdkSession } from '../../../src/copilot/sdk/session/session-registry.js';
 import sessionsRouter from '../../../src/copilot/server/routes/sdk/sessions.js';
 
 /**

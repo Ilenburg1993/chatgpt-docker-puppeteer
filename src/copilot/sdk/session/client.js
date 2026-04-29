@@ -1,56 +1,20 @@
 // @ts-check
 /**
  * @module copilot/sdk/client
- * @file Wrapper do CopilotClient com circuit breaker para operações de conexão. Re-exporta CopilotClient do SDK para
- *   uso via barrel `#copilot/sdk`.
- *
- *   src/copilot/sdk/client.js
- * @see EventBus
- * @see module:copilot/lib/session
- * @see module:copilot/always-alive
+ * @file Wrapper do CopilotClient com circuit breaker para operações de conexão.
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
 import { CircuitBreaker } from '../../core/circuit-breaker.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
-import {
-    clearActiveSdkSessions,
-    getActiveSdkSession,
-    getActiveSdkSessionCount,
-    incrementActiveSdkSessionMessageCount,
-    listActiveSdkSessions,
-    registerActiveSdkSession,
-    removeActiveSdkSession,
-} from '../../infra/sdk-session-registry.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { buildCopilotClientOptionsFromEnv } from './client-options.js';
 import { createSession as createLifecycleSession, resumeSession as resumeLifecycleSession } from './lifecycle.js';
+import { createSdkSessionRegistry, defaultSdkSessionRegistry } from './session-registry.js';
 
-// Re-export para que consumidores usem `#copilot/sdk` em vez de `@github/copilot-sdk`
 export { CopilotClient };
-
-/**
- * Circuit breaker para operações de conexão ao SDK CLI. Protege contra retry storm em caso de CLI indisponível ou erro
- * de rede.
- *
- * @type {CircuitBreaker}
- */
-export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', {
-    failThreshold: 3,
-    resetTimeoutMs: 60_000,
-    halfOpenMax: 1,
-});
-
-/**
- * Acesso explícito ao circuit breaker compartilhado. Código novo deve preferir este getter ao import direto do objeto.
- *
- * @returns {CircuitBreaker}
- */
-export function getSdkConnectionCircuitBreaker() {
-    return sdkConnectionCircuitBreaker;
-}
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -73,28 +37,31 @@ export function getSdkConnectionCircuitBreaker() {
  *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
  *
- * @typedef {import('@github/copilot-sdk').SessionLifecycleHandler} SessionLifecycleHandler
+ * @typedef {import('./session-registry.js').SdkSessionRegistry} SdkSessionRegistry
  *
  * @typedef {Object} SessionEntry
- * @property {CopilotSession} session - Sessão ativa
- * @property {string} model - Modelo utilizado
- * @property {number} createdAt - Timestamp de criação local (ms)
- * @property {number} messagesCount - Total de mensagens enviadas
+ * @property {CopilotSession} session
+ * @property {string} model
+ * @property {number} createdAt
+ * @property {number} messagesCount
  *
  * @typedef {Object} ClientState
- * @property {CopilotClient | null} client - Instância do client ou null
- * @property {boolean} starting - Se está em processo de inicialização
- * @property {true} registryExternalized - Registry de sessões ativas externalizado para infra
+ * @property {CopilotClient | null} client
+ * @property {boolean} starting
+ * @property {true} registryExternalized
+ *
+ * @typedef {Object} CopilotClientManagerOptions
+ * @property {CircuitBreaker} [breaker]
+ * @property {SdkSessionRegistry} [registry]
+ * @property {(overrides?: Partial<CopilotClientOptions>) => CopilotClient} [createClient]
+ * @property {() => Promise<void>} [clearModelsCache]
  */
-/** @type {CopilotClient | null} */
-let _client = null;
 
-// C13-01: Promise compartilhada entre waiters para evitar retry storm após falha
-/** @type {Promise<import('@github/copilot-sdk').CopilotClient> | null} */
-let _startPromise = null;
-
-/** @type {boolean} */
-let _registryHasActiveSessions = false;
+export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', {
+    failThreshold: 3,
+    resetTimeoutMs: 60_000,
+    halfOpenMax: 1,
+});
 
 /**
  * @param {number} ms
@@ -119,10 +86,7 @@ async function clearModelsCacheBestEffort() {
 /**
  * Constrói as opções canônicas do CopilotClient.
  *
- * A fonte de verdade mora em `config/client-options.js`: este wrapper existe para preservar a API pública histórica de
- * `#copilot/sdk` enquanto garante que boot, server, terminal e agent usem as mesmas regras SDK-first.
- *
- * @param {Partial<CopilotClientOptions>} [overrides] - Opções adicionais para sobrescrever
+ * @param {Partial<CopilotClientOptions>} [overrides]
  * @returns {Partial<CopilotClientOptions>}
  */
 export function buildClientOptions(overrides = {}) {
@@ -130,37 +94,87 @@ export function buildClientOptions(overrides = {}) {
 }
 
 /**
- * Cria uma instância NÃO-singleton de CopilotClient com as opções canônicas do projeto.
+ * Cria uma instância não-singleton de CopilotClient com as opções canônicas.
  *
- * Use esta factory para fluxos isolados (ex.: preflight/reconnect) em vez de `new CopilotClient(...)` direto em
- * consumers. Isso centraliza policy/env no mesmo builder usado por `getClient()`.
- *
- * @param {Partial<CopilotClientOptions>} [overrides] - Overrides opcionais (ex.: telemetry, cliUrl)
+ * @param {Partial<CopilotClientOptions>} [overrides]
  * @returns {CopilotClient}
  */
 export function createCopilotClient(overrides = {}) {
     const options = buildClientOptions(overrides);
     return new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
 }
+
 /**
- * Retorna (ou cria) a instância singleton de CopilotClient já conectada.
- *
- * Se `COPILOT_CLI_URL` estiver definida, conecta ao CLI externo em vez de fazer spawn.
- *
- * @param {Partial<CopilotClientOptions>} [overrides] - Opções adicionais (ex: cliPath, logLevel)
- * @returns {Promise<CopilotClient>}
+ * Runtime stateful e isolável para CopilotClient. O módulo ainda expõe uma instância default para compatibilidade, mas
+ * consumidores que precisam de isolamento podem criar seu próprio manager com registry e circuit breaker próprios.
  */
-export async function getClient(overrides = {}) {
-    if (_client && _client.getState() === 'connected') {
-        return _client;
+export class CopilotClientManager {
+    /** @type {CopilotClient | null} */
+    #client = null;
+
+    /** @type {Promise<CopilotClient> | null} */
+    #startPromise = null;
+
+    /** @type {boolean} */
+    #registryHasActiveSessions = false;
+
+    /** @type {CircuitBreaker} */
+    #breaker;
+
+    /** @type {SdkSessionRegistry} */
+    #registry;
+
+    /** @type {(overrides?: Partial<CopilotClientOptions>) => CopilotClient} */
+    #createClient;
+
+    /** @type {() => Promise<void>} */
+    #clearModelsCache;
+
+    /**
+     * @param {CopilotClientManagerOptions} [options]
+     */
+    constructor(options = {}) {
+        this.#breaker =
+            options.breaker ??
+            new CircuitBreaker('sdk-connection', {
+                failThreshold: 3,
+                resetTimeoutMs: 60_000,
+                halfOpenMax: 1,
+            });
+        this.#registry = options.registry ?? createSdkSessionRegistry();
+        this.#createClient = options.createClient ?? createCopilotClient;
+        this.#clearModelsCache = options.clearModelsCache ?? clearModelsCacheBestEffort;
     }
 
-    // C13-01: usar Promise compartilhada para evitar retry storm em concorrência
-    if (_startPromise) {
-        return _startPromise;
+    /**
+     * @returns {CircuitBreaker}
+     */
+    getCircuitBreaker() {
+        return this.#breaker;
     }
 
-    _startPromise = (async () => {
+    /**
+     * @param {Partial<CopilotClientOptions>} [overrides]
+     * @returns {Promise<CopilotClient>}
+     */
+    async getClient(overrides = {}) {
+        if (this.#client && this.#client.getState() === 'connected') {
+            return this.#client;
+        }
+
+        if (this.#startPromise) {
+            return this.#startPromise;
+        }
+
+        this.#startPromise = this.#connect(overrides);
+        return this.#startPromise;
+    }
+
+    /**
+     * @param {Partial<CopilotClientOptions>} overrides
+     * @returns {Promise<CopilotClient>}
+     */
+    async #connect(overrides) {
         const startedAt = Date.now();
         emitSdkOperationMetric({ operation: 'client.connect', status: 'started' });
         try {
@@ -171,31 +185,25 @@ export async function getClient(overrides = {}) {
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    sdkConnectionCircuitBreaker.guard();
-                    const client = createCopilotClient(overrides);
+                    this.#breaker.guard();
+                    const client = this.#createClient(overrides);
                     await client.start();
-                    sdkConnectionCircuitBreaker.recordSuccess();
-                    _client = client;
+                    this.#breaker.recordSuccess();
+                    this.#client = client;
                     log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
                     emitSdkOperationMetric({
                         operation: 'client.connect',
                         status: 'succeeded',
                         durationMs: Date.now() - startedAt,
-                        attributes: {
-                            attempt,
-                            breakerState: sdkConnectionCircuitBreaker.getState(),
-                        },
+                        attributes: { attempt, breakerState: this.#breaker.getState() },
                     });
                     return client;
                 } catch (error) {
                     lastError = error;
                     const policy = getSdkRecoveryPolicy(error, 'connection');
 
-                    if (policy.tripCircuit) {
-                        sdkConnectionCircuitBreaker.recordFailure();
-                    } else if (policy.resetCircuit) {
-                        sdkConnectionCircuitBreaker.reset();
-                    }
+                    if (policy.tripCircuit) this.#breaker.recordFailure();
+                    else if (policy.resetCircuit) this.#breaker.reset();
 
                     const shouldRetry = policy.retryable && attempt < maxAttempts;
                     log(
@@ -207,7 +215,6 @@ export async function getClient(overrides = {}) {
                         await wait(policy.backoffMs);
                         continue;
                     }
-
                     break;
                 }
             }
@@ -220,312 +227,405 @@ export async function getClient(overrides = {}) {
                 durationMs: Date.now() - startedAt,
                 attributes: {
                     errorKind: finalSdkError.kind,
-                    breakerState: sdkConnectionCircuitBreaker.getState(),
+                    breakerState: this.#breaker.getState(),
                     retryable: policy.retryable,
                     tripCircuit: policy.tripCircuit,
                 },
             });
             throw finalSdkError;
         } finally {
-            _startPromise = null;
+            this.#startPromise = null;
         }
-    })();
+    }
 
-    return _startPromise;
+    /**
+     * @returns {Promise<Error[]>}
+     */
+    async stopClient() {
+        if (!this.#client) return [];
+        log('INFO', '[lib/sdk-client] Parando CopilotClient...');
+        const errors = await this.#client.stop();
+        if (errors.length > 0) {
+            log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
+        }
+        this.#clearRegistryIfOwned();
+        await this.#clearModelsCache();
+        this.#client = null;
+        return errors;
+    }
+
+    /**
+     * @returns {Promise<void>}
+     */
+    async forceStopClient() {
+        if (!this.#client) return;
+        log('WARN', '[lib/sdk-client] Parando CopilotClient de forma forçada (sem cleanup)...');
+        try {
+            /** @type {{ forceStop?: () => Promise<void> }} */
+            const anyClient = this.#client;
+            if (typeof anyClient.forceStop === 'function') await anyClient.forceStop();
+            else await this.#client.stop();
+        } catch (e) {
+            log('WARN', `[lib/sdk-client] Erro no forceStop: ${toError(e).message}`);
+        }
+        this.#clearRegistryIfOwned();
+        await this.#clearModelsCache();
+        this.#client = null;
+    }
+
+    /**
+     * @returns {ConnectionState | 'not_started'}
+     */
+    getClientState() {
+        return this.#client?.getState() ?? 'not_started';
+    }
+
+    /**
+     * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+     */
+    async pingClient() {
+        const client = await this.getClient();
+        return client.ping();
+    }
+
+    /** @returns {Promise<GetStatusResponse>} */
+    async getClientStatus() {
+        const client = await this.getClient();
+        return client.getStatus();
+    }
+
+    /** @returns {Promise<GetAuthStatusResponse>} */
+    async getAuthStatus() {
+        const client = await this.getClient();
+        return client.getAuthStatus();
+    }
+
+    /** @returns {Promise<ModelInfo[]>} */
+    async listAvailableModels() {
+        const client = await this.getClient();
+        return client.listModels();
+    }
+
+    /** @returns {Promise<string | undefined>} */
+    async getLastClientSessionId() {
+        const client = await this.getClient();
+        return client.getLastSessionId();
+    }
+
+    /** @returns {Promise<string | undefined>} */
+    async getForegroundClientSessionId() {
+        const client = await this.getClient();
+        return client.getForegroundSessionId();
+    }
+
+    /**
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async setForegroundClientSessionId(sessionId) {
+        const client = await this.getClient();
+        await client.setForegroundSessionId(sessionId);
+    }
+
+    /** @returns {Promise<ReturnType<CopilotClient['rpc']>>} */
+    async getServerRpc() {
+        const client = await this.getClient();
+        return client.rpc;
+    }
+
+    /**
+     * @param {SessionConfig} config
+     * @returns {Promise<CopilotSession>}
+     */
+    async createClientSession(config) {
+        const client = await this.getClient();
+        const { session } = await createLifecycleSession(
+            client,
+            /** @type {import('./lifecycle.js').SessionCreateOptions} */ (/** @type {unknown} */ (config)),
+        );
+        this.#registry.register(session, {
+            model: config.model ?? 'unknown',
+            createdAt: Date.now(),
+            messagesCount: 0,
+        });
+        this.#registryHasActiveSessions = true;
+        log('INFO', `[lib/sdk-client] Sessão criada: ${session.sessionId} (modelo: ${config.model ?? 'unknown'})`);
+        return session;
+    }
+
+    /**
+     * @param {string} sessionId
+     * @param {ResumeSessionConfig} config
+     * @returns {Promise<CopilotSession>}
+     */
+    async resumeClientSession(sessionId, config) {
+        const existing = this.#registry.get(sessionId);
+        if (existing) {
+            log('INFO', `[lib/sdk-client] Sessão ${sessionId} já ativa no registry — retornando existente.`);
+            return existing.session;
+        }
+
+        const client = await this.getClient();
+        const { session } = await resumeLifecycleSession(
+            client,
+            sessionId,
+            /** @type {import('./lifecycle.js').SessionResumeOptions} */ (/** @type {unknown} */ (config)),
+        );
+        this.#registry.register(session, {
+            model: /** @type {string} */ (/** @type {Record<string, unknown>} */ (config)['model'] ?? 'unknown'),
+            createdAt: Date.now(),
+            messagesCount: 0,
+        });
+        this.#registryHasActiveSessions = true;
+        log('INFO', `[lib/sdk-client] Sessão retomada: ${session.sessionId}`);
+        return session;
+    }
+
+    /**
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async disconnectClientSession(sessionId) {
+        const entry = this.#registry.get(sessionId);
+        if (!entry) {
+            log('WARN', `[lib/sdk-client] disconnectClientSession: sessão ${sessionId} não encontrada no registry.`);
+            return;
+        }
+        try {
+            await entry.session.disconnect();
+        } catch (e) {
+            log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${toError(e).message}`);
+        }
+        this.#registry.remove(sessionId);
+        if (this.#registry.count() === 0) this.#registryHasActiveSessions = false;
+        log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
+    }
+
+    /**
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async deleteClientSession(sessionId) {
+        const entry = this.#registry.get(sessionId);
+        if (entry) {
+            try {
+                await entry.session.disconnect();
+            } catch (e) {
+                logSwallowed(e, 'sdk.client.disconnect');
+            }
+            this.#registry.remove(sessionId);
+            if (this.#registry.count() === 0) this.#registryHasActiveSessions = false;
+        }
+
+        const client = await this.getClient();
+        await client.deleteSession(sessionId);
+        log('INFO', `[lib/sdk-client] Sessão ${sessionId} deletada do disco.`);
+    }
+
+    /**
+     * @param {string} sessionId
+     * @returns {SessionEntry | undefined}
+     */
+    getClientSession(sessionId) {
+        return this.#registry.get(sessionId);
+    }
+
+    /** @returns {({ sessionId: string } & SessionEntry)[]} */
+    listActiveClientSessions() {
+        return this.#registry.list();
+    }
+
+    /**
+     * @param {SessionListFilter} [filter]
+     * @returns {Promise<SessionMetadata[]>}
+     */
+    async listAllClientSessions(filter) {
+        const client = await this.getClient();
+        return client.listSessions(filter);
+    }
+
+    /**
+     * @param {string} sessionId
+     * @returns {number}
+     */
+    incrementSessionMessageCount(sessionId) {
+        return this.#registry.incrementMessageCount(sessionId);
+    }
+
+    /** @returns {number} */
+    getActiveSessionCount() {
+        return this.#registry.count();
+    }
+
+    /** @returns {void} */
+    resetForTest() {
+        this.#client = null;
+        this.#startPromise = null;
+        this.#breaker.reset();
+        this.#registry.clear();
+        this.#registryHasActiveSessions = false;
+        void this.#clearModelsCache();
+    }
+
+    /**
+     * @param {CopilotClient} mockClient
+     * @returns {void}
+     */
+    injectClientForTest(mockClient) {
+        this.#client = mockClient;
+        this.#startPromise = null;
+    }
+
+    /** @returns {void} */
+    #clearRegistryIfOwned() {
+        if (!this.#registryHasActiveSessions) return;
+        this.#registry.clear();
+        this.#registryHasActiveSessions = false;
+    }
 }
+
 /**
- * Para o cliente graciosamente e limpa todas as sessões do registry.
- *
- * @returns {Promise<Error[]>} Array de erros encontrados durante cleanup (vazio = sucesso total)
+ * @param {CopilotClientManagerOptions} [options]
+ * @returns {CopilotClientManager}
  */
+export function createCopilotClientManager(options = {}) {
+    return new CopilotClientManager(options);
+}
+
+export const defaultClientManager = new CopilotClientManager({
+    breaker: sdkConnectionCircuitBreaker,
+    registry: defaultSdkSessionRegistry,
+});
+
+export function getSdkConnectionCircuitBreaker() {
+    return defaultClientManager.getCircuitBreaker();
+}
+
+export async function getClient(overrides = {}) {
+    return defaultClientManager.getClient(overrides);
+}
+
 export async function stopClient() {
-    if (!_client) return [];
-    log('INFO', '[lib/sdk-client] Parando CopilotClient...');
-    const errors = await _client.stop();
-    if (errors.length > 0) {
-        log('WARN', `[lib/sdk-client] Erros ao parar: ${errors.map((e) => e.message).join(', ')}`);
-    }
-    if (_registryHasActiveSessions) {
-        clearActiveSdkSessions();
-        _registryHasActiveSessions = false;
-    }
-    await clearModelsCacheBestEffort();
-    _client = null;
-    return errors;
+    return defaultClientManager.stopClient();
 }
-/**
- * Para o cliente de forma forçada (sem cleanup gracioso). Use apenas em emergências.
- *
- * @returns {Promise<void>}
- */
+
 export async function forceStopClient() {
-    if (!_client) return;
-    log('WARN', '[lib/sdk-client] Parando CopilotClient de forma forçada (sem cleanup)...');
-    try {
-        /** @type {{ forceStop?: () => Promise<void> }} */
-        const anyClient = _client;
-        if (typeof anyClient.forceStop === 'function') {
-            await anyClient.forceStop();
-        } else {
-            await _client.stop();
-        }
-    } catch (e) {
-        log('WARN', `[lib/sdk-client] Erro no forceStop: ${toError(e).message}`);
-    }
-    if (_registryHasActiveSessions) {
-        clearActiveSdkSessions();
-        _registryHasActiveSessions = false;
-    }
-    await clearModelsCacheBestEffort();
-    _client = null;
+    return defaultClientManager.forceStopClient();
 }
-/**
- * Estado atual da conexão do client.
- *
- * @returns {ConnectionState | 'not_started'}
- */
+
 export function getClientState() {
-    return _client?.getState() ?? 'not_started';
+    return defaultClientManager.getClientState();
 }
-/**
- * Executa ping no CLI para verificar conectividade.
- *
- * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
- */
+
 export async function pingClient() {
-    const client = await getClient();
-    return client.ping();
+    return defaultClientManager.pingClient();
 }
-/**
- * Retorna o status do CLI incluindo versão e informações de protocolo.
- *
- * @returns {Promise<GetStatusResponse>}
- */
+
 export async function getClientStatus() {
-    const client = await getClient();
-    return client.getStatus();
+    return defaultClientManager.getClientStatus();
 }
-/**
- * Retorna o status de autenticação GitHub do CLI.
- *
- * @returns {Promise<GetAuthStatusResponse>}
- */
+
 export async function getAuthStatus() {
-    const client = await getClient();
-    return client.getAuthStatus();
+    return defaultClientManager.getAuthStatus();
 }
-/**
- * Lista todos os modelos disponíveis no CLI.
- *
- * @returns {Promise<ModelInfo[]>}
- */
+
 export async function listAvailableModels() {
-    const client = await getClient();
-    return client.listModels();
+    return defaultClientManager.listAvailableModels();
 }
 
-/**
- * Retorna o ID da sessão mais recentemente atualizada no servidor Copilot.
- *
- * @returns {Promise<string | undefined>}
- */
 export async function getLastClientSessionId() {
-    const client = await getClient();
-    return client.getLastSessionId();
+    return defaultClientManager.getLastClientSessionId();
 }
 
-/**
- * Retorna o sessionId atualmente em foreground no modo TUI+server.
- *
- * @returns {Promise<string | undefined>}
- */
 export async function getForegroundClientSessionId() {
-    const client = await getClient();
-    return client.getForegroundSessionId();
+    return defaultClientManager.getForegroundClientSessionId();
 }
 
 /**
- * Define qual sessão deve ficar em foreground no modo TUI+server.
- *
  * @param {string} sessionId
  * @returns {Promise<void>}
  */
 export async function setForegroundClientSessionId(sessionId) {
-    const client = await getClient();
-    await client.setForegroundSessionId(sessionId);
+    return defaultClientManager.setForegroundClientSessionId(sessionId);
+}
+
+export async function getServerRpc() {
+    return defaultClientManager.getServerRpc();
 }
 
 /**
- * Retorna a facade de server RPC do SDK para o client atual.
- *
- * @returns {Promise<ReturnType<import('@github/copilot-sdk').CopilotClient['rpc']>>}
- */
-export async function getServerRpc() {
-    const client = await getClient();
-    return client.rpc;
-}
-/**
- * Cria uma nova sessão no CopilotClient e registra no registry em memória.
- *
- * @param {SessionConfig} config - Configuração completa da sessão
+ * @param {SessionConfig} config
  * @returns {Promise<CopilotSession>}
  */
 export async function createClientSession(config) {
-    const client = await getClient();
-    const { session } = await createLifecycleSession(
-        client,
-        /** @type {import('./lifecycle.js').SessionCreateOptions} */ (/** @type {unknown} */ (config)),
-    );
-    registerActiveSdkSession(session, {
-        model: config.model ?? 'unknown',
-        createdAt: Date.now(),
-        messagesCount: 0,
-    });
-    _registryHasActiveSessions = true;
-    log('INFO', `[lib/sdk-client] Sessão criada: ${session.sessionId} (modelo: ${config.model ?? 'unknown'})`);
-    return session;
+    return defaultClientManager.createClientSession(config);
 }
+
 /**
- * Retoma uma sessão existente e registra no registry em memória. Se a sessão já está ativa no registry, retorna a
- * existente sem nova conexão.
- *
- * @param {string} sessionId - ID da sessão a retomar
- * @param {ResumeSessionConfig} config - Configuração de retomada
+ * @param {string} sessionId
+ * @param {ResumeSessionConfig} config
  * @returns {Promise<CopilotSession>}
  */
 export async function resumeClientSession(sessionId, config) {
-    const existing = getActiveSdkSession(sessionId);
-    if (existing) {
-        log('INFO', `[lib/sdk-client] Sessão ${sessionId} já ativa no registry — retornando existente.`);
-        return existing.session;
-    }
-
-    const client = await getClient();
-    const { session } = await resumeLifecycleSession(
-        client,
-        sessionId,
-        /** @type {import('./lifecycle.js').SessionResumeOptions} */ (/** @type {unknown} */ (config)),
-    );
-    registerActiveSdkSession(session, {
-        model: /** @type {string} */ (/** @type {Record<string, unknown>} */ (config)['model'] ?? 'unknown'),
-        createdAt: Date.now(),
-        messagesCount: 0,
-    });
-    _registryHasActiveSessions = true;
-    log('INFO', `[lib/sdk-client] Sessão retomada: ${session.sessionId}`);
-    return session;
+    return defaultClientManager.resumeClientSession(sessionId, config);
 }
+
 /**
- * Desconecta uma sessão ativa e remove do registry.
- *
- * @param {string} sessionId - ID da sessão a desconectar
+ * @param {string} sessionId
  * @returns {Promise<void>}
  */
 export async function disconnectClientSession(sessionId) {
-    const entry = getActiveSdkSession(sessionId);
-    if (!entry) {
-        log('WARN', `[lib/sdk-client] disconnectClientSession: sessão ${sessionId} não encontrada no registry.`);
-        return;
-    }
-    try {
-        await entry.session.disconnect();
-    } catch (e) {
-        log('WARN', `[lib/sdk-client] Erro ao desconectar sessão ${sessionId}: ${toError(e).message}`);
-    }
-    removeActiveSdkSession(sessionId);
-    if (getActiveSdkSessionCount() === 0) {
-        _registryHasActiveSessions = false;
-    }
-    log('INFO', `[lib/sdk-client] Sessão ${sessionId} desconectada e removida do registry.`);
+    return defaultClientManager.disconnectClientSession(sessionId);
 }
+
 /**
- * Deleta permanentemente uma sessão do disco do CLI (irreversível).
- *
- * @param {string} sessionId - ID da sessão a deletar
+ * @param {string} sessionId
  * @returns {Promise<void>}
  */
 export async function deleteClientSession(sessionId) {
-    // Desconecta do registry se estiver ativa
-    const entry = getActiveSdkSession(sessionId);
-    if (entry) {
-        try {
-            await entry.session.disconnect();
-        } catch (e) {
-            logSwallowed(e, 'sdk.client.disconnect');
-        }
-        removeActiveSdkSession(sessionId);
-        if (getActiveSdkSessionCount() === 0) {
-            _registryHasActiveSessions = false;
-        }
-    }
-
-    const client = await getClient();
-    await client.deleteSession(sessionId);
-    log('INFO', `[lib/sdk-client] Sessão ${sessionId} deletada do disco.`);
+    return defaultClientManager.deleteClientSession(sessionId);
 }
+
 /**
- * Retorna a entrada de sessão ativa de um ID (somente registry em memória).
- *
  * @param {string} sessionId
  * @returns {SessionEntry | undefined}
  */
 export function getClientSession(sessionId) {
-    return getActiveSdkSession(sessionId);
+    return defaultClientManager.getClientSession(sessionId);
 }
-/**
- * Retorna todas as entradas de sessão ativas no registry em memória.
- *
- * @returns {({ sessionId: string } & SessionEntry)[]}
- */
+
 export function listActiveClientSessions() {
-    return listActiveSdkSessions();
+    return defaultClientManager.listActiveClientSessions();
 }
+
 /**
- * Lista todas as sessões salvas no disco do CLI (pode incluir sessões inativas).
- *
- * @param {SessionListFilter} [filter] - Filtro opcional por repositório, etc.
+ * @param {SessionListFilter} [filter]
  * @returns {Promise<SessionMetadata[]>}
  */
 export async function listAllClientSessions(filter) {
-    const client = await getClient();
-    return client.listSessions(filter);
+    return defaultClientManager.listAllClientSessions(filter);
 }
+
 /**
- * Incrementa o contador de mensagens enviadas de uma sessão no registry.
- *
  * @param {string} sessionId
- * @returns {number} O novo total de mensagens (ou 0 se sessao nao encontrada)
- */
-export function incrementSessionMessageCount(sessionId) {
-    return incrementActiveSdkSessionMessageCount(sessionId);
-}
-/**
- * Retorna o número de sessões ativas no registry em memória.
- *
  * @returns {number}
  */
+export function incrementSessionMessageCount(sessionId) {
+    return defaultClientManager.incrementSessionMessageCount(sessionId);
+}
+
 export function getActiveSessionCount() {
-    return getActiveSdkSessionCount();
+    return defaultClientManager.getActiveSessionCount();
 }
-/**
- * Reseta o estado interno do módulo. **Apenas para uso em testes**.
- *
- * @returns {void}
- */
+
 export function _resetClientState() {
-    _client = null;
-    _startPromise = null;
-    sdkConnectionCircuitBreaker.reset();
-    clearActiveSdkSessions();
-    void clearModelsCacheBestEffort();
+    defaultClientManager.resetForTest();
 }
+
 /**
- * Injeta um client mock para testes. **Apenas para uso em testes**.
- *
  * @param {CopilotClient} mockClient
  * @returns {void}
  */
 export function _injectClientForTest(mockClient) {
-    _client = mockClient;
-    _startPromise = null;
+    defaultClientManager.injectClientForTest(mockClient);
 }

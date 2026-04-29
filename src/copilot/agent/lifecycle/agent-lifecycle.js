@@ -76,6 +76,12 @@ import {
 /** @typedef {import('../types.js').LifecycleHost} LifecycleHost */
 
 /**
+ * @typedef {import('../types.js').AgentStartPhaseResult} AgentStartPhaseResult
+ *
+ * @typedef {AgentStartPhaseResult['phase']} AgentStartPhase
+ */
+
+/**
  * Inicializa (ou reinicializa) a sessão SDK.
  *
  * @param {AgentContext} ctx
@@ -194,9 +200,6 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         { eventBus },
     );
     ctx.setBootReport(bootResult.bootReport);
-    if (bootResult.error) {
-        throw bootResult.error;
-    }
     ctx.setSessionEventUnsubscribers(bootResult.unsubs);
     if (bootResult.agentObserver) {
         ctx.setAgentObserver(bootResult.agentObserver);
@@ -217,6 +220,9 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         ctx.setQuotaMonitor(bootResult.quotaMonitor);
     } else {
         ctx.clearQuotaMonitor();
+    }
+    if (bootResult.error) {
+        throw bootResult.error;
     }
 
     ctx.setStatus('idle', host);
@@ -246,6 +252,109 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
 }
 
 /**
+ * Limpa recursos alocados por um `agentStart()` que falhou antes de publicar `ready`.
+ *
+ * A rotina é deliberadamente best-effort: preserva o erro original do boot e apenas registra falhas de rollback. Ela
+ * cobre o caso crítico em que `initSession()` já finalizou uma sessão e `performBootWiring()` falhou em alguma etapa
+ * posterior, deixando client/session/listeners/timers parcialmente vivos.
+ *
+ * @param {AgentContext} ctx
+ * @param {LifecycleHost & import('node:events').EventEmitter} host
+ * @param {Error} cause
+ * @returns {Promise<void>}
+ */
+async function rollbackFailedAgentStart(ctx, host, cause) {
+    log('WARN', `[AlwaysAlive] Rollback de start parcial iniciado: ${cause.message}`);
+
+    if (ctx.getDialogLoopAttachedSnapshot()) {
+        ctx.detachDialogLoopListeners();
+    }
+    if (ctx.isDialogLoopActive()) {
+        ctx.forceDeactivateDialogLoop();
+        host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'agent_start_failed' });
+    }
+
+    const metricsTimer = ctx.getMetricsTimerSnapshot();
+    if (metricsTimer) {
+        clearInterval(metricsTimer);
+        ctx.clearMetricsTimer();
+    }
+    const mcpReconnectCancel = ctx.getMcpReconnectCancelSnapshot();
+    if (mcpReconnectCancel) {
+        mcpReconnectCancel();
+        ctx.clearMcpReconnectCancel();
+    }
+    ctx.stopQuotaMonitor();
+    ctx.stopKeepalive('agent_start_failed');
+    defaultMetrics.stopPeriodicSnapshot();
+
+    const drainedBackgroundTasks = await ctx.drainBackgroundTasks(1000);
+    if (!drainedBackgroundTasks) {
+        log('WARN', '[AlwaysAlive] Background tasks ainda pendentes após rollback de start parcial.');
+    }
+
+    const remainingTasks = ctx.drainMessageQueue(
+        new SessionError('[AlwaysAlive] Agente falhou durante startup.', 'AGENT_START_FAILED'),
+    );
+    if (remainingTasks.length > 0) {
+        log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no rollback de start.`);
+    }
+
+    const agentObserver = ctx.getAgentObserverSnapshot();
+    if (agentObserver) {
+        agentObserver.detach();
+        ctx.clearAgentObserver();
+    }
+
+    const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
+    for (const unsub of sessionEventUnsubscribers) unsub();
+    ctx.clearSessionEventUnsubscribers();
+
+    const session = ctx.getSessionSnapshot();
+    if (session) {
+        try {
+            await disconnectAgentSdkSession(session);
+        } catch (e) {
+            log('WARN', `[AlwaysAlive] Erro ao desconectar sessão no rollback de start: ${toError(e).message}`);
+        }
+        ctx.clearSession();
+        ctx.invalidateMessagesCache();
+        unbindAgentSessionTools();
+    }
+
+    const client = ctx.getClientSnapshot();
+    if (client) {
+        try {
+            const stopErrors = await stopAgentSdkClient(client);
+            if (stopErrors.length > 0) {
+                log(
+                    'WARN',
+                    `[AlwaysAlive] SDK client.stop() no rollback retornou erros: ${stopErrors
+                        .map((e) => toError(e).message)
+                        .join('; ')}`,
+                );
+            }
+        } catch (e) {
+            log('WARN', `[AlwaysAlive] Erro ao parar client SDK no rollback de start: ${toError(e).message}`);
+        }
+        ctx.clearClient();
+    }
+
+    const clearedOwnership = await clearActiveSdkSessionOwnershipWithPolicy(
+        {
+            getHubSessionId,
+            setSharedSdkSessionId,
+        },
+        { label: 'agent.start.rollback.ownership.clear' },
+    );
+    if (!clearedOwnership.ok) {
+        log('WARN', `[AlwaysAlive] Ownership clear degradado no rollback de start: ${clearedOwnership.error.message}`);
+    }
+
+    ctx.invalidateStatusSnapshot();
+}
+
+/**
  * Inicia o agente: conecta ao CLI e cria/retoma sessão.
  *
  * @param {AgentContext} ctx
@@ -258,43 +367,142 @@ export async function agentStart(ctx, host) {
         return;
     }
 
+    const startStartedAt = Date.now();
+    /** @type {AgentStartPhaseResult[]} */
+    const startPhases = [];
     ctx.setStatus('starting', host);
     log('INFO', '[AlwaysAlive] Iniciando agente...');
 
-    const resetShutdown = await resetAgentRuntimeGracefulShutdownFlag();
-    if (!resetShutdown.ok) {
-        log('WARN', `[AlwaysAlive] gracefulShutdown=false não persistido no startup: ${resetShutdown.error.message}`);
-    }
-
-    initEventCollector({
-        metrics: defaultMetrics,
-        errorTracker: defaultErrorTracker,
-        persist: true,
-    });
-
-    // registerGlobalHandlers é chamado por entry.js (process.on handlers com logging)
-    // para evitar duplicação, não registramos aqui.
-
-    defaultMetrics.startPeriodicSnapshot();
-
     try {
-        const _otelConfig = buildTelemetryConfig();
-        const client = createAgentSdkClient(_otelConfig ? { telemetry: _otelConfig } : {});
-        ctx.setClient(client);
+        await runAgentStartPhase(startPhases, 'graceful-shutdown-reset', 'preflight', async () => {
+            const resetShutdown = await resetAgentRuntimeGracefulShutdownFlag();
+            if (!resetShutdown.ok) {
+                log(
+                    'WARN',
+                    `[AlwaysAlive] gracefulShutdown=false não persistido no startup: ${resetShutdown.error.message}`,
+                );
+            }
+        });
 
-        const { session, isResumed } = await startSpan('copilot.session.init', { model: ctx.getModelSnapshot() }, () =>
-            initSession(ctx, client, host),
+        await runAgentStartPhase(startPhases, 'event-collector.init', 'preflight', async () => {
+            initEventCollector({
+                metrics: defaultMetrics,
+                errorTracker: defaultErrorTracker,
+                persist: true,
+            });
+        });
+
+        // registerGlobalHandlers é chamado por entry.js (process.on handlers com logging)
+        // para evitar duplicação, não registramos aqui.
+        await runAgentStartPhase(startPhases, 'metrics.periodic.start', 'preflight', async () => {
+            defaultMetrics.startPeriodicSnapshot();
+        });
+
+        const client = await runAgentStartPhase(startPhases, 'sdk.client.create', 'client', async () => {
+            const otelConfig = buildTelemetryConfig();
+            const nextClient = createAgentSdkClient(otelConfig ? { telemetry: otelConfig } : {});
+            ctx.setClient(nextClient);
+            return nextClient;
+        });
+
+        const { session, isResumed } = await runAgentStartPhase(startPhases, 'sdk.session.init', 'session', () =>
+            startSpan('copilot.session.init', { model: ctx.getModelSnapshot() }, () => initSession(ctx, client, host)),
         );
 
-        await wireAgentSessionRuntime(ctx, host, client, session, isResumed, {
-            ownershipLabel: 'agent.start.ownership.sync',
-        });
+        await runAgentStartPhase(startPhases, 'agent.session.runtime.wire', 'wiring', () =>
+            wireAgentSessionRuntime(ctx, host, client, session, isResumed, {
+                ownershipLabel: 'agent.start.ownership.sync',
+            }),
+        );
+
+        ctx.setStartReport(buildAgentStartReport(startStartedAt, startPhases, true, null, null));
     } catch (e) {
+        const error = toError(e);
+        const failedPhase = findLastFailedAgentStartPhase(startPhases);
+        await runAgentStartPhase(startPhases, 'agent.start.rollback', 'rollback', () =>
+            rollbackFailedAgentStart(ctx, host, error),
+        ).catch((rollbackError) => {
+            log('WARN', `[AlwaysAlive] Rollback de start parcial falhou: ${toError(rollbackError).message}`);
+        });
+        ctx.setStartReport(buildAgentStartReport(startStartedAt, startPhases, false, failedPhase, error.message));
         ctx.setStatus('stopped', host);
-        log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${toError(e).message}`);
+        log('ERROR', `[AlwaysAlive] Falha ao iniciar: ${error.message}`);
         host.emit(EMITTER_ERROR, e);
         throw e;
     }
+}
+
+/**
+ * @param {AgentStartPhaseResult[]} phases
+ * @returns {string | null}
+ */
+function findLastFailedAgentStartPhase(phases) {
+    for (let index = phases.length - 1; index >= 0; index--) {
+        const phase = phases[index];
+        if (phase?.status === 'failed') return phase.name;
+    }
+    return null;
+}
+
+/**
+ * @template T
+ * @param {AgentStartPhaseResult[]} phases
+ * @param {string} name
+ * @param {AgentStartPhase} phase
+ * @param {() => T | Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+async function runAgentStartPhase(phases, name, phase, fn) {
+    const startedAt = Date.now();
+    try {
+        const value = await Promise.resolve(fn());
+        const completedAt = Date.now();
+        phases.push({
+            name,
+            phase,
+            status: 'ok',
+            startedAt,
+            completedAt,
+            durationMs: completedAt - startedAt,
+            error: null,
+        });
+        return value;
+    } catch (error) {
+        const completedAt = Date.now();
+        phases.push({
+            name,
+            phase,
+            status: 'failed',
+            startedAt,
+            completedAt,
+            durationMs: completedAt - startedAt,
+            error: toError(error).message,
+        });
+        throw error;
+    }
+}
+
+/**
+ * @param {number} startedAt
+ * @param {AgentStartPhaseResult[]} phases
+ * @param {boolean} ok
+ * @param {string | null} failedPhase
+ * @param {string | null} error
+ * @returns {import('../types.js').AgentStartReport}
+ */
+function buildAgentStartReport(startedAt, phases, ok, failedPhase, error) {
+    const completedAt = Date.now();
+    return {
+        startedAt,
+        completedAt,
+        durationMs: completedAt - startedAt,
+        ok,
+        failedPhase,
+        error,
+        phaseCount: phases.length,
+        failedCount: phases.filter((phase) => phase.status === 'failed').length,
+        phases: phases.map((phase) => ({ ...phase })),
+    };
 }
 
 /**

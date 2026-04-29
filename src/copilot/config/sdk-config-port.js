@@ -21,3 +21,38 @@ export {
     registerCustomTool,
     removeCustomTool,
 } from '#copilot/sdk';
+
+export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';
+export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from '../sdk/session/client-options.js';
+
+/**
+ * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').ResumeSessionConfig} ResumeSessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').PermissionHandler} PermissionHandler
+ *
+ * @typedef {import('#copilot/sdk/types').Tool} Tool
+ *
+ * @typedef {import('#copilot/sdk/types').SystemMessageConfig} SystemMessageConfig
+ *
+ * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
+ *
+ * @typedef {import('#copilot/sdk/types').CustomAgentConfig} CustomAgentConfig
+ *
+ * @typedef {import('#copilot/sdk/types').DefaultAgentConfig} DefaultAgentConfig
+ *
+ * @typedef {import('#copilot/sdk/types').InfiniteSessionConfig} InfiniteSessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
+ *
+ * @typedef {import('#copilot/sdk/types').ElicitationHandler} ElicitationHandler
+ *
+ * @typedef {import('#copilot/sdk/types').ModelCapabilitiesOverride} ModelCapabilitiesOverride
+ *
+ * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
+ *
+ * @typedef {import('#copilot/sdk/types').CreateSessionFsHandler} CreateSessionFsHandler
+ *
+ * @typedef {import('#copilot/sdk/types').SectionOverrideAction} SectionOverrideAction
+ */

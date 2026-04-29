@@ -18,7 +18,6 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
-import { createQueuedElicitationHandler } from '#copilot/hooks';
 import { MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
@@ -26,6 +25,7 @@ import { DialogLoopManager } from './dialog/loop-manager.js';
 import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
+import { createQueuedElicitationHandler } from './ports/hook-port.js';
 import { defaultMetrics } from './ports/observability-port.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history-sync.js';

@@ -13,8 +13,8 @@ import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { COPILOT_MODEL } from '../config/agent.js';
 import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
+import { resolveHubTurnTimeout } from '../config/hub-timeout-policy.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
-import { resolveHubTurnTimeout } from './timeout-policy.js';
 
 /**
  * @typedef {Object} SendPipelineDeps
