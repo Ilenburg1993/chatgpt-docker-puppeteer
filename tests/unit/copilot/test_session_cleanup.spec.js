@@ -6,16 +6,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { beforeAll, describe, it } from 'vitest';
+import { describe, it } from 'vitest';
+import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
 
-describe('cleanupStaleSessions', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session/cleanup.js').cleanupStaleSessions} */
-    let cleanupStaleSessions;
-
-    beforeAll(async () => {
-        ({ cleanupStaleSessions } = await import('../../../src/copilot/agent/session/cleanup.js'));
-    });
-
+describe('cleanupStaleSessions', () => {
     /**
      * @param {{ sessionId: string; startTime: Date }[]} sessions
      * @returns {any}
@@ -40,6 +34,29 @@ describe('cleanupStaleSessions', async () => {
         const result = await cleanupStaleSessions(client, { currentSessionId: 'current-1' });
         assert.equal(result.deleted, 0);
         assert.equal(result.kept, 1);
+    });
+
+    it('deve preservar sessões protegidas por foreground/last-session', async () => {
+        const now = Date.now();
+        /** @type {string[]} */
+        const deleted = [];
+        const client = /** @type {any} */ ({
+            listSessions: async () => [
+                { sessionId: 'foreground-1', startTime: new Date(now - 48 * 3600_000) },
+                { sessionId: 'last-1', startTime: new Date(now - 48 * 3600_000) },
+                { sessionId: 'old-1', startTime: new Date(now - 48 * 3600_000) },
+            ],
+            getForegroundSessionId: async () => 'foreground-1',
+            getLastSessionId: async () => 'last-1',
+            deleteSession: async (/** @type {string} */ id) => {
+                deleted.push(id);
+            },
+        });
+        const result = await cleanupStaleSessions(client, { maxAgeMs: 24 * 3600_000 });
+        assert.deepEqual(result.protectedIds.sort(), ['foreground-1', 'last-1']);
+        assert.deepEqual(deleted, ['old-1']);
+        assert.equal(result.deleted, 1);
+        assert.equal(result.kept, 2);
     });
 
     it('deve deletar sessões mais velhas que maxAgeMs', async () => {

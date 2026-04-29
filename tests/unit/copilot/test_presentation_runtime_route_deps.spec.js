@@ -101,6 +101,7 @@ vi.mock('#copilot/sdk', () => ({
     toolsHandlePendingCall: vi.fn(),
     toolsList: vi.fn(),
     uiElicitation: vi.fn(),
+    validateProviderConfig: vi.fn(),
     workspaceCreateFile: vi.fn(),
     workspaceListFiles: vi.fn(),
     workspaceReadFile: vi.fn(),

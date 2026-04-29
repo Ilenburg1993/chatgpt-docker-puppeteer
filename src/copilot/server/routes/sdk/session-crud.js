@@ -50,6 +50,34 @@ function listActiveSessions(routeDeps) {
     );
 }
 
+/**
+ * Valida e normaliza `provider` usando o boundary canônico do SDK.
+ *
+ * @param {SdkRouteDeps} routeDeps
+ * @param {unknown} provider
+ * @param {Res} res
+ * @returns {import('#copilot/sdk/types').ProviderConfig | undefined}
+ */
+function normalizeRouteProvider(routeDeps, provider, res) {
+    if (provider === undefined) return undefined;
+    try {
+        return routeDeps.sdkSession.validateProviderConfig(
+            /** @type {import('#copilot/sdk/types').ProviderConfig} */ (/** @type {unknown} */ (provider)),
+        );
+    } catch (error) {
+        res.status(400).json({ ok: false, error: toProviderValidationMessage(error) });
+        return undefined;
+    }
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function toProviderValidationMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /sessions/active  +  GET /sessions/last
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +260,11 @@ router.post(
                 }
                 safeModel = modelResult.model;
             }
-            if (provider !== undefined && safeModel === undefined) {
+            const safeProvider = normalizeRouteProvider(routeDeps, provider, res);
+            if (provider !== undefined && safeProvider === undefined) {
+                return;
+            }
+            if (safeProvider !== undefined && safeModel === undefined) {
                 res.status(400).json({
                     ok: false,
                     error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
@@ -249,7 +281,6 @@ router.post(
                 systemMessage,
                 availableTools,
                 excludedTools,
-                provider,
                 workingDirectory,
                 streaming,
                 mcpServers,
@@ -259,6 +290,7 @@ router.post(
                 disabledSkills,
                 infiniteSessions,
             });
+            if (safeProvider !== undefined) sessionOptions.provider = safeProvider;
             if (safeModel !== undefined) sessionOptions.model = safeModel;
 
             const session = await routeDeps.sdkSession.createClientSession(
@@ -470,7 +502,11 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             }
             safeModel = modelResult.model;
         }
-        if (provider !== undefined && safeModel === undefined) {
+        const safeProvider = normalizeRouteProvider(routeDeps, provider, res);
+        if (provider !== undefined && safeProvider === undefined) {
+            return;
+        }
+        if (safeProvider !== undefined && safeModel === undefined) {
             res.status(400).json({
                 ok: false,
                 error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
@@ -486,7 +522,6 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             systemMessage,
             availableTools,
             excludedTools,
-            provider,
             workingDirectory,
             streaming,
             mcpServers,
@@ -497,6 +532,7 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             infiniteSessions,
             disableResume,
         });
+        if (safeProvider !== undefined) resumeOptions.provider = safeProvider;
         if (safeModel !== undefined) resumeOptions.model = safeModel;
 
         const session = await routeDeps.sdkSession.resumeClientSession(

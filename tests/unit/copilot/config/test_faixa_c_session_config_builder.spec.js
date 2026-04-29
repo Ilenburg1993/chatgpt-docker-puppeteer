@@ -254,9 +254,15 @@ describe('SessionConfigBuilder', () => {
     });
 
     it('provider() define BYOK config', () => {
-        const provider = { type: /** @type {const} */ ('openai'), baseUrl: 'http://localhost:11434/v1' };
+        const provider = { type: 'openai', baseUrl: 'http://localhost:11434/v1/' };
         const config = new SessionConfigBuilder().provider(/** @type {any} */ (provider)).build();
-        expect(config.provider).toEqual(provider);
+        expect(config.provider).toEqual({ type: 'openai', baseUrl: 'http://localhost:11434/v1' });
+    });
+
+    it('provider() valida config inválido', () => {
+        expect(() =>
+            new SessionConfigBuilder().provider(/** @type {any} */ ({ type: 'openai', baseUrl: '' })).build(),
+        ).toThrow('baseUrl is required');
     });
 
     it('gitHubToken() define token por sessão', () => {

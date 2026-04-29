@@ -56,10 +56,8 @@ vi.mock('#copilot/observability/otel', () => ({
     startSpan: vi.fn((_name, _attrs, fn) => fn()),
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
-    persistState: vi.fn(),
-    persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
-    writeStateAsync: vi.fn(),
+vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+    persistAgentRuntimePendingTurnState: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
 }));
 
 /* ── SUT ── */
@@ -70,7 +68,7 @@ import {
     executeTurnImpl,
     waitForRestartAndReply,
 } from '../../../src/copilot/agent/dialog/turn-executor.js';
-import { persistStateWithPolicy } from '../../../src/copilot/agent/lifecycle/state-io.js';
+import { persistAgentRuntimePendingTurnState } from '../../../src/copilot/agent/facades/agent-runtime-state.js';
 
 /* ── helpers ── */
 
@@ -110,7 +108,7 @@ describe('turn-executor', () => {
     beforeEach(async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         emitter = makeEmitter();
-        vi.mocked(persistStateWithPolicy).mockResolvedValue({ ok: true, value: /** @type {any} */ ({}) });
+        vi.mocked(persistAgentRuntimePendingTurnState).mockResolvedValue({ ok: true, value: /** @type {any} */ ({}) });
     });
 
     afterEach(() => {
@@ -144,7 +142,7 @@ describe('turn-executor', () => {
         });
 
         it('roteia a persistência assíncrona via trackBackgroundTask quando o host suporta tracker', async () => {
-            vi.mocked(persistStateWithPolicy).mockResolvedValue({
+            vi.mocked(persistAgentRuntimePendingTurnState).mockResolvedValue({
                 ok: true,
                 value: /** @type {any} */ ({ pendingTurnMessage: 'hello world' }),
             });
@@ -163,18 +161,15 @@ describe('turn-executor', () => {
             );
         });
 
-        it('usa persistStateWithPolicy para marcar pending turn no início do turno', () => {
+        it('usa persistAgentRuntimePendingTurnState para marcar pending turn no início do turno', () => {
             const counter = { sendCount: 0 };
 
             emitTurnStart(emitter, 'hello world', counter);
 
-            expect(persistStateWithPolicy).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    pendingTurnMessage: 'hello world',
-                    pendingTurnConsumedPR: false,
-                }),
-                { label: 'dialog.turn.pending' },
-            );
+            expect(persistAgentRuntimePendingTurnState).toHaveBeenCalledWith({
+                message: 'hello world',
+                ts: expect.any(Number),
+            });
         });
     });
 

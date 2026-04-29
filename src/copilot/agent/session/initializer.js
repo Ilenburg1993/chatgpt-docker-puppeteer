@@ -228,15 +228,23 @@ export async function initOrResumeSession(client, sessionOptions) {
         result = await createAgentSdkSessionByClient(client, opts);
     }
 
-    const persistedConcreteModel = typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
+    const requestedNativeAutoModel = model === 'auto';
+    const persistedConcreteModel =
+        !requestedNativeAutoModel && typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
     const effectiveModel =
         typeof result.model === 'string'
             ? result.model
-            : (persistedConcreteModel ?? (model === 'auto' ? AGENT_SDK_DEFAULT_MODEL : model));
-    if (result.isResumed && state?.model === 'auto') {
+            : (persistedConcreteModel ?? (requestedNativeAutoModel ? 'auto' : model));
+    if (
+        result.isResumed &&
+        requestedNativeAutoModel &&
+        state?.model &&
+        state.model !== 'auto' &&
+        result.model === undefined
+    ) {
         log(
-            'WARN',
-            `[PersistentSession] Estado legado com model="auto" detectado no resume — exibindo fallback canônico '${effectiveModel}' até persistir um modelo concreto.`,
+            'INFO',
+            `[PersistentSession] Retomada solicitada com model="auto" — ignorando modelo concreto persistido '${state.model}' para preservar roteamento nativo do SDK.`,
         );
     }
     const effectiveReasoningEffort =

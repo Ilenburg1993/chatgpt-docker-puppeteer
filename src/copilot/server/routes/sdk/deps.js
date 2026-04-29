@@ -58,6 +58,7 @@ import {
     toolsHandlePendingCall,
     toolsList,
     uiElicitation,
+    validateProviderConfig,
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
@@ -94,6 +95,7 @@ const sdkSessionOps = Object.freeze({
     pickDefined,
     resumeClientSession,
     setForegroundClientSessionId,
+    validateProviderConfig,
 });
 
 const sdkSessionRpcOps = Object.freeze({

@@ -78,6 +78,10 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 51    | `51-BUGFIX-RECURSAO-ALWAYSALIVE-RUNTIME-CONTROLS-LLMB.md`             | correção do stack overflow no boot da LLM-B por recursão entre `AlwaysAliveAgent` e façades  |
 | 52    | `52-AUDITORIA-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                        | auditoria profunda do ciclo `terminal:llm-b`, boot, lifecycle, recursos e shutdown           |
 | 53    | `53-ROADMAP-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                          | roadmap por faixas para transformar boot/lifecycle/shutdown em runtime lifecycle auditável   |
+| 54    | `54-MAPEAMENTO-CLEANUP-PROTECTED-SESSIONS-E-PROVIDER-BOUNDARY.md`     | cleanup defensivo de sessões protegidas e validação canônica de `provider` nas bordas        |
+| 55    | `55-MAPEAMENTO-LOOP-MANAGER-E-HEALTH-RUNTIME-STATE-BOUNDARY.md`       | convergência de `loop-manager` e `health-check` para façades semânticas de runtime-state     |
+| 56    | `56-MAPEAMENTO-TURN-EXECUTOR-RUNTIME-STATE-BOUNDARY.md`               | convergência do `turn-executor` para a fronteira semântica de runtime-state                  |
+| 57    | `57-AUDITORIA-GERAL-SRC-COPILOT-AGENT-GRAFOS-ASIS-TOBE-ROADMAP.md`    | auditoria geral de `src/copilot/agent` com grafos AS-IS/TO-BE e roadmap consolidado          |
 
 ---
 
@@ -185,6 +189,14 @@ Na transição para o Bloco B, o pacote já passa a incluir também:
 - roadmap específico de lifecycle (`53`), cobrindo shutdown single-flight, cleanup em boot failure,
   fases explícitas de shutdown, ownership único de recursos, rollback de boot/agent start,
   observabilidade de lifecycle e matriz de sinais TTY/headless/PM2.
+- checkpoint complementar de cleanup/provider (`54`), cobrindo a proteção de foreground/last-session
+  em `cleanupStaleSessions()` e a validação/normalização canônica de `provider` no builder
+  declarativo e nas rotas SDK.
+- checkpoint complementar de runtime state/health (`55`), cobrindo a remoção de `state-io` direto em
+  `dialog/loop-manager`, a promoção de capabilities semânticas em `agent-runtime-state` e a
+  agregação canônica de sinais de health via `agent-health-access`.
+- checkpoint complementar de `turn-executor` (`56`), cobrindo a remoção de `persistStateWithPolicy`
+  direto do executor de turno e a promoção do marcador de pending turn para `agent-runtime-state`.
 
 ---
 

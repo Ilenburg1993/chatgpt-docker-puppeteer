@@ -15,7 +15,11 @@
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { toError } from '../../core/error-handlers.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
-import { deleteAgentSdkSessionByClient, listAgentSdkSessionsByClient } from '../facades/agent-sdk-access.js';
+import {
+    deleteAgentSdkSessionByClient,
+    listAgentSdkProtectedSessionIdsByClient,
+    listAgentSdkSessionsByClient,
+} from '../facades/agent-sdk-access.js';
 import { log, startSpan } from '../ports/observability-port.js';
 
 /**
@@ -24,6 +28,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  * @property {number} deleted - Sessões removidas
  * @property {string[]} deletedIds - IDs removidos
  * @property {number} kept - Sessões mantidas
+ * @property {string[]} protectedIds - IDs preservados por política defensiva de ownership/foreground
  * @property {string[]} errors - Erros encontrados
  */
 
@@ -34,6 +39,7 @@ import { log, startSpan } from '../ports/observability-port.js';
  * @param {{
  *     maxAgeMs?: number;
  *     currentSessionId?: string | null;
+ *     preserveSessionIds?: (string | null | undefined)[];
  * }} [options]
  * @returns {Promise<SessionCleanupResult>}
  */
@@ -45,8 +51,21 @@ export async function cleanupStaleSessions(client, options = {}) {
         'copilot.session.cleanup',
         { extra: { maxAgeMs, currentSessionId: currentSessionId ?? '' } },
         async () => {
+            /** @type {string[]} */
+            const protectedIds = await listAgentSdkProtectedSessionIdsByClient(client, [
+                currentSessionId,
+                ...(options.preserveSessionIds ?? []),
+            ]);
+            const protectedIdSet = new Set(protectedIds);
             /** @type {SessionCleanupResult} */
-            const result = { total: 0, deleted: 0, deletedIds: [], kept: 0, errors: [] };
+            const result = {
+                total: 0,
+                deleted: 0,
+                deletedIds: [],
+                kept: 0,
+                protectedIds,
+                errors: [],
+            };
 
             try {
                 const sessions = await listAgentSdkSessionsByClient(client);
@@ -65,8 +84,8 @@ export async function cleanupStaleSessions(client, options = {}) {
                     const id = session.sessionId;
                     if (!id) continue;
 
-                    // Nunca deletar a sessão ativa
-                    if (id === currentSessionId) {
+                    // Nunca deletar sessões protegidas por ownership/foreground/last-session.
+                    if (protectedIdSet.has(id)) {
                         result.kept++;
                         continue;
                     }
@@ -133,6 +152,7 @@ export async function cleanupStaleSessions(client, options = {}) {
  * @param {{
  *     maxAgeMs?: number;
  *     currentSessionId?: string | null;
+ *     preserveSessionIds?: (string | null | undefined)[];
  * }} [options]
  * @param {{
  *     label?: string;

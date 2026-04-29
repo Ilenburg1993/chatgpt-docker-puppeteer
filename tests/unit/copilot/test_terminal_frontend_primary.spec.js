@@ -428,6 +428,10 @@ describe('terminal/frontend/llm-b-frontend', () => {
         expect(projection.pendingQuestionShadowRemainingMs).toBe(0);
         expect(projection.recommendedAction).toBe('clear_pending_question_shadow');
         expect(projection.activity.label).toBeTruthy();
+        expect(projection.lifecycle).toEqual(expect.objectContaining({ shuttingDown: expect.any(Boolean) }));
+        expect(projection.lifecycleSummary).toEqual(
+            expect.objectContaining({ registeredShutdownHandlers: expect.any(Number) }),
+        );
     });
 
     it('projeta status/config/context para runtime explícito quando informado', () => {

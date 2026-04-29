@@ -10,7 +10,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll } from './sdk-config-port.js';
+import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, approveAll, validateProviderConfig } from './sdk-config-port.js';
 
 /**
  * @typedef {import('./sdk-config-port.js').SessionConfig} SessionConfig
@@ -279,7 +279,9 @@ export class SessionConfigBuilder {
      * @returns {this}
      */
     provider(provider) {
-        this.#config.provider = provider;
+        this.#config.provider = validateProviderConfig(
+            /** @type {import('#copilot/sdk/types').ProviderConfig} */ (/** @type {unknown} */ (provider)),
+        );
         return this;
     }
 

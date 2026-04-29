@@ -35,8 +35,12 @@ import {
 } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
+import {
+    persistAgentRuntimeDialogState,
+    readAgentRuntimeDialogBootstrapState,
+    readAgentRuntimeDialogPersistedState,
+} from '../facades/agent-runtime-state.js';
 import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
-import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 import { log, startSpanImmediate } from '../ports/observability-port.js';
 import { TurnQueue } from './backpressure.js';
 import { DialogCompactionPolicy } from './compaction-policy.js';
@@ -134,9 +138,9 @@ export class DialogLoopManager extends EventEmitter {
         this.#compactionPolicy = new DialogCompactionPolicy();
 
         // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
-        const persistedState = readState();
-        this.#state = new DialogLoopStateMachine({ paused: Boolean(persistedState?.dialogPaused) });
-        const saved = persistedState?.prMetrics;
+        const persistedBootstrap = readAgentRuntimeDialogBootstrapState();
+        this.#state = new DialogLoopStateMachine({ paused: persistedBootstrap.dialogPaused });
+        const saved = persistedBootstrap.prMetrics;
         this.#costLedger = new DialogCostLedger(saved && typeof saved === 'object' ? saved : null);
     }
 
@@ -472,8 +476,8 @@ export class DialogLoopManager extends EventEmitter {
             log('WARN', '[DialogLoopManager] resume() já em andamento — ignorado.');
             return;
         }
-        const state = await readStateAsync();
-        if (!this.#state.paused && !state?.dialogPaused) {
+        const persisted = await readAgentRuntimeDialogPersistedState();
+        if (!this.#state.paused && !persisted.dialogPaused) {
             log('WARN', '[DialogLoopManager] resume() sem dialogPaused=true — ignorado.');
             this.#state.finishResume();
             return;
@@ -500,9 +504,9 @@ export class DialogLoopManager extends EventEmitter {
             // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
             this.#watchdogSupervisor.clear();
             this.#state.prepareResumeRestart();
-            const deactivated = await persistStateWithPolicy(
+            const deactivated = await persistAgentRuntimeDialogState(
                 { dialogLoopActive: false },
-                { label: 'dialog.state.resume_restart' },
+                'dialog.state.resume_restart',
             );
             if (!deactivated.ok) {
                 logSwallowed(deactivated.error, 'agent.loopManager.writeState');
@@ -783,9 +787,9 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<void>}
      */
     #trackPersistedState(data, meta) {
-        const policyOpts = meta.label !== undefined ? { label: meta.label } : {};
+        const label = meta.label ?? 'dialog.state.persist';
         return this.#trackBackgroundTask(
-            persistStateWithPolicy(data, policyOpts).then((result) => {
+            persistAgentRuntimeDialogState(data, label).then((result) => {
                 if (!result.ok) {
                     const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
                     throw failure.error;
@@ -815,7 +819,7 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<boolean>}
      */
     async #persistStateNow(data, label) {
-        const result = await persistStateWithPolicy(data, { label });
+        const result = await persistAgentRuntimeDialogState(data, label);
         if (!result.ok) {
             log('WARN', `[DialogLoopManager] ${label} falhou: ${result.error.message}`);
             return false;

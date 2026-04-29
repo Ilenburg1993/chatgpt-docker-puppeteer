@@ -22,6 +22,14 @@
  *     backoffMs: number;
  *     reason: string;
  * }} RuntimeSdkRecoveryPolicy
+ *
+ *
+ * @typedef {{
+ *     label: string;
+ *     headline: string;
+ *     detail: string;
+ *     actionHint: string;
+ * }} RuntimeSdkRecoveryMessage
  */
 
 /**
@@ -180,6 +188,66 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
                     scope === 'connection'
                         ? 'falha desconhecida de conexão é tratada conservadoramente como transitória'
                         : 'falha desconhecida fora da conexão não recebe reconnect automático por padrão',
+            };
+    }
+}
+
+/**
+ * Monta uma mensagem operacional para bordas humanas do runtime local.
+ *
+ * A mensagem separa falhas do processo local de bloqueios externos do SDK. Rate limit/quota/auth não devem ser
+ * mascarados como boot quebrado, nem alimentar reconexão automática.
+ *
+ * @param {RuntimeSdkRecoveryPolicy} policy
+ * @param {unknown} error
+ * @returns {RuntimeSdkRecoveryMessage}
+ */
+export function describeSdkRecoveryPolicy(policy, error) {
+    const message =
+        error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null
+              ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
+              : String(error);
+    switch (policy.kind) {
+        case 'auth':
+            return {
+                label: '[sdk auth]',
+                headline: message,
+                detail: 'Autenticação do SDK bloqueou o dialog loop; o host local continua vivo.',
+                actionHint: 'Reautentique o Copilot/GitHub e use /restart para tentar novamente.',
+            };
+        case 'rate_limit':
+            return {
+                label: '[sdk quota]',
+                headline: message,
+                detail: 'Rate limit do SDK bloqueou o primeiro turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
+                actionHint:
+                    'Aguarde o reset indicado pelo SDK ou use /model auto seguido de /restart para uma nova tentativa controlada.',
+            };
+        case 'quota_exhausted':
+            return {
+                label: '[sdk quota]',
+                headline: message,
+                detail: 'Quota do SDK esgotada; reconnect automático foi desativado para evitar consumo repetido de PRs.',
+                actionHint:
+                    'Aguarde o reset da quota, altere o modelo com /model <id> ou use /model auto e depois /restart.',
+            };
+        case 'timeout':
+        case 'network':
+            return {
+                label: '[sdk rede]',
+                headline: message,
+                detail: 'Falha transitória do SDK; a política permite retry/backoff local.',
+                actionHint: 'Se persistir, verifique conectividade e use /restart.',
+            };
+        case 'unknown':
+        default:
+            return {
+                label: '[sdk]',
+                headline: message,
+                detail: 'Erro não classificado do SDK.',
+                actionHint: 'Use /status, /errors e /restart após revisar o erro.',
             };
     }
 }

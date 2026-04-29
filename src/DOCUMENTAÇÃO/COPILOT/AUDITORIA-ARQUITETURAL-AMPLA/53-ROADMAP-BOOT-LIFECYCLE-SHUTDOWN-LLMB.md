@@ -97,6 +97,15 @@ Criar um módulo canônico com fases:
 - [x] resultado: `BootLifecycleReport`;
 - [x] decompor `terminal-host` em fases reais: init, aliases, runtime config, pinned context, hub,
       HTTP server, listeners e REPL.
+- [x] adicionar `boot-surface-validation` entre `runtime-wiring` e `terminal-init` para validar load
+      real de SDK, agent, terminal e cobertura dos handlers contra o plano.
+- [x] corrigir incidente live de 2026-04-29 em que `repl` era tratado como fase curta e derrubava
+      `terminal:llm-b` com `BootPhaseTimeoutError` enquanto o primeiro READY do agent ainda estava
+      em processamento; o REPL agora inicia o bootstrap do dialog loop em background.
+- [x] corrigir dívida exposta pela mesma validação live: `model="auto"` era degradado localmente
+      para `gpt-5-mini` em create/resume, impedindo a própria recomendação do SDK de usar auto
+      quando a quota do modelo concreto estourava; a fronteira SDK agora preserva `auto` como target
+      nativo.
 
 ### D2 — Rollback parcial
 
@@ -110,7 +119,19 @@ Criar um módulo canônico com fases:
 - [x] último boot report disponível via `presentation/runtime-lifecycle.js`;
 - [x] `/health` inclui snapshot de lifecycle;
 - [x] `/diagnose` renderiza boot/shutdown report de modo amigável;
-- [ ] `/status` deve renderizar o boot report de modo amigável.
+- [x] `/status` renderiza lifecycle/boot de modo amigável no REPL e expõe `lifecycleSummary` no
+      HTTP.
+
+### D4 — Contrato de superfícies carregadas
+
+- [x] `boot/surface-validation.js` lista os exports mínimos que o boot depende em `#copilot/sdk`,
+      `#copilot/agent` e `terminal/index.js`;
+- [x] `bootstrap.js` importa dinamicamente `#copilot/sdk` e `#copilot/agent` durante o boot e falha
+      antes do servidor se algum caminho/export crítico estiver ausente;
+- [x] a validação também detecta fases novas no plano sem handler executável, exceto fases
+      documentais/compat explicitamente permitidas;
+- [ ] ampliar a superfície mínima conforme novos recursos do SDK/agent se tornarem obrigatórios para
+      o boot transacional.
 
 ---
 

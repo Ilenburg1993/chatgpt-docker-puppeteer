@@ -78,6 +78,65 @@ export function readAgentRuntimeSessionId(ctx) {
 }
 
 /**
+ * Lê o bootstrap persistido do dialog loop para inicialização síncrona do runtime.
+ *
+ * @returns {{ dialogPaused: boolean; prMetrics: Record<string, unknown> | null }}
+ */
+export function readAgentRuntimeDialogBootstrapState() {
+    const persistedState = readState();
+    const rawPrMetrics = persistedState?.prMetrics;
+    return {
+        dialogPaused: Boolean(persistedState?.dialogPaused),
+        prMetrics: rawPrMetrics && typeof rawPrMetrics === 'object' ? rawPrMetrics : null,
+    };
+}
+
+/**
+ * Lê de forma assíncrona o estado persistido mínimo do dialog loop.
+ *
+ * @returns {Promise<{ dialogPaused: boolean; dialogLoopActive: boolean }>}
+ */
+export async function readAgentRuntimeDialogPersistedState() {
+    const state = await readStateAsync();
+    return {
+        dialogPaused: Boolean(state?.dialogPaused),
+        dialogLoopActive: Boolean(state?.dialogLoopActive),
+    };
+}
+
+/**
+ * Persiste fragmento parcial do estado do dialog loop usando policy canônica do agent.
+ *
+ * @param {Record<string, unknown>} partial
+ * @param {string} label
+ * @returns {Promise<
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ * >}
+ */
+export async function persistAgentRuntimeDialogState(partial, label) {
+    return persistStateWithPolicy(partial, { label });
+}
+
+/**
+ * Persiste o marcador canônico de turno pendente do dialog loop.
+ *
+ * @param {{ message: string; ts: number }} input
+ * @returns {Promise<
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ * >}
+ */
+export async function persistAgentRuntimePendingTurnState(input) {
+    return persistStateWithPolicy(
+        {
+            pendingTurnMessage: input.message,
+            pendingTurnTs: input.ts,
+            pendingTurnConsumedPR: false,
+        },
+        { label: 'dialog.turn.pending' },
+    );
+}
+
+/**
  * Limpa a shadow persistida de `ask_user` restaurada no runtime e agenda a persistência canônica.
  *
  * @param {AgentRuntimeStateContext} ctx

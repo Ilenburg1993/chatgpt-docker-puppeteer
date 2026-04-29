@@ -22,7 +22,7 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/runtime-ui-state-store.js';
-import { getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
+import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import {
     readTerminalDialogStreamMeta,
@@ -127,6 +127,7 @@ async function _doEnsureDialogLoop() {
             const sdkRecoveryPolicy = getSdkRecoveryPolicy(err, 'session');
             if (sdkRecoveryPolicy.kind !== 'unknown' && !sdkRecoveryPolicy.allowReconnect) {
                 const message = toError(err).message;
+                const recoveryMessage = describeSdkRecoveryPolicy(sdkRecoveryPolicy, err);
                 log(
                     'WARN',
                     `[dialog] ensureDialogLoop pausado por policy SDK (kind=${sdkRecoveryPolicy.kind}): ${message}`,
@@ -136,14 +137,13 @@ async function _doEnsureDialogLoop() {
                     severity: 'warn',
                     source: 'sdk',
                 });
-                const label = sdkRecoveryPolicy.kind === 'auth' ? '[sdk auth]' : '[sdk quota]';
-                println(`\n\x1b[31m  ${label}\x1b[0m ${message}`);
-                println(
-                    '  \x1b[90mDialog loop pausado; reconnect nao sera tentado automaticamente para preservar PRs.\x1b[0m',
-                );
+                println(`\n\x1b[31m  ${recoveryMessage.label}\x1b[0m ${recoveryMessage.headline}`);
+                println(`  \x1b[90m${recoveryMessage.detail}\x1b[0m`);
+                println(`  \x1b[90m${recoveryMessage.actionHint}\x1b[0m`);
                 emitNerv('copilot:dialog:boot_blocked', {
                     error: message,
                     reason: `sdk_${sdkRecoveryPolicy.kind}`,
+                    actionHint: recoveryMessage.actionHint,
                     severity: 'warn',
                 });
                 return;

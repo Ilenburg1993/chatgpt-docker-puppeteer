@@ -20,6 +20,7 @@ export {
     patchToolsConfig,
     registerCustomTool,
     removeCustomTool,
+    validateProviderConfig,
 } from '#copilot/sdk';
 
 export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';

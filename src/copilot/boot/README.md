@@ -14,6 +14,8 @@ Regras:
 - `boot/plan.js` descreve as fases, donos e timeouts do boot.
 - `boot/lifecycle-runner.js` executa o plano por handlers de fase, produz `BootLifecycleReport` e
   executa rollbacks best-effort quando uma fase falha.
+- `boot/surface-validation.js` valida, antes de HTTP/REPL, se SDK, agent, terminal e handlers do
+  plano foram carregados com as superfícies mínimas esperadas.
 
 Fronteiras:
 
@@ -28,6 +30,8 @@ Lifecycle:
 - as fases do terminal são executadas separadamente: `terminal-init`, `terminal-aliases`,
   `terminal-runtime-config`, `terminal-pinned-context`, `terminal-conversation-hub`,
   `copilot-http-server`, `terminal-runtime-listeners` e `repl`;
+- `boot-surface-validation` roda depois de `runtime-wiring` e antes de qualquer exposição HTTP,
+  convertendo exports/paths quebrados em falha explícita de boot;
 - fases sem handler ficam como `skipped` no relatório; isso é intencional apenas para fases
   documentais ou compat que sejam deliberadamente delegadas a outro host;
 - o último relatório fica disponível por `getLastBootLifecycleReport()` e é projetado por

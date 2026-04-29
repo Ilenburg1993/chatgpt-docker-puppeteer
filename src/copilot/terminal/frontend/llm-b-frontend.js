@@ -13,7 +13,7 @@ import { getWorkspaceContext } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
 import { defaultErrorTracker, getToolStats } from '#copilot/observability';
 import { sendRuntimeDialogTurnForRuntime } from '../../presentation/runtime-dialog.js';
-import { readRuntimeLifecycleSnapshot } from '../../presentation/runtime-lifecycle.js';
+import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../presentation/runtime-lifecycle.js';
 import {
     listRuntimeAvailableModelsProjection,
     readRuntimeModelMetadata,
@@ -178,6 +178,8 @@ export function readTerminalRuntimeBase(runtimeId) {
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
  *     activity: import('../activity-state.js').TerminalActivitySnapshot;
+ *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
+ *     lifecycleSummary: ReturnType<typeof buildRuntimeLifecycleSummary>;
  * }}
  */
 export function readTerminalStatusProjection({ hubSessionId = null, injectPort, runtimeId = null } = {}) {
@@ -187,6 +189,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const recommendedAction = /** @type {AgentRecommendedAction | null} */ (
         typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
     );
+    const lifecycle = readRuntimeLifecycleSnapshot();
     return {
         snap: base.snap,
         health: base.health,
@@ -218,6 +221,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         workspace: getWorkspaceContext(),
         turnCount: readTerminalTurnCount(),
         activity: readTerminalActivitySnapshot(),
+        lifecycle,
+        lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),
     };
 }
 

@@ -58,6 +58,12 @@ export function createCopilotBootPlan(config = readCopilotBootConfig()) {
                 timeoutMs: 15_000,
             },
             {
+                id: 'boot-surface-validation',
+                owner: 'bootstrap',
+                responsibility: 'validar superfícies carregadas do SDK, agent, terminal e handlers do plano',
+                timeoutMs: 5_000,
+            },
+            {
                 id: 'terminal-init',
                 owner: 'terminal',
                 responsibility: 'criar contexto transacional do terminal e registrar início do boot local',
@@ -102,7 +108,7 @@ export function createCopilotBootPlan(config = readCopilotBootConfig()) {
             {
                 id: 'repl',
                 owner: 'terminal',
-                responsibility: 'abrir loop interativo apos servidor e runtime estarem prontos',
+                responsibility: 'abrir host REPL/HTTP e disparar bootstrap do dialog loop sem bloquear o boot',
                 timeoutMs: 10_000,
             },
             {

@@ -67,6 +67,9 @@ export function setSessionAutoModelResolver(resolver) {
 /**
  * Resolve `model: "auto"` sem depender estaticamente do pacote de models.
  *
+ * Mantido como utilitário explícito para fluxos que precisam de um modelo concreto. A criação/retomada canônica de
+ * sessão preserva `model: "auto"` para que o próprio SDK possa aplicar a política nativa de roteamento/quota.
+ *
  * @param {string} model
  * @param {string} [fallback='gpt-5-mini'] Default is `'gpt-5-mini'`
  * @returns {Promise<string>}
@@ -475,9 +478,9 @@ function buildSessionConfig(opts, mode) {
 /**
  * Normaliza model/reasoningEffort para `resumeSession`.
  *
- * Regra arquitetural: `model='auto'` é válido para CREATE (onde o wrapper resolve o modelo via catalog/model selector),
- * mas não deve ser reenviado em RESUME. Em retomadas, `auto` significa “usar a sessão já existente”, portanto o wrapper
- * omite `model` e também `reasoningEffort` associado quando não houver um modelo concreto explícito.
+ * Regra arquitetural: `model='auto'` deve chegar ao SDK. Ele é um alvo nativo do Copilot, não só placeholder local; sem
+ * isso, sessões retomadas ficam presas em um modelo concreto antigo e não conseguem obedecer a mensagens de quota como
+ * “switch to auto model”. Reasoning effort é omitido nesse caso porque o modelo efetivo será decidido pelo SDK.
  *
  * @param {SessionResumeOptions} options
  * @returns {{ model?: string | undefined; reasoningEffort?: ReasoningEffortLevel | undefined }}
@@ -488,15 +491,12 @@ function normalizeResumeModelSelection(options) {
         if (options.reasoningEffort !== undefined) {
             log(
                 'INFO',
-                '[lib/session] resumeSession: model="auto" em retomada — omitindo também reasoningEffort até que haja modelo concreto.',
+                '[lib/session] resumeSession: preservando model="auto" nativo e omitindo reasoningEffort até que haja modelo concreto.',
             );
         } else {
-            log(
-                'INFO',
-                '[lib/session] resumeSession: model="auto" em retomada — usando modelo já persistido na sessão.',
-            );
+            log('INFO', '[lib/session] resumeSession: preservando model="auto" nativo na retomada.');
         }
-        return {};
+        return { model: 'auto' };
     }
 
     if (selectedModel === undefined && options.reasoningEffort !== undefined) {
@@ -529,18 +529,14 @@ function normalizeResumeModelSelection(options) {
 export async function createSession(client, opts) {
     assertClient(client, 'createSession');
     const options = opts ?? {};
-    let model = options.model ?? 'gpt-5-mini';
+    const model = options.model ?? 'gpt-5-mini';
     let reasoningEffort = options.reasoningEffort;
 
-    // Se modelo é 'auto', usar seleção automática via ModelSelector (F40.2)
     if (model === 'auto') {
-        try {
-            log('INFO', '[session] Iniciando auto-seleção de modelo...');
-            model = await resolveSessionCreateModel(model, 'gpt-5-mini');
-            log('INFO', `[session] Modelo auto-selecionado: ${model}`);
-        } catch (e) {
-            log('WARN', `[session] Auto-seleção de modelo falhou: ${toError(e).message}; usando fallback gpt-5-mini`);
-            model = 'gpt-5-mini';
+        log('INFO', '[session] Preservando model="auto" nativo do SDK.');
+        if (reasoningEffort !== undefined) {
+            log('INFO', '[session] reasoningEffort omitido porque model="auto" será resolvido pelo SDK.');
+            reasoningEffort = undefined;
         }
     }
 
@@ -549,7 +545,14 @@ export async function createSession(client, opts) {
         reasoningEffort = getDefaultGpt5MiniReasoningEffort();
     }
 
-    const config = buildSessionConfig({ ...options, model, ...(reasoningEffort ? { reasoningEffort } : {}) }, 'create');
+    /** @type {SessionCreateOptions} */
+    const createOptions = { ...options, model };
+    if (reasoningEffort !== undefined) {
+        createOptions.reasoningEffort = reasoningEffort;
+    } else if ('reasoningEffort' in createOptions) {
+        delete createOptions.reasoningEffort;
+    }
+    const config = buildSessionConfig(createOptions, 'create');
 
     log('INFO', `[lib/session] Criando nova sessao: model='${model}'`);
     const session = await runSessionLifecycleOperation({

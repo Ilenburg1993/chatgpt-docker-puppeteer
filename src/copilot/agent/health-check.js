@@ -10,6 +10,8 @@
  * @typedef {import('./agent-context.js').AgentContext} AgentContext
  */
 
+import { readAgentHealthInputSnapshot } from './facades/agent-health-access.js';
+
 /**
  * @typedef {{
  *     getStatusSnapshot: () => import('./types.js').AgentStatusSnapshot;
@@ -66,42 +68,47 @@ function selectRecommendedAction(state) {
  * @returns {import('./types.js').AgentHealthSnapshot}
  */
 export function getAgentHealthSnapshot(ctx, host) {
-    const snap = host.getStatusSnapshot();
-    const hasPendingQuestion = ctx.hasPendingQuestion();
-    const pendingQuestionKind = ctx.getPendingQuestionKind();
-    const hasPendingQuestionShadow = ctx.hasPendingQuestionShadow();
-    const pendingQuestionShadowKind = ctx.getPendingQuestionShadowKind();
-    const pendingQuestionShadowState = ctx.getPendingQuestionShadowState();
-    const pendingQuestionShadowExpired = ctx.isPendingQuestionShadowExpired();
-    const pendingQuestionShadowAgeMs = ctx.getPendingQuestionShadowAgeMs();
-    const pendingQuestionShadowExpiresAt = ctx.getPendingQuestionShadowExpiresAt();
-    const pendingQuestionShadowRemainingMs = ctx.getPendingQuestionShadowRemainingMs();
-    const backgroundPendingLabels = ctx.getBackgroundPendingLabels(5);
-    const bootReport = ctx.getBootReportSnapshot();
-    const startReport = typeof ctx.getStartReportSnapshot === 'function' ? ctx.getStartReportSnapshot() : null;
-    const sdkResources = typeof host.getSdkResourceSnapshot === 'function' ? host.getSdkResourceSnapshot() : null;
+    const healthInput = readAgentHealthInputSnapshot(ctx, host);
+    const {
+        snap,
+        hasPendingQuestion,
+        pendingQuestionKind,
+        hasPendingQuestionShadow,
+        pendingQuestionShadowKind,
+        pendingQuestionShadowState,
+        pendingQuestionShadowExpired,
+        pendingQuestionShadowAgeMs,
+        pendingQuestionShadowExpiresAt,
+        pendingQuestionShadowRemainingMs,
+        backgroundPendingLabels,
+        backgroundPendingCount,
+        bootReport,
+        startReport,
+        sdkResources,
+        clientAvailable,
+        sessionContextActive,
+        dialogActive,
+        dialogAttached,
+        dialogPaused,
+        keepaliveRunning,
+        quotaMonitorRunning,
+    } = healthInput;
 
     const runtimeOperational =
         snap.status === 'idle' || snap.status === 'processing' || snap.status === 'waiting_for_input';
 
-    const clientAvailable = ctx.hasClient();
-    const sessionActive = ctx.hasActiveSession() && Boolean(snap.sessionId);
-    const dialogActive = ctx.isDialogLoopActive();
-    const dialogAttached = ctx.getDialogLoopAttachedSnapshot();
+    const sessionActive = sessionContextActive && Boolean(snap.sessionId);
     const dialogOk = !dialogActive || dialogAttached;
     const queueOk = !snap.starvationAlert;
     const waitingForInput = snap.status === 'waiting_for_input';
     const ioOk = !hasPendingQuestion || waitingForInput || dialogActive;
-    const keepaliveRunning = ctx.isKeepaliveRunning();
     const keepaliveSuppressedByDialog = sessionActive && dialogActive;
     const keepaliveOk = !sessionActive || keepaliveRunning || keepaliveSuppressedByDialog;
-    const backgroundPendingCount = ctx.getBackgroundPendingCount();
     const backgroundOk = backgroundPendingCount < BACKGROUND_PENDING_WARN_THRESHOLD;
     const failedBootSteps = bootReport?.failedCount ?? 0;
     const degradedBootSteps = bootReport?.degradedCount ?? 0;
     const bootOk = bootReport === null || bootReport.ok;
     const bootNeedsAttention = degradedBootSteps > 0;
-    const quotaMonitorRunning = ctx.getQuotaMonitorSnapshot() !== null;
     const quotaConfigured = clientAvailable || sessionActive;
     const quotaOk = !quotaConfigured || quotaMonitorRunning;
     const sdkResourcesOk = sdkResources === null || sdkResources.allCoreResourcesAvailable;
@@ -256,7 +263,7 @@ export function getAgentHealthSnapshot(ctx, host) {
                 ok: dialogOk,
                 active: dialogActive,
                 attached: dialogAttached,
-                paused: ctx.isDialogLoopPaused(),
+                paused: dialogPaused,
             },
             queue: {
                 ok: queueOk,

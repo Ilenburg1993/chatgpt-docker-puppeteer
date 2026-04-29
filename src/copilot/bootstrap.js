@@ -17,7 +17,12 @@
  */
 
 import { AUDIT_BUS } from '#copilot/audit';
-import { createCopilotBootPlan, readCopilotBootConfig, runCopilotBootPlan } from '#copilot/boot';
+import {
+    assertCopilotBootSurfaces,
+    createCopilotBootPlan,
+    readCopilotBootConfig,
+    runCopilotBootPlan,
+} from '#copilot/boot';
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { HOOKS_LOGGER } from '#copilot/hooks';
 import { ERROR_TRACKER } from '#copilot/observability';
@@ -83,102 +88,132 @@ export async function bootCopilot() {
             `[bootstrap] Iniciando copilot (modo ${bootConfig.mode}) em ${bootConfig.workspace.root} -> ${bootConfig.server.url}.`,
         );
 
+        /**
+         * @type {Record<
+         *     string,
+         *     import('./boot/lifecycle-runner.js').BootPhaseHandler | (() => void | Promise<void>)
+         * >}
+         */
+        const phaseHandlers = {
+            observability: async () => {
+                bootstrapObservability();
+                container.resolve(ERROR_TRACKER).registerGlobalHandlers();
+            },
+            'late-deps': async () => {
+                const { buildTool } = await import('./tools/index.js');
+                bootstrapLateDeps({ buildTool });
+
+                const { defaultBus } = await import('./hooks/bus.js');
+                container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+
+                const { setAuditBus } = await import('./audit/pipeline-permission.js');
+                setAuditBus(defaultBus);
+
+                // ── Validation: verify all critical DI tokens are registered ────────
+                container.validateRequired([
+                    SHUTDOWN_LOGGER,
+                    EVENT_BUS,
+                    SDK_LOGGER,
+                    TOOLS_BUILDER,
+                    AUDIT_BUS,
+                    HOOKS_LOGGER,
+                    TOOLS_LOGGER,
+                    TOOLS_METRICS,
+                ]);
+            },
+            'sdk-preflight': async () => {
+                bootState.bootPreflight = await runCopilotSdkBootPreflight({
+                    createClient: () => createCopilotClient(),
+                    checkAuthStatus,
+                    configuredModel: COPILOT_MODEL,
+                    pingTimeoutMs: PING_TIMEOUT_MS,
+                    log,
+                });
+            },
+            'runtime-wiring': async () => {
+                const [{ wireCopilotRuntimeDI }, terminal, { startTodoCleanupJob }] = await Promise.all([
+                    import('./runtime-wiring.js'),
+                    import('./terminal/index.js'),
+                    import('./tools/todo/store.js'),
+                ]);
+
+                // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
+                // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
+                const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
+                bootState.wireRuntime = wireRuntime;
+                bootState.terminal = terminal;
+                bootState.startTodoCleanupJob = startTodoCleanupJob;
+                bootState.terminalContext = terminal.createTerminalBootContext({
+                    startCopilotServer,
+                    wireRuntime,
+                    startTodoCleanupJob,
+                    bootConfig,
+                    ...(bootState.bootPreflight ? { bootPreflight: bootState.bootPreflight } : {}),
+                });
+            },
+            'boot-surface-validation': async () => {
+                if (!bootState.terminal) {
+                    throw new Error('[bootstrap] runtime-wiring não carregou a superfície terminal.');
+                }
+                const [sdkSurface, agentSurface] = await Promise.all([
+                    import('#copilot/sdk'),
+                    import('#copilot/agent'),
+                ]);
+                const report = assertCopilotBootSurfaces({
+                    sdk: sdkSurface,
+                    agent: agentSurface,
+                    terminal: bootState.terminal,
+                    plan: bootPlan,
+                    phaseHandlers,
+                });
+                log(
+                    'DEBUG',
+                    `[bootstrap] Superfícies de boot validadas: ${report.groups
+                        .map((group) => `${group.name}:${group.available.length}/${group.expected.length}`)
+                        .join(' ')}`,
+                );
+            },
+            'terminal-init': async () => {
+                if (!bootState.terminal || !bootState.terminalContext) {
+                    throw new Error('[bootstrap] runtime-wiring não produziu dependências do terminal.');
+                }
+                log('DEBUG', `[bootstrap] Plano de boot: ${bootPlan.phases.map((phase) => phase.id).join(' -> ')}`);
+                await bootState.terminal.runTerminalInitPhase(bootState.terminalContext);
+            },
+            'terminal-aliases': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalAliasesPhase(ctx);
+            },
+            'terminal-runtime-config': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalRuntimeConfigPhase(ctx);
+            },
+            'terminal-pinned-context': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalPinnedContextPhase(ctx);
+            },
+            'terminal-conversation-hub': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalConversationHubPhase(ctx);
+            },
+            'copilot-http-server': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalHttpServerPhase(ctx);
+            },
+            'terminal-runtime-listeners': async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalRuntimeListenersPhase(ctx);
+            },
+            repl: async () => {
+                const { terminal, ctx } = requireTerminalBootState(bootState);
+                await terminal.runTerminalReplPhase(ctx);
+            },
+        };
+
         await runCopilotBootPlan(bootPlan, {
             emit: emitBootLifecycleEvent,
             log,
-            phaseHandlers: {
-                observability: async () => {
-                    bootstrapObservability();
-                    container.resolve(ERROR_TRACKER).registerGlobalHandlers();
-                },
-                'late-deps': async () => {
-                    const { buildTool } = await import('./tools/index.js');
-                    bootstrapLateDeps({ buildTool });
-
-                    const { defaultBus } = await import('./hooks/bus.js');
-                    container.register(AUDIT_BUS, () => defaultBus, 'singleton');
-
-                    const { setAuditBus } = await import('./audit/pipeline-permission.js');
-                    setAuditBus(defaultBus);
-
-                    // ── Validation: verify all critical DI tokens are registered ────────
-                    container.validateRequired([
-                        SHUTDOWN_LOGGER,
-                        EVENT_BUS,
-                        SDK_LOGGER,
-                        TOOLS_BUILDER,
-                        AUDIT_BUS,
-                        HOOKS_LOGGER,
-                        TOOLS_LOGGER,
-                        TOOLS_METRICS,
-                    ]);
-                },
-                'sdk-preflight': async () => {
-                    bootState.bootPreflight = await runCopilotSdkBootPreflight({
-                        createClient: () => createCopilotClient(),
-                        checkAuthStatus,
-                        configuredModel: COPILOT_MODEL,
-                        pingTimeoutMs: PING_TIMEOUT_MS,
-                        log,
-                    });
-                },
-                'runtime-wiring': async () => {
-                    const [{ wireCopilotRuntimeDI }, terminal, { startTodoCleanupJob }] = await Promise.all([
-                        import('./runtime-wiring.js'),
-                        import('./terminal/index.js'),
-                        import('./tools/todo/store.js'),
-                    ]);
-
-                    // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
-                    // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
-                    const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
-                    bootState.wireRuntime = wireRuntime;
-                    bootState.terminal = terminal;
-                    bootState.startTodoCleanupJob = startTodoCleanupJob;
-                    bootState.terminalContext = terminal.createTerminalBootContext({
-                        startCopilotServer,
-                        wireRuntime,
-                        startTodoCleanupJob,
-                        bootConfig,
-                        ...(bootState.bootPreflight ? { bootPreflight: bootState.bootPreflight } : {}),
-                    });
-                },
-                'terminal-init': async () => {
-                    if (!bootState.terminal || !bootState.terminalContext) {
-                        throw new Error('[bootstrap] runtime-wiring não produziu dependências do terminal.');
-                    }
-                    log('DEBUG', `[bootstrap] Plano de boot: ${bootPlan.phases.map((phase) => phase.id).join(' -> ')}`);
-                    await bootState.terminal.runTerminalInitPhase(bootState.terminalContext);
-                },
-                'terminal-aliases': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalAliasesPhase(ctx);
-                },
-                'terminal-runtime-config': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalRuntimeConfigPhase(ctx);
-                },
-                'terminal-pinned-context': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalPinnedContextPhase(ctx);
-                },
-                'terminal-conversation-hub': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalConversationHubPhase(ctx);
-                },
-                'copilot-http-server': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalHttpServerPhase(ctx);
-                },
-                'terminal-runtime-listeners': async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalRuntimeListenersPhase(ctx);
-                },
-                repl: async () => {
-                    const { terminal, ctx } = requireTerminalBootState(bootState);
-                    await terminal.runTerminalReplPhase(ctx);
-                },
-            },
+            phaseHandlers,
         });
     } catch (error) {
         _booted = false;

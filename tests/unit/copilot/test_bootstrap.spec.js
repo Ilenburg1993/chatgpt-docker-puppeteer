@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
     bootstrapObservability: vi.fn(),
     bootstrapLateDeps: vi.fn(),
     validateRequired: vi.fn(),
+    assertCopilotBootSurfaces: vi.fn(() => ({ ok: true, groups: [], missing: [] })),
     createCopilotBootPlan: vi.fn(() => ({
         phases: [
             { id: 'observability' },
             { id: 'late-deps' },
             { id: 'sdk-preflight' },
             { id: 'runtime-wiring' },
+            { id: 'boot-surface-validation' },
             { id: 'terminal-init' },
             { id: 'terminal-aliases' },
             { id: 'terminal-runtime-config' },
@@ -73,9 +75,24 @@ vi.mock('../../../src/copilot/core/di-container.js', () => ({
 }));
 
 vi.mock('#copilot/boot', () => ({
+    assertCopilotBootSurfaces: mocks.assertCopilotBootSurfaces,
     createCopilotBootPlan: mocks.createCopilotBootPlan,
     readCopilotBootConfig: mocks.readCopilotBootConfig,
     runCopilotBootPlan: mocks.runCopilotBootPlan,
+}));
+
+vi.mock('#copilot/agent', () => ({
+    AlwaysAliveAgent: class MockAlwaysAliveAgent {},
+    ALWAYS_ALIVE_AGENT: Symbol.for('ALWAYS_ALIVE_AGENT'),
+    alwaysAliveAgent: {},
+    getAgent: vi.fn(),
+    readAgentRuntimeCapabilities: vi.fn(),
+    readAgentRuntimeHealthSnapshot: vi.fn(),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(),
+    readAgentRuntimeStatusSnapshot: vi.fn(),
+    sendAgentDialogTurn: vi.fn(),
+    startAgentDialogLoop: vi.fn(),
+    startRuntime: vi.fn(),
 }));
 
 vi.mock('../../../src/copilot/agent/lifecycle/runtime-host.js', () => ({
@@ -176,6 +193,7 @@ describe('copilot/bootstrap', () => {
                 { id: 'late-deps' },
                 { id: 'sdk-preflight' },
                 { id: 'runtime-wiring' },
+                { id: 'boot-surface-validation' },
                 { id: 'terminal-init' },
                 { id: 'terminal-aliases' },
                 { id: 'terminal-runtime-config' },
@@ -202,6 +220,7 @@ describe('copilot/bootstrap', () => {
         mocks.runTerminalRuntimeListenersPhase.mockReset();
         mocks.runTerminalReplPhase.mockReset();
         mocks.wireCopilotRuntimeDI.mockReset();
+        mocks.assertCopilotBootSurfaces.mockClear();
         mocks.registerGlobalHandlers.mockReset();
     });
 
@@ -216,5 +235,6 @@ describe('copilot/bootstrap', () => {
         expect(mocks.runTerminalReplPhase).toHaveBeenCalledTimes(2);
         expect(mocks.bootstrapObservability).toHaveBeenCalledTimes(2);
         expect(mocks.registerGlobalHandlers).toHaveBeenCalledTimes(2);
+        expect(mocks.assertCopilotBootSurfaces).toHaveBeenCalledTimes(2);
     });
 });

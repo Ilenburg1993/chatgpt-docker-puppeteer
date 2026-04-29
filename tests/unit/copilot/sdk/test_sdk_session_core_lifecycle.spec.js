@@ -146,15 +146,20 @@ describe('sdk/session/lifecycle core hardening', () => {
         }
     });
 
-    it('createSession usa resolver injetável para model auto sem import estático de models', async () => {
+    it('createSession preserva model auto nativo do SDK sem resolver local', async () => {
         const client = fakeClient();
         const resolver = vi.fn().mockResolvedValue('resolved-auto-model');
         setSessionAutoModelResolver(resolver);
 
-        await createSession(client, { model: 'auto' });
+        await createSession(client, { model: 'auto', reasoningEffort: 'high' });
 
-        expect(resolver).toHaveBeenCalledWith('gpt-5-mini');
-        expect(client.createSession).toHaveBeenCalledWith(expect.objectContaining({ model: 'resolved-auto-model' }));
+        expect(resolver).not.toHaveBeenCalled();
+        expect(client.createSession).toHaveBeenCalledWith(expect.objectContaining({ model: 'auto' }));
+        expect(client.createSession).toHaveBeenCalledWith(
+            expect.not.objectContaining({
+                reasoningEffort: 'high',
+            }),
+        );
     });
 
     it('resolveSessionCreateModel retorna modelo explícito sem acionar resolver', async () => {
@@ -210,7 +215,7 @@ describe('sdk/session/lifecycle core hardening', () => {
         );
     });
 
-    it('resumeSession saneia model="auto" e omite reasoningEffort sem modelo concreto', async () => {
+    it('resumeSession preserva model="auto" nativo e omite reasoningEffort sem modelo concreto', async () => {
         const client = fakeClient();
 
         await resumeSession(client, 's2', {
@@ -220,15 +225,14 @@ describe('sdk/session/lifecycle core hardening', () => {
 
         expect(client.resumeSession).toHaveBeenCalledWith(
             's2',
-            expect.not.objectContaining({
+            expect.objectContaining({
                 model: 'auto',
-                reasoningEffort: 'high',
             }),
         );
         expect(client.resumeSession).toHaveBeenCalledWith(
             's2',
-            expect.objectContaining({
-                streaming: true,
+            expect.not.objectContaining({
+                reasoningEffort: 'high',
             }),
         );
     });

@@ -51,6 +51,7 @@ describe('Block A — public surface baseline contracts', () => {
             'sendRuntimeDialogTurn',
             'buildAgentModuleHealth',
             'readRuntimeLifecycleSnapshot',
+            'buildRuntimeLifecycleSummary',
             'readAgentStatusSnapshot',
             'readAgentStatusValue',
             'buildAgentConnectedSsePayload',

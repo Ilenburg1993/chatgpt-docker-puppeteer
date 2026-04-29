@@ -327,9 +327,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                 new URL('../../../src/copilot/agent/session/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
-            expect(src).toContain('onAgentSdkLifecycleEvents');
-            expect(src).toContain('getAgentSdkLifecycleEvents');
-            expect(src).toContain('getAgentSdkSessionLifecycleEvents');
+            expect(src).toContain('attachAgentSdkBootLifecycleBridge');
             expect(src).toContain("from '../facades/agent-sdk-access.js'");
             expect(src).not.toContain("from '#copilot/sdk'");
         });
@@ -343,7 +341,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
             const section3Match = src.match(/\/\/ ── 3\. Client lifecycle[\s\S]*?\/\/ ── 4\./);
             if (section3Match) {
                 expect(section3Match[0]).not.toMatch(/client\.on\(SESSION_LIFECYCLE_EVENTS\./);
-                expect(section3Match[0]).toContain('onAgentSdkLifecycleEvents');
+                expect(section3Match[0]).toContain('attachAgentSdkBootLifecycleBridge');
             }
         });
     });

@@ -13,4 +13,5 @@ export * from './lifecycle-runner.js';
 export * from './plan.js';
 export * from './session-fs.js';
 export * from './skills.js';
+export * from './surface-validation.js';
 export * from './workspace.js';

@@ -25,7 +25,7 @@ import {
 } from '#copilot/events';
 import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
-import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { persistAgentRuntimePendingTurnState } from '../facades/agent-runtime-state.js';
 import { log, METRICS_STORE, startSpan } from '../ports/observability-port.js';
 
 const MAX_DELTA_FALLBACK_CHARS = 50_000;
@@ -379,14 +379,7 @@ export function emitTurnStart(emitter, message, counter, host) {
     const turnStart = Date.now();
     counter.sendCount++;
     emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
-    const persistPendingTurnTask = persistStateWithPolicy(
-        {
-            pendingTurnMessage: message,
-            pendingTurnTs: turnStart,
-            pendingTurnConsumedPR: false,
-        },
-        { label: 'dialog.turn.pending' },
-    ).then((result) => {
+    const persistPendingTurnTask = persistAgentRuntimePendingTurnState({ message, ts: turnStart }).then((result) => {
         if (!result.ok) {
             const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
             throw failure.error;

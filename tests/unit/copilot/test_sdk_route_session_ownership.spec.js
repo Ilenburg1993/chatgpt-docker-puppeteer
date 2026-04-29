@@ -192,7 +192,7 @@ describe('sdk routes session ownership SSOT', () => {
             systemMessage: { mode: 'customize', content: 'contexto' },
             availableTools: ['read_file'],
             excludedTools: ['shell'],
-            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1/' },
             workingDirectory: '/workspaces/project',
             streaming: true,
             mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
@@ -210,8 +210,19 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(createdConfigs[0], {
             onPermissionRequest: createdConfigs[0].onPermissionRequest,
             ...body,
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
         });
         assert.equal(typeof createdConfigs[0].onPermissionRequest, 'function');
+    });
+
+    it('POST /sessions rejeita provider inválido antes de chegar ao SDK', async () => {
+        const res = await request(createApp())
+            .post('/sessions')
+            .send({ model: 'gpt-4.1', provider: { type: 'openai', baseUrl: '' } })
+            .expect(400);
+
+        assert.match(String(res.body.error), /baseUrl is required/);
+        assert.equal(createdConfigs.length, 0);
     });
 
     it('PUT /sessions/foreground/:id promove a sessão para a SSOT compartilhada', async () => {
@@ -245,7 +256,7 @@ describe('sdk routes session ownership SSOT', () => {
             systemMessage: { mode: 'append', content: 'resume' },
             availableTools: ['read_file'],
             excludedTools: ['shell'],
-            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1/' },
             workingDirectory: '/workspaces/project',
             streaming: false,
             mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
@@ -264,12 +275,23 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(resumedConfigs[0], {
             onPermissionRequest: resumedConfigs[0].onPermissionRequest,
             ...body,
+            provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
             infiniteSessions: {
                 enabled: false,
                 backgroundCompactionThreshold: 0.8,
             },
         });
         assert.equal(typeof resumedConfigs[0].onPermissionRequest, 'function');
+    });
+
+    it('POST /sessions/:id/resume rejeita provider inválido antes de chamar resumeSession', async () => {
+        const res = await request(createApp())
+            .post('/sessions/sdk-rich/resume')
+            .send({ model: 'gpt-4.1', provider: { type: 'azure', baseUrl: '' } })
+            .expect(400);
+
+        assert.match(String(res.body.error), /baseUrl is required/);
+        assert.equal(resumedConfigs.length, 0);
     });
 
     it('POST /sessions/:id/disconnect limpa somente o sdkSessionId compartilhado quando a sessão era a ativa', async () => {

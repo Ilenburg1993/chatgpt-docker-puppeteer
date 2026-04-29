@@ -17,6 +17,8 @@ describe('copilot/boot — contrato central de boot', () => {
         expect(typeof mod.createCopilotBootPlan).toBe('function');
         expect(typeof mod.runCopilotBootPlan).toBe('function');
         expect(typeof mod.getLastBootLifecycleReport).toBe('function');
+        expect(typeof mod.validateCopilotBootSurfaces).toBe('function');
+        expect(typeof mod.assertCopilotBootSurfaces).toBe('function');
     });
 
     it('centraliza variaveis operacionais de boot', async () => {
@@ -48,6 +50,7 @@ describe('copilot/boot — contrato central de boot', () => {
         expect(plan.workspaceRoot).toBe(config.workspace.root);
         expect(plan.phases.map((phase) => phase.id)).toContain('terminal-pinned-context');
         expect(plan.phases.map((phase) => phase.id)).toContain('sdk-preflight');
+        expect(plan.phases.map((phase) => phase.id)).toContain('boot-surface-validation');
         expect(plan.phases.map((phase) => phase.id)).toContain('copilot-http-server');
         expect(plan.phases.map((phase) => phase.id)).toContain('repl');
         expect(plan.phases.map((phase) => phase.id)).toContain('compat-runtime-host');

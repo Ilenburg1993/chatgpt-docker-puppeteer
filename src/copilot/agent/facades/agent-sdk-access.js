@@ -12,7 +12,7 @@
  * @see EventBus
  */
 
-import { SessionError } from '#copilot/core';
+import { SessionError, toError } from '#copilot/core';
 import {
     accountGetQuota,
     checkAuthStatus,
@@ -62,6 +62,7 @@ import {
     workspaceListFiles,
     workspaceReadFile,
 } from '#copilot/sdk';
+import { log } from '../ports/observability-port.js';
 export { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from './agent-sdk-runtime.js';
 
 /**
@@ -457,6 +458,51 @@ export function startAgentSdkBootQuotaBridge(options) {
  */
 export async function listAgentSdkSessionsByClient(client, filter) {
     return listSessions(client, filter);
+}
+
+/**
+ * Retorna a lista canônica de sessionIds que não devem ser tocados por limpezas automáticas.
+ *
+ * Inclui explicitamente seeds fornecidos pelo caller e também foreground/last session do client quando disponíveis.
+ *
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {(string | null | undefined)[]} [seedIds]
+ * @returns {Promise<string[]>}
+ */
+export async function listAgentSdkProtectedSessionIdsByClient(client, seedIds = []) {
+    /** @type {Set<string>} */
+    const ids = new Set();
+    for (const id of seedIds) {
+        if (typeof id === 'string' && id.length > 0) {
+            ids.add(id);
+        }
+    }
+
+    try {
+        const foregroundSessionId = await client.getForegroundSessionId?.();
+        if (typeof foregroundSessionId === 'string' && foregroundSessionId.length > 0) {
+            ids.add(foregroundSessionId);
+        }
+    } catch (error) {
+        log(
+            'DEBUG',
+            `[agent-sdk-access] getForegroundSessionId indisponível para cleanup defensivo: ${toError(error).message}`,
+        );
+    }
+
+    try {
+        const lastSessionId = await client.getLastSessionId?.();
+        if (typeof lastSessionId === 'string' && lastSessionId.length > 0) {
+            ids.add(lastSessionId);
+        }
+    } catch (error) {
+        log(
+            'DEBUG',
+            `[agent-sdk-access] getLastSessionId indisponível para cleanup defensivo: ${toError(error).message}`,
+        );
+    }
+
+    return [...ids];
 }
 
 /**

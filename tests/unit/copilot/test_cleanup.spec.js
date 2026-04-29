@@ -56,6 +56,29 @@ describe('cleanupStaleSessions', () => {
         expect(r.kept).toBe(2); // current + recent
     });
 
+    it('preserva foreground/last-session mesmo quando estão expiradas', async () => {
+        const old = new Date(Date.now() - 100_000_000).toISOString();
+        vi.mocked(listSessions).mockResolvedValue(
+            /** @type {any} */ ([
+                { sessionId: 'fg', startTime: old },
+                { sessionId: 'last', startTime: old },
+                { sessionId: 'old-1', startTime: old },
+            ]),
+        );
+        vi.mocked(deleteSession).mockResolvedValue(undefined);
+
+        const r = await cleanupStaleSessions(
+            /** @type {any} */ ({
+                getForegroundSessionId: async () => 'fg',
+                getLastSessionId: async () => 'last',
+            }),
+        );
+
+        expect(r.protectedIds.sort()).toEqual(['fg', 'last']);
+        expect(r.deletedIds).toEqual(['old-1']);
+        expect(r.kept).toBe(2);
+    });
+
     it('pula sessões sem startTime válido', async () => {
         vi.mocked(listSessions).mockResolvedValue(
             /** @type {any} */ ([{ sessionId: 's1', startTime: null }, { sessionId: 's2' }]),

@@ -203,7 +203,10 @@ describe('terminal/dialog/engine.js — contrato', () => {
         await expect(mod.ensureDialogLoop()).resolves.toBeUndefined();
         expect(vi.mocked(nerv.emitNerv)).toHaveBeenCalledWith(
             'copilot:dialog:boot_blocked',
-            expect.objectContaining({ reason: 'sdk_rate_limit' }),
+            expect.objectContaining({
+                reason: 'sdk_rate_limit',
+                actionHint: expect.stringContaining('/model auto'),
+            }),
         );
     });
 

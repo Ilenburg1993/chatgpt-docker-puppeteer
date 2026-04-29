@@ -19,6 +19,7 @@ import readline from 'node:readline';
 import { logSwallowed } from '../core/error-handlers.js';
 import { extractAtReferences } from '../presentation/runtime-file-context.js';
 import { addAttachment, getHubSessionId, setRl } from '../presentation/runtime-ui-state-store.js';
+import { recordTerminalActivity } from './activity-state.js';
 import { resolve } from './alias-store.js';
 import {
     cmdActivity as _cmdActivity,
@@ -340,10 +341,48 @@ async function _cmdQuit(rl, injectServer, cleanup) {
 export { setupAgentListeners } from './repl-listeners.js';
 
 /**
+ * Dispara o bootstrap do dialog loop sem prender o lifecycle do REPL.
+ *
+ * O REPL/HTTP são hosts permanentes; o primeiro READY do agent pode demorar por resume, sync de sessão, skills ou
+ * latência do SDK. Essa tarefa é observável, mas não é pré-condição para considerar a fase `repl` iniciada.
+ *
+ * @param {{
+ *     ensureDialogLoopFn?: () => Promise<void>;
+ *     printlnFn?: (line: string) => void;
+ *     logFn?: typeof log;
+ * }} [deps]
+ * @returns {Promise<void>}
+ */
+export function launchTerminalDialogLoopBootstrap(deps = {}) {
+    const ensureDialogLoopFn = deps.ensureDialogLoopFn ?? ensureDialogLoop;
+    const printlnFn = deps.printlnFn ?? println;
+    const logFn = deps.logFn ?? log;
+
+    recordTerminalActivity('boot', 'Inicializando dialog loop', {
+        detail: 'Bootstrap assíncrono do protocolo READY/REPLY',
+        source: 'terminal',
+        recordHistory: false,
+    });
+
+    return Promise.resolve()
+        .then(() => ensureDialogLoopFn())
+        .catch((e) => {
+            const error = toError(e);
+            recordTerminalActivity('error', 'Falha no bootstrap do dialog loop', {
+                detail: error.message,
+                source: 'terminal',
+                severity: 'error',
+            });
+            printlnFn(`\x1b[31m  [erro de boot] ${error.message}\x1b[0m`);
+            logFn('ERROR', `[TerminalServer] Dialog loop bootstrap error: ${error.message}`);
+        });
+}
+
+/**
  * Inicia o REPL readline do terminal permanente.
  *
- * Em modo headless (stdin não-TTY), apenas garante o dialog loop e retorna, deixando o inject server HTTP manter o
- * event loop ativo.
+ * Em modo headless (stdin não-TTY), dispara o dialog loop em background e retorna, deixando o inject server HTTP manter
+ * o event loop ativo.
  *
  * @param {import('node:http').Server} injectServer - Servidor HTTP de injeção (para fechar no /quit)
  * @returns {Promise<void>}
@@ -351,7 +390,7 @@ export { setupAgentListeners } from './repl-listeners.js';
 export async function startRepl(injectServer) {
     if (!process.stdin.isTTY) {
         println('[boot] Modo headless detectado — REPL desativado. Use POST :' + INJECT_PORT + '/inject.');
-        await ensureDialogLoop();
+        void launchTerminalDialogLoopBootstrap();
         return;
     }
 
@@ -384,12 +423,7 @@ export async function startRepl(injectServer) {
     println(BANNER);
     println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
 
-    try {
-        await ensureDialogLoop();
-    } catch (e) {
-        println(`\x1b[31m  [erro de boot] ${toError(e).message}\x1b[0m`);
-        log('ERROR', `[TerminalServer] Boot error: ${toError(e).message}`);
-    }
+    void launchTerminalDialogLoopBootstrap();
 
     rl.setPrompt(buildUserPrompt());
     rl.prompt();
