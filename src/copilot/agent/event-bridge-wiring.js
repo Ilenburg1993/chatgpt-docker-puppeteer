@@ -10,7 +10,8 @@
  * @module copilot/agent/event-bridge-wiring
  */
 
-import { bridgeEmitter, container, logSwallowed } from '#copilot/core';
+import { container, logSwallowed } from '#copilot/core';
+import { wireAgentRuntimeEventBusBridge } from './facades/agent-runtime-event-bridge.js';
 
 /**
  * @typedef {import('node:events').EventEmitter & {
@@ -57,8 +58,6 @@ export function ensureAgentEventBusBridge(agent, options) {
     void (async () => {
         try {
             const { EVENT_BUS } = await import('../core/di-tokens.js');
-            const { AGENT_EVENT_BRIDGE_MAP, DIALOG_LOOP_EVENT_BRIDGE_MAP, HANDOFF_EVENT_BRIDGE_MAP } =
-                await import('./event-bridge-map.js');
 
             if (!options.isCurrentAgent(agent)) {
                 return;
@@ -73,9 +72,7 @@ export function ensureAgentEventBusBridge(agent, options) {
                 return;
             }
 
-            bridgeEmitter(agent, bus, AGENT_EVENT_BRIDGE_MAP);
-            bridgeEmitter(agent.ctx.getDialogLoopManagerSnapshot(), bus, DIALOG_LOOP_EVENT_BRIDGE_MAP);
-            bridgeEmitter(agent.ctx.getHandoffManagerSnapshot(), bus, HANDOFF_EVENT_BRIDGE_MAP);
+            wireAgentRuntimeEventBusBridge(agent, bus);
 
             _eventBusBridgeWired = true;
         } catch (_busWiringErr) {

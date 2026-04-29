@@ -84,6 +84,12 @@ const RULES = [
         message: 'agent-lifecycle deve delegar snapshots de shutdown à façade agent-runtime-state.',
     },
     {
+        file: 'src/copilot/agent/event-bridge-wiring.js',
+        rule: 'agent-event-bridge-wiring-must-not-read-runtime-managers-directly',
+        patterns: [/\bagent\.ctx\.(?:getDialogLoopManagerSnapshot|getHandoffManagerSnapshot)\(/],
+        message: 'event-bridge-wiring deve delegar seleção de emitters à façade agent-runtime-event-bridge.',
+    },
+    {
         filePrefix: `agent${path.sep}session${path.sep}`,
         rule: 'agent-session-must-not-call-raw-sdk-session-create-resume',
         regex: /\bawait\s+client\.(?:createSession|resumeSession)\(/,

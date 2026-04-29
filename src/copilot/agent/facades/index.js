@@ -60,6 +60,7 @@ export {
     setRuntimePermissionMode,
     startRuntime,
 } from './agent-runtime-controls.js';
+export { readAgentRuntimeEventBridgeSources, wireAgentRuntimeEventBusBridge } from './agent-runtime-event-bridge.js';
 export { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from './agent-runtime-ownership.js';
 export {
     clearAgentRuntimePendingQuestionShadow,

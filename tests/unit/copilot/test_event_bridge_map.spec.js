@@ -7,6 +7,7 @@ import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'vitest';
 
+import { checkOfficialSeams } from '../../../scripts/check-copilot-official-seams.mjs';
 import {
     AGENT_EVENT_BRIDGE_MAP,
     DIALOG_LOOP_EVENT_BRIDGE_MAP,
@@ -46,9 +47,15 @@ describe('event-bridge-map › contratos declarativos', () => {
 
         assert.match(alwaysAliveSrc, /event-bridge-wiring\.js/);
         assert.match(alwaysAliveSrc, /ensureAgentEventBusBridge\(/);
-        assert.match(wiringSrc, /AGENT_EVENT_BRIDGE_MAP/);
-        assert.match(wiringSrc, /DIALOG_LOOP_EVENT_BRIDGE_MAP/);
-        assert.match(wiringSrc, /HANDOFF_EVENT_BRIDGE_MAP/);
-        assert.match(wiringSrc, /bridgeEmitter\(agent, bus, AGENT_EVENT_BRIDGE_MAP\)/);
+        assert.match(wiringSrc, /wireAgentRuntimeEventBusBridge\(agent, bus\)/);
+        assert.doesNotMatch(wiringSrc, /agent\.ctx\.getDialogLoopManagerSnapshot\(/);
+        assert.doesNotMatch(wiringSrc, /agent\.ctx\.getHandoffManagerSnapshot\(/);
+    });
+
+    it('gate estrutural impede event-bridge-wiring de ler managers crus do runtime', () => {
+        const findings = checkOfficialSeams().filter(
+            (finding) => finding.rule === 'agent-event-bridge-wiring-must-not-read-runtime-managers-directly',
+        );
+        assert.deepEqual(findings, []);
     });
 });
