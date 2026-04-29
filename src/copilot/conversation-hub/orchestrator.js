@@ -48,7 +48,8 @@ export function setFallbackAgent(agent) {
 /**
  * @typedef {Object} SendToLlmBOpts
  * @property {boolean} [useStructured] - Usar chatStructured() em vez de chat() (default: true)
- * @property {number} [timeoutMs] - Timeout para a resposta (default: 120000)
+ * @property {number | null} [timeoutMs] - Timeout por inatividade para a resposta. Use `0/null` para watchdog-only (sem
+ *   timeout absoluto).
  * @property {string} [model] - Modelo a registrar no turn (default: 'gpt-4.1')
  * @property {object} [structuredInput] - Campos extras para chatStructured() (context, intent, etc.)
  *

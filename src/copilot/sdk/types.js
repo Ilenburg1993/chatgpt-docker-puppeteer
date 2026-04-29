@@ -973,14 +973,14 @@
  * simplificar o cast — cada função wrapper já valida feature flag e sessão antes de invocar.
  *
  * @typedef {object} ExperimentalRpcNamespace
- * @property {(params?: Record<string, unknown>) => Promise<any>} start
- * @property {(params?: Record<string, unknown>) => Promise<any>} list
- * @property {(params?: Record<string, unknown>) => Promise<any>} getCurrent
- * @property {(params?: Record<string, unknown>) => Promise<any>} enable
- * @property {(params?: Record<string, unknown>) => Promise<any>} disable
- * @property {(params?: Record<string, unknown>) => Promise<any>} select
- * @property {(params?: Record<string, unknown>) => Promise<any>} deselect
- * @property {(params?: Record<string, unknown>) => Promise<any>} reload
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [start]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [list]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [getCurrent]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [enable]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [disable]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [select]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [deselect]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [reload]
  */
 
 /**

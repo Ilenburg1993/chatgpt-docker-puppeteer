@@ -54,6 +54,17 @@ export function fileAttachment(path, opts = {}) {
 }
 
 /**
+ * Alias explícito para `fileAttachment`, preservando a nomenclatura proposta na auditoria externa.
+ *
+ * @param {string} path
+ * @param {{ displayName?: string }} [opts]
+ * @returns {FileAttachment}
+ */
+export function createFileAttachment(path, opts = {}) {
+    return fileAttachment(path, opts);
+}
+
+/**
  * Cria attachment de diretório.
  *
  * @param {string} path
@@ -107,6 +118,18 @@ export function blobAttachment(data, mimeType, opts = {}) {
         mimeType: requireNonEmptyString(mimeType, 'mimeType'),
         ...optionalDisplayName(opts.displayName),
     });
+}
+
+/**
+ * Alias explícito para `blobAttachment`, preservando a nomenclatura proposta na auditoria externa.
+ *
+ * @param {string} data
+ * @param {string} mimeType
+ * @param {{ displayName?: string }} [opts]
+ * @returns {BlobAttachment}
+ */
+export function createBlobAttachment(data, mimeType, opts = {}) {
+    return blobAttachment(data, mimeType, opts);
 }
 
 /**

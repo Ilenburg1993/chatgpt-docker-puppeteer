@@ -128,6 +128,17 @@ describe('F32.3 — injectToLlmB concurrência com múltiplos inject', () => {
         assert.ok(result.reply.includes('teste singleton'), 'reply deve conter mensagem original');
     });
 
+    it('aceita timeoutMs=0 (watchdog-only) sem falhar localmente', async () => {
+        const result = await injectToLlmB('watchdog only inject', {
+            port,
+            timeoutMs: 0,
+            retries: 0,
+        });
+
+        assert.ok(result.ok, 'resultado deve ser ok=true');
+        assert.ok(result.reply.includes('watchdog only inject'));
+    });
+
     it('duas chamadas sequenciais não interferem entre si', async () => {
         const r1 = await injectToLlmB('msg-1', { port, timeoutMs: 5000, retries: 0 });
         const r2 = await injectToLlmB('msg-2', { port, timeoutMs: 5000, retries: 0 });

@@ -47,6 +47,26 @@ function getRpc(session) {
     return /** @type {import('../types.js').ExperimentalSession} */ (/** @type {unknown} */ (session)).rpc;
 }
 
+/**
+ * Resolve um método experimental obrigatório com narrowing explícito para satisfazer strict typing.
+ *
+ * @template {keyof import('../types.js').ExperimentalSession['rpc']} N
+ * @template {keyof NonNullable<import('../types.js').ExperimentalSession['rpc'][N]>} M
+ * @param {CopilotSession} session
+ * @param {N} namespace
+ * @param {M} method
+ * @returns {NonNullable<NonNullable<import('../types.js').ExperimentalSession['rpc'][N]>[M]>}
+ */
+function requireRpcMethod(session, namespace, method) {
+    const rpc = getRpc(session);
+    const ns = rpc[namespace];
+    const fn = ns?.[method];
+    if (typeof fn !== 'function') {
+        throw new TypeError(`[sdk/experimental-rpc] método RPC indisponível: ${String(namespace)}.${String(method)}()`);
+    }
+    return /** @type {NonNullable<NonNullable<import('../types.js').ExperimentalSession['rpc'][N]>[M]>} */ (fn);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // fleet subsystem — SDK: fleet.start(params)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -67,7 +87,7 @@ export async function fleetStart(session, options) {
     assertRpcSession(session, 'fleet.start');
     appLog('INFO', `[sdk/experimental-rpc] fleet.start: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).fleet.start(options ?? {});
+        return /** @type {FleetStartResult} */ (await requireRpcMethod(session, 'fleet', 'start')(options ?? {}));
     } catch (error) {
         throw toSdkOperationError('experimental.fleet.start', error);
     }
@@ -93,7 +113,7 @@ export async function agentList(session) {
     assertRpcSession(session, 'agent.list');
     appLog('DEBUG', `[sdk/experimental-rpc] agent.list: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).agent.list();
+        return /** @type {AgentInfo[]} */ (await requireRpcMethod(session, 'agent', 'list')());
     } catch (error) {
         throw toSdkOperationError('experimental.agent.list', error);
     }
@@ -110,7 +130,7 @@ export async function agentGetCurrent(session) {
     assertRpcSession(session, 'agent.getCurrent');
     appLog('DEBUG', `[sdk/experimental-rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).agent.getCurrent();
+        return /** @type {AgentInfo | null} */ (await requireRpcMethod(session, 'agent', 'getCurrent')());
     } catch (error) {
         throw toSdkOperationError('experimental.agent.getCurrent', error);
     }
@@ -131,7 +151,8 @@ export async function agentSelect(session, name) {
     }
     appLog('INFO', `[sdk/experimental-rpc] agent.select: name='${name}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).agent.select({ name });
+        await requireRpcMethod(session, 'agent', 'select')({ name });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.agent.select', error);
     }
@@ -148,7 +169,8 @@ export async function agentDeselect(session) {
     assertRpcSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/experimental-rpc] agent.deselect: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).agent.deselect();
+        await requireRpcMethod(session, 'agent', 'deselect')();
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.agent.deselect', error);
     }
@@ -165,7 +187,8 @@ export async function agentReload(session) {
     assertRpcSession(session, 'agent.reload');
     appLog('INFO', `[sdk/experimental-rpc] agent.reload: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).agent.reload();
+        await requireRpcMethod(session, 'agent', 'reload')();
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.agent.reload', error);
     }
@@ -198,7 +221,7 @@ export async function skillsList(session) {
     assertRpcSession(session, 'skills.list');
     appLog('DEBUG', `[sdk/experimental-rpc] skills.list: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).skills.list();
+        return /** @type {SkillInfo[]} */ (await requireRpcMethod(session, 'skills', 'list')());
     } catch (error) {
         throw toSdkOperationError('experimental.skills.list', error);
     }
@@ -219,7 +242,8 @@ export async function skillsEnable(session, name) {
     }
     appLog('INFO', `[sdk/experimental-rpc] skills.enable: name='${name}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).skills.enable({ name });
+        await requireRpcMethod(session, 'skills', 'enable')({ name });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.skills.enable', error);
     }
@@ -240,7 +264,8 @@ export async function skillsDisable(session, name) {
     }
     appLog('INFO', `[sdk/experimental-rpc] skills.disable: name='${name}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).skills.disable({ name });
+        await requireRpcMethod(session, 'skills', 'disable')({ name });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.skills.disable', error);
     }
@@ -257,7 +282,8 @@ export async function skillsReload(session) {
     assertRpcSession(session, 'skills.reload');
     appLog('INFO', `[sdk/experimental-rpc] skills.reload: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).skills.reload();
+        await requireRpcMethod(session, 'skills', 'reload')();
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.skills.reload', error);
     }
@@ -288,7 +314,7 @@ export async function mcpList(session) {
     assertRpcSession(session, 'mcp.list');
     appLog('DEBUG', `[sdk/experimental-rpc] mcp.list: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).mcp.list();
+        return /** @type {McpServerInfo[]} */ (await requireRpcMethod(session, 'mcp', 'list')());
     } catch (error) {
         throw toSdkOperationError('experimental.mcp.list', error);
     }
@@ -309,7 +335,8 @@ export async function mcpEnable(session, serverName) {
     }
     appLog('INFO', `[sdk/experimental-rpc] mcp.enable: serverName='${serverName}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).mcp.enable({ serverName });
+        await requireRpcMethod(session, 'mcp', 'enable')({ serverName });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.mcp.enable', error);
     }
@@ -330,7 +357,8 @@ export async function mcpDisable(session, serverName) {
     }
     appLog('INFO', `[sdk/experimental-rpc] mcp.disable: serverName='${serverName}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).mcp.disable({ serverName });
+        await requireRpcMethod(session, 'mcp', 'disable')({ serverName });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.mcp.disable', error);
     }
@@ -347,7 +375,8 @@ export async function mcpReload(session) {
     assertRpcSession(session, 'mcp.reload');
     appLog('INFO', `[sdk/experimental-rpc] mcp.reload: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).mcp.reload();
+        await requireRpcMethod(session, 'mcp', 'reload')();
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.mcp.reload', error);
     }
@@ -372,7 +401,7 @@ export async function pluginsList(session) {
     assertRpcSession(session, 'plugins.list');
     appLog('DEBUG', `[sdk/experimental-rpc] plugins.list: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).plugins.list();
+        return /** @type {PluginInfo[]} */ (await requireRpcMethod(session, 'plugins', 'list')());
     } catch (error) {
         throw toSdkOperationError('experimental.plugins.list', error);
     }
@@ -404,7 +433,7 @@ export async function extensionsList(session) {
     assertRpcSession(session, 'extensions.list');
     appLog('DEBUG', `[sdk/experimental-rpc] extensions.list: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).extensions.list();
+        return /** @type {ExtensionInfo[]} */ (await requireRpcMethod(session, 'extensions', 'list')());
     } catch (error) {
         throw toSdkOperationError('experimental.extensions.list', error);
     }
@@ -425,7 +454,8 @@ export async function extensionsEnable(session, id) {
     }
     appLog('INFO', `[sdk/experimental-rpc] extensions.enable: id='${id}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).extensions.enable({ id });
+        await requireRpcMethod(session, 'extensions', 'enable')({ id });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.extensions.enable', error);
     }
@@ -446,7 +476,8 @@ export async function extensionsDisable(session, id) {
     }
     appLog('INFO', `[sdk/experimental-rpc] extensions.disable: id='${id}', sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).extensions.disable({ id });
+        await requireRpcMethod(session, 'extensions', 'disable')({ id });
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.extensions.disable', error);
     }
@@ -463,7 +494,8 @@ export async function extensionsReload(session) {
     assertRpcSession(session, 'extensions.reload');
     appLog('INFO', `[sdk/experimental-rpc] extensions.reload: sessionId='${session.sessionId}'`);
     try {
-        return await getRpc(session).extensions.reload();
+        await requireRpcMethod(session, 'extensions', 'reload')();
+        return;
     } catch (error) {
         throw toSdkOperationError('experimental.extensions.reload', error);
     }

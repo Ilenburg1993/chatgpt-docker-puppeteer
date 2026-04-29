@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     blobAttachment,
+    createBlobAttachment,
+    createFileAttachment,
     directoryAttachment,
     fileAttachment,
     getSessionCapabilities,
@@ -45,6 +47,16 @@ describe('sdk attachment helpers', () => {
             type: 'selection',
             filePath: '/tmp/a.js',
             displayName: 'a.js',
+        });
+        expect(createFileAttachment('/tmp/b.js', { displayName: 'b.js' })).toEqual({
+            type: 'file',
+            path: '/tmp/b.js',
+            displayName: 'b.js',
+        });
+        expect(createBlobAttachment('ZGF0YQ==', 'text/plain')).toEqual({
+            type: 'blob',
+            data: 'ZGF0YQ==',
+            mimeType: 'text/plain',
         });
     });
 

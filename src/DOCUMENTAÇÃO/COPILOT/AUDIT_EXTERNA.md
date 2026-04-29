@@ -16,6 +16,37 @@ categorias: **API não coberta**, **contratos de tipo incorretos**, **vícios ar
 **segurança/robustez** e **débito de manutenção**. A arquitetura atual tem fundações sólidas mas
 precisa de uma refatoração estrutural para atingir o Estado da Arte.
 
+> **Status de validação factual (2026-04-29):** esta auditoria foi revalidada contra o código atual
+> e contra o pacote realmente instalado em `node_modules/@github/copilot-sdk`. Parte importante dos
+> achados originais já foi resolvida; alguns itens eram verdadeiros à época, mas hoje são **falsos
+> positivos históricos**; e um subconjunto permanece como **dívida arquitetural real**.
+
+### 0.1 Matriz factual resumida de validação
+
+| Grupo                                                | Situação atual                            | Observações                                                                                                      |
+| ---------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `onElicitationRequest`                               | ✅ Resolvido                              | `SessionCreateOptions`/`SessionResumeOptions` + `buildSessionConfig()` já cobrem o campo                         |
+| `commands` em `SessionConfig`                        | ✅ Resolvido                              | Create/resume já propagam `commands`                                                                             |
+| `modelCapabilities`                                  | ✅ Resolvido                              | Create/resume já propagam override                                                                               |
+| Attachment helpers                                   | ✅ Resolvido                              | Existem `blobAttachment`, `fileAttachment` e aliases `createBlobAttachment`, `createFileAttachment`              |
+| `watchCapabilities` / `waitForElicitationCapability` | ✅ Resolvido                              | Implementados em `sdk/session/capabilities.js`                                                                   |
+| `capabilities.changed` em `SESSION_EVENTS`           | ✅ Resolvido                              | Constante canônica já adicionada                                                                                 |
+| `withSession()` / resource management                | ✅ Resolvido                              | Implementado em `session/client-facade.js`                                                                       |
+| `custom.js` top-level await                          | ✅ Resolvido                              | Substituído por `initCustomTools()` / carregamento explícito                                                     |
+| `httpRequest` com HTTPS                              | ✅ Resolvido                              | Suporte a `http:` e `https:`                                                                                     |
+| `env_read` expondo `HOME`/`PATH`                     | ✅ Resolvido                              | Removidos da allowlist                                                                                           |
+| `math_eval` sem limite/regex frágil                  | ✅ Resolvido                              | Limite de tamanho + regex endurecida                                                                             |
+| `clearModelsCache()` após stop                       | ✅ Resolvido                              | `stopClient()` e `forceStopClient()` já limpam cache                                                             |
+| `PermissionRequestResult` kinds                      | ✅ Validado como falso positivo histórico | O SDK instalado usa `approve-once/reject` para o handler; `approved/denied-*` pertencem a `permission.completed` |
+| `buildSessionConfig` deprecada sem substituto        | ✅ Falso positivo histórico               | `src/copilot/config/session-config.js` existe e expõe `SessionConfigBuilder`                                     |
+| `known-models` incompleto para Claude 4.5            | 🟡 Parcialmente resolvido                 | `claude-sonnet-4-5` já existia; `claude-opus-4-5` e `claude-haiku-4-5` adicionados nesta rodada                  |
+| `ExperimentalRpcNamespace` permissivo                | 🟡 Parcialmente resolvido                 | Tipagem endurecida para `Promise<unknown>` + métodos opcionais; wrappers ainda usam casts                        |
+| Singleton `_client`                                  | 🔶 Aberto                                 | Dívida arquitetural real; ainda singleton                                                                        |
+| `ModelRegistry`/`ModelSelector` singleton            | 🔶 Aberto                                 | Dívida arquitetural real                                                                                         |
+| acoplamento `lifecycle -> models`                    | 🔶 Aberto                                 | Ainda existe em `createSession()` para resolver `model='auto'`                                                   |
+| `buildCustomTools()` via module var                  | 🔶 Aberto                                 | Ainda depende de `setCustomToolsBuilder()`                                                                       |
+| DI container real                                    | 🔶 Aberto                                 | Continua parcial/por variáveis de módulo                                                                         |
+
 ---
 
 ## Índice

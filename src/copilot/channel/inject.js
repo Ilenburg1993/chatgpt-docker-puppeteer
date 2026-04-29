@@ -101,11 +101,15 @@ function _estimateInjectP95() {
 }
 
 /**
- * @param {number | undefined} explicitTimeoutMs
+ * @param {number | null | undefined} explicitTimeoutMs
  * @param {string} message
- * @returns {{ timeoutMs: number; strategy: 'explicit' | 'adaptive'; reasons: string[] }}
+ * @returns {{ timeoutMs: number | null; strategy: 'explicit' | 'adaptive' | 'disabled'; reasons: string[] }}
  */
 function _resolveInjectTurnTimeout(explicitTimeoutMs, message) {
+    if (explicitTimeoutMs === 0 || explicitTimeoutMs === null) {
+        return { timeoutMs: null, strategy: 'disabled', reasons: ['caller_disabled'] };
+    }
+
     const explicit =
         typeof explicitTimeoutMs === 'number' && Number.isFinite(explicitTimeoutMs) && explicitTimeoutMs > 0
             ? _clamp(explicitTimeoutMs, MIN_TURN_TIMEOUT_MS, MAX_TURN_TIMEOUT_MS)
@@ -230,7 +234,8 @@ function _checkClientRateLimit() {
 /**
  * @typedef {Object} InjectOpts
  * @property {string} [from] - ator remetente (default: 'llm-a')
- * @property {number} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo)
+ * @property {number | null} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo). Use 0/null para
+ *   watchdog-only (sem timeout absoluto)
  * @property {number} [transportTimeoutMs] - timeout de transporte HTTP (padrão adaptativo, maior que `timeoutMs`)
  * @property {number} [port] - porta do terminal (default: porta canônica do boot)
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
@@ -401,7 +406,11 @@ async function _doInjectToLlmB(message, opts) {
     const port = opts.port ?? DEFAULT_PORT;
     const timeoutDecision = _resolveInjectTurnTimeout(opts.timeoutMs, message);
     const timeoutMs = timeoutDecision.timeoutMs;
-    const transportDecision = _resolveTransportTimeout(timeoutMs, opts.transportTimeoutMs, 'inject');
+    const transportDecision = _resolveTransportTimeout(
+        timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        opts.transportTimeoutMs,
+        'inject',
+    );
     const transportTimeoutMs = transportDecision.timeoutMs;
     const from = opts.from ?? 'llm-a';
     const attachments = opts.attachments;
@@ -458,7 +467,7 @@ async function _doInjectToLlmB(message, opts) {
 
     log(
         'INFO',
-        `[inject-llmb] timeout(turn=${timeoutMs}ms/${timeoutDecision.strategy}, transport=${transportTimeoutMs ?? 'disabled'}/${transportDecision.strategy})` +
+        `[inject-llmb] timeout(turn=${timeoutMs === null ? 'watchdog-only' : `${timeoutMs}ms`}/${timeoutDecision.strategy}, transport=${transportTimeoutMs ?? 'disabled'}/${transportDecision.strategy})` +
             ` reasons(turn=${timeoutDecision.reasons.join('+')}; transport=${transportDecision.reasons.join('+')})`,
     );
 

@@ -18,6 +18,8 @@
  */
 
 import { z } from 'zod';
+import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
+import { resolveHubTurnTimeout } from '../conversation-hub/timeout-policy.js';
 import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
@@ -127,7 +129,12 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
             .optional()
             .default(true)
             .describe('Se true, usa chatStructured() com protocolo StructuredMessage'),
-        timeoutMs: z.number().optional().default(120000).describe('Timeout em ms para aguardar resposta de LLM-B'),
+        timeoutMs: z
+            .union([z.number(), z.null()])
+            .optional()
+            .describe(
+                'Timeout por inatividade em ms para aguardar resposta de LLM-B. Use 0/null para watchdog-only (sem timeout absoluto).',
+            ),
     }),
     handler: async (
         /**
@@ -139,7 +146,7 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
          *     priority?: 'low' | 'medium' | 'high' | 'critical';
          *     responseType?: string;
          *     useStructured?: boolean;
-         *     timeoutMs?: number;
+         *     timeoutMs?: number | null;
          * }}
          */
         { hubSessionId, message, context, intent, priority, responseType, useStructured, timeoutMs },
@@ -165,15 +172,19 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
                     ? intent.slice(0, MAX_MSG_CHARS) + ' […truncado]'
                     : intent;
 
-            // UPG-04: validar timeoutMs para evitar valores absurdos de modelos alucinados
-            const resolvedTimeout =
-                typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
-                    ? Math.min(Math.max(timeoutMs, 5_000), 300_000)
-                    : 120_000;
+            const useStructuredResolved = useStructured !== false && !!(context || intent);
+            const timeoutDecision = resolveHubTurnTimeout({
+                defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+                ...(timeoutMs !== undefined ? { explicitTimeoutMs: timeoutMs } : {}),
+                payloadChars: safeMessage.length + (safeContext?.length ?? 0) + (safeIntent?.length ?? 0),
+                useStructured: useStructuredResolved,
+                ...(priority !== undefined ? { priority } : {}),
+                ...(responseType !== undefined ? { responseType } : {}),
+            });
 
             // Se useStructured e há context/intent, enviar como StructuredMessageInput
             let payload;
-            if (useStructured !== false && (safeContext || safeIntent)) {
+            if (useStructuredResolved) {
                 payload = {
                     context: safeContext ?? safeMessage,
                     intent: safeIntent ?? safeMessage,
@@ -185,8 +196,10 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
             }
 
             const result = await hub.sendToLlmB(hubSessionId, payload, {
-                useStructured: useStructured !== false && !!(context || intent),
-                timeoutMs: resolvedTimeout,
+                useStructured: useStructuredResolved,
+                ...(timeoutDecision.timeoutMs !== null
+                    ? { timeoutMs: timeoutDecision.timeoutMs }
+                    : { timeoutMs: null }),
             });
 
             log('INFO', `[hub_send_message] Resposta de LLM-B recebida (${result.durationMs}ms).`);
@@ -197,6 +210,11 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
                 hubSessionId: result.hubSessionId,
                 turnNumber: result.turnNumber,
                 durationMs: result.durationMs,
+                timeout: {
+                    valueMs: timeoutDecision.timeoutMs,
+                    strategy: timeoutDecision.strategy,
+                    reasons: timeoutDecision.reasons,
+                },
                 response: result.content,
                 structured: result.structured ?? null,
             };

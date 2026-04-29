@@ -9,7 +9,8 @@
  * - hubTools exporta array com 5 tools
  * - setHub injeta o hub corretamente
  * - hub_create_session: sucesso, hub indisponível, erro interno
- * - hub_send_message: sucesso, trunca mensagens longas, clamp timeout, hub indisponível
+ * - hub_send_message: sucesso, trunca mensagens longas, policy de timeout (adaptive/explicit/watchdog-only), hub
+ *   indisponível
  * - hub_poll_user_messages: sucesso, sem mensagens, hub indisponível
  * - hub_read_history: sucesso com turns, total count, hub indisponível
  * - hub_list_sessions: sucesso, filtro por status, hub indisponível
@@ -216,7 +217,7 @@ describe('hub-tools', () => {
             expect(payload).toContain('…truncado');
         });
 
-        it('clamp timeout para range válido (5s-300s)', async () => {
+        it('clamp timeout explícito para range válido (5s-24h)', async () => {
             await find().handler({
                 hubSessionId: 'hub-session-123',
                 message: 'test',
@@ -224,7 +225,30 @@ describe('hub-tools', () => {
             });
 
             const opts = /** @type {any} */ (/** @type {any[]} */ (fakeHub.sendToLlmB.mock.calls[0] ?? [])[2]);
-            expect(opts.timeoutMs).toBeLessThanOrEqual(300000);
+            expect(opts.timeoutMs).toBeLessThanOrEqual(24 * 60 * 60_000);
+        });
+
+        it('aceita timeoutMs=0 e envia watchdog-only (null)', async () => {
+            await find().handler({
+                hubSessionId: 'hub-session-123',
+                message: 'test watchdog-only',
+                timeoutMs: 0,
+            });
+
+            const opts = /** @type {any} */ (/** @type {any[]} */ (fakeHub.sendToLlmB.mock.calls[0] ?? [])[2]);
+            expect(opts.timeoutMs).toBeNull();
+        });
+
+        it('usa timeout adaptativo quando timeoutMs é inválido', async () => {
+            await find().handler({
+                hubSessionId: 'hub-session-123',
+                message: 'x'.repeat(20_000),
+                timeoutMs: Number.NaN,
+            });
+
+            const opts = /** @type {any} */ (/** @type {any[]} */ (fakeHub.sendToLlmB.mock.calls[0] ?? [])[2]);
+            expect(typeof opts.timeoutMs).toBe('number');
+            expect(opts.timeoutMs).toBeGreaterThanOrEqual(5_000);
         });
 
         it('retorna erro quando hub indisponível', async () => {

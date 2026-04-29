@@ -227,6 +227,8 @@ export {
 
 export {
     blobAttachment,
+    createBlobAttachment,
+    createFileAttachment,
     directoryAttachment,
     fileAttachment,
     normalizeAttachments,

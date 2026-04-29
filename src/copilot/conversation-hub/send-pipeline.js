@@ -14,6 +14,7 @@ import { log } from '#copilot/observability';
 import { COPILOT_MODEL } from '../config/agent.js';
 import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
 import { callViaDialogLoop, callViaSimpleChat, callViaStructured } from './call-strategies.js';
+import { resolveHubTurnTimeout } from './timeout-policy.js';
 
 /**
  * @typedef {Object} SendPipelineDeps
@@ -65,9 +66,13 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
     }
 
     const useStructured = opts.useStructured !== false;
-    // Converte 0 → null (disable guard); usa LLM_B_TURN_TIMEOUT_MS como default.
-    const timeoutMs =
-        opts.timeoutMs === 0 ? null : opts.timeoutMs !== undefined ? opts.timeoutMs : LLM_B_TURN_TIMEOUT_MS;
+    const timeoutDecision = resolveHubTurnTimeout({
+        defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+        ...(opts.timeoutMs !== undefined ? { explicitTimeoutMs: opts.timeoutMs } : {}),
+        payloadChars: typeof message === 'string' ? message.length : JSON.stringify(message).length,
+        useStructured,
+    });
+    const timeoutMs = timeoutDecision.timeoutMs;
     const modelLabel = opts.model ?? COPILOT_MODEL;
 
     const messageContent = typeof message === 'string' ? message : JSON.stringify(message);
@@ -108,6 +113,10 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
     log(
         'DEBUG',
         `[HubOrchestrator] Turno #${turnNumber} (LLM-A) enviado para LLM-B: ${messageContent.slice(0, 80)}...`,
+    );
+    log(
+        'DEBUG',
+        `[HubOrchestrator] timeout(turn=${timeoutMs === null ? 'watchdog-only' : `${timeoutMs}ms`}/${timeoutDecision.strategy}; reasons=${timeoutDecision.reasons.join('+')})`,
     );
 
     const startTime = Date.now();

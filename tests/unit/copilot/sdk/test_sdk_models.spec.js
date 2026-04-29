@@ -156,6 +156,11 @@ describe('known model catalog', () => {
     it('inclui claude-sonnet-4-5 como fallback estático', () => {
         expect(KNOWN_MODELS.some((model) => model.id === 'claude-sonnet-4-5')).toBe(true);
     });
+
+    it('inclui variantes Claude 4.5 adicionais como fallback estático', () => {
+        expect(KNOWN_MODELS.some((model) => model.id === 'claude-opus-4-5')).toBe(true);
+        expect(KNOWN_MODELS.some((model) => model.id === 'claude-haiku-4-5')).toBe(true);
+    });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
