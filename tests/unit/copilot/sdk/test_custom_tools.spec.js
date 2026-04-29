@@ -127,6 +127,12 @@ describe('F39 — BUILTIN_HANDLER_MAP', () => {
         expect(result).toContain('allowlist');
     });
 
+    it('env_read não expõe HOME nem PATH', () => {
+        const envRead = BUILTIN_HANDLER_MAP.get('env_read');
+        expect(envRead?.({ key: 'HOME' })).toContain('allowlist');
+        expect(envRead?.({ key: 'PATH' })).toContain('allowlist');
+    });
+
     it('env_read rejeita key vazia', () => {
         const envRead = BUILTIN_HANDLER_MAP.get('env_read');
         const result = envRead?.({ key: '' });
@@ -167,6 +173,11 @@ describe('F39 — BUILTIN_HANDLER_MAP', () => {
     it('math_eval rejeita expressão complexa', () => {
         const me = BUILTIN_HANDLER_MAP.get('math_eval');
         expect(me?.({ expression: '2 + 3 + 4' })).toContain('não suportada');
+    });
+
+    it('math_eval rejeita expressão longa antes do parser', () => {
+        const me = BUILTIN_HANDLER_MAP.get('math_eval');
+        expect(me?.({ expression: `${'1'.repeat(65)} + 2` })).toContain('muito longa');
     });
 });
 
@@ -274,6 +285,14 @@ describe('F39 — buildCustomTools', () => {
         expect(buildCall).toBeDefined();
         const result = await buildCall.handler({ text: 'world' });
         expect(result).toBe('echo: world');
+    });
+
+    it('constrói tools mesmo sem builder externo injetado', async () => {
+        setCustomToolsBuilder(/** @type {any} */ (null));
+        await registerCustomTool({ name: 'fallback_echo', description: 'Echo', handlerId: 'echo' });
+        const tools = buildCustomTools();
+        expect(tools).toHaveLength(1);
+        expect(tools[0]?.name).toBe('fallback_echo');
     });
 });
 

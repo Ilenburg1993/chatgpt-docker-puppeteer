@@ -29,6 +29,7 @@ vi.mock('@github/copilot-sdk', () => ({
 import {
     CONNECTION_STATES,
     INFINITE_SESSION_DEFAULTS,
+    PERMISSION_COMPLETED_KINDS,
     PERMISSION_RESULTS,
     PROVIDER_TYPES,
     REASONING_EFFORTS,
@@ -110,13 +111,22 @@ describe('SECTION_ACTIONS', () => {
 // ─── PERMISSION_RESULTS ───────────────────────────────────────────────────────
 
 describe('PERMISSION_RESULTS', () => {
-    it('contém os 5 resultados possíveis', () => {
-        expect(Object.keys(PERMISSION_RESULTS)).toHaveLength(5);
-        expect(PERMISSION_RESULTS.ALLOW).toBe('allow');
-        expect(PERMISSION_RESULTS.DENY).toBe('deny');
-        expect(PERMISSION_RESULTS.ALLOW_ALWAYS).toBe('allowAlways');
-        expect(PERMISSION_RESULTS.DENY_ALWAYS).toBe('denyAlways');
-        expect(PERMISSION_RESULTS.DISMISS).toBe('dismiss');
+    it('contém os decision kinds aceitos pelo PermissionHandler do SDK', () => {
+        expect(Object.keys(PERMISSION_RESULTS)).toHaveLength(6);
+        expect(PERMISSION_RESULTS.APPROVE_ONCE).toBe('approve-once');
+        expect(PERMISSION_RESULTS.APPROVE_FOR_SESSION).toBe('approve-for-session');
+        expect(PERMISSION_RESULTS.APPROVE_FOR_LOCATION).toBe('approve-for-location');
+        expect(PERMISSION_RESULTS.REJECT).toBe('reject');
+        expect(PERMISSION_RESULTS.USER_NOT_AVAILABLE).toBe('user-not-available');
+        expect(PERMISSION_RESULTS.NO_RESULT).toBe('no-result');
+    });
+});
+
+describe('PERMISSION_COMPLETED_KINDS', () => {
+    it('contém os kinds emitidos em permission.completed', () => {
+        expect(PERMISSION_COMPLETED_KINDS.APPROVED).toBe('approved');
+        expect(PERMISSION_COMPLETED_KINDS.DENIED_BY_RULES).toBe('denied-by-rules');
+        expect(PERMISSION_COMPLETED_KINDS.DENIED_INTERACTIVELY_BY_USER).toBe('denied-interactively-by-user');
     });
 });
 
@@ -164,6 +174,10 @@ describe('SESSION_EVENTS', () => {
         expect(sessionEvents).toContain('session.idle');
         expect(sessionEvents).toContain('session.error');
         expect(sessionEvents).toContain('session.shutdown');
+    });
+
+    it('inclui capabilities.changed do SDK', () => {
+        expect(SESSION_EVENTS.CAPABILITIES_CHANGED).toBe('capabilities.changed');
     });
 
     it('categorias de evento assistant.* presentes', () => {

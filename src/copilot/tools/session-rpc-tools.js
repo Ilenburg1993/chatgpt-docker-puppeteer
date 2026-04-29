@@ -76,25 +76,62 @@ function getRpc() {
 const RPC_TIMEOUT_MS = COPILOT_RPC_TIMEOUT_MS;
 
 /**
+ * Executa uma Promise com timeout e garante cleanup do timer em sucesso/falha.
+ *
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} timeoutMs
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+async function withTimeout(promise, timeoutMs, label) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timer = null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_resolve, reject) => {
+                timer = setTimeout(() => reject(new TimeoutError(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
+    }
+}
+
+/**
+ * Resolve timeout efetivo para uma chamada RPC.
+ *
+ * `null` desabilita timeout absoluto (usar somente quando a operação for naturalmente longa e legítima).
+ *
+ * @param {number | null | undefined} timeoutMs
+ * @returns {number | null}
+ */
+function resolveRpcTimeoutMs(timeoutMs) {
+    if (timeoutMs === null) return null;
+    if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) return timeoutMs;
+    return RPC_TIMEOUT_MS;
+}
+
+/**
  * Executa uma operação RPC com checagem de disponibilidade e tratamento de erros padronizado.
  *
  * @template T
  * @param {string} toolName - Nome do tool para logging
  * @param {(rpc: ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade>) => Promise<T>} fn - Função que
  *   recebe o handle RPC e executa a operação
+ * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<T | { error: string }>}
  */
-async function wrapRpc(toolName, fn) {
+async function wrapRpc(toolName, fn, opts = {}) {
     const r = getRpc();
     if (!r.ok) return { error: r.error };
+    const timeoutMs = resolveRpcTimeoutMs(opts.timeoutMs);
     try {
-        // GAP-TOOLS-003: timeout para evitar RPC travada indefinidamente
-        const result = await Promise.race([
-            fn(r.rpc),
-            new Promise((_resolve, reject) =>
-                setTimeout(() => reject(new TimeoutError(`RPC timeout (${RPC_TIMEOUT_MS}ms)`)), RPC_TIMEOUT_MS),
-            ),
-        ]);
+        // GAP-TOOLS-003: timeout para evitar RPC travada indefinidamente em operações curtas de controle.
+        const result = timeoutMs === null ? await fn(r.rpc) : await withTimeout(fn(r.rpc), timeoutMs, 'RPC');
         return /** @type {T} */ (result);
     } catch (e) {
         log('ERROR', `[${toolName}] ${toError(e).message}`);
@@ -287,14 +324,19 @@ const sessionCompactTool = createTool({
         /** @type {unknown} */ (z.object({}))
     ),
     handler: async () =>
-        wrapRpc('session_compact', async (rpc) => {
-            const result = await rpc.compaction.compact();
-            log(
-                'INFO',
-                `[session_compact] success=${result.success} freed=${result.tokensRemoved ?? 0} msgs=${result.messagesRemoved ?? 0}`,
-            );
-            return result;
-        }),
+        // Compaction pode ser legítima e naturalmente longa em sessões extensas; evitar timeout absoluto aqui.
+        wrapRpc(
+            'session_compact',
+            async (rpc) => {
+                const result = await rpc.compaction.compact();
+                log(
+                    'INFO',
+                    `[session_compact] success=${result.success} freed=${result.tokensRemoved ?? 0} msgs=${result.messagesRemoved ?? 0}`,
+                );
+                return result;
+            },
+            { timeoutMs: null },
+        ),
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@
 import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
+import { assertRpcSession } from './guards.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -48,17 +49,6 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
  */
 
 /**
- * @param {unknown} session
- * @param {string} caller
- * @returns {asserts session is CopilotSession}
- */
-function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || !('rpc' in session)) {
-        throw new TypeError('[sdk/rpc/' + caller + '] Sessao invalida ou sem RPC disponivel.');
-    }
-}
-
-/**
  * Resolve método de compaction compatível entre SDKs (`history.compact` no v0.3.0, `compaction.compact` legado).
  *
  * @param {CopilotSession} session
@@ -83,7 +73,7 @@ function getCompactionMethod(session) {
  * @returns {Promise<CompactionCompactResult>}
  */
 export async function compactionCompact(session) {
-    assertSession(session, 'compaction.compact');
+    assertRpcSession(session, 'compaction.compact');
     appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
     const startedAt = Date.now();
     emitSdkOperationMetric({ operation: 'rpc.compaction.compact', status: 'started', sessionId: session.sessionId });
@@ -123,7 +113,7 @@ export async function compactionCompact(session) {
  * @returns {Promise<ShellExecResult>}
  */
 export async function shellExec(session, command, options) {
-    assertSession(session, 'shell.exec');
+    assertRpcSession(session, 'shell.exec');
     if (typeof command !== 'string' || command.length === 0) {
         throw new TypeError('[sdk/rpc/shell.exec] command deve ser string não-vazia.');
     }
@@ -171,7 +161,7 @@ export async function shellExec(session, command, options) {
  * @returns {Promise<ShellKillResult>}
  */
 export async function shellKill(session, processId, signal) {
-    assertSession(session, 'shell.kill');
+    assertRpcSession(session, 'shell.kill');
     if (typeof processId !== 'string' || processId.length === 0) {
         throw new TypeError('[sdk/rpc/shell.kill] processId deve ser string não-vazia.');
     }
@@ -207,7 +197,7 @@ export async function shellKill(session, processId, signal) {
  * @returns {Promise<ElicitationResult>}
  */
 export async function uiElicitation(session, message, requestedSchema) {
-    assertSession(session, 'ui.elicitation');
+    assertRpcSession(session, 'ui.elicitation');
     if (typeof message !== 'string' || message.length === 0) {
         throw new TypeError('[sdk/rpc/ui.elicitation] message deve ser string não-vazia.');
     }
@@ -262,7 +252,7 @@ export async function uiElicitation(session, message, requestedSchema) {
  * @returns {Promise<HandleResult>}
  */
 export async function commandsHandlePending(session, requestId, options) {
-    assertSession(session, 'commands.handlePendingCommand');
+    assertRpcSession(session, 'commands.handlePendingCommand');
     if (typeof requestId !== 'string' || requestId.length === 0) {
         throw new TypeError('[sdk/rpc/commands.handlePendingCommand] requestId deve ser string não-vazia.');
     }
@@ -293,7 +283,7 @@ export async function commandsHandlePending(session, requestId, options) {
  * @returns {Promise<HandleResult>}
  */
 export async function permissionsHandlePending(session, requestId, result) {
-    assertSession(session, 'permissions.handlePendingPermissionRequest');
+    assertRpcSession(session, 'permissions.handlePendingPermissionRequest');
     if (typeof requestId !== 'string' || requestId.length === 0) {
         throw new TypeError(
             '[sdk/rpc/permissions.handlePendingPermissionRequest] requestId deve ser string não-vazia.',
@@ -332,7 +322,7 @@ export async function permissionsHandlePending(session, requestId, result) {
  * @returns {Promise<HandleResult>}
  */
 export async function toolsHandlePendingCall(session, requestId, options) {
-    assertSession(session, 'tools.handlePendingToolCall');
+    assertRpcSession(session, 'tools.handlePendingToolCall');
     if (typeof requestId !== 'string' || requestId.length === 0) {
         throw new TypeError('[sdk/rpc/tools.handlePendingToolCall] requestId deve ser string não-vazia.');
     }
@@ -373,7 +363,7 @@ export async function toolsHandlePendingCall(session, requestId, options) {
  * @returns {Promise<AgentListResult>}
  */
 export async function agentList(session) {
-    assertSession(session, 'agent.list');
+    assertRpcSession(session, 'agent.list');
     appLog('DEBUG', `[sdk/rpc] agent.list: sessionId='${session.sessionId}'`);
     try {
         return /** @type {AgentListResult} */ (await session.rpc.agent.list());
@@ -389,7 +379,7 @@ export async function agentList(session) {
  * @returns {Promise<AgentCurrentResult>}
  */
 export async function agentGetCurrent(session) {
-    assertSession(session, 'agent.getCurrent');
+    assertRpcSession(session, 'agent.getCurrent');
     appLog('DEBUG', `[sdk/rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
     try {
         return /** @type {AgentCurrentResult} */ (await session.rpc.agent.getCurrent());
@@ -406,7 +396,7 @@ export async function agentGetCurrent(session) {
  * @returns {Promise<AgentSelectResult>}
  */
 export async function agentSelect(session, name) {
-    assertSession(session, 'agent.select');
+    assertRpcSession(session, 'agent.select');
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/rpc/agent.select] name deve ser string não-vazia.');
     }
@@ -425,7 +415,7 @@ export async function agentSelect(session, name) {
  * @returns {Promise<AgentDeselectResult>}
  */
 export async function agentDeselect(session) {
-    assertSession(session, 'agent.deselect');
+    assertRpcSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/rpc] agent.deselect: sessionId='${session.sessionId}'`);
     try {
         await session.rpc.agent.deselect();
@@ -442,7 +432,7 @@ export async function agentDeselect(session) {
  * @returns {Promise<AgentReloadResult>}
  */
 export async function agentReload(session) {
-    assertSession(session, 'agent.reload');
+    assertRpcSession(session, 'agent.reload');
     appLog('INFO', `[sdk/rpc] agent.reload: sessionId='${session.sessionId}'`);
     try {
         return /** @type {AgentReloadResult} */ (await session.rpc.agent.reload());
@@ -462,11 +452,5 @@ export async function agentReload(session) {
  * @returns {Promise<CompactionCompactResult>}
  */
 export async function compactionCompactTyped(session) {
-    assertSession(session, 'compaction.compact');
-    appLog('INFO', `[sdk/rpc] compaction.compact: sessionId='${session.sessionId}'`);
-    try {
-        return await getCompactionMethod(session)();
-    } catch (error) {
-        throw toSdkOperationError('compaction.compact', error);
-    }
+    return compactionCompact(session);
 }

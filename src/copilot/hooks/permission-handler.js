@@ -16,6 +16,9 @@
  * - `{ kind: "user-not-available" }`
  * - `{ kind: "no-result" }` (somente protocolo v1; protocolo v2 rejeita)
  *
+ * Os eventos `permission.completed` usam uma taxonomia diferente (`approved`, `denied-by-rules`,
+ * `denied-interactively-by-user`, etc.). Handlers de permissão devem retornar a union de decisão do SDK.
+ *
  * @module copilot/hooks/permission-handler
  * @see EventBus
  * @see module:copilot/hooks/types
@@ -143,13 +146,24 @@ export function createPermissionHandler(config) {
 
         // 1. Callback custom tem precedência total
         if (onRequest) {
-            const customResult = await onRequest(request, invocation);
-            if (customResult !== undefined) {
-                const result = normalizeCustomDecision(customResult);
-                if (auditMode || result.kind !== 'approve-once') {
-                    log('INFO', `[hooks/permission] onRequest: kind='${kind}', tool='${toolName}' → ${result.kind}`);
+            try {
+                const customResult = await onRequest(request, invocation);
+                if (customResult !== undefined) {
+                    const result = normalizeCustomDecision(customResult);
+                    if (auditMode || result.kind !== 'approve-once') {
+                        log(
+                            'INFO',
+                            `[hooks/permission] onRequest: kind='${kind}', tool='${toolName}' → ${result.kind}`,
+                        );
+                    }
+                    return result;
                 }
-                return result;
+            } catch (error) {
+                log(
+                    'WARN',
+                    `[hooks/permission] onRequest falhou; negando por segurança: kind='${kind}', tool='${toolName}' error='${error instanceof Error ? error.message : String(error)}'`,
+                );
+                return makeDenied();
             }
         }
 

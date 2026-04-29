@@ -44,6 +44,15 @@ export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', 
 });
 
 /**
+ * Acesso explícito ao circuit breaker compartilhado. Código novo deve preferir este getter ao import direto do objeto.
+ *
+ * @returns {CircuitBreaker}
+ */
+export function getSdkConnectionCircuitBreaker() {
+    return sdkConnectionCircuitBreaker;
+}
+
+/**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
@@ -93,6 +102,18 @@ let _registryHasActiveSessions = false;
  */
 async function wait(ms) {
     await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function clearModelsCacheBestEffort() {
+    try {
+        const { clearModelsCache } = await import('../models/helpers.js');
+        clearModelsCache();
+    } catch (error) {
+        logSwallowed(error, 'sdk.client.clearModelsCache');
+    }
 }
 
 /**
@@ -228,6 +249,7 @@ export async function stopClient() {
         clearActiveSdkSessions();
         _registryHasActiveSessions = false;
     }
+    await clearModelsCacheBestEffort();
     _client = null;
     return errors;
 }
@@ -254,6 +276,7 @@ export async function forceStopClient() {
         clearActiveSdkSessions();
         _registryHasActiveSessions = false;
     }
+    await clearModelsCacheBestEffort();
     _client = null;
 }
 /**
@@ -494,6 +517,7 @@ export function _resetClientState() {
     _startPromise = null;
     sdkConnectionCircuitBreaker.reset();
     clearActiveSdkSessions();
+    void clearModelsCacheBestEffort();
 }
 /**
  * Injeta um client mock para testes. **Apenas para uso em testes**.

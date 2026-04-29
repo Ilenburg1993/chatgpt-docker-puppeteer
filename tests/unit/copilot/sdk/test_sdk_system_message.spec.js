@@ -34,6 +34,7 @@ import {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
+    transformSection,
 } from '../../../../src/copilot/sdk/session/system-message.js';
 
 // ─── SYSTEM_PROMPT_SECTIONS re-export ─────────────────────────────────────────
@@ -151,6 +152,12 @@ describe('sectionOverride()', () => {
         expect(/** @type {Function} */ (o.action)('original content')).toBe('PREFIXED: original content');
     });
 
+    it('transformSection cria override explícito para SectionTransformFn', () => {
+        const o = transformSection((/** @type {string} */ current) => `${current}\nextra`);
+        expect(typeof o.action).toBe('function');
+        expect(/** @type {Function} */ (o.action)('base')).toBe('base\nextra');
+    });
+
     it('SectionTransformFn async retorna Promise', async () => {
         const fn = async (/** @type {string} */ current) => `ASYNC: ${current}`;
         const o = sectionOverride(fn);
@@ -226,6 +233,7 @@ describe('sdk/index.js barrel re-exports system-message', () => {
         expect(typeof barrel.replaceSystemMessage).toBe('function');
         expect(typeof barrel.customizeSystemMessage).toBe('function');
         expect(typeof barrel.sectionOverride).toBe('function');
+        expect(typeof barrel.transformSection).toBe('function');
         expect(typeof barrel.appendToGuidelines).toBe('function');
         expect(typeof barrel.replaceIdentity).toBe('function');
         expect(typeof barrel.getSectionNames).toBe('function');

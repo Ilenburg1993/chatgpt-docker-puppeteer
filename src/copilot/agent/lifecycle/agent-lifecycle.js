@@ -332,18 +332,28 @@ export async function agentStop(
 
         if (ctx.isProcessing() || ctx.isWaitingForInput()) {
             log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
-            await Promise.race([
-                new Promise((resolve) => {
-                    const onIdle = () => {
-                        if (!ctx.isProcessing() && !ctx.isWaitingForInput()) {
-                            host.off(EMITTER_STATUS, onIdle);
-                            resolve(undefined);
-                        }
-                    };
-                    host.on(EMITTER_STATUS, onIdle);
-                }),
-                new Promise((resolve) => setTimeout(resolve, shutdownTimeoutMs)),
-            ]);
+            /** @type {ReturnType<typeof setTimeout> | null} */
+            let shutdownTimeoutHandle = null;
+            try {
+                await Promise.race([
+                    new Promise((resolve) => {
+                        const onIdle = () => {
+                            if (!ctx.isProcessing() && !ctx.isWaitingForInput()) {
+                                host.off(EMITTER_STATUS, onIdle);
+                                resolve(undefined);
+                            }
+                        };
+                        host.on(EMITTER_STATUS, onIdle);
+                    }),
+                    new Promise((resolve) => {
+                        shutdownTimeoutHandle = setTimeout(resolve, shutdownTimeoutMs);
+                    }),
+                ]);
+            } finally {
+                if (shutdownTimeoutHandle !== null) {
+                    clearTimeout(shutdownTimeoutHandle);
+                }
+            }
         }
 
         if (ctx.getDialogLoopAttachedSnapshot()) {

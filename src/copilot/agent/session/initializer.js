@@ -72,12 +72,23 @@ const RESUMED_SESSION_HEALTH_TIMEOUT_MS = 5_000;
 async function _validateResumedSession(session) {
     if (!canReadAgentSdkSessionMessages(session)) return true;
     try {
-        await Promise.race([
-            readAgentSdkSessionMessages(session),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('resume-health-timeout')), RESUMED_SESSION_HEALTH_TIMEOUT_MS),
-            ),
-        ]);
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let timeoutHandle = null;
+        try {
+            await Promise.race([
+                readAgentSdkSessionMessages(session),
+                new Promise((_, reject) => {
+                    timeoutHandle = setTimeout(
+                        () => reject(new Error('resume-health-timeout')),
+                        RESUMED_SESSION_HEALTH_TIMEOUT_MS,
+                    );
+                }),
+            ]);
+        } finally {
+            if (timeoutHandle !== null) {
+                clearTimeout(timeoutHandle);
+            }
+        }
         return true;
     } catch (e) {
         log('WARN', `[PersistentSession] Sessão retomada falhou no health-check: ${toError(e).message}`);

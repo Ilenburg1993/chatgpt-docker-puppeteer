@@ -291,10 +291,20 @@ export async function clearStateAsync() {
  * @returns {Promise<void>}
  */
 export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
-    await Promise.race([
-        _writeQueue.catch((e) => logSwallowed(e, 'stateIo.drainWrites')),
-        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
-    ]);
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timeoutHandle = null;
+    try {
+        await Promise.race([
+            _writeQueue.catch((e) => logSwallowed(e, 'stateIo.drainWrites')),
+            new Promise((resolve) => {
+                timeoutHandle = setTimeout(resolve, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutHandle !== null) {
+            clearTimeout(timeoutHandle);
+        }
+    }
 }
 
 /**

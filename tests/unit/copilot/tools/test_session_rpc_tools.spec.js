@@ -267,6 +267,28 @@ describe('session-rpc-tools', () => {
             expect(result.tokensFreed).toBe(500);
             expect(result.messagesRemoved).toBe(3);
         });
+
+        it('não aplica timeout absoluto em compaction longa legítima', async () => {
+            vi.useFakeTimers();
+            fakeRpc.compaction.compact.mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        setTimeout(() => {
+                            resolve({ success: true, tokensRemoved: 1200, messagesRemoved: 8 });
+                        }, 7_000);
+                    }),
+            );
+
+            const tool = mod.sessionRpcTools.find((t) => t.name === 'session_compact');
+            const pending = /** @type {any} */ (tool).handler({});
+            await vi.advanceTimersByTimeAsync(7_000);
+            const result = await pending;
+
+            expect(result.success).toBe(true);
+            expect(result.tokensRemoved).toBe(1200);
+            expect(result.messagesRemoved).toBe(8);
+            vi.useRealTimers();
+        });
     });
 
     // ── wrapRpc error handling ────────────────────────────────────────────
@@ -294,5 +316,17 @@ describe('session-rpc-tools', () => {
 
             expect(result.error).toMatch(/timeout/i);
         }, 10000);
+
+        it('limpa timer de timeout após sucesso rápido (sem timer pendurado)', async () => {
+            vi.useFakeTimers();
+            fakeRpc.mode.get.mockResolvedValueOnce({ mode: 'plan' });
+
+            const tool = mod.sessionRpcTools.find((t) => t.name === 'session_mode_get');
+            const result = await /** @type {any} */ (tool).handler({});
+
+            expect(result.mode).toBe('plan');
+            expect(vi.getTimerCount()).toBe(0);
+            vi.useRealTimers();
+        });
     });
 });

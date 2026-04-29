@@ -63,6 +63,7 @@ import {
     listModels,
     supportsReasoning,
 } from '../../../../src/copilot/sdk/models/helpers.js';
+import { KNOWN_MODELS } from '../../../../src/copilot/sdk/models/known-models.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -148,6 +149,12 @@ describe('F76 - listModels / getModelById', () => {
         const models = [makeModel()];
         const model = getModelById(models, 'nao-existe');
         expect(model).toBeUndefined();
+    });
+});
+
+describe('known model catalog', () => {
+    it('inclui claude-sonnet-4-5 como fallback estático', () => {
+        expect(KNOWN_MODELS.some((model) => model.id === 'claude-sonnet-4-5')).toBe(true);
     });
 });
 

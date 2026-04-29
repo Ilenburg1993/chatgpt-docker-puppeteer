@@ -68,11 +68,24 @@ export const SECTION_ACTIONS = /** @type {const} */ ({
 
 /** Valores de resultado de permissão. */
 export const PERMISSION_RESULTS = /** @type {const} */ ({
-    ALLOW: 'allow',
-    DENY: 'deny',
-    ALLOW_ALWAYS: 'allowAlways',
-    DENY_ALWAYS: 'denyAlways',
-    DISMISS: 'dismiss',
+    APPROVE_ONCE: 'approve-once',
+    APPROVE_FOR_SESSION: 'approve-for-session',
+    APPROVE_FOR_LOCATION: 'approve-for-location',
+    REJECT: 'reject',
+    USER_NOT_AVAILABLE: 'user-not-available',
+    NO_RESULT: 'no-result',
+});
+
+/** Result kinds observados em eventos `permission.completed` do SDK. */
+export const PERMISSION_COMPLETED_KINDS = /** @type {const} */ ({
+    APPROVED: 'approved',
+    APPROVED_FOR_SESSION: 'approved-for-session',
+    APPROVED_FOR_LOCATION: 'approved-for-location',
+    DENIED_BY_RULES: 'denied-by-rules',
+    DENIED_NO_APPROVAL_RULE_AND_COULD_NOT_REQUEST_FROM_USER: 'denied-no-approval-rule-and-could-not-request-from-user',
+    DENIED_INTERACTIVELY_BY_USER: 'denied-interactively-by-user',
+    DENIED_BY_CONTENT_EXCLUSION_POLICY: 'denied-by-content-exclusion-policy',
+    DENIED_BY_PERMISSION_REQUEST_HOOK: 'denied-by-permission-request-hook',
 });
 
 // ─── Tool Result Types ────────────────────────────────────────────────────────
@@ -173,6 +186,7 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── Permission ──
     PERMISSION_REQUESTED: 'permission.requested',
     PERMISSION_COMPLETED: 'permission.completed',
+    CAPABILITIES_CHANGED: 'capabilities.changed',
 
     // ── User Input / Elicitation ──
     USER_INPUT_REQUESTED: 'user_input.requested',

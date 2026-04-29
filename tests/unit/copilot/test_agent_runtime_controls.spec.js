@@ -91,7 +91,64 @@ describe('agent-runtime-controls facade', () => {
     it('lê handoff manager por façade e retorna null quando indisponível', () => {
         const manager = { getHistory: vi.fn(() => []) };
         expect(getRuntimeHandoffManager(/** @type {any} */ ({ getHandoffManager: () => manager }))).toBe(manager);
+        const snapshotManager = { getHistory: vi.fn(() => ['ok']) };
+        expect(
+            getRuntimeHandoffManager(
+                /** @type {any} */ ({
+                    getHandoffManagerSnapshot: () => snapshotManager,
+                    getHandoffManager: () => manager,
+                }),
+            ),
+        ).toBe(snapshotManager);
         expect(getRuntimeHandoffManager(/** @type {any} */ ({}))).toBeNull();
+    });
+
+    it('prefere métodos estáveis do AgentContext para evitar recursão via getters do agent', () => {
+        mocks.readAgentRuntimeStatusSnapshot.mockReturnValue({
+            status: 'processing',
+            model: 'fallback-model',
+            reasoningEffort: 'medium',
+            queueSize: 99,
+            pendingQuestion: { kind: 'reply', text: 'fallback' },
+        });
+
+        const control = readRuntimeControlState(
+            /** @type {any} */ ({
+                getRuntimeStatus: () => 'idle',
+                getModelSnapshot: () => 'gpt-5-mini',
+                getReasoningEffortSnapshot: () => 'high',
+                getQueueSnapshot: () => ({ size: 3 }),
+                isDialogLoopActive: () => true,
+                isDialogLoopPaused: () => true,
+                dialogPaused: false,
+            }),
+        );
+
+        const interaction = readRuntimeInteractionState(
+            /** @type {any} */ ({
+                getPendingQuestionForStatusSnapshot: () => ({ kind: 'question', text: 'via-ctx' }),
+                getPendingQuestionKind: () => 'question',
+                getPendingQuestionShadowSnapshot: () => ({ question: 'shadow', meta: { kind: 'ready' } }),
+                getPendingQuestionShadowKind: () => 'ready',
+                getPendingQuestionShadowState: () => 'active',
+                isPendingQuestionShadowExpired: () => false,
+                getPendingQuestionShadowAgeMs: () => 10,
+                getPendingQuestionShadowExpiresAt: () => 20,
+                getPendingQuestionShadowRemainingMs: () => 10,
+            }),
+        );
+
+        expect(control.status).toBe('idle');
+        expect(control.model).toBe('gpt-5-mini');
+        expect(control.reasoningEffort).toBe('high');
+        expect(control.queueSize).toBe(3);
+        expect(control.dialogLoopActive).toBe(true);
+        expect(control.dialogPaused).toBe(true);
+        expect(interaction.pendingQuestion).toEqual({ kind: 'question', text: 'via-ctx' });
+        expect(interaction.pendingQuestionKind).toBe('question');
+        expect(interaction.pendingQuestionShadowKind).toBe('ready');
+        expect(interaction.pendingQuestionShadowState).toBe('active');
+        expect(interaction.pendingQuestionShadowAgeMs).toBe(10);
     });
 
     it('normaliza governança/capabilities/tool registry por façade única', () => {

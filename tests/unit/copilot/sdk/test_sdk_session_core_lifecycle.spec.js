@@ -69,11 +69,19 @@ describe('sdk/session/lifecycle core hardening', () => {
     it('createSession propaga gitHubToken e createSessionFsHandler', async () => {
         const client = fakeClient();
         const sessionFsHandler = vi.fn();
+        const elicitationHandler = vi.fn();
+        const commandHandler = vi.fn();
 
         await createSession(client, {
             model: 'gpt-4.1',
             gitHubToken: 'ghs_session',
             createSessionFsHandler: sessionFsHandler,
+            onElicitationRequest: elicitationHandler,
+            commands: [{ name: 'diagnose', description: 'Diagnose', handler: commandHandler }],
+            modelCapabilities: { supports: { vision: false } },
+            enableConfigDiscovery: true,
+            includeSubAgentStreamingEvents: false,
+            defaultAgent: { excludedTools: ['shell'] },
         });
 
         expect(client.createSession).toHaveBeenCalledWith(
@@ -81,6 +89,12 @@ describe('sdk/session/lifecycle core hardening', () => {
                 model: 'gpt-4.1',
                 gitHubToken: 'ghs_session',
                 createSessionFsHandler: sessionFsHandler,
+                onElicitationRequest: elicitationHandler,
+                commands: [expect.objectContaining({ name: 'diagnose', handler: commandHandler })],
+                modelCapabilities: { supports: { vision: false } },
+                enableConfigDiscovery: true,
+                includeSubAgentStreamingEvents: false,
+                defaultAgent: { excludedTools: ['shell'] },
             }),
         );
     });
@@ -108,6 +122,27 @@ describe('sdk/session/lifecycle core hardening', () => {
         });
     });
 
+    it('createSession permite configurar reasoning default do gpt-5-mini por env', async () => {
+        const previous = process.env.COPILOT_GPT5_MINI_REASONING_EFFORT;
+        process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = 'medium';
+        try {
+            const client = fakeClient();
+            await createSession(client);
+            expect(client.createSession).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    model: 'gpt-5-mini',
+                    reasoningEffort: 'medium',
+                }),
+            );
+        } finally {
+            if (previous === undefined) {
+                delete process.env.COPILOT_GPT5_MINI_REASONING_EFFORT;
+            } else {
+                process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = previous;
+            }
+        }
+    });
+
     it('resumeSession valida sessionId não-vazio', async () => {
         const client = fakeClient();
         await expect(resumeSession(client, '')).rejects.toThrow(TypeError);
@@ -124,10 +159,18 @@ describe('sdk/session/lifecycle core hardening', () => {
     it('resumeSession propaga gitHubToken e createSessionFsHandler', async () => {
         const client = fakeClient();
         const sessionFsHandler = vi.fn();
+        const elicitationHandler = vi.fn();
+        const commandHandler = vi.fn();
 
         await resumeSession(client, 's2', {
             gitHubToken: 'ghs_resume',
             createSessionFsHandler: sessionFsHandler,
+            onElicitationRequest: elicitationHandler,
+            commands: [{ name: 'resume-diagnose', handler: commandHandler }],
+            modelCapabilities: { supports: { vision: true } },
+            enableConfigDiscovery: true,
+            includeSubAgentStreamingEvents: false,
+            defaultAgent: { availableTools: ['read_file'] },
         });
 
         expect(client.resumeSession).toHaveBeenCalledWith(
@@ -135,6 +178,12 @@ describe('sdk/session/lifecycle core hardening', () => {
             expect.objectContaining({
                 gitHubToken: 'ghs_resume',
                 createSessionFsHandler: sessionFsHandler,
+                onElicitationRequest: elicitationHandler,
+                commands: [expect.objectContaining({ name: 'resume-diagnose', handler: commandHandler })],
+                modelCapabilities: { supports: { vision: true } },
+                enableConfigDiscovery: true,
+                includeSubAgentStreamingEvents: false,
+                defaultAgent: { availableTools: ['read_file'] },
             }),
         );
     });

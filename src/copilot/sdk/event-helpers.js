@@ -37,7 +37,8 @@
  * @returns {Promise<T>} Primeiro argumento emitido pelo evento
  */
 export function waitForEvent(emitter, event, opts = {}) {
-    const { timeoutMs = 30_000, timeoutError, signal } = opts;
+    const { timeoutError, signal } = opts;
+    const timeoutMs = opts.timeoutMs ?? (signal ? null : 30_000);
 
     return new Promise((resolve, reject) => {
         if (signal?.aborted) {
@@ -101,7 +102,8 @@ export function waitForEvent(emitter, event, opts = {}) {
  * @returns {Promise<{ event: string; data: unknown }>}
  */
 export function raceEvents(emitter, events, opts = {}) {
-    const { timeoutMs = 30_000, timeoutError, signal } = opts;
+    const { timeoutError, signal } = opts;
+    const timeoutMs = opts.timeoutMs ?? (signal ? null : 30_000);
 
     return new Promise((resolve, reject) => {
         if (signal?.aborted) {

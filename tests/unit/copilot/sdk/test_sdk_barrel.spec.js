@@ -75,6 +75,7 @@ describe('F86 - Barrel complete export coverage', () => {
             'getClientSession',
             'getClientState',
             'getClientStatus',
+            'getSdkConnectionCircuitBreaker',
             'incrementSessionMessageCount',
             'listActiveClientSessions',
             'listAllClientSessions',
@@ -109,6 +110,7 @@ describe('F86 - Barrel complete export coverage', () => {
         const names = [
             'CONNECTION_STATES',
             'INFINITE_SESSION_DEFAULTS',
+            'PERMISSION_COMPLETED_KINDS',
             'PERMISSION_RESULTS',
             'PROVIDER_TYPES',
             'REASONING_EFFORTS',
@@ -143,6 +145,7 @@ describe('F86 - Barrel complete export coverage', () => {
             'replaceSystemMessage',
             'sectionOverride',
             'supportsCustomizeMode',
+            'transformSection',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
@@ -174,6 +177,23 @@ describe('F86 - Barrel complete export coverage', () => {
             'quickResume',
             'quickSession',
             'shutdownClient',
+            'withSession',
+        ];
+        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
+    });
+
+    it('exports attachment and capability helpers', async () => {
+        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        const names = [
+            'blobAttachment',
+            'directoryAttachment',
+            'fileAttachment',
+            'normalizeAttachments',
+            'selectionAttachment',
+            'getSessionCapabilities',
+            'supportsElicitation',
+            'waitForElicitationCapability',
+            'watchCapabilities',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });

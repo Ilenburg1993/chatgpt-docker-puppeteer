@@ -75,6 +75,32 @@ export async function quickDisconnect(session) {
     await disconnectSession(session);
 }
 
+/**
+ * Cria uma sessão temporária, executa um callback e garante cleanup por `Symbol.asyncDispose` quando disponível.
+ *
+ * @template T
+ * @param {Partial<SessionCreateOptions>} opts
+ * @param {(result: SessionResult) => Promise<T> | T} fn
+ * @returns {Promise<T>}
+ */
+export async function withSession(opts, fn) {
+    if (typeof fn !== 'function') {
+        throw new TypeError('[sdk/client-facade] withSession requer callback fn');
+    }
+    const result = await quickSession(opts);
+    try {
+        return await fn(result);
+    } finally {
+        const disposable = /** @type {{ [Symbol.asyncDispose]?: () => Promise<void> }} */ (result.session);
+        const asyncDispose = disposable[Symbol.asyncDispose];
+        if (typeof asyncDispose === 'function') {
+            await asyncDispose();
+        } else {
+            await quickDisconnect(result.session);
+        }
+    }
+}
+
 // ─── ensureClient ─────────────────────────────────────────────────────────────
 
 /**

@@ -1249,3 +1249,37 @@ Leitura arquitetural:
 - `boot-steps` avança para papel de orquestrador de pipeline;
 - `agent-runtime-state` concentra a regra semântica de estado da shadow persistida;
 - o eixo de estado persistido continua saindo de chamadas ad hoc para façades explícitas.
+
+### 10.24 Checkpoint complementar — Bugfix de recursão no boot da LLM-B (2026-04-29)
+
+Estado complementar validado após incidente real em `npm run terminal:llm-b`:
+
+- o boot falhava com `RangeError: Maximum call stack size exceeded` no eixo
+  `AlwaysAliveAgent.pendingQuestion` ↔ `readRuntimeInteractionState()`;
+- causa raiz: as façades de `runtime-controls` ainda liam propriedades/getters do próprio
+  `AlwaysAliveAgent`, enquanto os getters do agent já delegavam para essas mesmas façades.
+
+Correção aplicada:
+
+- `agent/always-alive.js` passou a usar `this.ctx` como fonte para `runtime-controls` nesse eixo;
+- `agent/facades/agent-runtime-controls.js` passou a preferir métodos estáveis do `AgentContext`
+  (`getPendingQuestionForStatusSnapshot`, `getQueueSnapshot`, `getRuntimeStatus`, etc.) em vez de
+  depender de propriedades potencialmente recursivas do agent;
+- `sdk/session/client-facade.js` recebeu ajuste strict-safe em `Symbol.asyncDispose` durante a
+  rodada.
+
+Validação deste checkpoint:
+
+- `npm run typecheck:strict:src.copilot` ✅
+- `eslint` focado ✅
+- lote focado de regressão ✅
+  - `tests/unit/copilot/test_agent_runtime_controls.spec.js`
+  - `tests/unit/copilot/test_always_alive_delegation.spec.js`
+  - `tests/unit/copilot/contracts/test_lifecycle_boundary_block_b.spec.js`
+- `terminal:llm-b` voltou a subir sem stack overflow ✅
+
+Leitura arquitetural:
+
+- a purificação do runtime não pode introduzir loops semânticos entre getters do agent e façades;
+- façades devem preferir snapshots/métodos estáveis do `AgentContext` quando o owner alto nível já
+  delega leitura para elas.

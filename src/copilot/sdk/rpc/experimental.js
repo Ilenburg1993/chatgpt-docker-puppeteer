@@ -17,27 +17,11 @@
 import { toSdkOperationError } from '../errors.js';
 import { isExperimentalEnabled } from '../feature-flags.js';
 import { log as appLog } from '../logger.js';
+import { assertRpcSession } from './guards.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */
-
-/**
- * Valida a sessão e lança se inválida.
- *
- * @param {unknown} session
- * @param {string} caller
- * @returns {asserts session is CopilotSession}
- */
-function assertSession(session, caller) {
-    if (
-        !session ||
-        typeof session !== 'object' ||
-        typeof (/** @type {Record<string, unknown>} */ (session)['rpc']) !== 'object'
-    ) {
-        throw new TypeError(`[sdk/experimental-rpc/${caller}] CopilotSession inválida ou não conectada.`);
-    }
-}
 
 /**
  * Lança erro padrão quando uma feature experimental está desabilitada.
@@ -80,7 +64,7 @@ function getRpc(session) {
  */
 export async function fleetStart(session, options) {
     if (!isExperimentalEnabled('fleet')) throwNotEnabled('fleet', 'fleet.start');
-    assertSession(session, 'fleet.start');
+    assertRpcSession(session, 'fleet.start');
     appLog('INFO', `[sdk/experimental-rpc] fleet.start: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).fleet.start(options ?? {});
@@ -106,7 +90,7 @@ export async function fleetStart(session, options) {
  */
 export async function agentList(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.list');
-    assertSession(session, 'agent.list');
+    assertRpcSession(session, 'agent.list');
     appLog('DEBUG', `[sdk/experimental-rpc] agent.list: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).agent.list();
@@ -123,7 +107,7 @@ export async function agentList(session) {
  */
 export async function agentGetCurrent(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.getCurrent');
-    assertSession(session, 'agent.getCurrent');
+    assertRpcSession(session, 'agent.getCurrent');
     appLog('DEBUG', `[sdk/experimental-rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).agent.getCurrent();
@@ -141,7 +125,7 @@ export async function agentGetCurrent(session) {
  */
 export async function agentSelect(session, name) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.select');
-    assertSession(session, 'agent.select');
+    assertRpcSession(session, 'agent.select');
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/agent.select] name deve ser string não-vazia.');
     }
@@ -161,7 +145,7 @@ export async function agentSelect(session, name) {
  */
 export async function agentDeselect(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.deselect');
-    assertSession(session, 'agent.deselect');
+    assertRpcSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/experimental-rpc] agent.deselect: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).agent.deselect();
@@ -178,7 +162,7 @@ export async function agentDeselect(session) {
  */
 export async function agentReload(session) {
     if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.reload');
-    assertSession(session, 'agent.reload');
+    assertRpcSession(session, 'agent.reload');
     appLog('INFO', `[sdk/experimental-rpc] agent.reload: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).agent.reload();
@@ -211,7 +195,7 @@ export async function agentReload(session) {
  */
 export async function skillsList(session) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.list');
-    assertSession(session, 'skills.list');
+    assertRpcSession(session, 'skills.list');
     appLog('DEBUG', `[sdk/experimental-rpc] skills.list: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).skills.list();
@@ -229,7 +213,7 @@ export async function skillsList(session) {
  */
 export async function skillsEnable(session, name) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.enable');
-    assertSession(session, 'skills.enable');
+    assertRpcSession(session, 'skills.enable');
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.enable] name deve ser string não-vazia.');
     }
@@ -250,7 +234,7 @@ export async function skillsEnable(session, name) {
  */
 export async function skillsDisable(session, name) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.disable');
-    assertSession(session, 'skills.disable');
+    assertRpcSession(session, 'skills.disable');
     if (typeof name !== 'string' || name.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/skills.disable] name deve ser string não-vazia.');
     }
@@ -270,7 +254,7 @@ export async function skillsDisable(session, name) {
  */
 export async function skillsReload(session) {
     if (!isExperimentalEnabled('skills')) throwNotEnabled('skills', 'skills.reload');
-    assertSession(session, 'skills.reload');
+    assertRpcSession(session, 'skills.reload');
     appLog('INFO', `[sdk/experimental-rpc] skills.reload: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).skills.reload();
@@ -301,7 +285,7 @@ export async function skillsReload(session) {
  */
 export async function mcpList(session) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.list');
-    assertSession(session, 'mcp.list');
+    assertRpcSession(session, 'mcp.list');
     appLog('DEBUG', `[sdk/experimental-rpc] mcp.list: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).mcp.list();
@@ -319,7 +303,7 @@ export async function mcpList(session) {
  */
 export async function mcpEnable(session, serverName) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.enable');
-    assertSession(session, 'mcp.enable');
+    assertRpcSession(session, 'mcp.enable');
     if (typeof serverName !== 'string' || serverName.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.enable] serverName deve ser string não-vazia.');
     }
@@ -340,7 +324,7 @@ export async function mcpEnable(session, serverName) {
  */
 export async function mcpDisable(session, serverName) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.disable');
-    assertSession(session, 'mcp.disable');
+    assertRpcSession(session, 'mcp.disable');
     if (typeof serverName !== 'string' || serverName.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/mcp.disable] serverName deve ser string não-vazia.');
     }
@@ -360,7 +344,7 @@ export async function mcpDisable(session, serverName) {
  */
 export async function mcpReload(session) {
     if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.reload');
-    assertSession(session, 'mcp.reload');
+    assertRpcSession(session, 'mcp.reload');
     appLog('INFO', `[sdk/experimental-rpc] mcp.reload: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).mcp.reload();
@@ -385,7 +369,7 @@ export async function mcpReload(session) {
  */
 export async function pluginsList(session) {
     if (!isExperimentalEnabled('plugins')) throwNotEnabled('plugins', 'plugins.list');
-    assertSession(session, 'plugins.list');
+    assertRpcSession(session, 'plugins.list');
     appLog('DEBUG', `[sdk/experimental-rpc] plugins.list: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).plugins.list();
@@ -417,7 +401,7 @@ export async function pluginsList(session) {
  */
 export async function extensionsList(session) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.list');
-    assertSession(session, 'extensions.list');
+    assertRpcSession(session, 'extensions.list');
     appLog('DEBUG', `[sdk/experimental-rpc] extensions.list: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).extensions.list();
@@ -435,7 +419,7 @@ export async function extensionsList(session) {
  */
 export async function extensionsEnable(session, id) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.enable');
-    assertSession(session, 'extensions.enable');
+    assertRpcSession(session, 'extensions.enable');
     if (typeof id !== 'string' || id.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.enable] id deve ser string não-vazia.');
     }
@@ -456,7 +440,7 @@ export async function extensionsEnable(session, id) {
  */
 export async function extensionsDisable(session, id) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.disable');
-    assertSession(session, 'extensions.disable');
+    assertRpcSession(session, 'extensions.disable');
     if (typeof id !== 'string' || id.length === 0) {
         throw new TypeError('[sdk/experimental-rpc/extensions.disable] id deve ser string não-vazia.');
     }
@@ -476,7 +460,7 @@ export async function extensionsDisable(session, id) {
  */
 export async function extensionsReload(session) {
     if (!isExperimentalEnabled('extensions')) throwNotEnabled('extensions', 'extensions.reload');
-    assertSession(session, 'extensions.reload');
+    assertRpcSession(session, 'extensions.reload');
     appLog('INFO', `[sdk/experimental-rpc] extensions.reload: sessionId='${session.sessionId}'`);
     try {
         return await getRpc(session).extensions.reload();

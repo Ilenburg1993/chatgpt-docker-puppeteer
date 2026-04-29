@@ -2,8 +2,8 @@
 /**
  * src/copilot/lib/http-request.js
  *
- * Helper HTTP genérico para chamadas internas (loopback) usando URL completa. Centraliza o padrão de `http.request` com
- * limite de resposta e timeout.
+ * Helper HTTP(S) genérico para chamadas internas usando URL completa. Centraliza timeout, limite de resposta e
+ * validação explícita de protocolo.
  *
  * @module copilot/lib/http-request
  * @see EventBus
@@ -11,9 +11,10 @@
  */
 
 import http from 'node:http';
+import https from 'node:https';
 
 /**
- * Executa uma requisição HTTP simples para URLs `http://`.
+ * Executa uma requisição HTTP(S) simples para URLs `http://` e `https://`.
  *
  * @example
  *     const { statusCode, body } = await httpRequest('GET', 'http://localhost:3009/health');
@@ -27,7 +28,18 @@ import http from 'node:http';
  */
 export function httpRequest(method, urlStr, body = null, timeoutMs = 5000, maxResponseBytes = 1024 * 1024) {
     return new Promise((resolve, reject) => {
-        const url = new URL(urlStr);
+        let url;
+        try {
+            url = new URL(urlStr);
+        } catch {
+            reject(new TypeError(`[http-request] URL inválida: ${urlStr}`));
+            return;
+        }
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            reject(new TypeError(`[http-request] protocolo não suportado: ${url.protocol}`));
+            return;
+        }
+        const transport = url.protocol === 'https:' ? https : http;
         const options = {
             hostname: url.hostname,
             port: url.port,
@@ -39,7 +51,7 @@ export function httpRequest(method, urlStr, body = null, timeoutMs = 5000, maxRe
             options.headers['Content-Type'] = 'application/json';
             options.headers['Content-Length'] = String(Buffer.byteLength(body));
         }
-        const req = http.request(options, (res) => {
+        const req = transport.request(options, (res) => {
             let data = '';
             let received = 0;
             res.on('data', (/** @type {Buffer} */ chunk) => {

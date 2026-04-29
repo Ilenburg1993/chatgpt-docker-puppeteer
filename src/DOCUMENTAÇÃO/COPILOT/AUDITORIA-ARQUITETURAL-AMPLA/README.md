@@ -75,6 +75,7 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 48    | `48-MAPEAMENTO-ALWAYSALIVE-RUNTIME-CONTROLS-E-DIALOG.md`              | mapeamento da delegação de `AlwaysAliveAgent` para `runtime-controls` e `dialog-runtime`     |
 | 49    | `49-MAPEAMENTO-ALWAYSALIVE-RUNTIME-GOVERNANCE-E-CAPABILITIES.md`      | mapeamento da delegação de governança/capabilities para `agent-runtime-controls`             |
 | 50    | `50-MAPEAMENTO-BOOTSTEPS-SHADOW-REAPER-RUNTIME-STATE.md`              | mapeamento da extração do reaper de shadow de `boot-steps` para `agent-runtime-state`        |
+| 51    | `51-BUGFIX-RECURSAO-ALWAYSALIVE-RUNTIME-CONTROLS-LLMB.md`             | correção do stack overflow no boot da LLM-B por recursão entre `AlwaysAliveAgent` e façades  |
 
 ---
 
@@ -173,6 +174,9 @@ Na transição para o Bloco B, o pacote já passa a incluir também:
   inspeção direta de `ctx` no reaper de `pendingQuestionShadow` em `boot-steps.js`, agora delegada
   para `shouldReapAgentRuntimePendingQuestionShadow()` na façade `agent-runtime-state`, com seam
   dedicada para impedir regressão.
+- checkpoint complementar de bugfix live (`51`), cobrindo a recursão entre `AlwaysAliveAgent` e
+  `agent-runtime-controls` que derrubava o boot de `terminal:llm-b`, além do endurecimento da
+  preferência por métodos estáveis do `AgentContext` nas façades de runtime.
 
 ---
 

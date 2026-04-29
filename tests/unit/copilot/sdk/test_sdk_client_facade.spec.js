@@ -101,6 +101,7 @@ import {
     quickResume,
     quickSession,
     shutdownClient,
+    withSession,
 } from '../../../../src/copilot/sdk/session/client-facade.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -154,6 +155,27 @@ describe('quickResume()', () => {
 describe('quickDisconnect()', () => {
     it('delega para disconnectSession', async () => {
         await quickDisconnect(/** @type {any} */ (mockSession));
+        expect(mockDisconnectSession).toHaveBeenCalledWith(mockSession);
+    });
+});
+
+describe('withSession()', () => {
+    it('executa callback e usa Symbol.asyncDispose quando disponível', async () => {
+        const asyncDispose = vi.fn().mockResolvedValue(undefined);
+        mockCreateSession.mockResolvedValueOnce({
+            ...mockResult,
+            session: { ...mockSession, [Symbol.asyncDispose]: asyncDispose },
+        });
+
+        const result = await withSession({ model: 'gpt-4.1' }, async ({ sessionId }) => `ok:${sessionId}`);
+
+        expect(result).toBe('ok:sess-123');
+        expect(asyncDispose).toHaveBeenCalledOnce();
+        expect(mockDisconnectSession).not.toHaveBeenCalled();
+    });
+
+    it('usa disconnectSession como fallback de cleanup', async () => {
+        await withSession({}, () => 'done');
         expect(mockDisconnectSession).toHaveBeenCalledWith(mockSession);
     });
 });
@@ -213,5 +235,6 @@ describe('sdk/index.js barrel re-exports client-facade', () => {
         expect(typeof barrel.ensureClient).toBe('function');
         expect(typeof barrel.shutdownClient).toBe('function');
         expect(typeof barrel.isClientReady).toBe('function');
+        expect(typeof barrel.withSession).toBe('function');
     });
 });

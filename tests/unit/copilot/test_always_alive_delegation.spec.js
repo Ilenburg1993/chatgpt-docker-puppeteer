@@ -116,9 +116,16 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
 
     // ─── Getters sem acoplamento direto ao ctx ─────────────────────────────
 
-    it('não mantém chamadas diretas a this.ctx.* no corpo da classe', () => {
-        const ctxGets = (src.match(/this\.ctx\./g) || []).length;
-        assert.equal(ctxGets, 0, `esperado zero chamadas diretas a this.ctx.*, encontrado: ${ctxGets}`);
+    it('usa this.ctx apenas como argumento para façades, não para chamadas cruas de método', () => {
+        assert.ok(!src.includes('this.ctx.getPermissionModeSnapshot()'));
+        assert.ok(!src.includes('this.ctx.setPermissionMode('));
+        assert.ok(!src.includes('this.ctx.getPermissionCapabilitySnapshot()'));
+        assert.ok(!src.includes('this.ctx.getContextFactoryCapabilitiesSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getToolRegistrySnapshot()'));
+        assert.ok(!src.includes('this.ctx.getToolRegistryEntriesSnapshot()'));
+        assert.ok(!src.includes('this.ctx.getRuntimeStatus()'));
+        assert.ok(!src.includes('this.ctx.isDialogLoopActive()'));
+        assert.ok(!src.includes('this.ctx.getHandoffManagerSnapshot()'));
     });
 
     it('apenas 3 métodos privados restam (#setStatus, #processQueue, #tryReconnect)', () => {
@@ -141,19 +148,19 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     });
 
     it('status/dialogLoopActive/queueSize/pendingQuestion/shadow não tocam ctx diretamente', () => {
-        assert.ok(src.includes('readRuntimeControlState(this).status'));
-        assert.ok(src.includes('readRuntimeControlState(this).dialogLoopActive'));
-        assert.ok(src.includes('readRuntimeControlState(this).queueSize'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestion'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionKind'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadow'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowKind'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowState'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowExpired'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowAgeMs'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowExpiresAt'));
-        assert.ok(src.includes('readRuntimeInteractionState(this).pendingQuestionShadowRemainingMs'));
-        assert.ok(src.includes('getRuntimeHandoffManager(this)'));
+        assert.ok(src.includes('readRuntimeControlState(this.ctx).status'));
+        assert.ok(src.includes('readRuntimeControlState(this.ctx).dialogLoopActive'));
+        assert.ok(src.includes('readRuntimeControlState(this.ctx).queueSize'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestion'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionKind'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadow'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowKind'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowState'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpired'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowAgeMs'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpiresAt'));
+        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowRemainingMs'));
+        assert.ok(src.includes('getRuntimeHandoffManager(this.ctx)'));
         assert.ok(!src.includes('this.ctx.getRuntimeStatus()'));
         assert.ok(!src.includes('this.ctx.isDialogLoopActive()'));
         assert.ok(!src.includes('this.ctx.getHandoffManagerSnapshot()'));
@@ -167,6 +174,15 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
         assert.ok(!src.includes('this.ctx.getPendingQuestionShadowAgeMs()'));
         assert.ok(!src.includes('this.ctx.getPendingQuestionShadowExpiresAt()'));
         assert.ok(!src.includes('this.ctx.getPendingQuestionShadowRemainingMs()'));
+    });
+
+    it('usa AgentContext nas façades de runtime-controls para evitar recursão via getters do próprio agent', () => {
+        assert.ok(!src.includes('readRuntimeControlState(this).status'));
+        assert.ok(!src.includes('readRuntimeControlState(this).dialogLoopActive'));
+        assert.ok(!src.includes('readRuntimeControlState(this).queueSize'));
+        assert.ok(!src.includes('readRuntimeInteractionState(this).pendingQuestion'));
+        assert.ok(!src.includes('readRuntimeInteractionState(this).pendingQuestionShadow'));
+        assert.ok(!src.includes('getRuntimeHandoffManager(this)'));
     });
 
     it('permission/capabilities/tool registry não tocam ctx diretamente', () => {

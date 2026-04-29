@@ -180,16 +180,16 @@ describe('sdk/permissions.js', () => {
             expect(result.kind).toBe('approve-once');
         });
 
-        it('onRequest: falha é normalizada como SdkOperationError', async () => {
+        it('onRequest: falha nega por segurança sem propagar exceção ao SDK', async () => {
             const handler = perms.createPermissionHandler({
                 onRequest: () => {
                     throw new Error('boom');
                 },
             });
-            await expect(handler(makeRequest('safe_tool'), { sessionId: 's1' })).rejects.toMatchObject({
-                name: 'SdkOperationError',
-                operation: 'permissions.onRequest',
+            await expect(handler(makeRequest('safe_tool'), { sessionId: 's1' })).resolves.toMatchObject({
+                kind: 'reject',
             });
+            expect(mockLog).toHaveBeenCalledWith('WARN', expect.stringContaining('negando por segurança'));
         });
 
         it('auditMode: loga sem negar', async () => {

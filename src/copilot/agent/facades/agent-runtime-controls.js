@@ -15,14 +15,30 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
 /**
  * @typedef {{
  *     getHandoffManager?: (() => import('../infra/handoff-manager.js').HandoffManager | null) | undefined;
+ *     getHandoffManagerSnapshot?: (() => import('../infra/handoff-manager.js').HandoffManager | null) | undefined;
+ *     getRuntimeStatus?: (() => string) | undefined;
+ *     getModelSnapshot?: (() => string) | undefined;
+ *     getReasoningEffortSnapshot?: (() => string | undefined) | undefined;
+ *     getQueueSnapshot?: (() => { size: number }) | undefined;
+ *     getPendingQuestionForStatusSnapshot?: (() => import('../types.js').PendingQuestion | null) | undefined;
+ *     getPendingQuestionKind?: (() => import('../types.js').PendingQuestionKind | null) | undefined;
+ *     getPendingQuestionShadowSnapshot?: (() => import('../types.js').PendingQuestionShadow | null) | undefined;
+ *     getPendingQuestionShadowKind?: (() => import('../types.js').PendingQuestionKind | null) | undefined;
+ *     getPendingQuestionShadowState?: (() => import('../types.js').PendingQuestionShadowState | null) | undefined;
+ *     isPendingQuestionShadowExpired?: (() => boolean) | undefined;
+ *     getPendingQuestionShadowAgeMs?: (() => number | null) | undefined;
+ *     getPendingQuestionShadowExpiresAt?: (() => number | null) | undefined;
+ *     getPendingQuestionShadowRemainingMs?: (() => number | null) | undefined;
+ *     isDialogLoopActive?: (() => boolean) | undefined;
+ *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     start?: (() => Promise<void>) | undefined;
  *     abortCurrentMessage?: (() => Promise<void>) | undefined;
  *     answerPendingQuestion?: ((answer: string) => boolean) | undefined;
- *     clearPendingQuestionShadow?: (() => boolean) | undefined;
+ *     clearPendingQuestionShadow?: (() => void) | undefined;
  *     on?: ((event: string, handler: (...args: any[]) => void) => unknown) | undefined;
  *     once?: ((event: string, handler: (...args: any[]) => void) => unknown) | undefined;
  *     off?: ((event: string, handler: (...args: any[]) => void) => unknown) | undefined;
- *     pauseDialogLoop?: (() => Promise<void>) | undefined;
+ *     pauseDialogLoop?: ((sessionId: string | null) => Promise<void>) | undefined;
  *     resumeDialogLoop?: (() => Promise<void>) | undefined;
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
@@ -122,15 +138,18 @@ export function readRuntimeControlState(runtime) {
     const health = readAgentRuntimeHealthSnapshot(/** @type {import('../types.js').IAlwaysAliveAgent} */ (runtime));
     const dialogChecks =
         health && typeof health.checks?.dialog === 'object' ? health.checks.dialog : /** @type {any} */ (null);
+    const queueSnapshot = runtime.getQueueSnapshot?.();
 
     return {
-        status: String(snap['status'] ?? 'unknown'),
-        model: String(snap['model'] ?? 'unknown'),
-        reasoningEffort: String(snap['reasoningEffort'] ?? 'off'),
+        status: String(runtime.getRuntimeStatus?.() ?? snap['status'] ?? 'unknown'),
+        model: String(runtime.getModelSnapshot?.() ?? snap['model'] ?? 'unknown'),
+        reasoningEffort: String(runtime.getReasoningEffortSnapshot?.() ?? snap['reasoningEffort'] ?? 'off'),
         sessionId: typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null,
-        dialogLoopActive: Boolean(health?.dialogLoopActive ?? runtime.dialogLoopActive),
-        dialogPaused: Boolean(dialogChecks?.paused ?? runtime.dialogPaused),
-        queueSize: Number(snap['queueSize'] ?? 0),
+        dialogLoopActive: Boolean(
+            health?.dialogLoopActive ?? runtime.isDialogLoopActive?.() ?? runtime.dialogLoopActive,
+        ),
+        dialogPaused: Boolean(dialogChecks?.paused ?? runtime.isDialogLoopPaused?.() ?? runtime.dialogPaused),
+        queueSize: Number(queueSnapshot?.size ?? snap['queueSize'] ?? 0),
     };
 }
 
@@ -157,15 +176,18 @@ export function readRuntimePrBudgetSnapshot(runtime) {
 export function readRuntimeInteractionState(runtime) {
     const snap = readAgentRuntimeStatusSnapshot(/** @type {import('../types.js').IAlwaysAliveAgent} */ (runtime));
     const pendingQuestion =
+        runtime.getPendingQuestionForStatusSnapshot?.() ??
         runtime.pendingQuestion ??
         /** @type {import('../types.js').PendingQuestion | null} */ (snap['pendingQuestion'] ?? null);
-    const pendingQuestionShadow = runtime.pendingQuestionShadow ?? null;
+    const pendingQuestionShadow = runtime.getPendingQuestionShadowSnapshot?.() ?? runtime.pendingQuestionShadow ?? null;
     const pendingQuestionKind =
+        runtime.getPendingQuestionKind?.() ??
         runtime.pendingQuestionKind ??
         (pendingQuestion && typeof pendingQuestion === 'object' && typeof pendingQuestion.kind === 'string'
             ? pendingQuestion.kind
             : null);
     const pendingQuestionShadowKind =
+        runtime.getPendingQuestionShadowKind?.() ??
         runtime.pendingQuestionShadowKind ??
         (pendingQuestionShadow &&
         typeof pendingQuestionShadow === 'object' &&
@@ -175,8 +197,13 @@ export function readRuntimeInteractionState(runtime) {
             ? pendingQuestionShadow.meta.kind
             : null);
     const pendingQuestionShadowState =
+        runtime.getPendingQuestionShadowState?.() ??
         runtime.pendingQuestionShadowState ??
-        (pendingQuestionShadow !== null ? (runtime.pendingQuestionShadowExpired ? 'expired' : 'active') : null);
+        (pendingQuestionShadow !== null
+            ? (runtime.isPendingQuestionShadowExpired?.() ?? runtime.pendingQuestionShadowExpired)
+                ? 'expired'
+                : 'active'
+            : null);
 
     return {
         pendingQuestion,
@@ -184,10 +211,15 @@ export function readRuntimeInteractionState(runtime) {
         pendingQuestionShadow,
         pendingQuestionShadowKind,
         pendingQuestionShadowState,
-        pendingQuestionShadowExpired: Boolean(runtime.pendingQuestionShadowExpired),
-        pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs ?? null,
-        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt ?? null,
-        pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs ?? null,
+        pendingQuestionShadowExpired: Boolean(
+            runtime.isPendingQuestionShadowExpired?.() ?? runtime.pendingQuestionShadowExpired,
+        ),
+        pendingQuestionShadowAgeMs:
+            runtime.getPendingQuestionShadowAgeMs?.() ?? runtime.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt:
+            runtime.getPendingQuestionShadowExpiresAt?.() ?? runtime.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs:
+            runtime.getPendingQuestionShadowRemainingMs?.() ?? runtime.pendingQuestionShadowRemainingMs ?? null,
     };
 }
 
@@ -294,7 +326,11 @@ export function answerRuntimePendingQuestion(runtime, answer) {
  * @returns {boolean}
  */
 export function clearRuntimePendingQuestionShadow(runtime) {
-    return typeof runtime.clearPendingQuestionShadow === 'function' ? runtime.clearPendingQuestionShadow() : false;
+    if (typeof runtime.clearPendingQuestionShadow !== 'function') {
+        return false;
+    }
+    runtime.clearPendingQuestionShadow();
+    return true;
 }
 
 /**
@@ -333,7 +369,7 @@ export function offRuntimeEvent(runtime, event, handler) {
  */
 export async function pauseRuntimeDialogLoop(runtime) {
     if (typeof runtime.pauseDialogLoop !== 'function') throw new Error('AGENT_RUNTIME_DIALOG_PAUSE_UNAVAILABLE');
-    await runtime.pauseDialogLoop();
+    await runtime.pauseDialogLoop(null);
 }
 
 /**
@@ -350,7 +386,7 @@ export async function resumeRuntimeDialogLoop(runtime) {
  * @returns {import('../infra/handoff-manager.js').HandoffManager | null}
  */
 export function getRuntimeHandoffManager(runtime) {
-    return runtime.getHandoffManager?.() ?? null;
+    return runtime.getHandoffManagerSnapshot?.() ?? runtime.getHandoffManager?.() ?? null;
 }
 
 /**

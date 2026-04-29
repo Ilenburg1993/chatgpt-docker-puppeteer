@@ -267,7 +267,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return /** @type {AgentStatus} */ (readRuntimeControlState(this).status);
+        return /** @type {AgentStatus} */ (readRuntimeControlState(this.ctx).status);
     }
 
     /**
@@ -276,7 +276,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogLoopActive() {
-        return readRuntimeControlState(this).dialogLoopActive;
+        return readRuntimeControlState(this.ctx).dialogLoopActive;
     }
 
     /**
@@ -285,7 +285,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./infra/handoff-manager.js').HandoffManager | null}
      */
     getHandoffManager() {
-        return getRuntimeHandoffManager(this);
+        return getRuntimeHandoffManager(this.ctx);
     }
 
     /**
@@ -294,7 +294,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number}
      */
     get queueSize() {
-        return readRuntimeControlState(this).queueSize;
+        return readRuntimeControlState(this.ctx).queueSize;
     }
 
     /**
@@ -303,7 +303,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return readRuntimeInteractionState(this).pendingQuestion;
+        return readRuntimeInteractionState(this.ctx).pendingQuestion;
     }
 
     /**
@@ -312,7 +312,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionKind() {
-        return readRuntimeInteractionState(this).pendingQuestionKind;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionKind;
     }
 
     /**
@@ -321,7 +321,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadow | null}
      */
     get pendingQuestionShadow() {
-        return readRuntimeInteractionState(this).pendingQuestionShadow;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadow;
     }
 
     /**
@@ -330,7 +330,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionShadowKind() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowKind;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowKind;
     }
 
     /**
@@ -339,7 +339,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadowState | null}
      */
     get pendingQuestionShadowState() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowState;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowState;
     }
 
     /**
@@ -348,7 +348,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get pendingQuestionShadowExpired() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowExpired;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpired;
     }
 
     /**
@@ -357,7 +357,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowAgeMs() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowAgeMs;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowAgeMs;
     }
 
     /**
@@ -366,7 +366,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowExpiresAt() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowExpiresAt;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpiresAt;
     }
 
     /**
@@ -375,7 +375,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowRemainingMs() {
-        return readRuntimeInteractionState(this).pendingQuestionShadowRemainingMs;
+        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowRemainingMs;
     }
 
     /**

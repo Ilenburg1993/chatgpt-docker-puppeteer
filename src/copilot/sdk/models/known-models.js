@@ -114,6 +114,15 @@ export const KNOWN_MODELS = Object.freeze([
         aliases: [],
     },
     {
+        id: 'claude-sonnet-4-5',
+        costTier: /** @type {CostTier} */ ('high'),
+        speedTier: /** @type {SpeedTier} */ ('medium'),
+        contextWindow: 200_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        aliases: ['claude-4.5-sonnet', 'claude-sonnet-4.5', 'sonnet-4.5'],
+    },
+    {
         id: 'claude-sonnet-4',
         costTier: /** @type {CostTier} */ ('high'),
         speedTier: /** @type {SpeedTier} */ ('medium'),

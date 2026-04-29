@@ -57,14 +57,20 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
  * @property {PermissionHandler} [onPermissionRequest] - Handler de permissoes (default: approveAll)
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest] - Handler de input interativo do usuario
+ * @property {SessionConfig['onElicitationRequest']} [onElicitationRequest] - Handler de elicitation/form UI do SDK
  * @property {SessionConfig['hooks']} [hooks] - SessionHooks: onPreToolUse, onPostToolUse, onSessionStart, etc.
  * @property {ToolList} [tools] - Custom Tools a registrar na sessao
+ * @property {SessionConfig['commands']} [commands] - Slash commands registrados na sessão
  * @property {InfiniteSessionOptions} [infiniteSessions] - Configuracao de InfiniteSession
  * @property {boolean | object} [systemMessage] - false para desabilitar, objeto para customizar
  * @property {string} [systemMessageContent] - Conteudo a injetar em guidelines.append
  * @property {string} [workingDirectory] - Diretorio de trabalho da sessao
+ * @property {SessionConfig['modelCapabilities']} [modelCapabilities] - Overrides granulares de capabilities do modelo
+ * @property {boolean} [enableConfigDiscovery] - Descobrir MCP/skills/configs a partir do workingDirectory
+ * @property {boolean} [includeSubAgentStreamingEvents] - Incluir deltas de streaming de subagentes
  * @property {Record<string, import('@github/copilot-sdk').MCPServerConfig>} [mcpServers] - MCP servers para a sessao
  * @property {import('@github/copilot-sdk').CustomAgentConfig[]} [customAgents] - Agentes customizados
+ * @property {SessionConfig['defaultAgent']} [defaultAgent] - Configuração do agente default da sessão
  * @property {boolean} [streaming] - Habilitar streaming (default: true)
  * @property {string[]} [availableTools] - Lista de tools permitidas (overrides excludedTools)
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
@@ -85,14 +91,20 @@ import { listModels, resolveModelIdAuto } from '../models/index.js';
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforço de reasoning para a sessão retomada
  * @property {PermissionHandler} [onPermissionRequest]
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest]
+ * @property {SessionConfig['onElicitationRequest']} [onElicitationRequest]
  * @property {SessionConfig['hooks']} [hooks]
  * @property {ToolList} [tools]
+ * @property {SessionConfig['commands']} [commands]
  * @property {InfiniteSessionOptions} [infiniteSessions] - Configuração de InfiniteSession
  * @property {boolean | object} [systemMessage]
  * @property {string} [systemMessageContent]
  * @property {string} [workingDirectory] - Diretório de trabalho da sessão
+ * @property {SessionConfig['modelCapabilities']} [modelCapabilities] - Overrides granulares de capabilities do modelo
+ * @property {boolean} [enableConfigDiscovery] - Descobrir MCP/skills/configs a partir do workingDirectory
+ * @property {boolean} [includeSubAgentStreamingEvents] - Incluir deltas de streaming de subagentes
  * @property {Record<string, import('@github/copilot-sdk').MCPServerConfig>} [mcpServers] - MCP servers da sessão
  * @property {import('@github/copilot-sdk').CustomAgentConfig[]} [customAgents] - Agentes customizados
+ * @property {SessionConfig['defaultAgent']} [defaultAgent] - Configuração do agente default da sessão
  * @property {boolean} [streaming]
  * @property {string[]} [availableTools] - Lista de tools permitidas
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
@@ -285,6 +297,23 @@ function buildInfiniteSessionConfig(opts) {
 }
 
 /**
+ * Reasoning effort default aplicado ao fallback `gpt-5-mini`.
+ *
+ * @returns {ReasoningEffortLevel}
+ */
+function getDefaultGpt5MiniReasoningEffort() {
+    const configured = process.env['COPILOT_GPT5_MINI_REASONING_EFFORT'];
+    const valid = /** @type {ReasoningEffortLevel[]} */ (Object.values(REASONING_EFFORTS));
+    if (configured && valid.includes(/** @type {ReasoningEffortLevel} */ (configured))) {
+        return /** @type {ReasoningEffortLevel} */ (configured);
+    }
+    if (configured) {
+        log('WARN', `[lib/session] COPILOT_GPT5_MINI_REASONING_EFFORT='${configured}' inválido; usando high.`);
+    }
+    return REASONING_EFFORTS.HIGH;
+}
+
+/**
  * Monta o SessionConfig para createSession/resumeSession, usando objeto tipado com chaves condicionais.
  *
  * @param {SessionCreateOptions | SessionResumeOptions} opts
@@ -318,9 +347,15 @@ function buildSessionConfig(opts, mode) {
             }
             cfg.reasoningEffort = /** @type {ReasoningEffortLevel} */ (co.reasoningEffort);
         }
+        if (co.modelCapabilities !== undefined) cfg.modelCapabilities = co.modelCapabilities;
+        if (co.enableConfigDiscovery !== undefined) cfg.enableConfigDiscovery = co.enableConfigDiscovery;
         if (co.workingDirectory !== undefined) cfg.workingDirectory = co.workingDirectory;
+        if (co.includeSubAgentStreamingEvents !== undefined) {
+            cfg.includeSubAgentStreamingEvents = co.includeSubAgentStreamingEvents;
+        }
         if (co.mcpServers !== undefined) cfg.mcpServers = co.mcpServers;
         if (co.customAgents !== undefined) cfg.customAgents = co.customAgents;
+        if (co.defaultAgent !== undefined) cfg.defaultAgent = co.defaultAgent;
         if (co.availableTools !== undefined) cfg.availableTools = co.availableTools;
         if (co.excludedTools !== undefined) cfg.excludedTools = co.excludedTools;
         if (co.provider !== undefined) cfg.provider = co.provider;
@@ -339,6 +374,7 @@ function buildSessionConfig(opts, mode) {
     }
 
     if (opts.onUserInputRequest !== undefined) cfg.onUserInputRequest = opts.onUserInputRequest;
+    if (opts.onElicitationRequest !== undefined) cfg.onElicitationRequest = opts.onElicitationRequest;
 
     // RF-PR-01: compor hooks — onErrorOccurred com retry automático está em buildErrorOccurredHandler() (hooks.js)
     // e é o default de createHooks(). Preservamos hooks do usuário sem sobrescrever.
@@ -347,6 +383,7 @@ function buildSessionConfig(opts, mode) {
     }
 
     if (opts.tools !== undefined) cfg.tools = opts.tools;
+    if (opts.commands !== undefined) cfg.commands = opts.commands;
 
     // RF-PR-06: disableResume — reconexão silenciosa sem emitir session.resume
     if (mode === 'resume') {
@@ -363,9 +400,15 @@ function buildSessionConfig(opts, mode) {
             }
             cfg.reasoningEffort = /** @type {ReasoningEffortLevel} */ (ro.reasoningEffort);
         }
+        if (ro.modelCapabilities !== undefined) cfg.modelCapabilities = ro.modelCapabilities;
+        if (ro.enableConfigDiscovery !== undefined) cfg.enableConfigDiscovery = ro.enableConfigDiscovery;
         if (ro.workingDirectory !== undefined) cfg.workingDirectory = ro.workingDirectory;
+        if (ro.includeSubAgentStreamingEvents !== undefined) {
+            cfg.includeSubAgentStreamingEvents = ro.includeSubAgentStreamingEvents;
+        }
         if (ro.mcpServers !== undefined) cfg.mcpServers = ro.mcpServers;
         if (ro.customAgents !== undefined) cfg.customAgents = ro.customAgents;
+        if (ro.defaultAgent !== undefined) cfg.defaultAgent = ro.defaultAgent;
         if (ro.availableTools !== undefined) cfg.availableTools = ro.availableTools;
         if (ro.excludedTools !== undefined) cfg.excludedTools = ro.excludedTools;
         if (ro.provider !== undefined) cfg.provider = ro.provider;
@@ -462,9 +505,9 @@ export async function createSession(client, opts) {
         }
     }
 
-    // Regra canônica: fallback gpt-5-mini deve usar reasoning high quando não houver effort explícito.
+    // Regra canônica: fallback gpt-5-mini deve usar reasoning high por padrão, configurável por env.
     if (!reasoningEffort && model === 'gpt-5-mini') {
-        reasoningEffort = REASONING_EFFORTS.HIGH;
+        reasoningEffort = getDefaultGpt5MiniReasoningEffort();
     }
 
     const config = buildSessionConfig({ ...options, model, ...(reasoningEffort ? { reasoningEffort } : {}) }, 'create');

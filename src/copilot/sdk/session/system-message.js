@@ -153,6 +153,20 @@ export function sectionOverride(action, content) {
 }
 
 /**
+ * Atalho explícito para `SectionTransformFn`, útil quando o override precisa calcular a seção a partir do conteúdo
+ * atual fornecido pelo SDK.
+ *
+ * @param {SectionTransformFn} transform
+ * @returns {SectionOverride}
+ */
+export function transformSection(transform) {
+    if (typeof transform !== 'function') {
+        throw new TypeError('[sdk/system-message] transformSection: transform deve ser função');
+    }
+    return sectionOverride(transform);
+}
+
+/**
  * Atalho: cria um customize config que adiciona conteúdo à seção `guidelines`.
  *
  * @param {string} content - Conteúdo a ser adicionado

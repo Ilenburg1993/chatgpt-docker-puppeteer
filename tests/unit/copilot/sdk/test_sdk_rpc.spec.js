@@ -118,6 +118,11 @@ describe('sdk/rpc — Core Subsystems', () => {
         it('rejeita para sessão sem rpc', async () => {
             await expect(modelGetCurrent({ sessionId: 'x' })).rejects.toThrow('sem RPC');
         });
+
+        it('rejeita resposta do SDK sem modelId', async () => {
+            const s = fakeSession({ model: { getCurrent: vi.fn().mockResolvedValue({}), switchTo: vi.fn() } });
+            await expect(modelGetCurrent(s)).rejects.toThrow('resposta sem modelId');
+        });
     });
 
     describe('model.switchTo', () => {

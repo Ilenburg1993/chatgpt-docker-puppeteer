@@ -13,7 +13,6 @@
  */
 
 import { approveAll } from '@github/copilot-sdk';
-import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 
 // Re-export canônico do SDK
@@ -31,7 +30,8 @@ export { approveAll };
  * @typedef {object} PermissionHandlerConfig
  * @property {boolean} [allowAll=false] - Aprovar tudo (semântica approveAll). Default is `false`
  * @property {string[]} [allowTools] - Whitelist de nomes de tools permitidas
- * @property {PermissionRequest['kind'][]} [denyKinds] - Blacklist por tipo canônico do SDK
+ * @property {PermissionRequest['kind'][]} [denyKinds] - Blacklist por tipo canônico do SDK (`shell`, `write`, `read`,
+ *   `mcp`, `url`, `custom-tool`, `memory`, `hook`)
  * @property {string[]} [denyTools] - Blacklist de nomes de tools negadas
  * @property {RegExp[]} [denyPatterns] - Regex patterns para negar tools por nome
  * @property {boolean} [auditMode=false] - Logar todas as decisões sem negar. Default is `false`
@@ -175,10 +175,10 @@ export function createPermissionHandler(config) {
                     }
                 } catch (err) {
                     log(
-                        'ERROR',
-                        `[sdk/permissions] onRequest falhou: sessionId='${sessionId}' kind='${kind}' tool='${toolName}'`,
+                        'WARN',
+                        `[sdk/permissions] onRequest falhou; negando por segurança: sessionId='${sessionId}' kind='${kind}' tool='${toolName}' error='${err instanceof Error ? err.message : String(err)}'`,
                     );
-                    throw toSdkOperationError('permissions.onRequest', err);
+                    return denied();
                 }
             }
 

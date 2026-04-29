@@ -52,6 +52,7 @@ export {
     getClientStatus,
     getForegroundClientSessionId,
     getLastClientSessionId,
+    getSdkConnectionCircuitBreaker,
     getServerRpc,
     incrementSessionMessageCount,
     listActiveClientSessions,
@@ -143,6 +144,7 @@ export { pickDefined } from './utils.js';
 export {
     CONNECTION_STATES,
     INFINITE_SESSION_DEFAULTS,
+    PERMISSION_COMPLETED_KINDS,
     PERMISSION_RESULTS,
     PROVIDER_TYPES,
     REASONING_EFFORTS,
@@ -195,6 +197,7 @@ export {
     sectionOverride,
     supportsCustomizeMode,
     SYSTEM_PROMPT_SECTIONS,
+    transformSection,
 } from './session/system-message.js';
 
 // ─── Faixa 4: Unified Config Builder (rev.4) ─────────────────────────────────
@@ -219,7 +222,18 @@ export {
     quickResume,
     quickSession,
     shutdownClient,
+    withSession,
 } from './session/client-facade.js';
+
+export {
+    blobAttachment,
+    directoryAttachment,
+    fileAttachment,
+    normalizeAttachments,
+    selectionAttachment,
+} from './session/attachments.js';
+
+export { supportsElicitation, waitForElicitationCapability, watchCapabilities } from './session/capabilities.js';
 // Nota: buildConfig e getDefaults são aliases de buildSessionConfig e getProjectDefaults
 // já exportados acima (Faixa 4) — não re-exportar para evitar duplicadas.
 
@@ -347,6 +361,7 @@ export {
     buildCustomTools,
     BUILTIN_HANDLER_MAP,
     getCustomToolDefinitions,
+    initCustomTools,
     loadCustomToolsAsync,
     registerCustomTool,
     removeCustomTool,

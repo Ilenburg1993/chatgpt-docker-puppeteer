@@ -10,6 +10,7 @@
  * @see module:copilot/sdk/session-lifecycle
  */
 
+import { assertRpcSession } from './rpc/guards.js';
 import {
     modeGet,
     modelGetCurrent,
@@ -59,7 +60,7 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *
  * @typedef {'interactive' | 'plan' | 'autopilot'} SessionMode
  *
- * @typedef {{ modelId?: string }} ModelCurrentResult
+ * @typedef {{ modelId: string }} ModelCurrentResult
  *
  * @typedef {{ modelId?: string }} ModelSwitchResult
  *
@@ -71,7 +72,7 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *
  * @typedef {{ content: string }} WorkspaceReadResult
  *
- * @typedef {{ eventId: string }} LogResult
+ * @typedef {{ eventId: string; [k: string]: unknown }} LogResult
  *
  * @typedef {{ success: boolean; tokensRemoved: number; messagesRemoved: number }} CompactionResult
  *
@@ -95,19 +96,6 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *
  * @typedef {{}} AgentDeselectResult
  */
-
-// ─── Validação interna ────────────────────────────────────────────────────────
-
-/**
- * @param {unknown} session
- * @param {string} caller
- * @returns {asserts session is CopilotSession}
- */
-function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || !('rpc' in session)) {
-        throw new TypeError(`[sdk/rpc/${caller}] Sessão inválida ou sem RPC disponível.`);
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Aggregate — createSessionRpcFacade
@@ -149,7 +137,7 @@ function assertSession(session, caller) {
  * }}
  */
 export function createSessionRpcFacade(session) {
-    assertSession(session, 'createSessionRpcFacade');
+    assertRpcSession(session, 'createSessionRpcFacade');
     return {
         model: {
             getCurrent: () => /** @type {Promise<ModelCurrentResult>} */ (modelGetCurrent(session)),

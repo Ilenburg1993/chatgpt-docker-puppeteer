@@ -112,6 +112,7 @@ vi.mock('@github/copilot-sdk', () => {
 });
 
 import { getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
+import { listModels } from '../../../../src/copilot/sdk/models/helpers.js';
 import {
     _injectClientForTest,
     _resetClientState,
@@ -126,6 +127,7 @@ import {
     getClientState,
     getForegroundClientSessionId,
     getLastClientSessionId,
+    getSdkConnectionCircuitBreaker,
     getServerRpc,
     incrementSessionMessageCount,
     listActiveClientSessions,
@@ -258,6 +260,18 @@ describe('sdk/client › stopClient', () => {
         expect(mc.stop).toHaveBeenCalled();
         expect(getClientState()).toBe('not_started');
     });
+
+    it('limpa cache de modelos ao parar client', async () => {
+        const mc = mockClient();
+        mc.listModels.mockResolvedValueOnce([{ id: 'cached-model' }]).mockResolvedValueOnce([{ id: 'fresh-model' }]);
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(listModels({}, true)).resolves.toEqual([{ id: 'cached-model' }]);
+        await stopClient();
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(listModels()).resolves.toEqual([{ id: 'fresh-model' }]);
+    });
 });
 
 // ─── forceStopClient ────────────────────────────────────────────────────────
@@ -296,6 +310,10 @@ describe('sdk/client › getClientState', () => {
         mc.getState.mockReturnValue('disconnected');
         _injectClientForTest(/** @type {any} */ (mc));
         expect(getClientState()).toBe('disconnected');
+    });
+
+    it('expõe getter explícito do circuit breaker compartilhado', () => {
+        expect(getSdkConnectionCircuitBreaker()).toBe(sdkConnectionCircuitBreaker);
     });
 });
 

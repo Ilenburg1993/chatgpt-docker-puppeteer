@@ -212,12 +212,23 @@ export async function runCopilotSdkBootPreflight({
     try {
         client = createClient();
         await ensureAgentSdkClientStarted(client);
-        await Promise.race([
-            pingAgentSdkClient(client),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new TimeoutError(`Ping timeout (${pingTimeoutMs}ms)`)), pingTimeoutMs),
-            ),
-        ]);
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let pingTimeoutHandle = null;
+        try {
+            await Promise.race([
+                pingAgentSdkClient(client),
+                new Promise((_, reject) => {
+                    pingTimeoutHandle = setTimeout(
+                        () => reject(new TimeoutError(`Ping timeout (${pingTimeoutMs}ms)`)),
+                        pingTimeoutMs,
+                    );
+                }),
+            ]);
+        } finally {
+            if (pingTimeoutHandle !== null) {
+                clearTimeout(pingTimeoutHandle);
+            }
+        }
         report.pingOk = true;
         log('INFO', '[copilot/runtime-host] CLI conectado — ping OK.');
 

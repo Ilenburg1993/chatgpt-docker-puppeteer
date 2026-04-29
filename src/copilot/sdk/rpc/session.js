@@ -11,11 +11,12 @@
 import { toSdkOperationError } from '../errors.js';
 import { log as appLog } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
+import { assertRpcSession } from './guards.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
- * @typedef {{ modelId?: string }} ModelCurrentResult
+ * @typedef {{ modelId: string }} ModelCurrentResult
  *
  * @typedef {{ modelId?: string }} ModelSwitchResult
  *
@@ -33,19 +34,8 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
  *
  * @typedef {{ success?: boolean }} WorkspaceCreateResult
  *
- * @typedef {{ eventId: string }} LogResult
+ * @typedef {{ eventId: string; [k: string]: unknown }} LogResult
  */
-
-/**
- * @param {unknown} session
- * @param {string} caller
- * @returns {asserts session is CopilotSession}
- */
-function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || !('rpc' in session)) {
-        throw new TypeError('[sdk/rpc/' + caller + '] Sessao invalida ou sem RPC disponivel.');
-    }
-}
 
 /**
  * Resolve namespace de workspace compatível entre SDKs (`workspaces` no v0.3.0, `workspace` em versões anteriores).
@@ -85,10 +75,14 @@ function getWorkspaceRpc(session) {
  * @returns {Promise<ModelCurrentResult>}
  */
 export async function modelGetCurrent(session) {
-    assertSession(session, 'model.getCurrent');
+    assertRpcSession(session, 'model.getCurrent');
     appLog('DEBUG', `[sdk/rpc] model.getCurrent: sessionId='${session.sessionId}'`);
     try {
-        return /** @type {ModelCurrentResult} */ (await session.rpc.model.getCurrent());
+        const result = /** @type {{ modelId?: unknown }} */ (await session.rpc.model.getCurrent());
+        if (typeof result.modelId !== 'string' || result.modelId.length === 0) {
+            throw new TypeError('[sdk/rpc/model.getCurrent] resposta sem modelId.');
+        }
+        return /** @type {ModelCurrentResult} */ (result);
     } catch (error) {
         throw toSdkOperationError('model.getCurrent', error);
     }
@@ -107,7 +101,7 @@ export async function modelGetCurrent(session) {
  * @returns {Promise<ModelSwitchResult>}
  */
 export async function modelSwitchTo(session, modelId, options) {
-    assertSession(session, 'model.switchTo');
+    assertRpcSession(session, 'model.switchTo');
     if (typeof modelId !== 'string' || modelId.length === 0) {
         throw new TypeError('[sdk/rpc/model.switchTo] modelId deve ser string não-vazia.');
     }
@@ -160,7 +154,7 @@ export async function modelSwitchTo(session, modelId, options) {
  * @returns {Promise<ModeGetResult>}
  */
 export async function modeGet(session) {
-    assertSession(session, 'mode.get');
+    assertRpcSession(session, 'mode.get');
     appLog('DEBUG', `[sdk/rpc] mode.get: sessionId='${session.sessionId}'`);
     try {
         const rawMode = /** @type {unknown} */ (await session.rpc.mode.get());
@@ -182,7 +176,7 @@ export async function modeGet(session) {
  * @returns {Promise<ModeSetResult>}
  */
 export async function modeSet(session, mode) {
-    assertSession(session, 'mode.set');
+    assertRpcSession(session, 'mode.set');
     const valid = ['interactive', 'plan', 'autopilot'];
     if (!valid.includes(mode)) {
         throw new TypeError(`[sdk/rpc/mode.set] mode deve ser um de: ${valid.join(', ')}.`);
@@ -229,7 +223,7 @@ export async function modeSet(session, mode) {
  * @returns {Promise<PlanReadResult>}
  */
 export async function planRead(session) {
-    assertSession(session, 'plan.read');
+    assertRpcSession(session, 'plan.read');
     appLog('DEBUG', `[sdk/rpc] plan.read: sessionId='${session.sessionId}'`);
     try {
         return /** @type {PlanReadResult} */ (await session.rpc.plan.read());
@@ -246,7 +240,7 @@ export async function planRead(session) {
  * @returns {Promise<PlanMutationResult>}
  */
 export async function planUpdate(session, content) {
-    assertSession(session, 'plan.update');
+    assertRpcSession(session, 'plan.update');
     if (typeof content !== 'string') {
         throw new TypeError('[sdk/rpc/plan.update] content deve ser string.');
     }
@@ -288,7 +282,7 @@ export async function planUpdate(session, content) {
  * @returns {Promise<PlanMutationResult>}
  */
 export async function planDelete(session) {
-    assertSession(session, 'plan.delete');
+    assertRpcSession(session, 'plan.delete');
     appLog('INFO', `[sdk/rpc] plan.delete: sessionId='${session.sessionId}'`);
     const startedAt = Date.now();
     emitSdkOperationMetric({ operation: 'rpc.plan.delete', status: 'started', sessionId: session.sessionId });
@@ -325,7 +319,7 @@ export async function planDelete(session) {
  * @returns {Promise<WorkspaceListResult>}
  */
 export async function workspaceListFiles(session) {
-    assertSession(session, 'workspace.listFiles');
+    assertRpcSession(session, 'workspace.listFiles');
     appLog('DEBUG', `[sdk/rpc] workspace.listFiles: sessionId='${session.sessionId}'`);
     try {
         const workspaceRpc = getWorkspaceRpc(session);
@@ -343,7 +337,7 @@ export async function workspaceListFiles(session) {
  * @returns {Promise<WorkspaceReadResult>}
  */
 export async function workspaceReadFile(session, path) {
-    assertSession(session, 'workspace.readFile');
+    assertRpcSession(session, 'workspace.readFile');
     if (typeof path !== 'string' || path.length === 0) {
         throw new TypeError('[sdk/rpc/workspace.readFile] path deve ser string não-vazia.');
     }
@@ -365,7 +359,7 @@ export async function workspaceReadFile(session, path) {
  * @returns {Promise<WorkspaceCreateResult>}
  */
 export async function workspaceCreateFile(session, path, content) {
-    assertSession(session, 'workspace.createFile');
+    assertRpcSession(session, 'workspace.createFile');
     if (typeof path !== 'string' || path.length === 0) {
         throw new TypeError('[sdk/rpc/workspace.createFile] path deve ser string não-vazia.');
     }
@@ -420,7 +414,7 @@ export async function workspaceCreateFile(session, path, content) {
  * @returns {Promise<LogResult>}
  */
 export async function sessionLog(session, message, options) {
-    assertSession(session, 'log');
+    assertRpcSession(session, 'log');
     if (typeof message !== 'string' || message.length === 0) {
         throw new TypeError('[sdk/rpc/log] message deve ser string não-vazia.');
     }

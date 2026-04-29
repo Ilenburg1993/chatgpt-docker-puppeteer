@@ -168,15 +168,16 @@
 
 /**
  * Pedido de permissão emitido pelo CLI quando uma tool quer executar ação protegida. Campo discriminador: `kind`
- * (`"shell"` | `"write"` | `"mcp"` | `"read"` | `"url"` | `"custom-tool"`). Campos adicionais variam por kind (index
- * signature `[key: string]: unknown`).
+ * (`"shell"` | `"write"` | `"mcp"` | `"read"` | `"url"` | `"custom-tool"` | `"memory"` | `"hook"`). Campos adicionais
+ * variam por kind.
  *
  * @typedef {import('@github/copilot-sdk').PermissionRequest} PermissionRequest
  */
 
 /**
- * Resultado da decisão de permissão. Union de `SessionPermissionsHandlePendingPermissionRequestParams["result"]` | `{
- * kind: "no-result" }`.
+ * Resultado da decisão de permissão. No `@github/copilot-sdk@0.3.0`, essa union usa `approve-once`,
+ * `approve-for-session`, `approve-for-location`, `reject`, `user-not-available` e `no-result`. Os nomes
+ * `approved`/`denied-*` pertencem aos eventos `permission.completed`, não ao retorno do handler.
  *
  * @typedef {import('@github/copilot-sdk').PermissionRequestResult} PermissionRequestResult
  */
@@ -939,7 +940,7 @@
 /**
  * Resultado de `session.log()` — confirmação de log emitido.
  *
- * @typedef {{ logId?: string; [k: string]: unknown }} LogResult
+ * @typedef {{ eventId: string; [k: string]: unknown }} LogResult
  */
 
 // ─── Loose-typed SDK interfaces (projeto-local) ───────────────────────────────

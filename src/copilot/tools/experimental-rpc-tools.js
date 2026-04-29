@@ -68,30 +68,65 @@ function getSession() {
 }
 
 /**
+ * Executa uma Promise com timeout e garante cleanup do timer em sucesso/falha.
+ *
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} timeoutMs
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+async function withTimeout(promise, timeoutMs, label) {
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timer = null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_resolve, reject) => {
+                timer = setTimeout(() => reject(new TimeoutError(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
+    }
+}
+
+/**
+ * Resolve timeout efetivo para operações experimentais.
+ *
+ * `null` desabilita timeout absoluto (usar somente em operações potencialmente longas por natureza).
+ *
+ * @param {number | null | undefined} timeoutMs
+ * @returns {number | null}
+ */
+function resolveExperimentalTimeoutMs(timeoutMs) {
+    if (timeoutMs === null) return null;
+    if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) return timeoutMs;
+    return COPILOT_RPC_TIMEOUT_MS;
+}
+
+/**
  * Executa uma operação experimental com tratamento de erros padronizado e timeout.
  *
  * @template T
  * @param {string} toolName
  * @param {(session: import('#copilot/sdk/types').CopilotSession) => Promise<T>} fn
+ * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<T | { error: string }>}
  */
-async function wrapExp(toolName, fn) {
+async function wrapExp(toolName, fn, opts = {}) {
     let session;
     try {
         session = getSession();
     } catch (e) {
         return { error: toError(e).message };
     }
+    const timeoutMs = resolveExperimentalTimeoutMs(opts.timeoutMs);
     try {
-        const result = await Promise.race([
-            fn(session),
-            new Promise((_resolve, reject) =>
-                setTimeout(
-                    () => reject(new TimeoutError(`Experimental RPC timeout (${COPILOT_RPC_TIMEOUT_MS}ms)`)),
-                    COPILOT_RPC_TIMEOUT_MS,
-                ),
-            ),
-        ]);
+        const result =
+            timeoutMs === null ? await fn(session) : await withTimeout(fn(session), timeoutMs, 'Experimental RPC');
         return /** @type {T} */ (result);
     } catch (e) {
         log('ERROR', `[${toolName}] ${toError(e).message}`);
@@ -114,7 +149,8 @@ const expFleetStartTool = createTool({
         )
     ),
     handler: async (/** @type {{ prompt?: string }} */ params) =>
-        wrapExp('exp_fleet_start', (s) => fleetStart(s, params)),
+        // Fleet bootstrap pode durar mais que RPCs curtas de controle; evitar timeout absoluto aqui.
+        wrapExp('exp_fleet_start', (s) => fleetStart(s, params), { timeoutMs: null }),
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
