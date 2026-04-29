@@ -1,8 +1,7 @@
 # 49 — Mapeamento `AlwaysAliveAgent` vs runtime governance/capabilities
 
-**Data:** 2026-04-28
-**Escopo:** `src/copilot/agent/always-alive.js`, `agent/facades/agent-runtime-controls.js`,
-contratos de seams e testes unitários.
+**Data:** 2026-04-28 **Escopo:** `src/copilot/agent/always-alive.js`,
+`agent/facades/agent-runtime-controls.js`, contratos de seams e testes unitários.
 
 ---
 

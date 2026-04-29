@@ -1,9 +1,7 @@
 # 48 — Mapeamento de `AlwaysAliveAgent`, Runtime Controls e Dialog Runtime
 
-**Status**: checkpoint complementar de transformação
-**Data-base**: 2026-04-28
-**Programa**: P2 — Purificação do runtime `agent/`
-**Ondas relacionadas**: W18, W21, W23
+**Status**: checkpoint complementar de transformação **Data-base**: 2026-04-28 **Programa**: P2 —
+Purificação do runtime `agent/` **Ondas relacionadas**: W18, W21, W23
 
 ---
 

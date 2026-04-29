@@ -19,6 +19,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  *     choices?: string[];
  * }} AgentRuntimePendingQuestionSnapshot
  *
+ *
  * @typedef {{
  *     getSessionSnapshot?: (() => import('#copilot/sdk/types').CopilotSession | null) | undefined;
  *     hasPendingQuestion?: (() => boolean) | undefined;
@@ -27,9 +28,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  *     clearPendingQuestionShadow: () => void;
  *     setPendingQuestionShadow?: ((shadow: import('../types.js').PendingQuestionShadow) => void) | undefined;
  *     setSendCount?: ((count: number) => void) | undefined;
- *     getPendingQuestionSnapshot?:
- *         | (() => AgentRuntimePendingQuestionSnapshot | null)
- *         | undefined;
+ *     getPendingQuestionSnapshot?: (() => AgentRuntimePendingQuestionSnapshot | null) | undefined;
  *     getModelSnapshot?: (() => string) | undefined;
  *     getRuntimeStatus?: (() => string) | undefined;
  *     getSendCountSnapshot?: (() => number) | undefined;
@@ -38,6 +37,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  *         | ((task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>)
  *         | undefined;
  * }} AgentRuntimeStateContext
+ *
  *
  * @typedef {{
  *     sendCount: number;

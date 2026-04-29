@@ -1,8 +1,7 @@
 # 43 — Bloco B / W13: Watchdog-Only no Turno e Saneamento do Resume com `model="auto"`
 
-**Status**: checkpoint complementar validado
-**Última atualização**: 2026-04-28
-**Escopo desta subonda**:
+**Status**: checkpoint complementar validado **Última atualização**: 2026-04-28 **Escopo desta
+subonda**:
 
 - eliminar o falso timeout de `sendTurn sem progresso` em auditorias longas da LLM-B;
 - impedir que o resume de sessão reapresente `model="auto"` ao SDK;

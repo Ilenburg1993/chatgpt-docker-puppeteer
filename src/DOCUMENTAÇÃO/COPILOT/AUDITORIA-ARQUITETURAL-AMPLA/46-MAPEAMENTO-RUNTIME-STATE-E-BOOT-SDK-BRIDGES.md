@@ -1,8 +1,7 @@
 # 46 — Runtime State Semântico e Bridges de Boot do SDK
 
-**Status**: checkpoint complementar do Bloco B / continuidade do Bloco C
-**Última atualização**: 2026-04-28
-**Escopo desta etapa**:
+**Status**: checkpoint complementar do Bloco B / continuidade do Bloco C **Última atualização**:
+2026-04-28 **Escopo desta etapa**:
 
 - remover mais uma zona de acoplamento entre `AlwaysAliveAgent`/`boot-steps` e `state-io`;
 - tornar `boot-wiring` menos conhecedor dos detalhes de lifecycle/quota do SDK;

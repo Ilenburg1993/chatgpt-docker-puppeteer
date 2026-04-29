@@ -1,8 +1,7 @@
 # 44 — Mapeamento do Lifecycle Adjacente: `keepalive`, `cleanup`, `boot-steps` e `boot-wiring`
 
-**Status**: checkpoint complementar validado
-**Última atualização**: 2026-04-28
-**Escopo desta subonda**:
+**Status**: checkpoint complementar validado **Última atualização**: 2026-04-28 **Escopo desta
+subonda**:
 
 - delimitar responsabilidades entre `sdk/`, `agent/session/keepalive.js`, `cleanup.js`,
   `boot-steps.js` e `boot-wiring.js`;

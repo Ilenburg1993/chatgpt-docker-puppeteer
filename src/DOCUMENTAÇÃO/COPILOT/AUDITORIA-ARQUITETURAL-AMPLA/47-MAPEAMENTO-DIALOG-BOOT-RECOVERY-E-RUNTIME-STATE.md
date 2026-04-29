@@ -1,10 +1,8 @@
 # 47 — Mapeamento de Dialog Boot Recovery e Runtime-State
 
-**Status**: checkpoint complementar de transformação
-**Data-base**: 2026-04-28
-**Eixo principal**: `agent/session/boot-steps.js` ↔ `agent/facades/agent-runtime-state.js`
-**Programa**: P2 — Purificação do runtime `agent/`
-**Ondas relacionadas**: W18, W23
+**Status**: checkpoint complementar de transformação **Data-base**: 2026-04-28 **Eixo principal**:
+`agent/session/boot-steps.js` ↔ `agent/facades/agent-runtime-state.js` **Programa**: P2 —
+Purificação do runtime `agent/` **Ondas relacionadas**: W18, W23
 
 ---
 

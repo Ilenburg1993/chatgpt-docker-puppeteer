@@ -1,9 +1,9 @@
 # 45 — Mapeamento da Capability de Histórico (`getMessages`) entre `agent` e `sdk`
 
-**Status**: checkpoint complementar do Bloco B / transição para Bloco C
-**Última atualização**: 2026-04-28
-**Escopo desta etapa**: delimitar a responsabilidade da capability de leitura de histórico da sessão
-SDK (`getMessages`) e remover sondagens cruas dessa surface em módulos de `agent/session/*`.
+**Status**: checkpoint complementar do Bloco B / transição para Bloco C **Última atualização**:
+2026-04-28 **Escopo desta etapa**: delimitar a responsabilidade da capability de leitura de
+histórico da sessão SDK (`getMessages`) e remover sondagens cruas dessa surface em módulos de
+`agent/session/*`.
 
 ---
 

@@ -35,19 +35,19 @@ import {
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
 import {
-    createAgentSdkClient,
-    disconnectAgentSdkSession,
-    ensureAgentSdkClientStarted,
-    raceAgentSdkEvents,
-    stopAgentSdkClient,
-} from '../facades/agent-sdk-access.js';
-import {
     persistAgentRuntimeGracefulShutdownState,
     persistAgentRuntimePrConsumptionSnapshot,
     resetAgentRuntimeGracefulShutdownFlag,
     restoreAgentRuntimePersistentBootState,
     saveAgentRuntimeShutdownSnapshot,
 } from '../facades/agent-runtime-state.js';
+import {
+    createAgentSdkClient,
+    disconnectAgentSdkSession,
+    ensureAgentSdkClientStarted,
+    raceAgentSdkEvents,
+    stopAgentSdkClient,
+} from '../facades/agent-sdk-access.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,

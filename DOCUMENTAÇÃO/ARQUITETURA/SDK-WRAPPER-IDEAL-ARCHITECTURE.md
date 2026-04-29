@@ -129,8 +129,8 @@ export async function operationName(session, param, options) {
 
 ### Critérios para considerar um wrapper "completo"
 
-| Critério                                  | Obrigatório | Descrição                                 |
-| ----------------------------------------- | ----------- | ----------------------------------------- |
+| Critério                                  | Obrigatório  | Descrição                                 |
+| ----------------------------------------- | ------------ | ----------------------------------------- |
 | JSDoc com `@param` e `@returns` tipados   | ✅           | Todos os parâmetros públicos              |
 | `assertSession` ou equivalente            | ✅           | Para funções que recebem session          |
 | Validação de tipos de entrada             | ✅           | Antes de qualquer chamada ao SDK          |
@@ -148,8 +148,8 @@ export async function operationName(session, param, options) {
 
 ### 4.1 O que já está correto
 
-| Módulo                               | Status     | Notas                                                                                                                 |
-| ------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| Módulo                               | Status      | Notas                                                                                                                 |
+| ------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------- |
 | `sdk/types.js`                       | ✅ Completo | SSOT, strict-compliant, typedefs públicos + locais                                                                    |
 | `sdk/errors.js`                      | ✅ Completo | Classificação por kind, fingerprint, `SdkOperationError`                                                              |
 | `sdk/session/client.js`              | ✅ Completo | Circuit breaker, registry externalizado + recovery inicial por `SdkErrorKind`                                         |
@@ -170,8 +170,8 @@ export async function operationName(session, param, options) {
 
 ### 4.2 Gaps conhecidos (a resolver no roadmap)
 
-| Módulo                                         | Gap                                                                                                                                       | Severidade                                             |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Módulo                                         | Gap                                                                                                                                       | Severidade                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `sdk/session/permissions.js`                   | Hardening inicial aplicado; revisar métricas, owner e alinhamento fino com policy layer (`hooks/`)                                        | 🟡 Médio                                                |
 | `sdk/session/provider.js`                      | Hardening inicial aplicado; aprofundar ownership de BYOK/session auth e integração fina com lifecycle                                     | 🟡 Médio                                                |
 | `sdk/session/session-fs.js`                    | Wiring inicial + métricas L1 + gate de soberania + projeção no EventBus aplicados; decidir adapters além do provider local                | 🟡 Médio                                                |
@@ -411,23 +411,23 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                               | Status |
 | ------------------------------------------------------------------ | ------ |
-| Reescrever `sdk/types.js` como SSOT completo                       | ✅      |
-| Corrigir 30 erros TS2694 (tipos não-públicos)                      | ✅      |
-| Adicionar `SessionConfigOverrides` para exactOptionalPropertyTypes | ✅      |
-| `npm run typecheck:strict` → 0 erros                               | ✅      |
-| `npm run lint` → 0 erros                                           | ✅      |
+| Reescrever `sdk/types.js` como SSOT completo                       | ✅     |
+| Corrigir 30 erros TS2694 (tipos não-públicos)                      | ✅     |
+| Adicionar `SessionConfigOverrides` para exactOptionalPropertyTypes | ✅     |
+| `npm run typecheck:strict` → 0 erros                               | ✅     |
+| `npm run lint` → 0 erros                                           | ✅     |
 
 ### Fase 2 — Limpeza de legado (✅ CONCLUÍDA)
 
 | Item                                                                    | Status |
 | ----------------------------------------------------------------------- | ------ |
-| Remover compat shim `event-bus-observers.js`                            | ✅      |
-| Remover compat shim `terminal/workspace-context.js`                     | ✅      |
-| Migrar `legacy_web_fetch` → `web_fetch_local`                           | ✅      |
-| Migrar `legacy_report_intent` → `report_intent_local`                   | ✅      |
-| Remover rota `/telemetry` legada em `server/routes/sdk/agent.js`        | ✅      |
-| Remover `DEPRECATED_CUSTOM_TOOL_NAMES` em `server/routes/sdk/client.js` | ✅      |
-| Remover aliases `getDefaults`/`buildConfig` de `client-facade.js`       | ✅      |
+| Remover compat shim `event-bus-observers.js`                            | ✅     |
+| Remover compat shim `terminal/workspace-context.js`                     | ✅     |
+| Migrar `legacy_web_fetch` → `web_fetch_local`                           | ✅     |
+| Migrar `legacy_report_intent` → `report_intent_local`                   | ✅     |
+| Remover rota `/telemetry` legada em `server/routes/sdk/agent.js`        | ✅     |
+| Remover `DEPRECATED_CUSTOM_TOOL_NAMES` em `server/routes/sdk/client.js` | ✅     |
+| Remover aliases `getDefaults`/`buildConfig` de `client-facade.js`       | ✅     |
 
 ### Fase 3 — Completar retornos tipados nos wrappers RPC (🔄 EM ANDAMENTO)
 
@@ -435,19 +435,19 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                                                       | Status |
 | ------------------------------------------------------------------------------------------ | ------ |
-| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation                | ✅      |
-| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace              | ✅      |
-| Definir tipos de retorno para `rpc/server.js` — status, health, port                       | ✅      |
-| Adicionar try/catch padronizado em `rpc/experimental.js`                                   | ✅      |
-| Fechar wrappers de `session.ui.*` (`elicitation`, `confirm`, `select`, `input`)            | ✅      |
-| Verificar `sdk/session/permissions.js`, `sdk/session/provider.js` e endurecer `session-fs` | 🔄      |
+| Definir tipos de retorno para `rpc/ops.js` — compaction, shell, elicitation                | ✅     |
+| Definir tipos de retorno para `rpc/session.js` — model, mode, plan, workspace              | ✅     |
+| Definir tipos de retorno para `rpc/server.js` — status, health, port                       | ✅     |
+| Adicionar try/catch padronizado em `rpc/experimental.js`                                   | ✅     |
+| Fechar wrappers de `session.ui.*` (`elicitation`, `confirm`, `select`, `input`)            | ✅     |
+| Verificar `sdk/session/permissions.js`, `sdk/session/provider.js` e endurecer `session-fs` | 🔄     |
 
 ### Fase 3B — Convergência explícita de `agent ↔ sdk` (🔄 EM ANDAMENTO)
 
 **Meta**: o runtime do agente falar com o SDK por um conjunto pequeno de seams previsíveis.
 
-| Item                                                                                          | Status                            |
-| --------------------------------------------------------------------------------------------- | --------------------------------- |
+| Item                                                                                          | Status                             |
+| --------------------------------------------------------------------------------------------- | ---------------------------------- |
 | Convergir imports de `agent/messaging/*` para `#copilot/sdk` barrel                           | ✅                                 |
 | Convergir imports de `agent/session/{history-sync,keepalive,boot-wiring}` para barrel         | ✅                                 |
 | Convergir `agent/ports/tool-port.js` para `#copilot/sdk` barrel                               | ✅                                 |
@@ -467,8 +467,8 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 **Meta**: cada wrapper RPC que representa uma operação de negócio emite um evento de métricas.
 
-| Item                                                                              | Status                                                                          |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Item                                                                              | Status                                                                           |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Definir interface `SdkOperationMetric` em `types.js`                              | ✅                                                                               |
 | Introduzir emitter injetável em L1 (`sdk/telemetry/operation-metrics.js`)         | ✅                                                                               |
 | Integrar emitter ao bootstrap de observabilidade                                  | ✅                                                                               |
@@ -483,8 +483,8 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 **Meta**: nenhum módulo fora de `src/copilot/sdk/` importa `@github/copilot-sdk` diretamente.
 
-| Item                                                                   | Status                                  |
-| ---------------------------------------------------------------------- | --------------------------------------- |
+| Item                                                                   | Status                                   |
+| ---------------------------------------------------------------------- | ---------------------------------------- |
 | Scan automático: `check:copilot:boundary` fora de `src/copilot/sdk/`   | ✅                                       |
 | Configurar ESLint `no-restricted-imports` para enforçar boundary L0→L1 | ✅                                       |
 | Adicionar ao CI: falha se import direto detectado fora de `sdk/`       | 🔄 (via gate `check:copilot:guardrails`) |
@@ -495,11 +495,11 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                                    | Status |
 | ----------------------------------------------------------------------- | ------ |
-| Criar classe `SdkOperationError extends Error` em `sdk/errors.js`       | ✅      |
-| Adicionar `name`, `kind`, `operation`, `cause` como campos              | ✅      |
-| Migrar todos os catch em wrappers RPC para usar `SdkOperationError`     | ✅      |
-| Adicionar helper `toSdkOperationError()` para normalização centralizada | ✅      |
-| Atualizar JSDoc de todos os wrappers: `@throws {SdkOperationError}`     | 🔄      |
+| Criar classe `SdkOperationError extends Error` em `sdk/errors.js`       | ✅     |
+| Adicionar `name`, `kind`, `operation`, `cause` como campos              | ✅     |
+| Migrar todos os catch em wrappers RPC para usar `SdkOperationError`     | ✅     |
+| Adicionar helper `toSdkOperationError()` para normalização centralizada | ✅     |
+| Atualizar JSDoc de todos os wrappers: `@throws {SdkOperationError}`     | 🔄     |
 
 ### Fase 7 — Session `SdkOperationError` + recovery (⬜ PENDENTE)
 
@@ -507,9 +507,9 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                                            | Status |
 | ------------------------------------------------------------------------------- | ------ |
-| Integrar `classifySdkError` com circuit breaker no `session/client.js`          | ⬜      |
-| Políticas de retry por `SdkErrorKind` (`rate_limit` → back-off, `auth` → abort) | ⬜      |
-| Integrar com watchdog agent para notificar sobre `quota_exhausted`              | ⬜      |
+| Integrar `classifySdkError` com circuit breaker no `session/client.js`          | ⬜     |
+| Políticas de retry por `SdkErrorKind` (`rate_limit` → back-off, `auth` → abort) | ⬜     |
+| Integrar com watchdog agent para notificar sobre `quota_exhausted`              | ⬜     |
 
 ### Fase 8 — Guardrails de fronteira `agent ↔ sdk` (🔄 EM ANDAMENTO)
 
@@ -524,11 +524,11 @@ de `dist/index.d.ts` e migrar as definições locais para `import('@github/copil
 
 | Item                                                                                       | Status |
 | ------------------------------------------------------------------------------------------ | ------ |
-| Adicionar teste estrutural cobrando ausência de `../../sdk/*` em `agent/` fora de ports    | ✅      |
-| Adicionar teste estrutural cobrando ausência de `#copilot/sdk/*` interno fora da fronteira | ✅      |
-| Adicionar regra de lint/restricted-imports para `agent/**`                                 | ✅      |
-| Documentar explicitamente `facades/` e `ports/` como boundary de integração com o SDK      | ✅      |
-| Medir a redução de pontos de contato `agent ↔ sdk` por checkpoint                          | 🔄      |
+| Adicionar teste estrutural cobrando ausência de `../../sdk/*` em `agent/` fora de ports    | ✅     |
+| Adicionar teste estrutural cobrando ausência de `#copilot/sdk/*` interno fora da fronteira | ✅     |
+| Adicionar regra de lint/restricted-imports para `agent/**`                                 | ✅     |
+| Documentar explicitamente `facades/` e `ports/` como boundary de integração com o SDK      | ✅     |
+| Medir a redução de pontos de contato `agent ↔ sdk` por checkpoint                          | 🔄     |
 
 ---
 

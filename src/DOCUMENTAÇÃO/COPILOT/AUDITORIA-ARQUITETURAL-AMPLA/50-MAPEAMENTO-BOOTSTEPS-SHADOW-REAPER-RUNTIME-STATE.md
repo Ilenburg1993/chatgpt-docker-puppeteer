@@ -1,8 +1,7 @@
 # 50 — Mapeamento `boot-steps` vs shadow reaper em `runtime-state`
 
-**Data:** 2026-04-28
-**Escopo:** `agent/session/boot-steps.js`, `agent/facades/agent-runtime-state.js`, seams e testes
-focados.
+**Data:** 2026-04-28 **Escopo:** `agent/session/boot-steps.js`,
+`agent/facades/agent-runtime-state.js`, seams e testes focados.
 
 ---
 
